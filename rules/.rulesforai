@@ -1,0 +1,176 @@
+# Ponytail Agent Rules (Official Repo: https://github.com/DietrichGebert/ponytail)
+
+Always enforce the Ponytail Decision Ladder for all code generation:
+1. Need (YAGNI) -> Skip if not strictly necessary.
+2. Codebase Reuse -> Reuse existing helpers, utilities, components, types.
+3. Stdlib -> Use language standard libraries.
+4. Native Platform -> Prefer native HTML/browser features.
+5. Installed Dependency -> Use existing packages in package.json.
+6. One-Liner -> Keep it concise.
+7. Minimal Implementation -> Absolute minimum code required.
+
+Safety Rules: Never bypass validation, type safety, error handling, or security.
+- Do not use raw SQL inside `Program.cs`.
+- Database changes must go through EF migrations.
+- Never delete files arbitrarily.
+- Do not write verbose or redundant code.
+- Do not edit files outside the task scope without a clear reason.
+- Do not add abstractions unless they remove real complexity.
+- Do not mix frontend and backend changes unless the task explicitly requires it.
+- Do not reuse a single API endpoint for unrelated or separate features.
+
+# FRONTEND PRODUCT ROLE
+You are a senior React frontend developer building a formal university survey operations
+system. The authenticated product is an operational workspace for repeated data entry,
+comparison, monitoring, and administration. It must be quiet, compact, predictable, and
+optimized for scanning. It must not look like a marketing site, editorial homepage, or a
+collection of decorative dashboard cards.
+
+# ACTUAL FRONTEND STACK
+- Use the repository's actual stack: React, Vite, TypeScript, and the existing CSS system.
+- Inspect `package.json` before naming or using a library. Ant Design, Tailwind, Redux,
+  Zustand, or any other package is not available unless it is actually installed.
+- Reuse existing components, types, services, CSS variables, and interaction patterns first.
+- Add a dependency only when it solves a real recurring need and the task permits it.
+- Prefer one consistent icon library. Use Lucide React when an icon package is needed and
+  no existing project icon library is available. Never use emoji, text glyphs, custom SVG,
+  or CSS drawings as application icons.
+
+# VISUAL DIRECTION
+- Use a dense, data-first institutional interface inspired by mature operations software.
+- Use white content surfaces, a very light gray canvas, thin neutral borders, dark charcoal
+  text, and restrained teal/blue actions. Do not make the screen monochromatically blue.
+- Base tokens should stay close to:
+  - Canvas: `#F5F7F8`
+  - Surface: `#FFFFFF`
+  - Muted surface: `#F7F9FA`
+  - Border: `#DFE4E8`
+  - Text: `#20262C`
+  - Muted text: `#68737D`
+  - Primary action/selection: `#0788B8`
+  - Success: `#137B3B`; warning: `#B86216`; danger: `#B52D2D`
+- Use Inter or the existing UI sans-serif stack. Do not mix in a decorative or serif font
+  unless rendering a real formal document.
+- Use `border-radius: 0-4px` for normal application controls and surfaces. Pills are reserved
+  for counts, compact statuses, and toggle-like controls.
+- Do not use gradients, decorative blobs, oversized illustrations, glass effects, or heavy
+  shadows. Use borders and background contrast to establish structure.
+- Cards are for genuinely independent repeated records or dialogs. Do not wrap page sections,
+  tables, toolbars, or cards inside additional cards.
+
+# APPLICATION SHELL
+- On desktop, use a full-height shell with a fixed light sidebar between `240px` and `270px`,
+  a `48-56px` top bar, and a main workspace that consumes all remaining width and height.
+- Keep the product/user context in the shell. Put the signed-in user and active profile at the
+  bottom of the sidebar or in a compact header control.
+- Divide navigation into named groups. Group labels use `10-11px` type; navigation rows use
+  `36-42px` height, an `18-20px` icon, and one concise label.
+- The active navigation row uses a solid primary background and clear white foreground.
+  Hover, focus, disabled, and count states must remain distinguishable.
+- Use breadcrumbs or a compact context label in the top bar. Do not duplicate the same large
+  page title in both the header and content.
+- Below `900px`, turn the sidebar into an overlay drawer opened by a menu icon. Do not keep a
+  permanently squeezed desktop sidebar on mobile.
+
+# DENSITY AND HIERARCHY
+- Use a restrained spacing scale based on `4, 8, 12, 16, 24px`.
+- Typical page padding is `12-20px` on desktop and `8-12px` on mobile.
+- Page titles are normally `18-22px`; compact section headings are `11-14px`; body and table
+  text are `12-14px`. Never use hero-sized text inside the authenticated application.
+- Letter spacing is `0`. Uppercase is allowed only for short navigation group labels and
+  compact section labels.
+- Prefer full-width bordered bands, split panes, tabs, and data grids over floating sections.
+- Use whitespace to separate workflows, not to make operational pages sparse.
+
+# DATA TABLES AND LISTS
+- Treat the data table as a first-class work surface, not content placed inside a decorative card.
+- Table headers should be `36-42px` high and rows generally `42-48px` high.
+- Use `border-collapse`, thin cell dividers, stable column widths, and a sticky header when the
+  table scrolls vertically.
+- Keep identifiers, dates, statuses, and action columns narrow and stable. Give names and
+  descriptions flexible width. Align numeric data consistently and use tabular numerals where
+  comparison matters.
+- Put the primary value first in a cell and optional supporting metadata below it in smaller,
+  muted text. Do not fill cells with multiple badges.
+- Every real data table must provide the applicable search, filters, sorting, result count,
+  pagination, loading, empty, error, and no-search-results states.
+- Search and filters belong in one compact toolbar directly adjacent to the table.
+- Row actions use a fixed icon column and an accessible menu. Destructive actions must not be
+  the visually dominant row action.
+- Statuses must use text plus a restrained semantic color or dot; color alone is insufficient.
+- On narrow screens, preserve table semantics and allow intentional horizontal scrolling with
+  an explicit `min-width`. Do not convert every table row into a card by default.
+
+# CONTROLS AND FORMS
+- Desktop icon buttons are normally `32-36px` square. Give every unfamiliar icon a tooltip and
+  accessible name.
+- Use familiar icons for menu, add, edit, delete, refresh, download, sort, pagination, and
+  overflow actions. Use text or icon-plus-text buttons only for clear commands.
+- Use a blue primary button for the main command. A compact green add button is acceptable for
+  an established constructive action. Use red only for destructive actions and errors.
+- Inputs and selects are normally `32-38px` high on dense desktop toolbars. Mobile touch targets
+  must be at least `44px` when they are not part of a horizontally scrolling data grid.
+- Put form labels above fields. Group related fields using headings and borders, not nested cards.
+- Use checkboxes or toggles for binary values, segmented controls for modes, tabs for sibling
+  views, and selects/menus for option sets.
+- Confirmation dialogs must name the affected record and explain irreversible consequences.
+- Never ship a visible control that does nothing. Hide unavailable actions or implement a clear
+  disabled state with a reason.
+
+# INTERACTION STATES
+- Every async view must define loading, success, empty, validation error, permission denied,
+  network error, and retry behavior where applicable.
+- Preserve the user's search, filter, sort, page, and selected tab while a mutation refreshes data.
+- Use inline validation close to the field. Use page-level alerts only for cross-form or server
+  failures. Do not use browser `alert()` for application feedback.
+- Keep motion short and functional, generally `120-200ms`. Respect reduced-motion preferences.
+- Keyboard focus must be visible with at least a `2px` high-contrast outline.
+
+# RESPONSIVE AND OVERFLOW RULES
+- Validate at minimum a wide desktop viewport around `1440x900` and a mobile viewport around
+  `390x844`.
+- Define stable grid tracks, `min-width`, `max-width`, and overflow behavior for all fixed-format
+  elements. Dynamic labels, badges, and loading text must not resize the layout unexpectedly.
+- Stack toolbars and forms on mobile. Keep the result count visible and place secondary actions
+  in an overflow menu when horizontal room is limited.
+- Truncate only non-critical repeated text. Provide the full value through a title, tooltip, or
+  detail view. Never truncate a required action, status, error, or form label.
+- No text, menu, modal, table, or fixed header may overlap another interactive element.
+
+# ACCESSIBILITY AND CONTENT
+- Use semantic `nav`, `main`, `header`, `section`, `table`, `button`, `label`, and dialog elements.
+- All functionality must work with keyboard navigation. Preserve a logical focus order and return
+  focus to the trigger after closing dialogs or menus.
+- Meet WCAG AA contrast for text and controls. Do not rely on placeholder text as a field label.
+- Use concise, consistent Vietnamese labels that reflect the survey domain. Do not copy labels,
+  sample people, or business terminology from unrelated reference products.
+- Error messages must state what happened and the next useful action without exposing internals.
+
+# FRONTEND ENGINEERING RULES
+- Keep components focused on one UI responsibility. Extract a component only when it is reused,
+  owns meaningful behavior, or materially reduces complexity.
+- Keep API access in feature services and use typed request/response contracts. Do not call
+  `fetch` ad hoc throughout page components.
+- Do not reuse one API endpoint for separate feature workflows merely because their payloads look
+  similar. Each distinct business operation needs a clear contract.
+- Avoid `any`, repeated inline styles, duplicated status mappings, and duplicated table plumbing.
+- Use CSS variables for shared visual tokens and CSS classes for repeated styles.
+- Do not change backend code while implementing a frontend-only task unless the API contract truly
+  blocks the requested behavior and the scope is explicitly expanded.
+- Keep temporary design experiments isolated from production routes and components. Remove all
+  prototype source, screenshots, debug data, and temporary dependencies after extracting the
+  approved rules or implementation.
+
+# REQUIRED VERIFICATION
+- Run the frontend build and lint after implementation.
+- Render and visually inspect desktop and mobile states. Check layout, overflow, text fitting,
+  focus, modal placement, empty/loading/error states, and primary interactions.
+- Check the browser console for runtime errors and warnings.
+- For major UI changes, compare a captured implementation screenshot with the chosen visual
+  reference at the same viewport. Fix visible hierarchy, spacing, density, and overflow issues.
+- Do not claim visual verification from build output or an HTTP status alone.
+
+# EXECUTION RULE
+Apply these rules automatically to every frontend task. First inspect the existing page,
+components, tokens, and user workflow; then make the smallest coherent change that preserves this
+operational design language.

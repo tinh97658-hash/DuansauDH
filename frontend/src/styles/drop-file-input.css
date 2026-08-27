@@ -1,0 +1,115 @@
+.drop-file-input {
+    display: flex;
+    position: relative;
+    /* width: 400px;
+    height: 200px; */
+    border: 2px dashed #6990f2;
+    border-radius: 5px;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .drop-file-input input {
+    /* Set the opacity to 0 to hide the button */
+    opacity: 0;
+    position: absolute;
+  
+    /* Button will be at the top left corner of the drop-file-input */
+    top: 0;
+    left: 0;
+  
+    /* Set the input in the entire drop-file-input */
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+  }
+  
+  /* When the mouse pointer moves over this will set the button translucent */
+  .drop-file-input:hover,
+  .drop-file-input.dragover {
+    opacity: 0.6;
+  }
+  
+  .drop-file-input__label {
+    text-align: center;
+    color: #6990f2;
+    font-weight: 600;
+    padding: 10px;
+  }
+  
+  .drop-file-input__label img {
+    width: 100px;
+  }
+  
+  .drop-file-preview {
+    margin-top: 20px;
+  }
+  
+  .drop-file-preview p {
+    font-weight: 500;
+  }
+  
+  .drop-file-preview__title {
+    margin-bottom: 20px;
+  }
+  
+  .drop-file-preview__item {
+    position: relative;
+    display: flex;
+    margin-bottom: 10px;
+    background-color: #ffffff;
+    padding: 10px;
+    border-radius: 5px;
+  }
+  
+  .drop-file-preview img {
+    width: 60px;
+    height: 65px;
+    margin-right: 20px;
+  }
+  
+  .drop-file-preview__item__info {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  
+  .drop-file-preview__item__del {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: rgb(224, 223, 223);
+    box-shadow: rgba(90, 86, 86, 0.2) 0px 8px 24px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.3 ease;
+  }
+  
+  .drop-file-preview__item:hover .drop-file-preview__item__del {
+    opacity: 1;
+  }
+  
+  .btn .btn {
+    display: flex;
+    cursor: pointer;
+    width: 400px;
+    height: 40px;
+    font-weight: 600;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .btn p {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+

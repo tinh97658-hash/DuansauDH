@@ -1,0 +1,13 @@
+{
+  "short_name": "Đào tạo SĐH",
+  "name": "Hệ thống quản lý đào tạo sau đại học",
+  "icons": [{
+    "src": "https://sdh.vimaru.edu.vn/sites/sdh.vimaru.edu.vn/files/vmu-new-logo_0.png",
+    "type": "image/png",
+    "sizes": "any"
+  }],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#173b70",
+  "background_color": "#f2f5f9"
+}

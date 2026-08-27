@@ -1,0 +1,276 @@
+/* Modern Flat Institutional Ribbon Header */
+.ribbon-header {
+  position: relative;
+  z-index: 1000;
+  width: 100%;
+  color: var(--text-primary, #20262C);
+  background: #FFFFFF;
+  border-bottom: 1px solid var(--border-color, #DFE4E8);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+}
+
+/* 1. Titlebar */
+.ribbon-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 0 20px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #EDF2F7;
+}
+
+.ribbon-brand-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ribbon-brand {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ribbon-brand img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.ribbon-title {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.ribbon-title strong {
+  color: var(--secondary, #173B70);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.2px;
+}
+
+.ribbon-title span {
+  color: var(--text-secondary, #68737D);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+/* User Badge (Matching Screenshot Style) */
+.ribbon-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px 4px 8px;
+  background: #1E293B;
+  color: #FFFFFF;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ribbon-user-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: #0788B8;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 3px;
+}
+
+.ribbon-user-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.ribbon-user-name {
+  font-weight: 700;
+  color: #F8FAFC;
+  font-size: 12px;
+}
+
+.ribbon-user-role {
+  color: #94A3B8;
+  font-size: 10px;
+}
+
+/* 2. Tabs Bar */
+.ribbon-tabs {
+  display: flex;
+  min-height: 34px;
+  padding: 0 16px;
+  overflow-x: auto;
+  background: #FFFFFF;
+  border-bottom: 1px solid var(--border-color, #DFE4E8);
+  scrollbar-width: none;
+}
+
+.ribbon-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.ribbon-tabs button {
+  flex: 0 0 auto;
+  min-width: 120px;
+  padding: 8px 18px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary, #68737D);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ribbon-tabs button:hover {
+  color: var(--primary, #0788B8);
+  background: #F8FAFC;
+}
+
+.ribbon-tabs button.active {
+  color: var(--primary, #0788B8);
+  border-bottom-color: var(--primary, #0788B8);
+  background: #FFFFFF;
+}
+
+/* 3. Commands Bar */
+.ribbon-command-scroll {
+  overflow-x: auto;
+  background: #FAFBFC;
+  border-bottom: 1px solid var(--border-color, #DFE4E8);
+  scrollbar-width: thin;
+}
+
+.ribbon-commands {
+  display: flex;
+  align-items: stretch;
+  min-width: max-content;
+  height: 94px;
+  padding: 6px 12px 2px;
+}
+
+.ribbon-group {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 130px;
+  padding: 0 8px 18px;
+  border-right: 1px solid var(--border-color, #DFE4E8);
+}
+
+.ribbon-group:last-child {
+  border-right: none;
+}
+
+.ribbon-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 4px;
+  height: 72px;
+}
+
+.ribbon-action {
+  display: flex;
+  flex: 0 0 68px;
+  width: 68px;
+  height: 68px;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 2px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text-primary, #20262C);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.ribbon-action:hover,
+.ribbon-action:focus-visible {
+  background: #EBF5FB;
+  border-color: #0788B8;
+  color: #0788B8;
+  outline: none;
+}
+
+.ribbon-action-icon {
+  width: 26px !important;
+  height: 26px !important;
+  transition: transform 0.12s ease;
+}
+
+.ribbon-action:hover .ribbon-action-icon {
+  transform: translateY(-1px);
+}
+
+.ribbon-action span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 64px;
+}
+
+.ribbon-group-label {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  left: 4px;
+  overflow: hidden;
+  color: #8A94A3;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .ribbon-titlebar {
+    padding: 0 10px;
+    min-height: 46px;
+  }
+  .ribbon-brand img {
+    width: 30px;
+    height: 30px;
+  }
+  .ribbon-title strong {
+    font-size: 12px;
+  }
+  .ribbon-user {
+    padding: 2px 6px;
+  }
+  .ribbon-user-role {
+    display: none;
+  }
+  .ribbon-tabs button {
+    min-width: 100px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+}

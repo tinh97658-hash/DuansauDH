@@ -1,0 +1,131 @@
+:root {
+  --canvas-bg: #F5F7F8;
+  --surface-bg: #FFFFFF;
+  --muted-surface: #F7F9FA;
+  --border-color: #DFE4E8;
+  --border-light: #EDF2F7;
+  --text-primary: #20262C;
+  --text-secondary: #68737D;
+  --text-muted: #9EABB7;
+  --primary: #0788B8;
+  --primary-dark: #056A8F;
+  --primary-light: #EBF5FB;
+  --secondary: #173B70;
+  --success: #137B3B;
+  --success-light: #E6F4EA;
+  --warning: #B86216;
+  --warning-light: #FEF7E0;
+  --danger: #B52D2D;
+  --danger-light: #FCE8E6;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--canvas-bg);
+  color: var(--text-primary);
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code, kbd, samp, pre {
+  font-family: "Cascadia Code", Consolas, Monaco, "Courier New", monospace;
+  font-size: 12px;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F1F3F5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C4CCD6;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9AA5B4;
+}
+
+/* Remove MUI OutlinedInput empty top notch/legend cutout */
+.MuiOutlinedInput-notchedOutline {
+  top: 0 !important;
+}
+
+.MuiOutlinedInput-notchedOutline legend {
+  display: none !important;
+}
+
+/* A4 Printable Sheet Rules */
+@media print {
+  body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    font-size: 13px !important;
+  }
+
+  .ribbon-header,
+  footer,
+  .MuiDialogTitle-root,
+  .MuiBackdrop-root,
+  .Toastify {
+    display: none !important;
+  }
+
+  .MuiDialog-container {
+    display: block !important;
+    position: static !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .MuiDialog-paper {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: static !important;
+  }
+
+  .MuiDialogContent-root {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  #printable-a4-sheet {
+    max-width: 100% !important;
+    padding: 10mm 12mm !important;
+    margin: 0 auto !important;
+    page-break-after: avoid !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm;
+  }
+}

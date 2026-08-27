@@ -1,0 +1,12 @@
+ServerSide/node_modules
+ServerSide/dist
+ServerSide/.env.auth
+ServerSide/config.env
+.env
+/node_modules/
+/backend/node_modules/
+/backend/dist/
+/backend/coverage/
+/frontend/node_modules/
+/frontend/build/
+/frontend/coverage/
