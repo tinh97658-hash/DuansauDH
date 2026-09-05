@@ -17,6 +17,8 @@ export class CreateSubjectDto {
   @IsOptional() @IsBoolean() isRequired?: boolean;
   @IsOptional() @IsInt() @Min(0) sortOrder?: number;
   @IsOptional() @IsBoolean() active?: boolean;
+  @IsOptional() @IsUUID() canonicalSubjectId?: string | null;
+  @IsOptional() @IsBoolean() allowCrossMajor?: boolean;
 }
 
 export class UpdateSubjectDto {
@@ -31,6 +33,8 @@ export class UpdateSubjectDto {
   @IsOptional() @IsBoolean() isRequired?: boolean;
   @IsOptional() @IsInt() @Min(0) sortOrder?: number;
   @IsOptional() @IsBoolean() active?: boolean;
+  @IsOptional() @IsUUID() canonicalSubjectId?: string | null;
+  @IsOptional() @IsBoolean() allowCrossMajor?: boolean;
 }
 
 // ===== Gói học phần =====

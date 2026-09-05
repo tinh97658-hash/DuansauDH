@@ -7,6 +7,7 @@ import { District } from "../database/models/common/district.model.js";
 import { Ethnicity } from "../database/models/common/ethnicity.model.js";
 import { Lecturer } from "../database/models/common/lecturer.model.js";
 import { Major } from "../database/models/common/major.model.js";
+import { Room } from "../database/models/common/room.model.js";
 import { Nationality } from "../database/models/common/nationality.model.js";
 import { StudyStatus } from "../database/models/common/study-status.model.js";
 import { TrainingLevel } from "../database/models/common/training-level.model.js";
@@ -14,7 +15,7 @@ import { TrainingMode } from "../database/models/common/training-mode.model.js";
 import { TrainingModeGroup } from "../database/models/common/training-mode-group.model.js";
 import { Ward } from "../database/models/common/ward.model.js";
 import { Staff } from "../database/models/staff.model.js";
-import { CreateCatalogDto, UpdateCatalogDto } from "./dto/catalog.dto.js";
+import { CreateCatalogDto, CreateRoomDto, UpdateCatalogDto, UpdateRoomDto } from "./dto/catalog.dto.js";
 
 // Các model danh mục dùng chung; dùng any để tránh lỗi union ModelStatic với method this của Sequelize.
 type CatalogModel = any;
@@ -37,6 +38,7 @@ export class SystemService {
     @InjectModel(BridgeKnowledgeSubject) private readonly bridgeKnowledgeSubjects: typeof BridgeKnowledgeSubject,
     @InjectModel(Lecturer) private readonly lecturers: typeof Lecturer,
     @InjectModel(Staff) private readonly staff: typeof Staff,
+    @InjectModel(Room) private readonly rooms: typeof Room,
   ) {}
 
   // ===== Các chức năng chưa triển khai =====
@@ -51,7 +53,7 @@ export class SystemService {
   checkUpdate() { return this.stub("check-update", "Check Update"); }
 
   // ===== Tiện ích dùng chung =====
-  private pick(dto: CreateCatalogDto | UpdateCatalogDto, keys: string[]) {
+  private pick(dto: object, keys: string[]) {
     const output: Record<string, unknown> = {};
     for (const key of keys) {
       const value = (dto as Record<string, unknown>)[key];
@@ -313,6 +315,26 @@ export class SystemService {
     return row;
   }
   async removeLecturer(id: string) { return this.removeSimple(this.lecturers, id, "Giảng viên"); }
+
+  // ===== Phòng học dùng chung =====
+  async listRooms(includeInactive = false) {
+    return this.rooms.findAll({
+      ...(includeInactive ? {} : { where: { isActive: true } }),
+      order: [["code", "ASC"], ["name", "ASC"]],
+    });
+  }
+
+  async createRoom(dto: CreateRoomDto) {
+    await this.ensureCodeUnique(this.rooms, dto.code);
+    return this.rooms.create(this.pick(dto, ["code", "name", "capacity", "isActive"]) as any);
+  }
+
+  async updateRoom(id: string, dto: UpdateRoomDto) {
+    const room = await this.findOr404(this.rooms, id, "Phòng học");
+    if (dto.code && dto.code !== room.code) await this.ensureCodeUnique(this.rooms, dto.code, id);
+    await room.update(this.pick(dto, ["code", "name", "capacity", "isActive"]) as any);
+    return room;
+  }
 
   private async ensureEmailUnique(email: string, excludeId?: string) {
     if (!email || !email.trim()) return;

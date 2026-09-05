@@ -7,6 +7,7 @@ import {
   InfoRounded, LanguageRounded, ListAltRounded, LocationCityRounded, LockRounded, LogoutRounded,
   ManageAccountsRounded, MenuBookRounded, NoteAddRounded, PaymentsRounded, RuleRounded,
   SchoolRounded, ScoreboardRounded, SendRounded, SummarizeRounded, SupervisorAccountRounded,
+  MeetingRoomRounded,
   SystemUpdateRounded, TableChartRounded, TrackChangesRounded, UploadFileRounded,
   VerifiedRounded, WorkspacePremiumRounded,
 } from "@mui/icons-material";
@@ -25,7 +26,7 @@ const tabs = [
   ["reports", "BÁO CÁO"],
 ];
 
-const ribbons = {
+export const ribbons = {
   system: [
     group("THÔNG TIN", [
       action("Thông tin về đơn vị", "/system/unit-info", InfoRounded, "#168bc2"),
@@ -42,6 +43,7 @@ const ribbons = {
     ]),
     group("DANH MỤC ĐÀO TẠO", [
       action("Giảng viên", "/system/lecturers", SchoolRounded, "#3f8cc3", { roles: ["admin"] }),
+      action("Phòng học", "/system/rooms", MeetingRoomRounded, "#168b7c", { roles: ["admin"] }),
       action("Nhóm hình thức đào tạo", "/system/training-mode-groups", CategoryRounded, "#168bc2"),
       action("Hình thức đào tạo", "/system/training-modes", FactCheckRounded, "#81952c"),
       action("Ngành học", "/system/majors", MenuBookRounded, "#c0792a"),
@@ -67,6 +69,8 @@ const ribbons = {
       action("Phân nhóm học phần", "/masters/assign-class-groups", GroupWorkRounded, "#81952c"),
     ]),
     group("QUÁ TRÌNH HỌC TẬP", [
+      action("Tạo lớp học phần", "/masters/course-offerings", NoteAddRounded, "#0788b8"),
+      action("Xếp lịch", "/masters/schedule", EventNoteRounded, "#7b5fac"),
       action("Xét tư cách thi hết môn", "/masters/exam-eligibility", RuleRounded, "#397c8d"),
       action("Danh sách thi, điểm thi", "/masters/exam-lists", ListAltRounded, "#a04f86"),
     ]),
@@ -166,7 +170,16 @@ const RibbonHeader = () => {
           const visibleActions = itemGroup.actions.filter((item) => !item.roles || item.roles.includes(role));
           if (!visibleActions.length) return null;
           return <section className="ribbon-group" key={itemGroup.label}><div className="ribbon-actions">
-            {visibleActions.map((item) => { const Icon = item.icon; return <button type="button" className="ribbon-action" key={item.label} onClick={() => runAction(item)} title={item.label}><Icon className="ribbon-action-icon" style={{ color: item.color }} /><span>{item.label}</span></button>; })}
+            {visibleActions.map((item) => {
+              const Icon = item.icon;
+              const schedulingActive = ["/masters/course-offerings", "/masters/schedule"].includes(item.route)
+                && (path === item.route || path === `${item.route}/`);
+              return <button type="button" className="ribbon-action" key={item.label} onClick={() => runAction(item)} title={item.label}
+                aria-current={schedulingActive ? "page" : undefined}
+                style={schedulingActive ? { background: "#e8f3fa", borderColor: "#78acd0", color: "#075a9c", fontWeight: 600, boxShadow: "inset 0 -2px #075a9c" } : undefined}>
+                <Icon className="ribbon-action-icon" style={{ color: item.color }} /><span>{item.label}</span>
+              </button>;
+            })}
           </div><div className="ribbon-group-label">{itemGroup.label}</div></section>;
         })}
       </div></div>

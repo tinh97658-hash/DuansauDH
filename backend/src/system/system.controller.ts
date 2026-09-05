@@ -1,8 +1,8 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from "@nestjs/common";
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
-import { Roles } from "../common/auth-user.js";
+import { CurrentUser, Roles } from "../common/auth-user.js";
 import { RolesGuard } from "../common/roles.guard.js";
-import { CreateCatalogDto, UpdateCatalogDto } from "./dto/catalog.dto.js";
+import { CreateCatalogDto, CreateRoomDto, UpdateCatalogDto, UpdateRoomDto } from "./dto/catalog.dto.js";
 import { SystemService } from "./system.service.js";
 
 @Controller("system")
@@ -50,6 +50,16 @@ export class SystemController {
   @Post("lecturers") @Roles("admin") @UseGuards(RolesGuard) createLecturer(@Body() dto: CreateCatalogDto) { return this.system.createLecturer(dto); }
   @Put("lecturers/:id") @Roles("admin") @UseGuards(RolesGuard) updateLecturer(@Param("id") id: string, @Body() dto: UpdateCatalogDto) { return this.system.updateLecturer(id, dto); }
   @Delete("lecturers/:id") @Roles("admin") @UseGuards(RolesGuard) removeLecturer(@Param("id") id: string) { return this.system.removeLecturer(id); }
+
+  // ===== Phòng học dùng chung =====
+  @Get("rooms") @Roles("admin", "supervisor", "examiner") @UseGuards(RolesGuard) rooms(
+    @CurrentUser() user: any,
+    @Query("includeInactive") includeInactive?: string,
+  ) {
+    return this.system.listRooms(user?.role === "admin" && includeInactive === "true");
+  }
+  @Post("rooms") @Roles("admin") @UseGuards(RolesGuard) createRoom(@Body() dto: CreateRoomDto) { return this.system.createRoom(dto); }
+  @Put("rooms/:id") @Roles("admin") @UseGuards(RolesGuard) updateRoom(@Param("id") id: string, @Body() dto: UpdateRoomDto) { return this.system.updateRoom(id, dto); }
 
   // ===== Nhóm hình thức đào tạo =====
   @Get("training-mode-groups") trainingModeGroups() { return this.system.listTrainingModeGroups(); }

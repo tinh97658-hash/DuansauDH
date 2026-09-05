@@ -13,6 +13,7 @@ export class Staff extends Model {
   @Column({ type: DataType.STRING, allowNull: false }) declare email: string;
   @Column({ type: DataType.STRING(60), allowNull: true }) declare password: string | null;
   @Column({ type: DataType.ENUM("admin", "supervisor", "examiner"), allowNull: false }) declare role: string;
+  @Default(false) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare canManageScheduling: boolean;
 
   @BelongsToMany(() => Student, () => StaffStudent)
   declare students: Student[];

@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, Chip, Typography } from "@mui/material";
+import { Box, Card, Chip, Typography } from "@mui/material";
 import ResponsiveAppBar from "./navbarNew";
 import Footer from "./footer";
 
@@ -15,22 +15,24 @@ const FeatureLayout = ({
   fluid = true,
   maxWidth,
   hideHeader = true,
+  workspaceMode = false,
 }) => (
-  <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--canvas-bg, #F5F7F8)" }}>
-    <div>
+  <Box data-feature-workspace={workspaceMode ? "true" : "false"} sx={{
+    minHeight: "100vh", display: "flex", flexDirection: "column", bgcolor: "var(--canvas-bg, #F5F7F8)",
+    ...(workspaceMode ? { "@media (min-width:1200px)": { height: "100dvh", minHeight: 0, overflow: "hidden" } } : {}),
+  }}>
+    <Box sx={{ flex: "none" }}>
       <ResponsiveAppBar />
-    </div>
-    <main
-      style={{
-        flex: 1,
-        padding: "10px 16px 20px",
-        width: "100%",
-        maxWidth: fluid ? "100%" : (maxWidth || 1400),
-        margin: "0 auto",
+    </Box>
+    <Box
+      component="main"
+      sx={{
+        flex: 1, p: "10px 16px 20px", width: "100%", maxWidth: fluid ? "100%" : (maxWidth || 1400), mx: "auto",
+        ...(workspaceMode ? { "@media (min-width:1200px)": { minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" } } : {}),
       }}
     >
       {!hideHeader && title && (
-        <div style={{ marginBottom: "10px" }}>
+        <Box sx={{ mb: "10px", flex: "none" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             {group && (
               <Chip
@@ -55,19 +57,21 @@ const FeatureLayout = ({
               {desc}
             </Typography>
           )}
-        </div>
+        </Box>
       )}
 
-      {children || (
-        <Card variant="outlined" sx={{ borderRadius: "4px", borderColor: "#DFE4E8", bgcolor: "#FFFFFF", p: 3 }}>
-          <Typography variant="body2" sx={{ color: "#68737D", textAlign: "center" }}>
-            ⚙️ Chức năng <strong>{title}</strong> đang được cấu hình và phát triển.
-          </Typography>
-        </Card>
-      )}
-    </main>
-    <Footer />
-  </div>
+      <Box sx={workspaceMode ? { flex: 1, minHeight: 0, "@media (max-width:1199.95px)": { flex: "initial" } } : undefined}>
+        {children || (
+          <Card variant="outlined" sx={{ borderRadius: "4px", borderColor: "#DFE4E8", bgcolor: "#FFFFFF", p: 3 }}>
+            <Typography variant="body2" sx={{ color: "#68737D", textAlign: "center" }}>
+              ⚙️ Chức năng <strong>{title}</strong> đang được cấu hình và phát triển.
+            </Typography>
+          </Card>
+        )}
+      </Box>
+    </Box>
+    {!workspaceMode && <Footer />}
+  </Box>
 );
 
 export default FeatureLayout;

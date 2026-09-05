@@ -29,6 +29,7 @@ import Nationalities from "./pages/system/nationalities";
 import Wards from "./pages/system/wards";
 import Cities from "./pages/system/cities";
 import Lecturers from "./pages/system/lecturers";
+import Rooms from "./pages/system/rooms";
 import TrainingModeGroups from "./pages/system/trainingModeGroups";
 import TrainingModes from "./pages/system/trainingModes";
 import Majors from "./pages/system/majors";
@@ -49,6 +50,8 @@ import MastersBridgeCourse from "./pages/masters/bridgeCourse";
 import MastersAdmissionScores from "./pages/masters/admissionScores";
 import MastersCreateClassGroups from "./pages/masters/createClassGroups";
 import MastersAssignClassGroups from "./pages/masters/assignClassGroups";
+import MastersCourseOfferings from "./pages/masters/courseOfferings";
+import MastersSchedule from "./pages/masters/schedule";
 import MastersExamEligibility from "./pages/masters/examEligibility";
 import MastersExamLists from "./pages/masters/examLists";
 import EnglishExam from "./pages/masters/englishExam";
@@ -115,6 +118,7 @@ function App() {
             <Route path="system/wards" element={<Wards />} />
             <Route path="system/cities" element={<Cities />} />
             <Route path="system/lecturers" element={<Lecturers />} />
+            <Route path="system/rooms" element={<Rooms />} />
             <Route path="system/training-mode-groups" element={<TrainingModeGroups />} />
             <Route path="system/training-modes" element={<TrainingModes />} />
             <Route path="system/majors" element={<Majors />} />
@@ -136,6 +140,8 @@ function App() {
             <Route path="masters/admission-scores" element={<MastersAdmissionScores />} />
             <Route path="masters/create-class-groups" element={<MastersCreateClassGroups />} />
             <Route path="masters/assign-class-groups" element={<MastersAssignClassGroups />} />
+            <Route path="masters/course-offerings" element={<MastersCourseOfferings />} />
+            <Route path="masters/schedule" element={<MastersSchedule />} />
             <Route path="masters/exam-eligibility" element={<MastersExamEligibility />} />
             <Route path="masters/exam-lists" element={<MastersExamLists />} />
             <Route path="masters/english-exam" element={<EnglishExam />} />

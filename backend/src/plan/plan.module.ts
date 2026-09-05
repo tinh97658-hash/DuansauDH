@@ -8,12 +8,13 @@ import { Subject } from "../database/models/plan/subject.model.js";
 import { SubjectPackage } from "../database/models/plan/subject-package.model.js";
 import { SubjectPackageSubject } from "../database/models/plan/subject-package-subject.model.js";
 import { AdmissionRecord } from "../database/models/plan/admission-record.model.js";
+import { CourseOffering } from "../database/models/training/course-offering.model.js";
 import { ClassGroupService } from "./class-group.service.js";
 import { PlanController } from "./plan.controller.js";
 import { PlanService } from "./plan.service.js";
 
 @Module({
-  imports: [SequelizeModule.forFeature([Subject, SubjectPackage, SubjectPackageSubject, ClassGroup, ClassGroupMember, Major, AdmissionRecord])],
+  imports: [SequelizeModule.forFeature([Subject, SubjectPackage, SubjectPackageSubject, ClassGroup, ClassGroupMember, Major, AdmissionRecord, CourseOffering])],
   controllers: [PlanController],
   providers: [PlanService, ClassGroupService, RolesGuard],
   exports: [PlanService, ClassGroupService],

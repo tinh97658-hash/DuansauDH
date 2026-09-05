@@ -15,6 +15,11 @@ import {
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
+import SubjectIdentityFields, {
+  buildSubjectIdentityPayload,
+  emptySubjectIdentity,
+  normalizeSubjectIdentity,
+} from "../../components/SubjectIdentityFields";
 
 const SUBJECT_TYPES = [
   { value: "CS", label: "Cơ sở (CS)", color: "#0788B8" },
@@ -40,6 +45,7 @@ const initialSubjectDraft = (nextSortOrder = 1) => ({
   isRequired: true,
   sortOrder: nextSortOrder,
   active: true,
+  ...emptySubjectIdentity(),
 });
 
 const initialClassDraft = (year) => ({
@@ -98,6 +104,9 @@ const TrainingPlan = () => {
   const [editingSubjectId, setEditingSubjectId] = useState(null);
   const [editingSubjectForm, setEditingSubjectForm] = useState(null);
   const [deletingSubjectId, setDeletingSubjectId] = useState(null);
+  const [programSubjects, setProgramSubjects] = useState([]);
+  const [programSubjectsLoading, setProgramSubjectsLoading] = useState(false);
+  const [programSubjectsError, setProgramSubjectsError] = useState("");
   const firstDraftInputRef = useRef(null);
 
   // Class Table State (Excel-like)
@@ -178,6 +187,26 @@ const TrainingPlan = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const loadProgramSubjects = useCallback(async () => {
+    setProgramSubjectsLoading(true);
+    setProgramSubjectsError("");
+    try {
+      const { data } = await axios.get(`${API_BASE_URL}/plan/subjects?program=${level}`, { withCredentials: true });
+      setProgramSubjects(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setProgramSubjects([]);
+      setProgramSubjectsError(err.response?.data?.message || "Không thể tải danh sách học phần gốc dùng chung");
+    } finally {
+      setProgramSubjectsLoading(false);
+    }
+  }, [level]);
+
+  useEffect(() => {
+    if (isAdmin && (isAddingSubject || editingSubjectId)) {
+      loadProgramSubjects();
+    }
+  }, [editingSubjectId, isAddingSubject, isAdmin, loadProgramSubjects]);
 
   // Load Packages for active class
   const loadPackages = useCallback(async (targetClassId) => {
@@ -273,6 +302,7 @@ const TrainingPlan = () => {
       isRequired: Boolean(subjectDraft.isRequired),
       sortOrder: Number(subjectDraft.sortOrder || 0),
       active: Boolean(subjectDraft.active),
+      ...buildSubjectIdentityPayload(subjectDraft),
     };
 
     try {
@@ -280,6 +310,7 @@ const TrainingPlan = () => {
       toast.success(`Đã thêm học phần "${created.name}"`);
       setSubjects((prev) => [...prev, created]);
       loadMajors();
+      loadProgramSubjects();
 
       if (keepOpenForNext) {
         setSubjectDraft(initialSubjectDraft(Number(subjectDraft.sortOrder || 0) + 1));
@@ -293,6 +324,7 @@ const TrainingPlan = () => {
   };
 
   const handleStartEditSubject = (s) => {
+    const identity = normalizeSubjectIdentity(s);
     setEditingSubjectId(s.id);
     setEditingSubjectForm({
       id: s.id,
@@ -305,6 +337,7 @@ const TrainingPlan = () => {
       isRequired: s.isRequired !== false,
       sortOrder: s.sortOrder ?? 0,
       active: Boolean(s.active),
+      ...identity,
     });
   };
 
@@ -330,6 +363,7 @@ const TrainingPlan = () => {
       isRequired: Boolean(editingSubjectForm.isRequired),
       sortOrder: Number(editingSubjectForm.sortOrder || 0),
       active: Boolean(editingSubjectForm.active),
+      ...buildSubjectIdentityPayload(editingSubjectForm),
     };
 
     try {
@@ -340,6 +374,7 @@ const TrainingPlan = () => {
       );
       toast.success("Cập nhật học phần thành công");
       setSubjects((prev) => prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)));
+      loadProgramSubjects();
       setEditingSubjectId(null);
       setEditingSubjectForm(null);
     } catch (err) {
@@ -836,6 +871,34 @@ const TrainingPlan = () => {
               )}
             </Stack>
           </Stack>
+
+          {isAdmin && isAddingSubject && (
+            <Box sx={{ mb: 1.5 }}>
+              <SubjectIdentityFields
+                subject={subjectDraft}
+                identity={subjectDraft}
+                onChange={(identity) => setSubjectDraft((current) => ({ ...current, ...identity }))}
+                program={level}
+                subjects={programSubjects}
+                loading={programSubjectsLoading}
+                error={programSubjectsError}
+              />
+            </Box>
+          )}
+
+          {isAdmin && editingSubjectForm && (
+            <Box sx={{ mb: 1.5 }}>
+              <SubjectIdentityFields
+                subject={editingSubjectForm}
+                identity={editingSubjectForm}
+                onChange={(identity) => setEditingSubjectForm((current) => ({ ...current, ...identity }))}
+                program={level}
+                subjects={programSubjects}
+                loading={programSubjectsLoading}
+                error={programSubjectsError}
+              />
+            </Box>
+          )}
 
           {/* Spreadsheet Table */}
           <TableContainer

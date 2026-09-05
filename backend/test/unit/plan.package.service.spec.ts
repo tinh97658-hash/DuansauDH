@@ -53,6 +53,9 @@ describe("PlanService.createPackage", () => {
       expect.arrayContaining([expect.objectContaining({ packageId: "pkg-1", subjectId: "sub-0" })]),
       expect.anything(),
     );
+    expect(subjects.findAll).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ majorId: classGroup.majorId, program: classGroup.program }),
+    }));
   });
 
   it("rejects an official package that does not have exactly 21 subjects", async () => {

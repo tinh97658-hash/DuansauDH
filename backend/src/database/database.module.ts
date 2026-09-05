@@ -18,6 +18,7 @@ import { Major } from "./models/common/major.model.js";
 import { StudyStatus } from "./models/common/study-status.model.js";
 import { BridgeKnowledgeSubject } from "./models/common/bridge-knowledge-subject.model.js";
 import { Lecturer } from "./models/common/lecturer.model.js";
+import { Room } from "./models/common/room.model.js";
 import { TrainingProgram } from "./models/common/training-program.model.js";
 // Bảng riêng: Kế hoạch khóa mới
 import { TrainingPlan } from "./models/plan/training-plan.model.js";
@@ -33,6 +34,9 @@ import { ClassGroupMember } from "./models/training/class-group-member.model.js"
 import { ExamSession } from "./models/training/exam-session.model.js";
 import { ExamEligibility } from "./models/training/exam-eligibility.model.js";
 import { ExamResult } from "./models/training/exam-result.model.js";
+import { CourseOffering } from "./models/training/course-offering.model.js";
+import { CourseOfferingClassGroup } from "./models/training/course-offering-class-group.model.js";
+import { TeachingSession } from "./models/training/teaching-session.model.js";
 // Bảng riêng: Đào tạo Thạc sĩ
 import { MastersAdmissionScore } from "./models/masters/masters-admission-score.model.js";
 import { EnglishExamSession } from "./models/masters/english-exam-session.model.js";
@@ -51,12 +55,12 @@ export const databaseModels = [
   Student, Staff, StaffStudent, Submission,
   // Common
   Ethnicity, Nationality, City, District, Ward, TrainingModeGroup, TrainingMode, TrainingLevel,
-  Major, StudyStatus, BridgeKnowledgeSubject, Lecturer, TrainingProgram,
+  Major, StudyStatus, BridgeKnowledgeSubject, Lecturer, Room, TrainingProgram,
   // Plan
   TrainingPlan, AdmissionTarget, AnnualFee, AdmissionRecord,
   Subject, SubjectPackage, SubjectPackageSubject,
   // Training (class & exam)
-  ClassGroup, ClassGroupMember, ExamSession, ExamEligibility, ExamResult,
+  ClassGroup, ClassGroupMember, CourseOffering, CourseOfferingClassGroup, TeachingSession, ExamSession, ExamEligibility, ExamResult,
   // Masters
   MastersAdmissionScore, EnglishExamSession, EnglishExamScore, EnglishCertification, GraduationDefense, GraduationRecord,
   // Doctoral

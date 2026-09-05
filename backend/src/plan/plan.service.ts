@@ -9,6 +9,7 @@ import { Subject } from "../database/models/plan/subject.model.js";
 import { SubjectPackage } from "../database/models/plan/subject-package.model.js";
 import { SubjectPackageSubject } from "../database/models/plan/subject-package-subject.model.js";
 import { AdmissionRecord } from "../database/models/plan/admission-record.model.js";
+import { CourseOffering } from "../database/models/training/course-offering.model.js";
 import { ClassGroupService } from "./class-group.service.js";
 import {
   CreateAdmissionRecordDto, CreateClassDto, CreateSubjectDto, CreateSubjectPackageDto,
@@ -26,6 +27,7 @@ export class PlanService {
     @InjectModel(AdmissionRecord) private readonly admissionRecordsModel: typeof AdmissionRecord,
     @InjectConnection() private readonly sequelize: Sequelize,
     private readonly classGroupsService: ClassGroupService,
+    @InjectModel(CourseOffering) private readonly courseOfferings: typeof CourseOffering,
   ) {}
 
   // ===== Các chức năng khác (chưa triển khai) =====
@@ -139,37 +141,129 @@ export class PlanService {
 
   async createSubject(dto: CreateSubjectDto) {
     const program = dto.program || "masters";
-    await this.requireMajorForProgram(dto.majorId, program);
-    await this.ensureUnique(this.subjects, "codeNumber", String(dto.codeNumber), undefined, { majorId: dto.majorId, program });
-    await this.ensureUnique(this.subjects, "codeText", dto.codeText, undefined, { majorId: dto.majorId, program });
-    const payload = this.pick(dto, [
-      "codeNumber", "codeText", "name", "majorId", "program", "credits",
-      "majorAssignment", "subjectType", "isRequired", "sortOrder", "active",
-    ]);
-    payload.program = program;
-    payload.code = dto.codeText || String(dto.codeNumber || "");
-    return this.subjects.create(payload as any);
+    return this.sequelize.transaction(async (transaction) => {
+      await this.requireMajorForProgram(dto.majorId, program, transaction);
+      await this.ensureUnique(this.subjects, "codeNumber", String(dto.codeNumber), undefined, { majorId: dto.majorId, program });
+      await this.ensureUnique(this.subjects, "codeText", dto.codeText, undefined, { majorId: dto.majorId, program });
+      await this.validateSubjectIdentityTarget(
+        undefined,
+        dto.canonicalSubjectId || null,
+        dto.allowCrossMajor ?? false,
+        program,
+        transaction,
+      );
+      const payload = this.pick(dto, [
+        "codeNumber", "codeText", "name", "majorId", "program", "credits",
+        "majorAssignment", "subjectType", "isRequired", "sortOrder", "active",
+        "canonicalSubjectId", "allowCrossMajor",
+      ]);
+      payload.program = program;
+      payload.code = dto.codeText || String(dto.codeNumber || "");
+      return this.subjects.create(payload as any, { transaction });
+    });
   }
 
   async updateSubject(id: string, dto: UpdateSubjectDto) {
-    const subject = await this.subjects.findByPk(id);
-    if (!subject) throw new NotFoundException("Không tìm thấy học phần.");
-    const majorId = dto.majorId || subject.majorId;
-    const program = dto.program || subject.program;
-    await this.requireMajorForProgram(majorId, program);
-    await this.ensureUnique(this.subjects, "codeNumber", String(dto.codeNumber ?? subject.codeNumber), id, { majorId, program });
-    await this.ensureUnique(this.subjects, "codeText", dto.codeText ?? subject.codeText, id, { majorId, program });
-    const payload = this.pick(dto, [
-      "codeNumber", "codeText", "name", "majorId", "program", "credits",
-      "majorAssignment", "subjectType", "isRequired", "sortOrder", "active",
-    ]);
-    if (dto.codeText !== undefined) {
-      payload.code = dto.codeText;
-    } else if (dto.codeNumber !== undefined && !subject.codeText) {
-      payload.code = String(dto.codeNumber);
+    return this.sequelize.transaction(async (transaction) => {
+      const subject = await this.subjects.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!subject) throw new NotFoundException("Không tìm thấy học phần.");
+      const majorId = dto.majorId || subject.majorId;
+      const program = dto.program || subject.program;
+      await this.requireMajorForProgram(majorId, program, transaction);
+      await this.validateSubjectIdentityUpdate(subject, dto, program, transaction);
+      await this.ensureUnique(this.subjects, "codeNumber", String(dto.codeNumber ?? subject.codeNumber), id, { majorId, program });
+      await this.ensureUnique(this.subjects, "codeText", dto.codeText ?? subject.codeText, id, { majorId, program });
+      const payload = this.pick(dto, [
+        "codeNumber", "codeText", "name", "majorId", "program", "credits",
+        "majorAssignment", "subjectType", "isRequired", "sortOrder", "active",
+        "canonicalSubjectId", "allowCrossMajor",
+      ]);
+      if (dto.codeText !== undefined) {
+        payload.code = dto.codeText;
+      } else if (dto.codeNumber !== undefined && !subject.codeText) {
+        payload.code = String(dto.codeNumber);
+      }
+      await subject.update(payload, { transaction });
+      return this.subjects.findByPk(id, {
+        include: [
+          { model: Major, as: "major", attributes: ["id", "code", "name"] },
+          { model: Subject, as: "canonicalSubject" },
+        ],
+        transaction,
+      });
+    });
+  }
+
+  private async validateSubjectIdentityUpdate(
+    subject: Subject,
+    dto: UpdateSubjectDto,
+    nextProgram: string,
+    transaction: Transaction,
+  ) {
+    const changesCanonical = Object.prototype.hasOwnProperty.call(dto, "canonicalSubjectId");
+    const currentCanonicalId = subject.canonicalSubjectId || null;
+    const nextCanonicalId = changesCanonical ? (dto.canonicalSubjectId || null) : currentCanonicalId;
+    const nextAllowCrossMajor = dto.allowCrossMajor ?? subject.allowCrossMajor ?? false;
+    const canonicalChanged = currentCanonicalId !== nextCanonicalId;
+    const programChanged = nextProgram !== subject.program;
+    const deactivating = dto.active === false && subject.active !== false;
+    const disablingCrossMajor = subject.allowCrossMajor === true && nextAllowCrossMajor === false;
+
+    await this.validateSubjectIdentityTarget(
+      subject.id,
+      nextCanonicalId,
+      nextAllowCrossMajor,
+      nextProgram,
+      transaction,
+    );
+
+    const dependentCount = await this.subjects.count({
+      where: { canonicalSubjectId: subject.id },
+      transaction,
+    });
+    if (dependentCount > 0 && nextCanonicalId) {
+      throw new ConflictException("Học phần đang là gốc của mapping khác nên không thể trở thành alias.");
     }
-    await subject.update(payload);
-    return this.subjects.findByPk(id, { include: [{ model: Major, as: "major", attributes: ["id", "code", "name"] }] });
+    if (dependentCount > 0 && !nextAllowCrossMajor) {
+      throw new ConflictException("Không thể tắt dùng chung liên ngành khi học phần vẫn đang có alias.");
+    }
+    if (dependentCount > 0 && programChanged) {
+      throw new ConflictException("Không thể đổi bậc đào tạo của học phần gốc đang có alias.");
+    }
+    if (dependentCount > 0 && deactivating) {
+      throw new ConflictException("Không thể ngừng sử dụng học phần gốc đang có alias.");
+    }
+
+    if (canonicalChanged || disablingCrossMajor) {
+      const offeringCount = await this.courseOfferings.count({ where: { subjectId: subject.id }, transaction });
+      if (offeringCount > 0) {
+        throw new ConflictException("Không thể đổi logical identity của học phần đang được lớp học phần tham chiếu.");
+      }
+    }
+  }
+
+  private async validateSubjectIdentityTarget(
+    subjectId: string | undefined,
+    canonicalSubjectId: string | null,
+    allowCrossMajor: boolean,
+    program: string,
+    transaction: Transaction,
+  ) {
+    if (subjectId && canonicalSubjectId === subjectId) {
+      throw new BadRequestException("Học phần không được tham chiếu chính nó làm học phần gốc.");
+    }
+    if (canonicalSubjectId && allowCrossMajor) {
+      throw new BadRequestException("Học phần alias không thể đồng thời là học phần gốc dùng chung liên ngành.");
+    }
+
+    if (canonicalSubjectId) {
+      const root = await this.subjects.findByPk(canonicalSubjectId, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!root) throw new BadRequestException("Không tìm thấy học phần gốc được chọn.");
+      if (root.canonicalSubjectId) throw new BadRequestException("Học phần alias phải trỏ trực tiếp tới một học phần gốc, không được tạo chuỗi mapping.");
+      if (root.program !== program) throw new BadRequestException("Học phần alias và học phần gốc phải cùng bậc đào tạo.");
+      if (root.active === false) throw new BadRequestException("Học phần gốc đã ngừng sử dụng.");
+      if (root.allowCrossMajor !== true) throw new BadRequestException("Học phần gốc chưa được cho phép dùng chung liên ngành.");
+    }
   }
 
   async removeSubject(id: string) {
@@ -177,6 +271,10 @@ export class PlanService {
     if (!subject) throw new NotFoundException("Không tìm thấy học phần.");
     const packageUsage = await this.packageEntries.count({ where: { subjectId: id } });
     if (packageUsage > 0) throw new ConflictException("Không thể xóa học phần đang được sử dụng trong gói học phần.");
+    const aliasUsage = await this.subjects.count({ where: { canonicalSubjectId: id } });
+    if (aliasUsage > 0) throw new ConflictException("Không thể xóa học phần đang là gốc của mapping liên ngành.");
+    const offeringUsage = await this.courseOfferings.count({ where: { subjectId: id } });
+    if (offeringUsage > 0) throw new ConflictException("Không thể xóa học phần đang được lớp học phần tham chiếu.");
     await subject.destroy();
     return { success: true, message: "Đã xóa học phần." };
   }
