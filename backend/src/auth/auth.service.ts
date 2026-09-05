@@ -10,6 +10,7 @@ export class AuthService {
   async validateLocal(email: string, password: string) {
     const staff = await this.staff.findByEmail(email);
     if (staff) {
+      if (!staff.active) throw new UnauthorizedException("Tài khoản đã bị khóa");
       if (!staff.password) throw new UnauthorizedException("Tài khoản cán bộ này yêu cầu đăng nhập bằng Google");
       if (await bcrypt.compare(password, staff.password)) return staff;
       throw new UnauthorizedException("Email hoặc mật khẩu không chính xác");
@@ -25,11 +26,16 @@ export class AuthService {
   async validateGoogle(email: string) {
     const staff = await this.staff.findByEmail(email);
     if (!staff) throw new UnauthorizedException("Tài khoản cán bộ chưa được cấp quyền sử dụng hệ thống");
+    if (!staff.active) throw new UnauthorizedException("Tài khoản đã bị khóa");
     return staff;
   }
 
   async deserialize(key: string) {
     const [type, id] = String(key).split(":");
-    return type === "staff" ? this.staff.findById(id) : this.students.findById(id);
+    if (type === "staff") {
+      const staff = await this.staff.findById(id);
+      return staff?.active ? staff : null;
+    }
+    return this.students.findById(id);
   }
 }

@@ -16,6 +16,36 @@ export class StaffRepository {
     return this.staff.scope("withoutPassword").findByPk(id, options);
   }
 
+  findByIdWithPassword(id: string, options: any = {}) {
+    return this.staff.findByPk(id, options);
+  }
+
+  list(query?: string, role?: string) {
+    const filters: any[] = [];
+    if (query?.trim()) {
+      const pattern = `%${query.trim()}%`;
+      filters.push({ [Op.or]: [
+        { name: { [Op.iLike]: pattern } },
+        { email: { [Op.iLike]: pattern } },
+      ] });
+    }
+    if (role && role !== "ALL") filters.push({ role });
+    return this.staff.findAll({
+      where: filters.length ? { [Op.and]: filters } : undefined,
+      order: [["active", "DESC"], ["name", "ASC"], ["email", "ASC"]],
+    });
+  }
+
+  countActiveAdmins(excludeId?: string) {
+    return this.staff.count({
+      where: {
+        role: "admin",
+        active: true,
+        ...(excludeId ? { id: { [Op.ne]: excludeId } } : {}),
+      },
+    });
+  }
+
   findAdmin() {
     return this.staff.scope("withoutPassword").findOne({ where: { role: "admin" }, order: [["createdAt", "ASC"]] });
   }

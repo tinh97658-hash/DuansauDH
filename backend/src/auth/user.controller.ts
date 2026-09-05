@@ -42,10 +42,9 @@ export class UserController {
   }
 
   @Patch("updatePassword")
-  @Roles("student")
-  @UseGuards(RolesGuard)
+  @UseGuards(AuthenticatedGuard)
   updatePassword(@CurrentUser() user: any, @Body() input: UpdatePasswordDto) {
-    return this.students.updatePassword(user.id, input);
+    return user instanceof Staff ? this.staff.updatePassword(user.id, input) : this.students.updatePassword(user.id, input);
   }
 
   @Post("submit")
