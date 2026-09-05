@@ -267,6 +267,28 @@ Migration nằm tại `backend/src/database/migrations`, được biên dịch c
 2. PostgreSQL session store.
 3. UUID/database defaults và các check constraint.
 
+## Postgraduate Course Offering & Scheduling
+
+Chức năng Tạo lớp học phần và Xếp lịch sau đại học sử dụng migrations **021–024**.
+Môi trường mới cần cấu hình database và chạy migration còn thiếu từ thư mục `backend`
+bằng npm script hiện có:
+
+```powershell
+npm run db:migrate
+```
+
+Dữ liệu PostgreSQL LOCAL không đi theo Git; mỗi môi trường có database riêng.
+
+Backend **đã có phân quyền scheduling** qua `Staff.canManageScheduling` và
+`SchedulingWriteGuard`, không phải trạng thái “chưa làm phân quyền”. Hiện chỉ chưa
+có UI quản trị để chọn/gán người phụ trách scheduling. Admin có operation
+`PUT /scheduling/assignee`; body JSON chứa `staffId` của Staff thuộc chính database
+của môi trường triển khai. Không hard-code UUID/Staff ID từ database của máy khác.
+
+Unit/integration tests của feature được commit cùng source. PostgreSQL integration
+tests có tạo/xóa dữ liệu nên chỉ chạy sau khi cấu hình isolated test database,
+không dùng database LOCAL đang phục vụ công việc.
+
 ## Tạo quản trị viên đầu tiên
 
 Sau khi cấu hình `ADMIN_EMAIL`, `ADMIN_NAME` và `ADMIN_PASSWORD` trong `.env`, chạy trong thư mục `backend`:
