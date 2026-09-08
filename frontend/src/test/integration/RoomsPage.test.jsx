@@ -11,7 +11,7 @@ const renderPage = async () => {
 };
 const clickAndWait = async (element) => { await act(async () => { fireEvent.click(element); }); };
 
-jest.mock("axios", () => ({ get: jest.fn(), post: jest.fn(), put: jest.fn(), defaults: {} }));
+jest.mock("axios", () => ({ get: jest.fn(), post: jest.fn(), put: jest.fn(), defaults: {}, interceptors: { request: { use: jest.fn() } } }));
 jest.mock("../../components/FeatureLayout", () => function FeatureLayoutMock({ children }) { return children; });
 
 const room = { id: "room-1", code: "301", name: "Phòng 301", capacity: null, isActive: false };

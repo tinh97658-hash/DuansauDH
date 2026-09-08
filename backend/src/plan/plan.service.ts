@@ -141,6 +141,7 @@ export class PlanService {
 
   async createSubject(dto: CreateSubjectDto) {
     const program = dto.program || "masters";
+    if ((dto.teachingUnits != null) !== (dto.teachingUnitType != null)) throw new BadRequestException("Nhập đồng thời số giờ/tiết và đơn vị.");
     return this.sequelize.transaction(async (transaction) => {
       await this.requireMajorForProgram(dto.majorId, program, transaction);
       await this.ensureUnique(this.subjects, "codeNumber", String(dto.codeNumber), undefined, { majorId: dto.majorId, program });
@@ -155,7 +156,7 @@ export class PlanService {
       const payload = this.pick(dto, [
         "codeNumber", "codeText", "name", "majorId", "program", "credits",
         "majorAssignment", "subjectType", "isRequired", "sortOrder", "active",
-        "canonicalSubjectId", "allowCrossMajor",
+        "canonicalSubjectId", "allowCrossMajor", "teachingUnits", "teachingUnitType",
       ]);
       payload.program = program;
       payload.code = dto.codeText || String(dto.codeNumber || "");
@@ -167,6 +168,9 @@ export class PlanService {
     return this.sequelize.transaction(async (transaction) => {
       const subject = await this.subjects.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!subject) throw new NotFoundException("Không tìm thấy học phần.");
+      const units = dto.teachingUnits ?? subject.teachingUnits;
+      const unitType = dto.teachingUnitType ?? subject.teachingUnitType;
+      if ((units != null) !== (unitType != null)) throw new BadRequestException("Nhập đồng thời số giờ/tiết và đơn vị.");
       const majorId = dto.majorId || subject.majorId;
       const program = dto.program || subject.program;
       await this.requireMajorForProgram(majorId, program, transaction);
@@ -176,7 +180,7 @@ export class PlanService {
       const payload = this.pick(dto, [
         "codeNumber", "codeText", "name", "majorId", "program", "credits",
         "majorAssignment", "subjectType", "isRequired", "sortOrder", "active",
-        "canonicalSubjectId", "allowCrossMajor",
+        "canonicalSubjectId", "allowCrossMajor", "teachingUnits", "teachingUnitType",
       ]);
       if (dto.codeText !== undefined) {
         payload.code = dto.codeText;
@@ -207,7 +211,6 @@ export class PlanService {
     const canonicalChanged = currentCanonicalId !== nextCanonicalId;
     const programChanged = nextProgram !== subject.program;
     const deactivating = dto.active === false && subject.active !== false;
-    const disablingCrossMajor = subject.allowCrossMajor === true && nextAllowCrossMajor === false;
 
     await this.validateSubjectIdentityTarget(
       subject.id,
@@ -224,9 +227,6 @@ export class PlanService {
     if (dependentCount > 0 && nextCanonicalId) {
       throw new ConflictException("Học phần đang là gốc của mapping khác nên không thể trở thành alias.");
     }
-    if (dependentCount > 0 && !nextAllowCrossMajor) {
-      throw new ConflictException("Không thể tắt dùng chung liên ngành khi học phần vẫn đang có alias.");
-    }
     if (dependentCount > 0 && programChanged) {
       throw new ConflictException("Không thể đổi bậc đào tạo của học phần gốc đang có alias.");
     }
@@ -234,7 +234,7 @@ export class PlanService {
       throw new ConflictException("Không thể ngừng sử dụng học phần gốc đang có alias.");
     }
 
-    if (canonicalChanged || disablingCrossMajor) {
+    if (canonicalChanged) {
       const offeringCount = await this.courseOfferings.count({ where: { subjectId: subject.id }, transaction });
       if (offeringCount > 0) {
         throw new ConflictException("Không thể đổi logical identity của học phần đang được lớp học phần tham chiếu.");
@@ -262,7 +262,6 @@ export class PlanService {
       if (root.canonicalSubjectId) throw new BadRequestException("Học phần alias phải trỏ trực tiếp tới một học phần gốc, không được tạo chuỗi mapping.");
       if (root.program !== program) throw new BadRequestException("Học phần alias và học phần gốc phải cùng bậc đào tạo.");
       if (root.active === false) throw new BadRequestException("Học phần gốc đã ngừng sử dụng.");
-      if (root.allowCrossMajor !== true) throw new BadRequestException("Học phần gốc chưa được cho phép dùng chung liên ngành.");
     }
   }
 
@@ -292,7 +291,7 @@ export class PlanService {
         {
           model: SubjectPackage,
           as: "packages",
-          attributes: ["id", "code", "name", "isOfficial", "active", "totalSubjects"],
+          attributes: ["id", "code", "name", "isOfficial", "active", "totalSubjects", "canMerge"],
         },
       ],
       order: [["academicYear", "DESC"], ["code", "ASC"]],
@@ -304,7 +303,7 @@ export class PlanService {
     return this.classGroups.findByPk(created.id, {
       include: [
         { model: Major, as: "major", attributes: ["id", "code", "name"] },
-        { model: SubjectPackage, as: "packages", attributes: ["id", "code", "name", "isOfficial", "active", "totalSubjects"] },
+        { model: SubjectPackage, as: "packages", attributes: ["id", "code", "name", "isOfficial", "active", "totalSubjects", "canMerge"] },
       ],
     });
   }
@@ -314,7 +313,7 @@ export class PlanService {
     return this.classGroups.findByPk(id, {
       include: [
         { model: Major, as: "major", attributes: ["id", "code", "name"] },
-        { model: SubjectPackage, as: "packages", attributes: ["id", "code", "name", "isOfficial", "active", "totalSubjects"] },
+        { model: SubjectPackage, as: "packages", attributes: ["id", "code", "name", "isOfficial", "active", "totalSubjects", "canMerge"] },
       ],
     });
   }
@@ -358,6 +357,7 @@ export class PlanService {
       classGroupId: dto.classGroupId,
       active: dto.active ?? true,
       isOfficial: dto.isOfficial ?? false,
+      canMerge: dto.canMerge ?? false,
       totalSubjects: dto.subjectIds.length,
     }, { transaction });
 
@@ -403,7 +403,7 @@ export class PlanService {
       await this.packages.update({ isOfficial: false }, { where: { classGroupId: pkg.classGroupId }, transaction });
     }
 
-    const payload = this.pick(dto, ["code", "name", "active", "isOfficial"]);
+    const payload = this.pick(dto, ["code", "name", "active", "isOfficial", "canMerge"]);
     if (dto.subjectIds !== undefined) payload.totalSubjects = dto.subjectIds.length;
     await pkg.update(payload, { transaction });
 

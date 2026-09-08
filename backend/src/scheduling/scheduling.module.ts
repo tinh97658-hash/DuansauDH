@@ -1,3 +1,4 @@
+import { CourseOfferingParticipant } from "../database/models/training/course-offering-participant.model.js";
 import { Module } from "@nestjs/common";
 import { SequelizeModule } from "@nestjs/sequelize";
 import { RolesGuard } from "../common/roles.guard.js";
@@ -21,6 +22,7 @@ import { SchedulingService } from "./scheduling.service.js";
   imports: [SequelizeModule.forFeature([
     CourseOffering,
     CourseOfferingClassGroup,
+    CourseOfferingParticipant,
     Subject,
     SubjectPackage,
     SubjectPackageSubject,

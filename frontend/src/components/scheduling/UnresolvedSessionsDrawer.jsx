@@ -1,7 +1,7 @@
 import React from "react";
 import { Alert, Box, ButtonBase, CircularProgress, Drawer, IconButton, Stack, Typography } from "@mui/material";
 import { CloseRounded } from "@mui/icons-material";
-import { isSessionPast, shortTime, vietnameseDate } from "../../utils/schedulingCalendar";
+import { isSessionPast, vietnameseDate } from "../../utils/schedulingCalendar";
 import { schedulingType, schedulingTypographySx } from "./schedulingTypography";
 
 const UnresolvedSessionsDrawer = ({ open, offering, sessions, loading, error, onClose, onOpenSession }) => {
@@ -36,12 +36,12 @@ const UnresolvedSessionsDrawer = ({ open, offering, sessions, loading, error, on
                 <Box key={section.label} component="section" aria-label={section.label} sx={{ mb: 2 }}>
                   <Typography variant="caption" sx={{ "&&": { display: "block", mb: 0.75, color: section.color, fontSize: 11, fontWeight: 700 } }}>{section.label} · {section.items.length}</Typography>
                   {section.items.map((session) => (
-                    <ButtonBase key={session.id} component="button" onClick={() => onOpenSession(session)} aria-label={`Xem buổi ${vietnameseDate(session.sessionDate)} ${shortTime(session.startTime)}`} sx={{ width: "100%", display: "block", textAlign: "left", mb: 0.7, p: "10px 11px", border: "1px solid #CDD7DE", borderLeft: `3px solid ${section.color}`, bgcolor: section.background }}>
+                    <ButtonBase key={session.id} component="button" onClick={() => onOpenSession(session)} aria-label={`Xem buổi ${vietnameseDate(session.sessionDate)} ${(session.period === "MORNING" ? "Sáng" : "Chiều")}`} sx={{ width: "100%", display: "block", textAlign: "left", mb: 0.7, p: "10px 11px", border: "1px solid #CDD7DE", borderLeft: `3px solid ${section.color}`, bgcolor: section.background }}>
                       <Stack direction="row" justifyContent="space-between" spacing={1}>
                         <Typography variant="body2" sx={{ "&&": { fontWeight: 700 } }}>{vietnameseDate(session.sessionDate)}</Typography>
                         <Typography variant="caption" sx={{ "&&": { color: section.color, fontWeight: 700 } }}>{section.state}</Typography>
                       </Stack>
-                      <Typography variant="caption" sx={{ "&&": { display: "block", fontWeight: 600 } }}>{session.period === "MORNING" ? "Sáng" : "Chiều"} · {shortTime(session.startTime)}–{shortTime(session.endTime)}</Typography>
+                      <Typography variant="caption" sx={{ "&&": { display: "block", fontWeight: 600 } }}>{session.period === "MORNING" ? "Sáng" : "Chiều"}</Typography>
                       <Typography variant="caption" sx={{ "&&": { display: "block", color: "#536A77" } }}>{session.lecturer?.name || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</Typography>
                     </ButtonBase>
                   ))}

@@ -11,7 +11,7 @@ export const getBusinessWallTime = (now = new Date()) => {
 };
 
 // Persisted DATEONLY/TIME values are Vietnamese wall time, never server-local Dates.
-export const isSessionEndedInBusinessTimezone = (session: { sessionDate: string; endTime: string }, now = new Date()) => {
+export const isSessionEndedInBusinessTimezone = (session: { sessionDate: string | null; endTime: string | null }, now = new Date()) => {
   if (!session?.sessionDate || !session?.endTime) return false;
   const endTime = session.endTime.length === 5 ? `${session.endTime}:00` : session.endTime;
   return `${session.sessionDate} ${endTime}` < getBusinessWallTime(now);

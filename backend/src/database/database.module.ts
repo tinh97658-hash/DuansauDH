@@ -1,3 +1,4 @@
+import { CourseOfferingParticipant } from "./models/training/course-offering-participant.model.js";
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { SequelizeModule } from "@nestjs/sequelize";
@@ -60,7 +61,7 @@ export const databaseModels = [
   TrainingPlan, AdmissionTarget, AnnualFee, AdmissionRecord,
   Subject, SubjectPackage, SubjectPackageSubject,
   // Training (class & exam)
-  ClassGroup, ClassGroupMember, CourseOffering, CourseOfferingClassGroup, TeachingSession, ExamSession, ExamEligibility, ExamResult,
+  ClassGroup, ClassGroupMember, CourseOffering, CourseOfferingClassGroup, CourseOfferingParticipant, TeachingSession, ExamSession, ExamEligibility, ExamResult,
   // Masters
   MastersAdmissionScore, EnglishExamSession, EnglishExamScore, EnglishCertification, GraduationDefense, GraduationRecord,
   // Doctoral

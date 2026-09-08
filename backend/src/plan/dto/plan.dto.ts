@@ -1,5 +1,5 @@
 import { Transform } from "class-transformer";
-import { ArrayMaxSize, ArrayMinSize, ArrayNotEmpty, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min } from "class-validator";
+import { ArrayMaxSize, ArrayMinSize, ArrayNotEmpty, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min, ValidateIf } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim());
 const trimUpper = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim().toUpperCase());
@@ -12,6 +12,8 @@ export class CreateSubjectDto {
   @IsUUID() majorId!: string;
   @IsOptional() @IsIn(["masters", "doctoral"]) program?: string;
   @IsOptional() @IsInt() @Min(0) credits?: number;
+  @IsOptional() @IsInt() @Min(1) teachingUnits?: number;
+  @IsOptional() @IsIn(["hours", "periods"]) teachingUnitType?: "hours" | "periods";
   @IsOptional() @IsBoolean() majorAssignment?: boolean;
   @IsOptional() @IsIn(["CS", "CN", "TC", "CH"]) subjectType?: string;
   @IsOptional() @IsBoolean() isRequired?: boolean;
@@ -28,6 +30,8 @@ export class UpdateSubjectDto {
   @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsIn(["masters", "doctoral"]) program?: string;
   @IsOptional() @IsInt() @Min(0) credits?: number;
+  @IsOptional() @IsInt() @Min(1) teachingUnits?: number;
+  @IsOptional() @IsIn(["hours", "periods"]) teachingUnitType?: "hours" | "periods";
   @IsOptional() @IsBoolean() majorAssignment?: boolean;
   @IsOptional() @IsIn(["CS", "CN", "TC", "CH"]) subjectType?: string;
   @IsOptional() @IsBoolean() isRequired?: boolean;
@@ -45,6 +49,7 @@ export class CreateSubjectPackageDto {
   @IsArray() @IsUUID("4", { each: true }) @ArrayNotEmpty() @ArrayMaxSize(21) @ArrayUnique() subjectIds!: string[];
   @IsOptional() @IsBoolean() active?: boolean;
   @IsOptional() @IsBoolean() isOfficial?: boolean;
+  @ValidateIf((_object, value) => value !== undefined) @IsBoolean() canMerge?: boolean;
 }
 
 export class UpdateSubjectPackageDto {
@@ -54,6 +59,7 @@ export class UpdateSubjectPackageDto {
   @IsOptional() @IsArray() @IsUUID("4", { each: true }) @ArrayMinSize(1) @ArrayMaxSize(21) @ArrayUnique() subjectIds?: string[];
   @IsOptional() @IsBoolean() active?: boolean;
   @IsOptional() @IsBoolean() isOfficial?: boolean;
+  @ValidateIf((_object, value) => value !== undefined) @IsBoolean() canMerge?: boolean;
 }
 
 // ===== Lớp học (class group) =====

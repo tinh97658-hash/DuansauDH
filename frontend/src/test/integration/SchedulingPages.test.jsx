@@ -1,290 +1,180 @@
-/* eslint-disable testing-library/no-node-access -- Visual contracts assert panel order/layout and MUI Select's persisted input/disabled wrapper, not just accessible text. */
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import axios from "axios";
+import React from "react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import axios from "axios";
 import CourseOfferings from "../../pages/masters/courseOfferings";
-import Schedule from "../../pages/masters/schedule";
 
-jest.mock("axios", () => ({ get: jest.fn(), post: jest.fn(), put: jest.fn(), defaults: {} }));
-// Decorative icons are not under test; keep the actual scheduling controls/components.
-jest.mock("@mui/icons-material", () => ({
-  AddRounded: () => null, RefreshRounded: () => null, SearchRounded: () => null,
-  ArrowForwardRounded: () => null, CheckCircleRounded: () => null, CloseRounded: () => null,
-  LayersRounded: () => null, EventNoteRounded: () => null, DeleteOutlineRounded: () => null,
-  EditRounded: () => null, MeetingRoomRounded: () => null, VisibilityRounded: () => null,
-  ChevronLeftRounded: () => null, ChevronRightRounded: () => null, TodayRounded: () => null, AccessTimeRounded: () => null,
-}));
-jest.mock("../../components/FeatureLayout", () => function FeatureLayoutMock({ children, workspaceMode, hideHeader, title, group, desc }) {
-  return <div data-workspace-mode={workspaceMode ? "true" : "false"}>{!hideHeader && <header>{group}<h1>{title}</h1>{desc}</header>}{children}</div>;
+jest.mock("axios", () => ({ get: jest.fn(), post: jest.fn(), put: jest.fn(), defaults: {}, interceptors: { request: { use: jest.fn() } } }));
+jest.mock("../../components/FeatureLayout", () => ({ children }) => <main>{children}</main>);
+
+const major = { id: "major", code: "CNTT", name: "Công nghệ thông tin", active: true };
+const subject = { id: "subject", code: "CSDL", name: "Cơ sở dữ liệu nâng cao", credits: 3 };
+const group = (id, canMerge = true) => ({ id, code: id, name: "Lớp " + id.toUpperCase(), majorId: major.id, major, academicYear: "2026", memberCount: 2, canMerge });
+const learner = (id) => ({ identity: "student:" + id, studentId: id, admissionRecordId: "admission-" + id, regNo: "HV00" + id, fullName: "Học viên " + id, note: null });
+const sourceRosters = { a: [learner("1"), learner("2")], b: [learner("2"), learner("3")], c: [learner("4")] };
+let manager, sourceGroups, savedOffering;
+beforeEach(() => {
+  jest.clearAllMocks(); manager = true; sourceGroups = [group("a"), group("b"), group("c", false)]; savedOffering = null;
+  axios.get.mockImplementation(async (url) => {
+    if (url.endsWith("/auth/session")) return { data: { user: { canManageScheduling: manager } } };
+    if (url.includes("/plan/training-plan")) return { data: [major] };
+    if (url.endsWith("/masters/class-groups")) return { data: sourceGroups };
+    if (url.includes("course-offering-candidates")) return { data: { subjects: [{ subject, eligibleClassGroups: sourceGroups }] } };
+    if (url.endsWith("/course-offerings/offering")) return { data: { ...savedOffering, participants: savedOffering.participants.map((row) => ({ ...row })) } };
+    throw Error("Unexpected GET " + url);
+  });
+  axios.post.mockImplementation(async (url, body) => {
+    const uniqueParticipants = [...new Map(body.classGroupIds.flatMap((id) => sourceRosters[id]).map((row) => [row.identity, { ...row }])).values()];
+    if (url.endsWith("/participant-preview")) return { data: { participantCount: uniqueParticipants.length, classGroupCount: body.classGroupIds.length, participants: uniqueParticipants } };
+    if (url.endsWith("/course-offerings")) {
+      savedOffering = {
+        id: "offering", name: body.name, subject, subjectId: subject.id,
+        groupLinks: body.classGroupIds.map((id) => ({ classGroup: sourceGroups.find((row) => row.id === id) })),
+        participants: uniqueParticipants.map((row) => ({ ...row, id: "member-" + row.studentId, note: body.participantNotes.find((note) => note.studentId === row.studentId)?.note || "" })),
+        participantCount: uniqueParticipants.length,
+      };
+      return { data: savedOffering };
+    }
+    throw Error("Unexpected POST " + url);
+  });
+  axios.put.mockImplementation(async (url, body) => {
+    if (url.endsWith("/name")) savedOffering.name = body.name;
+    else {
+      const participant = savedOffering.participants.find((row) => url.endsWith("/participants/" + row.id + "/note"));
+      if (!participant) throw Error("Unknown participant");
+      participant.note = body.note;
+    }
+    return { data: savedOffering };
+  });
 });
 
-const major = { id: "major-1", code: "CNTT", name: "Công nghệ thông tin", program: "masters", active: true };
-const secondMajor = { id: "major-2", code: "KT", name: "Kinh tế", program: "masters", active: true };
-const group = {
-  id: "group-1",
-  code: "CNTT-2026-N01",
-  name: "Nhóm 01",
-  majorId: major.id,
-  major,
-  academicYear: "2026",
-  term: "HK1",
-};
-const previousGroup = { ...group, id: "group-2025", code: "CNTT-2025-N01", academicYear: "2025" };
-const activeGroup = { ...group, id: "group-active", code: "CNTT-2026-N02", name: "Nhóm 02" };
-const subject = { id: "subject-1", code: "HP01", name: "Học phần thật", program: "masters" };
-const candidate = {
-  subject,
-  eligibleClassGroups: [{ ...group, memberCount: 24 }],
-  activeClassGroups: [activeGroup],
-  completedClassGroups: [],
-};
-const persistedOffering = {
-  id: "7b46c74b-344a-4fd6-a7e2-1868c40bfc31",
-  subject,
-  status: "active",
-  participantCount: 24,
-  sessionSummary: { totalCount: 0, heldCount: 0, notHeldCount: 0, plannedCount: 0, pendingCount: 0, futurePlannedCount: 0, firstPlannedSessionDate: null },
-  groupLinks: [{ classGroupId: group.id, classGroup: group }],
-};
+function Probe() { return <div data-testid="schedule-location">{useLocation().search}</div>; }
+function mount(path = "/masters/course-offerings") {
+  return render(<MemoryRouter initialEntries={[path]}><Routes>
+    <Route path="/masters/course-offerings" element={<CourseOfferings />} />
+    <Route path="/masters/schedule" element={<Probe />} />
+  </Routes></MemoryRouter>);
+}
+async function select(label, option) {
+  fireEvent.mouseDown(screen.getByLabelText(label));
+  fireEvent.click(await screen.findByRole("option", { name: option }));
+}
+async function chooseSubject() {
+  await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).not.toHaveAttribute("aria-disabled", "true"));
+  await select("Chuyên ngành", "CNTT · Công nghệ thông tin");
+  await select("Khóa / Năm học", "2026");
+  fireEvent.click(await screen.findByRole("button", { name: /Cơ sở dữ liệu nâng cao/ }));
+  await screen.findByRole("checkbox", { name: "Chọn Lớp A" });
+}
+async function selectSources(ids = ["a", "b"]) {
+  for (const id of ids) fireEvent.click(screen.getByRole("checkbox", { name: "Chọn Lớp " + id.toUpperCase() }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "TIẾP TỤC" })).toBeEnabled());
+}
+async function confirmStep() {
+  fireEvent.change(screen.getByLabelText(/Tên lớp học phần/), { target: { value: "Lớp CNTT bổ sung" } });
+  await selectSources();
+  fireEvent.click(screen.getByRole("button", { name: "TIẾP TỤC" }));
+  await screen.findByText("Kiểm tra thông tin trước khi tạo");
+}
+const createCalls = () => axios.post.mock.calls.filter(([url]) => url.endsWith("/course-offerings"));
 
-const mockReads = (canManageScheduling, { includeScheduling = false, candidates = [candidate] } = {}) => {
-  axios.get.mockImplementation((url) => {
-    if (url.includes("/system/majors")) return Promise.resolve({ data: [major, secondMajor] });
-    if (url.includes("/auth/session")) return Promise.resolve({ data: { authenticated: true, user: { canManageScheduling } } });
-    if (url.includes("/masters/class-groups")) {
-      return Promise.resolve({ data: url.includes(secondMajor.id) ? [] : [group, previousGroup] });
-    }
-    if (url.includes("/scheduling/course-offering-candidates")) return Promise.resolve({ data: { subjects: candidates } });
-    if (includeScheduling && url.includes("/scheduling/course-offerings?")) return Promise.resolve({ data: [persistedOffering] });
-    if (includeScheduling && url.includes("/scheduling/pending-teaching-sessions")) return Promise.resolve({ data: [] });
-    if (includeScheduling && url.includes("/scheduling/teaching-sessions?")) return Promise.resolve({ data: [] });
-    if (includeScheduling && url.includes("/system/lecturers")) return Promise.resolve({ data: [] });
-    if (includeScheduling && url.includes("/system/rooms")) return Promise.resolve({ data: [] });
-    return Promise.reject(new Error(`Unexpected GET ${url}`));
+it("keeps viewing independent from selected sources and counts each learner once", async () => {
+  mount(); await chooseSubject();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Chọn Lớp A" }));
+  fireEvent.click(screen.getByRole("button", { name: "Xem Lớp B" }));
+  const roster = screen.getByTestId("source-roster");
+  expect(await within(roster).findByText("HV003")).toBeInTheDocument();
+  expect(within(roster).queryByText("HV001")).not.toBeInTheDocument();
+  expect(screen.getByRole("checkbox", { name: "Chọn Lớp A" })).toBeChecked();
+  expect(screen.getByRole("checkbox", { name: "Chọn Lớp B" })).not.toBeChecked();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Chọn Lớp B" }));
+  expect(await screen.findByText("3 HỌC VIÊN")).toBeInTheDocument();
+  expect(screen.getByText("2 LỚP / NHÓM ĐÃ CHỌN")).toBeInTheDocument();
+  expect(createCalls()).toHaveLength(0);
+  expect(axios.get.mock.calls.find(([url]) => url.includes("course-offering-candidates"))[0]).toContain("majorId=major&academicYear=2026");
+  expect(screen.queryByText(/Học kỳ/)).not.toBeInTheDocument();
+});
+
+it("preserves the form and notes when going back, then creates only on final confirmation", async () => {
+  mount(); await chooseSubject(); await confirmStep();
+  const roster = screen.getByTestId("course-offering-roster");
+  expect(within(roster).getAllByRole("columnheader").map((node) => node.textContent)).toEqual(["STT", "Mã học viên", "Họ và tên học viên", "Ghi chú"]);
+  expect(within(roster).getByText("01")).toBeInTheDocument();
+  expect(within(roster).getAllByRole("row")).toHaveLength(4);
+  fireEvent.change(screen.getByLabelText("Ghi chú HV002"), { target: { value: "Học viên học bổ sung" } });
+  fireEvent.click(screen.getByRole("button", { name: /QUAY LẠI CHỈNH SỬA/ }));
+  expect(screen.getByLabelText(/Tên lớp học phần/)).toHaveValue("Lớp CNTT bổ sung");
+  expect(screen.getByRole("checkbox", { name: "Chọn Lớp A" })).toBeChecked();
+  expect(screen.getByRole("checkbox", { name: "Chọn Lớp B" })).toBeChecked();
+  fireEvent.click(screen.getByRole("button", { name: "TIẾP TỤC" }));
+  expect(screen.getByLabelText("Ghi chú HV002")).toHaveValue("Học viên học bổ sung");
+  expect(createCalls()).toHaveLength(0);
+  fireEvent.click(screen.getByRole("button", { name: "XÁC NHẬN TẠO LỚP HỌC PHẦN" }));
+  expect(await screen.findByText("ĐÃ TẠO LỚP HỌC PHẦN")).toBeInTheDocument();
+  expect(createCalls()).toHaveLength(1);
+  expect(createCalls()[0][1]).toEqual({
+    name: "Lớp CNTT bổ sung", subjectId: "subject", classGroupIds: ["a", "b"],
+    participantNotes: [1, 2, 3].map((id) => ({ studentId: String(id), admissionRecordId: "admission-" + id, note: id === 2 ? "Học viên học bổ sung" : "" })),
   });
-};
+  fireEvent.click(screen.getByRole("button", { name: /SANG XẾP LỊCH/ }));
+  expect(await screen.findByTestId("schedule-location")).toHaveTextContent("?offeringId=offering");
+});
 
-// These actions start candidate/preview requests or navigation; await their React updates.
-// eslint-disable-next-line testing-library/no-unnecessary-act -- Await asynchronous candidate/preview updates beyond fireEvent's synchronous act.
-const clickAndWait = async (element) => { await act(async () => { fireEvent.click(element); await new Promise((resolve) => setTimeout(resolve, 0)); }); };
-const renderPage = async (node) => {
-  let result;
-  // eslint-disable-next-line testing-library/no-unnecessary-act -- Mount starts mocked API reads that must settle before interactions.
-  await act(async () => { result = render(node); });
-  return result;
-};
+it("loads a created class by URL and persists renaming and participant notes", async () => {
+  const view = mount(); await chooseSubject(); await confirmStep();
+  fireEvent.click(screen.getByRole("button", { name: "XÁC NHẬN TẠO LỚP HỌC PHẦN" }));
+  await screen.findByText("ĐÃ TẠO LỚP HỌC PHẦN");
+  fireEvent.click(screen.getByText("Xem danh sách học viên / Đổi tên lớp"));
+  fireEvent.change(screen.getByLabelText("Tên lớp học phần"), { target: { value: "Lớp CNTT đổi tên" } });
+  fireEvent.click(screen.getByRole("button", { name: "Đổi tên" }));
+  await screen.findByText("Đã lưu tên lớp học phần.");
+  fireEvent.change(screen.getByLabelText("Ghi chú HV001"), { target: { value: "Ghi chú trong lớp HP" } });
+  fireEvent.click(screen.getByRole("button", { name: "Lưu ghi chú" }));
+  await screen.findByText("Đã lưu ghi chú học viên.");
+  view.unmount(); mount("/masters/course-offerings?offeringId=offering");
+  await screen.findByText("ĐÃ TẠO LỚP HỌC PHẦN");
+  fireEvent.click(screen.getByText("Xem danh sách học viên / Đổi tên lớp"));
+  expect(await screen.findByDisplayValue("Lớp CNTT đổi tên")).toBeInTheDocument();
+  expect(screen.getByLabelText("Ghi chú HV001")).toHaveValue("Ghi chú trong lớp HP");
+  expect(axios.put).toHaveBeenCalledWith(expect.stringContaining("/offering/participants/member-1/note"), { note: "Ghi chú trong lớp HP" });
+});
 
-const chooseSelectOption = async (label, optionName) => {
-  const select = await screen.findByLabelText(label);
-  await waitFor(() => expect(select.closest(".MuiInputBase-root")).not.toHaveClass("Mui-disabled"));
-  fireEvent.mouseDown(select);
-  await clickAndWait(await screen.findByRole("option", { name: optionName }));
-};
+it("allows a nonmergeable source on its own while preventing multiple incompatible sources", async () => {
+  mount(); await chooseSubject();
+  expect(screen.getByRole("checkbox", { name: "Chọn Lớp C" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Chọn Lớp C" }));
+  expect(screen.getByRole("checkbox", { name: "Chọn Lớp A" })).toBeDisabled();
+  expect(screen.getByRole("checkbox", { name: "Chọn Lớp B" })).toBeDisabled();
+  fireEvent.change(screen.getByLabelText(/Tên lớp học phần/), { target: { value: "Lớp xếp riêng" } });
+  await screen.findByText("1 HỌC VIÊN");
+  fireEvent.click(screen.getByRole("button", { name: "TIẾP TỤC" }));
+  fireEvent.click(screen.getByRole("button", { name: "XÁC NHẬN TẠO LỚP HỌC PHẦN" }));
+  await screen.findByText("ĐÃ TẠO LỚP HỌC PHẦN");
+  expect(createCalls()[0][1].classGroupIds).toEqual(["c"]);
+  expect(screen.getByRole("button", { name: /SANG XẾP LỊCH/ })).toBeEnabled();
+});
 
-const reachSubjectWorkspace = async () => {
-  await chooseSelectOption("Chọn chuyên ngành", `${major.name} (${major.code})`);
-  await chooseSelectOption("Khóa / Năm học", "2026");
-  await clickAndWait(await screen.findByRole("button", { name: /HP01 · Học phần thật/ }));
-};
+it("validates required scope and resets the form without creating or deleting data", async () => {
+  mount();
+  await waitFor(() => expect(screen.getByRole("button", { name: "TIẾP TỤC" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "TIẾP TỤC" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Chọn chuyên ngành");
+  await chooseSubject();
+  fireEvent.change(screen.getByLabelText(/Tên lớp học phần/), { target: { value: "Tên chưa lưu" } });
+  await selectSources(["a"]);
+  fireEvent.click(screen.getByRole("button", { name: "LÀM LẠI" }));
+  expect(screen.getByLabelText(/Tên lớp học phần/)).toHaveValue("");
+  expect(screen.getByText("0 LỚP / NHÓM ĐÃ CHỌN")).toBeInTheDocument();
+  expect(createCalls()).toHaveLength(0);
+  expect(axios.put).not.toHaveBeenCalled();
+});
 
-const LocationProbe = () => {
-  const location = useLocation();
-  return <div data-testid="location-search">{location.search}</div>;
-};
-
-// The A/B preview race test awaits several real MUI renders on the Windows runner.
-jest.setTimeout(30000);
-
-describe("Masters course-offering page", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    axios.post.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/participant-preview") ? { classGroupCount: 1, participantCount: 24 } : persistedOffering }));
-    Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: jest.fn() });
-  });
-
-  it("reveals scope steps progressively and resets downstream choices when scope changes", async () => {
-    mockReads(true);
-    const { container } = await renderPage(<MemoryRouter><CourseOfferings /></MemoryRouter>);
-
-    expect(await screen.findByLabelText("Chọn chuyên ngành")).toBeInTheDocument();
-    expect(container.firstChild).toHaveAttribute("data-workspace-mode", "true");
-    expect(screen.queryByLabelText("Khóa / Năm học")).not.toBeInTheDocument();
-    expect(screen.queryByText("HỌC PHẦN CÒN CẦN TỔ CHỨC")).not.toBeInTheDocument();
-
-    await chooseSelectOption("Chọn chuyên ngành", `${major.name} (${major.code})`);
-    const yearSelect = await screen.findByLabelText("Khóa / Năm học");
-    expect(yearSelect.parentElement.querySelector("input")).toHaveValue("");
-    expect(screen.queryByText("HỌC PHẦN CÒN CẦN TỔ CHỨC")).not.toBeInTheDocument();
-
-    await chooseSelectOption("Khóa / Năm học", "2026");
-    expect(await screen.findByText("HỌC PHẦN CÒN CẦN TỔ CHỨC")).toBeInTheDocument();
-    await clickAndWait(await screen.findByRole("button", { name: /HP01 · Học phần thật/ }));
-    expect(await screen.findByText("GHÉP LỚP / NHÓM")).toBeInTheDocument();
-
-    await chooseSelectOption("Khóa / Năm học", "2025");
-    expect(screen.queryByText("GHÉP LỚP / NHÓM")).not.toBeInTheDocument();
-    expect(await screen.findByText("Chọn Học phần để tổ chức lớp học phần")).toBeInTheDocument();
-
-    await chooseSelectOption("Chọn chuyên ngành", `${secondMajor.name} (${secondMajor.code})`);
-    expect(screen.queryByText("HỌC PHẦN CÒN CẦN TỔ CHỨC")).not.toBeInTheDocument();
-    const resetYearSelect = screen.getAllByLabelText("Khóa / Năm học").find((element) => element.getAttribute("role") === "button");
-    expect(resetYearSelect.parentElement.querySelector("input")).toHaveValue("");
-  });
-
-  it("creates from eligible groups and opens the persisted offering in scheduling selection mode", async () => {
-    mockReads(true, { includeScheduling: true });
-
-    await renderPage(
-      <MemoryRouter initialEntries={["/masters/course-offerings"]}>
-        <Routes>
-          <Route path="/masters/course-offerings" element={<CourseOfferings />} />
-          <Route path="/masters/schedule" element={<><LocationProbe /><Schedule /></>} />
-        </Routes>
-      </MemoryRouter>,
-    );
-
-    await reachSubjectWorkspace();
-    const groupCheckbox = await screen.findByRole("checkbox", { name: `Chọn nhóm ${group.code}` });
-    expect(screen.getByRole("checkbox", { name: `Chọn nhóm ${activeGroup.code}` })).toBeDisabled();
-    const candidateUrl = axios.get.mock.calls.find(([url]) => url.includes("course-offering-candidates"))[0];
-    expect(candidateUrl).toContain("program=masters");
-    await clickAndWait(groupCheckbox);
-    await waitFor(() => expect(screen.getByTestId("participant-preview-count")).toHaveTextContent("24"));
-    await clickAndWait(screen.getByRole("button", { name: "Tạo lớp học phần" }));
-
-    await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
-      expect.stringContaining("/scheduling/course-offerings"),
-      { subjectId: subject.id, classGroupIds: [group.id] },
-      { withCredentials: true },
-    ));
-    expect(await screen.findByText("ĐÃ TẠO LỚP HỌC PHẦN")).toBeInTheDocument();
-    expect(axios.get.mock.calls.filter(([url]) => url.includes("course-offering-candidates"))).toHaveLength(2);
-
-    await clickAndWait(screen.getByRole("button", { name: "Sang Xếp lịch" }));
-    expect(await screen.findByTestId("location-search")).toHaveTextContent(`?offeringId=${persistedOffering.id}`);
-    const selectedCard = await screen.findByRole("button", { name: /HP01 · Học phần thật/ });
-    expect(selectedCard).toHaveAttribute("data-selected", "true");
-    expect(selectedCard).toHaveAttribute("data-new-offering", "true");
-    expect(screen.getByTestId("selected-offering-strip")).toHaveTextContent("ĐANG XẾP");
-    expect(screen.getByTestId("weekly-calendar")).toHaveAttribute("data-selecting", "true");
-    expect(screen.getByPlaceholderText("Tìm môn / lớp...")).toHaveValue("");
-    expect(screen.getByRole("button", { name: /ĐANG DẠY · 1/ })).toHaveAttribute("data-active", "true");
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "center", inline: "nearest" });
-  });
-
-  it("keeps create controls disabled for read-only Staff", async () => {
-    mockReads(false);
-    await renderPage(<MemoryRouter><CourseOfferings /></MemoryRouter>);
-
-    expect(await screen.findByText("Tài khoản hiện tại chỉ có quyền xem.")).toBeInTheDocument();
-    await reachSubjectWorkspace();
-    const groupCheckbox = await screen.findByRole("checkbox", { name: `Chọn nhóm ${group.code}` });
-    expect(groupCheckbox).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Tạo lớp học phần" })).toBeDisabled();
-    expect(axios.post).not.toHaveBeenCalled();
-  });
-
-  it("keeps the current cohort's candidates when the previous cohort responds last", async () => {
-    mockReads(true);
-    const reads = axios.get.getMockImplementation();
-    const requests = [];
-    axios.get.mockImplementation((url, config) => {
-      if (!url.includes("/course-offering-candidates?")) return reads(url, config);
-      return new Promise((resolve) => requests.push({ url, resolve }));
-    });
-    await renderPage(<MemoryRouter><CourseOfferings /></MemoryRouter>);
-    await chooseSelectOption("Chọn chuyên ngành", `${major.name} (${major.code})`);
-    await chooseSelectOption("Khóa / Năm học", "2026");
-    expect(requests).toHaveLength(1);
-    expect(requests[0].url).toContain("academicYear=2026");
-    await chooseSelectOption("Khóa / Năm học", "2025");
-    expect(requests).toHaveLength(2);
-    expect(requests[1].url).toContain("academicYear=2025");
-    const current = { ...candidate, subject: { ...subject, id: "subject-2025", code: "HP25", name: "Học phần khóa 2025" } };
-    await act(async () => { requests[1].resolve({ data: { subjects: [current] } }); });
-    expect(screen.getByText("HP25 · Học phần khóa 2025")).toBeInTheDocument();
-    await act(async () => { requests[0].resolve({ data: { subjects: [candidate] } }); });
-    expect(screen.getByText("HP25 · Học phần khóa 2025")).toBeInTheDocument();
-    expect(screen.queryByText("HP01 · Học phần thật")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Khóa / Năm học")).toHaveTextContent("2025");
-  });
-
-  it("keeps two upper panels and a bottom composition/summary with a disabled, non-demo retake area", async () => {
-    mockReads(true);
-    await renderPage(<MemoryRouter><CourseOfferings /></MemoryRouter>);
-    await reachSubjectWorkspace();
-    expect(screen.queryByRole("heading", { name: "Tạo lớp học phần" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Đào tạo Thạc sĩ")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Tổ chức học phần từ gói học phần chính thức/)).not.toBeInTheDocument();
-    expect(within(screen.getByTestId("offering-shell")).getByText("TẠO LỚP HỌC PHẦN")).toBeInTheDocument();
-    const top = screen.getByTestId("offering-top-panels");
-    const groupsPanel = screen.getByTestId("offering-groups-panel");
-    const retake = screen.getByTestId("offering-retake-panel");
-    expect(top.children).toHaveLength(2);
-    expect(top.firstElementChild).toBe(groupsPanel);
-    expect(top.lastElementChild).toBe(retake);
-    expect(retake).toHaveAttribute("aria-disabled", "true");
-    expect(within(retake).getByLabelText("Tìm học viên học lại")).toBeDisabled();
-    expect(within(retake).getAllByText("Chưa có dữ liệu học lại chính thức")).toHaveLength(1);
-    expect(within(retake).getAllByText("Danh sách học viên học lại sẽ xuất hiện tại đây khi kết quả học tập được liên kết chính xác với học phần.")).toHaveLength(1);
-    expect(within(retake).queryByText(/Chức năng này sẽ được mở/)).not.toBeInTheDocument();
-    expect(within(retake).queryByRole("checkbox")).not.toBeInTheDocument();
-    const bottom = screen.getByTestId("offering-bottom-panel");
-    expect(top.nextElementSibling).toBe(bottom);
-    expect(bottom.lastElementChild).toBe(screen.getByTestId("offering-summary"));
-    expect(screen.getByTestId("offering-shell")).toHaveStyle("height: 100%; min-height: 0; grid-template-rows: 68px minmax(0,1fr)");
-    expect(screen.getByTestId("offering-body")).toHaveStyle("min-height: 0; grid-template-rows: minmax(0,1fr) 170px");
-    expect(bottom).toHaveStyle("height: 170px; grid-template-columns: minmax(0,1fr) 260px");
-    const summary = screen.getByTestId("offering-summary");
-    expect(summary).toHaveStyle("grid-template-rows: auto minmax(0,1fr) auto");
-    expect(summary).not.toHaveStyle("overflow-y: auto");
-    expect(within(summary).getByRole("button", { name: "Làm lại" })).toBeDisabled();
-    expect(within(summary).getByRole("button", { name: "Tạo lớp học phần" })).toBeDisabled();
-    expect(within(summary).getByRole("button", { name: "Tạo lớp học phần" })).toBeVisible();
-    expect(within(bottom).getByText("3 · THÀNH PHẦN LỚP HỌC PHẦN")).toBeInTheDocument();
-    expect(screen.queryByText(/2\/3 ·/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Ghép học viên học lại ·/)).not.toBeInTheDocument();
-    expect(screen.getByTestId("create-offering-workspace")).toHaveAttribute("data-scheduling-typography", "compact");
-    expect(screen.getByTestId("participant-preview-count")).toHaveTextContent("0");
-    expect(axios.post).not.toHaveBeenCalled();
-  });
-
-  it("keeps the A+B authoritative preview when the older A-only response arrives last", async () => {
-    const groupB = { ...group, id: "group-b", code: "CNTT-2026-B", memberCount: 2 };
-    mockReads(true, { candidates: [{ ...candidate, eligibleClassGroups: [{ ...group, memberCount: 2 }, groupB] }] });
-    let resolveA;
-    let resolveAB;
-    axios.post.mockImplementation((_url, data) => new Promise((resolve) => {
-      if (data.classGroupIds.length === 1) resolveA = resolve;
-      else resolveAB = resolve;
-    }));
-    await renderPage(<MemoryRouter><CourseOfferings /></MemoryRouter>);
-    await reachSubjectWorkspace();
-    await clickAndWait(screen.getByRole("checkbox", { name: `Chọn nhóm ${group.code}` }));
-    expect(screen.getByLabelText("Đang tính tổng học viên")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Tạo lớp học phần" })).toBeDisabled();
-    await clickAndWait(screen.getByRole("checkbox", { name: `Chọn nhóm ${groupB.code}` }));
-    expect(axios.post).toHaveBeenLastCalledWith(expect.stringMatching(/\/participant-preview$/), { classGroupIds: [group.id, groupB.id] }, { withCredentials: true });
-    await act(async () => { resolveAB({ data: { classGroupCount: 2, participantCount: 3 } }); });
-    expect(screen.getByTestId("participant-preview-count")).toHaveTextContent("3");
-    await act(async () => { resolveA({ data: { classGroupCount: 1, participantCount: 2 } }); });
-    expect(screen.getByTestId("participant-preview-count")).toHaveTextContent("3");
-    expect(screen.getByRole("button", { name: "Tạo lớp học phần" })).toBeEnabled();
-    await clickAndWait(screen.getByRole("button", { name: "Làm lại" }));
-    expect(screen.getByTestId("participant-preview-count")).toHaveTextContent("0");
-    expect(axios.post).toHaveBeenCalledTimes(2);
-  });
-
-  it("shows an unknown count and blocks create on preview failure without falling back to memberCount sums", async () => {
-    mockReads(true);
-    axios.post.mockRejectedValue(new Error("Preview unavailable"));
-    await renderPage(<MemoryRouter><CourseOfferings /></MemoryRouter>);
-    await reachSubjectWorkspace();
-    await clickAndWait(screen.getByRole("checkbox", { name: `Chọn nhóm ${group.code}` }));
-    expect(await screen.findByText(/Không thể tính tổng học viên/)).toBeInTheDocument();
-    expect(screen.getByTestId("participant-preview-count")).toHaveTextContent("—");
-    expect(screen.getByRole("button", { name: "Tạo lớp học phần" })).toBeDisabled();
-    expect(axios.post).toHaveBeenCalledTimes(1);
-    expect(axios.post.mock.calls[0][0]).toMatch(/\/participant-preview$/);
-  });
+it("disables creation and editing when the session lacks scheduling permission", async () => {
+  manager = false; mount(); await chooseSubject();
+  expect(screen.getByLabelText(/Tên lớp học phần/)).toBeDisabled();
+  expect(screen.getByRole("checkbox", { name: "Chọn Lớp A" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "TIẾP TỤC" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Xem Lớp B" }));
+  expect(await within(screen.getByTestId("source-roster")).findByText("HV003")).toBeInTheDocument();
+  expect(createCalls()).toHaveLength(0);
 });

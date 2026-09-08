@@ -61,8 +61,8 @@ describePostgres("Scheduling PostgreSQL locking", () => {
       Lecturer.create({ id: ids.lecturer2, code: `${prefix}L2`, name: `${prefix} Lecturer 2`, active: true }),
     ]);
     await Promise.all([
-      CourseOffering.create({ id: ids.offering1, subjectId: ids.subject, status: "active" }),
-      CourseOffering.create({ id: ids.offering2, subjectId: ids.subject, status: "active" }),
+      CourseOffering.create({ id: ids.offering1, subjectId: ids.subject, name: "Test offering", status: "active" }),
+      CourseOffering.create({ id: ids.offering2, subjectId: ids.subject, name: "Test offering", status: "active" }),
     ]);
     await Promise.all([
       CourseOfferingClassGroup.create({ courseOfferingId: ids.offering1, classGroupId: ids.group1 }),
@@ -94,8 +94,6 @@ describePostgres("Scheduling PostgreSQL locking", () => {
     const created = await service.createTeachingSession({
       courseOfferingId: ids.offering1,
       sessionDate: "2098-09-12",
-      startTime: "08:00",
-      endTime: "10:00",
       period: "MORNING",
       lecturerId: ids.lecturer1,
       roomId: ids.room1,
@@ -105,7 +103,8 @@ describePostgres("Scheduling PostgreSQL locking", () => {
     const listed = await service.listTeachingSessions({ from: "2098-09-12", to: "2098-09-12" });
 
     expect(reloaded.id).toBe(created.id);
-    expect(reloaded.startTime).toBe("08:00:00");
+    expect(reloaded.startTime).toBe("00:00:00");
+    expect(reloaded.endTime).toBe("12:00:00");
     expect(listed.map((item) => item.id)).toContain(created.id);
   });
 

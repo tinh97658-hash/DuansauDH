@@ -12,6 +12,8 @@ import {
   ListTeachingSessionsQueryDto,
   PreviewCourseOfferingParticipantsDto,
   UpdateTeachingSessionDto,
+  RenameCourseOfferingDto,
+  UpdateCourseOfferingParticipantNoteDto,
 } from "./dto/scheduling.dto.js";
 import { SchedulingService } from "./scheduling.service.js";
 
@@ -38,7 +40,6 @@ export class SchedulingController {
   }
 
   @Post("course-offerings/participant-preview")
-  @UseGuards(SchedulingWriteGuard)
   previewCourseOfferingParticipants(@Body() dto: PreviewCourseOfferingParticipantsDto) {
     return this.scheduling.previewCourseOfferingParticipants(dto);
   }
@@ -46,6 +47,25 @@ export class SchedulingController {
   @Get("course-offerings/:id/unresolved-teaching-sessions")
   listUnresolvedTeachingSessions(@Param("id", ParseUUIDPipe) id: string) {
     return this.scheduling.listUnresolvedTeachingSessions(id);
+  }
+
+  @Get("course-offerings/:id/sessions")
+  courseOfferingSessions(@Param("id", ParseUUIDPipe) id: string) { return this.scheduling.listCourseOfferingSessions(id); }
+
+  @Put("course-offerings/:id/name")
+  @UseGuards(SchedulingWriteGuard)
+  renameCourseOffering(@Param("id", ParseUUIDPipe) id: string, @Body() dto: RenameCourseOfferingDto) {
+    return this.scheduling.renameCourseOffering(id, dto.name);
+  }
+
+  @Put("course-offerings/:id/participants/:participantId/note")
+  @UseGuards(SchedulingWriteGuard)
+  updateParticipantNote(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("participantId", ParseUUIDPipe) participantId: string,
+    @Body() dto: UpdateCourseOfferingParticipantNoteDto,
+  ) {
+    return this.scheduling.updateCourseOfferingParticipantNote(id, participantId, dto.note);
   }
 
   @Get("course-offerings/:id")
@@ -98,15 +118,6 @@ export class SchedulingController {
   @UseGuards(SchedulingWriteGuard)
   deleteTeachingSession(@Param("id", ParseUUIDPipe) id: string) {
     return this.scheduling.deleteTeachingSession(id);
-  }
-
-  @Put("course-offerings/:id/completion")
-  @UseGuards(SchedulingWriteGuard)
-  completeCourseOffering(
-    @Param("id", ParseUUIDPipe) id: string,
-    @CurrentUser() user: any,
-  ) {
-    return this.scheduling.completeCourseOffering(id, user.id);
   }
 
   @Put("assignee")

@@ -3,7 +3,7 @@ import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
-  Alert, Box, Button, Checkbox, Chip, CircularProgress, FormControl,
+  Alert, Box, Button, Checkbox, Chip, CircularProgress, FormControl, FormControlLabel,
   IconButton, InputAdornment, MenuItem, Paper, Select, Stack, Switch, Tab, Tabs,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField,
   Tooltip, Typography,
@@ -15,6 +15,7 @@ import {
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
+import TeachingLoadFields, { teachingLoadPayload } from "../../components/TeachingLoadFields";
 import SubjectIdentityFields, {
   buildSubjectIdentityPayload,
   emptySubjectIdentity,
@@ -303,6 +304,7 @@ const TrainingPlan = () => {
       sortOrder: Number(subjectDraft.sortOrder || 0),
       active: Boolean(subjectDraft.active),
       ...buildSubjectIdentityPayload(subjectDraft),
+      ...teachingLoadPayload(subjectDraft),
     };
 
     try {
@@ -332,6 +334,8 @@ const TrainingPlan = () => {
       codeText: s.codeText || "",
       name: s.name,
       credits: s.credits ?? 3,
+      teachingUnits: s.teachingUnits,
+      teachingUnitType: s.teachingUnitType,
       majorAssignment: Boolean(s.majorAssignment),
       subjectType: s.subjectType || "CN",
       isRequired: s.isRequired !== false,
@@ -364,6 +368,7 @@ const TrainingPlan = () => {
       sortOrder: Number(editingSubjectForm.sortOrder || 0),
       active: Boolean(editingSubjectForm.active),
       ...buildSubjectIdentityPayload(editingSubjectForm),
+      ...teachingLoadPayload(editingSubjectForm),
     };
 
     try {
@@ -576,6 +581,13 @@ const TrainingPlan = () => {
     } catch (err) {
       toast.error(err.response?.data?.message || "Không thể đặt gói chính thức");
     }
+  };
+
+  const handleMergePermission = async (pkg, canMerge) => {
+    try {
+      const { data } = await axios.put(API_BASE_URL + "/plan/subject-packages/" + pkg.id, { canMerge }, { withCredentials: true });
+      setPackages((rows) => rows.map((p) => p.id === pkg.id ? data : p));
+    } catch (error) { toast.error(error.response?.data?.message || "Không lưu được quyền ghép lớp."); }
   };
 
   const handleStartEditPkg = (pkg) => {
@@ -874,6 +886,7 @@ const TrainingPlan = () => {
 
           {isAdmin && isAddingSubject && (
             <Box sx={{ mb: 1.5 }}>
+              <TeachingLoadFields value={subjectDraft} onChange={setSubjectDraft} />
               <SubjectIdentityFields
                 subject={subjectDraft}
                 identity={subjectDraft}
@@ -888,6 +901,7 @@ const TrainingPlan = () => {
 
           {isAdmin && editingSubjectForm && (
             <Box sx={{ mb: 1.5 }}>
+              <TeachingLoadFields value={editingSubjectForm} onChange={setEditingSubjectForm} />
               <SubjectIdentityFields
                 subject={editingSubjectForm}
                 identity={editingSubjectForm}
@@ -1758,6 +1772,9 @@ const TrainingPlan = () => {
                                       verticalAlign: "top",
                                     }}
                                   >
+                                    <FormControlLabel sx={{ m: 0 }} label="Có thể ghép lớp" control={<Checkbox size="small" checked={pkg.canMerge === true} disabled={!isAdmin}
+                                      inputProps={{ "aria-label": "Có thể ghép lớp " + pkg.code }}
+                                      onChange={(e) => handleMergePermission(pkg, e.target.checked)} />} />
                                     {isEditing ? (
                                       <Stack spacing={0.5} sx={{ py: 0.5 }}>
                                         <TextField

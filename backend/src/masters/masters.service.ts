@@ -66,7 +66,6 @@ export class MastersService {
     const where: Record<string, unknown> = { program: "masters" };
     if (majorId) where.majorId = majorId;
     if (academicYear) where.academicYear = academicYear;
-    if (term) where.term = term;
     if (status && status !== "ALL") where.status = status;
 
     const groups = await this.classGroups.findAll({
@@ -133,12 +132,53 @@ export class MastersService {
     };
   }
 
+  async createClassFromStudents(dto: import("./dto/masters-class-group.dto.js").CreateClassFromStudentsDto) {
+    const id = await this.sequelize.transaction(async (transaction) => {
+      const parent = await this.classGroups.findOne({
+        where: { id: dto.parentGroupId, program: "masters", status: "open" },
+        transaction, lock: transaction.LOCK.UPDATE,
+      });
+      if (!parent || parent.parentGroupId || !parent.majorId) throw new BadRequestException("Chọn Nhóm HP đang mở có ngành.");
+      const ids = [...new Set(dto.admissionRecordIds)];
+      if (ids.length !== dto.admissionRecordIds.length) throw new BadRequestException("Danh sách học viên rỗng hoặc trùng.");
+      const records = await this.admissionRecords.findAll({
+        where: this.eligibleAdmissionWhere(parent, ids) as any, transaction, lock: transaction.LOCK.UPDATE,
+      });
+      if (records.length !== ids.length) throw new BadRequestException("Học viên không đủ điều kiện hoặc khác ngành/khóa của nhóm.");
+      const group = await this.classGroupsService.create({
+        code: dto.code, name: dto.name, parentGroupId: parent.id, majorId: parent.majorId,
+        program: "masters", academicYear: parent.academicYear || undefined,
+        maxStudents: Math.max(40, records.length),
+      }, transaction);
+      const seen = new Set<string>();
+      const rows = records.filter((record) => {
+        const identity = record.studentId || record.id;
+        if (seen.has(identity)) return false;
+        seen.add(identity); return true;
+      });
+      await this.classGroupMembers.bulkCreate(rows.map((record) => ({
+        classGroupId: group.id, admissionRecordId: record.id, studentId: record.studentId || null,
+      })), { transaction });
+      return group.id;
+    });
+    return this.getClassGroup(id);
+  }
+
+  async updateMemberNote(classGroupId: string, memberId: string, note: string) {
+    await this.getClassGroup(classGroupId);
+    const member = await this.classGroupMembers.findOne({ where: { id: memberId, classGroupId } });
+    if (!member) throw new NotFoundException("Không tìm thấy học viên trong lớp.");
+    await member.update({ note });
+    return member;
+  }
+
   async createClassGroup(dto: CreateMastersClassGroupDto) {
     const group = await this.classGroupsService.create({ ...dto, program: "masters" });
     return this.getClassGroup(group.id);
   }
 
   async updateClassGroup(id: string, dto: UpdateMastersClassGroupDto) {
+    await this.getClassGroup(id);
     await this.classGroupsService.update(id, dto);
     return this.getClassGroup(id);
   }
@@ -198,7 +238,6 @@ export class MastersService {
     // Lấy tất cả các thành viên của nhóm học phần thạc sĩ trong cùng năm/học kỳ
     const groupWhere: Record<string, unknown> = { program: "masters" };
     if (academicYear) groupWhere.academicYear = academicYear;
-    if (term) groupWhere.term = term;
 
     const members = await this.classGroupMembers.findAll({
       include: [
@@ -206,23 +245,26 @@ export class MastersService {
           model: ClassGroup,
           as: "classGroup",
           where: groupWhere,
-          attributes: ["id", "code", "name", "academicYear", "term"],
+          attributes: ["id", "code", "name", "majorId", "academicYear", "term", "parentGroupId"],
         },
       ],
     });
 
     const memberMap = new Map<string, { memberId: string; group: any }>();
     for (const m of members) {
-      if (m.admissionRecordId) {
-        memberMap.set(m.admissionRecordId, {
-          memberId: m.id,
-          group: m.classGroup ? { id: m.classGroup.id, code: m.classGroup.code, name: m.classGroup.name } : null,
-        });
+      if (m.classGroup && !m.classGroup.parentGroupId) {
+        for (const identity of [m.admissionRecordId, m.studentId].filter(Boolean)) {
+          memberMap.set([identity, m.classGroup.majorId || "", m.classGroup.academicYear || ""].join(":"), {
+            memberId: m.id,
+            group: { id: m.classGroup.id, code: m.classGroup.code, name: m.classGroup.name },
+          });
+        }
       }
     }
 
     return records.map((r) => {
-      const assignment = memberMap.get(r.id);
+      const scopeSuffix = [r.majorId || "", r.academicYear || ""].join(":");
+      const assignment = memberMap.get(r.id + ":" + scopeSuffix) || (r.studentId ? memberMap.get(r.studentId + ":" + scopeSuffix) : undefined);
       return {
         id: r.id,
         code: r.code || "",
@@ -239,8 +281,47 @@ export class MastersService {
         status: r.status,
         assignedGroup: assignment ? assignment.group : null,
         memberId: assignment ? assignment.memberId : null,
+        classes: members.filter((m) => m.admissionRecordId === r.id && m.classGroup?.parentGroupId)
+          .map((m) => ({ id: m.classGroup.id, name: m.classGroup.name, code: m.classGroup.code })) ,
       };
     });
+  }
+
+
+  // Root admission groups compete within program + major + intake year.
+  // Child teaching classes and CourseOffering snapshots are a separate scope.
+  private async requireUnassignedInScope(group: ClassGroup, records: AdmissionRecord[], transaction: Transaction) {
+    const studentIds = [...new Set(records.map((record) => record.studentId).filter((id): id is string => Boolean(id)))].sort();
+    if (studentIds.length) {
+      await this.students.findAll({
+        where: { id: { [Op.in]: studentIds } }, order: [["id", "ASC"]],
+        transaction, lock: transaction.LOCK.UPDATE,
+      });
+    }
+    const scopeGroups = await this.classGroups.findAll({
+      where: { program: group.program, parentGroupId: null, majorId: group.majorId || null, academicYear: group.academicYear },
+      attributes: ["id", "code", "name"], transaction,
+    });
+    const memberships = await this.classGroupMembers.findAll({
+      where: {
+        classGroupId: { [Op.in]: scopeGroups.map((item) => item.id) },
+        [Op.or]: [
+          { admissionRecordId: { [Op.in]: records.map((record) => record.id) } },
+          ...(studentIds.length ? [{ studentId: { [Op.in]: studentIds } }] : []),
+        ],
+      },
+      transaction,
+    });
+    for (const record of records) {
+      const membership = memberships.find((member) => member.admissionRecordId === record.id
+        || (record.studentId && member.studentId === record.studentId));
+      if (!membership) continue;
+      const current = scopeGroups.find((item) => item.id === membership.classGroupId);
+      throw new ConflictException(
+        "Học viên " + (record.code || record.fullName || record.id) + " đã thuộc nhóm "
+        + (current?.code || current?.name || membership.classGroupId) + " và không thể gán tiếp vào nhóm " + (group.code || group.name) + ".",
+      );
+    }
   }
 
   // ===== PHÂN NHÓM HỌC VIÊN =====
@@ -252,28 +333,35 @@ export class MastersService {
         lock: transaction.LOCK.UPDATE,
       });
       if (!group) throw new NotFoundException("Không tìm thấy nhóm học phần đang mở.");
+      if (group.parentGroupId) {
+        const records = await this.admissionRecords.findAll({
+          where: this.eligibleAdmissionWhere(group, dto.admissionRecordIds) as any,
+          transaction, lock: transaction.LOCK.UPDATE,
+        });
+        if (records.length !== dto.admissionRecordIds.length) throw new BadRequestException("Học viên không đủ điều kiện hoặc khác ngành/khóa.");
+        const members = await this.classGroupMembers.findAll({ where: { classGroupId }, transaction });
+        const seen = new Set(members.map((m) => m.studentId || m.admissionRecordId));
+        const rows = records.filter((r) => {
+          const identity = r.studentId || r.id;
+          if (seen.has(identity)) return false;
+          seen.add(identity); return true;
+        });
+        if (members.length + rows.length > group.maxStudents) throw new BadRequestException("Lớp vượt quá sĩ số tối đa.");
+        await this.classGroupMembers.bulkCreate(rows.map((r) => ({ classGroupId, admissionRecordId: r.id, studentId: r.studentId || null })), { transaction });
+        return { success: true, added: rows.length };
+      }
       const admissionRecordIds = dto.admissionRecordIds;
       const records = await this.admissionRecords.findAll({
         where: this.eligibleAdmissionWhere(group, admissionRecordIds) as any,
-        attributes: ["id", "studentId"],
+        attributes: ["id", "studentId", "code", "fullName"],
+        order: [["id", "ASC"]],
         transaction,
         lock: transaction.LOCK.UPDATE,
       });
       if (records.length !== admissionRecordIds.length) {
         throw new BadRequestException("Danh sách có học viên không đủ điều kiện, sai chuyên ngành hoặc sai khóa tuyển sinh.");
       }
-      const samePeriodGroups = await this.classGroups.findAll({
-        where: { program: "masters", academicYear: group.academicYear, term: group.term },
-        attributes: ["id"],
-        transaction,
-      });
-      await this.classGroupMembers.destroy({
-        where: {
-          classGroupId: { [Op.in]: samePeriodGroups.map((item) => item.id) },
-          admissionRecordId: { [Op.in]: admissionRecordIds },
-        },
-        transaction,
-      });
+      await this.requireUnassignedInScope(group, records, transaction);
       const existingCount = await this.classGroupMembers.count({ where: { classGroupId }, transaction });
       if (existingCount + records.length > group.maxStudents) {
         throw new BadRequestException(`Nhóm chỉ còn ${Math.max(0, group.maxStudents - existingCount)} chỗ trống.`);
@@ -308,33 +396,23 @@ export class MastersService {
         lock: transaction.LOCK.UPDATE,
       });
       if (groups.length !== dto.classGroupIds.length) throw new BadRequestException("Danh sách có nhóm không tồn tại hoặc đã đóng.");
+      if (groups.some((group) => group.parentGroupId)) throw new BadRequestException("Không chia lại học viên giữa các lớp HP độc lập.");
       const scope = groups[0];
       const sameScope = groups.every((group) => (
         group.academicYear === scope.academicYear
-        && group.term === scope.term
         && (group.majorId || null) === (scope.majorId || null)
       ));
-      if (!sameScope) throw new BadRequestException("Các nhóm chia đều phải cùng chuyên ngành, năm tuyển sinh và học kỳ.");
+      if (!sameScope) throw new BadRequestException("Các nhóm chia đều phải cùng chuyên ngành và năm tuyển sinh.");
       const records = await this.admissionRecords.findAll({
         where: this.eligibleAdmissionWhere(scope, dto.admissionRecordIds) as any,
+        order: [["id", "ASC"]],
         transaction,
         lock: transaction.LOCK.UPDATE,
       });
       if (records.length !== dto.admissionRecordIds.length) {
         throw new BadRequestException("Danh sách có học viên không đủ điều kiện, sai chuyên ngành hoặc sai khóa tuyển sinh.");
       }
-      const samePeriodGroups = await this.classGroups.findAll({
-        where: { program: "masters", academicYear: scope.academicYear, term: scope.term },
-        attributes: ["id"],
-        transaction,
-      });
-      await this.classGroupMembers.destroy({
-        where: {
-          classGroupId: { [Op.in]: samePeriodGroups.map((group) => group.id) },
-          admissionRecordId: { [Op.in]: dto.admissionRecordIds },
-        },
-        transaction,
-      });
+      await this.requireUnassignedInScope(scope, records, transaction);
       const sortedStudents = [...records];
       if ((dto.method || "alphabetical") === "alphabetical") {
         sortedStudents.sort((left, right) => {

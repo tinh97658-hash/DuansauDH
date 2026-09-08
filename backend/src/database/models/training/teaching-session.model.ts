@@ -12,15 +12,19 @@ export class TeachingSession extends Model {
   @BelongsTo(() => CourseOffering, { foreignKey: "courseOfferingId", as: "courseOffering" })
   declare courseOffering: CourseOffering;
 
-  @Column({ type: DataType.DATEONLY, allowNull: false }) declare sessionDate: string;
-  @Column({ type: DataType.TIME, allowNull: false }) declare startTime: string;
-  @Column({ type: DataType.TIME, allowNull: false }) declare endTime: string;
-  @Column({ type: DataType.ENUM("MORNING", "AFTERNOON"), allowNull: false }) declare period: "MORNING" | "AFTERNOON";
+  @Default(true) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare isScheduled: boolean;
+  @Column({ type: DataType.INTEGER, allowNull: true }) declare sequenceNumber: number | null;
+  @Column({ type: DataType.INTEGER, allowNull: true }) declare plannedUnits: number | null;
 
-  @ForeignKey(() => Lecturer) @Column({ type: DataType.UUID, allowNull: false }) declare lecturerId: string;
+  @Column({ type: DataType.DATEONLY, allowNull: true }) declare sessionDate: string | null;
+  @Column({ type: DataType.TIME, allowNull: true }) declare startTime: string | null;
+  @Column({ type: DataType.TIME, allowNull: true }) declare endTime: string | null;
+  @Column({ type: DataType.ENUM("MORNING", "AFTERNOON"), allowNull: true }) declare period: "MORNING" | "AFTERNOON" | null;
+
+  @ForeignKey(() => Lecturer) @Column({ type: DataType.UUID, allowNull: true }) declare lecturerId: string | null;
   @BelongsTo(() => Lecturer, { foreignKey: "lecturerId", as: "lecturer" }) declare lecturer: Lecturer;
 
-  @ForeignKey(() => Room) @Column({ type: DataType.UUID, allowNull: false }) declare roomId: string;
+  @ForeignKey(() => Room) @Column({ type: DataType.UUID, allowNull: true }) declare roomId: string | null;
   @BelongsTo(() => Room, { foreignKey: "roomId", as: "room" }) declare room: Room;
 
   @Column({ type: DataType.TEXT, allowNull: true }) declare note: string | null;

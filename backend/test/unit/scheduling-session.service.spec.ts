@@ -39,10 +39,11 @@ const buildService = () => {
   const classGroupMembers = { findAll: jest.fn().mockResolvedValue([]) };
   const majors = { findOne: jest.fn() };
   const staff = { findByPk: jest.fn(), update: jest.fn() };
-  const sequelize = { transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)) };
+  const sequelize = { query: jest.fn(), transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)) };
   const rooms = { findAll: jest.fn() };
   const lecturers = { findAll: jest.fn() };
   const teachingSessions = { findAll: jest.fn(), findByPk: jest.fn(), findOne: jest.fn(), create: jest.fn() };
+  const offeringParticipants = { findAll: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) };
   const service = new SchedulingService(
     courseOfferings as never,
     offeringGroups as never,
@@ -56,9 +57,10 @@ const buildService = () => {
     rooms as never,
     lecturers as never,
     teachingSessions as never,
+    offeringParticipants as never,
   );
   return {
-    service, courseOfferings, offeringGroups, subjects, classGroups, classGroupMembers,
+    service, offeringParticipants, courseOfferings, offeringGroups, subjects, packages, classGroups, classGroupMembers,
     sequelize, rooms, lecturers, teachingSessions,
   };
 };
@@ -75,6 +77,7 @@ const arrangeValid = (mocks: ReturnType<typeof buildService>, options: {
   mocks.rooms.findAll.mockImplementation(async (query: any) => roomRows.filter((item) => idsFrom(query).includes(item.id)));
   mocks.lecturers.findAll.mockImplementation(async (query: any) => lecturerRows.filter((item) => idsFrom(query).includes(item.id)));
   mocks.classGroups.findAll.mockResolvedValue(groups);
+  mocks.packages.findAll.mockResolvedValue(groups.map((g) => ({ classGroupId: g.id, canMerge: true })));
   mocks.courseOfferings.findByPk.mockResolvedValue(offering());
   mocks.subjects.findByPk.mockResolvedValue(subject);
   mocks.teachingSessions.findAll.mockResolvedValue([]);
@@ -110,7 +113,8 @@ describe("SchedulingService TeachingSession", () => {
   it("rejects an ended create target before locks or insert with normalized time details", async () => {
     const mocks = buildService();
     arrangeValid(mocks);
-    const dto = createDto({ sessionDate: "2026-09-04", startTime: "10:00", endTime: "11:59:59" });
+    jest.setSystemTime(new Date("2026-09-04T05:01:00Z"));
+    const dto = createDto({ sessionDate: "2026-09-04" });
     try {
       await mocks.service.createTeachingSession(dto);
       throw new Error("Expected past target rejection");
@@ -120,7 +124,7 @@ describe("SchedulingService TeachingSession", () => {
       expect((error as ConflictException).getResponse()).toEqual({
         code: "SESSION_TIME_IN_PAST",
         message: "Không thể xếp lịch vào một buổi học đã kết thúc.",
-        details: { sessionDate: "2026-09-04", startTime: "10:00:00", endTime: "11:59:59" },
+        details: { sessionDate: "2026-09-04", startTime: "00:00:00", endTime: "12:00:00" },
       });
     }
     expect(mocks.sequelize.transaction).not.toHaveBeenCalled();
@@ -164,8 +168,7 @@ describe("SchedulingService TeachingSession", () => {
       mocks.teachingSessions.findAll.mockImplementation(async (query: any) => {
         expect(query.where.status).toEqual({ [Op.ne]: "not_held" });
         expect(query.where.sessionDate).toBe("2026-09-12");
-        expect(query.where.startTime[Op.lt]).toBe("10:00:00");
-        expect(query.where.endTime[Op.gt]).toBe("08:00:00");
+        expect(query.where.period).toBe("MORNING");
         return [existing].filter((item) => item.status !== query.where.status[Op.ne]);
       });
       if (status === "not_held") {
@@ -187,8 +190,8 @@ describe("SchedulingService TeachingSession", () => {
     expect(mocks.teachingSessions.create).toHaveBeenCalledWith({
       courseOfferingId: "offering-1",
       sessionDate: "2026-09-12",
-      startTime: "08:00:00",
-      endTime: "10:00:00",
+      startTime: "00:00:00",
+      endTime: "12:00:00",
       period: "MORNING",
       lecturerId: "lecturer-1",
       roomId: "room-1",
@@ -200,23 +203,21 @@ describe("SchedulingService TeachingSession", () => {
     expect(mocks.classGroups.findAll.mock.invocationCallOrder[0]).toBeLessThan(mocks.courseOfferings.findByPk.mock.invocationCallOrder[0]);
   });
 
-  it("rejects an empty or reversed time range", async () => {
-    const mocks = buildService();
-
-    await expect(mocks.service.createTeachingSession(createDto({ startTime: "10:00", endTime: "10:00" })))
-      .rejects.toThrow("bắt đầu phải nhỏ hơn");
-    await expect(mocks.service.createTeachingSession(createDto({ startTime: "11:00", endTime: "10:00" })))
-      .rejects.toThrow("bắt đầu phải nhỏ hơn");
-    expect(mocks.sequelize.transaction).not.toHaveBeenCalled();
+  it("derives the entire period without requiring manual times", async () => {
+    const mocks = buildService(); arrangeValid(mocks);
+    const { startTime, endTime, ...dto } = createDto();
+    await mocks.service.createTeachingSession(dto);
+    expect(mocks.teachingSessions.create).toHaveBeenCalledWith(expect.objectContaining({ period: "MORNING", startTime: "00:00:00", endTime: "12:00:00" }), { transaction });
   });
 
-  it("rejects a completed CourseOffering", async () => {
+
+  it("allows more sessions regardless of legacy class completion or teaching quantities", async () => {
     const mocks = buildService();
     arrangeValid(mocks);
-    mocks.courseOfferings.findByPk.mockResolvedValue(offering({ status: "completed" }));
+    mocks.courseOfferings.findByPk.mockResolvedValue(offering({ status: "completed", plannedUnits: 1, unitType: "periods" }));
 
-    await expect(mocks.service.createTeachingSession(createDto())).rejects.toThrow("đã hoàn thành");
-    expect(mocks.teachingSessions.create).not.toHaveBeenCalled();
+    await expect(mocks.service.createTeachingSession(createDto())).resolves.toBeDefined();
+    expect(mocks.teachingSessions.create).toHaveBeenCalledTimes(1);
   });
 
   it("rejects an inactive Room", async () => {
@@ -290,17 +291,13 @@ describe("SchedulingService TeachingSession", () => {
     await expectConflictCode(mocks.service.createTeachingSession(createDto()), "CLASS_GROUP_CONFLICT");
   });
 
-  it("uses strict overlap so a touching boundary is not a conflict", async () => {
-    const mocks = buildService();
-    arrangeValid(mocks);
-    mocks.teachingSessions.findAll.mockImplementation(async (query: any) => {
-      expect(query.where.startTime[Op.lt]).toBe("11:00:00");
-      expect(query.where.endTime[Op.gt]).toBe("10:00:00");
-      return [];
-    });
-
-    await expect(mocks.service.createTeachingSession(createDto({ startTime: "10:00", endTime: "11:00" }))).resolves.toBeDefined();
+  it("reserves the whole period even when legacy times do not overlap", async () => {
+    const mocks = buildService(); arrangeValid(mocks);
+    mocks.teachingSessions.findAll.mockResolvedValue([session({ startTime: "10:00:00", endTime: "11:00:00" })]);
+    await expectConflictCode(mocks.service.createTeachingSession(createDto()), "ROOM_CONFLICT");
+    expect(mocks.teachingSessions.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ period: "MORNING" }) }));
   });
+
 
   it("excludes the session itself during update conflict checking", async () => {
     const mocks = buildService();
@@ -313,8 +310,8 @@ describe("SchedulingService TeachingSession", () => {
     const conflictQuery = mocks.teachingSessions.findAll.mock.calls[0][0] as any;
     expect(conflictQuery.where.id[Op.ne]).toBe(current.id);
     expect(current.update).toHaveBeenCalledWith(expect.objectContaining({
-      startTime: "08:30:00",
-      endTime: "10:30:00",
+      startTime: "00:00:00",
+      endTime: "12:00:00",
     }), { transaction });
   });
 
@@ -344,10 +341,7 @@ describe("SchedulingService TeachingSession", () => {
   it("rejects a Room smaller than the deduplicated CourseOffering participant count", async () => {
     const mocks = buildService();
     arrangeValid(mocks, { rooms: [room("room-1", 1)] });
-    mocks.classGroupMembers.findAll.mockResolvedValue([
-      { id: "member-1", classGroupId: "group-1", studentId: "student-1" },
-      { id: "member-2", classGroupId: "group-1", studentId: "student-2" },
-    ]);
+    mocks.offeringParticipants.count.mockResolvedValue(2);
 
     await expectConflictCode(mocks.service.createTeachingSession(createDto()), "ROOM_CAPACITY_EXCEEDED");
   });
@@ -356,10 +350,7 @@ describe("SchedulingService TeachingSession", () => {
     const mocks = buildService();
     const groups = [group("group-a"), group("group-b")];
     arrangeValid(mocks, { groups, rooms: [room("room-1", 1)] });
-    mocks.classGroupMembers.findAll.mockResolvedValue([
-      { id: "member-1", classGroupId: "group-a", studentId: "student-1" },
-      { id: "member-2", classGroupId: "group-b", studentId: "student-1" },
-    ]);
+    mocks.offeringParticipants.count.mockResolvedValue(1);
 
     await expect(mocks.service.createTeachingSession(createDto())).resolves.toBeDefined();
   });
@@ -435,7 +426,7 @@ describe("SchedulingService TeachingSession", () => {
     const mocks = buildService();
     const persisted = session().courseOffering;
     mocks.courseOfferings.findByPk.mockResolvedValue(persisted);
-    mocks.classGroupMembers.findAll.mockResolvedValue([{ id: "membership", classGroupId: "group-1", studentId: "student-1" }]);
+    mocks.offeringParticipants.findAll.mockResolvedValue([{ id: "membership", courseOfferingId: persisted.id, identity: "student:student-1", studentId: "student-1" }]);
     const rows = [
       session({ id: "held", status: "held" }), session({ id: "not-held", status: "not_held" }),
       session({ id: "pending-1", sessionDate: "2026-08-01" }), session({ id: "pending-2", sessionDate: "2026-08-09" }),
@@ -443,7 +434,7 @@ describe("SchedulingService TeachingSession", () => {
       session({ id: "other-offering", courseOfferingId: "offering-2" }),
     ];
     mocks.teachingSessions.findAll.mockImplementation(async (query: any) => {
-      expect(query.where).toEqual({ courseOfferingId: persisted.id, status: "planned" });
+      expect(query.where).toEqual({ courseOfferingId: persisted.id, status: "planned", isScheduled: true });
       expect(query.include.map((item: any) => item.as)).toEqual(["courseOffering", "lecturer", "room", "confirmedBy"]);
       expect(query.include[0].include.map((item: any) => item.as)).toEqual(["subject", "groupLinks"]);
       return rows.filter((item) => item.courseOfferingId === query.where.courseOfferingId && item.status === query.where.status);
@@ -533,48 +524,39 @@ describe("SchedulingService TeachingSession", () => {
     expect(pendingDelete.destroy).not.toHaveBeenCalled();
   });
 
-  it("completes manually after at least one held session and no planned session", async () => {
+  it("does not recheck merge permissions when scheduling an existing combined class", async () => {
     const mocks = buildService();
-    const persistedOffering = {
-      ...offering(),
-      subject,
-      groupLinks: [],
-      update: jest.fn().mockResolvedValue(undefined),
-    };
-    mocks.courseOfferings.findByPk.mockResolvedValue(persistedOffering);
-    mocks.subjects.findByPk.mockResolvedValue(subject);
-    mocks.teachingSessions.findAll.mockResolvedValue([session({ status: "held" })]);
-
-    await mocks.service.completeCourseOffering(persistedOffering.id, "staff-1");
-
-    expect(persistedOffering.update).toHaveBeenCalledWith(expect.objectContaining({
-      status: "completed",
-      completedAt: expect.any(Date),
-      completedByStaffId: "staff-1",
-    }), { transaction });
+    arrangeValid(mocks, { groups: [group("group-a"), group("group-b")] });
+    mocks.packages.findAll.mockResolvedValue([{ canMerge: false }]);
+    await expect(mocks.service.createTeachingSession(createDto())).resolves.toBeDefined();
+    expect(mocks.packages.findAll).not.toHaveBeenCalled();
   });
 
-  it("blocks completion when no session was confirmed as held", async () => {
+  it("creates additional sessions across weeks without reading or enforcing a total", async () => {
     const mocks = buildService();
-    mocks.courseOfferings.findByPk.mockResolvedValue({ ...offering(), update: jest.fn() });
-    mocks.subjects.findByPk.mockResolvedValue(subject);
-    mocks.teachingSessions.findAll.mockResolvedValue([]);
-    await expectConflictCode(mocks.service.completeCourseOffering("offering-1", "staff-1"), "NO_HELD_SESSIONS");
+    arrangeValid(mocks);
+    mocks.courseOfferings.findByPk.mockResolvedValue(offering({ plannedUnits: 1, unitType: "periods" }));
+    for (const sessionDate of ["2026-09-12", "2026-09-14", "2026-09-21", "2026-10-05"]) {
+      await mocks.service.createTeachingSession(createDto({ sessionDate }));
+    }
+    expect(mocks.teachingSessions.create).toHaveBeenCalledTimes(4);
+    expect(mocks.courseOfferings.create).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ["future", "2999-09-12"],
-    ["pending", "2000-09-12"],
-  ])("blocks completion while a %s planned session remains unresolved", async (_kind, sessionDate) => {
-    const mocks = buildService();
-    mocks.courseOfferings.findByPk.mockResolvedValue({ ...offering(), update: jest.fn() });
-    mocks.subjects.findByPk.mockResolvedValue(subject);
-    mocks.teachingSessions.findAll.mockResolvedValue([
-      session({ id: "held-session", status: "held" }),
-      session({ id: "planned-session", status: "planned", sessionDate }),
+  it("detects a shared confirmed student across different source groups", async () => {
+    const mocks = buildService(); arrangeValid(mocks);
+    mocks.teachingSessions.findAll.mockResolvedValue([session({
+      courseOfferingId: "other-offering", lecturerId: "other-lecturer", roomId: "other-room",
+      courseOffering: { groupLinks: [{ classGroupId: "other-group" }] },
+    })]);
+    mocks.offeringParticipants.findAll.mockResolvedValue([
+      { courseOfferingId: "offering-1", identity: "student:same-student" },
+      { courseOfferingId: "other-offering", identity: "student:same-student" },
     ]);
-    await expectConflictCode(mocks.service.completeCourseOffering("offering-1", "staff-1"), "UNRESOLVED_SESSIONS");
+    await expectConflictCode(mocks.service.createTeachingSession(createDto()), "CLASS_GROUP_CONFLICT");
+    expect(mocks.teachingSessions.create).not.toHaveBeenCalled();
   });
+
 });
 describe("Vietnam clock and period consistency", () => {
   it("formats an absolute instant without reading any server-local wall-clock getters", () => {
@@ -589,10 +571,10 @@ describe("Vietnam clock and period consistency", () => {
   beforeEach(() => jest.useFakeTimers({ now: new Date("2026-09-05T03:30:00Z") }));
   afterEach(() => jest.useRealTimers());
 
-  it.each([["10:20", true], ["10:45", false]])("compares end %s to Vietnam 10:30 from an absolute UTC instant", async (endTime, ended) => {
-    const mocks = buildService();
-    arrangeValid(mocks);
-    const request = mocks.service.createTeachingSession(createDto({ sessionDate: "2026-09-05", startTime: "10:00", endTime }));
+  it.each([["04:59", false], ["05:01", true]])("uses Vietnam noon as the morning boundary at UTC %s", async (clock, ended) => {
+    const mocks = buildService(); arrangeValid(mocks);
+    jest.setSystemTime(new Date("2026-09-05T" + clock + ":00Z"));
+    const request = mocks.service.createTeachingSession(createDto({ sessionDate: "2026-09-05" }));
     if (ended) await expectConflictCode(request, "SESSION_TIME_IN_PAST");
     else await expect(request).resolves.toBeDefined();
   });
@@ -607,41 +589,11 @@ describe("Vietnam clock and period consistency", () => {
     await expect(mocks.service.createTeachingSession(createDto({ period, startTime, endTime }))).resolves.toBeDefined();
   });
 
-  it.each([
-    ["MORNING", "13:00", "15:00"], ["MORNING", "11:30", "13:00"],
-    ["AFTERNOON", "09:57", "11:59"], ["AFTERNOON", "11:30", "13:00"],
-    ["MORNING", "12:00", "12:01"], ["MORNING", "10:00", "12:00:01"],
-  ])("rejects %s %s–%s on both create and update without a write", async (period, startTime, endTime) => {
-    const mocks = buildService();
-    arrangeValid(mocks);
-    const persisted = session();
-    mocks.teachingSessions.findByPk.mockResolvedValue(persisted);
-    for (const request of [
-      () => mocks.service.createTeachingSession(createDto({ period, startTime, endTime })),
-      () => mocks.service.updateTeachingSession(persisted.id, { period, startTime, endTime }),
-    ]) {
-      try { await request(); throw new Error("Expected mismatch"); }
-      catch (error) {
-        expect(error).toBeInstanceOf(BadRequestException);
-        expect((error as BadRequestException).getStatus()).toBe(400);
-        expect((error as BadRequestException).getResponse()).toEqual({
-          code: "PERIOD_TIME_MISMATCH",
-          message: period === "MORNING" ? "Giờ học phải nằm trong khoảng Sáng 00:00–12:00." : "Giờ học phải nằm trong khoảng Chiều 12:00–23:59.",
-          details: { period, startTime: startTime + ":00", endTime: endTime.length === 5 ? endTime + ":00" : endTime },
-        });
-      }
-    }
-    expect(mocks.teachingSessions.create).not.toHaveBeenCalled();
-    expect(persisted.update).not.toHaveBeenCalled();
-  });
-
-  it("requires correcting historical period mismatch even on a note-only update", async () => {
-    const mocks = buildService();
-    arrangeValid(mocks);
-    const persisted = session({ period: "AFTERNOON" });
-    mocks.teachingSessions.findByPk.mockResolvedValue(persisted);
-    await expect(mocks.service.updateTeachingSession(persisted.id, { note: "unchanged time" })).rejects.toBeInstanceOf(BadRequestException);
-    expect(persisted.update).not.toHaveBeenCalled();
-    await expect(mocks.service.updateTeachingSession(persisted.id, { period: "MORNING" })).resolves.toBeDefined();
+  it.each(["MORNING", "AFTERNOON"])("ignores legacy manual clock values and allocates %s as a whole slot", async (period) => {
+    const mocks = buildService(); arrangeValid(mocks);
+    await mocks.service.createTeachingSession(createDto({ period, startTime: "11:30", endTime: "13:00" }));
+    expect(mocks.teachingSessions.create).toHaveBeenCalledWith(expect.objectContaining({
+      period, startTime: period === "MORNING" ? "00:00:00" : "12:00:00", endTime: period === "MORNING" ? "12:00:00" : "23:59:59",
+    }), { transaction });
   });
 });

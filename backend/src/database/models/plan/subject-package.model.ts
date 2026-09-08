@@ -15,5 +15,6 @@ export class SubjectPackage extends Model {
   @Default(21) @Column({ type: DataType.INTEGER, allowNull: false }) declare totalSubjects: number;
   @Default(true) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare active: boolean;
   @Default(false) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare isOfficial: boolean;
+  @Default(false) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare canMerge: boolean;
   @HasMany(() => SubjectPackageSubject, { foreignKey: "packageId", as: "entries" }) declare entries: SubjectPackageSubject[];
 }

@@ -1,12 +1,12 @@
 import { Transform } from "class-transformer";
-import { ArrayMinSize, ArrayUnique, IsArray, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from "class-validator";
+import { ArrayMinSize, ArrayUnique, IsArray, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim());
 const trimUpper = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim().toUpperCase());
 
 export class CreateMastersClassGroupDto {
   @IsString() @MaxLength(30) @Transform(trimUpper) code!: string;
-  @IsString() @MaxLength(200) @Transform(trim) name!: string;
+  @IsString() @MaxLength(200) @MinLength(1) @Transform(trim) name!: string;
   @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsString() @MaxLength(20) @Transform(trim) academicYear?: string;
   @IsOptional() @IsString() @MaxLength(20) @Transform(trim) term?: string;
@@ -17,7 +17,7 @@ export class CreateMastersClassGroupDto {
 
 export class UpdateMastersClassGroupDto {
   @IsOptional() @IsString() @MaxLength(30) @Transform(trimUpper) code?: string;
-  @IsOptional() @IsString() @MaxLength(200) @Transform(trim) name?: string;
+  @IsOptional() @IsString() @MaxLength(200) @MinLength(1) @Transform(trim) name?: string;
   @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsString() @MaxLength(20) @Transform(trim) academicYear?: string;
   @IsOptional() @IsString() @MaxLength(20) @Transform(trim) term?: string;
@@ -43,6 +43,20 @@ export class BatchCreateMastersClassGroupsDto {
   @IsInt() @Min(0) startIndex!: number;
   @IsOptional() @IsUUID() majorId?: string;
   @IsString() @MaxLength(20) @Transform(trim) academicYear!: string;
-  @IsString() @MaxLength(20) @Transform(trim) term!: string;
+  @IsOptional() @IsString() @MaxLength(20) @Transform(trim) term?: string;
   @IsInt() @Min(1) @Max(200) maxStudents!: number;
+}
+
+export class CreateClassFromStudentsDto {
+  @IsUUID() parentGroupId!: string;
+  @IsString() @MinLength(1) @MaxLength(30) @Transform(trimUpper) code!: string;
+  @IsString() @MinLength(1) @MaxLength(200) @Transform(trim) name!: string;
+  @IsOptional() @IsArray() @ArrayUnique() @IsUUID("all", { each: true }) admissionRecordIds: string[] = [];
+}
+export class UpdateMemberNoteDto {
+  @IsString() @MaxLength(2000) @Transform(trim) note!: string;
+}
+
+export class RenameClassDto {
+  @IsString() @MinLength(1) @MaxLength(200) @Transform(trim) name!: string;
 }

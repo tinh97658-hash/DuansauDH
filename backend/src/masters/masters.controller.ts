@@ -5,6 +5,8 @@ import { RolesGuard } from "../common/roles.guard.js";
 import {
   AssignMembersDto, AutoAssignDto, BatchCreateMastersClassGroupsDto, CreateMastersClassGroupDto, UpdateMastersClassGroupDto,
 } from "./dto/masters-class-group.dto.js";
+import { SchedulingWriteGuard } from "../common/scheduling-write.guard.js";
+import { CreateClassFromStudentsDto, UpdateMemberNoteDto, RenameClassDto } from "./dto/masters-class-group.dto.js";
 import { MastersService } from "./masters.service.js";
 
 @Controller("masters")
@@ -42,6 +44,22 @@ export class MastersController {
     return this.masters.listEligibleStudents(majorId, academicYear, term);
   }
 
+  @Post("class-groups/from-students")
+  @Roles("admin", "supervisor", "examiner") @UseGuards(RolesGuard, SchedulingWriteGuard)
+  createClassFromStudents(@Body() dto: CreateClassFromStudentsDto) { return this.masters.createClassFromStudents(dto); }
+
+  @Put("class-groups/:id/name")
+  @Roles("admin", "supervisor", "examiner") @UseGuards(RolesGuard, SchedulingWriteGuard)
+  renameClass(@Param("id") id: string, @Body() dto: RenameClassDto) {
+    return this.masters.updateClassGroup(id, { name: dto.name });
+  }
+
+  @Put("class-groups/:id/member-notes/:memberId")
+  @Roles("admin", "supervisor", "examiner") @UseGuards(RolesGuard, SchedulingWriteGuard)
+  memberNote(@Param("id") id: string, @Param("memberId") memberId: string, @Body() dto: UpdateMemberNoteDto) {
+    return this.masters.updateMemberNote(id, memberId, dto.note);
+  }
+
   @Get("class-groups/:id")
   getClassGroup(@Param("id") id: string) {
     return this.masters.getClassGroup(id);
@@ -77,8 +95,8 @@ export class MastersController {
 
   // ===== PHÂN NHÓM HỌC VIÊN =====
   @Post("class-groups/:id/members")
-  @Roles("admin")
-  @UseGuards(RolesGuard)
+  @Roles("admin", "supervisor", "examiner")
+  @UseGuards(RolesGuard, SchedulingWriteGuard)
   assignMembers(@Param("id") id: string, @Body() dto: AssignMembersDto) {
     return this.masters.assignMembers(id, dto);
   }

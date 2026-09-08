@@ -42,7 +42,7 @@ describe("Subject cross-major identity fields", () => {
   it("maps the root toggle to allowCrossMajor=true and canonicalSubjectId=null", () => {
     const onChange = renderFields({ allowCrossMajor: false, canonicalSubjectId: null });
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Cho phép ghép lớp khác ngành" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Có thể ghép lớp" }));
 
     expect(onChange).toHaveBeenCalledWith({ allowCrossMajor: true, canonicalSubjectId: null });
   });
@@ -85,7 +85,7 @@ describe("Subject cross-major identity fields", () => {
       { ...root, id: "alias-root", canonicalSubjectId: "another-root" },
     ], alias.id, "masters");
 
-    expect(candidates).toEqual([root]);
+    expect(candidates).toEqual([root, { ...root, id: "not-enabled", allowCrossMajor: false }]);
   });
 
   it("renders arbitrary real candidates instead of a hard-coded common-subject catalog", () => {

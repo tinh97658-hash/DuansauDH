@@ -15,6 +15,8 @@ export class Subject extends Model {
   @BelongsTo(() => Subject, { foreignKey: "canonicalSubjectId", as: "canonicalSubject" }) declare canonicalSubject: any;
   @HasMany(() => Subject, { foreignKey: "canonicalSubjectId", as: "aliases" }) declare aliases: Subject[];
   @Default(false) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare allowCrossMajor: boolean;
+  @Column({ type: DataType.INTEGER, allowNull: true }) declare teachingUnits: number | null;
+  @Column({ type: DataType.STRING(10), allowNull: true }) declare teachingUnitType: "hours" | "periods" | null;
   @Default(3) @Column({ type: DataType.INTEGER, allowNull: false }) declare credits: number;
   @Default(false) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare majorAssignment: boolean;
   @Default("CN") @Column({ type: DataType.STRING(10), allowNull: false }) declare subjectType: string;

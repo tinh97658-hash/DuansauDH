@@ -5,7 +5,7 @@ import {
 import { ChevronLeftRounded, ChevronRightRounded, TodayRounded } from "@mui/icons-material";
 import { schedulingType, schedulingTypographySx } from "./schedulingTypography";
 import {
-  formatDateKey, getBusinessTodayKey, isSessionPast, shortTime, vietnameseDate, vietnameseDayMonth,
+  formatDateKey, getBusinessTodayKey, isSessionPast, vietnameseDate, vietnameseDayMonth,
   vietnameseWeekdayShort, weekDaysFrom,
 } from "../../utils/schedulingCalendar";
 
@@ -19,7 +19,7 @@ const sessionVisual = (session) => {
   if (session.status === "held") return { key: "held", label: "✓ ĐÃ DIỄN RA", background: "#ebf7f0", border: "#92c7a7", accent: "#35875a", color: "#26704b" };
   if (session.status === "not_held") return { key: "not-held", label: "— KHÔNG DIỄN RA", background: "#fff4f4", border: "#d9a0a4", accent: "#b4232b", color: "#9b1c23" };
   if (isSessionPast(session)) return { key: "pending", label: "● CHỜ XÁC NHẬN", background: "#fff6dd", border: "#dabb68", accent: "#cd8810", color: "#8a5b08" };
-  return { key: "planned", label: "○ ĐÃ XẾP", background: "#e9f3f9", border: "#91bad5", accent: "#2f7db2", color: "#286f9e" };
+  return { key: "planned", label: "○ ĐÃ XẾP SẮP TỚI", background: "#e9f3f9", border: "#91bad5", accent: "#2f7db2", color: "#286f9e" };
 };
 
 const SessionCard = ({ session, onOpen }) => {
@@ -28,18 +28,19 @@ const SessionCard = ({ session, onOpen }) => {
     <ButtonBase
       component="button"
       onClick={(event) => { event.stopPropagation(); onOpen(session); }}
-      aria-label={`Xem buổi học ${session.courseOffering?.subject?.code || ""} ${shortTime(session.startTime)}`}
+      aria-label={`Xem buổi học ${session.courseOffering?.subject?.code || ""} ${(session.period === "MORNING" ? "Sáng" : "Chiều")}`}
       data-session-state={visual.key}
+      data-session-id={session.id}
       style={{ backgroundColor: visual.background, borderColor: visual.border, borderLeftColor: visual.accent }}
       sx={{
         width: "100%", display: "block", mb: 0.45, p: "7px 8px", border: "1px solid", borderLeft: "3px solid",
         color: "text.primary", textAlign: "left", transition: "filter 150ms", "&:hover": { filter: "brightness(.98)" },
       }}
     >
-      <Typography data-testid="calendar-subject-title" variant="body2" sx={{ "&&": { ...schedulingType.cardTitle, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", maxHeight: "2.4em", color: "#244A61", lineHeight: 1.2, overflowWrap: "anywhere" } }}>{session.courseOffering?.subject?.code} · {session.courseOffering?.subject?.name}</Typography>
-      <Typography variant="caption" noWrap sx={{ "&&": { ...schedulingType.meta, display: "block", mt: "3px", color: "#496675" } }}>{groupCodes(session.courseOffering) || "Chưa có lớp/nhóm"}</Typography>
-      <Typography variant="caption" noWrap sx={{ "&&": { ...schedulingType.meta, display: "block", mt: "2px", color: "#4A606E" } }}>{session.room?.code || "Chưa có phòng"} · {shortTime(session.startTime)}–{shortTime(session.endTime)}</Typography>
-      <Typography variant="caption" noWrap sx={{ "&&": { ...schedulingType.status, display: "block", mt: "3px", color: visual.color } }}>{visual.label}</Typography>
+      <Typography data-testid="calendar-class-title" variant="body2" sx={{ "&&": { ...schedulingType.cardTitle, fontSize: 14, textTransform: "uppercase", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", color: "#244A61", lineHeight: 1.25, overflowWrap: "anywhere" } }}>{session.courseOffering?.name || groupCodes(session.courseOffering)}</Typography>
+      <Typography data-testid="calendar-subject-title" variant="caption" noWrap sx={{ "&&": { ...schedulingType.meta, fontSize: 12, display: "block", mt: "4px", color: "#253C49" } }}>{session.courseOffering?.subject?.name}</Typography>
+      <Typography variant="caption" sx={{ "&&": { ...schedulingType.meta, fontSize: 12, display: "block", mt: "3px", color: "#687780", overflowWrap: "anywhere" } }}>GV {session.lecturer?.name || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</Typography>
+      <Typography variant="caption" noWrap sx={{ "&&": { ...schedulingType.status, fontSize: 12, display: "block", mt: "3px", color: visual.color } }}>{visual.label}</Typography>
     </ButtonBase>
   );
 };

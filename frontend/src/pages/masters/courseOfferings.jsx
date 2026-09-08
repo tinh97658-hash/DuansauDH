@@ -1,433 +1,345 @@
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
-import {
-  Alert, Box, Button, Checkbox, Chip, CircularProgress, FormControl, IconButton,
-  InputAdornment, MenuItem, Paper, Select, Stack, TextField, Typography,
-} from "@mui/material";
-import {
-  ArrowForwardRounded, CheckCircleRounded, CloseRounded, LayersRounded,
-  RefreshRounded, SearchRounded,
-} from "@mui/icons-material";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Alert, Box, Button, Checkbox, Chip, MenuItem, Paper, Stack, TextField, Typography } from "@mui/material";
+import CheckIcon from "@mui/icons-material/Check";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import SearchIcon from "@mui/icons-material/Search";
+import "./courseOfferings.css";
 import FeatureLayout from "../../components/FeatureLayout";
-import { schedulingType, schedulingTypographySx } from "../../components/scheduling/schedulingTypography";
+import CourseOfferingRoster, { participantKey } from "../../components/CourseOfferingRoster";
 import { API_BASE_URL } from "../../config/http";
 
-const rowsFrom = (payload) => Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
-const byTextDesc = (left, right) => String(right).localeCompare(String(left), "vi", { numeric: true });
-const unique = (values) => [...new Set(values.filter(Boolean))];
-
-const requestError = (error, fallback) => {
-  const status = error?.response?.status;
-  const message = error?.response?.data?.message;
-  if (status === 403) return message || "Tài khoản không có quyền tạo lớp học phần.";
-  if (status === 409) return message || "Dữ liệu vừa thay đổi hoặc lớp học phần đã tồn tại.";
-  if (status === 400 || status === 404) return message || "Dữ liệu lựa chọn không còn hợp lệ.";
-  return message || fallback;
+const rowsFrom = (data) => Array.isArray(data) ? data : data?.data || [];
+const messageFrom = (error, fallback) => {
+  const message = error.response?.data?.message;
+  return Array.isArray(message) ? message.join(". ") : message || fallback;
 };
+const textMatches = (text, search) => String(text || "").toLocaleLowerCase("vi").includes(search.trim().toLocaleLowerCase("vi"));
+const offeringGroups = (offering) => (offering?.groupLinks || []).map((link) => link.classGroup).filter(Boolean);
+const SectionHeading = ({ number, children, count }) => <div className="co-section-heading"><span className="co-number">{number}</span><h2>{children}</h2>{count != null && <span className="co-count">{count}</span>}</div>;
 
-const StepLabel = ({ number, children }) => (
-  <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.65 }}>
-    <Box sx={{ width: 23, height: 23, display: "grid", placeItems: "center", borderRadius: "4px", bgcolor: "#E7F2F8", color: "#075A9C", fontSize: 11, fontWeight: 700 }}>{number}</Box>
-    <Typography variant="caption" sx={{ "&&": { color: "#536B79", fontWeight: 700, ...schedulingType.eyebrow } }}>{children}</Typography>
-  </Stack>
-);
-
-const WorkspaceGuide = ({ selectedMajor, academicYear, candidateCount }) => {
-  let title = "Bắt đầu bằng Chuyên ngành";
-  let copy = "Chọn chuyên ngành ở bên trái để bắt đầu tạo lớp học phần.";
-  let meta = "";
-  if (selectedMajor && !academicYear) {
-    title = selectedMajor.name;
-    copy = "Tiếp tục chọn Khóa / Năm học để xác định các học phần còn cần tổ chức.";
-  } else if (selectedMajor && academicYear) {
-    title = "Chọn Học phần để tổ chức lớp học phần";
-    copy = `${selectedMajor.name} · ${academicYear}`;
-    meta = `${candidateCount} học phần hiện có thể tổ chức.`;
-  }
-  return (
-    <Box sx={{ height: "100%", minHeight: 0, display: "grid", placeItems: "center", bgcolor: "#EEF3F6", p: 4, textAlign: "center" }}>
-      <Box sx={{ maxWidth: 500 }}>
-        <Box sx={{ width: 50, height: 50, display: "grid", placeItems: "center", mx: "auto", mb: 1.25, border: "1px solid #A8BDCB", borderRadius: "50%", bgcolor: "#FFFFFF", color: "#2D6C95" }}><LayersRounded /></Box>
-        <Typography variant="caption" sx={{ "&&": { color: "#607784", ...schedulingType.eyebrow } }}>TẠO LỚP HỌC PHẦN</Typography>
-        <Typography variant="h5" sx={{ "&&": { mt: 0.5, color: "#24465D" } }}>{title}</Typography>
-        <Typography variant="body2" sx={{ "&&": { mt: 0.75, color: "#637682" } }}>{copy}</Typography>
-        {meta && <Typography variant="body2" sx={{ "&&": { mt: 1, color: "#31536A", fontWeight: 700 } }}>{meta}</Typography>}
-      </Box>
-    </Box>
-  );
-};
-
-const CourseOfferings = () => {
+export default function CourseOfferings() {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const offeringId = params.get("offeringId") || "";
+  const [step, setStep] = useState(offeringId ? 3 : 1);
   const [majors, setMajors] = useState([]);
   const [groups, setGroups] = useState([]);
-  const [selectedMajorId, setSelectedMajorId] = useState("");
+  const [majorId, setMajorId] = useState("");
   const [academicYear, setAcademicYear] = useState("");
-  const [term, setTerm] = useState("");
-  const [candidates, setCandidates] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [subjectId, setSubjectId] = useState("");
   const [subjectSearch, setSubjectSearch] = useState("");
   const [groupSearch, setGroupSearch] = useState("");
-  const [selectedSubjectId, setSelectedSubjectId] = useState("");
-  const [selectedGroupIds, setSelectedGroupIds] = useState([]);
-  const [participantPreview, setParticipantPreview] = useState({ key: "", count: 0, loading: false, error: "" });
-  const previewRequest = useRef(0);
-  const candidatesRequest = useRef(0);
-  const [canManageScheduling, setCanManageScheduling] = useState(false);
-  const [accessLoaded, setAccessLoaded] = useState(false);
-  const [loadingContext, setLoadingContext] = useState(true);
-  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [name, setName] = useState("");
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [viewedId, setViewedId] = useState("");
+  const [viewedRoster, setViewedRoster] = useState({ id: "", participants: [] });
+  const [preview, setPreview] = useState({ key: "", participants: [] });
+  const [notes, setNotes] = useState({});
+  const [created, setCreated] = useState(null);
+  const [savedName, setSavedName] = useState("");
+  const [canManage, setCanManage] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [subjectsLoading, setSubjectsLoading] = useState(false);
+  const [successLoading, setSuccessLoading] = useState(Boolean(offeringId));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [createdOffering, setCreatedOffering] = useState(null);
+  const [notice, setNotice] = useState("");
+  const writing = useRef(false);
+  const loadedOfferingId = useRef("");
+
+  useEffect(() => {
+    document.scrollingElement?.scrollTo?.({ top: 0, behavior: "instant" });
+  }, [step]);
 
   useEffect(() => {
     let active = true;
     Promise.all([
-      axios.get(`${API_BASE_URL}/system/majors?program=masters`, { withCredentials: true }),
-      axios.get(`${API_BASE_URL}/auth/session`, { withCredentials: true }),
-    ])
-      .then(([majorResponse, sessionResponse]) => {
-        if (!active) return;
-        setMajors(rowsFrom(majorResponse.data).filter((major) => major.active !== false));
-        setCanManageScheduling(sessionResponse.data?.user?.canManageScheduling === true);
-        setError("");
-      })
-      .catch((requestFailure) => { if (active) setError(requestError(requestFailure, "Không thể tải dữ liệu khởi tạo.")); })
-      .finally(() => { if (active) { setAccessLoaded(true); setLoadingContext(false); } });
+      axios.get(API_BASE_URL + "/plan/training-plan?program=masters"),
+      axios.get(API_BASE_URL + "/masters/class-groups"),
+      axios.get(API_BASE_URL + "/auth/session"),
+    ]).then(([majorResponse, groupResponse, authResponse]) => {
+      if (!active) return;
+      setMajors(rowsFrom(majorResponse.data).filter((major) => major.active !== false));
+      setGroups(rowsFrom(groupResponse.data));
+      setCanManage(authResponse.data?.user?.canManageScheduling === true);
+    }).catch((failure) => { if (active) setError(messageFrom(failure, "Không tải được phạm vi tổ chức.")); })
+      .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
 
   useEffect(() => {
-    if (!selectedMajorId) { setGroups([]); return undefined; }
     let active = true;
-    setLoadingContext(true);
-    axios.get(`${API_BASE_URL}/masters/class-groups?${new URLSearchParams({ majorId: selectedMajorId })}`, { withCredentials: true })
-      .then(({ data }) => { if (active) { setGroups(rowsFrom(data)); setError(""); } })
-      .catch((requestFailure) => { if (active) { setGroups([]); setError(requestError(requestFailure, "Không thể tải nhóm học viên của ngành đã chọn.")); } })
-      .finally(() => { if (active) setLoadingContext(false); });
+    setSubjects([]);
+    if (!majorId || !academicYear) { setSubjectsLoading(false); return () => { active = false; }; }
+    setSubjectsLoading(true);
+    axios.get(API_BASE_URL + "/scheduling/course-offering-candidates?" + new URLSearchParams({ program: "masters", majorId, academicYear }))
+      .then(({ data }) => { if (active) setSubjects(data.subjects || []); })
+      .catch((failure) => { if (active) setError(messageFrom(failure, "Không tải được môn / học phần.")); })
+      .finally(() => { if (active) setSubjectsLoading(false); });
     return () => { active = false; };
-  }, [selectedMajorId]);
+  }, [majorId, academicYear]);
 
-  const academicYears = useMemo(() => unique(groups.map((group) => group.academicYear)).sort(byTextDesc), [groups]);
-  const terms = useMemo(() => unique(groups.filter((group) => group.academicYear === academicYear).map((group) => group.term))
-    .sort((left, right) => String(left).localeCompare(String(right), "vi", { numeric: true })), [groups, academicYear]);
-
-  const loadCandidates = useCallback(async () => {
-    const requestId = ++candidatesRequest.current;
-    if (!selectedMajorId || !academicYear) { setCandidates([]); setLoadingCandidates(false); return; }
-    setLoadingCandidates(true);
-    try {
-      const params = new URLSearchParams({ program: "masters", majorId: selectedMajorId, academicYear });
-      if (term) params.set("term", term);
-      const { data } = await axios.get(`${API_BASE_URL}/scheduling/course-offering-candidates?${params}`, { withCredentials: true });
-      if (requestId !== candidatesRequest.current) return;
-      setCandidates(rowsFrom(data?.subjects));
-      setError("");
-    } catch (requestFailure) {
-      if (requestId !== candidatesRequest.current) return;
-      setCandidates([]);
-      setError(requestError(requestFailure, "Không thể tải học phần còn cần tổ chức."));
-    } finally {
-      if (requestId === candidatesRequest.current) setLoadingCandidates(false);
-    }
-  }, [academicYear, selectedMajorId, term]);
+  const selectionKey = selectedIds.slice().sort().join(",");
+  useEffect(() => {
+    let active = true;
+    if (!selectionKey) { setPreview({ key: "", participants: [] }); return () => { active = false; }; }
+    axios.post(API_BASE_URL + "/scheduling/course-offerings/participant-preview", { classGroupIds: selectionKey.split(",") })
+      .then(({ data }) => { if (active) setPreview({ key: selectionKey, participants: data.participants || [] }); })
+      .catch((failure) => { if (active) setError(messageFrom(failure, "Không tổng hợp được học viên.")); });
+    return () => { active = false; };
+  }, [selectionKey]);
 
   useEffect(() => {
-    loadCandidates();
-    return () => { candidatesRequest.current += 1; };
-  }, [loadCandidates]);
+    let active = true;
+    if (!viewedId) { setViewedRoster({ id: "", participants: [] }); return () => { active = false; }; }
+    axios.post(API_BASE_URL + "/scheduling/course-offerings/participant-preview", { classGroupIds: [viewedId] })
+      .then(({ data }) => { if (active) setViewedRoster({ id: viewedId, participants: data.participants || [] }); })
+      .catch((failure) => { if (active) setError(messageFrom(failure, "Không tải được học viên của lớp / nhóm.")); });
+    return () => { active = false; };
+  }, [viewedId]);
 
   useEffect(() => {
-    const requestId = ++previewRequest.current;
-    const key = selectedGroupIds.join(",");
-    if (selectedGroupIds.length === 0) {
-      setParticipantPreview({ key, count: 0, loading: false, error: "" });
-    } else {
-      setParticipantPreview({ key, count: null, loading: true, error: "" });
-      axios.post(`${API_BASE_URL}/scheduling/course-offerings/participant-preview`, { classGroupIds: selectedGroupIds }, { withCredentials: true })
-        .then(({ data }) => {
-          if (previewRequest.current !== requestId) return;
-          if (!Number.isInteger(data?.participantCount) || data.participantCount < 0) throw new Error("Invalid participant preview");
-          setParticipantPreview({ key, count: data.participantCount, loading: false, error: "" });
-        })
-        .catch((requestFailure) => {
-          if (previewRequest.current !== requestId) return;
-          setParticipantPreview({ key, count: null, loading: false, error: requestError(requestFailure, "Không thể tính tổng học viên. Vui lòng chọn lại nhóm để thử lại.") });
-        });
+    let active = true;
+    if (!offeringId || loadedOfferingId.current === offeringId) return () => { active = false; };
+    setStep(3); setSuccessLoading(true);
+    axios.get(API_BASE_URL + "/scheduling/course-offerings/" + offeringId)
+      .then(({ data }) => {
+        if (!active) return;
+        loadedOfferingId.current = data.id;
+        setCreated(data); setSavedName(data.name || ""); setNotes({});
+      })
+      .catch((failure) => { if (active) setError(messageFrom(failure, "Không tải được lớp học phần đã tạo.")); })
+      .finally(() => { if (active) setSuccessLoading(false); });
+    return () => { active = false; };
+  }, [offeringId]);
+
+  const years = useMemo(() => [...new Set(groups.filter((group) => group.majorId === majorId).map((group) => group.academicYear).filter(Boolean))]
+    .sort((a, b) => String(b).localeCompare(String(a), "vi", { numeric: true })), [groups, majorId]);
+  const major = majors.find((item) => item.id === majorId);
+  const candidate = subjects.find((item) => item.subject.id === subjectId);
+  const sourceGroups = candidate?.eligibleClassGroups || [];
+  const selectedGroups = sourceGroups.filter((group) => selectedIds.includes(group.id));
+  const viewedGroup = sourceGroups.find((group) => group.id === viewedId);
+  const previewReady = preview.key === selectionKey;
+  const participants = previewReady ? preview.participants : [];
+  const resetSelection = () => { setSubjectId(""); setSelectedIds([]); setViewedId(""); setNotes({}); setGroupSearch(""); };
+  const reset = () => {
+    setMajorId(""); setAcademicYear(""); resetSelection(); setSubjectSearch(""); setName("");
+    setStep(1); setCreated(null); setSavedName(""); setError(""); setNotice(""); setParams({}, { replace: true });
+  };
+  const selectSubject = (id) => {
+    setSubjectId(id); setSelectedIds([]); setNotes({}); setGroupSearch(""); setError("");
+    setViewedId(subjects.find((item) => item.subject.id === id)?.eligibleClassGroups[0]?.id || "");
+  };
+  const toggleGroup = (group, checked) => {
+    setError("");
+    setSelectedIds((current) => checked ? [...current, group.id] : current.filter((id) => id !== group.id));
+  };
+  const continueToConfirmation = () => {
+    setError(""); setNotice("");
+    if (!majorId || !academicYear || !subjectId || !name.trim() || !selectedIds.length) {
+      setError("Chọn chuyên ngành, khóa / năm, môn học, nhập tên lớp và chọn ít nhất một lớp / nhóm."); return;
     }
-    return () => { previewRequest.current = requestId + 1; };
-  }, [selectedGroupIds]);
-
-  const selectedMajor = majors.find((major) => major.id === selectedMajorId) || null;
-  const selectedCandidate = candidates.find((candidate) => candidate.subject?.id === selectedSubjectId) || null;
-  const selectedGroups = (selectedCandidate?.eligibleClassGroups || []).filter((group) => selectedGroupIds.includes(group.id));
-  const previewCurrent = participantPreview.key === selectedGroupIds.join(",");
-  const previewLoading = selectedGroupIds.length > 0 && (!previewCurrent || participantPreview.loading);
-  const previewError = previewCurrent ? participantPreview.error : "";
-  const selectedMemberCount = selectedGroupIds.length === 0 ? 0 : previewCurrent && !previewLoading && !previewError ? participantPreview.count : null;
-  const filteredCandidates = useMemo(() => {
-    const keyword = subjectSearch.trim().toLocaleLowerCase("vi");
-    if (!keyword) return candidates;
-    return candidates.filter((candidate) => `${candidate.subject?.code || ""} ${candidate.subject?.name || ""}`.toLocaleLowerCase("vi").includes(keyword));
-  }, [candidates, subjectSearch]);
-  const displayedGroups = useMemo(() => {
-    if (!selectedCandidate) return [];
-    const eligible = (selectedCandidate.eligibleClassGroups || []).map((group) => ({ group, eligibility: "eligible" }));
-    const busy = (selectedCandidate.activeClassGroups || []).map((group) => ({ group, eligibility: "active" }));
-    const completed = (selectedCandidate.completedClassGroups || []).map((group) => ({ group, eligibility: "completed" }));
-    const seen = new Set();
-    const keyword = groupSearch.trim().toLocaleLowerCase("vi");
-    return [...eligible, ...busy, ...completed].filter(({ group }) => {
-      if (!group?.id || seen.has(group.id)) return false;
-      seen.add(group.id);
-      return !keyword || `${group.code || ""} ${group.name || ""} ${group.major?.name || ""}`.toLocaleLowerCase("vi").includes(keyword);
-    });
-  }, [groupSearch, selectedCandidate]);
-
-  const resetDraft = () => { setSelectedGroupIds([]); setCreatedOffering(null); setError(""); };
-  const changeMajor = (value) => {
-    setSelectedMajorId(value); setAcademicYear(""); setTerm(""); setCandidates([]); setSelectedSubjectId("");
-    setSubjectSearch(""); setGroupSearch(""); setSelectedGroupIds([]); setCreatedOffering(null); setError("");
+    if (!previewReady) { setError("Đang tổng hợp danh sách học viên, vui lòng chờ."); return; }
+    setName(name.trim()); setStep(2);
   };
-  const changeAcademicYear = (value) => {
-    setAcademicYear(value); setTerm(""); setCandidates([]); setSelectedSubjectId(""); setSubjectSearch("");
-    setGroupSearch(""); setSelectedGroupIds([]); setCreatedOffering(null); setError("");
-  };
-  const changeTerm = (value) => {
-    setTerm(value); setSelectedSubjectId(""); setGroupSearch(""); setSelectedGroupIds([]); setCreatedOffering(null); setError("");
-  };
-  const chooseSubject = (subjectId) => { setSelectedSubjectId(subjectId); setSelectedGroupIds([]); setGroupSearch(""); setCreatedOffering(null); setError(""); };
-  const toggleGroup = (groupId) => {
-    if (!canManageScheduling) return;
-    setSelectedGroupIds((current) => current.includes(groupId) ? current.filter((id) => id !== groupId) : [...current, groupId]);
-  };
-
-  const createOffering = async () => {
-    if (!canManageScheduling || !selectedSubjectId || selectedGroupIds.length === 0 || previewLoading || previewError || selectedMemberCount === null) return;
-    setSaving(true);
+  const create = async () => {
+    if (writing.current || !canManage) return;
+    writing.current = true; setSaving(true); setError("");
     try {
-      const { data } = await axios.post(`${API_BASE_URL}/scheduling/course-offerings`, { subjectId: selectedSubjectId, classGroupIds: selectedGroupIds }, { withCredentials: true });
-      setCreatedOffering(data);
-      toast.success("Đã tạo lớp học phần.");
-      setError("");
-      await loadCandidates();
-    } catch (requestFailure) {
-      setError(requestError(requestFailure, "Không thể tạo lớp học phần."));
-    } finally {
-      setSaving(false);
-    }
+      const participantNotes = participants.map((participant) => ({
+        ...(participant.studentId ? { studentId: participant.studentId } : {}),
+        ...(participant.admissionRecordId ? { admissionRecordId: participant.admissionRecordId } : {}),
+        note: notes[participantKey(participant)] || "",
+      }));
+      const { data } = await axios.post(API_BASE_URL + "/scheduling/course-offerings", { name: name.trim(), subjectId, classGroupIds: selectedIds, participantNotes });
+      loadedOfferingId.current = data.id;
+      setCreated(data); setSavedName(data.name); setNotes({}); setStep(3);
+      setParams({ offeringId: data.id }, { replace: true });
+    } catch (failure) { setError(messageFrom(failure, "Không tạo được lớp học phần. Vui lòng kiểm tra và thử lại.")); }
+    finally { writing.current = false; setSaving(false); }
   };
+  const rename = async () => {
+    if (!canManage || writing.current || !savedName.trim()) return;
+    writing.current = true; setSaving(true); setError(""); setNotice("");
+    try {
+      await axios.put(API_BASE_URL + "/scheduling/course-offerings/" + created.id + "/name", { name: savedName.trim() });
+      setCreated((current) => ({ ...current, name: savedName.trim() })); setSavedName(savedName.trim()); setNotice("Đã lưu tên lớp học phần.");
+    } catch (failure) { setError(messageFrom(failure, "Không đổi được tên lớp học phần.")); }
+    finally { writing.current = false; setSaving(false); }
+  };
+  const saveNotes = async () => {
+    if (!canManage || writing.current) return;
+    writing.current = true; setSaving(true); setError(""); setNotice("");
+    try {
+      for (const participant of created.participants || []) {
+        const note = notes[participantKey(participant)];
+        if (note === undefined || note === (participant.note || "")) continue;
+        await axios.put(API_BASE_URL + "/scheduling/course-offerings/" + created.id + "/participants/" + participant.id + "/note", { note });
+        setCreated((current) => ({ ...current, participants: current.participants.map((row) => row.id === participant.id ? { ...row, note } : row) }));
+      }
+      setNotes({}); setNotice("Đã lưu ghi chú học viên.");
+    } catch (failure) { setError(messageFrom(failure, "Không lưu được toàn bộ ghi chú. Vui lòng thử lại.")); }
+    finally { writing.current = false; setSaving(false); }
+  };
+  const changeNote = (identity, value) => setNotes((current) => ({ ...current, [identity]: value }));
+  const savedGroups = offeringGroups(created);
+  const displayGroups = step === 3 ? savedGroups : selectedGroups;
+  const displaySubject = step === 3 ? created?.subject : candidate?.subject;
+  const displayMajors = step === 3 ? [...new Set(savedGroups.map((group) => group.major?.name).filter(Boolean))].join(", ") : major?.name;
+  const displayYears = step === 3 ? [...new Set(savedGroups.map((group) => group.academicYear).filter(Boolean))].join(", ") : academicYear;
+  const dirtyNotes = (created?.participants || []).some((participant) => notes[participantKey(participant)] !== undefined
+    && notes[participantKey(participant)] !== (participant.note || ""));
 
-  const createdGroups = (createdOffering?.groupLinks || []).map((link) => link.classGroup).filter(Boolean);
-  const compositionMajors = unique(selectedGroups.map((group) => group.major?.name));
-  const compositionTerms = unique(selectedGroups.map((group) => group.term));
 
-  return (
-    <FeatureLayout hideHeader workspaceMode>
-      <Box
-        data-testid="create-offering-workspace"
-        data-scheduling-typography="compact"
-        sx={{
-          ...schedulingTypographySx,
-          height: "100%", minHeight: 0, display: "grid",
-          gridTemplateColumns: { xs: "1fr", lg: "minmax(320px, 30%) minmax(0, 70%)" }, gap: "1px", bgcolor: "#C8D3DB",
-          border: "1px solid #C5D0D8", overflow: { lg: "hidden" },
-        }}
-      >
-        <Box component="aside" sx={{ minHeight: 0, display: "flex", flexDirection: "column", bgcolor: "#F8FAFB", borderRight: { lg: "1px solid #C5D0D8" } }}>
-          <Box sx={{ flex: "none", p: 1.5, bgcolor: "#FFFFFF", borderBottom: "1px solid #D6E0E6" }}>
-            <Typography variant="caption" sx={{ "&&": { display: "block", mb: 1, color: "#526875", ...schedulingType.eyebrow } }}>PHẠM VI TỔ CHỨC</Typography>
-            <StepLabel number="1">CHUYÊN NGÀNH</StepLabel>
-            <FormControl size="small" fullWidth>
-              <Select MenuProps={{ PaperProps: { sx: schedulingTypographySx } }} displayEmpty inputProps={{ "aria-label": "Chọn chuyên ngành" }} value={selectedMajorId} renderValue={(value) => value ? majors.find((major) => major.id === value)?.name : "Chọn chuyên ngành"} onChange={(event) => changeMajor(event.target.value)} disabled={loadingContext && majors.length === 0}>
-                {majors.map((major) => <MenuItem key={major.id} value={major.id}>{major.name} ({major.code})</MenuItem>)}
-              </Select>
-            </FormControl>
+  const classSummary = <Box className="co-class-summary">
+    <div className="co-muted-label">LỚP HỌC PHẦN</div>
+    <h2 className="co-class-name">{step === 3 ? created?.name : name}</h2>
+    <div className="co-metadata">
+      <div><span>Học phần</span><p>{displaySubject?.name || "—"}</p></div>
+      <div><span>Số tín chỉ</span><p>{displaySubject?.credits ?? "—"}</p></div>
+      <div><span>Năm</span><p>{displayYears || "—"}</p></div>
+      <div><span>Chuyên ngành</span><p>{displayMajors || "—"}</p></div>
+    </div>
+    <div className="co-muted-label">Lớp / Khóa tham gia</div>
+    <div className="co-tags">{displayGroups.map((group) => <Chip key={group.id} label={group.name} />)}</div>
+  </Box>;
 
-            {selectedMajorId && (
-              <Box sx={{ mt: 1.25 }}>
-                <StepLabel number="2">KHÓA / NĂM HỌC</StepLabel>
-                <Stack direction="row" spacing={0.75}>
-                  <Box sx={{ minWidth: 0, flex: 1 }}>
-                    <Typography component="label" variant="caption" sx={{ "&&": { display: "block", mb: 0.35, color: "#5C6E7A", ...schedulingType.fieldLabel } }}>Khóa / Năm học</Typography>
-                    <FormControl size="small" fullWidth>
-                      <Select MenuProps={{ PaperProps: { sx: schedulingTypographySx } }} displayEmpty inputProps={{ "aria-label": "Khóa / Năm học" }} value={academicYear} renderValue={(value) => value || "Chọn khóa / năm"} onChange={(event) => changeAcademicYear(event.target.value)} disabled={loadingContext || academicYears.length === 0}>
-                        {academicYears.map((year) => <MenuItem key={year} value={year}>{year}</MenuItem>)}
-                      </Select>
-                    </FormControl>
-                  </Box>
-                  {academicYear && terms.length > 0 && (
-                    <Box sx={{ minWidth: 112 }}>
-                      <Typography component="label" variant="caption" sx={{ "&&": { display: "block", mb: 0.35, color: "#5C6E7A", ...schedulingType.fieldLabel } }}>Học kỳ</Typography>
-                      <FormControl size="small" fullWidth>
-                        <Select MenuProps={{ PaperProps: { sx: schedulingTypographySx } }} displayEmpty renderValue={(value) => value || "Tất cả"} inputProps={{ "aria-label": "Học kỳ" }} value={term} onChange={(event) => changeTerm(event.target.value)}>
-                          <MenuItem value="">Tất cả</MenuItem>{terms.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
-                        </Select>
-                      </FormControl>
-                    </Box>
-                  )}
-                </Stack>
-                {!loadingContext && academicYears.length === 0 && <Typography variant="caption" sx={{ "&&": { display: "block", mt: 0.65, color: "warning.dark" } }}>Chuyên ngành chưa có nhóm với năm học hợp lệ.</Typography>}
-              </Box>
-            )}
-          </Box>
-
-          <Box sx={{ minHeight: 0, flex: 1, display: "flex", flexDirection: "column", p: 1.2, bgcolor: "#F1F4F6", overflow: "hidden" }}>
-            {academicYear && (
-              <>
-                <Stack direction="row" alignItems="center" spacing={0.65} sx={{ mb: 0.75 }}>
-                  <Box sx={{ width: 23, height: 23, display: "grid", placeItems: "center", borderRadius: "4px", bgcolor: "#E7F2F8", color: "#075A9C", fontSize: 11, fontWeight: 700 }}>3</Box>
-                  <Typography variant="caption" sx={{ "&&": { flex: 1, color: "#4E626F", ...schedulingType.eyebrow } }}>HỌC PHẦN CÒN CẦN TỔ CHỨC</Typography>
-                  <Chip size="small" label={filteredCandidates.length} sx={{ height: 19 }} />
-                  <IconButton size="small" aria-label="Tải lại học phần" onClick={loadCandidates} disabled={loadingCandidates}><RefreshRounded fontSize="small" /></IconButton>
-                </Stack>
-                <TextField
-                  size="small" fullWidth placeholder="Tìm học phần..." value={subjectSearch} onChange={(event) => setSubjectSearch(event.target.value)}
-                  InputProps={{ startAdornment: <InputAdornment position="start"><SearchRounded fontSize="small" /></InputAdornment> }} sx={{ mb: 0.75, bgcolor: "#FFFFFF" }}
-                />
-              </>
-            )}
-            {error && <Alert severity="error" sx={{ mb: 0.75, py: 0 }}>{error}</Alert>}
-            {accessLoaded && !canManageScheduling && <Box sx={{ mb: 0.75, p: 0.75, borderLeft: "3px solid #CE9D35", bgcolor: "#FFF8E5", color: "#674F1E", fontSize: 11 }}>Tài khoản hiện tại chỉ có quyền xem.</Box>}
-            <Box sx={{ minHeight: 0, flex: 1, overflowY: "auto" }}>
-              {!selectedMajorId ? <Typography variant="caption" color="text.secondary">Chọn chuyên ngành để tiếp tục.</Typography>
-                : !academicYear ? <Typography variant="caption" color="text.secondary">Chọn khóa / năm học để tải học phần.</Typography>
-                  : loadingCandidates ? <Box role="status" sx={{ height: 120, display: "grid", placeItems: "center" }}><CircularProgress size={25} /></Box>
-                    : filteredCandidates.length === 0 ? <Box sx={{ p: 2, border: "1px dashed #B8C5CE", bgcolor: "#FFFFFF", textAlign: "center" }}><Typography variant="caption" color="text.secondary">Không còn học phần cần tổ chức trong phạm vi đã chọn.</Typography></Box>
-                      : <Stack spacing={0.6}>{filteredCandidates.map((candidate) => {
-                        const item = candidate.subject || {};
-                        const selected = item.id === selectedSubjectId;
-                        return (
-                          <Box
-                            key={item.id} component="button" type="button" onClick={() => chooseSubject(item.id)} data-selected={selected ? "true" : "false"}
-                            sx={{ width: "100%", p: 1, border: "1px solid", borderColor: selected ? "#3D86BA" : "#C6D1D9", borderLeft: `3px solid ${selected ? "#075A9C" : "#7E9EB3"}`, bgcolor: selected ? "#EFF7FB" : "#FFFFFF", textAlign: "left", color: "inherit", cursor: "pointer", transition: "background-color 150ms, border-color 150ms", "&:hover": { bgcolor: selected ? "#E7F3FA" : "#F7FAFC", borderColor: "#7EAAC7" } }}
-                          >
-                            <Typography variant="body2" sx={{ "&&": { color: "#1C3A50", fontWeight: 700 } }}>{item.code || "Không mã"} · {item.name}</Typography>
-                            <Typography variant="caption" sx={{ "&&": { display: "block", mt: 0.35, color: "#5F717D" } }}>{candidate.eligibleClassGroups?.length || 0} lớp/nhóm có thể chọn</Typography>
-                          </Box>
-                        );
-                      })}</Stack>}
-            </Box>
-          </Box>
-        </Box>
-
-        <Box component="section" sx={{ minWidth: 0, minHeight: 0, bgcolor: "#EEF3F6", p: { xs: 1, lg: 1.25 }, overflow: "hidden" }}>
-          {createdOffering ? (
-            <Box sx={{ height: "100%", display: "grid", placeItems: "center", bgcolor: "#F7FAFC" }}>
-              <Paper variant="outlined" sx={{ width: "min(560px, 92%)", p: 2.75, textAlign: "center", borderColor: "#B6CCDA" }}>
-                <CheckCircleRounded sx={{ color: "success.main", fontSize: 42 }} />
-                <Typography variant="caption" sx={{ "&&": { display: "block", mt: 0.5, color: "success.dark", ...schedulingType.eyebrow } }}>ĐÃ TẠO LỚP HỌC PHẦN</Typography>
-                <Typography variant="h4" sx={{ "&&": { mt: 0.5 } }}>{createdOffering.subject?.code} · {createdOffering.subject?.name}</Typography>
-                <Typography variant="body2" sx={{ "&&": { mt: 0.6, color: "text.secondary" } }}>{unique(createdGroups.map((group) => group.major?.name)).join(" · ")} · {unique(createdGroups.map((group) => group.academicYear)).join(", ")}</Typography>
-                <Box sx={{ mt: 1.5, p: 1.25, bgcolor: "#F0F5F8", border: "1px solid #D5E0E6" }}>
-                  <Typography variant="body2" sx={{ "&&": { fontWeight: 700 } }}>{createdGroups.length} lớp/nhóm · {createdOffering.participantCount ?? 0} học viên hiện có</Typography>
-                  <Typography variant="caption">{createdGroups.map((group) => `${group.code} · ${group.name}`).join("; ")}</Typography>
-                </Box>
-                <Stack direction={{ xs: "column", sm: "row" }} justifyContent="center" spacing={0.75} sx={{ mt: 1.75 }}>
-                  <Button variant="outlined" onClick={() => { setCreatedOffering(null); setSelectedSubjectId(""); setSelectedGroupIds([]); }}>Tạo lớp học phần khác</Button>
-                  <Button variant="contained" endIcon={<ArrowForwardRounded />} onClick={() => navigate(`/masters/schedule?offeringId=${createdOffering.id}`)}>Sang Xếp lịch</Button>
-                </Stack>
-              </Paper>
-            </Box>
-          ) : !selectedCandidate ? (
-            <WorkspaceGuide selectedMajor={selectedMajor} academicYear={academicYear} candidateCount={candidates.length} />
-          ) : (
-            <Paper variant="outlined" data-testid="offering-shell" sx={{ height: "100%", minHeight: 0, display: "grid", gridTemplateRows: "68px minmax(0,1fr)", overflow: "hidden" }}>
-              <Box sx={{ px: 1.75, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, borderBottom: "1px solid #D7E0E6" }}>
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography variant="caption" sx={{ "&&": { color: "#718692", ...schedulingType.eyebrow } }}>TẠO LỚP HỌC PHẦN</Typography>
-                  <Typography variant="h5" noWrap>{selectedCandidate.subject?.code} · {selectedCandidate.subject?.name}</Typography>
-                </Box>
-                <Stack direction="row" spacing={0.5} flexShrink={0}><Chip size="small" variant="outlined" label={selectedMajor?.code || selectedMajor?.name} /><Chip size="small" variant="outlined" label={academicYear} />{term && <Chip size="small" variant="outlined" label={term} />}</Stack>
-              </Box>
-
-              <Box data-testid="offering-body" sx={{ minHeight: 0, display: "grid", gridTemplateRows: "minmax(0,1fr) 170px", overflow: "hidden" }}>
-              <Box data-testid="offering-top-panels" sx={{ minHeight: 0, display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", overflow: "hidden" }}>
-                <Box data-testid="offering-groups-panel" sx={{ minWidth: 0, minHeight: 0, display: "grid", gridTemplateRows: "auto auto minmax(0,1fr)", borderRight: "1px solid #d2dbe1" }}>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ p: "12px 14px", minHeight: 64, borderBottom: "1px solid #E0E7EB" }}>
-                  <Box sx={{ width: 28, height: 28, display: "grid", placeItems: "center", borderRadius: "4px", bgcolor: "#EDF6FB", color: "#126B9F", fontWeight: 700 }}>1</Box>
-                  <Box sx={{ flex: 1 }}><Typography variant="caption" sx={{ "&&": { display: "block", color: "#284C62", ...schedulingType.panelTitle } }}>GHÉP LỚP / NHÓM</Typography><Typography variant="caption" color="text.secondary">Thành phần chính của lớp học phần</Typography></Box>
-                </Stack>
-                <Stack direction="row" spacing={0.75} alignItems="center" sx={{ p: "8px 12px" }}>
-                  <TextField size="small" fullWidth placeholder="Tìm lớp / nhóm..." value={groupSearch} onChange={(event) => setGroupSearch(event.target.value)} />
-                  <Chip size="small" label={`${selectedCandidate.eligibleClassGroups?.length || 0} có thể chọn`} />
-                </Stack>
-                <Box sx={{ minHeight: 0, overflowY: "auto", px: 0.75, pb: 1 }}>
-                  {displayedGroups.length === 0 ? <Box sx={{ height: "100%", display: "grid", placeItems: "center" }}><Typography variant="body2" color="text.secondary">Không có lớp/nhóm phù hợp.</Typography></Box>
-                    : displayedGroups.map(({ group, eligibility }) => {
-                      const selectable = eligibility === "eligible";
-                      const checked = selectedGroupIds.includes(group.id);
-                      const statusText = selectable ? (checked ? "ĐÃ CHỌN" : "CÓ THỂ CHỌN") : (eligibility === "active" ? "ĐANG TỔ CHỨC" : "ĐÃ HOÀN THÀNH");
-                      return (
-                        <Box
-                          key={group.id} component="button" type="button" disabled={!selectable || !canManageScheduling} onClick={() => toggleGroup(group.id)}
-                          sx={{ width: "100%", minHeight: 58, display: "grid", gridTemplateColumns: "36px minmax(0,1fr) auto", alignItems: "center", gap: 1, p: "8px 10px", border: 0, borderBottom: "1px solid #e1e7eb", bgcolor: checked ? "#F1F8FC" : (selectable ? "#FFFFFF" : "#F4F6F7"), color: "inherit", textAlign: "left", cursor: selectable && canManageScheduling ? "pointer" : "not-allowed", opacity: selectable ? 1 : 0.72, transition: "background-color 150ms", "&:hover": selectable && canManageScheduling ? { bgcolor: "#EAF5FB" } : {} }}
-                        >
-                          <Checkbox checked={checked} disabled={!selectable || !canManageScheduling} inputProps={{ "aria-label": `Chọn nhóm ${group.code}` }} />
-                          <Box sx={{ minWidth: 0 }}><Typography variant="body2" noWrap sx={{ "&&": schedulingType.cardTitle }}>{group.code} · {group.name}</Typography><Typography variant="caption" noWrap>{group.major?.name || "Chưa có ngành"} · {group.academicYear || "-"}{group.term ? ` · ${group.term}` : ""} · {group.memberCount ?? 0} HV</Typography></Box>
-                          <Chip size="small" color={checked ? "primary" : "default"} variant={checked ? "filled" : "outlined"} label={statusText} />
-                        </Box>
-                      );
-                    })}
-                </Box>
-                </Box>
-                <Box data-testid="offering-retake-panel" aria-disabled="true" sx={{ minWidth: 0, minHeight: 0, display: "grid", gridTemplateRows: "auto auto minmax(0,1fr)", bgcolor: "#F5F7F9" }}>
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ p: "12px 14px", minHeight: 64, borderBottom: "1px solid #E0E7EB" }}>
-                    <Box sx={{ flexShrink: 0, width: 28, height: 28, display: "grid", placeItems: "center", borderRadius: "4px", bgcolor: "#E7EDF1", color: "#627682", fontWeight: 700 }}>2</Box>
-                    <Box><Typography variant="caption" sx={{ "&&": { display: "block", color: "#536B79", ...schedulingType.panelTitle } }}>HỌC VIÊN HỌC LẠI TỪ KHÓA TRƯỚC</Typography><Typography variant="caption" color="text.secondary">Chỉ ghép bổ sung vào lớp / nhóm ở vùng 1</Typography></Box>
-                  </Stack>
-                  <Box sx={{ p: "8px 12px" }}><TextField size="small" fullWidth disabled placeholder="Tìm học viên học lại..." inputProps={{ "aria-label": "Tìm học viên học lại" }} /></Box>
-                  <Box sx={{ minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", p: "20px 24px", textAlign: "center" }}>
-                    <Box sx={{ maxWidth: 330 }}>
-                      <Typography sx={{ "&&": { fontSize: 12, fontWeight: 600, color: "#526773" } }}>Chưa có dữ liệu học lại chính thức</Typography>
-                      <Typography sx={{ "&&": { mt: 0.75, fontSize: 10.5, fontWeight: 400, lineHeight: 1.4, color: "#6a7b86" } }}>Danh sách học viên học lại sẽ xuất hiện tại đây khi kết quả học tập được liên kết chính xác với học phần.</Typography>
-                    </Box>
-                  </Box>
-                </Box>
-              </Box>
-
-              <Box data-testid="offering-bottom-panel" sx={{ height: 170, minHeight: 0, display: "grid", gridTemplateColumns: "minmax(0,1fr) 260px", borderTop: "1px solid #C9D5DD", bgcolor: "#F7FAFC" }}>
-                <Box sx={{ p: "12px 14px", minWidth: 0, minHeight: 0, overflowY: "auto" }}>
-                  <Typography variant="caption" sx={{ "&&": { color: "#26495E", fontWeight: 700 } }}>3 · THÀNH PHẦN LỚP HỌC PHẦN</Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ "&&": { ml: 0.75 } }}>Những lớp/nhóm đã chọn</Typography>
-                  <Stack direction="row" spacing={0.65} sx={{ mt: 0.8, overflowX: "auto", pb: 0.5 }}>
-                    {selectedGroups.length === 0 ? <Typography variant="body2" color="text.secondary" sx={{ "&&": { py: 1.5 } }}>Chưa chọn thành phần. Bắt đầu bằng một lớp/nhóm ở vùng trên.</Typography>
-                      : selectedGroups.map((group) => (
-                        <Paper key={group.id} variant="outlined" sx={{ minWidth: 165, maxWidth: 220, height: 48, display: "flex", alignItems: "center", px: 1, borderColor: "#BFD0DA" }}>
-                          <Box sx={{ minWidth: 0, flex: 1 }}><Typography variant="caption" noWrap sx={{ "&&": { fontWeight: 700 } }}>{group.code}</Typography><Typography variant="caption" noWrap sx={{ "&&": { display: "block" } }}>{group.major?.name} · {group.memberCount ?? 0} HV</Typography></Box>
-                          {canManageScheduling && <IconButton size="small" aria-label={`Bỏ nhóm ${group.code}`} onClick={() => toggleGroup(group.id)}><CloseRounded fontSize="small" /></IconButton>}
-                        </Paper>
-                      ))}
-                  </Stack>
-                </Box>
-                <Box data-testid="offering-summary" sx={{ p: "11px 14px", minHeight: 0, display: "grid", gridTemplateRows: "auto minmax(0,1fr) auto", borderLeft: "1px solid #D9E1E6", bgcolor: "#FFFFFF" }}>
-                  <Typography variant="caption" sx={{ "&&": { color: "#748792", ...schedulingType.eyebrow } }}>TỔNG HỢP</Typography>
-                  <Box sx={{ minHeight: 0, overflowY: "auto", py: 0.5 }}>
-                    <Stack direction="row" spacing={2}>
-                      <Box><Typography variant="h5" sx={{ "&&": { fontSize: 16, fontWeight: 700 } }}>{selectedGroups.length}</Typography><Typography variant="caption">Lớp / nhóm</Typography></Box>
-                      <Box><Typography variant="h5" sx={{ "&&": { fontSize: 16, fontWeight: 700 } }} data-testid="participant-preview-count" aria-live="polite">{previewLoading ? <CircularProgress size={18} aria-label="Đang tính tổng học viên" /> : selectedMemberCount ?? "—"}</Typography><Typography variant="caption">Tổng học viên</Typography></Box>
-                    </Stack>
-                    {previewError && <Typography role="alert" variant="caption" color="error" sx={{ "&&": { display: "block" } }}>{previewError}</Typography>}
-                    <Typography variant="caption" sx={{ "&&": { display: "block", mt: 0.6 } }}>Chuyên ngành: {compositionMajors.join(" · ") || "Chưa có ngành"}</Typography>
-                    <Typography variant="caption" sx={{ "&&": { display: "block" } }}>Khóa / Năm: {academicYear}{compositionTerms.length ? ` · ${compositionTerms.join(", ")}` : ""}</Typography>
-                  </Box>
-                  <Stack direction="row" alignItems="center" spacing="6px" sx={{ height: 36 }}>
-                    <Button size="small" variant="outlined" sx={{ "&&": { width: 74, minWidth: 74, height: 36, flexShrink: 0 } }} onClick={resetDraft} disabled={!canManageScheduling || selectedGroups.length === 0}>Làm lại</Button>
-                    <Button size="small" fullWidth variant="contained" sx={{ "&&": { flex: 1, minWidth: 0, px: 0.5, height: 36, whiteSpace: "nowrap", fontSize: 12.5, fontWeight: 600 } }} onClick={createOffering} disabled={!canManageScheduling || selectedGroups.length === 0 || saving || previewLoading || Boolean(previewError) || selectedMemberCount === null}>{saving ? "Đang lưu..." : "Tạo lớp học phần"}</Button>
-                  </Stack>
-                </Box>
-              </Box>
-              </Box>
-            </Paper>
-          )}
-        </Box>
-      </Box>
-      <ToastContainer position="top-center" autoClose={2400} hideProgressBar={false} newestOnTop closeOnClick pauseOnHover draggable={false} limit={2} />
-    </FeatureLayout>
-  );
-};
-
-export default CourseOfferings;
+  return <FeatureLayout title="Tạo lớp học phần">
+    <Box className="course-offering-flow">
+      {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
+      {notice && <Alert severity="success" onClose={() => setNotice("")}>{notice}</Alert>}
+      {!loading && !canManage && <Alert severity="info">Bạn có thể xem thông tin. Cần quyền quản lý xếp lịch để tạo hoặc chỉnh sửa lớp học phần.</Alert>}
+      {loading && <Typography role="status">Đang tải phạm vi tổ chức...</Typography>}
+      {step === 1 && <div className="co-create-grid">
+        <Paper component="aside" variant="outlined" className="co-scope co-panel">
+          <div className="co-scope-filters">
+            <h2 className="co-small-heading">PHẠM VI TỔ CHỨC</h2>
+            <SectionHeading number="1">CHUYÊN NGÀNH</SectionHeading>
+            <TextField select fullWidth className="co-scope-field" label="Chuyên ngành" value={majorId} disabled={loading} onChange={(event) => {
+              setMajorId(event.target.value); setAcademicYear(""); resetSelection(); setError("");
+            }}><MenuItem value="">Chọn chuyên ngành</MenuItem>{majors.map((item) => <MenuItem key={item.id} value={item.id}>{item.code} · {item.name}</MenuItem>)}</TextField>
+            <SectionHeading number="2">KHÓA / NĂM HỌC</SectionHeading>
+            <TextField select fullWidth className="co-scope-field" label="Khóa / Năm học" value={academicYear} disabled={!majorId} onChange={(event) => {
+              setAcademicYear(event.target.value); resetSelection(); setError("");
+            }}><MenuItem value="">Chọn khóa / năm</MenuItem>{years.map((year) => <MenuItem key={year} value={year}>{year}</MenuItem>)}</TextField>
+          </div>
+          <div className="co-subjects">
+            <SectionHeading number="3" count={subjects.length}>HỌC PHẦN CÒN CẦN TỔ CHỨC</SectionHeading>
+            <TextField fullWidth placeholder="Tìm học phần..." inputProps={{ "aria-label": "Tìm môn / học phần" }}
+              InputProps={{ startAdornment: <SearchIcon className="co-search-icon" /> }} value={subjectSearch} onChange={(event) => setSubjectSearch(event.target.value)} />
+            {subjectsLoading && <Typography role="status" sx={{ mt: 2 }}>Đang tải môn học...</Typography>}
+            {!subjectsLoading && !academicYear && <p className="co-empty">Chọn chuyên ngành và khóa / năm để xem môn học.</p>}
+            {!subjectsLoading && academicYear && !subjects.length && <p className="co-empty">Chưa có môn cần tổ chức trong phạm vi này. Kiểm tra gói học phần chính thức của các lớp / nhóm.</p>}
+            <div className="co-subject-list" role="list" aria-label="Môn / học phần còn cần tổ chức">
+              {subjects.filter((item) => textMatches(item.subject.code + " " + item.subject.name, subjectSearch)).map((item) => <Button key={item.subject.id}
+                className="co-subject-card" aria-pressed={subjectId === item.subject.id} variant="outlined" onClick={() => selectSubject(item.subject.id)}>
+                <span><strong className="co-subject-code">{item.subject.code}</strong>
+                  <span className="co-subject-name">{item.subject.name}</span>
+                  <span className="co-caption">{item.eligibleClassGroups.length} lớp / nhóm có thể chọn</span></span>
+              </Button>)}
+            </div>
+          </div>
+        </Paper>
+        <Paper component="section" variant="outlined" className="co-organize co-panel">
+          <div className="co-name-block">
+            <h1 className="co-small-heading">TẠO LỚP HỌC PHẦN</h1>
+            <label className="co-name-label" htmlFor="course-offering-name">Tên lớp học phần *</label>
+            <TextField id="course-offering-name" fullWidth required value={name} disabled={!canManage}
+              inputProps={{ maxLength: 200 }} onChange={(event) => setName(event.target.value)} />
+          </div>
+          <div className="co-participation-grid">
+            <div className="co-groups">
+              <SectionHeading number="1">LỚP / NHÓM THAM GIA</SectionHeading>
+              <TextField fullWidth inputProps={{ "aria-label": "Tìm lớp / nhóm" }} placeholder="Tìm lớp / nhóm..." value={groupSearch} onChange={(event) => setGroupSearch(event.target.value)} />
+              {!candidate && <p className="co-empty">Chọn một môn học ở phạm vi tổ chức.</p>}
+              <div className="co-group-list">
+                {sourceGroups.filter((group) => textMatches(group.code + " " + group.name, groupSearch)).map((group) => {
+                  const selected = selectedIds.includes(group.id);
+                  const blockedMerge = !selected && selectedGroups.length > 0 && (!group.canMerge || selectedGroups.some((item) => !item.canMerge));
+                  return <div key={group.id} className={"co-group-row" + (viewedId === group.id ? " is-viewed" : "")}>
+                    <Checkbox checked={selected} inputProps={{ "aria-label": "Chọn " + group.name }} disabled={!canManage || blockedMerge}
+                      onChange={(event) => toggleGroup(group, event.target.checked)} />
+                    <Button className="co-group-preview-button" onClick={() => setViewedId(group.id)} aria-label={"Xem " + group.name} aria-pressed={viewedId === group.id}>
+                      <span className="co-group-description"><strong>{group.name}</strong><span>{group.major?.name || major?.name}{group.canMerge ? "" : " · Xếp riêng"}</span></span>
+                      <span className="co-group-status"><span>{group.memberCount || 0} học viên</span>{viewedId === group.id && <span className="co-viewed-badge">ĐANG XEM</span>}</span>
+                    </Button>
+                  </div>;
+                })}
+              </div>
+              {selectedGroups.some((group) => !group.canMerge) && <p className="co-caption">Lớp / nhóm này xếp riêng. Chỉ chọn nhiều lớp khi các gói học phần đều cho phép ghép.</p>}
+            </div>
+            <div className="co-preview" data-testid="source-roster">
+              <SectionHeading number="2">HỌC VIÊN CỦA LỚP / NHÓM</SectionHeading>
+              {viewedGroup ? <>
+                <div className="co-preview-heading"><strong>{viewedGroup.name}</strong><span>{viewedRoster.id === viewedId ? viewedRoster.participants.length + " học viên" : "Đang tải..."}</span></div>
+                {viewedRoster.id !== viewedId ? <Typography role="status">Đang tải học viên...</Typography> : <>
+                  <div className="co-preview-list">
+                    {viewedRoster.participants.map((participant, index) => <div key={participantKey(participant)} className="co-preview-learner">
+                      <span className="co-ordinal">{String(index + 1).padStart(2, "0")}</span>
+                      <div><strong>{participant.fullName}</strong><span>{participant.regNo || "—"}</span></div>
+                    </div>)}
+                  </div>
+                  {!viewedRoster.participants.length && <p className="co-empty">Lớp / nhóm chưa có học viên.</p>}
+                </>}
+              </> : <p className="co-empty">Bấm tên lớp / nhóm để xem học viên. Việc xem giữ nguyên các lớp đã chọn.</p>}
+            </div>
+          </div>
+          <div className="co-selection-footer">
+            <div aria-label="Tổng hợp lớp đã chọn">
+              <div className="co-totals"><strong>{selectedIds.length} LỚP / NHÓM ĐÃ CHỌN</strong><strong>{previewReady ? participants.length + " HỌC VIÊN" : "Đang tổng hợp học viên..."}</strong></div>
+              <div className="co-tags">{selectedGroups.map((group) => <Chip key={group.id} label={group.name + " · " + (group.memberCount || 0) + " HV"} />)}</div>
+            </div>
+            <div className="co-actions">
+              <Button variant="outlined" onClick={reset}>LÀM LẠI</Button>
+              <Button variant="contained" endIcon={<ArrowForwardIcon />} onClick={continueToConfirmation} disabled={!canManage || loading || !previewReady}>TIẾP TỤC</Button>
+            </div>
+          </div>
+        </Paper>
+      </div>}
+      {step === 2 && <Paper variant="outlined" className="co-confirm co-panel">
+        <header className="co-confirm-header"><h1>XÁC NHẬN LỚP HỌC PHẦN</h1><p>Kiểm tra thông tin trước khi tạo</p></header>
+        {classSummary}
+        <div className="co-confirm-roster"><CourseOfferingRoster participants={participants} notes={notes} onNoteChange={changeNote} disabled={!canManage || saving} /></div>
+        <div className="co-actions co-confirm-actions">
+          <Button variant="outlined" startIcon={<ArrowBackIcon />} onClick={() => { setStep(1); setError(""); }} disabled={saving}>QUAY LẠI CHỈNH SỬA</Button>
+          <Button variant="contained" onClick={create} disabled={!canManage || saving}>XÁC NHẬN TẠO LỚP HỌC PHẦN</Button>
+        </div>
+      </Paper>}
+      {step === 3 && <div className="co-success-stage">
+        <Paper variant="outlined" className="co-success co-panel">
+          {successLoading ? <Typography role="status">Đang tải lớp học phần đã tạo...</Typography> : created ? <>
+            <div className="co-success-icon"><CheckIcon /></div>
+            <h1 className="co-success-label">ĐÃ TẠO LỚP HỌC PHẦN</h1>
+            <h2 className="co-class-name">{created.name}</h2>
+            <p className="co-success-subtitle">{displayMajors || "—"} · Năm {displayYears || "—"}</p>
+            <div className="co-success-summary">
+              <div className="co-totals"><strong>{savedGroups.length} lớp / nhóm</strong><strong>{created.participants?.length ?? created.participantCount ?? 0} học viên</strong></div>
+              <div className="co-success-groups">{savedGroups.map((group) => <span key={group.id}>{group.name}</span>)}</div>
+            </div>
+            <div className="co-actions co-success-actions">
+              <Button variant="outlined" onClick={reset} disabled={saving}>TẠO LỚP HỌC PHẦN KHÁC</Button>
+              <Button variant="contained" endIcon={<ArrowForwardIcon />} onClick={() => navigate("/masters/schedule?offeringId=" + created.id)} disabled={saving}>SANG XẾP LỊCH</Button>
+            </div>
+          </> : <Button onClick={reset}>QUAY LẠI TẠO LỚP HỌC PHẦN</Button>}
+        </Paper>
+        {created && !successLoading && <details className="co-saved-details">
+          <summary>Xem danh sách học viên / Đổi tên lớp</summary>
+          <Paper variant="outlined" className="co-panel co-details-panel">
+            {classSummary}
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ my: 3 }}>
+              <TextField fullWidth size="small" label="Tên lớp học phần" value={savedName} inputProps={{ maxLength: 200 }} disabled={!canManage || saving} onChange={(event) => setSavedName(event.target.value)} />
+              {canManage && <Button onClick={rename} disabled={saving || !savedName.trim() || savedName.trim() === created.name} sx={{ minWidth: 115 }}>Đổi tên</Button>}
+            </Stack>
+            <CourseOfferingRoster participants={created.participants || []} notes={notes} onNoteChange={changeNote} disabled={!canManage || saving} />
+            {canManage && <Button onClick={saveNotes} disabled={saving || !dirtyNotes} sx={{ mt: 1 }}>Lưu ghi chú</Button>}
+          </Paper>
+        </details>}
+      </div>}
+    </Box>
+  </FeatureLayout>;
+}

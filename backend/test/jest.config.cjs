@@ -1,6 +1,7 @@
 module.exports = {
   rootDir: "..",
   testEnvironment: "node",
+  setupFiles: ["reflect-metadata"],
   testMatch: [
     "<rootDir>/test/**/*.spec.ts",
     "<rootDir>/test/**/*.e2e-spec.ts",

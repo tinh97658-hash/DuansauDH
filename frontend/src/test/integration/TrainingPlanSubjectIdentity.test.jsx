@@ -20,7 +20,7 @@ jest.mock("axios", () => ({
   post: jest.fn(),
   put: jest.fn(),
   delete: jest.fn(),
-  defaults: {},
+  defaults: {}, interceptors: { request: { use: jest.fn() } },
 }));
 jest.mock("../../components/FeatureLayout", () => function FeatureLayoutMock({ children }) { return children; });
 
@@ -80,7 +80,7 @@ describe("Training Plan Subject identity persistence", () => {
     fireEvent.change(screen.getByPlaceholderText("Mã số (101)"), { target: { value: "201" } });
     fireEvent.change(screen.getByPlaceholderText("Mã chữ (CS01)"), { target: { value: "NEW-ROOT" } });
     fireEvent.change(screen.getByPlaceholderText("Nhập tên học phần..."), { target: { value: "Học phần gốc mới" } });
-    await clickAndWait(screen.getByRole("checkbox", { name: "Cho phép ghép lớp khác ngành" }));
+    await clickAndWait(screen.getByRole("checkbox", { name: "Có thể ghép lớp" }));
     await clickAndWait(screen.getByRole("button", { name: "Lưu & Thêm tiếp (Enter)" }));
 
     await waitFor(() => expect(axios.post).toHaveBeenCalledWith(

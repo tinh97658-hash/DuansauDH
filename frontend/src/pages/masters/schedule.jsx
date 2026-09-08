@@ -15,8 +15,9 @@ import UnresolvedSessionsDrawer from "../../components/scheduling/UnresolvedSess
 import { schedulingType, schedulingTypographySx } from "../../components/scheduling/schedulingTypography";
 import SessionComposer from "../../components/scheduling/SessionComposer";
 import WeeklyCalendar from "../../components/scheduling/WeeklyCalendar";
+import "../../components/scheduling/schedulingReferences.css";
 import { API_BASE_URL } from "../../config/http";
-import { addDays, formatDateKey, getBusinessTodayKey, isSessionPast, mondayOf, shortTime } from "../../utils/schedulingCalendar";
+import { addDays, formatDateKey, getBusinessTodayKey, isSessionPast, mondayOf } from "../../utils/schedulingCalendar";
 
 const rowsFrom = (payload) => Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
 const offeringGroups = (offering) => (offering?.groupLinks || []).map((link) => link.classGroup).filter(Boolean);
@@ -26,7 +27,6 @@ const conflictDetail = (details) => {
   const context = details?.conflictingSession || {};
   const groups = (context.classGroups || []).map((group) => group.code || group.name).filter(Boolean).join(", ");
   return [
-    details?.startTime && details?.endTime ? `${shortTime(details.startTime)}–${shortTime(details.endTime)}` : "",
     context.subject?.code ? `Học phần: ${context.subject.code}${context.subject.name ? ` · ${context.subject.name}` : ""}` : "",
     groups ? `Lớp: ${groups}` : "",
     context.lecturer?.name ? `Giảng viên: ${context.lecturer.name}` : "",
@@ -58,11 +58,9 @@ const scopeForOffering = (offering) => {
   const groups = offeringGroups(offering);
   const majorIds = unique(groups.map((group) => group.majorId || group.major?.id));
   const years = unique(groups.map((group) => group.academicYear));
-  const terms = unique(groups.map((group) => group.term));
   return {
     majorId: majorIds.length === 1 ? majorIds[0] : "",
     academicYear: years.length === 1 ? years[0] : "",
-    term: terms.length === 1 ? terms[0] : "",
   };
 };
 
@@ -78,12 +76,11 @@ const Schedule = () => {
   const [rooms, setRooms] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [highlightedId, setHighlightedId] = useState("");
-  const [status, setStatus] = useState("active");
   const [majorId, setMajorId] = useState("");
   const [academicYear, setAcademicYear] = useState("");
-  const [term, setTerm] = useState("");
   const [search, setSearch] = useState("");
   const [monday, setMonday] = useState(() => mondayOf(getBusinessTodayKey()));
+  const requestedSessionId = searchParams.get("sessionId") || "";
   const [canManageScheduling, setCanManageScheduling] = useState(false);
   const [accessLoaded, setAccessLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -98,7 +95,6 @@ const Schedule = () => {
   const [pendingOpen, setPendingOpen] = useState(false);
   const [pendingError, setPendingError] = useState("");
   const [pendingSavingId, setPendingSavingId] = useState("");
-  const [completionSaving, setCompletionSaving] = useState(false);
   const [unresolvedOffering, setUnresolvedOffering] = useState(null);
   const [unresolvedSessions, setUnresolvedSessions] = useState([]);
   const [unresolvedLoading, setUnresolvedLoading] = useState(false);
@@ -107,10 +103,11 @@ const Schedule = () => {
 
   const weekFrom = formatDateKey(monday);
   const weekTo = formatDateKey(addDays(monday, 6));
-  const composerMonday = composer?.initialDate ? mondayOf(composer.initialDate) : monday;
+  const composerDate = composer?.availabilityDate || composer?.initialDate;
+  const composerMonday = composerDate ? mondayOf(composerDate) : monday;
   const composerWeekFrom = formatDateKey(composerMonday);
   const composerWeekTo = formatDateKey(addDays(composerMonday, 6));
-  const needsOffWeekAvailability = Boolean(composer?.session?.status === "planned" && !isSessionPast(composer.session) && composerWeekFrom !== weekFrom);
+  const needsOffWeekAvailability = Boolean(composer && (!composer.session || (composer.session.status === "planned" && !isSessionPast(composer.session))) && composerWeekFrom !== weekFrom);
 
   useEffect(() => {
     if (!needsOffWeekAvailability) return undefined;
@@ -167,10 +164,8 @@ const Schedule = () => {
       if (requested) {
         const scope = scopeForOffering(requested);
         setSelectedId(requested.id);
-        setStatus(requested.status === "completed" ? "completed" : "active");
         setMajorId(scope.majorId);
         setAcademicYear(scope.academicYear);
-        setTerm(scope.term);
         setSearch("");
         setHighlightedId(requested.id);
       } else {
@@ -207,7 +202,7 @@ const Schedule = () => {
   const loadPendingSessions = useCallback(async () => {
     try {
       const { data } = await axios.get(`${API_BASE_URL}/scheduling/pending-teaching-sessions`, { withCredentials: true });
-      setPendingSessions(rowsFrom(data));
+      setPendingSessions(rowsFrom(data).filter((session) => session.courseOffering?.subject?.active !== false));
       setPendingError("");
     } catch (requestFailure) {
       setPendingSessions([]);
@@ -251,36 +246,29 @@ const Schedule = () => {
     return [...byId.values()].sort((a, b) => String(a.name).localeCompare(String(b.name), "vi"));
   }, [allGroups]);
   const years = useMemo(() => unique(allGroups.filter((group) => !majorId || group.majorId === majorId).map((group) => group.academicYear)).sort((a, b) => String(b).localeCompare(String(a), "vi", { numeric: true })), [allGroups, majorId]);
-  const terms = useMemo(() => unique(allGroups.filter((group) => (!majorId || group.majorId === majorId) && (!academicYear || group.academicYear === academicYear)).map((group) => group.term)).sort((a, b) => String(a).localeCompare(String(b), "vi", { numeric: true })), [academicYear, allGroups, majorId]);
+
 
   const scopeOfferings = useMemo(() => offerings.filter((offering) => offeringGroups(offering).some((group) => (
     (!majorId || group.majorId === majorId)
     && (!academicYear || group.academicYear === academicYear)
-    && (!term || group.term === term)
-  ))), [academicYear, majorId, offerings, term]);
-  const statusCounts = useMemo(() => ({
-    active: scopeOfferings.filter((offering) => offering.status === "active").length,
-    completed: scopeOfferings.filter((offering) => offering.status === "completed").length,
-  }), [scopeOfferings]);
-  const sessionOfferingIds = useMemo(() => new Set(sessions.map((session) => session.courseOfferingId)), [sessions]);
-  const activeWithoutSessions = useMemo(() => scopeOfferings.filter((offering) => offering.status === "active" && !sessionOfferingIds.has(offering.id)).length, [scopeOfferings, sessionOfferingIds]);
+  ))), [academicYear, majorId, offerings]);
+  const weekSessionsFor = (id) => sessions.filter((session) => session.courseOfferingId === id && session.isScheduled !== false && session.status !== "not_held");
 
   const filteredOfferings = useMemo(() => {
     const keyword = search.trim().toLocaleLowerCase("vi");
     return scopeOfferings.filter((offering) => {
-      if (offering.status !== status) return false;
       if (!keyword) return true;
       const subject = offering.subject || {};
+      if (offering.name?.toLocaleLowerCase("vi").includes(keyword)) return true;
       const groupText = offeringGroups(offering).map((group) => `${group.code || ""} ${group.name || ""} ${group.major?.name || ""}`).join(" ");
       return `${subject.code || ""} ${subject.name || ""} ${groupText}`.toLocaleLowerCase("vi").includes(keyword);
     });
-  }, [scopeOfferings, search, status]);
+  }, [scopeOfferings, search]);
 
-  const displaySessions = useMemo(() => sessions.filter((session) => offeringGroups(session.courseOffering).some((group) => (
+  const displaySessions = useMemo(() => sessions.filter((session) => session.courseOffering?.subject?.active !== false && offeringGroups(session.courseOffering).some((group) => (
       (!majorId || group.majorId === majorId)
       && (!academicYear || group.academicYear === academicYear)
-      && (!term || group.term === term)
-    ))), [academicYear, majorId, sessions, term]);
+    ))), [academicYear, majorId, sessions]);
   const availabilitySessions = sessions;
   useEffect(() => {
     if (!highlightedId || !filteredOfferings.some((offering) => offering.id === highlightedId)) return undefined;
@@ -290,8 +278,20 @@ const Schedule = () => {
     return () => window.clearTimeout(timer);
   }, [filteredOfferings, highlightedId]);
 
+  useEffect(() => {
+    if (!requestedSessionId || !accessLoaded) return undefined;
+    let active = true;
+    axios.get(API_BASE_URL + "/scheduling/teaching-sessions/" + requestedSessionId).then(({ data }) => {
+      if (!active) return;
+      if (data.courseOfferingId !== requestedOfferingId) { setError("Buổi học không thuộc lớp học phần đã chọn."); return; }
+      setComposer({ session: data, initialDate: data.sessionDate || getBusinessTodayKey(), initialPeriod: data.period || "" });
+      if (data.sessionDate) setMonday(mondayOf(data.sessionDate));
+    }).catch((e) => { if (active) setError(requestMessage(e, "Không tải được buổi học.")); });
+    return () => { active = false; };
+  }, [requestedSessionId, requestedOfferingId, accessLoaded]);
+
   const selectedOffering = offerings.find((offering) => offering.id === selectedId) || null;
-  const selecting = Boolean(selectedOffering && selectedOffering.status === "active" && accessLoaded && canManageScheduling);
+  const selecting = Boolean(selectedOffering && accessLoaded && canManageScheduling);
 
   const selectOffering = (offering) => {
     setSelectedId(offering.id);
@@ -310,7 +310,7 @@ const Schedule = () => {
     setGuidance(""); setComposerError("");
     setPendingOpen(false);
     setUnresolvedOffering(null);
-    setComposer({ session, initialDate: session.sessionDate, initialPeriod: session.period });
+    setComposer({ session, initialDate: session.sessionDate || getBusinessTodayKey(), initialPeriod: session.period || "" });
   };
 
   const saveSession = async (values) => {
@@ -325,6 +325,7 @@ const Schedule = () => {
         toast.success("Buổi học đã được tạo.");
       }
       setComposer(null);
+      setMonday(mondayOf(values.sessionDate));
       await Promise.all([loadSessions(), loadOfferings(), loadPendingSessions()]);
     } catch (requestFailure) {
       setComposerError(conflictMessage(requestFailure, rooms, lecturers));
@@ -372,21 +373,6 @@ const Schedule = () => {
 
   const confirmSession = (confirmationStatus) => confirmTeachingSession(composer?.session, confirmationStatus, true);
 
-  const completeOffering = async (offering) => {
-    if (!offering || !window.confirm("Xác nhận hoàn thành giảng dạy lớp học phần này?")) return;
-    setCompletionSaving(true);
-    try {
-      await axios.put(`${API_BASE_URL}/scheduling/course-offerings/${offering.id}/completion`, {}, { withCredentials: true });
-      setStatus("completed");
-      toast.success("Lớp học phần đã được chuyển sang Hoàn thành.");
-      await loadOfferings();
-    } catch (requestFailure) {
-      setError(requestMessage(requestFailure, "Không thể hoàn thành lớp học phần."));
-    } finally {
-      setCompletionSaving(false);
-    }
-  };
-
   const viewUnresolvedSessions = (offering) => {
     setUnresolvedSessions([]); setUnresolvedLoading(true); setUnresolvedError("");
     setUnresolvedOffering(offering);
@@ -398,20 +384,20 @@ const Schedule = () => {
     setDetailOfferingId(offering?.id || offering?.courseOfferingId || "");
   };
 
-  const composerOffering = composer?.session?.courseOffering || selectedOffering;
   const composerAvailabilityLoading = needsOffWeekAvailability && (offWeekAvailability.from !== composerWeekFrom || offWeekAvailability.loading);
-  const composerCanEdit = canManageScheduling && composerOffering?.status !== "completed" && (!needsOffWeekAvailability || (!composerAvailabilityLoading && !offWeekAvailability.error));
+  const composerCanEdit = canManageScheduling && (!needsOffWeekAvailability || (!composerAvailabilityLoading && !offWeekAvailability.error));
   const detailOffering = offerings.find((offering) => offering.id === detailOfferingId) || null;
   const selectedGroups = offeringGroups(selectedOffering);
   const selectedStrip = selectedOffering ? (
     <Box
       data-testid="selected-offering-strip"
-      sx={{ minHeight: 68, display: "grid", gridTemplateColumns: { xs: "1fr", md: "auto minmax(220px,1fr) minmax(210px,auto) auto" }, alignItems: "center", gap: 1.4, px: 1.5, py: 0.8, borderBottom: "1px solid #7EAFD1", bgcolor: selectedOffering.status === "active" ? "#E6F2F9" : "#F2F4F6" }}
+      sx={{ minHeight: 68, display: "grid", gridTemplateColumns: { xs: "1fr", md: "auto minmax(220px,1fr) minmax(210px,auto) auto" }, alignItems: "center", gap: 1.4, px: 1.5, py: 0.8, borderBottom: "1px solid #7EAFD1", bgcolor: "#E6F2F9" }}
     >
-      <Typography variant="caption" sx={{ "&&": { pr: { md: 1.5 }, borderRight: { md: "1px solid #A4C6DC" }, color: selectedOffering.status === "active" ? "#075A9C" : "#68737D", fontWeight: 700 } }}>{selecting ? "▣ ĐANG XẾP" : "CHỈ XEM"}</Typography>
-      <Box><Typography variant="subtitle2" sx={{ "&&": { color: "#143D5B" } }}>{selectedOffering.subject?.code} · {selectedOffering.subject?.name}</Typography><Typography variant="caption">{selectedGroups.map((group) => `${group.code} · ${group.major?.name || "Chưa có ngành"}`).join("; ")}</Typography></Box>
+      <Typography variant="caption" sx={{ "&&": { pr: { md: 1.5 }, borderRight: { md: "1px solid #A4C6DC" }, color: "#075A9C", fontWeight: 700 } }}>{selecting ? "▣ ĐANG XẾP" : "CHỈ XEM"}</Typography>
+      <Box><Typography variant="subtitle2" sx={{ "&&": { color: "#143D5B" } }}>{selectedOffering.name || selectedOffering.subject?.name}</Typography><Typography variant="caption">{selectedGroups.map((group) => `${group.code} · ${group.major?.name || "Chưa có ngành"}`).join("; ")}</Typography></Box>
       <Box sx={{ pl: { md: 1.5 }, borderLeft: { md: "1px solid #AECDDB" } }}><Typography variant="caption" color="text.secondary">BƯỚC TIẾP THEO</Typography><Typography variant="caption" sx={{ "&&": { display: "block", color: "#234B66", fontWeight: 700 } }}>{selecting ? "Chọn ngày trên lịch để nhập buổi học." : "Lớp học phần đang ở chế độ chỉ xem."}</Typography></Box>
       <Stack direction="row" spacing={0.5}>
+        {selecting && <Button size="small" variant="contained" onClick={() => openSlot(weekFrom < getBusinessTodayKey() ? getBusinessTodayKey() : weekFrom, "")}>Thêm buổi</Button>}
         <Button size="small" variant="outlined" onClick={() => setDetailOfferingId(selectedOffering.id)}>Chi tiết</Button>
         <Button size="small" variant="outlined" onClick={() => setSelectedId("")}>Bỏ chọn</Button>
       </Stack>
@@ -432,16 +418,10 @@ const Schedule = () => {
               <Button size="small" component={Link} to="/masters/course-offerings" startIcon={<AddRounded />}>Tạo mới</Button>
             </Stack>
             <Typography component="label" variant="caption" sx={{ "&&": { display: "block", mt: 0.6, mb: 0.3, color: "#5C6E7A", fontSize: 11.5, fontWeight: 600 } }}>Chuyên ngành</Typography>
-            <FormControl size="small" fullWidth><Select MenuProps={{ PaperProps: { sx: schedulingTypographySx } }} displayEmpty renderValue={(value) => value ? majors.find((major) => major.id === value)?.name : "Tất cả chuyên ngành"} inputProps={{ "aria-label": "Chuyên ngành" }} value={majorId} onChange={(event) => { setMajorId(event.target.value); setAcademicYear(""); setTerm(""); }}><MenuItem value="">Tất cả chuyên ngành</MenuItem>{majors.map((major) => <MenuItem key={major.id} value={major.id}>{major.code} · {major.name}</MenuItem>)}</Select></FormControl>
+            <FormControl size="small" fullWidth><Select MenuProps={{ PaperProps: { sx: schedulingTypographySx } }} displayEmpty renderValue={(value) => value ? majors.find((major) => major.id === value)?.name : "Tất cả chuyên ngành"} inputProps={{ "aria-label": "Chuyên ngành" }} value={majorId} onChange={(event) => { setMajorId(event.target.value); setAcademicYear(""); }}><MenuItem value="">Tất cả chuyên ngành</MenuItem>{majors.map((major) => <MenuItem key={major.id} value={major.id}>{major.code} · {major.name}</MenuItem>)}</Select></FormControl>
             <Stack direction="row" spacing={0.65} sx={{ mt: 0.65 }}>
-              <Box sx={{ flex: 1 }}><Typography component="label" variant="caption" sx={{ "&&": { display: "block", mb: 0.3, color: "#5C6E7A", fontSize: 11.5, fontWeight: 600 } }}>Khóa / Năm</Typography><FormControl size="small" fullWidth><Select MenuProps={{ PaperProps: { sx: schedulingTypographySx } }} displayEmpty renderValue={(value) => value || "Tất cả"} inputProps={{ "aria-label": "Khóa / Năm" }} value={academicYear} onChange={(event) => { setAcademicYear(event.target.value); setTerm(""); }}><MenuItem value="">Tất cả</MenuItem>{years.map((year) => <MenuItem key={year} value={year}>{year}</MenuItem>)}</Select></FormControl></Box>
-              <Box sx={{ flex: 1 }}><Typography component="label" variant="caption" sx={{ "&&": { display: "block", mb: 0.3, color: "#5C6E7A", fontSize: 11.5, fontWeight: 600 } }}>Học kỳ</Typography><FormControl size="small" fullWidth><Select MenuProps={{ PaperProps: { sx: schedulingTypographySx } }} displayEmpty renderValue={(value) => value || "Tất cả"} inputProps={{ "aria-label": "Học kỳ" }} value={term} onChange={(event) => setTerm(event.target.value)}><MenuItem value="">Tất cả</MenuItem>{terms.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}</Select></FormControl></Box>
+              <Box sx={{ flex: 1 }}><Typography component="label" variant="caption" sx={{ "&&": { display: "block", mb: 0.3, color: "#5C6E7A", fontSize: 11.5, fontWeight: 600 } }}>Khóa / Năm</Typography><FormControl size="small" fullWidth><Select MenuProps={{ PaperProps: { sx: schedulingTypographySx } }} displayEmpty renderValue={(value) => value || "Tất cả"} inputProps={{ "aria-label": "Khóa / Năm" }} value={academicYear} onChange={(event) => { setAcademicYear(event.target.value); }}><MenuItem value="">Tất cả</MenuItem>{years.map((year) => <MenuItem key={year} value={year}>{year}</MenuItem>)}</Select></FormControl></Box>
             </Stack>
-            <Box sx={{ mt: 0.8, display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid #C5D0D8" }}>
-              <Button data-active={status === "active" ? "true" : "false"} onClick={() => setStatus("active")} sx={{ "&&": { borderRadius: 0, py: 0.55, bgcolor: status === "active" ? "#075A9C" : "#FFFFFF", color: status === "active" ? "#FFFFFF" : "#526875", "&:hover": { bgcolor: status === "active" ? "#064D87" : "#EEF4F7" } } }}>ĐANG DẠY · {statusCounts.active}</Button>
-              <Button data-active={status === "completed" ? "true" : "false"} onClick={() => setStatus("completed")} sx={{ "&&": { borderRadius: 0, py: 0.55, borderLeft: "1px solid #C5D0D8", bgcolor: status === "completed" ? "#687985" : "#FFFFFF", color: status === "completed" ? "#FFFFFF" : "#526875", "&:hover": { bgcolor: status === "completed" ? "#596A75" : "#EEF4F7" } } }}>HOÀN THÀNH · {statusCounts.completed}</Button>
-            </Box>
-            {!sessionsLoading && activeWithoutSessions > 0 && <Box sx={{ mt: 0.75, px: 0.8, py: 0.65, borderLeft: "3px solid #CE9D35", bgcolor: "#FFF8E5", color: "#674F1E", fontSize: 11 }}>● {activeWithoutSessions} lớp học phần chưa có lịch tuần này</Box>}
             {accessLoaded && !canManageScheduling && <Box sx={{ mt: 0.65, px: 0.8, py: 0.65, borderLeft: "3px solid #7E9EB3", bgcolor: "#EEF4F7", color: "#526875", fontSize: 11 }}>Quyền chỉ xem · Không thể tạo hoặc sửa lịch.</Box>}
             {error && <Alert severity="error" sx={{ mt: 0.65, py: 0 }}>{error}</Alert>}
           </Box>
@@ -457,7 +437,8 @@ const Schedule = () => {
                 : filteredOfferings.length === 0 ? <Box sx={{ p: 2, border: "1px dashed #B8C5CE", bgcolor: "#FFFFFF", textAlign: "center" }}><Typography variant="caption" color="text.secondary">Chưa có lớp học phần phù hợp.</Typography></Box>
                   : <Stack spacing={0.7}>{filteredOfferings.map((offering) => {
                     const groups = offeringGroups(offering);
-                    const hasWeekSession = sessionOfferingIds.has(offering.id);
+                    const weekSessions = weekSessionsFor(offering.id);
+                    const upcomingThisWeek = weekSessions.filter((session) => session.status === "planned" && !isSessionPast(session)).length;
                     const selected = offering.id === selectedId;
                     const highlighted = offering.id === highlightedId;
                     return (
@@ -467,17 +448,22 @@ const Schedule = () => {
                         component="article"
                         role="button"
                         tabIndex={0}
+                        className="schedule-offering-card"
                         data-offering-id={offering.id}
                         data-selected={selected ? "true" : "false"}
                         data-new-offering={highlighted ? "true" : "false"}
                         onClick={() => setDetailOfferingId(offering.id)}
-                        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setDetailOfferingId(offering.id); }}
+                        onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); setDetailOfferingId(offering.id); } }}
                         sx={{ p: 1, border: "1px solid", borderColor: selected ? "#3D86BA" : "#C6D1D9", borderLeft: `3px solid ${selected ? "#075A9C" : "#7E9EB3"}`, bgcolor: highlighted ? "#E8F6FC" : (selected ? "#EFF7FB" : "#FFFFFF"), boxShadow: highlighted ? "inset 0 0 0 2px #5FA6D0" : "none", cursor: "pointer", transition: "background-color 180ms, border-color 180ms, box-shadow 180ms", "&:hover": { bgcolor: selected ? "#E8F4FA" : "#F8FAFB", borderColor: "#7EAAC7" } }}
                       >
-                        <Stack direction="row" justifyContent="space-between" spacing={0.75} alignItems="flex-start"><Typography variant="body2" sx={{ "&&": { color: "#1C3A50", fontWeight: 700 } }}>{offering.subject?.code} · {offering.subject?.name}</Typography><Chip size="small" variant="outlined" color={offering.status === "active" ? "primary" : "default"} label={offering.status === "active" ? "ĐANG DẠY" : "HOÀN THÀNH"} /></Stack>
-                        <Typography variant="caption" sx={{ "&&": { display: "block", mt: 0.4, color: "#4F6471" } }}>{groups.map((group) => group.code).join(", ") || "Chưa có nhóm"}</Typography>
-                        <Typography variant="caption" sx={{ "&&": { display: "block", color: "#60727F" } }}>{unique(groups.map((group) => group.major?.name)).join(" · ")} · {unique(groups.map((group) => group.academicYear)).join(", ")}{unique(groups.map((group) => group.term)).length ? ` · ${unique(groups.map((group) => group.term)).join(", ")}` : ""}</Typography>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 0.8, pt: 0.65, borderTop: "1px solid #E1E7EB" }}><Typography variant="caption" sx={{ "&&": { color: hasWeekSession ? "#276A98" : "#7B642D", fontWeight: 700 } }}>{hasWeekSession ? "Đã có lịch tuần này" : "Chưa có lịch tuần này"}</Typography>{offering.status === "active" && canManageScheduling && <Button size="small" variant="contained" onClick={(event) => { event.stopPropagation(); selectOffering(offering); }} sx={{ "&&": { minHeight: 27, py: 0 } }}>{hasWeekSession ? "Xếp thêm" : "Xếp lịch"}</Button>}</Stack>
+                        <Typography component="h2" className="schedule-offering-name">{offering.name || offering.subject?.name}</Typography>
+                        <Typography className="schedule-offering-subject">{offering.subject?.name}</Typography>
+                        <Typography className="schedule-offering-members">{groups.length} lớp/nhóm · {offering.participantCount ?? 0} HV</Typography>
+                        <Box className="schedule-offering-footer">
+                          <Typography className="schedule-offering-held">Đã diễn ra {Number(offering.sessionSummary?.heldCount || 0)} buổi</Typography>
+                          <Typography className="schedule-offering-week" data-has-week={weekSessions.length > 0}>{upcomingThisWeek > 0 ? "Có " + upcomingThisWeek + " lịch sắp tới" : weekSessions.length > 0 ? "Có lịch tuần này" : "Chưa có lịch tuần này"}</Typography>
+                          {canManageScheduling && <Button variant="contained" onClick={(event) => { event.stopPropagation(); selectOffering(offering); }}>Xếp lịch</Button>}
+                        </Box>
                       </Box>
                     );
                   })}</Stack>}
@@ -497,18 +483,18 @@ const Schedule = () => {
       </Box>
 
       <SessionComposer
-        open={Boolean(composer)} offering={selectedOffering} session={composer?.session || null} initialDate={composer?.initialDate || ""} initialPeriod={composer?.initialPeriod || ""}
+        open={Boolean(composer)} offering={offerings.find((offering) => offering.id === composer?.session?.courseOfferingId) || selectedOffering} session={composer?.session || null} initialDate={composer?.initialDate || ""} initialPeriod={composer?.initialPeriod || ""}
         lecturers={lecturers} rooms={rooms} sessions={needsOffWeekAvailability ? offWeekAvailability.sessions : availabilitySessions} canEdit={composerCanEdit} weekFrom={composerWeekFrom} weekTo={composerWeekTo}
-        availabilityLoading={composerAvailabilityLoading} saving={saving} serverError={composerError || (needsOffWeekAvailability ? offWeekAvailability.error : "")} onClose={() => { if (!saving) setComposer(null); }} onSubmit={saveSession} onDelete={deleteSession} onConfirm={confirmSession} onViewOffering={viewOffering}
+        onDateChange={(date) => setComposer((current) => ({ ...current, availabilityDate: date }))} availabilityLoading={composerAvailabilityLoading} saving={saving} serverError={composerError || (needsOffWeekAvailability ? offWeekAvailability.error : "")} onClose={() => { if (!saving) setComposer(null); }} onSubmit={saveSession} onDelete={deleteSession} onConfirm={confirmSession} onViewOffering={viewOffering}
       />
       <PendingSessionsDrawer
         open={pendingOpen} sessions={pendingSessions} savingId={pendingSavingId} error={pendingError}
-        onClose={() => { if (!pendingSavingId) setPendingOpen(false); }} onOpenSession={openSession}
+        onClose={() => { if (!pendingSavingId) setPendingOpen(false); }}
         onConfirm={(session, confirmationStatus) => confirmTeachingSession(session, confirmationStatus)}
       />
       <CourseOfferingDrawer
-        open={Boolean(detailOffering)} offering={detailOffering} canManage={canManageScheduling} saving={completionSaving}
-        onClose={() => setDetailOfferingId("")} onSchedule={selectOffering} onComplete={completeOffering} onViewUnresolved={viewUnresolvedSessions}
+        open={Boolean(detailOffering)} offering={detailOffering} canManage={canManageScheduling} saving={saving}
+        onChanged={loadOfferings} onClose={() => setDetailOfferingId("")} onSchedule={selectOffering} onScheduleSession={(session) => { setDetailOfferingId(""); openSession(session); }} onViewUnresolved={viewUnresolvedSessions}
       />
       <UnresolvedSessionsDrawer
         open={Boolean(unresolvedOffering)} offering={unresolvedOffering} sessions={unresolvedSessions} loading={unresolvedLoading} error={unresolvedError}

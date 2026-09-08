@@ -157,14 +157,14 @@ describe("PlanService Subject logical identity", () => {
       .rejects.toThrow("phải cùng bậc đào tạo");
   });
 
-  it("rejects a root that is not enabled for cross-major use", async () => {
+  it("allows mapping a shared subject while cross-major merging is disabled", async () => {
     const { service, subjects } = buildService();
     const alias = subject();
     const root = subject({ id: "root", majorId: "major-1", canonicalSubjectId: null, allowCrossMajor: false });
     subjects.findByPk.mockImplementation(async (id: string) => id === alias.id ? alias : root);
 
-    await expect(service.updateSubject(alias.id, { canonicalSubjectId: root.id }))
-      .rejects.toThrow("chưa được cho phép dùng chung liên ngành");
+    await service.updateSubject(alias.id, { canonicalSubjectId: root.id });
+    expect(alias.update).toHaveBeenCalledWith(expect.objectContaining({ canonicalSubjectId: root.id }), expect.anything());
   });
 
   it("accepts an explicit alias-to-common-root mapping", async () => {
@@ -192,4 +192,15 @@ describe("PlanService Subject logical identity", () => {
       .rejects.toThrow("đang được lớp học phần tham chiếu");
     expect(alias.update).not.toHaveBeenCalled();
   });
+});
+
+it("turns merge permission off with aliases and existing offerings without changing their identity", async () => {
+  const { service, subjects, courseOfferings } = buildService();
+  const root = subject({ id: "root", allowCrossMajor: true });
+  subjects.findByPk.mockResolvedValue(root);
+  subjects.count.mockResolvedValue(2);
+  courseOfferings.count.mockResolvedValue(1);
+  await service.updateSubject(root.id, { allowCrossMajor: false });
+  expect(root.update).toHaveBeenCalledWith({ allowCrossMajor: false }, expect.anything());
+  expect(courseOfferings.count).not.toHaveBeenCalled();
 });

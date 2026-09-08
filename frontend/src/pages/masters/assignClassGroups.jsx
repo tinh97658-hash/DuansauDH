@@ -16,11 +16,12 @@ import {
   RefreshRounded, SearchRounded,
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../../config/http";
+import ClassRosterDialog from "../../components/ClassRosterDialog";
+import CreateClassFromStudentsDialog from "../../components/CreateClassFromStudentsDialog";
 import FeatureLayout from "../../components/FeatureLayout";
 
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
-const TERMS = ["HK1", "HK2", "HK3", "Hè"];
 
 const AssignClassGroups = () => {
   const [searchParams] = useSearchParams();
@@ -28,11 +29,18 @@ const AssignClassGroups = () => {
   const initialMajorId = searchParams.get("majorId") || "ALL";
   const initialYear = searchParams.get("year") || String(currentYear);
 
+  const [createClassOpen, setCreateClassOpen] = useState(false);
+  const [rosterId, setRosterId] = useState("");
+  const [canManageScheduling, setCanManageScheduling] = useState(false);
+  useEffect(() => {
+    let active = true;
+    axios.get(API_BASE_URL + "/auth/session").then(({ data }) => { if (active) setCanManageScheduling(data?.user?.canManageScheduling === true); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
   // Filters
   const [majors, setMajors] = useState([]);
   const [selectedYear, setSelectedYear] = useState(initialYear);
   const [selectedMajor, setSelectedMajor] = useState(initialMajorId);
-  const [selectedTerm, setSelectedTerm] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL"); // ALL, UNASSIGNED, ASSIGNED
   const [studentSearch, setStudentSearch] = useState("");
 
@@ -68,7 +76,6 @@ const AssignClassGroups = () => {
       const params = new URLSearchParams();
       if (selectedYear) params.append("academicYear", selectedYear);
       if (selectedMajor !== "ALL") params.append("majorId", selectedMajor);
-      if (selectedTerm !== "ALL") params.append("term", selectedTerm);
       params.append("status", "open");
 
       const { data } = await axios.get(`${API_BASE_URL}/masters/class-groups?${params.toString()}`, {
@@ -78,9 +85,10 @@ const AssignClassGroups = () => {
       setGroups(list);
 
       // Auto pick first group if none selected or current not in list
-      if (list.length > 0) {
-        if (!targetGroupId || !list.some((g) => g.id === targetGroupId)) {
-          setTargetGroupId(list[0].id);
+      const roots = list.filter((g) => !g.parentGroupId);
+      if (roots.length > 0) {
+        if (!targetGroupId || !roots.some((g) => g.id === targetGroupId)) {
+          setTargetGroupId(roots[0].id);
         }
       } else {
         setTargetGroupId("");
@@ -88,7 +96,7 @@ const AssignClassGroups = () => {
     } catch (err) {
       console.error(err);
     }
-  }, [selectedYear, selectedMajor, selectedTerm, targetGroupId]);
+  }, [selectedYear, selectedMajor, targetGroupId]);
 
   // Load students
   const loadStudents = useCallback(async () => {
@@ -97,7 +105,6 @@ const AssignClassGroups = () => {
       const params = new URLSearchParams();
       if (selectedYear) params.append("academicYear", selectedYear);
       if (selectedMajor !== "ALL") params.append("majorId", selectedMajor);
-      if (selectedTerm !== "ALL") params.append("term", selectedTerm);
 
       const { data } = await axios.get(`${API_BASE_URL}/masters/class-groups/eligible-students?${params.toString()}`, {
         withCredentials: true,
@@ -109,7 +116,7 @@ const AssignClassGroups = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedYear, selectedMajor, selectedTerm]);
+  }, [selectedYear, selectedMajor]);
 
   const refreshAll = useCallback(() => {
     loadGroups();
@@ -152,21 +159,25 @@ const AssignClassGroups = () => {
     });
   }, [students, filterStatus, studentSearch, currentTargetGroup]);
 
+  const selectableStudents = useMemo(() => filteredStudents.filter((student) => !student.assignedGroup), [filteredStudents]);
+  const validSelection = selectedStudentIds.length > 0 && selectedStudentIds.every((id) => selectableStudents.some((student) => student.id === id));
+
   useEffect(() => {
-    const visibleIds = new Set(filteredStudents.map((student) => student.id));
+    const visibleIds = new Set(selectableStudents.map((student) => student.id));
     setSelectedStudentIds((previous) => previous.filter((id) => visibleIds.has(id)));
-  }, [filteredStudents]);
+  }, [selectableStudents]);
 
   // Selection handlers
   const handleToggleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedStudentIds(filteredStudents.map((s) => s.id));
+      setSelectedStudentIds(selectableStudents.map((s) => s.id));
     } else {
       setSelectedStudentIds([]);
     }
   };
 
   const handleToggleSelectStudent = (id) => {
+    if (!selectableStudents.some((student) => student.id === id)) return;
     setSelectedStudentIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
@@ -175,7 +186,7 @@ const AssignClassGroups = () => {
   // Assign selected to target group
   const handleAssignSelected = async () => {
     if (!targetGroupId) return toast.error("Vui lòng chọn nhóm học phần mục tiêu.");
-    if (selectedStudentIds.length === 0) return toast.error("Vui lòng chọn ít nhất một học viên.");
+    if (!validSelection) return toast.error("Chỉ chọn học viên chưa được phân nhóm.");
 
     setActionLoading(true);
     try {
@@ -216,7 +227,7 @@ const AssignClassGroups = () => {
     if (groups.length < 2) {
       return toast.warning("Cần có ít nhất 2 nhóm học phần đang mở để thực hiện chia đều tự động.");
     }
-    setAutoTargetGroupIds(groups.map((g) => g.id));
+    setAutoTargetGroupIds(groups.filter((g) => !g.parentGroupId).map((g) => g.id));
     setAutoDialogOpen(true);
   };
 
@@ -229,7 +240,7 @@ const AssignClassGroups = () => {
     // Determine students to distribute: either currently checked, or all unassigned in filtered view, or all in view
     let targetStudentIds = selectedStudentIds;
     if (targetStudentIds.length === 0) {
-      targetStudentIds = filteredStudents.map((s) => s.id);
+      targetStudentIds = selectableStudents.map((s) => s.id);
     }
 
     if (targetStudentIds.length === 0) {
@@ -298,20 +309,6 @@ const AssignClassGroups = () => {
             </Select>
           </FormControl>
 
-          <FormControl size="small" sx={{ minWidth: 110 }}>
-            <InputLabel id="term-select-label">Học kỳ</InputLabel>
-            <Select
-              labelId="term-select-label"
-              label="Học kỳ"
-              value={selectedTerm}
-              onChange={(e) => setSelectedTerm(e.target.value)}
-            >
-              <MenuItem value="ALL">-- Tất cả --</MenuItem>
-              {TERMS.map((t) => (
-                <MenuItem key={t} value={t}>{t}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
 
           <Button
             variant="outlined"
@@ -342,6 +339,13 @@ const AssignClassGroups = () => {
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
+      <Stack direction="row" sx={{ mb: 1, gap: 1, flexWrap: "wrap" }}>
+        {groups.filter((g) => g.parentGroupId).map((g) => <Button key={g.id} variant="outlined" onClick={() => setRosterId(g.id)}>{g.name} · {g.memberCount || 0} HV</Button>)}
+      </Stack>
+      <CreateClassFromStudentsDialog open={createClassOpen} groups={groups} selectedIds={selectedStudentIds}
+        initialGroupId={currentTargetGroup?.parentGroupId ? currentTargetGroup.parentGroupId : targetGroupId}
+        onClose={() => setCreateClassOpen(false)} onCreated={(group) => { setCreateClassOpen(false); setRosterId(group.id); refreshAll(); toast.success("Đã tạo lớp và lưu học viên."); }} />
+      <ClassRosterDialog classId={rosterId} onClose={() => setRosterId("")} onChanged={refreshAll} />
       {/* Dual Panel Layout */}
       <Grid container spacing={2.5}>
         {/* Left Panel: Student Candidate List */}
@@ -409,13 +413,14 @@ const AssignClassGroups = () => {
                 size="small"
                 endIcon={<ArrowForwardRounded />}
                 onClick={handleAssignSelected}
-                disabled={selectedStudentIds.length === 0 || !targetGroupId || actionLoading}
+                disabled={!validSelection || loading || !targetGroupId || currentTargetGroup?.parentGroupId || actionLoading}
                 sx={{ bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F" } }}
               >
                 {actionLoading ? "Đang chuyển..." : "Gán vào nhóm"}
               </Button>
             </Box>
 
+            {canManageScheduling && <Button variant="outlined" sx={{ mb: 1 }} onClick={() => setCreateClassOpen(true)} disabled={!selectedStudentIds.length || actionLoading}>Tạo Lớp HP từ học viên đã chọn</Button>}
             {/* Student Table */}
             <TableContainer sx={{ flexGrow: 1, maxHeight: 520, border: "1px solid #e2e8f0", borderRadius: 1 }}>
               <Table size="small" stickyHeader>
@@ -424,9 +429,11 @@ const AssignClassGroups = () => {
                     <TableCell padding="checkbox">
                       <Checkbox
                         size="small"
-                        indeterminate={selectedStudentIds.length > 0 && selectedStudentIds.length < filteredStudents.length}
-                        checked={filteredStudents.length > 0 && selectedStudentIds.length === filteredStudents.length}
+                        indeterminate={selectedStudentIds.length > 0 && selectedStudentIds.length < selectableStudents.length}
+                        checked={selectableStudents.length > 0 && selectedStudentIds.length === selectableStudents.length}
                         onChange={handleToggleSelectAll}
+                        disabled={loading || !selectableStudents.length}
+                        inputProps={{ "aria-label": "Chọn tất cả học viên chưa phân nhóm" }}
                       />
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Mã HV / SBD</TableCell>
@@ -457,12 +464,14 @@ const AssignClassGroups = () => {
                           hover
                           selected={isSelected}
                           onClick={() => handleToggleSelectStudent(s.id)}
-                          sx={{ cursor: "pointer" }}
+                          sx={{ cursor: s.assignedGroup ? "default" : "pointer" }}
                         >
                           <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
                             <Checkbox
                               size="small"
                               checked={isSelected}
+                              disabled={Boolean(s.assignedGroup) || loading}
+                              inputProps={{ "aria-label": "Chọn học viên " + s.code, title: s.assignedGroup ? "Đã được phân vào " + (s.assignedGroup.code || s.assignedGroup.name) : undefined }}
                               onChange={() => handleToggleSelectStudent(s.id)}
                             />
                           </TableCell>
@@ -481,10 +490,11 @@ const AssignClassGroups = () => {
                             {s.majorName || "-"}
                           </TableCell>
                           <TableCell>
+                            {(s.classes || []).map((c) => <Typography key={c.id} variant="caption" display="block">{c.name}</Typography>)}
                             {s.assignedGroup ? (
                               <Chip
                                 size="small"
-                                label={s.assignedGroup.name || s.assignedGroup.code}
+                                label={s.assignedGroup.code || s.assignedGroup.name}
                                 color={s.assignedGroup.id === targetGroupId ? "success" : "default"}
                                 variant={s.assignedGroup.id === targetGroupId ? "filled" : "outlined"}
                                 sx={{ fontWeight: 600 }}
@@ -525,7 +535,7 @@ const AssignClassGroups = () => {
                 {groups.length === 0 ? (
                   <MenuItem value="" disabled><em>(Chưa có nhóm học phần nào đang mở)</em></MenuItem>
                 ) : (
-                  groups.map((g) => (
+                  groups.filter((g) => !g.parentGroupId).map((g) => (
                     <MenuItem key={g.id} value={g.id}>
                       {g.code} — {g.name} ({g.memberCount || 0}/{g.maxStudents || 40} HV)
                     </MenuItem>
@@ -623,8 +633,8 @@ const AssignClassGroups = () => {
 
           <Box sx={{ mb: 2, p: 1.5, bgcolor: "#f8fafc", borderRadius: 1 }}>
             <Typography variant="body2">
-              Số lượng học viên sẽ chia: <strong>{selectedStudentIds.length > 0 ? selectedStudentIds.length : filteredStudents.length}</strong> học viên
-              {selectedStudentIds.length > 0 ? " (đang chọn từ bảng)" : " (toàn bộ danh sách đang hiển thị)"}
+              Số lượng học viên sẽ chia: <strong>{selectedStudentIds.length > 0 ? selectedStudentIds.length : selectableStudents.length}</strong> học viên
+              {selectedStudentIds.length > 0 ? " (đang chọn từ bảng)" : " (học viên chưa phân nhóm đang hiển thị)"}
             </Typography>
           </Box>
 

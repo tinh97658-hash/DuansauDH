@@ -10,6 +10,7 @@ import { Major } from "../database/models/common/major.model.js";
 export interface CreateClassGroupInput {
   code: string;
   name: string;
+  parentGroupId?: string | null;
   program?: string;
   majorId?: string | null;
   academicYear?: string;
@@ -98,7 +99,14 @@ export class ClassGroupService {
   }
 
   async create(input: CreateClassGroupInput, transaction?: Transaction) {
+    if (!input.name?.trim() || !input.code?.trim()) throw new BadRequestException("Mã và tên lớp không được để trống.");
     const program = input.program || "masters";
+    if (input.parentGroupId) {
+      const parent = await this.classGroups.findByPk(input.parentGroupId, { transaction, ...(transaction ? { lock: transaction.LOCK.UPDATE } : {}) });
+      if (!parent || parent.parentGroupId || parent.program !== program || parent.majorId !== input.majorId || parent.status !== "open") {
+        throw new BadRequestException("Nhóm HP phải đang mở, cùng ngành/bậc và không phải lớp con.");
+      }
+    }
     await this.requireMajorForProgram(input.majorId, program, transaction);
     await this.ensureCodeUnique(input.code, program, undefined, transaction);
     return this.classGroups.create({
@@ -107,7 +115,8 @@ export class ClassGroupService {
       name: input.name,
       majorId: input.majorId || null,
       academicYear: input.academicYear || String(new Date().getFullYear()),
-      term: input.term || "HK1",
+      term: input.term || null,
+      parentGroupId: input.parentGroupId || null,
       maxStudents: input.maxStudents ?? 40,
       status: input.status || "open",
       note: input.note ?? null,
@@ -118,6 +127,12 @@ export class ClassGroupService {
     const group = await this.classGroups.findByPk(id, { transaction });
     if (!group) throw new NotFoundException("Không tìm thấy nhóm học phần.");
 
+    if (input.name !== undefined && !input.name?.trim()) throw new BadRequestException("Tên lớp không được để trống.");
+    if (input.code !== undefined && !input.code?.trim()) throw new BadRequestException("Mã lớp không được để trống.");
+    if ((input.majorId !== undefined && input.majorId !== group.majorId) || (input.program && input.program !== group.program)) {
+      const children = await this.classGroups.count({ where: { parentGroupId: id }, transaction });
+      if (group.parentGroupId || children > 0) throw new ConflictException("Không đổi ngành/bậc của nhóm đã có quan hệ lớp.");
+    }
     const program = input.program || group.program;
     const majorId = input.majorId !== undefined ? input.majorId : group.majorId;
     await this.requireMajorForProgram(majorId, program, transaction);
@@ -144,6 +159,7 @@ export class ClassGroupService {
   async remove(id: string, transaction?: Transaction) {
     const group = await this.classGroups.findByPk(id, { transaction });
     if (!group) throw new NotFoundException("Không tìm thấy nhóm học phần.");
+    if (await this.classGroups.count({ where: { parentGroupId: id }, transaction })) throw new ConflictException("Không xóa nhóm đang có lớp HP.");
     const [memberCount, packageCount] = await Promise.all([
       this.classGroupMembers.count({ where: { classGroupId: id }, transaction }),
       this.packages.count({ where: { classGroupId: id }, transaction }),

@@ -17,6 +17,12 @@ const buildService = () => {
   const rooms = { findAll: jest.fn() };
   const lecturers = { findAll: jest.fn() };
   const teachingSessions = { findAll: jest.fn().mockResolvedValue([]), findByPk: jest.fn(), findOne: jest.fn(), create: jest.fn() };
+  const savedParticipants: any[] = [];
+  const offeringParticipants = {
+    findAll: jest.fn(async () => savedParticipants),
+    bulkCreate: jest.fn(async (rows: any[]) => { savedParticipants.push(...rows); return rows; }),
+    count: jest.fn(async () => savedParticipants.length), findOne: jest.fn(),
+  };
   const service = new SchedulingService(
     courseOfferings as never,
     offeringGroups as never,
@@ -30,8 +36,9 @@ const buildService = () => {
     rooms as never,
     lecturers as never,
     teachingSessions as never,
+    offeringParticipants as never,
   );
-  return { service, courseOfferings, offeringGroups, subjects, packages, classGroups, classGroupMembers, majors, staff, sequelize, rooms, lecturers, teachingSessions };
+  return { service, offeringParticipants, courseOfferings, offeringGroups, subjects, packages, classGroups, classGroupMembers, majors, staff, sequelize, rooms, lecturers, teachingSessions };
 };
 
 const subject = {
@@ -63,12 +70,13 @@ const officialPackage = (classGroupId: string, entries = [{ subjectId: subject.i
   id: `package-${classGroupId}`,
   classGroupId,
   isOfficial: true,
+  canMerge: true,
   active: true,
   entries,
 });
 
 describe("SchedulingService participant preview", () => {
-  it("deduplicates A,B + B,C to 3, matches persisted create counts, and exposes no learner identities", async () => {
+  it("deduplicates A,B + B,C to 3 and persists the confirmed roster in the same transaction", async () => {
     const mocks = buildService();
     const groups = [group("group-a"), group("group-b")];
     mocks.classGroups.findAll.mockResolvedValue(groups);
@@ -79,7 +87,8 @@ describe("SchedulingService participant preview", () => {
       { id: "member-c", classGroupId: "group-b", studentId: "student-c" },
     ]);
     const preview = await mocks.service.previewCourseOfferingParticipants({ classGroupIds: groups.map((item) => item.id) });
-    expect(preview).toEqual({ classGroupCount: 2, participantCount: 3 });
+    expect(preview).toEqual(expect.objectContaining({ classGroupCount: 2, participantCount: 3, participants: expect.any(Array) }));
+    expect(preview.participants.map((p) => p.identity)).toEqual(["student:student-a", "student:student-b", "student:student-c"]);
     expect(mocks.courseOfferings.create).not.toHaveBeenCalled();
     expect(mocks.offeringGroups.bulkCreate).not.toHaveBeenCalled();
     expect(mocks.sequelize.transaction).not.toHaveBeenCalled();
@@ -93,20 +102,20 @@ describe("SchedulingService participant preview", () => {
     mocks.courseOfferings.findByPk.mockResolvedValue({
       id: "created", subject, groupLinks: groups.map((item) => ({ classGroupId: item.id, classGroup: item })),
     });
-    const created: any = await mocks.service.createCourseOffering({ subjectId: subject.id, classGroupIds: groups.map((item) => item.id) });
+    const created: any = await mocks.service.createCourseOffering({ name: "Lớp tự đặt", subjectId: subject.id, classGroupIds: groups.map((item) => item.id) });
     expect(created.participantCount).toBe(preview.participantCount);
   });
 
-  it("reuses admission and membership fallback identity semantics without returning PII", async () => {
+  it("resolves Student identity through admission and preserves admission-only learners", async () => {
     const mocks = buildService();
     mocks.classGroups.findAll.mockResolvedValue([group("group-a"), group("group-b")]);
     mocks.classGroupMembers.findAll.mockResolvedValue([
       { id: "member-1", classGroupId: "group-a", admissionRecordId: "admission-a" },
       { id: "member-2", classGroupId: "group-b", admissionRecordId: "admission-a" },
-      { id: "member-3", classGroupId: "group-b" },
+      { id: "member-3", classGroupId: "group-b", admissionRecordId: "admission-b", admissionRecord: { studentId: "student-b", code: "HV-B", fullName: "Học viên B" } },
     ]);
     await expect(mocks.service.previewCourseOfferingParticipants({ classGroupIds: ["group-a", "group-b"] }))
-      .resolves.toEqual({ classGroupCount: 2, participantCount: 2 });
+      .resolves.toEqual(expect.objectContaining({ classGroupCount: 2, participantCount: 2, participants: expect.arrayContaining([expect.objectContaining({ identity: "student:student-b", regNo: "HV-B", fullName: "Học viên B" })]) }));
   });
 
   it("rejects nonexistent groups before counting or mutating data", async () => {
@@ -135,7 +144,6 @@ describe("SchedulingService course-offering candidates", () => {
       program: "masters",
       majorId: "major-1",
       academicYear: "2026",
-      term: "HK1",
     });
 
     expect(result.subjects).toHaveLength(1);
@@ -277,7 +285,6 @@ describe("SchedulingService course-offering candidates", () => {
   });
 });
 
-describe("SchedulingService.createCourseOffering", () => {
   const arrangeValidCreate = (mocks: ReturnType<typeof buildService>) => {
     const g1 = group("group-1");
     mocks.subjects.findByPk.mockResolvedValue(subject);
@@ -295,11 +302,14 @@ describe("SchedulingService.createCourseOffering", () => {
     return g1;
   };
 
+describe("SchedulingService.createCourseOffering", () => {
+
+
   it("creates the offering and group relation atomically after locking groups", async () => {
     const mocks = buildService();
     const g1 = arrangeValidCreate(mocks);
 
-    const result = await mocks.service.createCourseOffering({ subjectId: subject.id, classGroupIds: [g1.id], note: "Ghi chú" });
+    const result = await mocks.service.createCourseOffering({ name: "Lớp tự đặt", subjectId: subject.id, classGroupIds: [g1.id], note: "Ghi chú" });
 
     expect(mocks.sequelize.transaction).toHaveBeenCalledTimes(1);
     expect(mocks.classGroups.findAll).toHaveBeenCalledWith(expect.objectContaining({
@@ -308,7 +318,7 @@ describe("SchedulingService.createCourseOffering", () => {
       transaction,
     }));
     expect(mocks.courseOfferings.create).toHaveBeenCalledWith(
-      { subjectId: subject.id, status: "active", note: "Ghi chú" },
+      { subjectId: subject.id, status: "active", note: "Ghi chú", name: "Lớp tự đặt" },
       { transaction },
     );
     expect(mocks.offeringGroups.bulkCreate).toHaveBeenCalledWith(
@@ -318,9 +328,34 @@ describe("SchedulingService.createCourseOffering", () => {
     expect(result).toEqual(expect.objectContaining({ id: "offering-1" }));
   });
 
+  it.each(["", "   ", null, undefined])("requires a nonblank class name: %s", async (name) => {
+    const mocks = buildService();
+    await expect(mocks.service.createCourseOffering({ name: name as any, subjectId: subject.id, classGroupIds: ["group-1"] })).rejects.toThrow("Nhập tên lớp");
+    expect(mocks.sequelize.transaction).not.toHaveBeenCalled();
+  });
+
+  it("stores notes on the class snapshot and rejects notes for unselected learners", async () => {
+    const mocks = buildService();
+    arrangeValidCreate(mocks);
+    mocks.classGroupMembers.findAll.mockResolvedValue([{ id: "m", studentId: "student-a", student: { regNo: "HV-A", fullName: "Học viên A" }, note: "Ghi chú nhóm gốc" }]);
+    await expect(mocks.service.createCourseOffering({
+      name: "Lớp A", subjectId: subject.id, classGroupIds: ["group-1"],
+      participantNotes: [{ studentId: "outside", note: "Không hợp lệ" }],
+    })).rejects.toThrow("không thuộc");
+    expect(mocks.courseOfferings.create).not.toHaveBeenCalled();
+    const created = await mocks.service.createCourseOffering({
+      name: "Lớp A", subjectId: subject.id, classGroupIds: ["group-1"],
+      participantNotes: [{ studentId: "student-a", note: " Ghi chú riêng " }],
+    });
+    expect(created.participants[0]).toMatchObject({ regNo: "HV-A", fullName: "Học viên A", note: "Ghi chú riêng" });
+    expect(mocks.offeringParticipants.bulkCreate).toHaveBeenCalledWith([
+      expect.objectContaining({ courseOfferingId: "offering-1", identity: "student:student-a", note: "Ghi chú riêng" }),
+    ], { transaction });
+  });
+
   it("rejects duplicate class group ids before opening a transaction", async () => {
     const mocks = buildService();
-    await expect(mocks.service.createCourseOffering({
+    await expect(mocks.service.createCourseOffering({ name: "Lớp tự đặt",
       subjectId: subject.id,
       classGroupIds: ["group-1", "group-1"],
     })).rejects.toThrow("trùng lặp");
@@ -332,20 +367,20 @@ describe("SchedulingService.createCourseOffering", () => {
     arrangeValidCreate(mocks);
     mocks.packages.findAll.mockResolvedValue([]);
 
-    await expect(mocks.service.createCourseOffering({
+    await expect(mocks.service.createCourseOffering({ name: "Lớp tự đặt",
       subjectId: subject.id, classGroupIds: ["group-1"],
     })).rejects.toThrow("chưa có gói học phần chính thức");
     expect(mocks.courseOfferings.create).not.toHaveBeenCalled();
   });
 
-  it("rejects a local Subject combined with a group from another major as a capability not yet configured", async () => {
+  it("rejects a group whose local package does not map to the requested subject", async () => {
     const mocks = buildService();
     arrangeValidCreate(mocks);
     mocks.classGroups.findAll.mockResolvedValue([{ ...group("group-1"), majorId: "major-2" }]);
 
-    await expect(mocks.service.createCourseOffering({
+    await expect(mocks.service.createCourseOffering({ name: "Lớp tự đặt",
       subjectId: subject.id, classGroupIds: ["group-1"],
-    })).rejects.toThrow("chưa được cấu hình là học phần logic dùng chung liên ngành");
+    })).rejects.toThrow("không chứa học phần local cùng logical root");
     expect(mocks.courseOfferings.create).not.toHaveBeenCalled();
   });
 
@@ -357,7 +392,7 @@ describe("SchedulingService.createCourseOffering", () => {
       courseOffering: { subjectId: subject.id, status: "active" },
     }]);
 
-    await expect(mocks.service.createCourseOffering({
+    await expect(mocks.service.createCourseOffering({ name: "Lớp tự đặt",
       subjectId: subject.id, classGroupIds: ["group-1"],
     })).rejects.toThrow("đang thuộc một lớp học phần đang hoạt động");
   });
@@ -370,7 +405,7 @@ describe("SchedulingService.createCourseOffering", () => {
       courseOffering: { subjectId: subject.id, status: "completed" },
     }]);
 
-    await expect(mocks.service.createCourseOffering({
+    await expect(mocks.service.createCourseOffering({ name: "Lớp tự đặt",
       subjectId: subject.id, classGroupIds: ["group-1"],
     })).rejects.toThrow("đã hoàn thành học phần");
   });
@@ -401,8 +436,8 @@ describe("SchedulingService.createCourseOffering", () => {
     });
 
     const results = await Promise.allSettled([
-      mocks.service.createCourseOffering({ subjectId: subject.id, classGroupIds: ["group-1"] }),
-      mocks.service.createCourseOffering({ subjectId: subject.id, classGroupIds: ["group-1"] }),
+      mocks.service.createCourseOffering({ name: "Lớp tự đặt", subjectId: subject.id, classGroupIds: ["group-1"] }),
+      mocks.service.createCourseOffering({ name: "Lớp tự đặt", subjectId: subject.id, classGroupIds: ["group-1"] }),
     ]);
 
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
@@ -427,7 +462,7 @@ describe("SchedulingService.createCourseOffering", () => {
     mocks.offeringGroups.bulkCreate.mockResolvedValue([]);
     mocks.courseOfferings.findByPk.mockResolvedValue({ id: "offering-mixed", subject: root, groupLinks: [] });
 
-    await mocks.service.createCourseOffering({ subjectId: alias.id, classGroupIds: [g1.id, g2.id] });
+    await mocks.service.createCourseOffering({ name: "Lớp tự đặt", subjectId: alias.id, classGroupIds: [g1.id, g2.id] });
 
     expect(mocks.courseOfferings.create).toHaveBeenCalledWith(
       expect.objectContaining({ subjectId: root.id }),
@@ -448,7 +483,7 @@ describe("SchedulingService.createCourseOffering", () => {
       officialPackage(g2.id, [{ subjectId: otherRoot.id, subject: otherRoot }]),
     ]);
 
-    await expect(mocks.service.createCourseOffering({
+    await expect(mocks.service.createCourseOffering({ name: "Lớp tự đặt",
       subjectId: root.id, classGroupIds: [g1.id, g2.id],
     })).rejects.toThrow("không chứa học phần local cùng logical root");
     expect(mocks.courseOfferings.create).not.toHaveBeenCalled();
@@ -489,7 +524,6 @@ describe("SchedulingService persisted reads", () => {
       program: "masters",
       majorId: "major-1",
       academicYear: "2026",
-      term: "HK1",
       subjectId: "subject-1",
       status: "active",
     });
@@ -499,7 +533,6 @@ describe("SchedulingService persisted reads", () => {
         program: "masters",
         majorId: "major-1",
         academicYear: "2026",
-        term: "HK1",
       },
     }));
     const options = courseOfferings.findAll.mock.calls[0][0] as any;
@@ -507,7 +540,7 @@ describe("SchedulingService persisted reads", () => {
       subjectId: "subject-1",
       status: "active",
     }));
-    expect(options.include.find((include: any) => include.as === "subject").where).toEqual({ program: "masters" });
+    expect(options.include.find((include: any) => include.as === "subject").where).toEqual({ program: "masters", active: true });
   });
 
   it("keeps Doctoral disabled through the scheduling program capability policy", async () => {
@@ -534,6 +567,7 @@ describe("SchedulingService persisted reads", () => {
     expect(list).toEqual([persisted]);
     expect((list[0] as any).sessionSummary).toEqual({
       totalCount: 3,
+      unscheduledCount: 0,
       heldCount: 1,
       notHeldCount: 0,
       plannedCount: 2,
@@ -571,5 +605,28 @@ describe("Persisted latest same-period time suggestions", () => {
     expect((rows[1] as any).sessionSummary.latestTimesByPeriod).toEqual({
       AFTERNOON: { sessionId: "other", sessionDate: "2026-10-11", startTime: "19:00:00", endTime: "21:00:00" },
     });
+  });
+});
+
+describe("Shared-subject merge permission", () => {
+  it("rejects mixed majors when the logical subject permission is off", async () => {
+    const mocks = buildService();
+    arrangeValidCreate(mocks);
+    mocks.classGroups.findAll.mockResolvedValue([group("group-1", "A", "major-1"), group("group-2", "B", "major-2")]);
+    await expect(mocks.service.createCourseOffering({ name: "Lớp ghép", subjectId: subject.id, classGroupIds: ["group-1", "group-2"] }))
+      .rejects.toThrow("chưa bật Có thể ghép lớp");
+    expect(mocks.courseOfferings.create).not.toHaveBeenCalled();
+  });
+
+  it("creates an alias-major class separately with both subject and package merge permissions off", async () => {
+    const mocks = buildService();
+    arrangeValidCreate(mocks);
+    const root = { ...subject, allowCrossMajor: false };
+    const alias = { ...subject, id: "alias", majorId: "major-2", canonicalSubjectId: root.id };
+    mocks.subjects.findByPk.mockImplementation(async (id: string) => id === alias.id ? alias : root);
+    mocks.classGroups.findAll.mockResolvedValue([group("group-1", "B", "major-2")]);
+    mocks.packages.findAll.mockResolvedValue([{ ...officialPackage("group-1", [{ subjectId: alias.id, subject: alias }]), canMerge: false }]);
+    await mocks.service.createCourseOffering({ name: "Lớp riêng", subjectId: alias.id, classGroupIds: ["group-1"] });
+    expect(mocks.courseOfferings.create).toHaveBeenCalledWith(expect.objectContaining({ subjectId: root.id }), expect.anything());
   });
 });

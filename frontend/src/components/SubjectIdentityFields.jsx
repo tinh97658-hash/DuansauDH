@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import {
-  Alert, Box, CircularProgress, MenuItem, Paper, Stack, Switch, TextField, Typography,
+  Alert, Box, CircularProgress, MenuItem, Paper, Stack, Checkbox, FormControlLabel, TextField, Typography,
 } from "@mui/material";
 
 export const emptySubjectIdentity = () => ({
@@ -33,7 +33,6 @@ export const filterSubjectRootCandidates = (subjects, currentSubjectId, program)
     subject.id !== currentSubjectId
     && subject.program === program
     && subject.active === true
-    && subject.allowCrossMajor === true
     && !subject.canonicalSubjectId
   ))
 );
@@ -59,11 +58,12 @@ const SubjectIdentityFields = ({
     () => filterSubjectRootCandidates(subjects, subject?.id, program),
     [program, subject?.id, subjects],
   );
-  const selectedRoot = candidates.find((candidate) => candidate.id === value.canonicalSubjectId);
+  const selectedRoot = candidates.find((candidate) => candidate.id === value.canonicalSubjectId) || subject?.canonicalSubject;
 
   return (
     <Paper
       variant="outlined"
+      data-testid="subject-identity-fields"
       sx={{ p: 1.5, borderColor: "#C9D9E4", bgcolor: "#F8FBFD", borderRadius: "3px" }}
     >
       <Stack spacing={1.25}>
@@ -76,28 +76,28 @@ const SubjectIdentityFields = ({
           </Typography>
         </Box>
 
-        <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ md: "center" }}>
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 280 }}>
-            <Switch
-              size="small"
-              checked={value.allowCrossMajor}
-              disabled={Boolean(value.canonicalSubjectId)}
-              onChange={(event) => onChange(setSubjectRootEnabled(event.target.checked))}
-              inputProps={{ "aria-label": "Cho phép ghép lớp khác ngành" }}
-            />
-            <Typography sx={{ fontSize: 12.5, fontWeight: 600 }}>
-              Cho phép ghép lớp khác ngành
-            </Typography>
-          </Stack>
-
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "minmax(180px, 0.7fr) minmax(0, 1.3fr)" }, gap: 2, alignItems: "end" }}>
+          <Box>
+            <FormControlLabel sx={{ m: 0, minHeight: 36 }} label="Có thể ghép lớp" control={
+              <Checkbox size="small"
+                checked={value.canonicalSubjectId ? selectedRoot?.allowCrossMajor === true : value.allowCrossMajor}
+                disabled={Boolean(value.canonicalSubjectId)}
+                onChange={(event) => onChange(setSubjectRootEnabled(event.target.checked))}
+                inputProps={{ "aria-label": "Có thể ghép lớp" }} />
+            } />
+            {value.canonicalSubjectId && <Typography variant="caption" display="block">Theo cấu hình của học phần chung tương ứng.</Typography>}
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
+          <Typography component="label" htmlFor="shared-subject-root" sx={{ display: "block", mb: 0.75, fontSize: 12.5, color: "text.secondary" }}>Học phần chung tương ứng</Typography>
           <TextField
             select
             size="small"
-            label="Học phần chung tương ứng"
+            id="shared-subject-root"
             value={value.canonicalSubjectId || ""}
             disabled={value.allowCrossMajor || loading}
             onChange={(event) => onChange(setSubjectCanonicalRoot(event.target.value))}
-            sx={{ minWidth: { xs: "100%", md: 390 }, bgcolor: "#fff" }}
+            fullWidth
+            sx={{ bgcolor: "#fff", "& .MuiSelect-select": { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }}
             SelectProps={{ displayEmpty: true }}
             inputProps={{ "aria-label": "Học phần chung tương ứng" }}
           >
@@ -114,8 +114,9 @@ const SubjectIdentityFields = ({
             ))}
           </TextField>
 
+          </Box>
           {loading && <CircularProgress size={20} aria-label="Đang tải học phần gốc" />}
-        </Stack>
+        </Box>
 
         {error && <Alert severity="error" sx={{ py: 0 }}>{error}</Alert>}
 

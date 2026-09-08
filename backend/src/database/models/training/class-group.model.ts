@@ -16,6 +16,9 @@ export class ClassGroup extends Model {
   @Default(40) @Column({ type: DataType.INTEGER, allowNull: false }) declare maxStudents: number;
   @Default("open") @Column({ type: DataType.ENUM("open", "closed"), allowNull: false }) declare status: string;
   @Column(DataType.TEXT) declare note: string | null;
+  @ForeignKey(() => ClassGroup) @Column({ type: DataType.UUID, allowNull: true }) declare parentGroupId: string | null;
+  @BelongsTo(() => ClassGroup, { foreignKey: "parentGroupId", as: "parentGroup" }) declare parentGroup: ClassGroup | null;
+  @HasMany(() => ClassGroup, { foreignKey: "parentGroupId", as: "classes" }) declare classes: ClassGroup[];
   @HasMany(() => ClassGroupMember) declare members: ClassGroupMember[];
   @HasMany(() => SubjectPackage) declare packages: SubjectPackage[];
 }

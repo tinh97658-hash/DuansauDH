@@ -8,7 +8,7 @@ import { MastersService } from "../../src/masters/masters.service.js";
  */
 const buildService = () => {
   const classGroups = { findOne: jest.fn(), findAll: jest.fn(), findByPk: jest.fn(), create: jest.fn() };
-  const classGroupMembers = { count: jest.fn(), destroy: jest.fn(), bulkCreate: jest.fn(), findAll: jest.fn(), findOne: jest.fn() };
+  const classGroupMembers = { count: jest.fn(), destroy: jest.fn(), bulkCreate: jest.fn(), findAll: jest.fn().mockResolvedValue([]), findOne: jest.fn() };
   const admissionRecords = { findAll: jest.fn(), findByPk: jest.fn(), create: jest.fn() };
   const students = { findAll: jest.fn() };
   const majors = { findByPk: jest.fn() };
@@ -51,7 +51,7 @@ describe("MastersService.assignMembers", () => {
 
     const result = await service.assignMembers("g1", { admissionRecordIds: ["a1"] });
 
-    expect(classGroupMembers.destroy).toHaveBeenCalled();
+    expect(classGroupMembers.destroy).not.toHaveBeenCalled();
     expect(classGroupMembers.bulkCreate).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ classGroupId: "g1", admissionRecordId: "a1", studentId: "s1" })]),
       expect.anything(),
@@ -139,5 +139,41 @@ describe("MastersService.autoAssign", () => {
       classGroupIds: ["g1", "g2"],
       admissionRecordIds: ["a1", "a2"],
     })).rejects.toThrow("Các nhóm chia đều phải cùng chuyên ngành");
+  });
+});
+
+describe("Root group assignment exclusivity", () => {
+  it("rejects the entire mixed bulk before any mutation when one learner is already assigned", async () => {
+    const { service, classGroups, admissionRecords, classGroupMembers } = buildService();
+    classGroups.findOne.mockResolvedValue({ ...openGroup, code: "B", majorId: "major" });
+    classGroups.findAll.mockResolvedValue([{ id: "a", code: "A" }, { id: "g1", code: "B" }]);
+    admissionRecords.findAll.mockResolvedValue([{ id: "free", code: "HV2" }, { id: "assigned", code: "HV1", studentId: "student" }]);
+    classGroupMembers.findAll.mockResolvedValue([{ classGroupId: "a", admissionRecordId: "assigned", studentId: "student" }]);
+    await expect(service.assignMembers("g1", { admissionRecordIds: ["free", "assigned"] })).rejects.toThrow("HV1 đã thuộc nhóm A");
+    expect(classGroupMembers.bulkCreate).not.toHaveBeenCalled();
+    expect(classGroupMembers.destroy).not.toHaveBeenCalled();
+    expect(classGroups.findAll).toHaveBeenCalledWith(expect.objectContaining({
+      where: { program: "masters", majorId: "major", academicYear: "2026", parentGroupId: null },
+    }));
+  });
+
+  it("recognizes the same student through a different admission record", async () => {
+    const { service, classGroups, admissionRecords, classGroupMembers } = buildService();
+    classGroups.findOne.mockResolvedValue({ ...openGroup, code: "B" });
+    classGroups.findAll.mockResolvedValue([{ id: "a", code: "A" }]);
+    admissionRecords.findAll.mockResolvedValue([{ id: "new-record", studentId: "same-student", code: "HV1" }]);
+    classGroupMembers.findAll.mockResolvedValue([{ classGroupId: "a", admissionRecordId: "old-record", studentId: "same-student" }]);
+    await expect(service.assignMembers("g1", { admissionRecordIds: ["new-record"] })).rejects.toThrow("đã thuộc nhóm A");
+    expect(classGroupMembers.bulkCreate).not.toHaveBeenCalled();
+  });
+
+  it("does not let auto-assign move learners already assigned in the same scope", async () => {
+    const { service, classGroups, admissionRecords, classGroupMembers } = buildService();
+    classGroups.findAll.mockResolvedValue([{ ...openGroup, code: "A" }, { ...openGroup, id: "g2", code: "B" }]);
+    admissionRecords.findAll.mockResolvedValue([{ id: "a1", code: "HV1" }]);
+    classGroupMembers.findAll.mockResolvedValue([{ classGroupId: "g1", admissionRecordId: "a1" }]);
+    await expect(service.autoAssign({ classGroupIds: ["g1", "g2"], admissionRecordIds: ["a1"] })).rejects.toThrow("đã thuộc nhóm A");
+    expect(classGroupMembers.destroy).not.toHaveBeenCalled();
+    expect(classGroupMembers.bulkCreate).not.toHaveBeenCalled();
   });
 });

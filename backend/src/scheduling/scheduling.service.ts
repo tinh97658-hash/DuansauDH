@@ -1,3 +1,6 @@
+import { CourseOfferingParticipant } from "../database/models/training/course-offering-participant.model.js";
+import { Student } from "../database/models/student.model.js";
+import { AdmissionRecord } from "../database/models/plan/admission-record.model.js";
 import { isSessionEndedInBusinessTimezone } from "./scheduling-time.js";
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
@@ -44,6 +47,7 @@ export class SchedulingService {
     @InjectModel(Room) private readonly rooms: typeof Room,
     @InjectModel(Lecturer) private readonly lecturers: typeof Lecturer,
     @InjectModel(TeachingSession) private readonly teachingSessions: typeof TeachingSession,
+    @InjectModel(CourseOfferingParticipant) private readonly offeringParticipants: typeof CourseOfferingParticipant,
   ) {}
 
   private requireEnabledProgram(program: string) {
@@ -62,8 +66,8 @@ export class SchedulingService {
       majorId: value.majorId,
       major: value.major || null,
       academicYear: value.academicYear,
-      term: value.term,
       status: value.status,
+      parentGroupId: value.parentGroupId || null,
       memberCount,
       ...(local ? {
         localSubject: {
@@ -83,7 +87,7 @@ export class SchedulingService {
       transaction,
       ...(transaction ? { lock: transaction.LOCK.UPDATE } : {}),
     });
-    if (!root || root.active === false || root.canonicalSubjectId || root.program !== subject.program || root.allowCrossMajor !== true) {
+    if (!root || root.active === false || root.canonicalSubjectId || root.program !== subject.program) {
       throw new BadRequestException("Mapping học phần logic không còn hợp lệ.");
     }
     return root;
@@ -113,56 +117,59 @@ export class SchedulingService {
     ];
   }
 
-  private memberIdentity(member: ClassGroupMember | any) {
-    const value = typeof member?.get === "function" ? member.get({ plain: true }) : member;
-    return value.studentId ? `student:${value.studentId}`
-      : value.admissionRecordId ? `admission:${value.admissionRecordId}`
-        : `membership:${value.id}`;
-  }
-
   private setParticipantCount(offering: CourseOffering | any, participantCount: number) {
     if (typeof offering?.setDataValue === "function") offering.setDataValue("participantCount", participantCount);
     else offering.participantCount = participantCount;
   }
 
   private async attachParticipantCounts(offerings: Array<CourseOffering | any>, transaction?: Transaction) {
-    const groupIds = [...new Set(offerings.flatMap((offering) => (
-      (offering.groupLinks || []).map((link: CourseOfferingClassGroup | any) => link.classGroupId || link.classGroup?.id)
-    )).filter(Boolean))];
-    if (groupIds.length === 0) {
-      offerings.forEach((offering) => this.setParticipantCount(offering, 0));
-      return offerings;
-    }
-    const members = await this.classGroupMembers.findAll({
-      where: { classGroupId: { [Op.in]: groupIds } },
-      attributes: ["id", "classGroupId", "studentId", "admissionRecordId"],
+    const ids = [...new Set(offerings.map((offering) => offering.id).filter(Boolean))];
+    const participants = ids.length ? await this.offeringParticipants.findAll({
+      where: { courseOfferingId: { [Op.in]: ids } },
+      order: [["fullName", "ASC"], ["identity", "ASC"]],
       transaction,
-    });
-    const byGroup = new Map<string, Set<string>>();
-    for (const member of members) {
-      const identities = byGroup.get(member.classGroupId) || new Set<string>();
-      identities.add(this.memberIdentity(member));
-      byGroup.set(member.classGroupId, identities);
+    }) : [];
+    for (const offering of offerings) {
+      const roster = participants.filter((participant) => participant.courseOfferingId === offering.id);
+      this.setParticipantCount(offering, roster.length);
+      if (typeof offering.setDataValue === "function") offering.setDataValue("participants", roster);
+      offering.participants = roster;
     }
-    offerings.forEach((offering) => {
-      const identities = new Set<string>();
-      for (const link of offering.groupLinks || []) {
-        const groupId = link.classGroupId || link.classGroup?.id;
-        for (const identity of byGroup.get(groupId) || []) identities.add(identity);
-      }
-      this.setParticipantCount(offering, identities.size);
-    });
     return offerings;
   }
 
-  private async participantCountForGroups(classGroupIds: string[], transaction?: Transaction) {
+  private async participantsForGroups(classGroupIds: string[], transaction?: Transaction) {
     const members = await this.classGroupMembers.findAll({
       where: { classGroupId: { [Op.in]: classGroupIds } },
-      attributes: ["id", "classGroupId", "studentId", "admissionRecordId"],
+      include: [
+        { model: Student, as: "student", attributes: ["id", "regNo", "fullName"] },
+        { model: AdmissionRecord, as: "admissionRecord", attributes: ["id", "studentId", "code", "fullName"],
+          include: [{ model: Student, as: "student", attributes: ["id", "regNo", "fullName"] }] },
+      ],
+      order: [["admissionRecordId", "ASC"], ["id", "ASC"]],
       transaction,
-      ...(transaction ? { lock: transaction.LOCK.UPDATE } : {}),
+      ...(transaction ? { lock: { level: transaction.LOCK.UPDATE, of: ClassGroupMember } } : {}),
     });
-    return new Set(members.map((member) => this.memberIdentity(member))).size;
+    const unique = new Map<string, {
+      identity: string; studentId: string | null; admissionRecordId: string | null;
+      regNo: string; fullName: string; note: string | null;
+    }>();
+    for (const member of members) {
+      const admission = member.admissionRecord;
+      const studentId = member.studentId || admission?.studentId || null;
+      const admissionRecordId = member.admissionRecordId || null;
+      if (!studentId && !admissionRecordId) {
+        throw new BadRequestException("Nhóm có thành viên chưa liên kết học viên hoặc hồ sơ tuyển sinh. Cập nhật thành viên trước khi tạo lớp.");
+      }
+      const identity = studentId ? "student:" + studentId : "admission:" + admissionRecordId;
+      const student = member.student || admission?.student;
+      const regNo = student?.regNo && student.regNo !== "Not Set" ? student.regNo : admission?.code || "";
+      if (!unique.has(identity)) unique.set(identity, {
+        identity, studentId, admissionRecordId,
+        regNo, fullName: student?.fullName || admission?.fullName || "", note: null,
+      });
+    }
+    return [...unique.values()].sort((left, right) => left.fullName.localeCompare(right.fullName, "vi") || left.identity.localeCompare(right.identity));
   }
 
   async previewCourseOfferingParticipants(dto: PreviewCourseOfferingParticipantsDto) {
@@ -173,10 +180,8 @@ export class SchedulingService {
     if (groups.length !== dto.classGroupIds.length) {
       throw new NotFoundException("Danh sách có nhóm học viên không tồn tại.");
     }
-    return {
-      classGroupCount: groups.length,
-      participantCount: await this.participantCountForGroups(dto.classGroupIds),
-    };
+    const participants = await this.participantsForGroups(dto.classGroupIds);
+    return { classGroupCount: groups.length, participantCount: participants.length, participants };
   }
 
   private sessionHasEnded(session: Pick<TeachingSession, "sessionDate" | "endTime"> | any, now = new Date()) {
@@ -192,6 +197,7 @@ export class SchedulingService {
     const offeringIds = [...new Set(offerings.map((offering) => offering.id).filter(Boolean))];
     const emptySummary = () => ({
       totalCount: 0,
+      unscheduledCount: 0,
       heldCount: 0,
       notHeldCount: 0,
       plannedCount: 0,
@@ -204,15 +210,18 @@ export class SchedulingService {
     if (offeringIds.length > 0) {
       const sessions = await this.teachingSessions.findAll({
         where: { courseOfferingId: { [Op.in]: offeringIds } },
-        attributes: ["id", "courseOfferingId", "sessionDate", "period", "startTime", "endTime", "status"],
+        attributes: ["id", "courseOfferingId", "sessionDate", "period", "startTime", "endTime", "status", "isScheduled"],
         order: [["sessionDate", "DESC"], ["startTime", "DESC"], ["id", "DESC"]],
         transaction,
       });
       const now = new Date();
       for (const session of sessions) {
         const summary = byOffering.get(session.courseOfferingId) || emptySummary();
+        // Legacy generated drafts remain in the database, outside the open scheduling workflow.
+        if (session.isScheduled === false) continue;
+        if (!session.sessionDate || !session.endTime) continue;
         // Latest scheduled date/time across all weeks; only persisted sessions supply defaults.
-        if (session.period && !summary.latestTimesByPeriod[session.period]) {
+        if (session.period && session.startTime && !summary.latestTimesByPeriod[session.period]) {
           summary.latestTimesByPeriod[session.period] = {
             sessionId: session.id, sessionDate: session.sessionDate,
             startTime: session.startTime, endTime: session.endTime,
@@ -250,7 +259,7 @@ export class SchedulingService {
     if (!major) throw new NotFoundException("Không tìm thấy ngành đang hoạt động phù hợp với chương trình đào tạo.");
 
     const groupWhere: Record<string, unknown> = { program, academicYear: query.academicYear };
-    if (query.term) groupWhere.term = query.term;
+
 
     const groups = await this.classGroups.findAll({
       where: groupWhere,
@@ -259,10 +268,11 @@ export class SchedulingService {
     });
     const anchorGroupIds = new Set(groups.filter((group) => group.majorId === query.majorId).map((group) => group.id));
     if (anchorGroupIds.size === 0) {
-      return { scope: { program, majorId: query.majorId, academicYear: query.academicYear, term: query.term || null }, subjects: [] };
+      return { scope: { program, majorId: query.majorId, academicYear: query.academicYear }, subjects: [] };
     }
 
     const groupIds = groups.map((group) => group.id);
+    const packageGroupIds = [...new Set(groups.map((group) => group.parentGroupId || group.id))];
     const groupMembers = await this.classGroupMembers.findAll({
       where: { classGroupId: { [Op.in]: groupIds } },
       attributes: ["id", "classGroupId"],
@@ -273,7 +283,7 @@ export class SchedulingService {
       (memberCountByGroup.get(member.classGroupId) || 0) + 1,
     ));
     const packages = await this.packages.findAll({
-      where: { classGroupId: { [Op.in]: groupIds }, isOfficial: true, active: true },
+      where: { classGroupId: { [Op.in]: packageGroupIds }, isOfficial: true, active: true },
       include: [{
         model: SubjectPackageSubject,
         as: "entries",
@@ -290,7 +300,11 @@ export class SchedulingService {
         const localSubject = entry.subject as Subject;
         if (!localSubject) continue;
         localSubjects.set(localSubject.id, localSubject);
-        localPairs.push({ classGroupId: pkg.classGroupId, localSubject });
+        for (const group of groups.filter((item) => (item.parentGroupId || item.id) === pkg.classGroupId)) {
+          // Root groups remain schedulable for legacy data only while they have no child classes.
+          if (!group.parentGroupId && groups.some((child) => child.parentGroupId === group.id)) continue;
+          localPairs.push({ classGroupId: group.id, localSubject });
+        }
       }
     }
 
@@ -311,7 +325,7 @@ export class SchedulingService {
       const logicalSubject = rootById.get(pair.localSubject.canonicalSubjectId || pair.localSubject.id);
       if (!logicalSubject || logicalSubject.active === false || logicalSubject.canonicalSubjectId) return [];
       if (pair.localSubject.canonicalSubjectId && (
-        logicalSubject.allowCrossMajor !== true || logicalSubject.program !== pair.localSubject.program
+        logicalSubject.program !== pair.localSubject.program
       )) return [];
       return [{ ...pair, logicalSubject }];
     });
@@ -362,6 +376,7 @@ export class SchedulingService {
       }
       const status = stateByPair.get(`${pair.classGroupId}:${subject.id}`);
       const summary = this.groupSummary(group, pair.localSubject, memberCountByGroup.get(group.id) || 0);
+      Object.assign(summary, { canMerge: packages.find((pkg) => pkg.classGroupId === (group.parentGroupId || group.id))?.canMerge === true });
       if (status === "completed") row.completedClassGroups.push(summary);
       else if (status === "active") row.activeClassGroups.push(summary);
       else row.eligibleClassGroups.push(summary);
@@ -376,12 +391,15 @@ export class SchedulingService {
       ));
 
     return {
-      scope: { program, majorId: query.majorId, academicYear: query.academicYear, term: query.term || null },
+      scope: { program, majorId: query.majorId, academicYear: query.academicYear },
       subjects,
     };
   }
 
   async createCourseOffering(dto: CreateCourseOfferingDto) {
+    if (typeof dto.name !== "string" || !dto.name.trim() || dto.name.trim().length > 200) {
+      throw new BadRequestException("Nhập tên lớp học phần từ 1 đến 200 ký tự.");
+    }
     if (!Array.isArray(dto.classGroupIds) || dto.classGroupIds.length === 0) {
       throw new BadRequestException("Lớp học phần phải có ít nhất một nhóm học viên.");
     }
@@ -408,16 +426,23 @@ export class SchedulingService {
       });
       if (groups.length !== sortedGroupIds.length) throw new NotFoundException("Danh sách có nhóm học viên không tồn tại.");
 
+      if (new Set(groups.map((group) => group.academicYear || "")).size > 1) {
+        throw new BadRequestException("Chỉ chọn các lớp/nhóm trong cùng khóa/năm học.");
+      }
       if (groups.some((group) => group.program !== subject.program)) {
         throw new BadRequestException("Nhóm học viên không phù hợp với chương trình đào tạo của học phần.");
       }
-      const usesCrossMajorIdentity = groups.some((group) => group.majorId !== subject.majorId);
+      const usesCrossMajorIdentity = new Set(groups.map((group) => group.majorId)).size > 1;
       if (usesCrossMajorIdentity && subject.allowCrossMajor !== true) {
-        throw new BadRequestException("Học phần chưa được cấu hình là học phần logic dùng chung liên ngành.");
+        throw new BadRequestException("Học phần chưa bật Có thể ghép lớp; không được ghép các lớp khác chuyên ngành.");
       }
 
+      if (groups.some((group) => group.parentGroupId && sortedGroupIds.includes(group.parentGroupId))) {
+        throw new BadRequestException("Chỉ chọn lớp HP, không chọn đồng thời nhóm cha và lớp con.");
+      }
+      const packageGroupIds = [...new Set(groups.map((group) => group.parentGroupId || group.id))];
       const packages = await this.packages.findAll({
-        where: { classGroupId: { [Op.in]: sortedGroupIds }, isOfficial: true, active: true },
+        where: { classGroupId: { [Op.in]: packageGroupIds }, isOfficial: true, active: true },
         include: [{
           model: SubjectPackageSubject,
           as: "entries",
@@ -429,9 +454,12 @@ export class SchedulingService {
       });
       const packageByGroup = new Map(packages.map((pkg) => [pkg.classGroupId, pkg]));
       for (const group of groups) {
-        const officialPackage = packageByGroup.get(group.id);
+        const officialPackage = packageByGroup.get(group.parentGroupId || group.id);
         if (!officialPackage) {
           throw new BadRequestException(`Nhóm "${group.code}" chưa có gói học phần chính thức đang hoạt động.`);
+        }
+        if (groups.length > 1 && officialPackage.canMerge !== true) {
+          throw new BadRequestException("Chỉ được ghép các lớp có gói học phần chính thức bật Có thể ghép lớp.");
         }
         const matchingLocalSubject = (officialPackage.entries || [])
           .map((entry) => entry.subject as Subject)
@@ -464,14 +492,32 @@ export class SchedulingService {
         throw new ConflictException("Có nhóm đang thuộc một lớp học phần đang hoạt động của học phần này.");
       }
 
+      const participants = await this.participantsForGroups(sortedGroupIds, transaction);
+      const notes = new Map<string, string>();
+      for (const entry of dto.participantNotes || []) {
+        const participant = entry.studentId
+          ? participants.find((row) => row.studentId === entry.studentId)
+          : participants.find((row) => row.admissionRecordId === entry.admissionRecordId);
+        if (!participant || (!entry.studentId && !entry.admissionRecordId)) {
+          throw new BadRequestException("Ghi chú chứa học viên không thuộc các lớp/nhóm đã chọn.");
+        }
+        if (notes.has(participant.identity)) throw new BadRequestException("Ghi chú học viên bị trùng lặp.");
+        if (typeof entry.note !== "string" || entry.note.trim().length > 2000) throw new BadRequestException("Ghi chú không hợp lệ.");
+        notes.set(participant.identity, entry.note.trim());
+      }
       const offering = await this.courseOfferings.create({
         subjectId: subject.id,
+        name: dto.name.trim(),
         status: "active",
         note: dto.note || null,
       }, { transaction });
       await this.offeringGroups.bulkCreate(sortedGroupIds.map((classGroupId) => ({
         courseOfferingId: offering.id,
         classGroupId,
+      })), { transaction });
+
+      if (participants.length) await this.offeringParticipants.bulkCreate(participants.map((participant) => ({
+        ...participant, courseOfferingId: offering.id, note: notes.get(participant.identity) || null,
       })), { transaction });
 
       return this.findCourseOfferingById(offering.id, transaction);
@@ -485,11 +531,11 @@ export class SchedulingService {
     if (query.subjectId) where.subjectId = query.subjectId;
     if (query.status) where.status = query.status;
 
-    if (query.majorId || query.academicYear || query.term) {
+    if (query.majorId || query.academicYear) {
       const groupWhere: Record<string, unknown> = { program };
       if (query.majorId) groupWhere.majorId = query.majorId;
       if (query.academicYear) groupWhere.academicYear = query.academicYear;
-      if (query.term) groupWhere.term = query.term;
+
       const matchingGroups = await this.classGroups.findAll({ where: groupWhere, attributes: ["id"] });
       if (matchingGroups.length === 0) return [];
       const links = await this.offeringGroups.findAll({
@@ -503,7 +549,7 @@ export class SchedulingService {
 
     const offerings = await this.courseOfferings.findAll({
       where,
-      include: this.offeringIncludes({ program }),
+      include: this.offeringIncludes({ program, active: true }),
       order: [["createdAt", "DESC"]],
     });
     return this.attachCourseOfferingMetadata(offerings);
@@ -513,8 +559,50 @@ export class SchedulingService {
     return this.findCourseOfferingById(id);
   }
 
-  private normalizeTime(value: string) {
-    return value.length === 5 ? `${value}:00` : value;
+  async renameCourseOffering(id: string, name: string) {
+    if (typeof name !== "string" || !name.trim() || name.trim().length > 200) {
+      throw new BadRequestException("Nhập tên lớp học phần từ 1 đến 200 ký tự.");
+    }
+    return this.sequelize.transaction(async (transaction) => {
+      const offering = await this.courseOfferings.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!offering) throw new NotFoundException("Không tìm thấy lớp học phần.");
+      await this.requireEnabledOfferingSubject(offering, transaction);
+      await offering.update({ name: name.trim() }, { transaction });
+      return this.findCourseOfferingById(id, transaction);
+    });
+  }
+
+  async updateCourseOfferingParticipantNote(id: string, participantId: string, note: string) {
+    if (typeof note !== "string" || note.trim().length > 2000) throw new BadRequestException("Ghi chú không hợp lệ.");
+    return this.sequelize.transaction(async (transaction) => {
+      const offering = await this.courseOfferings.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!offering) throw new NotFoundException("Không tìm thấy lớp học phần.");
+      await this.requireEnabledOfferingSubject(offering, transaction);
+      const participant = await this.offeringParticipants.findOne({
+        where: { id: participantId, courseOfferingId: id }, transaction, lock: transaction.LOCK.UPDATE,
+      });
+      if (!participant) throw new NotFoundException("Không tìm thấy học viên trong lớp học phần.");
+      await participant.update({ note: note.trim() || null }, { transaction });
+      return participant;
+    });
+  }
+
+  async listCourseOfferingSessions(id: string) {
+    const offering = await this.courseOfferings.findByPk(id, { include: [{ model: Subject, as: "subject" }] });
+    if (!offering) throw new NotFoundException("Không tìm thấy lớp học phần.");
+    this.requireEnabledProgram(offering.subject.program);
+    const sessions = await this.teachingSessions.findAll({
+      where: { courseOfferingId: id, isScheduled: true }, include: this.sessionIncludes(),
+      order: [["sessionDate", "ASC"], ["period", "ASC"], ["id", "ASC"]],
+    });
+    await this.attachParticipantCounts(sessions.map((session) => session.courseOffering).filter(Boolean));
+    return sessions;
+  }
+
+  private periodBounds(period: string) {
+    if (period === "MORNING") return { startTime: "00:00:00", endTime: "12:00:00" };
+    if (period === "AFTERNOON") return { startTime: "12:00:00", endTime: "23:59:59" };
+    throw new BadRequestException("Chọn buổi Sáng hoặc Chiều.");
   }
 
   private validateTimeRange(startTime: string, endTime: string) {
@@ -628,16 +716,15 @@ export class SchedulingService {
       lock: transaction.LOCK.UPDATE,
     });
     if (!offering) throw new NotFoundException("Không tìm thấy lớp học phần.");
-    if (offering.status !== "active") {
-      throw new ConflictException("Không thể xếp lịch cho lớp học phần đã hoàn thành.");
-    }
     const subject = await this.requireEnabledOfferingSubject(offering, transaction);
     if (subject.active !== true) throw new BadRequestException("Học phần của lớp học phần đã ngừng sử dụng hoặc không tồn tại.");
     if (lockedGroups.some((group) => group.program !== subject.program)) {
       throw new BadRequestException("Thành phần nhóm học viên không phù hợp với chương trình của lớp học phần.");
     }
 
-    const participantCount = await this.participantCountForGroups(classGroupIds, transaction);
+    // Different source groups may share a student; serialize the availability check and insert.
+    await this.sequelize.query("SELECT pg_advisory_xact_lock(250025)", { transaction });
+    const participantCount = await this.offeringParticipants.count({ where: { courseOfferingId }, transaction });
     if (targetRoom.capacity === null || targetRoom.capacity === undefined) {
       throw new ConflictException({
         code: "ROOM_CAPACITY_MISSING",
@@ -713,6 +800,8 @@ export class SchedulingService {
       roomId: string;
       lecturerId: string;
       classGroupIds: string[];
+      period: string;
+      courseOfferingId: string;
     },
     transaction: Transaction,
     excludeSessionId?: string,
@@ -720,8 +809,7 @@ export class SchedulingService {
     const where: Record<string | symbol, unknown> = {
       sessionDate: values.sessionDate,
       status: { [Op.ne]: "not_held" },
-      startTime: { [Op.lt]: values.endTime },
-      endTime: { [Op.gt]: values.startTime },
+      period: values.period,
     };
     if (excludeSessionId) where.id = { [Op.ne]: excludeSessionId };
     const overlaps = await this.teachingSessions.findAll({
@@ -746,6 +834,11 @@ export class SchedulingService {
       order: [["startTime", "ASC"], ["id", "ASC"]],
     });
     const targetGroups = new Set(values.classGroupIds);
+    const offeringIds = [...new Set([values.courseOfferingId, ...overlaps.map((session) => session.courseOfferingId)])];
+    const roster = overlaps.length ? await this.offeringParticipants.findAll({
+      where: { courseOfferingId: { [Op.in]: offeringIds } }, transaction,
+    }) : [];
+    const targetMembers = new Set(roster.filter((member) => member.courseOfferingId === values.courseOfferingId).map((member) => member.identity));
     for (const existing of overlaps) {
       if (existing.roomId === values.roomId) {
         this.conflict("ROOM_CONFLICT", "Phòng học đã có lịch trong khoảng thời gian này.", existing, { roomId: values.roomId });
@@ -756,7 +849,8 @@ export class SchedulingService {
       const sharedGroupIds = (existing.courseOffering?.groupLinks || [])
         .map((link: CourseOfferingClassGroup) => link.classGroupId)
         .filter((id: string) => targetGroups.has(id));
-      if (sharedGroupIds.length > 0) {
+      const sharedStudent = roster.some((member) => member.courseOfferingId === existing.courseOfferingId && targetMembers.has(member.identity));
+      if (sharedGroupIds.length > 0 || sharedStudent) {
         this.conflict("CLASS_GROUP_CONFLICT", "Nhóm học viên đã có lịch trong khoảng thời gian này.", existing, { classGroupIds: sharedGroupIds });
       }
     }
@@ -795,7 +889,7 @@ export class SchedulingService {
     if (!offering) throw new NotFoundException("Không tìm thấy lớp học phần.");
     this.requireEnabledProgram(offering.subject.program);
     const sessions = await this.teachingSessions.findAll({
-      where: { courseOfferingId, status: "planned" },
+      where: { courseOfferingId, status: "planned", isScheduled: true },
       include: this.sessionIncludes(),
       order: [["sessionDate", "ASC"], ["startTime", "ASC"], ["id", "ASC"]],
     });
@@ -808,8 +902,7 @@ export class SchedulingService {
   }
 
   async createTeachingSession(dto: CreateTeachingSessionDto) {
-    const startTime = this.normalizeTime(dto.startTime);
-    const endTime = this.normalizeTime(dto.endTime);
+    const { startTime, endTime } = this.periodBounds(dto.period);
     this.validateTimeRange(startTime, endTime);
     this.assertPeriodTimeConsistency(dto.period, startTime, endTime);
     this.assertTargetSessionNotEnded(dto.sessionDate, startTime, endTime);
@@ -853,28 +946,35 @@ export class SchedulingService {
           details: { teachingSessionId: session.id },
         });
       }
+      if (session.isScheduled === false && (!dto.sessionDate || !dto.period || !dto.roomId || !dto.lecturerId)) {
+        throw new BadRequestException("Chọn đủ ngày, buổi, phòng và giảng viên.");
+      }
       const sessionDate = dto.sessionDate ?? session.sessionDate;
-      const startTime = this.normalizeTime(dto.startTime ?? session.startTime);
-      const endTime = this.normalizeTime(dto.endTime ?? session.endTime);
       const lecturerId = dto.lecturerId ?? session.lecturerId;
       const roomId = dto.roomId ?? session.roomId;
+      const period = dto.period ?? session.period;
+      if (!sessionDate || !lecturerId || !roomId || !period) {
+        throw new BadRequestException("Chọn đủ ngày, buổi, phòng và giảng viên.");
+      }
+      const { startTime, endTime } = this.periodBounds(period);
       this.validateTimeRange(startTime, endTime);
-      this.assertPeriodTimeConsistency(dto.period ?? session.period, startTime, endTime);
+      this.assertPeriodTimeConsistency(period, startTime, endTime);
       this.assertTargetSessionNotEnded(sessionDate, startTime, endTime);
       const classGroupIds = await this.offeringGroupIds(session.courseOfferingId, transaction);
       await this.lockAndValidateSessionResources(
         session.courseOfferingId,
-        [session.roomId, roomId],
-        [session.lecturerId, lecturerId],
+        [session.roomId, roomId].filter((id): id is string => Boolean(id)),
+        [session.lecturerId, lecturerId].filter((id): id is string => Boolean(id)),
         classGroupIds,
         roomId,
         lecturerId,
         transaction,
       );
-      const values = { sessionDate, startTime, endTime, period: dto.period ?? session.period, lecturerId, roomId };
-      await this.assertNoSessionConflict({ ...values, classGroupIds }, transaction, session.id);
+      const values = { sessionDate, startTime, endTime, period, lecturerId, roomId };
+      await this.assertNoSessionConflict({ ...values, courseOfferingId: session.courseOfferingId, classGroupIds }, transaction, session.id);
       await session.update({
         ...values,
+        isScheduled: true,
         ...(Object.prototype.hasOwnProperty.call(dto, "note") ? { note: dto.note || null } : {}),
       }, { transaction });
       return this.findTeachingSessionById(session.id, transaction);
@@ -926,47 +1026,6 @@ export class SchedulingService {
       }
       await session.destroy({ transaction });
       return { id, deleted: true };
-    });
-  }
-
-  async completeCourseOffering(id: string, staffId: string) {
-    return this.sequelize.transaction(async (transaction) => {
-      const offering = await this.courseOfferings.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
-      if (!offering) throw new NotFoundException("Không tìm thấy lớp học phần.");
-      await this.requireEnabledOfferingSubject(offering, transaction);
-      if (offering.status === "completed") return this.findCourseOfferingById(id, transaction);
-      const sessions = await this.teachingSessions.findAll({
-        where: { courseOfferingId: id },
-        attributes: ["id", "status", "sessionDate", "endTime"],
-        transaction,
-        lock: transaction.LOCK.UPDATE,
-      });
-      const unresolved = sessions.filter((session) => session.status === "planned");
-      if (unresolved.length > 0) {
-        throw new ConflictException({
-          code: "UNRESOLVED_SESSIONS",
-          message: `Còn ${unresolved.length} buổi đã xếp hoặc chờ xác nhận; chưa thể hoàn thành giảng dạy.`,
-          details: {
-            unresolvedCount: unresolved.length,
-            teachingSessionId: unresolved[0].id,
-            firstPlannedSessionDate: unresolved.map((session) => session.sessionDate).sort()[0],
-          },
-        });
-      }
-      const heldCount = sessions.filter((session) => session.status === "held").length;
-      if (heldCount === 0) {
-        throw new ConflictException({
-          code: "NO_HELD_SESSIONS",
-          message: "Cần ít nhất một buổi đã xác nhận diễn ra trước khi hoàn thành giảng dạy.",
-          details: { heldCount: 0 },
-        });
-      }
-      await offering.update({
-        status: "completed",
-        completedAt: new Date(),
-        completedByStaffId: staffId,
-      }, { transaction });
-      return this.findCourseOfferingById(id, transaction);
     });
   }
 

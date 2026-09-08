@@ -33,15 +33,20 @@ describe("SchedulingWriteGuard", () => {
   it("protects every scheduling mutation endpoint", () => {
     for (const handler of [
       SchedulingController.prototype.createCourseOffering,
-      SchedulingController.prototype.previewCourseOfferingParticipants,
       SchedulingController.prototype.createTeachingSession,
       SchedulingController.prototype.updateTeachingSession,
       SchedulingController.prototype.confirmTeachingSession,
       SchedulingController.prototype.deleteTeachingSession,
-      SchedulingController.prototype.completeCourseOffering,
+      SchedulingController.prototype.renameCourseOffering,
+      SchedulingController.prototype.updateParticipantNote,
     ]) {
       expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toContain(SchedulingWriteGuard);
     }
+  });
+
+  it("allows authorized staff to read the participant preview without write permission", () => {
+    expect(Reflect.getMetadata(GUARDS_METADATA, SchedulingController)).toContain(RolesGuard);
+    expect(Reflect.getMetadata(GUARDS_METADATA, SchedulingController.prototype.previewCourseOfferingParticipants) || []).not.toContain(SchedulingWriteGuard);
   });
 
   it("keeps unresolved-session reads under RolesGuard without requiring scheduling write access", () => {
