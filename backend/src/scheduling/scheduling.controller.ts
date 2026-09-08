@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Put, Query, 
 import { CurrentUser, Roles } from "../common/auth-user.js";
 import { RolesGuard } from "../common/roles.guard.js";
 import { SchedulingWriteGuard } from "../common/scheduling-write.guard.js";
+import { CourseOfferingWriteGuard } from "../common/course-offering-write.guard.js";
 import {
   AssignSchedulingManagerDto,
   ConfirmTeachingSessionDto,
@@ -12,6 +13,7 @@ import {
   ListTeachingSessionsQueryDto,
   PreviewCourseOfferingParticipantsDto,
   UpdateTeachingSessionDto,
+  RetakeQueryDto, RegisterRetakeDto, UpdateRosterNotesDto, SchedulingGroupSettingsDto,
 } from "./dto/scheduling.dto.js";
 import { SchedulingService } from "./scheduling.service.js";
 
@@ -27,7 +29,7 @@ export class SchedulingController {
   }
 
   @Post("course-offerings")
-  @UseGuards(SchedulingWriteGuard)
+  @UseGuards(CourseOfferingWriteGuard)
   createCourseOffering(@Body() dto: CreateCourseOfferingDto) {
     return this.scheduling.createCourseOffering(dto);
   }
@@ -38,9 +40,36 @@ export class SchedulingController {
   }
 
   @Post("course-offerings/participant-preview")
-  @UseGuards(SchedulingWriteGuard)
+  @UseGuards(CourseOfferingWriteGuard)
   previewCourseOfferingParticipants(@Body() dto: PreviewCourseOfferingParticipantsDto) {
     return this.scheduling.previewCourseOfferingParticipants(dto);
+  }
+
+  @Post("course-offerings/roster-preview")
+  @UseGuards(CourseOfferingWriteGuard)
+  previewCourseOfferingRoster(@Body() dto: PreviewCourseOfferingParticipantsDto) {
+    return this.scheduling.previewCourseOfferingRoster(dto);
+  }
+
+  @Get("retakes")
+  retakes(@Query() dto: RetakeQueryDto) { return this.scheduling.listRetakes(dto); }
+
+  @Post("retakes") @UseGuards(SchedulingWriteGuard)
+  registerRetake(@Body() dto: RegisterRetakeDto) { return this.scheduling.registerRetake(dto); }
+
+  @Get("course-offerings/:id/roster")
+  roster(@Param("id", ParseUUIDPipe) id: string) { return this.scheduling.getCourseOfferingRoster(id); }
+
+  @Put("course-offerings/:id/roster-notes") @UseGuards(CourseOfferingWriteGuard)
+  rosterNotes(@Param("id", ParseUUIDPipe) id: string, @Body() dto: UpdateRosterNotesDto) { return this.scheduling.updateRosterNotes(id, dto); }
+
+  @Put("groups/:id/settings") @UseGuards(CourseOfferingWriteGuard)
+  groupSettings(@Param("id", ParseUUIDPipe) id: string, @Body() dto: SchedulingGroupSettingsDto) { return this.scheduling.updateSchedulingGroup(id, dto); }
+
+  @Get("course-offering-students/:subjectId")
+  @UseGuards(CourseOfferingWriteGuard)
+  individualStudents(@Param("subjectId", ParseUUIDPipe) subjectId: string, @Query("search") search?: string) {
+    return this.scheduling.listIndividualStudents(subjectId, search);
   }
 
   @Get("course-offerings/:id/unresolved-teaching-sessions")

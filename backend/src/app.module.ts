@@ -22,7 +22,7 @@ import { SystemModule } from "./system/system.module.js";
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, envFilePath: environmentFiles, validationSchema: environmentSchema }),
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: environmentFiles, expandVariables: true, validationSchema: environmentSchema }),
     DatabaseModule,
     AuthModule,
     ManagementModule,

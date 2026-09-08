@@ -88,13 +88,10 @@ export class PlanService {
     return major;
   }
 
-  private async validatePackageSubjects(classGroup: ClassGroup, subjectIds: string[], transaction: Transaction, requireExactly21 = false) {
+  private async validatePackageSubjects(classGroup: ClassGroup, subjectIds: string[], transaction: Transaction) {
     if (!classGroup.majorId) throw new BadRequestException("Lớp học phải được gắn chuyên ngành trước khi tạo gói học phần.");
     if (subjectIds.length === 0 || subjectIds.length > 21) {
       throw new BadRequestException("Gói học phần phải có từ 1 đến 21 học phần.");
-    }
-    if (requireExactly21 && subjectIds.length !== 21) {
-      throw new BadRequestException("Gói học phần chính thức phải có đúng 21 học phần.");
     }
     const subjects = await this.subjects.findAll({
       where: { id: { [Op.in]: subjectIds }, majorId: classGroup.majorId, program: classGroup.program, active: true },
@@ -200,14 +197,10 @@ export class PlanService {
     nextProgram: string,
     transaction: Transaction,
   ) {
-    const changesCanonical = Object.prototype.hasOwnProperty.call(dto, "canonicalSubjectId");
-    const currentCanonicalId = subject.canonicalSubjectId || null;
-    const nextCanonicalId = changesCanonical ? (dto.canonicalSubjectId || null) : currentCanonicalId;
+    const nextCanonicalId = Object.prototype.hasOwnProperty.call(dto, "canonicalSubjectId")
+      ? (dto.canonicalSubjectId || null)
+      : (subject.canonicalSubjectId || null);
     const nextAllowCrossMajor = dto.allowCrossMajor ?? subject.allowCrossMajor ?? false;
-    const canonicalChanged = currentCanonicalId !== nextCanonicalId;
-    const programChanged = nextProgram !== subject.program;
-    const deactivating = dto.active === false && subject.active !== false;
-    const disablingCrossMajor = subject.allowCrossMajor === true && nextAllowCrossMajor === false;
 
     await this.validateSubjectIdentityTarget(
       subject.id,
@@ -217,29 +210,6 @@ export class PlanService {
       transaction,
     );
 
-    const dependentCount = await this.subjects.count({
-      where: { canonicalSubjectId: subject.id },
-      transaction,
-    });
-    if (dependentCount > 0 && nextCanonicalId) {
-      throw new ConflictException("Học phần đang là gốc của mapping khác nên không thể trở thành alias.");
-    }
-    if (dependentCount > 0 && !nextAllowCrossMajor) {
-      throw new ConflictException("Không thể tắt dùng chung liên ngành khi học phần vẫn đang có alias.");
-    }
-    if (dependentCount > 0 && programChanged) {
-      throw new ConflictException("Không thể đổi bậc đào tạo của học phần gốc đang có alias.");
-    }
-    if (dependentCount > 0 && deactivating) {
-      throw new ConflictException("Không thể ngừng sử dụng học phần gốc đang có alias.");
-    }
-
-    if (canonicalChanged || disablingCrossMajor) {
-      const offeringCount = await this.courseOfferings.count({ where: { subjectId: subject.id }, transaction });
-      if (offeringCount > 0) {
-        throw new ConflictException("Không thể đổi logical identity của học phần đang được lớp học phần tham chiếu.");
-      }
-    }
   }
 
   private async validateSubjectIdentityTarget(
@@ -345,7 +315,7 @@ export class PlanService {
     const classGroup = await this.classGroups.findByPk(dto.classGroupId, { transaction });
     if (!classGroup) throw new NotFoundException("Không tìm thấy lớp học.");
     await this.ensureUnique(this.packages, "code", dto.code, undefined, { classGroupId: dto.classGroupId });
-    await this.validatePackageSubjects(classGroup, dto.subjectIds, transaction, dto.isOfficial === true);
+    await this.validatePackageSubjects(classGroup, dto.subjectIds, transaction);
 
     // Nếu truyền isOfficial = true, gỡ official của các gói khác cùng lớp
     if (dto.isOfficial) {
@@ -392,10 +362,10 @@ export class PlanService {
     const classGroup = await this.classGroups.findByPk(pkg.classGroupId, { transaction });
     if (!classGroup) throw new NotFoundException("Không tìm thấy lớp học.");
     if (dto.subjectIds !== undefined) {
-      await this.validatePackageSubjects(classGroup, dto.subjectIds, transaction, dto.isOfficial === true || (pkg.isOfficial && dto.isOfficial !== false));
+      await this.validatePackageSubjects(classGroup, dto.subjectIds, transaction);
     } else if (dto.isOfficial === true) {
       const count = await this.packageEntries.count({ where: { packageId: id }, transaction });
-      if (count !== 21) throw new BadRequestException("Gói học phần chính thức phải có đúng 21 học phần.");
+      if (count === 0) throw new BadRequestException("Gói học phần phải có ít nhất 1 học phần.");
     }
 
     // Nếu cập nhật isOfficial = true, gỡ official của các gói khác cùng lớp
@@ -439,7 +409,7 @@ export class PlanService {
     // Gỡ bỏ trạng thái chính thức của tất cả các gói thuộc lớp này
     if (pkg.active === false) throw new BadRequestException("Không thể chọn gói học phần đã ngừng sử dụng.");
     const count = await this.packageEntries.count({ where: { packageId: id }, transaction });
-    if (count !== 21) throw new BadRequestException("Gói học phần chính thức phải có đúng 21 học phần.");
+    if (count === 0) throw new BadRequestException("Gói học phần phải có ít nhất 1 học phần.");
     await this.packages.update({ isOfficial: false }, { where: { classGroupId: pkg.classGroupId }, transaction });
 
     // Đặt gói được chọn thành chính thức
@@ -479,14 +449,14 @@ export class PlanService {
         limit: 21,
         transaction,
       });
-      if (subjects.length !== 21) throw new BadRequestException("Cần đủ 21 học phần đang hoạt động để tạo gói chuẩn.");
+      if (subjects.length === 0) throw new BadRequestException("Cần ít nhất 1 học phần đang hoạt động để tạo gói.");
       const subjectIds = subjects.map((subject) => subject.id);
       const definitions = [
         { code: `G1-${classGroup.code}`, name: "Gói học phần 1", isOfficial: true },
         { code: `G2-${classGroup.code}`, name: "Gói học phần 2", isOfficial: false },
       ];
       for (const definition of definitions) {
-        const pkg = await this.packages.create({ ...definition, classGroupId, active: true, totalSubjects: 21 }, { transaction });
+        const pkg = await this.packages.create({ ...definition, classGroupId, active: true, totalSubjects: subjectIds.length }, { transaction });
         await this.packageEntries.bulkCreate(subjectIds.map((subjectId, index) => ({
           packageId: pkg.id,
           subjectId,

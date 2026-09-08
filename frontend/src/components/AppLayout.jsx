@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import {
-  Avatar, Box, Button, Chip, Collapse, Divider, Drawer, FormControl,
+  Avatar, Box, Button, Chip, Collapse, Divider, Drawer,
   IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
-  Menu, MenuItem, Select, Stack, Tooltip, Typography, useMediaQuery, useTheme,
+  Menu, MenuItem, Stack, Tooltip, Typography, useMediaQuery, useTheme,
 } from "@mui/material";
 import {
   AccountCircleRounded, AddTaskRounded, AssessmentRounded, CategoryRounded,
@@ -21,14 +21,6 @@ import {
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../config/http";
 import { BRAND } from "../config/branding";
-
-const SEMESTERS = [
-  "2026-2027 - Học kỳ chính",
-  "2026-2027 - Học kỳ phụ",
-  "2025-2026 - Học kỳ 2",
-  "2025-2026 - Học kỳ 1",
-  "2024-2025 - Cả năm",
-];
 
 const NAV_GROUPS = [
   {
@@ -134,7 +126,6 @@ const AppLayout = ({ children }) => {
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [semester, setSemester] = useState(SEMESTERS[0]);
   const [role, setRole] = useState("admin");
   const [currentUser, setCurrentUser] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -321,31 +312,6 @@ const AppLayout = ({ children }) => {
         })}
       </Box>
 
-      {/* Bottom Sidebar Semester Switcher */}
-      <Box sx={{ p: 1.5, borderTop: "1px solid #DFE4E8", bgcolor: "#F7F9FA" }}>
-        <Typography variant="caption" sx={{ color: "#68737D", fontSize: 10, fontWeight: 700, display: "block", mb: 0.5 }}>
-          HỌC KỲ LÀM VIỆC
-        </Typography>
-        <FormControl fullWidth size="small">
-          <Select
-            value={semester}
-            onChange={(e) => setSemester(e.target.value)}
-            sx={{
-              height: 32,
-              fontSize: 12,
-              fontWeight: 600,
-              bgcolor: "#FFFFFF",
-              borderRadius: "4px",
-            }}
-          >
-            {SEMESTERS.map((s) => (
-              <MenuItem key={s} value={s} sx={{ fontSize: 12 }}>
-                {s}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Box>
     </Box>
   );
 

@@ -4,13 +4,13 @@
   --muted-surface: #F7F9FA;
   --border-color: #DFE4E8;
   --border-light: #EDF2F7;
-  --text-primary: #20262C;
-  --text-secondary: #68737D;
-  --text-muted: #9EABB7;
+  --text-primary: #172B3A;
+  --text-secondary: #607486;
+  --text-muted: #8A9AAA;
   --primary: #0788B8;
   --primary-dark: #056A8F;
   --primary-light: #EBF5FB;
-  --secondary: #173B70;
+  --secondary: #173E75;
   --success: #137B3B;
   --success-light: #E6F4EA;
   --warning: #B86216;
@@ -31,10 +31,20 @@ body {
   background-color: var(--canvas-bg);
   color: var(--text-primary);
   font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+optgroup,
+select,
+textarea {
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
 }
 
 code, kbd, samp, pre {

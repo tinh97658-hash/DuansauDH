@@ -13,7 +13,7 @@ export const theme = createTheme({
       contrastText: "#FFFFFF",
     },
     secondary: {
-      main: "#173B70",
+      main: "#173E75",
       light: "#EBF2F7",
       dark: "#0F274B",
       contrastText: "#FFFFFF",
@@ -23,9 +23,9 @@ export const theme = createTheme({
       paper: "#FFFFFF",
     },
     text: {
-      primary: "#20262C",
-      secondary: "#68737D",
-      disabled: "#9EABB7",
+      primary: "#172B3A",
+      secondary: "#607486",
+      disabled: "#8A9AAA",
     },
     divider: "#DFE4E8",
     success: {
@@ -58,27 +58,29 @@ export const theme = createTheme({
   },
   typography: {
     fontFamily: '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif',
-    fontSize: 13,
-    h1: { fontSize: "24px", fontWeight: 700, color: "#173B70" },
-    h2: { fontSize: "20px", fontWeight: 700, color: "#173B70" },
-    h3: { fontSize: "18px", fontWeight: 700, color: "#173B70" },
-    h4: { fontSize: "16px", fontWeight: 700, color: "#173B70" },
-    h5: { fontSize: "15px", fontWeight: 700, color: "#173B70" },
-    h6: { fontSize: "14px", fontWeight: 700, color: "#173B70" },
-    subtitle1: { fontSize: "14px", fontWeight: 600, color: "#20262C" },
-    subtitle2: { fontSize: "13px", fontWeight: 600, color: "#20262C" },
-    body1: { fontSize: "13px", color: "#20262C", lineHeight: 1.5 },
-    body2: { fontSize: "12px", color: "#20262C", lineHeight: 1.4 },
-    caption: { fontSize: "11px", color: "#68737D" },
-    button: { textTransform: "none", fontWeight: 600, fontSize: "13px" },
+    fontSize: 12.5,
+    h1: { fontSize: "24px", fontWeight: 700, color: "#173E75" },
+    h2: { fontSize: "20px", fontWeight: 700, color: "#173E75" },
+    h3: { fontSize: "18px", fontWeight: 700, color: "#173E75" },
+    h4: { fontSize: "16px", fontWeight: 700, color: "#173E75" },
+    h5: { fontSize: "15px", fontWeight: 700, color: "#173E75" },
+    h6: { fontSize: "14px", fontWeight: 700, color: "#173E75" },
+    subtitle1: { fontSize: "13px", fontWeight: 600, color: "#172B3A" },
+    subtitle2: { fontSize: "12.5px", fontWeight: 600, color: "#172B3A" },
+    body1: { fontSize: "12.5px", color: "#172B3A", lineHeight: 1.5 },
+    body2: { fontSize: "12.5px", color: "#172B3A", lineHeight: 1.45 },
+    caption: { fontSize: "11px", color: "#607486" },
+    button: { textTransform: "none", fontWeight: 600, fontSize: "12.5px" },
   },
   components: {
     MuiCssBaseline: {
       styleOverrides: {
         body: {
           backgroundColor: "#F5F7F8",
-          color: "#20262C",
+          color: "#172B3A",
           fontFamily: '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif',
+          fontSize: "12.5px",
+          lineHeight: 1.5,
           margin: 0,
         },
       },
@@ -88,6 +90,8 @@ export const theme = createTheme({
         root: {
           textTransform: "none",
           fontWeight: 600,
+          fontSize: "12.5px",
+          fontFamily: "inherit",
           borderRadius: 3,
           boxShadow: "none",
           padding: "6px 14px",
@@ -102,7 +106,7 @@ export const theme = createTheme({
           },
         },
         containedSecondary: {
-          backgroundColor: "#173B70",
+          backgroundColor: "#173E75",
           "&:hover": {
             backgroundColor: "#0F274B",
           },
@@ -121,7 +125,7 @@ export const theme = createTheme({
         },
         outlined: {
           borderColor: "#DFE4E8",
-          color: "#20262C",
+          color: "#172B3A",
           "&:hover": {
             borderColor: "#0788B8",
             backgroundColor: "#EBF5FB",
@@ -171,6 +175,7 @@ export const theme = createTheme({
           borderRadius: 3,
           backgroundColor: "#FFFFFF",
           fontSize: 13,
+          color: "#172B3A",
           "& .MuiOutlinedInput-notchedOutline": {
             borderColor: "#DFE4E8",
             top: 0,
@@ -210,6 +215,34 @@ export const theme = createTheme({
         },
       },
     },
+    MuiInputLabel: {
+      styleOverrides: {
+        root: {
+          color: "#607486",
+          fontSize: "13px",
+          fontFamily: "inherit",
+          "&.Mui-focused": { color: "#0788B8" },
+        },
+      },
+    },
+    MuiFormControlLabel: {
+      styleOverrides: {
+        label: {
+          color: "#172B3A",
+          fontSize: "12.5px",
+          fontFamily: "inherit",
+        },
+      },
+    },
+    MuiMenuItem: {
+      styleOverrides: {
+        root: {
+          color: "#172B3A",
+          fontSize: "12.5px",
+          fontFamily: "inherit",
+        },
+      },
+    },
     MuiTable: {
       styleOverrides: {
         root: {
@@ -223,7 +256,7 @@ export const theme = createTheme({
           backgroundColor: "#F0F4F8",
           "& .MuiTableCell-root": {
             backgroundColor: "#F0F4F8",
-            color: "#20262C",
+            color: "#172B3A",
             fontWeight: 700,
             fontSize: "12px",
             borderBottom: "2px solid #DFE4E8",
@@ -237,7 +270,7 @@ export const theme = createTheme({
         root: {
           borderColor: "#DFE4E8",
           padding: "7px 10px",
-          fontSize: "13px",
+          fontSize: "12.5px",
         },
         sizeSmall: {
           padding: "5px 8px",
@@ -284,7 +317,7 @@ export const theme = createTheme({
         root: {
           fontSize: "15px",
           fontWeight: 700,
-          color: "#173B70",
+          color: "#173E75",
           borderBottom: "1px solid #DFE4E8",
           padding: "12px 18px",
           backgroundColor: "#FAFBFC",
@@ -326,7 +359,7 @@ export const theme = createTheme({
           fontSize: "13px",
           fontWeight: 600,
           textTransform: "none",
-          color: "#68737D",
+          color: "#607486",
           "&.Mui-selected": {
             color: "#0788B8",
             fontWeight: 700,
@@ -338,7 +371,7 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 3,
-          fontSize: "13px",
+          fontSize: "12.5px",
         },
       },
     },

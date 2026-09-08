@@ -48,12 +48,12 @@ const FeatureLayout = ({
                 }}
               />
             )}
-            <Typography variant="h6" component="h1" sx={{ color: "#173B70", fontWeight: 700, fontSize: "16px" }}>
+            <Typography variant="h6" component="h1" sx={{ color: "var(--secondary, #173E75)", fontWeight: 700, fontSize: "16px" }}>
               {title}
             </Typography>
           </div>
           {desc && (
-            <Typography variant="body2" sx={{ color: "#68737D", fontSize: 12, mt: 0.2 }}>
+            <Typography variant="body2" sx={{ color: "var(--text-secondary, #607486)", fontSize: 12.5, mt: 0.2 }}>
               {desc}
             </Typography>
           )}
@@ -63,7 +63,7 @@ const FeatureLayout = ({
       <Box sx={workspaceMode ? { flex: 1, minHeight: 0, "@media (max-width:1199.95px)": { flex: "initial" } } : undefined}>
         {children || (
           <Card variant="outlined" sx={{ borderRadius: "4px", borderColor: "#DFE4E8", bgcolor: "#FFFFFF", p: 3 }}>
-            <Typography variant="body2" sx={{ color: "#68737D", textAlign: "center" }}>
+            <Typography variant="body2" sx={{ color: "var(--text-secondary, #607486)", textAlign: "center" }}>
               ⚙️ Chức năng <strong>{title}</strong> đang được cấu hình và phát triển.
             </Typography>
           </Card>

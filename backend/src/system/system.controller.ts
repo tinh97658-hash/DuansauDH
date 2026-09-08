@@ -13,7 +13,7 @@ export class SystemController {
   @Get("unit-info") unitInfo() { return this.system.unitInfo(); }
   @Get("license") license() { return this.system.license(); }
   @Get("change-password") changePassword() { return this.system.changePassword(); }
-  @Get("users") users() { return this.system.users(); }
+  @Get("users") @Roles("admin") @UseGuards(RolesGuard) users() { return this.system.users(); }
 
   // ===== Dân tộc =====
   @Get("ethnicities") ethnicities() { return this.system.listEthnicities(); }

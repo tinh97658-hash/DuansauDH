@@ -12,10 +12,11 @@ export class ClassGroup extends Model {
   @ForeignKey(() => Major) @Column({ type: DataType.UUID, allowNull: true }) declare majorId: string | null;
   @BelongsTo(() => Major) declare major: any;
   @Column(DataType.STRING(20)) declare academicYear: string | null;
-  @Column(DataType.STRING(20)) declare term: string | null;
   @Default(40) @Column({ type: DataType.INTEGER, allowNull: false }) declare maxStudents: number;
   @Default("open") @Column({ type: DataType.ENUM("open", "closed"), allowNull: false }) declare status: string;
   @Column(DataType.TEXT) declare note: string | null;
+  @Default([1, 2, 3, 4, 5, 6, 0]) @Column({ type: DataType.ARRAY(DataType.INTEGER), allowNull: false }) declare allowedWeekdays: number[];
+  @Default("ADMINISTRATIVE") @Column({ type: DataType.STRING(30), allowNull: false }) declare groupType: string;
   @HasMany(() => ClassGroupMember) declare members: ClassGroupMember[];
   @HasMany(() => SubjectPackage) declare packages: SubjectPackage[];
 }

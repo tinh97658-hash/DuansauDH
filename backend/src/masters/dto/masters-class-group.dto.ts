@@ -9,7 +9,6 @@ export class CreateMastersClassGroupDto {
   @IsString() @MaxLength(200) @Transform(trim) name!: string;
   @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsString() @MaxLength(20) @Transform(trim) academicYear?: string;
-  @IsOptional() @IsString() @MaxLength(20) @Transform(trim) term?: string;
   @IsOptional() @IsInt() @Min(1) maxStudents?: number;
   @IsOptional() @IsEnum(["open", "closed"]) status?: "open" | "closed";
   @IsOptional() @IsString() @MaxLength(1000) @Transform(trim) note?: string;
@@ -20,7 +19,6 @@ export class UpdateMastersClassGroupDto {
   @IsOptional() @IsString() @MaxLength(200) @Transform(trim) name?: string;
   @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsString() @MaxLength(20) @Transform(trim) academicYear?: string;
-  @IsOptional() @IsString() @MaxLength(20) @Transform(trim) term?: string;
   @IsOptional() @IsInt() @Min(1) maxStudents?: number;
   @IsOptional() @IsEnum(["open", "closed"]) status?: "open" | "closed";
   @IsOptional() @IsString() @MaxLength(1000) @Transform(trim) note?: string;
@@ -43,6 +41,5 @@ export class BatchCreateMastersClassGroupsDto {
   @IsInt() @Min(0) startIndex!: number;
   @IsOptional() @IsUUID() majorId?: string;
   @IsString() @MaxLength(20) @Transform(trim) academicYear!: string;
-  @IsString() @MaxLength(20) @Transform(trim) term!: string;
   @IsInt() @Min(1) @Max(200) maxStudents!: number;
 }

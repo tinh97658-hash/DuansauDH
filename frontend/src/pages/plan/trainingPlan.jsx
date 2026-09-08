@@ -15,7 +15,8 @@ import {
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
-import SubjectIdentityFields, {
+import SubjectSharingCheckbox from "../../components/SubjectSharingCheckbox";
+import {
   buildSubjectIdentityPayload,
   emptySubjectIdentity,
   normalizeSubjectIdentity,
@@ -52,7 +53,6 @@ const initialClassDraft = (year) => ({
   code: "",
   name: "",
   academicYear: year,
-  term: "HK1",
   note: "",
 });
 
@@ -104,9 +104,6 @@ const TrainingPlan = () => {
   const [editingSubjectId, setEditingSubjectId] = useState(null);
   const [editingSubjectForm, setEditingSubjectForm] = useState(null);
   const [deletingSubjectId, setDeletingSubjectId] = useState(null);
-  const [programSubjects, setProgramSubjects] = useState([]);
-  const [programSubjectsLoading, setProgramSubjectsLoading] = useState(false);
-  const [programSubjectsError, setProgramSubjectsError] = useState("");
   const firstDraftInputRef = useRef(null);
 
   // Class Table State (Excel-like)
@@ -187,26 +184,6 @@ const TrainingPlan = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  const loadProgramSubjects = useCallback(async () => {
-    setProgramSubjectsLoading(true);
-    setProgramSubjectsError("");
-    try {
-      const { data } = await axios.get(`${API_BASE_URL}/plan/subjects?program=${level}`, { withCredentials: true });
-      setProgramSubjects(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setProgramSubjects([]);
-      setProgramSubjectsError(err.response?.data?.message || "Không thể tải danh sách học phần gốc dùng chung");
-    } finally {
-      setProgramSubjectsLoading(false);
-    }
-  }, [level]);
-
-  useEffect(() => {
-    if (isAdmin && (isAddingSubject || editingSubjectId)) {
-      loadProgramSubjects();
-    }
-  }, [editingSubjectId, isAddingSubject, isAdmin, loadProgramSubjects]);
 
   // Load Packages for active class
   const loadPackages = useCallback(async (targetClassId) => {
@@ -310,7 +287,6 @@ const TrainingPlan = () => {
       toast.success(`Đã thêm học phần "${created.name}"`);
       setSubjects((prev) => [...prev, created]);
       loadMajors();
-      loadProgramSubjects();
 
       if (keepOpenForNext) {
         setSubjectDraft(initialSubjectDraft(Number(subjectDraft.sortOrder || 0) + 1));
@@ -374,12 +350,22 @@ const TrainingPlan = () => {
       );
       toast.success("Cập nhật học phần thành công");
       setSubjects((prev) => prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)));
-      loadProgramSubjects();
       setEditingSubjectId(null);
       setEditingSubjectForm(null);
     } catch (err) {
       toast.error(err.response?.data?.message || "Không thể cập nhật học phần");
     }
+  };
+
+  const handleChangeSubjectSharing = async (subject, identity) => {
+    if (!isAdmin) return;
+    const { data } = await axios.put(
+      `${API_BASE_URL}/plan/subjects/${subject.id}`,
+      buildSubjectIdentityPayload(identity),
+      { withCredentials: true },
+    );
+    setSubjects((previous) => previous.map((row) => row.id === subject.id ? { ...row, ...data } : row));
+    toast.success("Đã cập nhật lựa chọn học chung khác ngành");
   };
 
   // Fast 1-click toggle for boolean flags
@@ -450,7 +436,6 @@ const TrainingPlan = () => {
       program: level,
       majorId,
       academicYear: classDraft.academicYear.trim() || year,
-      term: classDraft.term.trim(),
       note: classDraft.note.trim(),
     };
 
@@ -472,7 +457,6 @@ const TrainingPlan = () => {
       code: c.code,
       name: c.name,
       academicYear: c.academicYear || year,
-      term: c.term || "",
       note: c.note || "",
     });
   };
@@ -486,7 +470,6 @@ const TrainingPlan = () => {
       name: editingClassForm.name.trim(),
       majorId,
       academicYear: editingClassForm.academicYear.trim(),
-      term: editingClassForm.term.trim(),
       note: editingClassForm.note.trim(),
     };
 
@@ -669,7 +652,7 @@ const TrainingPlan = () => {
     <FeatureLayout
       title="Kế hoạch đào tạo"
       group="Kế hoạch khóa mới"
-      desc="Lập và quản lý kế hoạch đào tạo theo từng chuyên ngành: danh mục học phần, lớp học và ma trận phân gói học phần (2 gói / lớp, 21 học phần / gói)."
+      desc="Lập và quản lý kế hoạch đào tạo theo từng chuyên ngành: danh mục học phần, lớp học và ma trận phân gói học phần (tối đa 21 học phần / gói)."
       maxWidth={1440}
     >
       <ToastContainer position="top-right" newestOnTop autoClose={2500} limit={3} />
@@ -872,34 +855,6 @@ const TrainingPlan = () => {
             </Stack>
           </Stack>
 
-          {isAdmin && isAddingSubject && (
-            <Box sx={{ mb: 1.5 }}>
-              <SubjectIdentityFields
-                subject={subjectDraft}
-                identity={subjectDraft}
-                onChange={(identity) => setSubjectDraft((current) => ({ ...current, ...identity }))}
-                program={level}
-                subjects={programSubjects}
-                loading={programSubjectsLoading}
-                error={programSubjectsError}
-              />
-            </Box>
-          )}
-
-          {isAdmin && editingSubjectForm && (
-            <Box sx={{ mb: 1.5 }}>
-              <SubjectIdentityFields
-                subject={editingSubjectForm}
-                identity={editingSubjectForm}
-                onChange={(identity) => setEditingSubjectForm((current) => ({ ...current, ...identity }))}
-                program={level}
-                subjects={programSubjects}
-                loading={programSubjectsLoading}
-                error={programSubjectsError}
-              />
-            </Box>
-          )}
-
           {/* Spreadsheet Table */}
           <TableContainer
             component={Paper}
@@ -920,6 +875,7 @@ const TrainingPlan = () => {
                   <TableCell>Tên môn học</TableCell>
                   <TableCell sx={{ width: 70, textAlign: "center" }}>Số TC</TableCell>
                   <TableCell sx={{ width: 100, textAlign: "center" }}>Loại HP</TableCell>
+                  <TableCell sx={{ width: 115, textAlign: "center" }}>Học chung khác ngành</TableCell>
                   <TableCell sx={{ width: 95, textAlign: "center" }}>Bài tập lớn</TableCell>
                   <TableCell sx={{ width: 90, textAlign: "center" }}>Bắt buộc</TableCell>
                   <TableCell sx={{ width: 70, textAlign: "center" }}>Thứ tự</TableCell>
@@ -931,7 +887,7 @@ const TrainingPlan = () => {
               <TableBody>
                 {filteredSubjects.length === 0 && !isAddingSubject ? (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 11 : 10} align="center" sx={{ py: 5, color: "#68737D" }}>
+                    <TableCell colSpan={isAdmin ? 12 : 11} align="center" sx={{ py: 5, color: "#68737D" }}>
                       Chưa có học phần nào cho chuyên ngành <strong>{selectedMajor?.name}</strong>.
                       {isAdmin && (
                         <Box sx={{ mt: 1 }}>
@@ -1008,6 +964,13 @@ const TrainingPlan = () => {
                                 </MenuItem>
                               ))}
                             </Select>
+                          </TableCell>
+                          <TableCell align="center">
+                            <SubjectSharingCheckbox
+                              key={`edit:${row.id}:${level}:${majorId}`}
+                              subject={editingSubjectForm}
+                              onChange={(identity) => setEditingSubjectForm((current) => ({ ...current, ...identity }))}
+                            />
                           </TableCell>
                           <TableCell align="center">
                             <Checkbox
@@ -1098,6 +1061,12 @@ const TrainingPlan = () => {
                               borderColor: SUBJECT_TYPES.find((t) => t.value === row.subjectType)?.color || "#68737D",
                               color: SUBJECT_TYPES.find((t) => t.value === row.subjectType)?.color || "#68737D",
                             }}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <SubjectSharingCheckbox
+                            subject={row} disabled={!isAdmin}
+                            onChange={(identity) => handleChangeSubjectSharing(row, identity)}
                           />
                         </TableCell>
                         <TableCell align="center">
@@ -1276,6 +1245,13 @@ const TrainingPlan = () => {
                       </Select>
                     </TableCell>
                     <TableCell align="center">
+                      <SubjectSharingCheckbox
+                        key={`draft:${level}:${majorId}:${subjectDraft.sortOrder}`}
+                        subject={subjectDraft}
+                        onChange={(identity) => setSubjectDraft((current) => ({ ...current, ...identity }))}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
                       <Checkbox
                         size="small"
                         checked={subjectDraft.majorAssignment}
@@ -1415,13 +1391,6 @@ const TrainingPlan = () => {
                               />
                             </Stack>
                             <Stack direction="row" spacing={1} alignItems="center">
-                              <TextField
-                                size="small"
-                                placeholder="Học kỳ"
-                                value={classDraft.term}
-                                onChange={(e) => setClassDraft((p) => ({ ...p, term: e.target.value }))}
-                                sx={{ ...cellInputSx, width: 100 }}
-                              />
                               <TextField
                                 size="small"
                                 placeholder="Ghi chú"
@@ -1719,7 +1688,7 @@ const TrainingPlan = () => {
 
                   {packages.length === 0 ? (
                     <Alert severity="warning" sx={{ borderRadius: "2px", fontSize: 13 }}>
-                      Lớp này chưa có gói học phần. Hãy bấm nút <strong>"Tạo nhanh Gói 1 & Gói 2"</strong> ở trên để tự động khởi tạo ma trận chọn 21 học phần.
+                      Lớp này chưa có gói học phần. Hãy bấm nút <strong>"Tạo nhanh Gói 1 & Gói 2"</strong> ở trên để tự động khởi tạo ma trận học phần.
                     </Alert>
                   ) : (
                     <Box>
@@ -1742,7 +1711,7 @@ const TrainingPlan = () => {
                               {/* Dynamic Package Columns */}
                               {packages.map((pkg) => {
                                 const entriesCount = (pkg.entries || []).length;
-                                const isTarget21 = entriesCount === 21;
+                                const hasSubjects = entriesCount > 0;
                                 const isEditing = editingPkgId === pkg.id;
                                 const isOfficial = Boolean(pkg.isOfficial);
 
@@ -1856,15 +1825,15 @@ const TrainingPlan = () => {
                                         {/* Counter Badge */}
                                         <Chip
                                           size="small"
-                                          label={`${entriesCount} / 21 HP`}
+                                          label={`${entriesCount} HP`}
                                           sx={{
                                             height: 19,
                                             fontSize: 10,
                                             fontWeight: 700,
                                             mt: 0.5,
-                                            bgcolor: isTarget21 ? "#E6F4EA" : "#FEF7E0",
-                                            color: isTarget21 ? "#137B3B" : "#B86216",
-                                            border: isTarget21 ? "1px solid #137B3B" : "1px solid #B86216",
+                                            bgcolor: hasSubjects ? "#E6F4EA" : "#FEF7E0",
+                                            color: hasSubjects ? "#137B3B" : "#B86216",
+                                            border: hasSubjects ? "1px solid #137B3B" : "1px solid #B86216",
                                           }}
                                         />
                                       </Box>

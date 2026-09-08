@@ -25,8 +25,8 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "start": "node scripts/run.cjs start",
+    "build": "node scripts/run.cjs build",
     "test": "react-scripts test",
     "test:ci": "react-scripts test --watchAll=false --runInBand",
     "test:coverage": "react-scripts test --watchAll=false --runInBand --coverage",

@@ -56,16 +56,23 @@ describe("Subject cross-major identity fields", () => {
     expect(onChange).toHaveBeenCalledWith({ allowCrossMajor: false, canonicalSubjectId: root.id });
   });
 
-  it("cannot construct a simultaneous alias and root state through UI transitions", () => {
+  it("keeps the select label shrunk when the empty display option is selected", () => {
+    renderFields({ allowCrossMajor: false, canonicalSubjectId: null });
+
+    expect(screen.getByText("Học phần chung tương ứng", { selector: "label" }))
+      .toHaveAttribute("data-shrink", "true");
+  });
+
+  it("normalizes legacy references into the automatic sharing flag", () => {
     expect(setSubjectRootEnabled(true)).toEqual({ allowCrossMajor: true, canonicalSubjectId: null });
     expect(setSubjectCanonicalRoot(root.id)).toEqual({ allowCrossMajor: false, canonicalSubjectId: root.id });
     expect(buildSubjectIdentityPayload({ allowCrossMajor: true, canonicalSubjectId: root.id }))
-      .toEqual({ allowCrossMajor: false, canonicalSubjectId: root.id });
+      .toEqual({ allowCrossMajor: true, canonicalSubjectId: null });
   });
 
   it("loads an existing Subject mapping into the edit state", () => {
     expect(normalizeSubjectIdentity({ ...alias, allowCrossMajor: false, canonicalSubjectId: root.id }))
-      .toEqual({ allowCrossMajor: false, canonicalSubjectId: root.id });
+      .toEqual({ allowCrossMajor: true, canonicalSubjectId: null });
     expect(normalizeSubjectIdentity({ ...root }))
       .toEqual({ allowCrossMajor: true, canonicalSubjectId: null });
   });
@@ -97,10 +104,10 @@ describe("Subject cross-major identity fields", () => {
     expect(screen.getByRole("option", { name: /API-987 · Tên do backend trả về/ })).toBeInTheDocument();
   });
 
-  it("shows the explicit CourseOffering/Scheduling consequence for an alias", () => {
+  it("shows a legacy mapping as sharing enabled without requiring the reference", () => {
     renderFields({ allowCrossMajor: false, canonicalSubjectId: root.id });
 
-    expect(screen.getByText(/sẽ được xem là cùng học phần logic với/)).toBeInTheDocument();
-    expect(screen.getByText(/Tạo lớp học phần \/ Xếp lịch/)).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Cho phép ghép lớp khác ngành" })).toBeChecked();
+    expect(screen.queryByText(/sẽ được xem là cùng học phần logic với/)).not.toBeInTheDocument();
   });
 });

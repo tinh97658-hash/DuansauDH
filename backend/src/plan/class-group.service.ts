@@ -13,7 +13,6 @@ export interface CreateClassGroupInput {
   program?: string;
   majorId?: string | null;
   academicYear?: string;
-  term?: string;
   maxStudents?: number;
   status?: string;
   note?: string | null;
@@ -25,7 +24,6 @@ export interface UpdateClassGroupInput {
   program?: string;
   majorId?: string | null;
   academicYear?: string;
-  term?: string;
   maxStudents?: number;
   status?: string;
   note?: string | null;
@@ -35,7 +33,6 @@ export interface ClassGroupFilters {
   program?: string;
   majorId?: string;
   academicYear?: string;
-  term?: string;
   status?: string;
 }
 
@@ -89,7 +86,6 @@ export class ClassGroupService {
     if (filters.program) where.program = filters.program;
     if (filters.majorId) where.majorId = filters.majorId;
     if (filters.academicYear) where.academicYear = filters.academicYear;
-    if (filters.term) where.term = filters.term;
     if (filters.status && filters.status !== "ALL") where.status = filters.status;
     return this.classGroups.findAll({
       where,
@@ -107,7 +103,6 @@ export class ClassGroupService {
       name: input.name,
       majorId: input.majorId || null,
       academicYear: input.academicYear || String(new Date().getFullYear()),
-      term: input.term || "HK1",
       maxStudents: input.maxStudents ?? 40,
       status: input.status || "open",
       note: input.note ?? null,
@@ -133,7 +128,7 @@ export class ClassGroupService {
     }
 
     const payload: Record<string, unknown> = {};
-    for (const key of ["code", "name", "program", "majorId", "academicYear", "term", "maxStudents", "status", "note"]) {
+    for (const key of ["code", "name", "program", "majorId", "academicYear", "maxStudents", "status", "note"]) {
       const value = input[key as keyof UpdateClassGroupInput];
       if (value !== undefined) payload[key] = value;
     }

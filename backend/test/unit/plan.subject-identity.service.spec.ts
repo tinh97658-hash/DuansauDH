@@ -181,15 +181,18 @@ describe("PlanService Subject logical identity", () => {
     );
   });
 
-  it("does not change the logical identity of a Subject referenced by an existing offering", async () => {
+  it("allows removing a legacy reference even when the Subject has an offering", async () => {
     const { service, subjects, courseOfferings } = buildService();
     const alias = subject();
     const root = subject({ id: "root", majorId: "major-1", canonicalSubjectId: null, allowCrossMajor: true });
     subjects.findByPk.mockImplementation(async (id: string) => id === root.id ? root : alias);
     courseOfferings.count.mockResolvedValue(1);
 
-    await expect(service.updateSubject(alias.id, { canonicalSubjectId: root.id }))
-      .rejects.toThrow("đang được lớp học phần tham chiếu");
-    expect(alias.update).not.toHaveBeenCalled();
+    await expect(service.updateSubject(alias.id, { canonicalSubjectId: null, allowCrossMajor: true }))
+      .resolves.toBeDefined();
+    expect(alias.update).toHaveBeenCalledWith(
+      expect.objectContaining({ canonicalSubjectId: null, allowCrossMajor: true }),
+      { transaction },
+    );
   });
 });

@@ -68,39 +68,39 @@ npm run db:seed:common
 
 ## Cấu hình môi trường
 
-Repository có hai file:
-
-- `.env`: cấu hình local đang dùng, được Git bỏ qua để tránh commit bí mật.
-- `.env.example`: mẫu cấu hình để tạo môi trường mới.
-
-Nếu cần tạo lại `.env`:
-
-```powershell
-Copy-Item .env.example .env
-```
+Toàn bộ cấu hình local nằm trong **`.env` ở thư mục gốc**, được Git bỏ qua.
+Docker Compose, backend, migration, seed và frontend đều đọc file này.
+Backend không còn tìm `config.env` hoặc `.env` riêng trong thư mục con.
+Môi trường mới cần tạo `.env` với các biến bên dưới và mật khẩu riêng.
 
 Các biến chính:
 
 | Biến | Giá trị local hiện tại | Ý nghĩa |
 | --- | --- | --- |
 | `WEB_PORT` | `3100` | Cổng web trên máy host |
+| `PORT` | `3001` | Cổng backend |
+| `DB_HOST` | `127.0.0.1` | Host PostgreSQL cho backend chạy ngoài Docker |
 | `DB_PORT` | `55432` | Cổng PostgreSQL local, chỉ bind vào `127.0.0.1` |
 | `DB_ADMIN_PORT` | `5051` | Cổng pgAdmin trên máy host |
 | `POSTGRES_DB` | `pgsms` | Tên database |
 | `POSTGRES_USER` | `pgsms` | Tài khoản PostgreSQL |
-| `POSTGRES_PASSWORD` | `pgsms-local-password` | Mật khẩu PostgreSQL local |
-| `DATABASE_URL` | PostgreSQL tại `127.0.0.1:55432` | Kết nối khi chạy backend ngoài Docker |
+| `POSTGRES_PASSWORD` | Đặt trong `.env` | Mật khẩu PostgreSQL, dùng cả khi kết nối từ pgAdmin |
+| `PGADMIN_EMAIL` | Đặt trong `.env` | Email khởi tạo pgAdmin |
+| `PGADMIN_PASSWORD` | Đặt trong `.env` | Mật khẩu khởi tạo pgAdmin, khác tài khoản PostgreSQL |
 | `SESSION_SECRET` | được đặt trong `.env` | Khóa ký session, tối thiểu 32 ký tự |
 | `SESSION_COOKIE_SECURE` | `false` | Dùng `true` khi production chạy HTTPS |
 | `DATABASE_SSL` | `false` | Bật TLS cho kết nối PostgreSQL production |
-| `FRONTEND_URL` | `http://localhost:3100` | Origin frontend được CORS cho phép |
-| `API_PUBLIC_URL` | `http://localhost:3100/api` | URL công khai dùng cho OAuth callback |
+| `FRONTEND_URL` | `http://localhost:${WEB_PORT}` | Origin frontend được CORS cho phép |
+| `API_PUBLIC_URL` | `http://localhost:${PORT}` | URL công khai dùng cho OAuth callback |
+| `REACT_APP_API_URL` | `${API_PUBLIC_URL}` | URL API cho frontend; đặt `/api` khi triển khai qua reverse proxy |
+| `GENERATE_SOURCEMAP` | `false` | Cấu hình build frontend |
 | `GOOGLE_CLIENT_ID` | trống | Google OAuth, không bắt buộc khi chạy DB |
 | `GOOGLE_CLIENT_SECRET` | trống | Google OAuth, không bắt buộc khi chạy DB |
 
-Không sử dụng các mật khẩu local ở môi trường thật.
-Khi đổi `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` hoặc `DB_PORT`, phải
-cập nhật `DATABASE_URL` tương ứng.
+Backend tự tạo `DATABASE_URL` từ `DB_HOST`, `DB_PORT` và `POSTGRES_*`, có mã hóa
+ký tự đặc biệt trong thông tin đăng nhập. Không khai báo lại `DATABASE_URL` trong
+`.env`; biến này chỉ dùng để ghi đè khi cần kết nối ngoài cấu hình local.
+Compose báo lỗi khi thiếu cấu hình bắt buộc, không tự chọn mật khẩu dự phòng.
 
 ## Chuẩn bị lần đầu
 
@@ -125,11 +125,7 @@ Get-ChildItem
 
 Kết quả phải thấy `compose.yaml`, `backend`, `frontend` và `README.md`.
 
-Nếu chưa có `.env`, tạo từ file mẫu:
-
-```powershell
-Copy-Item .env.example .env
-```
+Nếu chưa có `.env`, tạo tại thư mục gốc theo mục cấu hình môi trường phía trên.
 
 Không cần chạy `npm install` ở thư mục gốc. Backend và frontend có package riêng.
 
@@ -149,15 +145,17 @@ http://localhost:5051
 ```
 
 pgAdmin chạy ở desktop mode nên không có màn hình đăng nhập pgAdmin. Server
-`Postgraduate Student Management` đã được đăng ký sẵn. Khi pgAdmin yêu cầu mật
-khẩu kết nối database, nhập:
+`Postgraduate Student Management` đã được đăng ký sẵn và tự lấy mật khẩu từ
+`POSTGRES_PASSWORD` trong `.env`, không cần nhập hoặc lưu mật khẩu bằng tay.
+Mỗi lần khởi động, container tạo lại file mật khẩu nội bộ với quyền `0600` và
+cấu hình server từ cùng bộ biến `POSTGRES_*`. Thông tin kết nối:
 
 ```text
 Host: db
 Port: 5432
-Database: pgsms
-Username: pgsms
-Password: pgsms-local-password
+Database: giá trị POSTGRES_DB trong .env
+Username: giá trị POSTGRES_USER trong .env
+Password: giá trị POSTGRES_PASSWORD trong .env
 ```
 
 pgAdmin kết nối database bằng hostname `db` trên Docker network. PostgreSQL cũng
@@ -224,8 +222,8 @@ npm install
 npm start
 ```
 
-File `frontend/.env.development` đặt frontend ở cổng `3100` và trỏ API tới
-`http://localhost:3001`. Truy cập:
+`npm start` và `npm run build` đọc `.env` gốc. Frontend lấy cổng từ `WEB_PORT`
+và địa chỉ API từ `REACT_APP_API_URL`. Truy cập với cấu hình local hiện tại:
 
 ```text
 http://localhost:3100
@@ -325,7 +323,8 @@ docker compose down -v
 
 ### Cổng đang bị chiếm
 
-Đổi `WEB_PORT` hoặc `DB_ADMIN_PORT` trong `.env`, sau đó chạy lại Compose.
+Đổi cổng tương ứng trong `.env`: `WEB_PORT` cho frontend, `PORT` cho backend,
+`DB_ADMIN_PORT` cho pgAdmin hoặc `DB_PORT` cho PostgreSQL. Khởi động lại thành phần đó.
 
 ### Docker báo `parent snapshot ... does not exist`
 
@@ -348,6 +347,12 @@ docker compose --profile app logs --tail=100 migrate api
 ```
 
 ### pgAdmin không kết nối được
+
+Mật khẩu kết nối database là `POSTGRES_PASSWORD`, không phải `PGADMIN_PASSWORD`.
+Tên database và username của server đăng ký sẵn được lấy từ `.env` khi chạy Compose.
+PostgreSQL và pgAdmin lưu tài khoản trong volume: đổi mật khẩu trong `.env` không
+tự đổi mật khẩu tài khoản đã tồn tại. Cần đổi mật khẩu tài khoản đó tương ứng;
+không xóa volume để sửa lỗi mật khẩu vì sẽ mất dữ liệu.
 
 Kiểm tra database healthy và dùng hostname `db`, không dùng `localhost`, trong
 cấu hình server của pgAdmin:

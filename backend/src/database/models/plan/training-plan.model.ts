@@ -12,7 +12,6 @@ export class TrainingPlan extends Model {
   @ForeignKey(() => TrainingProgram) @Column({ type: DataType.UUID, allowNull: false }) declare programId: string;
   @BelongsTo(() => TrainingProgram) declare program: any;
   @Column({ type: DataType.STRING(20), allowNull: false }) declare academicYear: string;
-  @Column(DataType.STRING(20)) declare semester: string | null;
   @Column(DataType.DATEONLY) declare startDate: string | null;
   @Column(DataType.DATEONLY) declare endDate: string | null;
   @Default(0) @Column(DataType.INTEGER) declare targetStudents: number;

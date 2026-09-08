@@ -49,7 +49,9 @@ export class SystemService {
   unitInfo() { return this.stub("unit-info", "Thông tin về đơn vị"); }
   license() { return this.stub("license", "License"); }
   changePassword() { return this.stub("change-password", "Đổi mật khẩu"); }
-  users() { return this.stub("users", "Quản lý người dùng"); }
+  users() {
+    return this.staff.findAll({ attributes: ["id", "name", "email", "role", "canManageScheduling"], order: [["name", "ASC"], ["id", "ASC"]] });
+  }
   checkUpdate() { return this.stub("check-update", "Check Update"); }
 
   // ===== Tiện ích dùng chung =====

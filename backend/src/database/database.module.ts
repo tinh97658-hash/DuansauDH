@@ -37,6 +37,7 @@ import { ExamResult } from "./models/training/exam-result.model.js";
 import { CourseOffering } from "./models/training/course-offering.model.js";
 import { CourseOfferingClassGroup } from "./models/training/course-offering-class-group.model.js";
 import { TeachingSession } from "./models/training/teaching-session.model.js";
+import { CourseOfferingStudent } from "./models/training/course-offering-student.model.js";
 // Bảng riêng: Đào tạo Thạc sĩ
 import { MastersAdmissionScore } from "./models/masters/masters-admission-score.model.js";
 import { EnglishExamSession } from "./models/masters/english-exam-session.model.js";
@@ -60,7 +61,7 @@ export const databaseModels = [
   TrainingPlan, AdmissionTarget, AnnualFee, AdmissionRecord,
   Subject, SubjectPackage, SubjectPackageSubject,
   // Training (class & exam)
-  ClassGroup, ClassGroupMember, CourseOffering, CourseOfferingClassGroup, TeachingSession, ExamSession, ExamEligibility, ExamResult,
+  ClassGroup, ClassGroupMember, CourseOffering, CourseOfferingClassGroup, CourseOfferingStudent, TeachingSession, ExamSession, ExamEligibility, ExamResult,
   // Masters
   MastersAdmissionScore, EnglishExamSession, EnglishExamScore, EnglishCertification, GraduationDefense, GraduationRecord,
   // Doctoral

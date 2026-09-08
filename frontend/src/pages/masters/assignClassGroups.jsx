@@ -20,7 +20,26 @@ import FeatureLayout from "../../components/FeatureLayout";
 
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
-const TERMS = ["HK1", "HK2", "HK3", "Hè"];
+
+const normalizeClassGroupMember = (member, group) => {
+  const admissionRecord = member?.admissionRecord || null;
+  const student = member?.student || null;
+
+  return {
+    id: admissionRecord?.id || student?.id || `member:${member.id}`,
+    memberId: member.id,
+    code: admissionRecord?.code || student?.regNo || "",
+    fullName: admissionRecord?.fullName || student?.fullName || "Chưa có thông tin",
+    dob: admissionRecord?.dob || "",
+    gender: admissionRecord?.gender || "",
+    email: admissionRecord?.email || student?.email || "",
+    phone: admissionRecord?.phone || student?.telNo || "",
+    majorId: admissionRecord?.majorId || group.majorId || null,
+    majorName: admissionRecord?.majorName || admissionRecord?.major?.name || group.major?.name || "",
+    academicYear: admissionRecord?.academicYear || group.academicYear || "",
+    assignedGroup: { id: group.id, code: group.code, name: group.name },
+  };
+};
 
 const AssignClassGroups = () => {
   const [searchParams] = useSearchParams();
@@ -32,7 +51,6 @@ const AssignClassGroups = () => {
   const [majors, setMajors] = useState([]);
   const [selectedYear, setSelectedYear] = useState(initialYear);
   const [selectedMajor, setSelectedMajor] = useState(initialMajorId);
-  const [selectedTerm, setSelectedTerm] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL"); // ALL, UNASSIGNED, ASSIGNED
   const [studentSearch, setStudentSearch] = useState("");
 
@@ -68,7 +86,6 @@ const AssignClassGroups = () => {
       const params = new URLSearchParams();
       if (selectedYear) params.append("academicYear", selectedYear);
       if (selectedMajor !== "ALL") params.append("majorId", selectedMajor);
-      if (selectedTerm !== "ALL") params.append("term", selectedTerm);
       params.append("status", "open");
 
       const { data } = await axios.get(`${API_BASE_URL}/masters/class-groups?${params.toString()}`, {
@@ -88,7 +105,7 @@ const AssignClassGroups = () => {
     } catch (err) {
       console.error(err);
     }
-  }, [selectedYear, selectedMajor, selectedTerm, targetGroupId]);
+  }, [selectedYear, selectedMajor, targetGroupId]);
 
   // Load students
   const loadStudents = useCallback(async () => {
@@ -97,7 +114,6 @@ const AssignClassGroups = () => {
       const params = new URLSearchParams();
       if (selectedYear) params.append("academicYear", selectedYear);
       if (selectedMajor !== "ALL") params.append("majorId", selectedMajor);
-      if (selectedTerm !== "ALL") params.append("term", selectedTerm);
 
       const { data } = await axios.get(`${API_BASE_URL}/masters/class-groups/eligible-students?${params.toString()}`, {
         withCredentials: true,
@@ -109,7 +125,7 @@ const AssignClassGroups = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedYear, selectedMajor, selectedTerm]);
+  }, [selectedYear, selectedMajor]);
 
   const refreshAll = useCallback(() => {
     loadGroups();
@@ -126,16 +142,31 @@ const AssignClassGroups = () => {
     return groups.find((g) => g.id === targetGroupId) || null;
   }, [groups, targetGroupId]);
 
-  // Target group member records from students
+  // Thành viên đã thuộc lớp phải lấy trực tiếp từ lớp. Danh sách hồ sơ đủ điều kiện
+  // có thể rỗng khi dữ liệu cũ dùng năm tuyển sinh khác với năm của lớp.
+  const classGroupMembers = useMemo(() => groups.flatMap((group) => (
+    (Array.isArray(group.members) ? group.members : []).map((member) => (
+      normalizeClassGroupMember(member, group)
+    ))
+  )), [groups]);
+
   const groupMembers = useMemo(() => {
     if (!targetGroupId) return [];
-    return students.filter((s) => s.assignedGroup?.id === targetGroupId);
-  }, [students, targetGroupId]);
+    return classGroupMembers.filter((student) => student.assignedGroup.id === targetGroupId);
+  }, [classGroupMembers, targetGroupId]);
+
+  // Giữ học viên chưa phân lớp từ API hiện tại và bổ sung thành viên của các lớp
+  // đang hiển thị, tránh mất thông tin chỉ vì năm trên hồ sơ lịch sử không trùng khớp.
+  const visibleStudents = useMemo(() => {
+    const rows = new Map(students.map((student) => [student.id, student]));
+    classGroupMembers.forEach((student) => rows.set(student.id, student));
+    return [...rows.values()];
+  }, [classGroupMembers, students]);
 
   // Filtered left student list
   const filteredStudents = useMemo(() => {
     const kw = studentSearch.trim().toLowerCase();
-    return students.filter((s) => {
+    return visibleStudents.filter((s) => {
       if (currentTargetGroup?.majorId && s.majorId !== currentTargetGroup.majorId) return false;
       // Filter status
       if (filterStatus === "UNASSIGNED" && s.assignedGroup) return false;
@@ -150,23 +181,30 @@ const AssignClassGroups = () => {
       }
       return true;
     });
-  }, [students, filterStatus, studentSearch, currentTargetGroup]);
+  }, [visibleStudents, filterStatus, studentSearch, currentTargetGroup]);
+
+  const assignableStudents = useMemo(
+    () => filteredStudents.filter((student) => !student.assignedGroup),
+    [filteredStudents],
+  );
 
   useEffect(() => {
-    const visibleIds = new Set(filteredStudents.map((student) => student.id));
-    setSelectedStudentIds((previous) => previous.filter((id) => visibleIds.has(id)));
-  }, [filteredStudents]);
+    const assignableIds = new Set(assignableStudents.map((student) => student.id));
+    setSelectedStudentIds((previous) => previous.filter((id) => assignableIds.has(id)));
+  }, [assignableStudents]);
 
   // Selection handlers
   const handleToggleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedStudentIds(filteredStudents.map((s) => s.id));
+      setSelectedStudentIds(assignableStudents.map((s) => s.id));
     } else {
       setSelectedStudentIds([]);
     }
   };
 
   const handleToggleSelectStudent = (id) => {
+    const student = visibleStudents.find((item) => item.id === id);
+    if (!student || student.assignedGroup) return;
     setSelectedStudentIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
@@ -229,7 +267,7 @@ const AssignClassGroups = () => {
     // Determine students to distribute: either currently checked, or all unassigned in filtered view, or all in view
     let targetStudentIds = selectedStudentIds;
     if (targetStudentIds.length === 0) {
-      targetStudentIds = filteredStudents.map((s) => s.id);
+      targetStudentIds = assignableStudents.map((s) => s.id);
     }
 
     if (targetStudentIds.length === 0) {
@@ -298,21 +336,6 @@ const AssignClassGroups = () => {
             </Select>
           </FormControl>
 
-          <FormControl size="small" sx={{ minWidth: 110 }}>
-            <InputLabel id="term-select-label">Học kỳ</InputLabel>
-            <Select
-              labelId="term-select-label"
-              label="Học kỳ"
-              value={selectedTerm}
-              onChange={(e) => setSelectedTerm(e.target.value)}
-            >
-              <MenuItem value="ALL">-- Tất cả --</MenuItem>
-              {TERMS.map((t) => (
-                <MenuItem key={t} value={t}>{t}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
           <Button
             variant="outlined"
             startIcon={<RefreshRounded />}
@@ -351,7 +374,7 @@ const AssignClassGroups = () => {
               <Typography variant="subtitle1" sx={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 1 }}>
                 <PersonRounded sx={{ color: "#0788B8" }} />
                 Danh sách học viên
-                <Chip size="small" label={`${students.length} HV`} color="primary" variant="outlined" sx={{ ml: 0.5, fontWeight: 700 }} />
+                <Chip size="small" label={`${visibleStudents.length} HV`} color="primary" variant="outlined" sx={{ ml: 0.5, fontWeight: 700 }} />
               </Typography>
 
               {/* Status Filter Chips */}
@@ -401,7 +424,7 @@ const AssignClassGroups = () => {
             {/* Selection Status & Action Bar */}
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1, px: 0.5 }}>
               <Typography variant="body2" color="text.secondary">
-                Đã chọn: <strong>{selectedStudentIds.length}</strong> / {filteredStudents.length} học viên
+                Đã chọn: <strong>{selectedStudentIds.length}</strong> / {assignableStudents.length} học viên chưa có lớp
               </Typography>
 
               <Button
@@ -424,9 +447,10 @@ const AssignClassGroups = () => {
                     <TableCell padding="checkbox">
                       <Checkbox
                         size="small"
-                        indeterminate={selectedStudentIds.length > 0 && selectedStudentIds.length < filteredStudents.length}
-                        checked={filteredStudents.length > 0 && selectedStudentIds.length === filteredStudents.length}
+                        indeterminate={selectedStudentIds.length > 0 && selectedStudentIds.length < assignableStudents.length}
+                        checked={assignableStudents.length > 0 && selectedStudentIds.length === assignableStudents.length}
                         onChange={handleToggleSelectAll}
+                        disabled={assignableStudents.length === 0}
                       />
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Mã HV / SBD</TableCell>
@@ -451,19 +475,22 @@ const AssignClassGroups = () => {
                   ) : (
                     filteredStudents.map((s) => {
                       const isSelected = selectedStudentIds.includes(s.id);
+                      const isAssigned = Boolean(s.assignedGroup);
                       return (
                         <TableRow
                           key={s.id}
                           hover
                           selected={isSelected}
                           onClick={() => handleToggleSelectStudent(s.id)}
-                          sx={{ cursor: "pointer" }}
+                          sx={{ cursor: isAssigned ? "not-allowed" : "pointer", opacity: isAssigned ? 0.72 : 1 }}
                         >
                           <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
                             <Checkbox
                               size="small"
                               checked={isSelected}
                               onChange={() => handleToggleSelectStudent(s.id)}
+                              disabled={isAssigned}
+                              inputProps={{ "aria-label": isAssigned ? `${s.fullName} đã được phân lớp` : `Chọn ${s.fullName}` }}
                             />
                           </TableCell>
                           <TableCell>
@@ -623,8 +650,8 @@ const AssignClassGroups = () => {
 
           <Box sx={{ mb: 2, p: 1.5, bgcolor: "#f8fafc", borderRadius: 1 }}>
             <Typography variant="body2">
-              Số lượng học viên sẽ chia: <strong>{selectedStudentIds.length > 0 ? selectedStudentIds.length : filteredStudents.length}</strong> học viên
-              {selectedStudentIds.length > 0 ? " (đang chọn từ bảng)" : " (toàn bộ danh sách đang hiển thị)"}
+              Số lượng học viên sẽ chia: <strong>{selectedStudentIds.length > 0 ? selectedStudentIds.length : assignableStudents.length}</strong> học viên
+              {selectedStudentIds.length > 0 ? " (đang chọn từ bảng)" : " (toàn bộ học viên chưa có lớp đang hiển thị)"}
             </Typography>
           </Box>
 

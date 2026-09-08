@@ -1,5 +1,5 @@
-import { Transform } from "class-transformer";
-import { ArrayMinSize, ArrayUnique, IsArray, IsDateString, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from "class-validator";
+import { Transform, Type } from "class-transformer";
+import { ArrayMinSize, ArrayUnique, IsArray, IsDateString, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateNested, IsInt, Min, Max } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim());
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -9,24 +9,60 @@ export class CourseOfferingCandidatesQueryDto {
   @IsOptional() @IsIn(["masters", "doctoral"]) program = "masters";
   @IsUUID() majorId!: string;
   @IsString() @MinLength(1) @MaxLength(20) @Transform(trim) academicYear!: string;
-  @IsOptional() @IsString() @MaxLength(20) @Transform(trim) term?: string;
+}
+
+export class CourseOfferingParticipantNoteDto {
+  @IsString() @MaxLength(100) participantId!: string;
+  @IsString() @MaxLength(2000) @Transform(trim) note!: string;
 }
 
 export class CreateCourseOfferingDto {
+  @IsOptional() @IsUUID() majorId?: string;
+  @IsOptional() @IsString() @MaxLength(20) @Transform(trim) academicYear?: string;
+  @IsOptional() @IsArray() @ArrayUnique((entry: CourseOfferingParticipantNoteDto) => entry.participantId)
+  @ValidateNested({ each: true }) @Type(() => CourseOfferingParticipantNoteDto)
+  participantNotes?: CourseOfferingParticipantNoteDto[];
+  @IsOptional() @IsArray() @ArrayUnique() @IsUUID("all", { each: true }) admissionRecordIds?: string[];
   @IsUUID() subjectId!: string;
   @IsArray() @ArrayMinSize(1) @ArrayUnique() @IsUUID("all", { each: true }) classGroupIds!: string[];
   @IsOptional() @IsString() @MaxLength(2000) @Transform(trim) note?: string;
 }
 
 export class PreviewCourseOfferingParticipantsDto {
+  @IsOptional() @IsUUID() majorId?: string;
+  @IsOptional() @IsString() @MaxLength(20) @Transform(trim) academicYear?: string;
+  @IsOptional() @IsUUID() subjectId?: string;
+  @IsOptional() @IsArray() @ArrayUnique() @IsUUID("all", { each: true }) admissionRecordIds?: string[];
   @IsArray() @ArrayMinSize(1) @ArrayUnique() @IsUUID("all", { each: true }) classGroupIds!: string[];
+}
+
+export class RetakeQueryDto {
+  @IsUUID() subjectId!: string;
+  @IsUUID() majorId!: string;
+  @IsString() @MinLength(1) @MaxLength(20) academicYear!: string;
+}
+
+export class RegisterRetakeDto {
+  @IsUUID() sourceCourseOfferingId!: string;
+  @IsString() @MaxLength(100) participantId!: string;
+}
+
+export class UpdateRosterNotesDto {
+  @IsArray() @ArrayUnique((entry: CourseOfferingParticipantNoteDto) => entry.participantId)
+  @ValidateNested({ each: true }) @Type(() => CourseOfferingParticipantNoteDto)
+  participantNotes!: CourseOfferingParticipantNoteDto[];
+}
+
+export class SchedulingGroupSettingsDto {
+  @IsArray() @ArrayMinSize(1) @ArrayUnique() @IsInt({ each: true }) @Min(0, { each: true }) @Max(6, { each: true })
+  allowedWeekdays!: number[];
+  @IsIn(["ADMINISTRATIVE", "NON_ADMINISTRATIVE"]) groupType!: string;
 }
 
 export class ListCourseOfferingsQueryDto {
   @IsOptional() @IsIn(["masters", "doctoral"]) program = "masters";
   @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsString() @MaxLength(20) @Transform(trim) academicYear?: string;
-  @IsOptional() @IsString() @MaxLength(20) @Transform(trim) term?: string;
   @IsOptional() @IsUUID() subjectId?: string;
   @IsOptional() @IsIn(["active", "completed"]) status?: "active" | "completed";
 }

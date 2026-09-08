@@ -192,7 +192,6 @@ async function run() {
     name: "Kế hoạch tuyển sinh sau đại học năm 2026",
     programId: programIds.CTTHS || null,
     academicYear: "2026",
-    semester: "HK1",
     startDate: "2026-09-01",
     endDate: "2027-01-31",
     targetStudents: 120,
@@ -220,7 +219,7 @@ async function run() {
 
   // Khoản thu đầu năm
   const feeDefs: Array<[string, string | number, string, string]> = [
-    ["Học phí học kỳ I", 8000000, "2026-10-15", "Học phí học kỳ đầu tiên"],
+    ["Học phí đợt I", 8000000, "2026-10-15", "Học phí đợt đầu tiên"],
     ["Lệ phí nhập học", 500000, "2026-09-15", "Lệ phí làm thủ tục nhập học"],
     ["Bảo hiểm y tế", 700000, "2026-10-15", "Bảo hiểm y tế năm học 2026-2027"],
     ["Kinh phí bảo vệ luận văn", 1000000, "2027-05-30", "Kinh phí cho hội đồng bảo vệ luận văn"],
@@ -306,7 +305,6 @@ async function run() {
       name: c.name,
       majorId: majorKTHH.id,
       academicYear: "2026",
-      term: "HK1",
       maxStudents: c.maxStudents,
       status: "open",
       note: "Nhóm học phần demo khóa 32",

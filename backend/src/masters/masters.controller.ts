@@ -27,19 +27,17 @@ export class MastersController {
   listClassGroups(
     @Query("majorId") majorId?: string,
     @Query("academicYear") academicYear?: string,
-    @Query("term") term?: string,
     @Query("status") status?: string,
   ) {
-    return this.masters.listClassGroups(majorId, academicYear, term, status);
+    return this.masters.listClassGroups(majorId, academicYear, status);
   }
 
   @Get("class-groups/eligible-students")
   listEligibleStudents(
     @Query("majorId") majorId?: string,
     @Query("academicYear") academicYear?: string,
-    @Query("term") term?: string,
   ) {
-    return this.masters.listEligibleStudents(majorId, academicYear, term);
+    return this.masters.listEligibleStudents(majorId, academicYear);
   }
 
   @Get("class-groups/:id")

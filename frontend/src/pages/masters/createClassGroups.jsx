@@ -18,14 +18,12 @@ import FeatureLayout from "../../components/FeatureLayout";
 
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
-const TERMS = ["HK1", "HK2", "HK3", "Hè"];
 
 const initialForm = (year = String(currentYear)) => ({
   code: "",
   name: "",
   majorId: "",
   academicYear: year,
-  term: "HK1",
   maxStudents: 40,
   status: "open",
   note: "",
@@ -38,7 +36,6 @@ const initialBatchForm = (year = String(currentYear)) => ({
   startIndex: 1,
   majorId: "",
   academicYear: year,
-  term: "HK1",
   maxStudents: 40,
 });
 
@@ -49,7 +46,6 @@ const CreateClassGroups = () => {
   const [majors, setMajors] = useState([]);
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [selectedMajor, setSelectedMajor] = useState("ALL");
-  const [selectedTerm, setSelectedTerm] = useState("ALL");
   const [selectedStatus, setSelectedStatus] = useState("ALL");
   const [search, setSearch] = useState("");
 
@@ -92,7 +88,6 @@ const CreateClassGroups = () => {
       const params = new URLSearchParams();
       if (selectedYear) params.append("academicYear", selectedYear);
       if (selectedMajor !== "ALL") params.append("majorId", selectedMajor);
-      if (selectedTerm !== "ALL") params.append("term", selectedTerm);
       if (selectedStatus !== "ALL") params.append("status", selectedStatus);
 
       const { data } = await axios.get(`${API_BASE_URL}/masters/class-groups?${params.toString()}`, {
@@ -105,7 +100,7 @@ const CreateClassGroups = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedYear, selectedMajor, selectedTerm, selectedStatus]);
+  }, [selectedYear, selectedMajor, selectedStatus]);
 
   useEffect(() => {
     loadGroups();
@@ -148,7 +143,6 @@ const CreateClassGroups = () => {
       name: group.name,
       majorId: group.majorId || "",
       academicYear: group.academicYear || selectedYear,
-      term: group.term || "HK1",
       maxStudents: group.maxStudents || 40,
       status: group.status || "open",
       note: group.note || "",
@@ -166,7 +160,6 @@ const CreateClassGroups = () => {
         name: form.name.trim(),
         majorId: form.majorId || null,
         academicYear: form.academicYear,
-        term: form.term,
         maxStudents: Number(form.maxStudents || 40),
         status: form.status,
         note: form.note?.trim() || null,
@@ -202,7 +195,6 @@ const CreateClassGroups = () => {
         startIndex: Number(batchForm.startIndex || 1),
         majorId: batchForm.majorId || undefined,
         academicYear: batchForm.academicYear,
-        term: batchForm.term,
         maxStudents: Number(batchForm.maxStudents || 40),
       }, { withCredentials: true });
       toast.success(`Đã tạo thành công ${data.count} nhóm học phần.`);
@@ -266,21 +258,6 @@ const CreateClassGroups = () => {
               <MenuItem value="ALL">-- Tất cả ngành --</MenuItem>
               {majors.map((m) => (
                 <MenuItem key={m.id} value={m.id}>{m.name} ({m.code})</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl size="small" sx={{ minWidth: 110 }}>
-            <InputLabel id="term-filter-label">Học kỳ</InputLabel>
-            <Select
-              labelId="term-filter-label"
-              label="Học kỳ"
-              value={selectedTerm}
-              onChange={(e) => setSelectedTerm(e.target.value)}
-            >
-              <MenuItem value="ALL">-- Tất cả --</MenuItem>
-              {TERMS.map((t) => (
-                <MenuItem key={t} value={t}>{t}</MenuItem>
               ))}
             </Select>
           </FormControl>
@@ -353,7 +330,6 @@ const CreateClassGroups = () => {
               <TableCell sx={{ fontWeight: 700 }}>Tên nhóm học phần</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Ngành học</TableCell>
               <TableCell align="center" sx={{ fontWeight: 700, width: 90 }}>Năm học</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 700, width: 80 }}>Học kỳ</TableCell>
               <TableCell sx={{ fontWeight: 700, width: 150 }}>Sĩ số</TableCell>
               <TableCell align="center" sx={{ fontWeight: 700, width: 110 }}>Trạng thái</TableCell>
               <TableCell align="right" sx={{ fontWeight: 700, width: 170 }}>Thao tác</TableCell>
@@ -362,13 +338,13 @@ const CreateClassGroups = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} align="center" sx={{ py: 5 }}>
+                <TableCell colSpan={8} align="center" sx={{ py: 5 }}>
                   <CircularProgress size={30} />
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} align="center" sx={{ py: 5, color: "text.secondary" }}>
+                <TableCell colSpan={8} align="center" sx={{ py: 5, color: "text.secondary" }}>
                   Chưa có nhóm học phần nào phù hợp. Bấm "Thêm nhóm mới" hoặc "Tạo nhanh nhiều nhóm" để bắt đầu.
                 </TableCell>
               </TableRow>
@@ -393,7 +369,6 @@ const CreateClassGroups = () => {
                     </TableCell>
                     <TableCell>{row.major?.name || "-"}</TableCell>
                     <TableCell align="center">{row.academicYear || "-"}</TableCell>
-                    <TableCell align="center"><Chip size="small" label={row.term || "HK1"} variant="outlined" /></TableCell>
                     <TableCell>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         <Box sx={{ flexGrow: 1 }}>
@@ -497,20 +472,6 @@ const CreateClassGroups = () => {
                 >
                   {YEARS.map((y) => (
                     <MenuItem key={y} value={y}>{y}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <FormControl fullWidth size="small">
-                <InputLabel id="form-term-label">Học kỳ</InputLabel>
-                <Select
-                  labelId="form-term-label"
-                  label="Học kỳ"
-                  value={form.term}
-                  onChange={(e) => setForm((p) => ({ ...p, term: e.target.value }))}
-                >
-                  {TERMS.map((t) => (
-                    <MenuItem key={t} value={t}>{t}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -634,20 +595,6 @@ const CreateClassGroups = () => {
                 >
                   {YEARS.map((y) => (
                     <MenuItem key={y} value={y}>{y}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <FormControl fullWidth size="small">
-                <InputLabel id="batch-term-label">Học kỳ</InputLabel>
-                <Select
-                  labelId="batch-term-label"
-                  label="Học kỳ"
-                  value={batchForm.term}
-                  onChange={(e) => setBatchForm((p) => ({ ...p, term: e.target.value }))}
-                >
-                  {TERMS.map((t) => (
-                    <MenuItem key={t} value={t}>{t}</MenuItem>
                   ))}
                 </Select>
               </FormControl>

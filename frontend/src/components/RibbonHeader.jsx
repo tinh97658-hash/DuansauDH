@@ -18,6 +18,10 @@ import "../styles/ribbon-header.css";
 const action = (label, route, icon, color, options = {}) => ({ label, route, icon, color, ...options });
 const group = (label, actions) => ({ label, actions });
 
+export const isRibbonRouteActive = (pathname, route) => Boolean(
+  route && (pathname === route || pathname === `${route}/` || pathname.startsWith(`${route}/`)),
+);
+
 const tabs = [
   ["system", "HỆ THỐNG"],
   ["plan", "KẾ HOẠCH KHÓA MỚI"],
@@ -172,11 +176,9 @@ const RibbonHeader = () => {
           return <section className="ribbon-group" key={itemGroup.label}><div className="ribbon-actions">
             {visibleActions.map((item) => {
               const Icon = item.icon;
-              const schedulingActive = ["/masters/course-offerings", "/masters/schedule"].includes(item.route)
-                && (path === item.route || path === `${item.route}/`);
-              return <button type="button" className="ribbon-action" key={item.label} onClick={() => runAction(item)} title={item.label}
-                aria-current={schedulingActive ? "page" : undefined}
-                style={schedulingActive ? { background: "#e8f3fa", borderColor: "#78acd0", color: "#075a9c", fontWeight: 600, boxShadow: "inset 0 -2px #075a9c" } : undefined}>
+              const isActive = isRibbonRouteActive(path, item.route);
+              return <button type="button" className={`ribbon-action${isActive ? " active" : ""}`} key={item.label} onClick={() => runAction(item)} title={item.label}
+                aria-current={isActive ? "page" : undefined}>
                 <Icon className="ribbon-action-icon" style={{ color: item.color }} /><span>{item.label}</span>
               </button>;
             })}

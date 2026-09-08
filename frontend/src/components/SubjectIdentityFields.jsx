@@ -9,10 +9,9 @@ export const emptySubjectIdentity = () => ({
 });
 
 export const normalizeSubjectIdentity = (subject) => {
-  const canonicalSubjectId = subject?.canonicalSubjectId || null;
   return {
-    canonicalSubjectId,
-    allowCrossMajor: canonicalSubjectId ? false : Boolean(subject?.allowCrossMajor),
+    canonicalSubjectId: null,
+    allowCrossMajor: Boolean(subject?.allowCrossMajor || subject?.canonicalSubjectId),
   };
 };
 
@@ -98,6 +97,7 @@ const SubjectIdentityFields = ({
             disabled={value.allowCrossMajor || loading}
             onChange={(event) => onChange(setSubjectCanonicalRoot(event.target.value))}
             sx={{ minWidth: { xs: "100%", md: 390 }, bgcolor: "#fff" }}
+            InputLabelProps={{ shrink: true }}
             SelectProps={{ displayEmpty: true }}
             inputProps={{ "aria-label": "Học phần chung tương ứng" }}
           >

@@ -2,9 +2,11 @@ import { BelongsTo, Column, DataType, Default, ForeignKey, HasMany, Model, Table
 import { Staff } from "../staff.model.js";
 import { Subject } from "../plan/subject.model.js";
 import { CourseOfferingClassGroup } from "./course-offering-class-group.model.js";
+import { CourseOfferingStudent } from "./course-offering-student.model.js";
 
 @Table({ tableName: "course_offerings", underscored: true, timestamps: true })
 export class CourseOffering extends Model {
+  @HasMany(() => CourseOfferingStudent) declare individualStudents: CourseOfferingStudent[];
   @Default(DataType.UUIDV4) @Column({ type: DataType.UUID, primaryKey: true }) declare id: string;
 
   @ForeignKey(() => Subject) @Column({ type: DataType.UUID, allowNull: false }) declare subjectId: string;
@@ -20,6 +22,10 @@ export class CourseOffering extends Model {
   @BelongsTo(() => Staff, { foreignKey: "completedByStaffId", as: "completedBy" }) declare completedBy: Staff | null;
 
   @Column(DataType.TEXT) declare note: string | null;
+  @Default([]) @Column({ type: DataType.JSONB, allowNull: false })
+  declare participantNotes: Array<{ participantId: string; note: string }>;
+  @Default([1, 2, 3, 4, 5, 6, 0]) @Column({ type: DataType.ARRAY(DataType.INTEGER), allowNull: false }) declare retakeWeekdays: number[];
+  @Column({ type: DataType.VIRTUAL }) declare allowedWeekdays: number[];
 
   @Column({ type: DataType.VIRTUAL }) declare participantCount: number;
   @Column({ type: DataType.VIRTUAL }) declare sessionSummary: {

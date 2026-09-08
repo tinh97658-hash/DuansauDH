@@ -133,6 +133,7 @@
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  font-family: inherit;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -201,6 +202,7 @@
   background: transparent;
   font-size: 11px;
   font-weight: 500;
+  font-family: inherit;
   line-height: 1.2;
   text-align: center;
   cursor: pointer;
@@ -213,6 +215,27 @@
   border-color: #0788B8;
   color: #0788B8;
   outline: none;
+}
+
+.ribbon-action.active,
+.ribbon-action[aria-current="page"] {
+  background: #E8F3FA;
+  border-color: #78ACD0;
+  color: #075A9C;
+  font-weight: 700;
+  box-shadow: inset 0 -2px #075A9C, 0 1px 3px rgba(7, 90, 156, 0.16);
+}
+
+.ribbon-action.active:hover,
+.ribbon-action[aria-current="page"]:hover {
+  background: #E1F0F8;
+  border-color: #5F9BC5;
+  color: #075A9C;
+}
+
+.ribbon-action.active .ribbon-action-icon,
+.ribbon-action[aria-current="page"] .ribbon-action-icon {
+  color: #0788B8 !important;
 }
 
 .ribbon-action-icon {

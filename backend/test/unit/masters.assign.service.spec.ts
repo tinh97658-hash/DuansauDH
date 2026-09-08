@@ -33,7 +33,6 @@ const openGroup = {
   program: "masters",
   status: "open",
   academicYear: "2026",
-  term: "HK1",
   majorId: null,
   maxStudents: 40,
   name: "Nhóm 1",
@@ -44,19 +43,33 @@ describe("MastersService.assignMembers", () => {
     const { service, classGroups, classGroupMembers, admissionRecords } = buildService();
     classGroups.findOne.mockResolvedValue(openGroup);
     admissionRecords.findAll.mockResolvedValue([{ id: "a1", studentId: "s1" }]);
-    classGroups.findAll.mockResolvedValue([{ id: "g1" }]);
-    classGroupMembers.destroy.mockResolvedValue(0);
+    classGroupMembers.findAll.mockResolvedValue([]);
     classGroupMembers.count.mockResolvedValue(0);
     classGroupMembers.bulkCreate.mockResolvedValue([{}]);
 
     const result = await service.assignMembers("g1", { admissionRecordIds: ["a1"] });
 
-    expect(classGroupMembers.destroy).toHaveBeenCalled();
+    expect(classGroupMembers.destroy).not.toHaveBeenCalled();
     expect(classGroupMembers.bulkCreate).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ classGroupId: "g1", admissionRecordId: "a1", studentId: "s1" })]),
       expect.anything(),
     );
     expect(result.count).toBe(1);
+  });
+
+  it("rejects a student who already belongs to another class", async () => {
+    const { service, classGroups, classGroupMembers, admissionRecords } = buildService();
+    classGroups.findOne.mockResolvedValue(openGroup);
+    admissionRecords.findAll.mockResolvedValue([{ id: "a1", studentId: "s1" }]);
+    classGroupMembers.findAll.mockResolvedValue([{
+      classGroupId: "g2",
+      classGroup: { id: "g2", code: "N02", name: "Nhóm 2" },
+    }]);
+
+    await expect(service.assignMembers("g1", { admissionRecordIds: ["a1"] }))
+      .rejects.toThrow('đã được phân vào lớp "Nhóm 2"');
+    expect(classGroupMembers.bulkCreate).not.toHaveBeenCalled();
+    expect(classGroupMembers.destroy).not.toHaveBeenCalled();
   });
 
   it("rejects when an admission record is not eligible (wrong major/level/year/status)", async () => {
@@ -78,8 +91,7 @@ describe("MastersService.assignMembers", () => {
       { id: "a2", studentId: null },
       { id: "a3", studentId: null },
     ]);
-    classGroups.findAll.mockResolvedValue([{ id: "g1" }]);
-    classGroupMembers.destroy.mockResolvedValue(0);
+    classGroupMembers.findAll.mockResolvedValue([]);
     // 38 current + 3 new = 41 > maxStudents 40
     classGroupMembers.count.mockResolvedValue(38);
 
@@ -101,7 +113,7 @@ describe("MastersService.autoAssign", () => {
       { id: "a3", studentId: null, firstName: "Bình", fullName: "Lê Thị Bình" },
       { id: "a4", studentId: null, firstName: "Cường", fullName: "Phạm Văn Cường" },
     ]);
-    classGroupMembers.destroy.mockResolvedValue(0);
+    classGroupMembers.findAll.mockResolvedValue([]);
     classGroupMembers.count.mockResolvedValue(0);
     classGroupMembers.bulkCreate.mockResolvedValue([{}]);
 
@@ -122,6 +134,27 @@ describe("MastersService.autoAssign", () => {
     expect(result.distributed.reduce((sum: number, d: { count: number }) => sum + d.count, 0)).toBe(4);
   });
 
+  it("does not redistribute students who already have a class", async () => {
+    const { service, classGroups, classGroupMembers, admissionRecords } = buildService();
+    const g1 = { ...openGroup, code: "N01" };
+    const g2 = { ...openGroup, id: "g2", code: "N02" };
+    classGroups.findAll.mockResolvedValue([g1, g2]);
+    admissionRecords.findAll.mockResolvedValue([
+      { id: "a1", studentId: null, firstName: "An", fullName: "Nguyễn Văn An" },
+    ]);
+    classGroupMembers.findAll.mockResolvedValue([{
+      classGroupId: "g1",
+      classGroup: { id: "g1", code: "N01", name: "Nhóm 1" },
+    }]);
+
+    await expect(service.autoAssign({
+      classGroupIds: ["g1", "g2"],
+      admissionRecordIds: ["a1"],
+    })).rejects.toThrow('đã được phân vào lớp "Nhóm 1"');
+    expect(classGroupMembers.bulkCreate).not.toHaveBeenCalled();
+    expect(classGroupMembers.destroy).not.toHaveBeenCalled();
+  });
+
   it("requires at least 2 target groups", async () => {
     const { service } = buildService();
 
@@ -129,7 +162,7 @@ describe("MastersService.autoAssign", () => {
       .rejects.toThrow("Vui lòng chọn ít nhất 2 nhóm học phần.");
   });
 
-  it("rejects groups that are not in the same major/year/term scope", async () => {
+  it("rejects groups that are not in the same major/year scope", async () => {
     const { service, classGroups } = buildService();
     const g1 = { ...openGroup, code: "N01" };
     const g2 = { ...openGroup, id: "g2", code: "N02", academicYear: "2025" };

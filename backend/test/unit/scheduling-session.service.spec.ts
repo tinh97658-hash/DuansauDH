@@ -39,10 +39,12 @@ const buildService = () => {
   const classGroupMembers = { findAll: jest.fn().mockResolvedValue([]) };
   const majors = { findOne: jest.fn() };
   const staff = { findByPk: jest.fn(), update: jest.fn() };
-  const sequelize = { transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)) };
+  const sequelize = { query: jest.fn().mockResolvedValue([]), transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)) };
   const rooms = { findAll: jest.fn() };
   const lecturers = { findAll: jest.fn() };
   const teachingSessions = { findAll: jest.fn(), findByPk: jest.fn(), findOne: jest.fn(), create: jest.fn() };
+  const individualStudents = { findAll: jest.fn().mockResolvedValue([]), bulkCreate: jest.fn().mockResolvedValue([]) };
+  const admissionRecords = { findAll: jest.fn().mockResolvedValue([]) };
   const service = new SchedulingService(
     courseOfferings as never,
     offeringGroups as never,
@@ -56,9 +58,11 @@ const buildService = () => {
     rooms as never,
     lecturers as never,
     teachingSessions as never,
+    individualStudents as never,
+    admissionRecords as never,
   );
   return {
-    service, courseOfferings, offeringGroups, subjects, classGroups, classGroupMembers,
+    individualStudents, admissionRecords, service, courseOfferings, offeringGroups, subjects, classGroups, classGroupMembers,
     sequelize, rooms, lecturers, teachingSessions,
   };
 };
@@ -104,6 +108,25 @@ const expectConflictCode = async (promise: Promise<unknown>, code: string) => {
 };
 
 describe("SchedulingService TeachingSession", () => {
+  it("includes separately selected students in room capacity", async () => {
+    const mocks = buildService();
+    arrangeValid(mocks, { rooms: [room("room-1", 1)] });
+    mocks.classGroupMembers.findAll.mockResolvedValue([{ admissionRecordId: "group-student" }]);
+    mocks.individualStudents.findAll.mockResolvedValue([{ admissionRecordId: "extra-student" }]);
+    await expectConflictCode(mocks.service.createTeachingSession(createDto()), "ROOM_CAPACITY_EXCEEDED");
+    expect(mocks.teachingSessions.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects overlapping attendance between a group member and a separately selected student", async () => {
+    const mocks = buildService();
+    arrangeValid(mocks);
+    mocks.classGroupMembers.findAll.mockImplementation(async (options: any) => options.where.classGroupId[Op.in].includes("other-group") ? [{ studentId: "same-person" }] : []);
+    mocks.individualStudents.findAll.mockImplementation(async (options: any) => options.where.courseOfferingId === "offering-1" ? [{ admissionRecordId: "extra", admissionRecord: { studentId: "same-person" } }] : []);
+    mocks.teachingSessions.findAll.mockResolvedValue([session({ courseOfferingId: "other-offering", roomId: "other-room", lecturerId: "other-lecturer", courseOffering: { groupLinks: [{ classGroupId: "other-group" }] } })]);
+    await expectConflictCode(mocks.service.createTeachingSession(createDto()), "STUDENT_CONFLICT");
+    expect(mocks.sequelize.query).toHaveBeenCalledWith("SELECT pg_advisory_xact_lock(21025)", { transaction });
+    expect(mocks.teachingSessions.create).not.toHaveBeenCalled();
+  });
   beforeEach(() => { jest.useFakeTimers({ now: new Date("2026-09-04T05:00:00Z") }); });
   afterEach(() => { jest.useRealTimers(); });
 

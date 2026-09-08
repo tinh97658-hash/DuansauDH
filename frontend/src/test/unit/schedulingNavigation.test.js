@@ -3,7 +3,7 @@ jest.mock("@mui/icons-material", () => new Proxy({}, { get: () => () => null }))
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import RibbonHeader, { ribbons } from "../../components/RibbonHeader";
+import RibbonHeader, { isRibbonRouteActive, ribbons } from "../../components/RibbonHeader";
 
 describe("Masters scheduling ribbon", () => {
   it("moves both scheduling actions into the learning-process group without changing routes", () => {
@@ -35,18 +35,28 @@ describe("Masters scheduling ribbon", () => {
       const active = screen.getByRole("button", { name: activeLabel });
       const other = screen.getByRole("button", { name: otherLabel });
       expect(active).toHaveAttribute("aria-current", "page");
-      expect(active).toHaveStyle("background: #e8f3fa; border-color: #78acd0; color: #075a9c; font-weight: 600");
+      expect(active).toHaveClass("active");
       expect(other).not.toHaveAttribute("aria-current");
-      expect(other).not.toHaveAttribute("style");
+      expect(other).not.toHaveClass("active");
       await act(async () => { fireEvent.click(other); });
       expect(other).toHaveAttribute("aria-current", "page");
+      expect(other).toHaveClass("active");
       expect(active).not.toHaveAttribute("aria-current");
       await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tạo nhóm học phần" })); });
       expect(active).not.toHaveAttribute("aria-current");
       expect(other).not.toHaveAttribute("aria-current");
-      expect(screen.getByRole("button", { name: "Tạo nhóm học phần" })).not.toHaveAttribute("style");
+      expect(screen.getByRole("button", { name: "Tạo nhóm học phần" })).toHaveClass("active");
+      expect(screen.getByRole("button", { name: "Tạo nhóm học phần" })).toHaveAttribute("aria-current", "page");
     } finally {
       global.fetch = originalFetch;
     }
+  });
+
+  it("matches exact, trailing-slash and nested function routes without matching similar prefixes", () => {
+    expect(isRibbonRouteActive("/system/users", "/system/users")).toBe(true);
+    expect(isRibbonRouteActive("/system/users/", "/system/users")).toBe(true);
+    expect(isRibbonRouteActive("/system/users/edit/123", "/system/users")).toBe(true);
+    expect(isRibbonRouteActive("/system/users-archive", "/system/users")).toBe(false);
+    expect(isRibbonRouteActive("/system/users", null)).toBe(false);
   });
 });

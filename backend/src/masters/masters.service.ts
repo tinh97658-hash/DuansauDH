@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
-import { Op } from "sequelize";
+import { Op, UniqueConstraintError } from "sequelize";
 import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
@@ -62,11 +62,10 @@ export class MastersService {
     return where;
   }
 
-  async listClassGroups(majorId?: string, academicYear?: string, term?: string, status?: string) {
+  async listClassGroups(majorId?: string, academicYear?: string, status?: string) {
     const where: Record<string, unknown> = { program: "masters" };
     if (majorId) where.majorId = majorId;
     if (academicYear) where.academicYear = academicYear;
-    if (term) where.term = term;
     if (status && status !== "ALL") where.status = status;
 
     const groups = await this.classGroups.findAll({
@@ -159,7 +158,6 @@ export class MastersService {
           name: `${dto.namePrefix} ${number}`,
           majorId: dto.majorId || null,
           academicYear: dto.academicYear,
-          term: dto.term,
           maxStudents: dto.maxStudents,
           status: "open",
         };
@@ -178,7 +176,7 @@ export class MastersService {
     });
   }
 
-  async listEligibleStudents(majorId?: string, academicYear?: string, term?: string) {
+  async listEligibleStudents(majorId?: string, academicYear?: string) {
     const where: Record<string, unknown> = {
       trainingLevel: "Thạc sĩ",
       [Op.or]: [
@@ -195,10 +193,8 @@ export class MastersService {
       order: [["lastName", "ASC"], ["firstName", "ASC"], ["fullName", "ASC"]],
     });
 
-    // Lấy tất cả các thành viên của nhóm học phần thạc sĩ trong cùng năm/học kỳ
+    // Một học viên chỉ thuộc một nhóm học phần Thạc sĩ, không phụ thuộc bộ lọc đang xem.
     const groupWhere: Record<string, unknown> = { program: "masters" };
-    if (academicYear) groupWhere.academicYear = academicYear;
-    if (term) groupWhere.term = term;
 
     const members = await this.classGroupMembers.findAll({
       include: [
@@ -206,23 +202,26 @@ export class MastersService {
           model: ClassGroup,
           as: "classGroup",
           where: groupWhere,
-          attributes: ["id", "code", "name", "academicYear", "term"],
+          attributes: ["id", "code", "name", "academicYear"],
         },
       ],
     });
 
     const memberMap = new Map<string, { memberId: string; group: any }>();
+    const studentMemberMap = new Map<string, { memberId: string; group: any }>();
     for (const m of members) {
+      const assignment = {
+        memberId: m.id,
+        group: m.classGroup ? { id: m.classGroup.id, code: m.classGroup.code, name: m.classGroup.name } : null,
+      };
       if (m.admissionRecordId) {
-        memberMap.set(m.admissionRecordId, {
-          memberId: m.id,
-          group: m.classGroup ? { id: m.classGroup.id, code: m.classGroup.code, name: m.classGroup.name } : null,
-        });
+        memberMap.set(m.admissionRecordId, assignment);
       }
+      if (m.studentId) studentMemberMap.set(m.studentId, assignment);
     }
 
     return records.map((r) => {
-      const assignment = memberMap.get(r.id);
+      const assignment = memberMap.get(r.id) || (r.studentId ? studentMemberMap.get(r.studentId) : undefined);
       return {
         id: r.id,
         code: r.code || "",
@@ -262,29 +261,49 @@ export class MastersService {
       if (records.length !== admissionRecordIds.length) {
         throw new BadRequestException("Danh sách có học viên không đủ điều kiện, sai chuyên ngành hoặc sai khóa tuyển sinh.");
       }
-      const samePeriodGroups = await this.classGroups.findAll({
-        where: { program: "masters", academicYear: group.academicYear, term: group.term },
-        attributes: ["id"],
-        transaction,
-      });
-      await this.classGroupMembers.destroy({
+      const studentIds = records.map((record) => record.studentId).filter(Boolean) as string[];
+      const existingMemberships = await this.classGroupMembers.findAll({
         where: {
-          classGroupId: { [Op.in]: samePeriodGroups.map((item) => item.id) },
-          admissionRecordId: { [Op.in]: admissionRecordIds },
+          [Op.or]: [
+            { admissionRecordId: { [Op.in]: admissionRecordIds } },
+            ...(studentIds.length > 0 ? [{ studentId: { [Op.in]: studentIds } }] : []),
+          ],
         },
+        include: [{
+          model: ClassGroup,
+          as: "classGroup",
+          where: { program: "masters" },
+          attributes: ["id", "code", "name"],
+        }],
         transaction,
+        lock: transaction.LOCK.UPDATE,
       });
+      if (existingMemberships.length > 0) {
+        const existing = existingMemberships[0];
+        const assignedGroup = existing.classGroup;
+        throw new ConflictException(
+          `Học viên đã được phân vào lớp "${assignedGroup?.name || assignedGroup?.code || existing.classGroupId}". `
+          + "Không thể phân học viên này vào lớp khác; hãy xóa khỏi lớp hiện tại trước.",
+        );
+      }
       const existingCount = await this.classGroupMembers.count({ where: { classGroupId }, transaction });
       if (existingCount + records.length > group.maxStudents) {
         throw new BadRequestException(`Nhóm chỉ còn ${Math.max(0, group.maxStudents - existingCount)} chỗ trống.`);
       }
       const studentIdByRecord = new Map(records.map((record) => [record.id, record.studentId]));
-      await this.classGroupMembers.bulkCreate(admissionRecordIds.map((admissionRecordId) => ({
-        classGroupId,
-        admissionRecordId,
-        studentId: studentIdByRecord.get(admissionRecordId) || null,
-        enrolledAt: new Date(),
-      })), { transaction });
+      try {
+        await this.classGroupMembers.bulkCreate(admissionRecordIds.map((admissionRecordId) => ({
+          classGroupId,
+          admissionRecordId,
+          studentId: studentIdByRecord.get(admissionRecordId) || null,
+          enrolledAt: new Date(),
+        })), { transaction });
+      } catch (error) {
+        if (error instanceof UniqueConstraintError) {
+          throw new ConflictException("Có học viên vừa được phân vào lớp khác. Vui lòng tải lại danh sách.");
+        }
+        throw error;
+      }
       return { success: true, message: `Đã phân ${records.length} học viên vào nhóm "${group.name}".`, count: records.length };
     });
   }
@@ -311,10 +330,9 @@ export class MastersService {
       const scope = groups[0];
       const sameScope = groups.every((group) => (
         group.academicYear === scope.academicYear
-        && group.term === scope.term
         && (group.majorId || null) === (scope.majorId || null)
       ));
-      if (!sameScope) throw new BadRequestException("Các nhóm chia đều phải cùng chuyên ngành, năm tuyển sinh và học kỳ.");
+      if (!sameScope) throw new BadRequestException("Các nhóm chia đều phải cùng chuyên ngành và năm tuyển sinh.");
       const records = await this.admissionRecords.findAll({
         where: this.eligibleAdmissionWhere(scope, dto.admissionRecordIds) as any,
         transaction,
@@ -323,18 +341,31 @@ export class MastersService {
       if (records.length !== dto.admissionRecordIds.length) {
         throw new BadRequestException("Danh sách có học viên không đủ điều kiện, sai chuyên ngành hoặc sai khóa tuyển sinh.");
       }
-      const samePeriodGroups = await this.classGroups.findAll({
-        where: { program: "masters", academicYear: scope.academicYear, term: scope.term },
-        attributes: ["id"],
-        transaction,
-      });
-      await this.classGroupMembers.destroy({
+      const studentIds = records.map((record) => record.studentId).filter(Boolean) as string[];
+      const existingMemberships = await this.classGroupMembers.findAll({
         where: {
-          classGroupId: { [Op.in]: samePeriodGroups.map((group) => group.id) },
-          admissionRecordId: { [Op.in]: dto.admissionRecordIds },
+          [Op.or]: [
+            { admissionRecordId: { [Op.in]: dto.admissionRecordIds } },
+            ...(studentIds.length > 0 ? [{ studentId: { [Op.in]: studentIds } }] : []),
+          ],
         },
+        include: [{
+          model: ClassGroup,
+          as: "classGroup",
+          where: { program: "masters" },
+          attributes: ["id", "code", "name"],
+        }],
         transaction,
+        lock: transaction.LOCK.UPDATE,
       });
+      if (existingMemberships.length > 0) {
+        const existing = existingMemberships[0];
+        const assignedGroup = existing.classGroup;
+        throw new ConflictException(
+          `Học viên đã được phân vào lớp "${assignedGroup?.name || assignedGroup?.code || existing.classGroupId}". `
+          + "Chỉ học viên chưa có lớp mới được đưa vào chia tự động.",
+        );
+      }
       const sortedStudents = [...records];
       if ((dto.method || "alphabetical") === "alphabetical") {
         sortedStudents.sort((left, right) => {
@@ -356,7 +387,14 @@ export class MastersService {
         newMemberships.push({ classGroupId: target.id, admissionRecordId: student.id, studentId: student.studentId || null, enrolledAt: new Date() });
         loads.set(target.id, (loads.get(target.id) || 0) + 1);
       }
-      await this.classGroupMembers.bulkCreate(newMemberships, { transaction });
+      try {
+        await this.classGroupMembers.bulkCreate(newMemberships, { transaction });
+      } catch (error) {
+        if (error instanceof UniqueConstraintError) {
+          throw new ConflictException("Có học viên vừa được phân vào lớp khác. Vui lòng tải lại danh sách.");
+        }
+        throw error;
+      }
       return {
         success: true,
         message: `Đã phân đều ${newMemberships.length} học viên vào ${groups.length} nhóm học phần.`,

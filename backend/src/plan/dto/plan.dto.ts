@@ -63,7 +63,6 @@ export class CreateClassDto {
   @IsOptional() @IsIn(["masters", "doctoral"]) program?: string;
   @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsString() @MaxLength(20) academicYear?: string;
-  @IsOptional() @IsString() @MaxLength(20) term?: string;
   @IsOptional() @IsString() @MaxLength(2000) @Transform(trim) note?: string;
 }
 
@@ -73,7 +72,6 @@ export class UpdateClassDto {
   @IsOptional() @IsIn(["masters", "doctoral"]) program?: string;
   @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsString() @MaxLength(20) academicYear?: string;
-  @IsOptional() @IsString() @MaxLength(20) term?: string;
   @IsOptional() @IsString() @MaxLength(2000) @Transform(trim) note?: string;
 }
 
