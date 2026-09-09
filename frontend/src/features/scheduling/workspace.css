@@ -180,14 +180,15 @@
 .sl-schedule-view .sl-session.sl-not em{color:#c72d2d}
 .sl-schedule-view .v20-add-slot{margin-top:4px;padding:8px;border-color:#72aed0;border-radius:3px;background:#eef8fd;font-size:11px}
 
-/* Session editor. */
-.scheduling-v20.v20-dialog.sl-session-editor-dialog{position:fixed;inset:180px 0 0;width:100vw;height:calc(100dvh - 180px);max-width:none;max-height:none;margin:0;transform:none;border:0;border-top:1px solid #bfcedb;border-radius:0;box-shadow:none;font-size:16.5px}
+/* Scheduling overlays use the large centered modal from the reference screen. */
+.scheduling-v20.v20-dialog:is(.sl-session-editor-dialog,.sl-offering-drawer,.sl-pending-drawer){width:min(1400px,calc(100vw - 48px));max-width:calc(100vw - 48px);height:calc(100dvh - 40px);max-height:calc(100dvh - 40px);margin:20px;font-size:16.5px}
 .sl-session-editor-body{display:flex!important;flex-direction:column;padding:0!important;overflow:hidden!important}
-.sl-editor-hero{min-height:106px;display:flex;align-items:center;justify-content:space-between;gap:28px;padding:18px 22px;border-bottom:1px solid #d7e1e9;background:#fff}
+.sl-editor-hero{min-height:118px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:18px 22px;border-bottom:1px solid #d7e1e9;background:#fff}
 .sl-session-editor-dialog .sl-editor-hero .sl-eyebrow{font-size:15.5px;line-height:1.35}
 .sl-editor-hero h2{margin:5px 0 3px;color:#173e75;font-size:21px;line-height:1.3;text-transform:uppercase}
 .sl-editor-hero p{margin:0;color:#607486;font-size:14px;line-height:1.4}
-.sl-editor-hero>span{height:31px;display:inline-flex;align-items:center;padding:0 13px;border:1px solid #cae2d4;border-radius:4px;background:#eef8f2;color:#178447;font-size:13px;white-space:nowrap}
+.sl-editor-hero-actions{display:flex;align-items:flex-start;gap:8px}
+.sl-editor-hero-actions>span{height:31px;display:inline-flex;align-items:center;padding:0 13px;border:1px solid #cae2d4;border-radius:4px;background:#eef8f2;color:#178447;font-size:13px;white-space:nowrap}
 .sl-editor-notices:empty{display:none}.sl-editor-notices>.v20-error,.sl-editor-notices>.sl-attention{margin:0}
 .sl-session-editor-dialog .v20-composer{min-height:0;flex:1;grid-template-columns:42% 58%;gap:0;overflow:hidden}
 .sl-editor-info,.sl-editor-rooms{min-height:0;padding:24px 22px;overflow:auto}
@@ -204,7 +205,7 @@
 .sl-editor-rooms>.v20-hint{margin:-7px 0 17px;padding:0;color:#8a9aaa;font-size:13px;line-height:1.35}
 .sl-session-editor-dialog .v20-room-floor{margin-bottom:21px}
 .sl-session-editor-dialog .v20-room-floor>h4{margin:0 0 10px;color:#607486;font-size:13.5px;line-height:1.35}
-.sl-session-editor-dialog .v20-room-grid{grid-template-columns:repeat(3,minmax(170px,1fr));gap:14px}
+.sl-session-editor-dialog .v20-room-grid{grid-template-columns:repeat(4,minmax(135px,1fr));gap:14px}
 .sl-session-editor-dialog .v20-room{height:88px;min-height:88px;padding:11px 14px;border:1px solid #72aed0;border-radius:6px;background:#fff;color:#178447}
 .sl-session-editor-dialog .v20-room:disabled{opacity:1}
 .sl-session-editor-dialog .v20-room strong{display:block;color:#173e75;font-size:15.5px;line-height:1.3}
@@ -213,15 +214,14 @@
 .sl-session-editor-dialog .v20-room.sl-on{border:1px solid #168fba;box-shadow:inset 0 0 0 1px #168fba;background:#fff}
 .sl-session-editor-dialog .v20-room.v20-busy,.sl-session-editor-dialog .v20-room.v20-unavailable{border-color:#d7e1e9;background:#f4f7fa;color:#607486}
 .sl-session-editor-dialog .v20-room.v20-busy small,.sl-session-editor-dialog .v20-room.v20-unavailable small{color:#cf3030}
-.sl-session-editor-dialog .v20-dialog-foot{min-height:68px;padding:12px 22px;border-top:1px solid #d7e1e9;background:#fff}
+.sl-session-editor-dialog .v20-dialog-foot{min-height:68px;flex-wrap:wrap;padding:12px 22px;border-top:1px solid #d7e1e9;background:#fff}
 .sl-session-editor-dialog .v20-dialog-foot .sl-btn{min-width:96px;height:43px;border-radius:5px;font-size:13.5px}
 .sl-editor-room-picked{margin-right:auto;color:#172b3a;font-size:13px}
 .sl-editor-room-picked strong{color:#173e75}
 
-/* Course-offering and pending drawers. */
+/* Course-offering and pending modal content. */
 .scheduling-v20.v20-dialog.v20-drawer{top:180px;bottom:auto;height:calc(100dvh - 190px);max-height:none;margin:0 16px 10px 0;border:1px solid #d7e1e9;box-shadow:none}
-.scheduling-v20.v20-dialog.sl-offering-drawer{width:50vw;max-width:50vw;margin-right:0;font-size:16.5px}
-.sl-offering-body{padding:0!important;overflow:hidden!important}
+.sl-offering-body{display:flex!important;flex-direction:column;padding:0!important;overflow:hidden!important}
 .sl-offering-hero{min-height:172px;display:flex;align-items:flex-start;justify-content:space-between;padding:20px 22px 17px;border-bottom:1px solid #d7e1e9;background:#fff}
 .sl-offering-hero .sl-eyebrow{font-size:15.5px;line-height:1.35}
 .sl-offering-hero h2{margin:9px 0 3px;color:#173e75;font-size:21px;line-height:1.3;text-transform:uppercase}
@@ -229,7 +229,7 @@
 .sl-offering-hero p{margin:7px 0 11px;color:#607486;font-size:13.5px;line-height:1.4}
 .sl-offering-hero .sl-state{display:inline-flex;height:32px;align-items:center;padding:0 14px;border-radius:5px;font-size:12.5px}
 .sl-drawer-close{width:38px;height:38px;border:0;background:transparent;color:#607486;font-size:25px;line-height:1}
-.sl-offering-content{height:100%;padding:21px 22px 36px;overflow:auto}
+.sl-offering-content{min-height:0;flex:1;padding:21px 22px 36px;overflow:auto}
 .sl-offering-content{scrollbar-width:none}.sl-offering-content::-webkit-scrollbar{display:none}
 .sl-offering-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
 .sl-offering-stats>div{height:96px;display:grid;place-content:center;text-align:center;border:1px solid #d7e1e9;border-radius:5px;background:#f7f9fb}
@@ -240,10 +240,9 @@
 .sl-offering-groups>div{min-height:70px;padding:13px 15px;border:1px solid #d7e1e9;border-radius:5px;background:#fff}
 .sl-offering-groups strong,.sl-offering-groups span{display:block}
 .sl-offering-groups strong{font-size:14.5px;line-height:1.35}.sl-offering-groups span{margin-top:7px;color:#607486;font-size:12.5px;line-height:1.35}
-.sl-offering-drawer .v20-dialog-foot{min-height:117px;display:grid;grid-template-columns:1fr;gap:8px;padding:12px 22px;border-top:1px solid #d7e1e9;background:#fff}
-.sl-offering-drawer .v20-dialog-foot .sl-btn{width:100%;height:43px;min-height:43px;border-radius:5px;font-size:13.5px}
+.sl-offering-drawer .v20-dialog-foot{min-height:68px;display:flex;gap:8px;padding:12px 22px;border-top:1px solid #d7e1e9;background:#fff}
+.sl-offering-drawer .v20-dialog-foot .sl-btn{min-width:180px;height:43px;min-height:43px;border-radius:5px;font-size:13.5px}
 .sl-offering-drawer .v20-dialog-foot .sl-btn-primary{border-color:#168fba;background:#168fba;color:#fff}
-.scheduling-v20.v20-dialog.sl-pending-drawer{width:50vw;max-width:50vw;margin-right:0;font-size:16.5px}
 .sl-pending-drawer .v20-dialog-head{min-height:61px;padding:14px 20px;background:#fff}
 .sl-pending-drawer .v20-dialog-head h2{color:#173e75;font-size:19px}
 .sl-pending-drawer .v20-dialog-head .sl-btn{min-width:32px;padding:0;border:0;background:transparent;font-size:24px}
@@ -261,9 +260,14 @@
 @media(max-width:1199px){
   .v20-schedule-workspace{height:min(690px,calc(100dvh - 212px));min-height:0}
   .scheduling-v20 .sl-workspace.sl-schedule-view{min-width:1100px!important;min-height:0;grid-template-columns:480px minmax(0,1fr)}
-  .scheduling-v20.v20-dialog.sl-session-editor-dialog{inset:174px 0 0;height:calc(100dvh - 174px)}
   .scheduling-v20.v20-dialog.v20-drawer{top:174px;height:calc(100dvh - 174px);margin-bottom:0}
+  .sl-session-editor-dialog .v20-room-grid{grid-template-columns:repeat(3,minmax(135px,1fr))}
 }
 
-body .MuiDialog-root:has(:is(.sl-session-editor-dialog,.sl-offering-drawer,.sl-pending-drawer)){background:linear-gradient(to bottom,transparent 0 180px,#eef4f8 180px)}
-@media(max-width:1199px){body .MuiDialog-root:has(:is(.sl-session-editor-dialog,.sl-offering-drawer,.sl-pending-drawer)){background:linear-gradient(to bottom,transparent 0 174px,#eef4f8 174px)}}
+@media(max-width:760px){
+  .scheduling-v20.v20-dialog:is(.sl-session-editor-dialog,.sl-offering-drawer,.sl-pending-drawer){width:calc(100vw - 24px);max-width:calc(100vw - 24px);height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);margin:12px}
+  .sl-session-editor-dialog .v20-composer{display:block;overflow:auto}
+  .sl-editor-info,.sl-editor-rooms{overflow:visible}
+  .sl-editor-info{border-right:0;border-bottom:1px solid #d7e1e9}
+  .sl-session-editor-dialog .v20-room-grid{grid-template-columns:repeat(2,minmax(120px,1fr))}
+}

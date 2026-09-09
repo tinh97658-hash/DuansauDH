@@ -28,6 +28,8 @@ it("shows the seven-day calendar and selects a persisted offering for scheduling
 it("loads institute availability and excludes busy and undersized rooms before saving", async () => {
   const saved = jest.fn();
   render(<SessionEditor offering={offering} date="2099-01-05" period="MORNING" user={{ canManageScheduling: true }} onClose={jest.fn()} onSaved={saved} />);
+  expect(screen.getByRole("dialog")).toHaveClass("v20-wide");
+  expect(screen.getByRole("dialog")).not.toHaveClass("v20-drawer");
   expect(screen.queryByLabelText("Bắt đầu")).not.toBeInTheDocument();
   expect(screen.queryByLabelText("Kết thúc")).not.toBeInTheDocument();
   await waitFor(() => expect(screen.getByLabelText("Giảng viên")).toBeEnabled());

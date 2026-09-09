@@ -20,7 +20,7 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onSe
     catch (failure) { setError(message(failure)); }
     finally { setSaving(false); }
   };
-  return <Modal drawer hideHeader transparentBackdrop className="sl-offering-drawer" bodyClassName="sl-offering-body" title="CHI TIẾT LỚP HỌC PHẦN" busy={saving} onClose={onClose} actions={<>
+  return <Modal wide hideHeader className="sl-offering-drawer" bodyClassName="sl-offering-body" title="CHI TIẾT LỚP HỌC PHẦN" busy={saving} onClose={onClose} actions={<>
     {canManage && value.status === "active" && <><button className="sl-btn" onClick={() => onSelect(value)}>Xếp lịch / Xếp thêm</button><button className="sl-btn sl-btn-primary" disabled={saving || detail.loading || unresolved.loading || !!unresolved.error || !summary.heldCount || !!unresolved.data?.length} onClick={() => setCompleting(true)}>Xác nhận hoàn thành giảng dạy</button></>}
     {canManage && value.status === "completed" && <button className="sl-btn" disabled={roster.loading || !!roster.error} onClick={() => setRetakeOpen(true)}>Ghi nhận học viên cần học lại</button>}
   </>}>
