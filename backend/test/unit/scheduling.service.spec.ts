@@ -144,6 +144,7 @@ describe("SchedulingService participant preview", () => {
     });
     const created: any = await mocks.service.createCourseOffering({ subjectId: subject.id, classGroupIds: groups.map((item) => item.id) });
     expect(created.participantCount).toBe(preview.participantCount);
+    expect(created.groupLinks.map((link: any) => link.classGroup.memberCount)).toEqual([2, 2]);
   });
 
   it("reuses admission and membership fallback identity semantics without returning PII", async () => {
@@ -156,6 +157,36 @@ describe("SchedulingService participant preview", () => {
     ]);
     await expect(mocks.service.previewCourseOfferingParticipants({ classGroupIds: ["group-a", "group-b"] }))
       .resolves.toEqual({ classGroupCount: 2, participantCount: 2 });
+  });
+
+  it("keeps the member count of each merged class separate from the offering total", async () => {
+    const mocks = buildService();
+    const cnt = group("cnt", "CNT2026.02", "major-cnt");
+    const ktm = group("ktm", "KTM2026.03", "major-ktm");
+    const members = [
+      ...Array.from({ length: 5 }, (_, index) => ({
+        id: `cnt-${index}`, classGroupId: cnt.id, studentId: `cnt-student-${index}`,
+      })),
+      ...Array.from({ length: 22 }, (_, index) => ({
+        id: `ktm-${index}`, classGroupId: ktm.id, studentId: `ktm-student-${index}`,
+      })),
+    ];
+    const mergedOffering: any = {
+      id: "merged-offering",
+      subject,
+      individualStudents: [],
+      groupLinks: [
+        { classGroupId: cnt.id, classGroup: cnt },
+        { classGroupId: ktm.id, classGroup: ktm },
+      ],
+    };
+    mocks.courseOfferings.findByPk.mockResolvedValue(mergedOffering);
+    mocks.classGroupMembers.findAll.mockResolvedValue(members);
+
+    const result: any = await mocks.service.getCourseOffering(mergedOffering.id);
+
+    expect(result.participantCount).toBe(27);
+    expect(result.groupLinks.map((link: any) => link.classGroup.memberCount)).toEqual([5, 22]);
   });
 
   it("rejects nonexistent groups before counting or mutating data", async () => {
@@ -252,6 +283,7 @@ describe("SchedulingService course-offering candidates", () => {
       ...subject,
       id: "subject-alias",
       code: "HP-B",
+      name: "Tên học phần riêng của ngành B",
       majorId: "major-2",
       canonicalSubjectId: root.id,
       allowCrossMajor: false,
@@ -502,7 +534,7 @@ describe("SchedulingService.createCourseOffering", () => {
     expect(mocks.courseOfferings.create).toHaveBeenCalledTimes(1);
   });
 
-  it("creates one offering from identical subjects in mixed-major groups without references", async () => {
+  it.each(["major-1", "major-3"])("creates mixed-major groups when the working scope is %s", async (scopeMajorId) => {
     const mocks = buildService();
     const root = { ...subject, allowCrossMajor: true };
     const sameSubject = { ...subject, id: "subject-other-major", code: "HP-B", majorId: "major-2" };
@@ -519,12 +551,73 @@ describe("SchedulingService.createCourseOffering", () => {
     mocks.offeringGroups.bulkCreate.mockResolvedValue([]);
     mocks.courseOfferings.findByPk.mockResolvedValue({ id: "offering-mixed", subject: root, groupLinks: [] });
 
-    await mocks.service.createCourseOffering({ subjectId: root.id, classGroupIds: [g1.id, g2.id] });
+    await mocks.service.createCourseOffering({
+      subjectId: root.id, classGroupIds: [g1.id, g2.id], majorId: scopeMajorId, academicYear: "2026",
+    });
+
+    expect(mocks.offeringGroups.bulkCreate).toHaveBeenCalledWith([
+      { courseOfferingId: "offering-mixed", classGroupId: g1.id },
+      { courseOfferingId: "offering-mixed", classGroupId: g2.id },
+    ], { transaction });
 
     expect(mocks.courseOfferings.create).toHaveBeenCalledWith(
       expect.objectContaining({ subjectId: root.id }),
       { transaction },
     );
+  });
+
+  it("resolves an explicitly mapped local subject and persists the canonical root", async () => {
+    const mocks = buildService();
+    const root = { ...subject, allowCrossMajor: true };
+    const alias = {
+      ...subject,
+      id: "subject-alias",
+      code: "HP-B",
+      name: "Tên học phần riêng của ngành B",
+      majorId: "major-2",
+      canonicalSubjectId: root.id,
+      allowCrossMajor: false,
+    };
+    const g2 = group("group-2", "N02", "major-2");
+    mocks.subjects.findByPk.mockResolvedValue(alias);
+    mocks.subjects.findAll.mockResolvedValue([root]);
+    mocks.classGroups.findAll.mockResolvedValue([g2]);
+    mocks.packages.findAll.mockResolvedValue([
+      officialPackage(g2.id, [{ subjectId: alias.id, subject: alias }]),
+    ]);
+    mocks.offeringGroups.findAll.mockResolvedValue([]);
+    mocks.courseOfferings.create.mockResolvedValue({ id: "offering-alias" });
+    mocks.offeringGroups.bulkCreate.mockResolvedValue([]);
+    mocks.courseOfferings.findByPk.mockResolvedValue({ id: "offering-alias", subject: root, groupLinks: [] });
+
+    await mocks.service.createCourseOffering({ subjectId: alias.id, classGroupIds: [g2.id] });
+
+    expect(mocks.courseOfferings.create).toHaveBeenCalledWith(
+      expect.objectContaining({ subjectId: root.id }),
+      { transaction },
+    );
+  });
+
+  it("still rejects a selected group outside the working academic year", async () => {
+    const mocks = buildService();
+    arrangeValidCreate(mocks);
+
+    await expect(mocks.service.createCourseOffering({
+      subjectId: subject.id, classGroupIds: ["group-1"], majorId: "major-3", academicYear: "2027",
+    })).rejects.toThrow("Các nhóm ghép chung phải thuộc cùng khóa / năm học");
+    expect(mocks.courseOfferings.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects an alias whose canonical root is missing", async () => {
+    const mocks = buildService();
+    const alias = { ...subject, canonicalSubjectId: "missing-root", allowCrossMajor: false };
+    mocks.subjects.findByPk.mockResolvedValue(alias);
+    mocks.subjects.findAll.mockResolvedValue([]);
+
+    await expect(mocks.service.createCourseOffering({
+      subjectId: alias.id, classGroupIds: ["group-1"],
+    })).rejects.toThrow("Mapping học phần logic");
+    expect(mocks.courseOfferings.create).not.toHaveBeenCalled();
   });
 
   it("rejects mixed-major groups when a local package resolves to another logical root", async () => {

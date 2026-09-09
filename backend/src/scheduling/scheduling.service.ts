@@ -100,8 +100,42 @@ export class SchedulingService {
   }
 
   private sharingEnabled(subject: Subject | any) {
-    // canonicalSubjectId is only a compatibility signal for records created by the old UI.
-    return subject?.allowCrossMajor === true || Boolean(subject?.canonicalSubjectId);
+    return subject?.allowCrossMajor === true;
+  }
+
+  private async loadCanonicalRoots(
+    localSubjects: Array<Subject | any>,
+    program: string,
+    transaction?: Transaction,
+  ) {
+    const canonicalIds = [...new Set(localSubjects
+      .map((subject) => subject?.canonicalSubjectId)
+      .filter((id): id is string => Boolean(id)))];
+    const roots = canonicalIds.length === 0 ? [] : await this.subjects.findAll({
+      where: { id: { [Op.in]: canonicalIds }, program, active: true },
+      transaction,
+      ...(transaction ? { lock: transaction.LOCK.UPDATE } : {}),
+    });
+    return new Map<string, Subject>(roots.map((root) => [root.id, root]));
+  }
+
+  private logicalSubjectFor(
+    localSubject: Subject | any,
+    rootsById: Map<string, Subject>,
+    program: string,
+  ) {
+    if (!localSubject?.canonicalSubjectId) return localSubject as Subject;
+    const root = rootsById.get(localSubject.canonicalSubjectId);
+    if (!root || root.active === false || root.canonicalSubjectId || root.program !== program) {
+      throw new BadRequestException(`Mapping học phần logic của "${localSubject.name || localSubject.id}" không còn hợp lệ.`);
+    }
+    return root;
+  }
+
+  private async resolveLogicalSubject(subject: Subject, transaction?: Transaction) {
+    if (!subject.canonicalSubjectId) return subject;
+    const roots = await this.loadCanonicalRoots([subject], subject.program, transaction);
+    return this.logicalSubjectFor(subject, roots, subject.program);
   }
 
   private async requireEnabledOfferingSubject(offering: CourseOffering | any, transaction: Transaction) {
@@ -166,7 +200,15 @@ export class SchedulingService {
       for (const entry of offering.individualStudents || []) identities.add(this.memberIdentity(entry));
       for (const link of offering.groupLinks || []) {
         const groupId = link.classGroupId || link.classGroup?.id;
-        for (const identity of byGroup.get(groupId) || []) identities.add(identity);
+        const groupIdentities = byGroup.get(groupId) || new Set<string>();
+        if (link.classGroup) {
+          if (typeof link.classGroup.setDataValue === "function") {
+            link.classGroup.setDataValue("memberCount", groupIdentities.size);
+          } else {
+            link.classGroup.memberCount = groupIdentities.size;
+          }
+        }
+        for (const identity of groupIdentities) identities.add(identity);
       }
       this.setParticipantCount(offering, identities.size);
     });
@@ -380,10 +422,14 @@ export class SchedulingService {
       }
     }
 
+    const rootsById = await this.loadCanonicalRoots(localPairs.map((pair) => pair.localSubject), program);
     const resolvedPairs = localPairs.flatMap((pair) => {
       const classGroup = groupById.get(pair.classGroupId);
       if (!classGroup || pair.localSubject.majorId !== classGroup.majorId) return [];
-      return [{ ...pair, logicalSubject: pair.localSubject }];
+      return [{
+        ...pair,
+        logicalSubject: this.logicalSubjectFor(pair.localSubject, rootsById, program),
+      }];
     });
     const sharedAnchorPairs = resolvedPairs.filter((pair) => (
       anchorGroupIds.has(pair.classGroupId) && this.sharingEnabled(pair.logicalSubject)
@@ -481,7 +527,7 @@ export class SchedulingService {
         lock: transaction.LOCK.UPDATE,
       });
       if (!requestedSubject || requestedSubject.active === false) throw new NotFoundException("Không tìm thấy học phần đang hoạt động.");
-      const subject = requestedSubject;
+      const subject = await this.resolveLogicalSubject(requestedSubject, transaction);
       this.requireEnabledProgram(subject.program);
 
       const sortedGroupIds = [...uniqueGroupIds].sort();
@@ -513,7 +559,11 @@ export class SchedulingService {
         lock: transaction.LOCK.UPDATE,
       });
       const packageByGroup = new Map(packages.map((pkg) => [pkg.classGroupId, pkg]));
-      const matchingSubjectIds = new Set<string>([subject.id]);
+      const packageSubjects = packages.flatMap((pkg) => (pkg.entries || [])
+        .map((entry) => entry.subject as Subject)
+        .filter(Boolean));
+      const rootsById = await this.loadCanonicalRoots(packageSubjects, subject.program, transaction);
+      const matchingSubjectIds = new Set<string>([subject.id, requestedSubject.id]);
       for (const group of groups) {
         const officialPackage = packageByGroup.get(group.id);
         if (!officialPackage) {
@@ -525,7 +575,7 @@ export class SchedulingService {
             localSubject
             && localSubject.majorId === group.majorId
             && (
-              localSubject.id === subject.id
+              this.logicalSubjectFor(localSubject, rootsById, subject.program).id === subject.id
               || (this.sharingEnabled(subject) && this.sameSubjectAcrossMajors(subject, localSubject))
             )
           ));
@@ -556,9 +606,8 @@ export class SchedulingService {
 
       const individuals = await this.requireIndividualStudents(subject.id, dto.admissionRecordIds || [], transaction);
       if (!commonWeekdays(groups).length) throw new BadRequestException("Các nhóm đã chọn không có ngày học chung.");
-      if (dto.majorId && dto.academicYear && !groups.some((group) => group.majorId === dto.majorId && group.academicYear === dto.academicYear)) {
-        throw new BadRequestException("Phải có nhóm thuộc đúng chuyên ngành và khóa đang tổ chức.");
-      }
+      // majorId is the discovery scope; eligible groups may all belong to other majors.
+      // Their eligibility is determined by the official package and subject checks above.
       if (dto.academicYear && groups.some((group) => group.academicYear !== dto.academicYear)) {
         throw new BadRequestException("Các nhóm ghép chung phải thuộc cùng khóa / năm học đang tổ chức.");
       }

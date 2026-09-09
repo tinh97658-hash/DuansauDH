@@ -146,6 +146,7 @@ export class PlanService {
         undefined,
         dto.canonicalSubjectId || null,
         dto.allowCrossMajor ?? false,
+        dto.majorId,
         program,
         transaction,
       );
@@ -206,9 +207,30 @@ export class PlanService {
       subject.id,
       nextCanonicalId,
       nextAllowCrossMajor,
+      dto.majorId || subject.majorId,
       nextProgram,
       transaction,
     );
+
+    const dependentCount = await this.subjects.count({
+      where: { canonicalSubjectId: subject.id },
+      transaction,
+    });
+    if (dependentCount > 0 && nextCanonicalId) {
+      throw new ConflictException("Học phần đang là môn gốc nên không thể chuyển thành môn tương ứng của một môn khác.");
+    }
+    if (dependentCount > 0 && nextProgram !== subject.program) {
+      throw new ConflictException("Không thể đổi bậc đào tạo của môn gốc đang có môn tương ứng ở ngành khác.");
+    }
+    if (dependentCount > 0 && dto.majorId !== undefined && dto.majorId !== subject.majorId) {
+      throw new ConflictException("Không thể đổi chuyên ngành của môn gốc đang có môn tương ứng ở ngành khác.");
+    }
+    if (dependentCount > 0 && dto.active === false && subject.active !== false) {
+      throw new ConflictException("Không thể ngừng sử dụng môn gốc đang có môn tương ứng ở ngành khác.");
+    }
+    if (dependentCount > 0 && nextAllowCrossMajor !== true) {
+      throw new ConflictException("Không thể tắt học chung khác ngành khi môn gốc vẫn còn môn tương ứng.");
+    }
 
   }
 
@@ -216,6 +238,7 @@ export class PlanService {
     subjectId: string | undefined,
     canonicalSubjectId: string | null,
     allowCrossMajor: boolean,
+    majorId: string,
     program: string,
     transaction: Transaction,
   ) {
@@ -231,6 +254,7 @@ export class PlanService {
       if (!root) throw new BadRequestException("Không tìm thấy học phần gốc được chọn.");
       if (root.canonicalSubjectId) throw new BadRequestException("Học phần alias phải trỏ trực tiếp tới một học phần gốc, không được tạo chuỗi mapping.");
       if (root.program !== program) throw new BadRequestException("Học phần alias và học phần gốc phải cùng bậc đào tạo.");
+      if (root.majorId === majorId) throw new BadRequestException("Môn tương ứng phải thuộc một chuyên ngành khác.");
       if (root.active === false) throw new BadRequestException("Học phần gốc đã ngừng sử dụng.");
       if (root.allowCrossMajor !== true) throw new BadRequestException("Học phần gốc chưa được cho phép dùng chung liên ngành.");
     }

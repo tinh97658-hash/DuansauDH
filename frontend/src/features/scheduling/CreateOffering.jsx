@@ -64,7 +64,7 @@ export default function CreateOffering({ user }) {
     try {
       const participantNotes = roster.map((row) => ({ participantId: row.id, note: row.note.trim() })).filter((row) => row.note);
       const result = await api.post("/scheduling/course-offerings", { ...draft, participantNotes });
-      setCreated(result);
+      setCreated({ ...result, selectedClassGroups: chosen });
       setRoster(null);
     } catch (error) {
       setSaveError(message(error));
@@ -74,6 +74,11 @@ export default function CreateOffering({ user }) {
   };
 
   const major = majors.data?.find((item) => item.id === majorId);
+  const groupMajorName = (group) => group.major?.name
+    || majors.data?.find((item) => item.id === group.majorId)?.name
+    || "Chưa xác định chuyên ngành";
+  const participatingGroups = created?.selectedClassGroups || chosen;
+  const participatingMajors = unique(participatingGroups.map(groupMajorName)).join(" · ");
   const years = unique((groups.data || []).map((group) => group.academicYear)).sort((a, b) => b.localeCompare(a, "vi", { numeric: true }));
   const visibleGroups = eligible.filter((group) => normalize(`${group.code} ${group.name}`).includes(normalize(groupQuery)));
   const filteredSubjects = (candidates.data || []).filter((item) => normalize(`${item.subject.code} ${item.subject.name}`).includes(normalize(query)));
@@ -85,10 +90,10 @@ export default function CreateOffering({ user }) {
         <div className="sl-create-success-icon"><img src={successCircle} alt="" /><span>✓</span></div>
         <div className="sl-create-success-kicker">ĐÃ TẠO LỚP HỌC PHẦN</div>
         <h1>{offeringName}</h1>
-        <p>{major?.name} · Năm {year}</p>
+        <p>{participatingMajors} · Năm {year}</p>
         <div className="sl-create-success-summary">
           <div><strong>{groupIds.length} lớp / nhóm</strong><strong>{created.participantCount ?? preview.data?.participantCount ?? 0} học viên</strong></div>
-          <p>{chosen.map(groupLabel).join(" · ")}</p>
+          <p>{participatingGroups.map(groupLabel).join(" · ")}</p>
         </div>
         <div className="sl-create-success-actions">
           <button onClick={() => { resetSelection(); setSubject(""); setOfferingName(DEFAULT_OFFERING_NAME); }}>Tạo lớp học phần khác</button>
@@ -106,7 +111,7 @@ export default function CreateOffering({ user }) {
           <div className="sl-create-confirm-title"><h2>{offeringName}</h2><div><span>{year}</span><span>{subject?.credits ?? subject?.creditCount ?? 3} tín chỉ</span></div></div>
           <div className="sl-create-confirm-meta">
             <div><small>HỌC PHẦN</small><strong>{subject?.code} · {subject?.name}</strong></div>
-            <div><small>CHUYÊN NGÀNH</small><strong>{major?.name}</strong></div>
+            <div><small>CHUYÊN NGÀNH</small><strong>{participatingMajors}</strong></div>
           </div>
           <div className="sl-create-confirm-groups"><small>LỚP / KHÓA THAM GIA</small><div>{chosen.map((group) => <span key={group.id}>{group.name || group.code} · {group.academicYear}</span>)}</div></div>
         </div>
@@ -154,7 +159,7 @@ export default function CreateOffering({ user }) {
         <div className="sl-create-name"><div className="sl-eyebrow">TẠO LỚP HỌC PHẦN</div><label>TÊN LỚP HỌC PHẦN *<input aria-label="Tên lớp học phần" value={offeringName} onChange={(event) => setOfferingName(event.target.value)} /></label></div>
         <div className="sl-create-picker">
           <section className="sl-create-groups"><div className="sl-create-section-title"><b>1</b><strong>LỚP / NHÓM THAM GIA</strong></div><input className="sl-create-filter" placeholder="Tìm lớp / nhóm..." aria-label="Tìm lớp / nhóm" value={groupQuery} onChange={(event) => setGroupQuery(event.target.value)} />
-            <div className="sl-create-group-list">{visibleGroups.map((group) => { const picked = groupIds.includes(group.id); const incompatible = !picked && chosen.length > 0 && !intersectDays([...chosen, group]).length; return <button key={group.id} aria-pressed={picked} className={`${picked ? "sl-picked" : ""} ${incompatible ? "sl-disabled" : ""}`} disabled={!canEdit || incompatible} onClick={() => toggleGroup(group)}><span className="sl-create-checkbox">{picked ? "✓" : ""}</span><span><strong>{groupLabel(group)}</strong><small>{major?.name}</small></span><span className="sl-create-group-count">{group.memberCount || 0} học viên{picked && activeGroup?.id === group.id && <em>ĐANG XEM</em>}</span></button>; })}{!visibleGroups.length && <Notice>Không có lớp / nhóm phù hợp.</Notice>}</div>
+            <div className="sl-create-group-list">{visibleGroups.map((group) => { const picked = groupIds.includes(group.id); const incompatible = !picked && chosen.length > 0 && !intersectDays([...chosen, group]).length; return <button key={group.id} aria-pressed={picked} className={`${picked ? "sl-picked" : ""} ${incompatible ? "sl-disabled" : ""}`} disabled={!canEdit || incompatible} onClick={() => toggleGroup(group)}><span className="sl-create-checkbox">{picked ? "✓" : ""}</span><span><strong>{groupLabel(group)}</strong><small>{groupMajorName(group)}</small></span><span className="sl-create-group-count">{group.memberCount || 0} học viên{picked && activeGroup?.id === group.id && <em>ĐANG XEM</em>}</span></button>; })}{!visibleGroups.length && <Notice>Không có lớp / nhóm phù hợp.</Notice>}</div>
           </section>
           <section className="sl-create-students"><div className="sl-create-section-title"><b>2</b><strong>HỌC VIÊN CỦA LỚP / NHÓM</strong></div>
             {activeGroup ? <><div className="sl-create-active-group"><strong>{groupLabel(activeGroup)}</strong><span>{preview.loading && groupIds.includes(activeGroup.id) ? "…" : groupIds.includes(activeGroup.id) ? preview.data?.participantCount ?? activeGroup.memberCount ?? 0 : activeGroup.memberCount ?? 0} học viên</span></div><div className="sl-create-student-list">{preview.loading && groupIds.includes(activeGroup.id) ? <Notice>Đang tải học viên...</Notice> : groupIds.includes(activeGroup.id) && !preview.error ? (preview.data?.participants || []).map((row, index) => <div key={row.id}><span>{String(index + 1).padStart(2, "0")}</span><p><strong>{row.fullName}</strong><small>{row.code}</small></p></div>) : <div className="v20-hint">Chọn lớp / nhóm để xem danh sách học viên.</div>}</div></> : <Notice>Chọn một lớp / nhóm để xem học viên.</Notice>}

@@ -181,6 +181,39 @@ describe("PlanService Subject logical identity", () => {
     );
   });
 
+  it("rejects mapping two records from the same major", async () => {
+    const { service, subjects } = buildService();
+    const alias = subject();
+    const root = subject({ id: "root", majorId: alias.majorId, allowCrossMajor: true });
+    subjects.findByPk.mockImplementation(async (id: string) => id === root.id ? root : alias);
+
+    await expect(service.updateSubject(alias.id, { canonicalSubjectId: root.id }))
+      .rejects.toThrow("phải thuộc một chuyên ngành khác");
+    expect(alias.update).not.toHaveBeenCalled();
+  });
+
+  it("does not disable a root while another major still maps to it", async () => {
+    const { service, subjects } = buildService();
+    const root = subject({ id: "root", majorId: "major-1", allowCrossMajor: true });
+    subjects.findByPk.mockResolvedValue(root);
+    subjects.count.mockResolvedValue(1);
+
+    await expect(service.updateSubject(root.id, { allowCrossMajor: false }))
+      .rejects.toThrow("Không thể tắt học chung khác ngành");
+    expect(root.update).not.toHaveBeenCalled();
+  });
+
+  it("does not move a root to another major while aliases depend on it", async () => {
+    const { service, subjects } = buildService();
+    const root = subject({ id: "root", majorId: "major-1", allowCrossMajor: true });
+    subjects.findByPk.mockResolvedValue(root);
+    subjects.count.mockResolvedValue(1);
+
+    await expect(service.updateSubject(root.id, { majorId: "major-2" }))
+      .rejects.toThrow("Không thể đổi chuyên ngành của môn gốc");
+    expect(root.update).not.toHaveBeenCalled();
+  });
+
   it("allows removing a legacy reference even when the Subject has an offering", async () => {
     const { service, subjects, courseOfferings } = buildService();
     const alias = subject();

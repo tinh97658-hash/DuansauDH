@@ -22,6 +22,42 @@ const reach = async () => {
   fireEvent.click(await screen.findByRole("button", { name: /HP01.*Khai thác cảng/ }));
 };
 beforeEach(() => jest.clearAllMocks());
+it("shows each group's own major and submits mixed-major groups outside the working scope", async () => {
+  mocks();
+  const maritime = { id: "maritime", name: "Khoa học hàng hải", active: true };
+  const computing = { id: "computing", name: "Công nghệ thông tin", active: true };
+  const maritimeGroup = { ...group, id: "maritime-group", code: "KTH2026.01", name: "Lớp hàng hải", majorId: maritime.id, major: maritime };
+  // The catalog fallback must use this group's majorId, never the working scope.
+  const computingGroup = { ...group, id: "computing-group", code: "CNT2026.02", name: "Lớp CNTT", majorId: computing.id };
+  axios.get.mockImplementation(async (url) => ({ data:
+    url.endsWith("/auth/session") ? { user: { role: "admin" } }
+      : url.includes("/system/majors") ? [major, maritime, computing]
+        : url.includes("/masters/class-groups") ? [group]
+          : url.includes("/course-offering-candidates") ? { subjects: [{ subject, eligibleClassGroups: [group, maritimeGroup, computingGroup] }] }
+            : [],
+  }));
+  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  await reach();
+  const maritimeButton = screen.getByRole("button", { name: /KTH2026.01 · Lớp hàng hải/ });
+  const computingButton = screen.getByRole("button", { name: /CNT2026.02 · Lớp CNTT/ });
+  expect(within(maritimeButton).getByText(maritime.name)).toBeInTheDocument();
+  expect(within(computingButton).getByText(computing.name)).toBeInTheDocument();
+  expect(within(computingButton).queryByText(major.name)).not.toBeInTheDocument();
+  fireEvent.click(maritimeButton);
+  fireEvent.click(computingButton);
+  const next = screen.getByRole("button", { name: "Tạo lớp học phần" });
+  await waitFor(() => expect(next).toBeEnabled());
+  fireEvent.click(next);
+  const dialog = screen.getByRole("dialog", { name: "Xem trước danh sách lớp" });
+  expect(within(dialog).getByText(`${maritime.name} · ${computing.name}`)).toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận tạo lớp" }));
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringMatching(/course-offerings$/), {
+    subjectId: subject.id, classGroupIds: [maritimeGroup.id, computingGroup.id], majorId: major.id,
+    academicYear: "2026", participantNotes: [],
+  }, { withCredentials: true }));
+  expect(await screen.findByRole("button", { name: "Sang Xếp lịch" })).toBeInTheDocument();
+  expect(screen.getByText(`${maritime.name} · ${computing.name} · Năm 2026`)).toBeInTheDocument();
+});
 it("creates a real API draft with blank editable notes and opens scheduling after save", async () => {
   mocks(); render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
   await reach();
