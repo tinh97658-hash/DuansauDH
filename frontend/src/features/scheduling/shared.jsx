@@ -22,6 +22,13 @@ export const unique = (items) => [...new Set(items.filter(Boolean))];
 export const normalize = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").toLowerCase();
 export const groupsOf = (offering) => (offering?.groupLinks || []).map((link) => link.classGroup).filter(Boolean);
 export const labelOf = (offering) => groupsOf(offering).map((group) => group.code).join(" · ");
+export const offeringTitle = (offering) => {
+  const groups = groupsOf(offering);
+  if (!groups.length) return offering?.subject?.name || "Lớp học phần";
+  const title = groups[0].name || groups[0].code;
+  return groups.length > 1 ? `${title} + ${groups.length - 1} lớp` : title;
+};
+export const subjectLabel = (offering) => [offering?.subject?.code, offering?.subject?.name].filter(Boolean).join(" - ");
 export const daysLabel = (days) => days?.length ? days.map((day) => day === 0 ? "CN" : `T${day + 1}`).join(", ") : "Chưa cấu hình";
 export const intersectDays = (groups) => groups.length ? [1, 2, 3, 4, 5, 6, 0].filter((day) => groups.every((group) => (group.allowedWeekdays || [1, 2, 3, 4, 5, 6, 0]).includes(day))) : [];
 
@@ -44,12 +51,12 @@ export function useLoad(loader, dependencies) {
 export function Notice({ error, children }) {
   return <div className={error ? "v20-error" : "sl-empty"} role={error ? "alert" : "status"}>{error || children}</div>;
 }
-export function Modal({ title, children, onClose, busy = false, wide = false, drawer = false, actions }) {
+export function Modal({ title, children, onClose, busy = false, wide = false, drawer = false, actions, className = "", hideHeader = false, bodyClassName = "", transparentBackdrop = false }) {
   const titleId = useId();
-  return <Dialog open onClose={busy ? undefined : onClose} maxWidth={false} aria-labelledby={titleId}
-    PaperProps={{ className: `scheduling-v20 v20-dialog ${wide ? "v20-wide" : ""} ${drawer ? "v20-drawer" : ""}` }}>
-    <header className="v20-dialog-head"><h2 id={titleId}>{title}</h2><button className="sl-btn" aria-label="Đóng" disabled={busy} onClick={onClose}>×</button></header>
-    <div className="v20-dialog-body">{children}</div>
+  return <Dialog open hideBackdrop={transparentBackdrop} onClose={busy ? undefined : onClose} maxWidth={false} aria-labelledby={titleId}
+    PaperProps={{ className: `scheduling-v20 v20-dialog ${wide ? "v20-wide" : ""} ${drawer ? "v20-drawer" : ""} ${className}` }}>
+    {hideHeader ? <h2 id={titleId} className="sl-sr-only">{title}</h2> : <header className="v20-dialog-head"><h2 id={titleId}>{title}</h2><button className="sl-btn" aria-label="Đóng" disabled={busy} onClick={onClose}>×</button></header>}
+    <div className={`v20-dialog-body ${bodyClassName}`}>{children}</div>
     {actions && <footer className="v20-dialog-foot">{actions}</footer>}
   </Dialog>;
 }

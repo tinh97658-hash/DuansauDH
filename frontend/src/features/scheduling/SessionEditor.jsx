@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { api, groupsOf, labelOf, message, Modal, Notice, rows, useLoad } from "./shared";
+import { api, groupsOf, message, Modal, Notice, offeringTitle, rows, subjectLabel, useLoad } from "./shared";
 import { getBusinessTodayKey, getRoomFloor, isPeriodTimeConsistent, isSessionPast, shortTime, timesOverlap, vietnameseDate } from "../../utils/schedulingCalendar";
 
 const periodTimes = (period) => period === "AFTERNOON"
@@ -29,8 +29,9 @@ export default function SessionEditor({ session, offering, date, period, user, o
   const classConflict = conflicts.find((row) => row.courseOfferingId === offering.id || groupsOf(row.courseOffering).some((group) => ownGroups.has(group.id)));
   const lecturers = catalog.data?.lecturers || [];
   const rooms = catalog.data?.rooms || [];
+  const roomFloor = (room) => getRoomFloor(room.code) ?? (Number(String(room.code || "").match(/^[^0-9]*([0-9])/)?.[1] || NaN) || null);
   const roomReason = (room) => room.isActive === false ? "Ngừng sử dụng" : room.capacity == null ? "Chưa có sức chứa" : room.capacity < (currentOffering.participantCount || 0) ? "Không đủ chỗ" : conflicts.some((row) => row.roomId === room.id) ? "Đang bận" : "";
-  const floors = [...new Set(rooms.map((room) => getRoomFloor(room.code)))].sort((a, b) => (a ?? 99) - (b ?? 99));
+  const floors = [...new Set(rooms.map(roomFloor))].sort((a, b) => (a ?? 99) - (b ?? 99));
   const setField = (name, value) => { setForm((current) => ({ ...current, [name]: value, ...(name === "period" ? periodTimes(value) : {}) })); setError(""); };
   const mutate = async (action) => {
     setSaving(true); setError("");
@@ -50,26 +51,33 @@ export default function SessionEditor({ session, offering, date, period, user, o
     if (conflicts.some((row) => row.lecturerId === form.lecturerId)) return setError("Giảng viên đã có lịch trong khoảng thời gian này.");
     mutate(() => session ? api.put(`/scheduling/teaching-sessions/${session.id}`, form) : api.post("/scheduling/teaching-sessions", { ...form, courseOfferingId: offering.id }));
   };
-  return <Modal wide title={`${!session ? "XẾP BUỔI" : editing ? "CHỈNH SỬA LỊCH" : "CHI TIẾT BUỔI HỌC"} · ${vietnameseDate(form.sessionDate)}`} onClose={onClose} busy={saving} actions={<>
+  const periodLabel = form.period === "MORNING" ? "SÁNG" : "CHIỀU";
+  const roomStateLabel = (room) => {
+    const reason = roomReason(room);
+    if (reason === "Đang bận") return "ĐÃ CÓ LỊCH";
+    if (reason === "Không đủ chỗ") return "KHÔNG ĐỦ CHỖ";
+    if (reason === "Ngừng sử dụng") return "NGỪNG SỬ DỤNG";
+    if (reason === "Chưa có sức chứa") return "CHƯA CÓ SỨC CHỨA";
+    return "TRỐNG";
+  };
+  return <Modal wide hideHeader transparentBackdrop className="sl-session-editor-dialog" bodyClassName="sl-session-editor-body" title={`${!session ? "XẾP BUỔI" : editing ? "CHỈNH SỬA LỊCH" : "CHI TIẾT BUỔI HỌC"} · ${vietnameseDate(form.sessionDate)} · ${periodLabel}`} onClose={onClose} busy={saving} actions={<>
+    <span className="sl-editor-room-picked">Phòng đã chọn: <strong>{rooms.find((room) => room.id === form.roomId)?.code || "Chưa chọn"}</strong></span>
     {canManage && future && !editing && <><button className="sl-btn sl-btn-danger" disabled={saving} onClick={() => setDeleting(true)}>Xóa buổi học</button><button className="sl-btn" onClick={() => setEditing(true)}>Chỉnh sửa</button></>}
     {canManage && pending && <><button className="sl-btn" disabled={saving} onClick={() => mutate(() => api.put(`/scheduling/teaching-sessions/${session.id}/confirmation`, { status: "not_held" }))}>Không diễn ra</button><button className="sl-btn sl-btn-primary" disabled={saving} onClick={() => mutate(() => api.put(`/scheduling/teaching-sessions/${session.id}/confirmation`, { status: "held" }))}>Đã diễn ra</button></>}
-    <button className="sl-btn" disabled={saving} onClick={onClose}>Đóng</button>{editable && <button className="sl-btn sl-btn-primary" disabled={saving || catalog.loading || availability.loading || !!catalog.error || !!availability.error} onClick={save}>{saving ? "Đang lưu..." : "Lưu buổi học"}</button>}
+    <button className="sl-btn" disabled={saving} onClick={onClose}>{editable ? "Hủy" : "Đóng"}</button>{editable && <button className="sl-btn sl-btn-primary" aria-label="Lưu buổi học" disabled={saving || catalog.loading || availability.loading || !!catalog.error || !!availability.error} onClick={save}>{saving ? "Đang lưu..." : "Lưu lịch"}</button>}
   </>}>
-    <h3>{currentOffering.subject?.code} · {currentOffering.subject?.name}</h3><p>{labelOf(currentOffering)} · {currentOffering.participantCount ?? "…"} học viên</p>
-    {error && <Notice error={error} />}{catalog.error && <Notice error={catalog.error} />}{availability.error && <Notice error={availability.error} />}
-    {pending && <div className="sl-attention">Buổi học đã kết thúc · Chờ xác nhận kết quả diễn ra.</div>}
-    <div className="v20-composer"><div><h4>THỜI GIAN</h4>
-      <label className="v20-field">Ngày học<input aria-label="Ngày học" type="date" min={getBusinessTodayKey()} value={form.sessionDate} disabled={!editable || saving} onChange={(event) => { if (event.target.value) setField("sessionDate", event.target.value); }} /></label>
-      <label className="v20-field">Buổi<select aria-label="Buổi" value={form.period} disabled={!editable || saving} onChange={(event) => setField("period", event.target.value)}><option value="MORNING">Sáng</option><option value="AFTERNOON">Chiều</option></select></label>
-      <p className="v20-hint">Khung giờ buổi học: {form.startTime}–{form.endTime}</p>
+    <header className="sl-editor-hero"><div><div className="sl-eyebrow">{!session ? "XẾP BUỔI" : editing ? "CHỈNH SỬA LỊCH" : "CHI TIẾT BUỔI HỌC"} · {vietnameseDate(form.sessionDate)} · {periodLabel}</div><h2>{offeringTitle(currentOffering)}</h2><p>{subjectLabel(currentOffering)} · {groupsOf(currentOffering).length} lớp/nhóm · {currentOffering.participantCount ?? "…"} học viên</p></div><span>Đã diễn ra {currentOffering.sessionSummary?.heldCount || 0} buổi</span></header>
+    <div className="sl-editor-notices">{error && <Notice error={error} />}{catalog.error && <Notice error={catalog.error} />}{availability.error && <Notice error={availability.error} />}{pending && <div className="sl-attention">Buổi học đã kết thúc · Chờ xác nhận kết quả diễn ra.</div>}</div>
+    <div className="v20-composer"><div className="sl-editor-info"><h4>THÔNG TIN BUỔI HỌC</h4><strong className="sl-editor-date">{vietnameseDate(form.sessionDate)} · {periodLabel}</strong>
+      <div className="sl-editor-hidden-controls"><label>Ngày học<input aria-label="Ngày học" type="date" min={getBusinessTodayKey()} value={form.sessionDate} disabled={!editable || saving} onChange={(event) => { if (event.target.value) setField("sessionDate", event.target.value); }} /></label><label>Buổi<select aria-label="Buổi" value={form.period} disabled={!editable || saving} onChange={(event) => setField("period", event.target.value)}><option value="MORNING">Sáng</option><option value="AFTERNOON">Chiều</option></select></label></div>
+      <p className="v20-hint sl-editor-time">Khung giờ buổi học: {form.startTime}–{form.endTime}</p>
       <label className="v20-field">Giảng viên<select aria-label="Giảng viên" value={form.lecturerId} disabled={!editable || catalog.loading || !!catalog.error || saving} onChange={(event) => setField("lecturerId", event.target.value)}><option value="">Chọn giảng viên</option>{lecturers.filter((row) => row.active !== false || row.id === form.lecturerId).map((row) => { const busy = conflicts.some((item) => item.lecturerId === row.id); return <option key={row.id} value={row.id} disabled={busy || row.active === false}>{row.name}{busy ? " · Đang bận" : ""}</option>; })}</select></label>
       {!catalog.loading && !catalog.error && !lecturers.some((row) => row.active !== false) && <Notice>Chưa có giảng viên đang hoạt động. Khai báo tại Hệ thống → Giảng viên.</Notice>}
-      <label className="v20-field">Ghi chú<textarea aria-label="Ghi chú buổi học" maxLength={2000} value={form.note} disabled={!editable || saving} onChange={(event) => setField("note", event.target.value)} /></label>
+      <label className="v20-field">Ghi chú<textarea aria-label="Ghi chú buổi học" placeholder="Nhập ghi chú..." maxLength={2000} value={form.note} disabled={!editable || saving} onChange={(event) => setField("note", event.target.value)} /></label>
       {classConflict && <Notice error={`Lớp / nhóm đang bận: ${classConflict.courseOffering?.subject?.name || "Buổi học khác"} · ${shortTime(classConflict.startTime)}–${shortTime(classConflict.endTime)}`} />}
-      <button className="sl-btn sl-btn-link" onClick={() => onViewOffering(currentOffering)}>Xem chi tiết lớp học phần</button>
-    </div><section><h4>CHỌN PHÒNG HỌC</h4><p className="v20-hint">Phòng học được kiểm tra theo ngày và buổi đã chọn.</p>
+    </div><section className="sl-editor-rooms"><h4>PHÒNG HỌC TOÀN VIỆN</h4><p className="v20-hint">Tình trạng theo {vietnameseDate(form.sessionDate)} · {periodLabel}</p>
       {(catalog.loading || availability.loading) && <Notice>Đang kiểm tra phòng và giảng viên...</Notice>}
-      {floors.map((floor) => <div className="v20-room-floor" key={floor ?? "other"}><h4>{floor == null ? "Phòng khác" : `Tầng ${floor}`}</h4><div className="v20-room-grid">{rooms.filter((room) => getRoomFloor(room.code) === floor).map((room) => { const reason = roomReason(room); return <button key={room.id} aria-pressed={form.roomId === room.id} className={`v20-room ${form.roomId === room.id ? "sl-on" : ""} ${reason === "Đang bận" ? "v20-busy" : reason ? "v20-unavailable" : ""}`} disabled={!editable || saving || !validTime || availability.loading || !!availability.error || !!reason} onClick={() => setField("roomId", room.id)}><strong>{room.code}</strong><span>{room.capacity == null ? "Chưa khai báo sức chứa" : `${room.capacity} chỗ`}</span><small>{reason || (validTime ? "Có thể chọn" : "Chờ chọn giờ")}</small></button>; })}</div></div>)}
+      {floors.map((floor) => <div className="v20-room-floor" key={floor ?? "other"}><h4>{floor == null ? "PHÒNG KHÁC" : `TẦNG ${floor}`}</h4><div className="v20-room-grid">{rooms.filter((room) => roomFloor(room) === floor).map((room) => { const reason = roomReason(room); return <button key={room.id} aria-pressed={form.roomId === room.id} className={`v20-room ${form.roomId === room.id ? "sl-on" : ""} ${reason === "Đang bận" ? "v20-busy" : reason ? "v20-unavailable" : ""}`} disabled={!editable || saving || !validTime || availability.loading || !!availability.error || !!reason} onClick={() => setField("roomId", room.id)}><strong>{room.code}</strong><span>{room.capacity == null ? "Chưa khai báo sức chứa" : `${room.capacity} chỗ`}</span><small>{roomStateLabel(room)}</small></button>; })}</div></div>)}
       {!catalog.loading && !rooms.length && <Notice>Chưa có phòng học. Quản trị viên khai báo tại Hệ thống → Phòng học.</Notice>}
     </section></div>
     {deleting && <Modal title="Xóa buổi học" busy={saving} onClose={() => setDeleting(false)} actions={<><button className="sl-btn" disabled={saving} onClick={() => setDeleting(false)}>Hủy</button><button className="sl-btn sl-btn-danger" disabled={saving} onClick={() => mutate(() => api.delete(`/scheduling/teaching-sessions/${session.id}`))}>Xác nhận xóa</button></>}><p>Xóa buổi học ngày {vietnameseDate(session.sessionDate)} khỏi lịch?</p>{error && <Notice error={error} />}</Modal>}
