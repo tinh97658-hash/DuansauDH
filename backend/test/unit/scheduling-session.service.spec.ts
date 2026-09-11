@@ -34,7 +34,8 @@ const buildService = () => {
   const courseOfferings = { create: jest.fn(), findAll: jest.fn(), findByPk: jest.fn() };
   const offeringGroups = { bulkCreate: jest.fn(), findAll: jest.fn() };
   const subjects = { findByPk: jest.fn(), findAll: jest.fn() };
-  const packages = { findAll: jest.fn() };
+  const curriculumSubjects = { findAll: jest.fn().mockResolvedValue([]) };
+  const classGroupElectives = { findAll: jest.fn().mockResolvedValue([]) };
   const classGroups = { findAll: jest.fn() };
   const classGroupMembers = { findAll: jest.fn().mockResolvedValue([]) };
   const majors = { findOne: jest.fn() };
@@ -49,7 +50,8 @@ const buildService = () => {
     courseOfferings as never,
     offeringGroups as never,
     subjects as never,
-    packages as never,
+    curriculumSubjects as never,
+    classGroupElectives as never,
     classGroups as never,
     classGroupMembers as never,
     majors as never,

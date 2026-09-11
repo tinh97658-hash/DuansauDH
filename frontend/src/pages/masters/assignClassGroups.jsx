@@ -4,14 +4,14 @@ import { useSearchParams } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
-  Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog,
-  DialogActions, DialogContent, DialogTitle, FormControl, FormControlLabel,
+  Alert, Box, Button, Checkbox, Chip, CircularProgress,
+  FormControl,
   Grid, IconButton, InputAdornment, InputLabel, LinearProgress, MenuItem, Paper,
-  Radio, RadioGroup, Select, Stack, Table, TableBody, TableCell, TableContainer,
+  Select, Stack, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
-  ArrowForwardRounded, AutoAwesomeRounded,
+  ArrowForwardRounded,
   DeleteOutlineRounded, GroupWorkRounded, PersonRounded,
   RefreshRounded, SearchRounded,
 } from "@mui/icons-material";
@@ -62,11 +62,6 @@ const AssignClassGroups = () => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
-
-  // Auto assign dialog
-  const [autoDialogOpen, setAutoDialogOpen] = useState(false);
-  const [autoTargetGroupIds, setAutoTargetGroupIds] = useState([]);
-  const [autoMethod, setAutoMethod] = useState("alphabetical");
 
   // Load majors
   useEffect(() => {
@@ -249,58 +244,11 @@ const AssignClassGroups = () => {
     }
   };
 
-  // Open Auto Assign Dialog
-  const openAutoAssignModal = () => {
-    if (groups.length < 2) {
-      return toast.warning("Cần có ít nhất 2 nhóm học phần đang mở để thực hiện chia đều tự động.");
-    }
-    setAutoTargetGroupIds(groups.map((g) => g.id));
-    setAutoDialogOpen(true);
-  };
-
-  // Execute Auto Assign
-  const handleExecuteAutoAssign = async () => {
-    if (autoTargetGroupIds.length < 2) {
-      return toast.error("Vui lòng chọn ít nhất 2 nhóm học phần để chia đều.");
-    }
-
-    // Determine students to distribute: either currently checked, or all unassigned in filtered view, or all in view
-    let targetStudentIds = selectedStudentIds;
-    if (targetStudentIds.length === 0) {
-      targetStudentIds = assignableStudents.map((s) => s.id);
-    }
-
-    if (targetStudentIds.length === 0) {
-      return toast.error("Không có học viên nào để chia đều.");
-    }
-
-    setActionLoading(true);
-    try {
-      const { data } = await axios.post(
-        `${API_BASE_URL}/masters/class-groups/auto-assign`,
-        {
-          classGroupIds: autoTargetGroupIds,
-          admissionRecordIds: targetStudentIds,
-          method: autoMethod,
-        },
-        { withCredentials: true }
-      );
-      toast.success(data.message || "Đã phân chia tự động thành công.");
-      setAutoDialogOpen(false);
-      setSelectedStudentIds([]);
-      refreshAll();
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Không thể thực hiện chia đều tự động.");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   return (
     <FeatureLayout
       title="Phân nhóm học phần Thạc sĩ"
       group="Thủ tục đầu vào"
-      desc="Phân bổ và sắp xếp học viên Thạc sĩ vào các nhóm học phần theo chuyên ngành, hỗ trợ phân thủ công và chia đều tự động."
+      desc="Phân bổ và sắp xếp học viên Thạc sĩ vào các nhóm học phần theo chuyên ngành."
     >
       <ToastContainer position="top-center" newestOnTop limit={3} />
 
@@ -343,22 +291,6 @@ const AssignClassGroups = () => {
             sx={{ height: 36 }}
           >
             Làm mới
-          </Button>
-
-          <Box sx={{ flexGrow: 1 }} />
-
-          <Button
-            variant="outlined"
-            startIcon={<AutoAwesomeRounded />}
-            onClick={openAutoAssignModal}
-            sx={{
-              height: 36,
-              borderColor: "#168b7c",
-              color: "#168b7c",
-              "&:hover": { borderColor: "#0e6056", bgcolor: "#f0f8f7" },
-            }}
-          >
-            Chia đều tự động
           </Button>
         </Stack>
       </Paper>
@@ -636,85 +568,6 @@ const AssignClassGroups = () => {
           </Paper>
         </Grid>
       </Grid>
-
-      {/* Auto Assign Dialog */}
-      <Dialog open={autoDialogOpen} onClose={() => setAutoDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <AutoAwesomeRounded sx={{ color: "#168b7c" }} />
-          Chia đều học viên vào các nhóm học phần
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Hệ thống sẽ tự động phân bổ đều số lượng học viên được chọn vào các nhóm học phần đã tick dưới đây.
-          </Typography>
-
-          <Box sx={{ mb: 2, p: 1.5, bgcolor: "#f8fafc", borderRadius: 1 }}>
-            <Typography variant="body2">
-              Số lượng học viên sẽ chia: <strong>{selectedStudentIds.length > 0 ? selectedStudentIds.length : assignableStudents.length}</strong> học viên
-              {selectedStudentIds.length > 0 ? " (đang chọn từ bảng)" : " (toàn bộ học viên chưa có lớp đang hiển thị)"}
-            </Typography>
-          </Box>
-
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-            Chọn các nhóm nhận học viên:
-          </Typography>
-
-          <Stack spacing={0.5} sx={{ maxHeight: 200, overflowY: "auto", mb: 2, p: 1, border: "1px solid #e2e8f0", borderRadius: 1 }}>
-            {groups.map((g) => {
-              const checked = autoTargetGroupIds.includes(g.id);
-              return (
-                <FormControlLabel
-                  key={g.id}
-                  control={
-                    <Checkbox
-                      checked={checked}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setAutoTargetGroupIds((p) => [...p, g.id]);
-                        } else {
-                          setAutoTargetGroupIds((p) => p.filter((id) => id !== g.id));
-                        }
-                      }}
-                      color="primary"
-                    />
-                  }
-                  label={`${g.code} — ${g.name} (hiện có ${g.memberCount || 0}/${g.maxStudents || 40} HV)`}
-                />
-              );
-            })}
-          </Stack>
-
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-            Phương thức chia:
-          </Typography>
-          <RadioGroup
-            value={autoMethod}
-            onChange={(e) => setAutoMethod(e.target.value)}
-          >
-            <FormControlLabel
-              value="alphabetical"
-              control={<Radio color="primary" />}
-              label="Chia theo thứ tự vần tên A-Z (học viên được xếp theo bảng chữ cái trước khi chia đều)"
-            />
-            <FormControlLabel
-              value="round_robin"
-              control={<Radio color="primary" />}
-              label="Chia lần lượt theo danh sách hiện tại (Round-Robin)"
-            />
-          </RadioGroup>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setAutoDialogOpen(false)} color="inherit">Hủy</Button>
-          <Button
-            variant="contained"
-            onClick={handleExecuteAutoAssign}
-            disabled={actionLoading || autoTargetGroupIds.length < 2}
-            sx={{ bgcolor: "#168b7c", "&:hover": { bgcolor: "#0e6056" } }}
-          >
-            {actionLoading ? "Đang chia đều..." : "Thực hiện chia đều"}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </FeatureLayout>
   );
 };

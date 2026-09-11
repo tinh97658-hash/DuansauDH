@@ -46,8 +46,9 @@ export function parseBulkOptions(args: string[], now = new Date()) {
 export function buildBulkFixtures(options: BulkOptions): FixtureBatch[] {
   const { prefix, classes, students, subjects, weeks, start } = options;
   const batches: FixtureBatch[] = ["TrainingModeGroup", "TrainingMode", "TrainingLevel", "Major", "TrainingProgram",
-    "TrainingPlan", "AdmissionTarget", "AnnualFee", "Lecturer", "Room", "Subject", "ClassGroup", "AdmissionRecord",
-    "ClassGroupMember", "SubjectPackage", "SubjectPackageSubject", "CourseOffering", "CourseOfferingClassGroup", "TeachingSession"]
+    "TrainingPlan", "AdmissionTarget", "AnnualFee", "Lecturer", "Room", "Subject",
+    "Curriculum", "CurriculumBlock", "CurriculumSubject", "ClassGroup", "AdmissionRecord",
+    "ClassGroupMember", "ClassGroupElective", "CourseOffering", "CourseOfferingClassGroup", "TeachingSession"]
     .map((model) => ({ model, rows: [] }));
   const add = (model: string, row: FixtureRow) => {
     const record: FixtureRow = { id: randomUUID(), ...row };
@@ -83,13 +84,28 @@ export function buildBulkFixtures(options: BulkOptions): FixtureBatch[] {
     code: `${prefix}S${majors.indexOf(major) + 1}-${i + 1}`, codeText: `${prefix}S${majors.indexOf(major) + 1}-${i + 1}`, codeNumber: i + 1,
     name: `Học phần kiểm thử ${i + 1} (${major.code})`, majorId: major.id, program: "masters", credits: 3,
   })));
+  // CTĐT thuộc ngành + bậc + khóa; lớp kế thừa CTĐT và chỉ chọn học phần tự chọn.
+  const curriculums = majors.map((major, i) => add("Curriculum", {
+    code: `${prefix}CT${i + 1}`, name: `Chương trình đào tạo ${major.name} - Khóa ${academicYear}`,
+    majorId: major.id, program: "masters", applicableFromYear: academicYear,
+    totalCredits: subjects * 3, active: true, note: prefix,
+  }));
+  const curriculumBlocks = curriculums.map((curriculum) => add("CurriculumBlock", {
+    curriculumId: curriculum.id, code: "CN", name: "Kiến thức chuyên ngành", minCredits: 0, sortOrder: 1,
+  }));
+  const requiredCount = Math.ceil(subjects / 2);
+  const curriculumEntries = catalog.map((list, majorIndex) => list.map((subject, i) => add("CurriculumSubject", {
+    curriculumId: curriculums[majorIndex].id, blockId: curriculumBlocks[majorIndex].id, electiveGroupId: null,
+    subjectId: subject.id, isRequired: i < requiredCount, credits: 3, sortOrder: i,
+  })));
   for (let c = 0; c < classes; c++) {
     const n = c + 1;
-    const major = majors[c % majors.length];
+    const majorIndex = c % majors.length;
+    const major = majors[majorIndex];
     const lecturer = add("Lecturer", { code: `${prefix}GV${n}`, name: `Giảng viên kiểm thử ${n}`, email: `${prefix.toLowerCase()}.gv${n}@example.invalid`, active: true });
     const room = add("Room", { code: `${prefix}P${n}`, name: `Phòng kiểm thử ${n}`, capacity: students + 10, isActive: true });
     const group = add("ClassGroup", { code: `${prefix}L${n}`, name: `Lớp thạc sĩ kiểm thử ${n}`, majorId: major.id,
-      program: "masters", academicYear, maxStudents: students, status: "open", note: prefix });
+      curriculumId: curriculums[majorIndex].id, program: "masters", academicYear, maxStudents: students, status: "open", note: prefix });
     for (let s = 0; s < students; s++) {
       const record = add("AdmissionRecord", { code: `${prefix}HV${n}-${s + 1}`, lastName: "Nguyễn Kiểm", firstName: `Thử ${s + 1}`,
         fullName: `Nguyễn Kiểm Thử ${n}-${s + 1}`, email: `${prefix.toLowerCase()}.${n}.${s + 1}@example.invalid`,
@@ -99,15 +115,17 @@ export function buildBulkFixtures(options: BulkOptions): FixtureBatch[] {
         status: "approved", studyStatus: "Đã trúng tuyển" });
       add("ClassGroupMember", { classGroupId: group.id, admissionRecordId: record.id, studentId: null, note: prefix });
     }
-    const pack = add("SubjectPackage", { code: `${prefix}G${n}`, name: `Gói học phần kiểm thử ${n}`, classGroupId: group.id,
-      majorId: major.id, totalSubjects: subjects, isOfficial: true, active: true });
+    // Học phần tự chọn nửa sau của CTĐT do Viện chỉ định cho cả lớp.
+    const electiveEntries = curriculumEntries[majorIndex].filter((entry) => entry.isRequired === false);
+    for (const entry of electiveEntries) {
+      add("ClassGroupElective", { classGroupId: group.id, curriculumSubjectId: entry.id });
+    }
     const scheduledSubjectCount = Math.floor(subjects / 2);
-    catalog[c % majors.length].forEach((subject, i) => {
-      add("SubjectPackageSubject", { packageId: pack.id, subjectId: subject.id, sortOrder: i });
-      // Keep half of the official package as candidates so the same fixture can
+    curriculumEntries[majorIndex].forEach((entry, i) => {
+      // Keep half of the class curriculum as candidates so the same fixture can
       // exercise both "Tạo lớp học phần" and the calendar scheduling workflow.
       if (i >= scheduledSubjectCount) return;
-      const offering = add("CourseOffering", { subjectId: subject.id, status: "active", note: prefix });
+      const offering = add("CourseOffering", { subjectId: entry.subjectId, status: "active", note: prefix });
       add("CourseOfferingClassGroup", { courseOfferingId: offering.id, classGroupId: group.id });
       // Each class owns its room and lecturer. Distinct half-day slots avoid all three conflict types.
       for (let w = 0; w < weeks; w++) {

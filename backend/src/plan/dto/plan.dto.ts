@@ -1,5 +1,5 @@
-import { Transform } from "class-transformer";
-import { ArrayMaxSize, ArrayMinSize, ArrayNotEmpty, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min } from "class-validator";
+import { Transform, Type } from "class-transformer";
+import { ArrayMaxSize, ArrayMinSize, ArrayNotEmpty, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min, ValidateNested } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim());
 const trimUpper = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim().toUpperCase());
@@ -13,7 +13,7 @@ export class CreateSubjectDto {
   @IsOptional() @IsIn(["masters", "doctoral"]) program?: string;
   @IsOptional() @IsInt() @Min(0) credits?: number;
   @IsOptional() @IsBoolean() majorAssignment?: boolean;
-  @IsOptional() @IsIn(["CS", "CN", "TC", "CH"]) subjectType?: string;
+  @IsOptional() @IsIn(["KC", "CS", "CN", "TC", "CH"]) subjectType?: string;
   @IsOptional() @IsBoolean() isRequired?: boolean;
   @IsOptional() @IsInt() @Min(0) sortOrder?: number;
   @IsOptional() @IsBoolean() active?: boolean;
@@ -29,7 +29,7 @@ export class UpdateSubjectDto {
   @IsOptional() @IsIn(["masters", "doctoral"]) program?: string;
   @IsOptional() @IsInt() @Min(0) credits?: number;
   @IsOptional() @IsBoolean() majorAssignment?: boolean;
-  @IsOptional() @IsIn(["CS", "CN", "TC", "CH"]) subjectType?: string;
+  @IsOptional() @IsIn(["KC", "CS", "CN", "TC", "CH"]) subjectType?: string;
   @IsOptional() @IsBoolean() isRequired?: boolean;
   @IsOptional() @IsInt() @Min(0) sortOrder?: number;
   @IsOptional() @IsBoolean() active?: boolean;
@@ -37,23 +37,63 @@ export class UpdateSubjectDto {
   @IsOptional() @IsBoolean() allowCrossMajor?: boolean;
 }
 
-// ===== Gói học phần =====
-export class CreateSubjectPackageDto {
+// ===== Chương trình đào tạo (CTĐT theo ngành + bậc + khóa) =====
+export class CurriculumBlockDto {
   @IsString() @MaxLength(30) @Transform(trimUpper) code!: string;
   @IsString() @MaxLength(200) @Transform(trim) name!: string;
-  @IsUUID() classGroupId!: string;
-  @IsArray() @IsUUID("4", { each: true }) @ArrayNotEmpty() @ArrayMaxSize(21) @ArrayUnique() subjectIds!: string[];
-  @IsOptional() @IsBoolean() active?: boolean;
-  @IsOptional() @IsBoolean() isOfficial?: boolean;
+  @IsOptional() @IsInt() @Min(0) minCredits?: number;
+  @IsOptional() @IsInt() @Min(0) sortOrder?: number;
 }
 
-export class UpdateSubjectPackageDto {
-  @IsOptional() @IsString() @MaxLength(30) @Transform(trimUpper) code?: string;
-  @IsOptional() @IsString() @MaxLength(200) @Transform(trim) name?: string;
-  @IsOptional() @IsUUID() classGroupId?: string;
-  @IsOptional() @IsArray() @IsUUID("4", { each: true }) @ArrayMinSize(1) @ArrayMaxSize(21) @ArrayUnique() subjectIds?: string[];
+export class CurriculumElectiveGroupDto {
+  @IsString() @MaxLength(30) @Transform(trimUpper) code!: string;
+  @IsString() @MaxLength(200) @Transform(trim) name!: string;
+  @IsOptional() @IsInt() @Min(0) minCredits?: number;
+  @IsOptional() @IsInt() @Min(0) maxCredits?: number;
+  @IsOptional() @IsInt() @Min(0) sortOrder?: number;
+}
+
+export class CurriculumSubjectEntryDto {
+  @IsUUID() subjectId!: string;
+  @IsOptional() @IsString() @MaxLength(30) @Transform(trimUpper) blockCode?: string;
+  @IsOptional() @IsString() @MaxLength(30) @Transform(trimUpper) electiveGroupCode?: string | null;
+  @IsOptional() @IsBoolean() isRequired?: boolean;
+  @IsOptional() @IsInt() @Min(0) credits?: number;
+  @IsOptional() @IsInt() @Min(0) sortOrder?: number;
+}
+
+export class CreateCurriculumDto {
+  @IsString() @MaxLength(60) @Transform(trimUpper) code!: string;
+  @IsString() @MaxLength(200) @Transform(trim) name!: string;
+  @IsUUID() majorId!: string;
+  @IsOptional() @IsIn(["masters", "doctoral"]) program?: string;
+  @IsOptional() @IsString() @MaxLength(20) @Transform(trim) applicableFromYear?: string;
+  @IsOptional() @IsInt() @Min(0) totalCredits?: number;
   @IsOptional() @IsBoolean() active?: boolean;
-  @IsOptional() @IsBoolean() isOfficial?: boolean;
+  @IsOptional() @IsString() @MaxLength(2000) @Transform(trim) note?: string;
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => CurriculumBlockDto) blocks?: CurriculumBlockDto[];
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => CurriculumElectiveGroupDto) electiveGroups?: CurriculumElectiveGroupDto[];
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => CurriculumSubjectEntryDto) subjects?: CurriculumSubjectEntryDto[];
+}
+
+export class UpdateCurriculumDto {
+  @IsOptional() @IsString() @MaxLength(60) @Transform(trimUpper) code?: string;
+  @IsOptional() @IsString() @MaxLength(200) @Transform(trim) name?: string;
+  @IsOptional() @IsUUID() majorId?: string;
+  @IsOptional() @IsIn(["masters", "doctoral"]) program?: string;
+  @IsOptional() @IsString() @MaxLength(20) @Transform(trim) applicableFromYear?: string;
+  @IsOptional() @IsInt() @Min(0) totalCredits?: number;
+  @IsOptional() @IsBoolean() active?: boolean;
+  @IsOptional() @IsString() @MaxLength(2000) @Transform(trim) note?: string;
+}
+
+export class SetCurriculumSubjectsDto {
+  @IsArray() @ArrayUnique((entry: CurriculumSubjectEntryDto) => entry.subjectId)
+  @ValidateNested({ each: true }) @Type(() => CurriculumSubjectEntryDto) subjects!: CurriculumSubjectEntryDto[];
+}
+
+export class SetClassElectivesDto {
+  @IsArray() @IsUUID("4", { each: true }) @ArrayUnique() curriculumSubjectIds!: string[];
 }
 
 // ===== Lớp học (class group) =====

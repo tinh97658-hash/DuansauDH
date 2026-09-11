@@ -4,8 +4,8 @@ import { Op } from "sequelize";
 import type { Transaction } from "sequelize";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
 import { ClassGroupMember } from "../database/models/training/class-group-member.model.js";
-import { SubjectPackage } from "../database/models/plan/subject-package.model.js";
 import { Major } from "../database/models/common/major.model.js";
+import { CurriculumService } from "./curriculum.service.js";
 
 export interface CreateClassGroupInput {
   code: string;
@@ -37,12 +37,15 @@ export interface ClassGroupFilters {
 }
 
 /**
- * Service dùng chung quản lý bảng `class_groups` (nhóm học phần).
- * Là nguồn duy nhất cho các quy tắc nghiệp vụ khi tạo/sửa/xóa nhóm:
+ * Service dùng chung quản lý bảng `class_groups` (lớp/nhóm học viên).
+ * Là nguồn duy nhất cho các quy tắc nghiệp vụ khi tạo/sửa/xóa lớp:
  * - Chuyên ngành phải tồn tại, còn hoạt động và khớp bậc đào tạo (masters/doctoral).
  * - Mã nhóm duy nhất trong phạm vi bậc đào tạo.
  * - Sĩ số tối đa không được nhỏ hơn số học viên hiện có.
- * - Không xóa nhóm đang có học viên hoặc gói học phần.
+ * - Không xóa nhóm đang có học viên.
+ *
+ * Lớp **kế thừa chương trình đào tạo** của ngành + khóa (xem `CurriculumService`);
+ * đổi ngành, bậc hoặc khóa thì lớp được gắn lại CTĐT tương ứng.
  *
  * PlanService và MastersService ủy quyền thao tác CRUD nhóm về service này để
  * tránh lệch nghiệp vụ giữa hai luồng (kế hoạch đào tạo vs phân nhóm học viên).
@@ -52,8 +55,8 @@ export class ClassGroupService {
   constructor(
     @InjectModel(ClassGroup) private readonly classGroups: typeof ClassGroup,
     @InjectModel(ClassGroupMember) private readonly classGroupMembers: typeof ClassGroupMember,
-    @InjectModel(SubjectPackage) private readonly packages: typeof SubjectPackage,
     @InjectModel(Major) private readonly majors: typeof Major,
+    private readonly curriculums: CurriculumService,
   ) {}
 
   private async requireMajorForProgram(majorId: string | null | undefined, program: string, transaction?: Transaction) {
@@ -97,7 +100,7 @@ export class ClassGroupService {
     const program = input.program || "masters";
     await this.requireMajorForProgram(input.majorId, program, transaction);
     await this.ensureCodeUnique(input.code, program, undefined, transaction);
-    return this.classGroups.create({
+    const group = await this.classGroups.create({
       program,
       code: input.code,
       name: input.name,
@@ -107,6 +110,8 @@ export class ClassGroupService {
       status: input.status || "open",
       note: input.note ?? null,
     } as any, { transaction });
+    await this.curriculums.assignToClassGroup(group, transaction);
+    return group;
   }
 
   async update(id: string, input: UpdateClassGroupInput, transaction?: Transaction) {
@@ -114,7 +119,8 @@ export class ClassGroupService {
     if (!group) throw new NotFoundException("Không tìm thấy nhóm học phần.");
 
     const program = input.program || group.program;
-    const majorId = input.majorId !== undefined ? input.majorId : group.majorId;
+    // Lớp bắt buộc thuộc một chuyên ngành (để suy ra CTĐT), nên không cho xoá trắng.
+    const majorId = input.majorId ? input.majorId : group.majorId;
     await this.requireMajorForProgram(majorId, program, transaction);
 
     if (input.code !== undefined && input.code !== group.code) {
@@ -128,23 +134,24 @@ export class ClassGroupService {
     }
 
     const payload: Record<string, unknown> = {};
-    for (const key of ["code", "name", "program", "majorId", "academicYear", "maxStudents", "status", "note"]) {
+    for (const key of ["code", "name", "program", "majorId", "academicYear", "maxStudents", "status", "note"] as const) {
       const value = input[key as keyof UpdateClassGroupInput];
-      if (value !== undefined) payload[key] = value;
+      if (value === undefined) continue;
+      // `majorId` rỗng/null nghĩa là giữ nguyên chuyên ngành hiện có, không xoá trắng.
+      if (key === "majorId" && !value) continue;
+      payload[key] = value;
     }
     await group.update(payload as any, { transaction });
+    // Ngành/bậc/khóa đổi thì lớp phải theo CTĐT mới.
+    await this.curriculums.assignToClassGroup(group, transaction);
     return group;
   }
 
   async remove(id: string, transaction?: Transaction) {
     const group = await this.classGroups.findByPk(id, { transaction });
     if (!group) throw new NotFoundException("Không tìm thấy nhóm học phần.");
-    const [memberCount, packageCount] = await Promise.all([
-      this.classGroupMembers.count({ where: { classGroupId: id }, transaction }),
-      this.packages.count({ where: { classGroupId: id }, transaction }),
-    ]);
+    const memberCount = await this.classGroupMembers.count({ where: { classGroupId: id }, transaction });
     if (memberCount > 0) throw new ConflictException("Không thể xóa nhóm đang có học viên.");
-    if (packageCount > 0) throw new ConflictException("Không thể xóa lớp đang có gói học phần.");
     await group.destroy({ transaction });
     return { success: true, message: "Đã xóa nhóm học phần." };
   }

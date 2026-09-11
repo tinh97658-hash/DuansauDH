@@ -9,9 +9,11 @@ const buildService = () => {
     {} as never,
     {} as never,
     {} as never,
-    {} as never,
     majors as never,
     admissionRecords as never,
+    {} as never,
+    {} as never,
+    {} as never,
   );
   return { service, majors, admissionRecords };
 };
@@ -74,3 +76,62 @@ describe("PlanService admission major synchronization", () => {
     })).rejects.toThrow("Chuyên ngành đã chọn không tồn tại hoặc đã ngừng sử dụng");
   });
 });
+
+describe("PlanService common subjects and major handling", () => {
+  it("ensureCommonMajor creates CHUNG major if not found", async () => {
+    const majors = {
+      findOne: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({ id: "chung-id", code: "CHUNG", name: "Học phần chung (Cấp Viện)", program: "masters" }),
+    };
+    const service = new PlanService(
+      {} as never,
+      {} as never,
+      {} as never,
+      majors as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    const result = await service.ensureCommonMajor("masters");
+    expect(majors.findOne).toHaveBeenCalledWith(expect.objectContaining({ where: { code: "CHUNG", program: "masters" } }));
+    expect(majors.create).toHaveBeenCalledWith(expect.objectContaining({ code: "CHUNG", name: "Học phần chung (Cấp Viện)" }), expect.anything());
+    expect(result.code).toBe("CHUNG");
+  });
+
+  it("trainingPlan sorts common major (CHUNG) to the top with isCommon: true", async () => {
+    const majors = {
+      findOne: jest.fn().mockResolvedValue({ id: "chung-id", code: "CHUNG", name: "Học phần chung (Cấp Viện)", program: "masters" }),
+      create: jest.fn(),
+      findAll: jest.fn().mockResolvedValue([
+        { id: "major-it", code: "CNTT", name: "Công nghệ thông tin", program: "masters" },
+        { id: "chung-id", code: "CHUNG", name: "Học phần chung (Cấp Viện)", program: "masters" },
+        { id: "major-qtkd", code: "QTKD", name: "Quản trị kinh doanh", program: "masters" },
+      ]),
+    };
+    const subjects = {
+      findAll: jest.fn().mockResolvedValue([
+        { majorId: "chung-id", count: "3" },
+        { majorId: "major-it", count: "15" },
+      ]),
+    };
+    const service = new PlanService(
+      subjects as never,
+      {} as never,
+      {} as never,
+      majors as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    const list = await service.trainingPlan("masters");
+    expect(list[0].code).toBe("CHUNG");
+    expect(list[0].isCommon).toBe(true);
+    expect(list[0].subjectCount).toBe(3);
+    expect(list[1].isCommon).toBe(false);
+  });
+});
+

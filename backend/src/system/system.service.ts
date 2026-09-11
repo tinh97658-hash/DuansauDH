@@ -228,9 +228,10 @@ export class SystemService {
 
   // ===== Ngành học =====
   async listMajors(program?: string, trainingLevelId?: string) {
-    const where: Record<string, unknown> = {};
+    const where: any = {};
     if (program) where.program = program;
     if (trainingLevelId) where.trainingLevelId = trainingLevelId;
+    where.code = { [Op.ne]: "CHUNG" };
     return this.majors.findAll({
       where,
       include: [{ model: TrainingLevel, as: "trainingLevel", attributes: ["id", "code", "name"] }],

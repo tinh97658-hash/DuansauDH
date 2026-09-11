@@ -23,10 +23,36 @@ export const normalize = (value) => String(value || "").normalize("NFD").replace
 export const groupsOf = (offering) => (offering?.groupLinks || []).map((link) => link.classGroup).filter(Boolean);
 export const labelOf = (offering) => groupsOf(offering).map((group) => group.code).join(" · ");
 export const offeringTitle = (offering) => {
+  if (offering?.name && offering.name.trim()) return offering.name.trim();
   const groups = groupsOf(offering);
   if (!groups.length) return offering?.subject?.name || "Lớp học phần";
   const title = groups[0].name || groups[0].code;
   return groups.length > 1 ? `${title} + ${groups.length - 1} lớp` : title;
+};
+export const suggestOfferingName = (subject, chosen = [], fallbackYear = "") => {
+  if (!subject) return "";
+  const subjectName = subject.name || subject.code || "Học phần";
+  if (!chosen.length) {
+    return fallbackYear ? `Lớp ${subjectName} - ${fallbackYear}` : `Lớp ${subjectName}`;
+  }
+  const groupLabels = chosen.map((g) => g.code || g.name || "Lớp").filter(Boolean);
+  const cohorts = [...new Set(chosen.map((g) => g.academicYear).filter(Boolean))];
+
+  if (cohorts.length > 1) {
+    const cohortText = cohorts.sort().map((c) => `K${c}`).join(" + ");
+    if (groupLabels.length <= 2) {
+      return `Lớp ${subjectName} (Ghép ${groupLabels.join(" + ")})`;
+    }
+    return `Lớp ${subjectName} (Ghép ${cohortText})`;
+  }
+
+  if (chosen.length === 1) {
+    return `Lớp ${subjectName} - ${groupLabels[0]}`;
+  }
+  if (groupLabels.length <= 2) {
+    return `Lớp ${subjectName} - ${groupLabels.join(" + ")}`;
+  }
+  return `Lớp ${subjectName} - ${groupLabels[0]} + ${groupLabels.length - 1} lớp`;
 };
 export const subjectLabel = (offering) => [offering?.subject?.code, offering?.subject?.name].filter(Boolean).join(" - ");
 export const daysLabel = (days) => days?.length ? days.map((day) => day === 0 ? "CN" : `T${day + 1}`).join(", ") : "Chưa cấu hình";

@@ -73,3 +73,52 @@ it("saves and clears per-learner notes on a persisted roster", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Lưu ghi chú" }));
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.stringContaining("/roster-notes"), { participantNotes: [{ participantId: "student:one", note: "Miễn TA" }] }, { withCredentials: true }));
 });
+it("renders the list of scheduled sessions and filters them by status", async () => {
+  const mockSessions = [
+    {
+      id: "session-1",
+      courseOfferingId: "offering",
+      sessionDate: "2099-10-15",
+      period: "MORNING",
+      startTime: "08:00:00",
+      endTime: "11:30:00",
+      status: "planned",
+      room: { id: "r1", code: "P.301", name: "Phòng 301 Nhà A" },
+      lecturer: { id: "l1", code: "GV01", name: "TS. Nguyễn Bình" },
+    },
+    {
+      id: "session-2",
+      courseOfferingId: "offering",
+      sessionDate: "2020-01-10",
+      period: "AFTERNOON",
+      startTime: "13:30:00",
+      endTime: "17:00:00",
+      status: "held",
+      room: { id: "r2", code: "P.302", name: "Phòng 302 Nhà A" },
+      lecturer: { id: "l2", code: "GV02", name: "PGS. Trần Văn C" },
+    },
+  ];
+  axios.get.mockImplementation(async (url) => ({
+    data: url.includes("/teaching-sessions") ? mockSessions
+      : url.endsWith("/roster") ? { participants: [] }
+      : url.endsWith("/course-offerings/offering") ? { ...offering, sessionSummary: { heldCount: 1, futurePlannedCount: 1, pendingCount: 0 } }
+      : []
+  }));
+  render(<OfferingDetails offering={{ ...offering, sessionSummary: { heldCount: 1, futurePlannedCount: 1, pendingCount: 0 } }} user={{ role: "admin", canManageScheduling: true }} onClose={jest.fn()} />);
+
+  expect(await screen.findByText("LỊCH HỌC ĐÃ XẾP (2 buổi)")).toBeInTheDocument();
+  expect(screen.getByText("P.301")).toBeInTheDocument();
+  expect(screen.getByText("P.302")).toBeInTheDocument();
+  expect(screen.getByText("TS. Nguyễn Bình")).toBeInTheDocument();
+  expect(screen.getByText("PGS. Trần Văn C")).toBeInTheDocument();
+
+  // Filter to upcoming
+  fireEvent.click(screen.getByRole("button", { name: "Sắp tới (1)" }));
+  expect(screen.getByText("P.301")).toBeInTheDocument();
+  expect(screen.queryByText("P.302")).not.toBeInTheDocument();
+
+  // Filter to held
+  fireEvent.click(screen.getByRole("button", { name: "Đã diễn ra (1)" }));
+  expect(screen.queryByText("P.301")).not.toBeInTheDocument();
+  expect(screen.getByText("P.302")).toBeInTheDocument();
+});

@@ -15,6 +15,11 @@ describe("Masters scheduling ribbon", () => {
       { label: "Tạo lớp học phần", route: "/masters/course-offerings" },
       { label: "Xếp lịch", route: "/masters/schedule" },
     ]);
+    expect(learningGroup.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "Ma trận lớp học phần", route: "/masters/course-matrix" }),
+      ])
+    );
   });
 
   it("does not expose Masters scheduling routes in the Doctoral ribbon", () => {
@@ -22,11 +27,13 @@ describe("Masters scheduling ribbon", () => {
 
     expect(routes).not.toContain("/masters/course-offerings");
     expect(routes).not.toContain("/masters/schedule");
+    expect(routes).not.toContain("/masters/course-matrix");
   });
 
   it.each([
     ["/masters/course-offerings", "Tạo lớp học phần", "Xếp lịch"],
     ["/masters/schedule?offeringId=persisted-id", "Xếp lịch", "Tạo lớp học phần"],
+    ["/masters/course-matrix", "Ma trận lớp học phần", "Xếp lịch"],
   ])("highlights only the current scheduling route %s and follows navigation", async (path, activeLabel, otherLabel) => {
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ message: "admin" }) });

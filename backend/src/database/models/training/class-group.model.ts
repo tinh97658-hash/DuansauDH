@@ -1,7 +1,7 @@
 import { BelongsTo, Column, DataType, Default, ForeignKey, HasMany, Model, Table } from "sequelize-typescript";
 import { Major } from "../common/major.model.js";
 import { ClassGroupMember } from "./class-group-member.model.js";
-import { SubjectPackage } from "../plan/subject-package.model.js";
+import { Curriculum } from "../plan/curriculum.model.js";
 
 @Table({ tableName: "class_groups", underscored: true, timestamps: true })
 export class ClassGroup extends Model {
@@ -17,6 +17,7 @@ export class ClassGroup extends Model {
   @Column(DataType.TEXT) declare note: string | null;
   @Default([1, 2, 3, 4, 5, 6, 0]) @Column({ type: DataType.ARRAY(DataType.INTEGER), allowNull: false }) declare allowedWeekdays: number[];
   @Default("ADMINISTRATIVE") @Column({ type: DataType.STRING(30), allowNull: false }) declare groupType: string;
+  @ForeignKey(() => Curriculum) @Column({ type: DataType.UUID, allowNull: true }) declare curriculumId: string | null;
+  @BelongsTo(() => Curriculum) declare curriculum: Curriculum | null;
   @HasMany(() => ClassGroupMember) declare members: ClassGroupMember[];
-  @HasMany(() => SubjectPackage) declare packages: SubjectPackage[];
 }

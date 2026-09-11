@@ -12,6 +12,8 @@ export class CourseOffering extends Model {
   @ForeignKey(() => Subject) @Column({ type: DataType.UUID, allowNull: false }) declare subjectId: string;
   @BelongsTo(() => Subject, { foreignKey: "subjectId", as: "subject" }) declare subject: Subject;
 
+  @Column({ type: DataType.STRING(255), allowNull: true }) declare name: string | null;
+
   @Default("active")
   @Column({ type: DataType.ENUM("active", "completed"), allowNull: false })
   declare status: "active" | "completed";

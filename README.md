@@ -28,7 +28,7 @@ thạc sĩ, đào tạo tiến sĩ, báo cáo). Toàn bộ do migration quản l
 | `ethnicities`, `nationalities` | Danh mục dân tộc, quốc tịch |
 | `cities`, `districts`, `wards` | Đơn vị hành chính (thành phố → quận huyện → phường xã) |
 | `training_mode_groups`, `training_modes` | Nhóm & hình thức đào tạo |
-| `training_levels`, `majors`, `training_programs` | Trình độ, ngành, chương trình đào tạo |
+| `training_levels`, `majors`, `training_programs` | Trình độ, ngành, chương trình đào tạo (metadata) |
 | `study_statuses` | Trạng thái học tập |
 | `bridge_knowledge_subjects` | Học phần bổ sung kiến thức |
 | `lecturers` | Danh mục giảng viên (liên kết `staff` hoặc nhập tay) |
@@ -38,10 +38,23 @@ thạc sĩ, đào tạo tiến sĩ, báo cáo). Toàn bộ do migration quản l
 
 `training_plans`, `admission_targets`, `annual_fees`, `admission_records`.
 
+### Bảng riêng — Kế hoạch đào tạo & chương trình đào tạo
+
+`subjects` (danh mục học phần theo ngành + bậc), `curriculums` (CTĐT của một
+ngành + bậc + khóa), `curriculum_blocks` (khối kiến thức),
+`curriculum_elective_groups` (nhóm tự chọn kèm số tín chỉ tối thiểu/tối đa) và
+`curriculum_subjects` (học phần trong CTĐT: bắt buộc/tự chọn, thuộc khối, nhóm
+tự chọn). **Mỗi ngành + bậc + khóa có đúng một CTĐT**; lớp/nhóm học viên kế thừa
+CTĐT của ngành và khóa mình.
+
 ### Bảng riêng — Nhóm học phần & thi (dùng chung thạc sĩ/tiến sĩ)
 
-`class_groups`, `class_group_members`, `exam_sessions`, `exam_eligibilities`,
-`exam_results`.
+`class_groups` (lớp/nhóm học viên), `class_group_members`,
+`class_group_electives` (học phần tự chọn mà Viện chỉ định cho cả lớp),
+`exam_sessions`, `exam_eligibilities`, `exam_results`.
+
+Đào tạo học phần: `course_offerings`, `course_offering_class_groups`,
+`course_offering_students`, `teaching_sessions`, `scheduling_retakes`.
 
 ### Bảng riêng — Đào tạo Thạc sĩ
 

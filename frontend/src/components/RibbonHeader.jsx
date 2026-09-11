@@ -75,6 +75,7 @@ export const ribbons = {
     group("QUÁ TRÌNH HỌC TẬP", [
       action("Tạo lớp học phần", "/masters/course-offerings", NoteAddRounded, "#0788b8"),
       action("Xếp lịch", "/masters/schedule", EventNoteRounded, "#7b5fac"),
+      action("Ma trận lớp học phần", "/masters/course-matrix", TableChartRounded, "#168b7c"),
       action("Xét tư cách thi hết môn", "/masters/exam-eligibility", RuleRounded, "#397c8d"),
       action("Danh sách thi, điểm thi", "/masters/exam-lists", ListAltRounded, "#a04f86"),
     ]),

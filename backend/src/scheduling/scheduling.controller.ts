@@ -77,6 +77,11 @@ export class SchedulingController {
     return this.scheduling.listUnresolvedTeachingSessions(id);
   }
 
+  @Get("course-offerings/:id/teaching-sessions")
+  listTeachingSessionsForOffering(@Param("id", ParseUUIDPipe) id: string) {
+    return this.scheduling.listTeachingSessionsForOffering(id);
+  }
+
   @Get("course-offerings/:id")
   getCourseOffering(@Param("id", ParseUUIDPipe) id: string) {
     return this.scheduling.getCourseOffering(id);

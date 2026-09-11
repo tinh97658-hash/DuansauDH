@@ -8,8 +8,10 @@ const transaction = { LOCK: { UPDATE: "UPDATE" } };
 const buildService = () => {
   const courseOfferings = { create: jest.fn(), findAll: jest.fn(), findByPk: jest.fn() };
   const offeringGroups = { bulkCreate: jest.fn(), findAll: jest.fn() };
-  const subjects = { findByPk: jest.fn(), findAll: jest.fn() };
-  const packages = { findAll: jest.fn() };
+  const subjects = { findByPk: jest.fn(), findAll: jest.fn().mockResolvedValue([]) };
+  // `packages` giữ tên cũ cho dễ đọc: đây là danh mục học phần của CTĐT mà lớp kế thừa.
+  const curriculumSubjects = { findAll: jest.fn().mockResolvedValue([]) };
+  const classGroupElectives = { findAll: jest.fn().mockResolvedValue([]) };
   const classGroups = { findAll: jest.fn() };
   const classGroupMembers = { findAll: jest.fn().mockResolvedValue([]) };
   const majors = { findOne: jest.fn() };
@@ -24,7 +26,8 @@ const buildService = () => {
     courseOfferings as never,
     offeringGroups as never,
     subjects as never,
-    packages as never,
+    curriculumSubjects as never,
+    classGroupElectives as never,
     classGroups as never,
     classGroupMembers as never,
     majors as never,
@@ -36,7 +39,11 @@ const buildService = () => {
     individualStudents as never,
     admissionRecords as never,
   );
-  return { individualStudents, admissionRecords, service, courseOfferings, offeringGroups, subjects, packages, classGroups, classGroupMembers, majors, staff, sequelize, rooms, lecturers, teachingSessions };
+  return {
+    individualStudents, admissionRecords, service, courseOfferings, offeringGroups, subjects,
+    packages: curriculumSubjects, classGroupElectives, classGroups, classGroupMembers, majors, staff,
+    sequelize, rooms, lecturers, teachingSessions,
+  };
 };
 
 const subject = {
@@ -53,6 +60,8 @@ const subject = {
   allowCrossMajor: false,
 };
 
+const curriculumIdFor = (classGroupId: string) => `curriculum-${classGroupId}`;
+
 const group = (id: string, code = id, majorId = "major-1") => ({
   id,
   code,
@@ -62,14 +71,20 @@ const group = (id: string, code = id, majorId = "major-1") => ({
   program: "masters",
   academicYear: "2026",
   status: "open",
+  // Lớp kế thừa CTĐT của ngành + bậc + khóa.
+  curriculumId: curriculumIdFor(id),
 });
 
+/**
+ * Một dòng học phần bắt buộc trong CTĐT của lớp. Tên `officialPackage` được giữ lại
+ * để các test hiện có diễn đạt cùng một ý: "lớp có học phần này trong CTĐT".
+ */
 const officialPackage = (classGroupId: string, entries = [{ subjectId: subject.id, subject }]) => ({
-  id: `package-${classGroupId}`,
-  classGroupId,
-  isOfficial: true,
-  active: true,
-  entries,
+  id: `entry-${classGroupId}`,
+  curriculumId: curriculumIdFor(classGroupId),
+  isRequired: true,
+  subjectId: entries[0]?.subjectId,
+  subject: entries[0]?.subject,
 });
 
 describe("SchedulingService participant preview", () => {
@@ -377,6 +392,58 @@ describe("SchedulingService course-offering candidates", () => {
     expect(result.subjects[0].eligibleClassGroups.map((item) => item.id)).toEqual([g1.id]);
     expect(result.subjects[0].activeClassGroups.map((item) => item.id)).toEqual([g2.id]);
   });
+
+  it("includes eligible groups from other academic years when they have the subject in curriculum", async () => {
+    const { service, majors, classGroups, packages, offeringGroups } = buildService();
+    const g1 = group("group-1", "N01", "major-1");
+    const g2 = { ...group("group-2", "N02", "major-1"), academicYear: "2024" };
+    majors.findOne.mockResolvedValue({ id: "major-1" });
+    classGroups.findAll.mockResolvedValue([g1, g2]);
+    packages.findAll.mockResolvedValue([
+      officialPackage(g1.id, [{ subjectId: subject.id, subject }]),
+      officialPackage(g2.id, [{ subjectId: subject.id, subject }]),
+    ]);
+    offeringGroups.findAll.mockResolvedValue([]);
+
+    const result = await service.listCourseOfferingCandidates({
+      program: "masters", majorId: "major-1", academicYear: "2026",
+    });
+
+    expect(result.subjects[0].eligibleClassGroups.map((item) => item.id)).toEqual([g1.id, g2.id]);
+  });
+
+  it("exposes cross-major groups for institute common subjects (subjectType: KC)", async () => {
+    const { service, majors, classGroups, packages, offeringGroups } = buildService();
+    const commonSubject = {
+      id: "subject-kc",
+      code: "TRIET",
+      name: "Triết học",
+      credits: 3,
+      majorId: "CHUNG",
+      subjectType: "KC",
+      allowCrossMajor: true,
+      program: "masters",
+      active: true,
+      sortOrder: 1,
+    };
+    const g1 = group("group-1", "KTHH-26", "major-kthh");
+    const g2 = group("group-2", "KTVB-26", "major-ktvb");
+    majors.findOne.mockResolvedValue({ id: "major-kthh" });
+    classGroups.findAll.mockResolvedValue([g1, g2]);
+    packages.findAll.mockResolvedValue([
+      officialPackage(g1.id, [{ subjectId: commonSubject.id, subject: commonSubject }]),
+      officialPackage(g2.id, [{ subjectId: commonSubject.id, subject: commonSubject }]),
+    ]);
+    offeringGroups.findAll.mockResolvedValue([]);
+
+    const result = await service.listCourseOfferingCandidates({
+      program: "masters", majorId: "major-kthh", academicYear: "2026",
+    });
+
+    expect(result.subjects).toHaveLength(1);
+    expect(result.subjects[0].subject.id).toBe("subject-kc");
+    expect(result.subjects[0].eligibleClassGroups.map((g) => g.id)).toEqual(["group-1", "group-2"]);
+  });
 });
 
 describe("SchedulingService.createCourseOffering", () => {
@@ -401,7 +468,7 @@ describe("SchedulingService.createCourseOffering", () => {
     const mocks = buildService();
     const g1 = arrangeValidCreate(mocks);
 
-    const result = await mocks.service.createCourseOffering({ subjectId: subject.id, classGroupIds: [g1.id], note: "Ghi chú" });
+    const result = await mocks.service.createCourseOffering({ subjectId: subject.id, classGroupIds: [g1.id], name: "Lớp thí điểm", note: "Ghi chú" });
 
     expect(mocks.sequelize.transaction).toHaveBeenCalledTimes(1);
     expect(mocks.classGroups.findAll).toHaveBeenCalledWith(expect.objectContaining({
@@ -410,7 +477,7 @@ describe("SchedulingService.createCourseOffering", () => {
       transaction,
     }));
     expect(mocks.courseOfferings.create).toHaveBeenCalledWith(
-      { subjectId: subject.id, status: "active", note: "Ghi chú" },
+      expect.objectContaining({ name: "Lớp thí điểm", subjectId: subject.id, status: "active", note: "Ghi chú" }),
       { transaction },
     );
     expect(mocks.offeringGroups.bulkCreate).toHaveBeenCalledWith(
@@ -451,14 +518,25 @@ describe("SchedulingService.createCourseOffering", () => {
     expect(mocks.sequelize.transaction).not.toHaveBeenCalled();
   });
 
-  it("rejects a group without an active official package", async () => {
+  it("rejects a group that has no curriculum attached", async () => {
+    const mocks = buildService();
+    const g1 = arrangeValidCreate(mocks);
+    mocks.classGroups.findAll.mockResolvedValue([{ ...g1, curriculumId: null }]);
+
+    await expect(mocks.service.createCourseOffering({
+      subjectId: subject.id, classGroupIds: ["group-1"],
+    })).rejects.toThrow("chưa được gắn chương trình đào tạo");
+    expect(mocks.courseOfferings.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a group whose curriculum has no subject at all", async () => {
     const mocks = buildService();
     arrangeValidCreate(mocks);
     mocks.packages.findAll.mockResolvedValue([]);
 
     await expect(mocks.service.createCourseOffering({
       subjectId: subject.id, classGroupIds: ["group-1"],
-    })).rejects.toThrow("chưa có gói học phần chính thức");
+    })).rejects.toThrow("chưa có học phần nào");
     expect(mocks.courseOfferings.create).not.toHaveBeenCalled();
   });
 
@@ -598,14 +676,35 @@ describe("SchedulingService.createCourseOffering", () => {
     );
   });
 
-  it("still rejects a selected group outside the working academic year", async () => {
+  it("still rejects when no selected group belongs to the working academic year", async () => {
     const mocks = buildService();
     arrangeValidCreate(mocks);
 
     await expect(mocks.service.createCourseOffering({
       subjectId: subject.id, classGroupIds: ["group-1"], majorId: "major-3", academicYear: "2027",
-    })).rejects.toThrow("Các nhóm ghép chung phải thuộc cùng khóa / năm học");
+    })).rejects.toThrow("Lớp học phần phải có ít nhất một nhóm thuộc khóa / năm học đang tổ chức.");
     expect(mocks.courseOfferings.create).not.toHaveBeenCalled();
+  });
+
+  it("allows merging groups from different academic years when at least one belongs to working academic year", async () => {
+    const mocks = buildService();
+    arrangeValidCreate(mocks);
+    const g1 = { ...group("group-1"), academicYear: "2026" };
+    const g2 = { ...group("group-2"), academicYear: "2024" };
+    mocks.classGroups.findAll.mockResolvedValue([g1, g2]);
+    mocks.packages.findAll.mockResolvedValue([officialPackage(g1.id), officialPackage(g2.id)]);
+    mocks.courseOfferings.findByPk.mockResolvedValue({
+      id: "offering-1",
+      status: "active",
+      subject,
+      groupLinks: [{ classGroupId: g1.id, classGroup: g1 }, { classGroupId: g2.id, classGroup: g2 }],
+    });
+
+    const result = await mocks.service.createCourseOffering({
+      subjectId: subject.id, classGroupIds: [g1.id, g2.id], majorId: "major-1", academicYear: "2026",
+    });
+    expect(result).toBeDefined();
+    expect(mocks.courseOfferings.create).toHaveBeenCalled();
   });
 
   it("rejects an alias whose canonical root is missing", async () => {
@@ -620,7 +719,7 @@ describe("SchedulingService.createCourseOffering", () => {
     expect(mocks.courseOfferings.create).not.toHaveBeenCalled();
   });
 
-  it("rejects mixed-major groups when a local package resolves to another logical root", async () => {
+  it("rejects mixed-major groups when a local subject in the curriculum resolves to another logical root", async () => {
     const mocks = buildService();
     const root = { ...subject, allowCrossMajor: true };
     const otherRoot = { ...subject, id: "other-root", name: "Học phần khác", majorId: "major-2", allowCrossMajor: true };
@@ -635,7 +734,7 @@ describe("SchedulingService.createCourseOffering", () => {
 
     await expect(mocks.service.createCourseOffering({
       subjectId: root.id, classGroupIds: [g1.id, g2.id],
-    })).rejects.toThrow("không chứa môn trùng tên và số tín chỉ");
+    })).rejects.toThrow("không có môn trùng tên và số tín chỉ");
     expect(mocks.courseOfferings.create).not.toHaveBeenCalled();
   });
 });
@@ -730,6 +829,22 @@ describe("SchedulingService persisted reads", () => {
     expect(detail).toEqual(persisted);
     expect(courseOfferings.findAll).toHaveBeenCalled();
     expect(courseOfferings.findByPk).toHaveBeenCalledWith("offering-1", expect.objectContaining({ include: expect.any(Array) }));
+  });
+
+  it("lists all teaching sessions for a course offering", async () => {
+    const { service, courseOfferings, teachingSessions } = buildService();
+    const persisted = { id: "offering-1", status: "active", subject, groupLinks: [] };
+    courseOfferings.findByPk.mockResolvedValue(persisted);
+    const mockSessions = [
+      { id: "session-1", courseOfferingId: persisted.id, sessionDate: "2099-01-01", startTime: "08:00:00", endTime: "11:30:00", status: "planned", courseOffering: persisted },
+    ];
+    teachingSessions.findAll.mockResolvedValue(mockSessions);
+    const result = await service.listTeachingSessionsForOffering(persisted.id);
+    expect(result).toEqual(mockSessions);
+    expect(teachingSessions.findAll).toHaveBeenCalledWith(expect.objectContaining({
+      where: { courseOfferingId: persisted.id },
+      order: [["sessionDate", "ASC"], ["startTime", "ASC"], ["id", "ASC"]],
+    }));
   });
 });
 describe("Persisted latest same-period time suggestions", () => {

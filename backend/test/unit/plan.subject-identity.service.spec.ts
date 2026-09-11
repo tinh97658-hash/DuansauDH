@@ -23,14 +23,13 @@ const buildService = () => {
     count: jest.fn().mockResolvedValue(0),
     create: jest.fn(),
   };
-  const packageEntries = { count: jest.fn().mockResolvedValue(0) };
+  const curriculumEntries = { count: jest.fn().mockResolvedValue(0) };
   const majors = { findByPk: jest.fn().mockResolvedValue({ id: "major-2", program: "masters", active: true }) };
   const sequelize = { transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)) };
   const courseOfferings = { count: jest.fn().mockResolvedValue(0) };
   const service = new PlanService(
     subjects as never,
-    {} as never,
-    packageEntries as never,
+    curriculumEntries as never,
     {} as never,
     majors as never,
     {} as never,

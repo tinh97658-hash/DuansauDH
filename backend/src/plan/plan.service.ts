@@ -6,22 +6,21 @@ import { Sequelize } from "sequelize-typescript";
 import { Major } from "../database/models/common/major.model.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
 import { Subject } from "../database/models/plan/subject.model.js";
-import { SubjectPackage } from "../database/models/plan/subject-package.model.js";
-import { SubjectPackageSubject } from "../database/models/plan/subject-package-subject.model.js";
+import { Curriculum } from "../database/models/plan/curriculum.model.js";
+import { CurriculumSubject } from "../database/models/plan/curriculum-subject.model.js";
 import { AdmissionRecord } from "../database/models/plan/admission-record.model.js";
 import { CourseOffering } from "../database/models/training/course-offering.model.js";
 import { ClassGroupService } from "./class-group.service.js";
 import {
-  CreateAdmissionRecordDto, CreateClassDto, CreateSubjectDto, CreateSubjectPackageDto,
-  UpdateAdmissionRecordDto, UpdateClassDto, UpdateSubjectDto, UpdateSubjectPackageDto,
+  CreateAdmissionRecordDto, CreateClassDto, CreateSubjectDto,
+  UpdateAdmissionRecordDto, UpdateClassDto, UpdateSubjectDto,
 } from "./dto/plan.dto.js";
 
 @Injectable()
 export class PlanService {
   constructor(
     @InjectModel(Subject) private readonly subjects: typeof Subject,
-    @InjectModel(SubjectPackage) private readonly packages: typeof SubjectPackage,
-    @InjectModel(SubjectPackageSubject) private readonly packageEntries: typeof SubjectPackageSubject,
+    @InjectModel(CurriculumSubject) private readonly curriculumEntries: typeof CurriculumSubject,
     @InjectModel(ClassGroup) private readonly classGroups: typeof ClassGroup,
     @InjectModel(Major) private readonly majors: typeof Major,
     @InjectModel(AdmissionRecord) private readonly admissionRecordsModel: typeof AdmissionRecord,
@@ -88,21 +87,34 @@ export class PlanService {
     return major;
   }
 
-  private async validatePackageSubjects(classGroup: ClassGroup, subjectIds: string[], transaction: Transaction) {
-    if (!classGroup.majorId) throw new BadRequestException("Lớp học phải được gắn chuyên ngành trước khi tạo gói học phần.");
-    if (subjectIds.length === 0 || subjectIds.length > 21) {
-      throw new BadRequestException("Gói học phần phải có từ 1 đến 21 học phần.");
-    }
-    const subjects = await this.subjects.findAll({
-      where: { id: { [Op.in]: subjectIds }, majorId: classGroup.majorId, program: classGroup.program, active: true },
+  async ensureCommonMajor(program: string, transaction?: Transaction) {
+    const code = "CHUNG";
+    const name = "Học phần chung (Cấp Viện)";
+    let major = await this.majors.findOne({
+      where: { code, program },
       transaction,
     });
-    if (subjects.length !== subjectIds.length) {
-      throw new BadRequestException("Danh sách có học phần không tồn tại, đã ngừng sử dụng hoặc không thuộc chuyên ngành/bậc của lớp.");
+    if (!major) {
+      major = await this.majors.create({
+        code,
+        name,
+        program,
+        active: true,
+        durationYears: 2,
+        maxOvertimeYears: 2,
+        description: "Danh mục học phần dùng chung toàn trường do Viện quản lý",
+      } as any, { transaction });
     }
+    return major;
   }
 
   async trainingPlan(program?: string) {
+    if (program) {
+      await this.ensureCommonMajor(program);
+    } else {
+      await this.ensureCommonMajor("masters");
+      await this.ensureCommonMajor("doctoral");
+    }
     const majorWhere: Record<string, unknown> = {};
     if (program) majorWhere.program = program;
     const majors = await this.majors.findAll({
@@ -121,13 +133,35 @@ export class PlanService {
     })) as unknown as Array<{ majorId: string; count: string | number }>;
 
     for (const r of rows) counts[r.majorId] = Number(r.count) || 0;
-    return majors.map((m) => ({ id: m.id, code: m.code, name: m.name, program: m.program, subjectCount: counts[m.id] || 0 }));
+    return majors
+      .map((m) => ({
+        id: m.id,
+        code: m.code,
+        name: m.name,
+        program: m.program,
+        isCommon: m.code === "CHUNG",
+        subjectCount: counts[m.id] || 0,
+      }))
+      .sort((a, b) => {
+        if (a.isCommon && !b.isCommon) return -1;
+        if (!a.isCommon && b.isCommon) return 1;
+        return a.name.localeCompare(b.name, "vi");
+      });
   }
 
   // ===== Học phần theo chuyên ngành & bậc đào tạo =====
-  async listSubjects(majorId?: string, program?: string) {
-    const where: Record<string, unknown> = {};
-    if (majorId) where.majorId = majorId;
+  async listSubjects(majorId?: string, program?: string, includeCommon = false) {
+    const where: any = {};
+    if (majorId) {
+      if (includeCommon) {
+        where[Op.or] = [
+          { majorId },
+          { subjectType: "KC" },
+        ];
+      } else {
+        where.majorId = majorId;
+      }
+    }
     if (program) where.program = program;
     return this.subjects.findAll({
       where,
@@ -138,6 +172,9 @@ export class PlanService {
 
   async createSubject(dto: CreateSubjectDto) {
     const program = dto.program || "masters";
+    if (dto.subjectType === "KC") {
+      dto.allowCrossMajor = true;
+    }
     return this.sequelize.transaction(async (transaction) => {
       await this.requireMajorForProgram(dto.majorId, program, transaction);
       await this.ensureUnique(this.subjects, "codeNumber", String(dto.codeNumber), undefined, { majorId: dto.majorId, program });
@@ -162,6 +199,9 @@ export class PlanService {
   }
 
   async updateSubject(id: string, dto: UpdateSubjectDto) {
+    if (dto.subjectType === "KC") {
+      dto.allowCrossMajor = true;
+    }
     return this.sequelize.transaction(async (transaction) => {
       const subject = await this.subjects.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!subject) throw new NotFoundException("Không tìm thấy học phần.");
@@ -263,8 +303,8 @@ export class PlanService {
   async removeSubject(id: string) {
     const subject = await this.subjects.findByPk(id);
     if (!subject) throw new NotFoundException("Không tìm thấy học phần.");
-    const packageUsage = await this.packageEntries.count({ where: { subjectId: id } });
-    if (packageUsage > 0) throw new ConflictException("Không thể xóa học phần đang được sử dụng trong gói học phần.");
+    const curriculumUsage = await this.curriculumEntries.count({ where: { subjectId: id } });
+    if (curriculumUsage > 0) throw new ConflictException("Không thể xóa học phần đang nằm trong chương trình đào tạo.");
     const aliasUsage = await this.subjects.count({ where: { canonicalSubjectId: id } });
     if (aliasUsage > 0) throw new ConflictException("Không thể xóa học phần đang là gốc của mapping liên ngành.");
     const offeringUsage = await this.courseOfferings.count({ where: { subjectId: id } });
@@ -284,9 +324,9 @@ export class PlanService {
       include: [
         { model: Major, as: "major", attributes: ["id", "code", "name"] },
         {
-          model: SubjectPackage,
-          as: "packages",
-          attributes: ["id", "code", "name", "isOfficial", "active", "totalSubjects"],
+          model: Curriculum,
+          as: "curriculum",
+          attributes: ["id", "code", "name", "totalCredits", "applicableFromYear", "active"],
         },
       ],
       order: [["academicYear", "DESC"], ["code", "ASC"]],
@@ -298,7 +338,7 @@ export class PlanService {
     return this.classGroups.findByPk(created.id, {
       include: [
         { model: Major, as: "major", attributes: ["id", "code", "name"] },
-        { model: SubjectPackage, as: "packages", attributes: ["id", "code", "name", "isOfficial", "active", "totalSubjects"] },
+        { model: Curriculum, as: "curriculum", attributes: ["id", "code", "name", "totalCredits", "applicableFromYear", "active"] },
       ],
     });
   }
@@ -308,7 +348,7 @@ export class PlanService {
     return this.classGroups.findByPk(id, {
       include: [
         { model: Major, as: "major", attributes: ["id", "code", "name"] },
-        { model: SubjectPackage, as: "packages", attributes: ["id", "code", "name", "isOfficial", "active", "totalSubjects"] },
+        { model: Curriculum, as: "curriculum", attributes: ["id", "code", "name", "totalCredits", "applicableFromYear", "active"] },
       ],
     });
   }
@@ -317,205 +357,8 @@ export class PlanService {
     return this.classGroupsService.remove(id);
   }
 
-  // ===== Gói học phần theo lớp =====
-  async listPackages(classGroupId?: string) {
-    const where: Record<string, unknown> = {};
-    if (classGroupId) where.classGroupId = classGroupId;
-    return this.packages.findAll({
-      where,
-      include: [
-        {
-          model: SubjectPackageSubject,
-          as: "entries",
-          include: [{ model: Subject, as: "subject" }],
-        },
-      ],
-      order: [["isOfficial", "DESC"], ["code", "ASC"]],
-    });
-  }
-
-  async createPackage(dto: CreateSubjectPackageDto) {
-    return this.sequelize.transaction(async (transaction) => {
-    const classGroup = await this.classGroups.findByPk(dto.classGroupId, { transaction });
-    if (!classGroup) throw new NotFoundException("Không tìm thấy lớp học.");
-    await this.ensureUnique(this.packages, "code", dto.code, undefined, { classGroupId: dto.classGroupId });
-    await this.validatePackageSubjects(classGroup, dto.subjectIds, transaction);
-
-    // Nếu truyền isOfficial = true, gỡ official của các gói khác cùng lớp
-    if (dto.isOfficial) {
-      await this.packages.update({ isOfficial: false }, { where: { classGroupId: dto.classGroupId }, transaction });
-    }
-
-    const pkg = await this.packages.create({
-      code: dto.code,
-      name: dto.name,
-      classGroupId: dto.classGroupId,
-      active: dto.active ?? true,
-      isOfficial: dto.isOfficial ?? false,
-      totalSubjects: dto.subjectIds.length,
-    }, { transaction });
-
-    if (dto.subjectIds && dto.subjectIds.length > 0) {
-      const entries = dto.subjectIds.map((subjectId, idx) => ({
-        packageId: pkg.id,
-        subjectId,
-        sortOrder: idx + 1,
-      }));
-      await this.packageEntries.bulkCreate(entries, { transaction });
-    }
-
-    return this.packages.findByPk(pkg.id, {
-      include: [
-        {
-          model: SubjectPackageSubject,
-          as: "entries",
-          include: [{ model: Subject, as: "subject" }],
-        },
-      ], transaction,
-    });
-    });
-  }
-
-  async updatePackage(id: string, dto: UpdateSubjectPackageDto) {
-    return this.sequelize.transaction(async (transaction) => {
-    const pkg = await this.packages.findByPk(id, { transaction });
-    if (!pkg) throw new NotFoundException("Không tìm thấy gói học phần.");
-    if (dto.code !== undefined && dto.code !== pkg.code) {
-      await this.ensureUnique(this.packages, "code", dto.code, id, { classGroupId: pkg.classGroupId });
-    }
-    const classGroup = await this.classGroups.findByPk(pkg.classGroupId, { transaction });
-    if (!classGroup) throw new NotFoundException("Không tìm thấy lớp học.");
-    if (dto.subjectIds !== undefined) {
-      await this.validatePackageSubjects(classGroup, dto.subjectIds, transaction);
-    } else if (dto.isOfficial === true) {
-      const count = await this.packageEntries.count({ where: { packageId: id }, transaction });
-      if (count === 0) throw new BadRequestException("Gói học phần phải có ít nhất 1 học phần.");
-    }
-
-    // Nếu cập nhật isOfficial = true, gỡ official của các gói khác cùng lớp
-    if (dto.isOfficial === true) {
-      await this.packages.update({ isOfficial: false }, { where: { classGroupId: pkg.classGroupId }, transaction });
-    }
-
-    const payload = this.pick(dto, ["code", "name", "active", "isOfficial"]);
-    if (dto.subjectIds !== undefined) payload.totalSubjects = dto.subjectIds.length;
-    await pkg.update(payload, { transaction });
-
-    if (dto.subjectIds !== undefined) {
-      await this.packageEntries.destroy({ where: { packageId: id }, transaction });
-      if (dto.subjectIds.length > 0) {
-        const entries = dto.subjectIds.map((subjectId, idx) => ({
-          packageId: id,
-          subjectId,
-          sortOrder: idx + 1,
-        }));
-        await this.packageEntries.bulkCreate(entries, { transaction });
-      }
-    }
-
-    return this.packages.findByPk(id, {
-      include: [
-        {
-          model: SubjectPackageSubject,
-          as: "entries",
-          include: [{ model: Subject, as: "subject" }],
-        },
-      ], transaction,
-    });
-    });
-  }
-
-  async setOfficialPackage(id: string) {
-    return this.sequelize.transaction(async (transaction) => {
-    const pkg = await this.packages.findByPk(id, { transaction });
-    if (!pkg) throw new NotFoundException("Không tìm thấy gói học phần.");
-
-    // Gỡ bỏ trạng thái chính thức của tất cả các gói thuộc lớp này
-    if (pkg.active === false) throw new BadRequestException("Không thể chọn gói học phần đã ngừng sử dụng.");
-    const count = await this.packageEntries.count({ where: { packageId: id }, transaction });
-    if (count === 0) throw new BadRequestException("Gói học phần phải có ít nhất 1 học phần.");
-    await this.packages.update({ isOfficial: false }, { where: { classGroupId: pkg.classGroupId }, transaction });
-
-    // Đặt gói được chọn thành chính thức
-    await pkg.update({ isOfficial: true, totalSubjects: count }, { transaction });
-
-    return this.packages.findByPk(id, {
-      include: [
-        {
-          model: SubjectPackageSubject,
-          as: "entries",
-          include: [{ model: Subject, as: "subject" }],
-        },
-      ], transaction,
-    });
-    });
-  }
-
-  async removePackage(id: string) {
-    const pkg = await this.packages.findByPk(id);
-    if (!pkg) throw new NotFoundException("Không tìm thấy gói học phần.");
-    if (pkg.isOfficial) throw new ConflictException("Không thể xóa gói học phần chính thức. Hãy chọn gói chính thức khác trước.");
-    await pkg.destroy();
-    return { success: true, message: "Đã xóa gói học phần." };
-  }
-
-  // ===== Validation Helper: Gói học phần chính thức =====
-  async createDefaultPackages(classGroupId: string) {
-    return this.sequelize.transaction(async (transaction) => {
-      const classGroup = await this.classGroups.findByPk(classGroupId, { transaction });
-      if (!classGroup) throw new NotFoundException("Không tìm thấy lớp học.");
-      if (!classGroup.majorId) throw new BadRequestException("Lớp học chưa được gắn chuyên ngành.");
-      const existingCount = await this.packages.count({ where: { classGroupId }, transaction });
-      if (existingCount > 0) throw new ConflictException("Lớp học đã có gói học phần.");
-      const subjects = await this.subjects.findAll({
-        where: { majorId: classGroup.majorId, program: classGroup.program, active: true },
-        order: [["sortOrder", "ASC"], ["codeNumber", "ASC"]],
-        limit: 21,
-        transaction,
-      });
-      if (subjects.length === 0) throw new BadRequestException("Cần ít nhất 1 học phần đang hoạt động để tạo gói.");
-      const subjectIds = subjects.map((subject) => subject.id);
-      const definitions = [
-        { code: `G1-${classGroup.code}`, name: "Gói học phần 1", isOfficial: true },
-        { code: `G2-${classGroup.code}`, name: "Gói học phần 2", isOfficial: false },
-      ];
-      for (const definition of definitions) {
-        const pkg = await this.packages.create({ ...definition, classGroupId, active: true, totalSubjects: subjectIds.length }, { transaction });
-        await this.packageEntries.bulkCreate(subjectIds.map((subjectId, index) => ({
-          packageId: pkg.id,
-          subjectId,
-          sortOrder: index + 1,
-        })), { transaction });
-      }
-      return this.packages.findAll({
-        where: { classGroupId },
-        include: [{ model: SubjectPackageSubject, as: "entries", include: [{ model: Subject, as: "subject" }] }],
-        order: [["isOfficial", "DESC"], ["code", "ASC"]],
-        transaction,
-      });
-    });
-  }
-
-  async getOfficialPackageForClass(classGroupId: string) {
-    return this.packages.findOne({
-      where: { classGroupId, isOfficial: true },
-      include: [
-        {
-          model: SubjectPackageSubject,
-          as: "entries",
-          include: [{ model: Subject, as: "subject" }],
-        },
-      ],
-    });
-  }
-
-  async validateClassHasOfficialPackage(classGroupId: string) {
-    const officialPkg = await this.getOfficialPackageForClass(classGroupId);
-    if (!officialPkg) {
-      throw new BadRequestException("Lớp học chưa có gói học phần chính thức. Không thể xếp lịch học hoặc nhập điểm.");
-    }
-    return officialPkg;
-  }
+  // Ghi chú nghiệp vụ: danh mục học phần của lớp được suy ra từ chương trình đào tạo
+  // (CurriculumService) theo ngành + bậc + khóa. Không còn "gói học phần" theo lớp.
 
   // ===== HỒ SƠ TUYỂN SINH (ADMISSION RECORDS) =====
   async listAdmissionRecords(majorId?: string, trainingLevel?: string, academicYear?: string, status?: string) {

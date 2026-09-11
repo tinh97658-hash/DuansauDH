@@ -13,8 +13,8 @@ import { AppModule } from "../app.module.js";
  * Phạm vi:
  *  - Danh mục: quận/huyện, phường/xã (bổ sung cho các thành phố đã có), giảng viên.
  *  - Kế hoạch: chương trình đào tạo, kế hoạch tuyển sinh, chỉ tiêu, khoản thu.
- *  - Kế hoạch đào tạo: 30 học phần cho ngành Khai thác hàng hải (Thạc sĩ),
- *    2 lớp + 2 gói học phần/lớp (21 môn, 1 gói chính thức).
+ *  - Kế hoạch đào tạo: 30 học phần + 1 CTĐT cho ngành Khai thác hàng hải (Thạc sĩ),
+ *    2 lớp cùng kế thừa CTĐT đó và dùng chung danh sách học phần tự chọn.
  *  - Hồ sơ tuyển sinh: ~20 hồ sơ Thạc sĩ (đủ điều kiện phân nhóm) + phân nhóm
  *    học viên vào 2 lớp.
  */
@@ -31,20 +31,32 @@ async function run() {
   // =====================================================================
   const demoClassGroups = await M.ClassGroup.findAll({ where: { code: { [Op.like]: "THS-K32%" } }, attributes: ["id"] });
   const demoClassIds: string[] = demoClassGroups.map((g: any) => g.id);
-  const demoPackages = await M.SubjectPackage.findAll({
-    where: demoClassIds.length ? { classGroupId: { [Op.in]: demoClassIds } } : { id: null },
-    attributes: ["id"],
-  });
-  const demoPackageIds: string[] = demoPackages.map((p: any) => p.id);
   const kthhCleanup = await M.Major.findOne({ where: { code: "KTHH", program: "masters" } });
 
+  // Lớp demo có thể đã được dùng để mở lớp học phần qua giao diện, nên phải dọn
+  // liên kết lịch học trước khi xoá lớp (nếu không sẽ vi phạm khoá ngoại).
+  const demoLinks = await M.CourseOfferingClassGroup.findAll({
+    where: demoClassIds.length ? { classGroupId: { [Op.in]: demoClassIds } } : { id: null },
+    attributes: ["courseOfferingId"],
+  });
+  const demoOfferingIds = [...new Set<string>(demoLinks.map((link: any) => String(link.courseOfferingId)))];
+
+  await M.CourseOfferingStudent.destroy({ where: demoOfferingIds.length ? { courseOfferingId: { [Op.in]: demoOfferingIds } } : { id: null } });
+  await M.ClassGroupElective.destroy({ where: demoClassIds.length ? { classGroupId: { [Op.in]: demoClassIds } } : { id: null } });
   await M.ClassGroupMember.destroy({ where: demoClassIds.length ? { classGroupId: { [Op.in]: demoClassIds } } : { id: null } });
-  await M.SubjectPackageSubject.destroy({ where: demoPackageIds.length ? { packageId: { [Op.in]: demoPackageIds } } : { id: null } });
-  await M.SubjectPackage.destroy({ where: demoClassIds.length ? { classGroupId: { [Op.in]: demoClassIds } } : { id: null } });
+  await M.CourseOfferingClassGroup.destroy({ where: demoClassIds.length ? { classGroupId: { [Op.in]: demoClassIds } } : { id: null } });
+  await M.TeachingSession.destroy({ where: demoOfferingIds.length ? { courseOfferingId: { [Op.in]: demoOfferingIds } } : { id: null } });
+  await M.CourseOffering.destroy({ where: demoOfferingIds.length ? { id: { [Op.in]: demoOfferingIds } } : { id: null } });
   await M.ClassGroup.destroy({ where: demoClassIds.length ? { id: { [Op.in]: demoClassIds } } : { id: null } });
-  await M.Subject.destroy({ where: kthhCleanup ? { majorId: kthhCleanup.id, codeNumber: { [Op.gte]: 500 } } : { id: null } });
+  // KHÔNG xoá học phần và KHÔNG xoá CTĐT: cả hai là dữ liệu dùng chung cho mọi lớp
+  // cùng ngành + khóa, và có thể đã được tham chiếu bởi lớp học phần. Seed chỉ upsert.
   await M.AdmissionRecord.destroy({
-    where: { [Op.and]: [{ code: { [Op.like]: "HV26%" } }, { code: { [Op.ne]: "HV26001" } }] },
+    where: {
+      [Op.or]: [
+        { [Op.and]: [{ code: { [Op.like]: "HV26%" } }, { code: { [Op.ne]: "HV26001" } }] },
+        { code: { [Op.like]: "HV24%" } },
+      ],
+    },
   });
   log("dọn demo cũ", `${demoClassIds.length} lớp demo cũ đã xóa`);
 
@@ -272,9 +284,8 @@ async function run() {
 
   const subjects = [];
   for (const [codeNumber, codeText, name, credits, subjectType, isRequired, majorAssignment] of subjectDefs) {
-    const subject = await M.Subject.create({
+    const attributes = {
       code: codeText,
-      codeNumber,
       codeText,
       name,
       majorId: majorKTHH.id,
@@ -285,74 +296,108 @@ async function run() {
       isRequired,
       sortOrder: subjects.length,
       active: true,
+    };
+    const [subject] = await M.Subject.findOrCreate({
+      where: { majorId: majorKTHH.id, program: "masters", codeNumber },
+      defaults: { codeNumber, ...attributes },
     });
+    await subject.update(attributes);
     subjects.push(subject);
   }
   log("học phần", subjects.length);
 
   // =====================================================================
-  // 5. LỚP HỌC + GÓI HỌC PHẦN (2 lớp, mỗi lớp 2 gói / 21 môn)
+  // 5. CHƯƠNG TRÌNH ĐÀO TẠO + LỚP HỌC
+  //    CTĐT thuộc ngành + bậc + khóa; lớp kế thừa CTĐT, Viện chỉ chọn tự chọn.
   // =====================================================================
+  const blockDefs = [
+    { code: "CS", name: "Kiến thức cơ sở ngành", sortOrder: 1 },
+    { code: "CN", name: "Kiến thức chuyên ngành", sortOrder: 2 },
+    { code: "TC", name: "Học phần tự chọn", sortOrder: 3 },
+    { code: "CH", name: "Chuyên đề", sortOrder: 4 },
+  ];
+  // Tái sử dụng CTĐT đã có của ngành + khóa (dữ liệu dùng chung), chỉ bổ sung phần demo.
+  const [curriculum] = await M.Curriculum.findOrCreate({
+    where: { majorId: majorKTHH.id, program: "masters", applicableFromYear: "2026" },
+    defaults: {
+      code: "CT-KTHH-2026",
+      name: "Chương trình đào tạo Khai thác hàng hải - Khóa 2026",
+      majorId: majorKTHH.id,
+      program: "masters",
+      applicableFromYear: "2026",
+      totalCredits: 0,
+      active: true,
+      note: "CTĐT demo khóa 32",
+    },
+  });
+  const blocks: Record<string, any> = {};
+  for (const def of blockDefs) {
+    const [block] = await M.CurriculumBlock.findOrCreate({
+      where: { curriculumId: curriculum.id, code: def.code },
+      defaults: { ...def, curriculumId: curriculum.id, minCredits: 0 },
+    });
+    blocks[def.code] = block;
+  }
+  const curriculumEntries: any[] = [];
+  for (const [index, subject] of subjects.entries()) {
+    const entryAttributes = {
+      curriculumId: curriculum.id,
+      blockId: (blocks[subject.subjectType] || blocks.CN).id,
+      electiveGroupId: null,
+      subjectId: subject.id,
+      isRequired: subject.isRequired,
+      credits: subject.credits,
+      sortOrder: index + 1,
+    };
+    const [entry] = await M.CurriculumSubject.findOrCreate({
+      where: { curriculumId: curriculum.id, subjectId: subject.id },
+      defaults: entryAttributes,
+    });
+    await entry.update(entryAttributes);
+    curriculumEntries.push(entry);
+  }
+  const requiredCredits = curriculumEntries
+    .filter((entry) => entry.isRequired)
+    .reduce((total: number, entry: any) => total + (Number(entry.credits) || 0), 0);
+  await M.Curriculum.update({ totalCredits: requiredCredits }, { where: { id: curriculum.id } });
+  log("chương trình đào tạo", `${curriculumEntries.length} học phần demo`);
+
   const classDefs = [
     { code: "THS-K32-N01", name: "Nhóm 1 - Khóa 32", maxStudents: 20 },
     { code: "THS-K32-N02", name: "Nhóm 2 - Khóa 32", maxStudents: 20 },
   ];
   const classGroups = [];
   for (const c of classDefs) {
-    const group = await M.ClassGroup.create({
-      program: "masters",
-      code: c.code,
-      name: c.name,
-      majorId: majorKTHH.id,
-      academicYear: "2026",
-      maxStudents: c.maxStudents,
-      status: "open",
-      note: "Nhóm học phần demo khóa 32",
+    const [group] = await M.ClassGroup.findOrCreate({
+      where: { program: "masters", code: c.code },
+      defaults: {
+        program: "masters",
+        code: c.code,
+        name: c.name,
+        majorId: majorKTHH.id,
+        curriculumId: curriculum.id,
+        academicYear: "2026",
+        maxStudents: c.maxStudents,
+        status: "open",
+        note: "Nhóm học phần demo khóa 32",
+      },
     });
+    if (group.curriculumId !== curriculum.id) await group.update({ curriculumId: curriculum.id });
     classGroups.push(group);
   }
   log("lớp học", classGroups.length);
 
-  // Gói học phần: G1 = 21 môn đầu, G2 = 21 môn lệch (demo sự khác biệt giữa 2 gói)
-  const packagePlans: Array<{ group: any; pkg: Array<{ code: string; name: string; official: boolean; indexes: number[] }> }> = [
-    {
-      group: classGroups[0],
-      pkg: [
-        { code: "G1-THS-K32-N01", name: "Gói học phần 1", official: true, indexes: Array.from({ length: 21 }, (_, i) => i) },
-        { code: "G2-THS-K32-N01", name: "Gói học phần 2", official: false, indexes: [...Array.from({ length: 20 }, (_, i) => i), 22] },
-      ],
-    },
-    {
-      group: classGroups[1],
-      pkg: [
-        { code: "G1-THS-K32-N02", name: "Gói học phần 1", official: true, indexes: Array.from({ length: 21 }, (_, i) => i) },
-        { code: "G2-THS-K32-N02", name: "Gói học phần 2", official: false, indexes: Array.from({ length: 21 }, (_, i) => i + 1) },
-      ],
-    },
-  ];
-  let pkgCount = 0;
-  for (const { group, pkg } of packagePlans) {
-    for (const def of pkg) {
-      const p = await M.SubjectPackage.create({
-        code: def.code,
-        name: def.name,
-        classGroupId: group.id,
-        majorId: majorKTHH.id,
-        totalSubjects: def.indexes.length,
-        active: true,
-        isOfficial: def.official,
-      });
-      await M.SubjectPackageSubject.bulkCreate(
-        def.indexes.map((idx, order) => ({
-          packageId: p.id,
-          subjectId: subjects[idx].id,
-          sortOrder: order + 1,
-        })),
-      );
-      pkgCount++;
-    }
+  // Học phần tự chọn do Viện chỉ định cho cả lớp; mọi nhóm cùng ngành + khóa dùng chung CTĐT.
+  const electiveEntries = curriculumEntries.filter((entry) => entry.isRequired === false);
+  let electiveCount = 0;
+  for (const group of classGroups) {
+    await M.ClassGroupElective.bulkCreate(electiveEntries.map((entry) => ({
+      classGroupId: group.id,
+      curriculumSubjectId: entry.id,
+    })));
+    electiveCount += electiveEntries.length;
   }
-  log("gói học phần", pkgCount);
+  log("học phần tự chọn của lớp", electiveCount);
 
   // =====================================================================
   // 6. HỒ SƠ TUYỂN SINH (Thạc sĩ — đủ điều kiện phân nhóm)
@@ -414,6 +459,39 @@ async function run() {
     createdRecords.push(record);
   }
   log("hồ sơ tuyển sinh", createdRecords.length);
+
+  // 5 hồ sơ tuyển sinh năm 2024 cho ngành Khai thác hàng hải (Thạc sĩ)
+  const records2024: Array<[number, string, string, string, string, string]> = [
+    [1, "Nguyễn Hoàng", "Nam", "Nam", "1997-04-15", "Hải Phòng"],
+    [2, "Trần Đức", "Anh", "Nam", "1996-08-22", "Quảng Ninh"],
+    [3, "Lê Thị Mai", "Hoa", "Nữ", "1998-02-18", "Hà Nội"],
+    [4, "Phạm Quốc", "Huy", "Nam", "1995-11-30", "Hải Dương"],
+    [5, "Đặng Minh", "Tuấn", "Nam", "1996-06-12", "Thái Bình"],
+  ];
+  for (const [stt, lastName, firstName, gender, dob, cityName] of records2024) {
+    await M.AdmissionRecord.create({
+      code: `HV24${String(stt).padStart(3, "0")}`,
+      lastName,
+      firstName,
+      fullName: `${lastName} ${firstName}`,
+      dob,
+      gender,
+      email: `hv24_${stt}@demo.vimaru.edu.vn`,
+      phone: `09${String(12000000 + stt * 111111).padStart(8, "0")}`,
+      pob: cityName,
+      receiptType: "Trực tiếp",
+      trainingLevel: "Thạc sĩ",
+      trainingModeName: "Chính quy - Tập trung",
+      majorId: majorKTHH.id,
+      majorName: majorKTHH.name,
+      academicYear: "2024",
+      status: "approved",
+      studyStatus: "Đã trúng tuyển",
+      nationality: "Việt Nam",
+      ethnicity: "Kinh",
+    });
+  }
+  log("hồ sơ tuyển sinh năm 2024 (KTHH)", records2024.length);
 
   // =====================================================================
   // 7. PHÂN NHÓM HỌC VIÊN (12 hồ sơ KTHH vào 2 lớp)

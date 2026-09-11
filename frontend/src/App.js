@@ -52,6 +52,7 @@ import MastersCreateClassGroups from "./pages/masters/createClassGroups";
 import MastersAssignClassGroups from "./pages/masters/assignClassGroups";
 import MastersCourseOfferings from "./pages/masters/courseOfferings";
 import MastersSchedule from "./pages/masters/schedule";
+import MastersCourseMatrix from "./pages/masters/courseMatrix";
 import MastersExamEligibility from "./pages/masters/examEligibility";
 import MastersExamLists from "./pages/masters/examLists";
 import EnglishExam from "./pages/masters/englishExam";
@@ -142,6 +143,7 @@ function App() {
             <Route path="masters/assign-class-groups" element={<MastersAssignClassGroups />} />
             <Route path="masters/course-offerings" element={<MastersCourseOfferings />} />
             <Route path="masters/schedule" element={<MastersSchedule />} />
+            <Route path="masters/course-matrix" element={<MastersCourseMatrix />} />
             <Route path="masters/exam-eligibility" element={<MastersExamEligibility />} />
             <Route path="masters/exam-lists" element={<MastersExamLists />} />
             <Route path="masters/english-exam" element={<EnglishExam />} />

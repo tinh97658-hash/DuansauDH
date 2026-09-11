@@ -24,6 +24,7 @@
     "db:seed:common": "npm run build && node dist/database/seed-common.js",
     "db:seed:demo": "npm run build && node dist/database/seed-demo.js",
     "db:seed:scheduling-test": "npm run build && node dist/database/seeds/seed-scheduling-test.js",
+    "db:seed:masters": "npm run build && node dist/database/seeds/seed-masters-cntt-qtkd.js",
     "db:seed:bulk": "npm run build && node dist/database/seed-bulk.js",
     "db:seed:bulk:preview": "npm run db:seed:bulk -- --preview",
     "db:test:bulk": "npm run db:seed:bulk -- --rollback"

@@ -11,8 +11,8 @@ import { Major } from "../database/models/common/major.model.js";
 import { Lecturer } from "../database/models/common/lecturer.model.js";
 import { Room } from "../database/models/common/room.model.js";
 import { Subject } from "../database/models/plan/subject.model.js";
-import { SubjectPackage } from "../database/models/plan/subject-package.model.js";
-import { SubjectPackageSubject } from "../database/models/plan/subject-package-subject.model.js";
+import { CurriculumSubject } from "../database/models/plan/curriculum-subject.model.js";
+import { ClassGroupElective } from "../database/models/training/class-group-elective.model.js";
 import { Staff } from "../database/models/staff.model.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
 import { ClassGroupMember } from "../database/models/training/class-group-member.model.js";
@@ -42,7 +42,8 @@ export class SchedulingService {
     @InjectModel(CourseOffering) private readonly courseOfferings: typeof CourseOffering,
     @InjectModel(CourseOfferingClassGroup) private readonly offeringGroups: typeof CourseOfferingClassGroup,
     @InjectModel(Subject) private readonly subjects: typeof Subject,
-    @InjectModel(SubjectPackage) private readonly packages: typeof SubjectPackage,
+    @InjectModel(CurriculumSubject) private readonly curriculumSubjects: typeof CurriculumSubject,
+    @InjectModel(ClassGroupElective) private readonly classGroupElectives: typeof ClassGroupElective,
     @InjectModel(ClassGroup) private readonly classGroups: typeof ClassGroup,
     @InjectModel(ClassGroupMember) private readonly classGroupMembers: typeof ClassGroupMember,
     @InjectModel(Major) private readonly majors: typeof Major,
@@ -88,6 +89,7 @@ export class SchedulingService {
   }
 
   private sameSubjectAcrossMajors(left: Subject | any, right: Subject | any) {
+    if (left?.id && right?.id && left.id === right.id) return true;
     const normalizeName = (value: unknown) => String(value || "")
       .normalize("NFC")
       .trim()
@@ -100,7 +102,7 @@ export class SchedulingService {
   }
 
   private sharingEnabled(subject: Subject | any) {
-    return subject?.allowCrossMajor === true;
+    return subject?.allowCrossMajor === true || subject?.subjectType === "KC";
   }
 
   private async loadCanonicalRoots(
@@ -402,30 +404,55 @@ export class SchedulingService {
       member.classGroupId,
       (memberCountByGroup.get(member.classGroupId) || 0) + 1,
     ));
-    const packages = await this.packages.findAll({
-      where: { classGroupId: { [Op.in]: groupIds }, isOfficial: true, active: true },
-      include: [{
-        model: SubjectPackageSubject,
-        as: "entries",
-        required: true,
-        include: [{ model: Subject, as: "subject", required: true, where: { program, active: true } }],
-      }],
+    // Danh mục học phần hiệu lực của mỗi lớp = học phần bắt buộc trong CTĐT
+    // + học phần tự chọn mà Viện đã chỉ định cho lớp.
+    const curriculumIds = [...new Set(groups.map((group) => group.curriculumId).filter((id): id is string => Boolean(id)))];
+    const curriculumSubjectRows = curriculumIds.length === 0 ? [] : await this.curriculumSubjects.findAll({
+      where: { curriculumId: { [Op.in]: curriculumIds } },
+      include: [{ model: Subject, as: "subject", required: true, where: { program, active: true } }],
     });
+    const chosenElectives = await this.classGroupElectives.findAll({
+      where: { classGroupId: { [Op.in]: groupIds } },
+      attributes: ["classGroupId", "curriculumSubjectId"],
+    });
+    const electiveIdsByGroup = new Map<string, Set<string>>();
+    for (const elective of chosenElectives) {
+      const bucket = electiveIdsByGroup.get(elective.classGroupId) || new Set<string>();
+      bucket.add(elective.curriculumSubjectId);
+      electiveIdsByGroup.set(elective.classGroupId, bucket);
+    }
 
     const groupById = new Map(groups.map((group) => [group.id, group]));
     const localPairs: Array<{ classGroupId: string; localSubject: Subject }> = [];
-    for (const pkg of packages) {
-      for (const entry of pkg.entries || []) {
-        const localSubject = entry.subject as Subject;
+    for (const group of groups) {
+      if (!group.curriculumId) continue;
+      const allowed = electiveIdsByGroup.get(group.id) || new Set<string>();
+      for (const row of curriculumSubjectRows) {
+        if (row.curriculumId !== group.curriculumId) continue;
+        if (!row.isRequired && !allowed.has(row.id)) continue;
+        const localSubject = row.subject as Subject;
         if (!localSubject) continue;
-        localPairs.push({ classGroupId: pkg.classGroupId, localSubject });
+        localPairs.push({ classGroupId: group.id, localSubject });
+      }
+    }
+
+    const commonSubjects = ((await this.subjects.findAll({
+      where: { program, active: true, subjectType: "KC" },
+    })) || []).filter((s: any) => s?.subjectType === "KC");
+    for (const group of groups) {
+      for (const commonSubject of commonSubjects) {
+        if (!localPairs.some((p) => p.classGroupId === group.id && (p.localSubject.id === commonSubject.id || this.sameSubjectAcrossMajors(p.localSubject, commonSubject)))) {
+          localPairs.push({ classGroupId: group.id, localSubject: commonSubject });
+        }
       }
     }
 
     const rootsById = await this.loadCanonicalRoots(localPairs.map((pair) => pair.localSubject), program);
     const resolvedPairs = localPairs.flatMap((pair) => {
       const classGroup = groupById.get(pair.classGroupId);
-      if (!classGroup || pair.localSubject.majorId !== classGroup.majorId) return [];
+      if (!classGroup) return [];
+      const isCommonSubject = pair.localSubject.subjectType === "KC" || pair.localSubject.allowCrossMajor === true;
+      if (!isCommonSubject && pair.localSubject.majorId !== classGroup.majorId) return [];
       return [{
         ...pair,
         logicalSubject: this.logicalSubjectFor(pair.localSubject, rootsById, program),
@@ -449,8 +476,7 @@ export class SchedulingService {
     for (const pair of automaticallyMatchedPairs) {
       const isAnchor = anchorGroupIds.has(pair.classGroupId);
       const group = groupById.get(pair.classGroupId);
-      const inRequestedPeriod = group?.academicYear === query.academicYear;
-      if (!isAnchor && (!inRequestedPeriod || !anchorLogicalIds.has(pair.logicalSubject.id)
+      if (!isAnchor && (!anchorLogicalIds.has(pair.logicalSubject.id)
         || (group?.majorId !== query.majorId && !this.sharingEnabled(pair.logicalSubject)))) continue;
       pairByKey.set(`${pair.classGroupId}:${pair.logicalSubject.id}`, pair);
     }
@@ -500,11 +526,16 @@ export class SchedulingService {
 
     const subjects = [...result.values()]
       .filter((row) => row.eligibleClassGroups.some((group) => anchorGroupIds.has(group.id)))
-      .sort((left, right) => (
-        Number(left.subject.sortOrder || 0) - Number(right.subject.sortOrder || 0)
-        || Number(left.subject.codeNumber || 0) - Number(right.subject.codeNumber || 0)
-        || String(left.subject.name || "").localeCompare(String(right.subject.name || ""), "vi")
-      ));
+      .sort((left, right) => {
+        const leftKC = left.subject.subjectType === "KC" ? 0 : 1;
+        const rightKC = right.subject.subjectType === "KC" ? 0 : 1;
+        if (leftKC !== rightKC) return leftKC - rightKC;
+        return (
+          Number(left.subject.sortOrder || 0) - Number(right.subject.sortOrder || 0)
+          || Number(left.subject.codeNumber || 0) - Number(right.subject.codeNumber || 0)
+          || String(left.subject.name || "").localeCompare(String(right.subject.name || ""), "vi")
+        );
+      });
 
     return {
       scope: { program, majorId: query.majorId, academicYear: query.academicYear },
@@ -547,40 +578,70 @@ export class SchedulingService {
         throw new BadRequestException("Học phần chưa được tích cho phép học chung khác ngành.");
       }
 
-      const packages = await this.packages.findAll({
-        where: { classGroupId: { [Op.in]: sortedGroupIds }, isOfficial: true, active: true },
-        include: [{
-          model: SubjectPackageSubject,
-          as: "entries",
-          required: true,
-          include: [{ model: Subject, as: "subject", required: true, where: { program: subject.program, active: true } }],
-        }],
+      const curriculumIds = [...new Set(groups.map((group) => group.curriculumId).filter((id): id is string => Boolean(id)))];
+      const curriculumSubjectRows = curriculumIds.length === 0 ? [] : await this.curriculumSubjects.findAll({
+        where: { curriculumId: { [Op.in]: curriculumIds } },
+        include: [{ model: Subject, as: "subject", required: true, where: { program: subject.program, active: true } }],
         transaction,
         lock: transaction.LOCK.UPDATE,
       });
-      const packageByGroup = new Map(packages.map((pkg) => [pkg.classGroupId, pkg]));
-      const packageSubjects = packages.flatMap((pkg) => (pkg.entries || [])
-        .map((entry) => entry.subject as Subject)
-        .filter(Boolean));
-      const rootsById = await this.loadCanonicalRoots(packageSubjects, subject.program, transaction);
+      const chosenElectives = await this.classGroupElectives.findAll({
+        where: { classGroupId: { [Op.in]: sortedGroupIds } },
+        attributes: ["classGroupId", "curriculumSubjectId"],
+        transaction,
+      });
+      const electiveIdsByGroup = new Map<string, Set<string>>();
+      for (const elective of chosenElectives) {
+        const bucket = electiveIdsByGroup.get(elective.classGroupId) || new Set<string>();
+        bucket.add(elective.curriculumSubjectId);
+        electiveIdsByGroup.set(elective.classGroupId, bucket);
+      }
+      const entriesByGroup = new Map<string, Subject[]>();
+      const commonSubjects = ((await this.subjects.findAll({
+        where: { program: subject.program, active: true, subjectType: "KC" },
+        transaction,
+      })) || []).filter((s: any) => s?.subjectType === "KC");
+      for (const group of groups) {
+        if (!group.curriculumId) {
+          throw new BadRequestException(`Nhóm "${group.code}" chưa được gắn chương trình đào tạo.`);
+        }
+        const allowed = electiveIdsByGroup.get(group.id) || new Set<string>();
+        const localSubjects = curriculumSubjectRows
+          .filter((row) => row.curriculumId === group.curriculumId && (row.isRequired || allowed.has(row.id)))
+          .map((row) => row.subject as Subject)
+          .filter(Boolean);
+        for (const commonSub of commonSubjects) {
+          if (!localSubjects.some((s) => s.id === commonSub.id || this.sameSubjectAcrossMajors(s, commonSub))) {
+            localSubjects.push(commonSub);
+          }
+        }
+        if (localSubjects.length === 0) {
+          throw new BadRequestException(`Chương trình đào tạo của nhóm "${group.code}" chưa có học phần nào.`);
+        }
+        entriesByGroup.set(group.id, localSubjects);
+      }
+      const rootsById = await this.loadCanonicalRoots(
+        [...entriesByGroup.values()].flat(),
+        subject.program,
+        transaction,
+      );
       const matchingSubjectIds = new Set<string>([subject.id, requestedSubject.id]);
       for (const group of groups) {
-        const officialPackage = packageByGroup.get(group.id);
-        if (!officialPackage) {
-          throw new BadRequestException(`Nhóm "${group.code}" chưa có gói học phần chính thức đang hoạt động.`);
-        }
-        const matchingLocalSubject = (officialPackage.entries || [])
-          .map((entry) => entry.subject as Subject)
-          .find((localSubject) => (
-            localSubject
-            && localSubject.majorId === group.majorId
-            && (
-              this.logicalSubjectFor(localSubject, rootsById, subject.program).id === subject.id
-              || (this.sharingEnabled(subject) && this.sameSubjectAcrossMajors(subject, localSubject))
-            )
-          ));
+        const matchingLocalSubject = (entriesByGroup.get(group.id) || []).find((localSubject) => (
+          localSubject
+          && (
+            localSubject.majorId === group.majorId
+            || localSubject.subjectType === "KC"
+            || localSubject.allowCrossMajor === true
+          )
+          && (
+            localSubject.id === subject.id
+            || this.logicalSubjectFor(localSubject, rootsById, subject.program).id === subject.id
+            || (this.sharingEnabled(subject) && this.sameSubjectAcrossMajors(subject, localSubject))
+          )
+        ));
         if (!matchingLocalSubject) {
-          throw new BadRequestException(`Gói học phần chính thức của nhóm "${group.code}" không chứa môn trùng tên và số tín chỉ.`);
+          throw new BadRequestException(`Chương trình đào tạo của nhóm "${group.code}" không có môn trùng tên và số tín chỉ.`);
         }
         matchingSubjectIds.add(matchingLocalSubject.id);
       }
@@ -606,10 +667,10 @@ export class SchedulingService {
 
       const individuals = await this.requireIndividualStudents(subject.id, dto.admissionRecordIds || [], transaction);
       if (!commonWeekdays(groups).length) throw new BadRequestException("Các nhóm đã chọn không có ngày học chung.");
-      // majorId is the discovery scope; eligible groups may all belong to other majors.
-      // Their eligibility is determined by the official package and subject checks above.
-      if (dto.academicYear && groups.some((group) => group.academicYear !== dto.academicYear)) {
-        throw new BadRequestException("Các nhóm ghép chung phải thuộc cùng khóa / năm học đang tổ chức.");
+      // When academicYear is specified, at least one group must belong to this organizing cohort/academic year.
+      // Groups from other cohorts (e.g. earlier years) are allowed to be merged if eligible.
+      if (dto.academicYear && !groups.some((group) => group.academicYear === dto.academicYear)) {
+        throw new BadRequestException("Lớp học phần phải có ít nhất một nhóm thuộc khóa / năm học đang tổ chức.");
       }
       let selectedRetakes: any[] = [];
       if (individuals.length) {
@@ -624,7 +685,7 @@ export class SchedulingService {
         const targetYears = dto.academicYear ? [dto.academicYear] : groups.map((group) => group.academicYear || "");
         for (const record of individuals) {
           const request = retakes.find((item) => item.id === record.id);
-          if (!request || !targetYears.every((year) => isEarlierAcademicYear(request.academicYear, year))) {
+          if (!request || !targetYears.some((year) => isEarlierAcademicYear(request.academicYear, year))) {
             throw new BadRequestException("Học viên bổ sung phải có nhu cầu học lại đã ghi nhận từ khóa trước và chưa thuộc lớp đang dạy của học phần.");
           }
         }
@@ -646,6 +707,7 @@ export class SchedulingService {
         }
       }
       const offering = await this.courseOfferings.create({
+        name: dto.name || null,
         subjectId: subject.id,
         status: "active",
         note: dto.note || null,
@@ -989,6 +1051,21 @@ export class SchedulingService {
     this.requireEnabledProgram(offering.subject.program);
     const sessions = await this.teachingSessions.findAll({
       where: { courseOfferingId, status: "planned" },
+      include: this.sessionIncludes(),
+      order: [["sessionDate", "ASC"], ["startTime", "ASC"], ["id", "ASC"]],
+    });
+    await this.attachParticipantCounts(sessions.map((session) => session.courseOffering).filter(Boolean));
+    return sessions;
+  }
+
+  async listTeachingSessionsForOffering(courseOfferingId: string) {
+    const offering = await this.courseOfferings.findByPk(courseOfferingId, {
+      include: [{ model: Subject, as: "subject", required: true }],
+    });
+    if (!offering) throw new NotFoundException("Không tìm thấy lớp học phần.");
+    this.requireEnabledProgram(offering.subject.program);
+    const sessions = await this.teachingSessions.findAll({
+      where: { courseOfferingId },
       include: this.sessionIncludes(),
       order: [["sessionDate", "ASC"], ["startTime", "ASC"], ["id", "ASC"]],
     });

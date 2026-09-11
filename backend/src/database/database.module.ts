@@ -26,11 +26,14 @@ import { AdmissionTarget } from "./models/plan/admission-target.model.js";
 import { AnnualFee } from "./models/plan/annual-fee.model.js";
 import { AdmissionRecord } from "./models/plan/admission-record.model.js";
 import { Subject } from "./models/plan/subject.model.js";
-import { SubjectPackage } from "./models/plan/subject-package.model.js";
-import { SubjectPackageSubject } from "./models/plan/subject-package-subject.model.js";
+import { Curriculum } from "./models/plan/curriculum.model.js";
+import { CurriculumBlock } from "./models/plan/curriculum-block.model.js";
+import { CurriculumElectiveGroup } from "./models/plan/curriculum-elective-group.model.js";
+import { CurriculumSubject } from "./models/plan/curriculum-subject.model.js";
 // Bảng riêng: nhóm học phần & thi (dùng chung)
 import { ClassGroup } from "./models/training/class-group.model.js";
 import { ClassGroupMember } from "./models/training/class-group-member.model.js";
+import { ClassGroupElective } from "./models/training/class-group-elective.model.js";
 import { ExamSession } from "./models/training/exam-session.model.js";
 import { ExamEligibility } from "./models/training/exam-eligibility.model.js";
 import { ExamResult } from "./models/training/exam-result.model.js";
@@ -59,9 +62,9 @@ export const databaseModels = [
   Major, StudyStatus, BridgeKnowledgeSubject, Lecturer, Room, TrainingProgram,
   // Plan
   TrainingPlan, AdmissionTarget, AnnualFee, AdmissionRecord,
-  Subject, SubjectPackage, SubjectPackageSubject,
+  Subject, Curriculum, CurriculumBlock, CurriculumElectiveGroup, CurriculumSubject,
   // Training (class & exam)
-  ClassGroup, ClassGroupMember, CourseOffering, CourseOfferingClassGroup, CourseOfferingStudent, TeachingSession, ExamSession, ExamEligibility, ExamResult,
+  ClassGroup, ClassGroupMember, ClassGroupElective, CourseOffering, CourseOfferingClassGroup, CourseOfferingStudent, TeachingSession, ExamSession, ExamEligibility, ExamResult,
   // Masters
   MastersAdmissionScore, EnglishExamSession, EnglishExamScore, EnglishCertification, GraduationDefense, GraduationRecord,
   // Doctoral

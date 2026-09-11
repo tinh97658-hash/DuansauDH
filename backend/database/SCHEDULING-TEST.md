@@ -23,12 +23,12 @@ Chọn học phần → nhóm `DEV-SCHED-2026` → **Tạo lớp học phần** 
 
 ## Chuỗi dữ liệu và điều kiện ứng viên
 
-Seed tạo một chuyên ngành thạc sĩ đang hoạt động, ba học phần cùng ngành đang hoạt động (không có alias), một nhóm thuộc ngành/năm 2026, ba hồ sơ trúng tuyển và ba thành viên nhóm, một gói học phần **active + isOfficial**, ba liên kết từ gói tới học phần. Một giảng viên và một phòng 30 chỗ được thêm để thử bước xếp lịch sau đó.
+Seed tạo một chuyên ngành thạc sĩ đang hoạt động, **một chương trình đào tạo của ngành + bậc + khóa 2026** gồm một khối kiến thức và ba học phần cùng ngành đang hoạt động (không có alias), một nhóm thuộc ngành/năm 2026 **kế thừa CTĐT đó**, ba hồ sơ trúng tuyển và ba thành viên nhóm. Hai học phần là bắt buộc, học phần thứ ba là tự chọn và được Viện chỉ định cho cả lớp qua `class_group_electives`. Một giảng viên và một phòng 30 chỗ được thêm để thử bước xếp lịch sau đó.
 
-`SchedulingService.listCourseOfferingCandidates` đọc chính chuỗi này. Service hiện không yêu cầu bản ghi `TrainingProgram` cho điều kiện ứng viên. Seed không tạo `CourseOffering`, `CourseOfferingClassGroup` hoặc `TeachingSession`: nếu tạo trước lớp học phần thì cặp nhóm–học phần sẽ bị loại khỏi danh sách còn cần tổ chức. Các migration cần được chạy đầy đủ, bao gồm 021–024 và các migration nền cho gói học phần.
+`SchedulingService.listCourseOfferingCandidates` đọc chính chuỗi này: với mỗi lớp, danh mục học phần hiệu lực = học phần **bắt buộc** trong CTĐT cộng học phần **tự chọn** đã chọn cho lớp. Service hiện không yêu cầu bản ghi `TrainingProgram` cho điều kiện ứng viên. Seed không tạo `CourseOffering`, `CourseOfferingClassGroup` hoặc `TeachingSession`: nếu tạo trước lớp học phần thì cặp nhóm–học phần sẽ bị loại khỏi danh sách còn cần tổ chức. Các migration cần được chạy đầy đủ, bao gồm 021–024 và 030 (chương trình đào tạo).
 
 Frontend gọi API thật, API đọc PostgreSQL thật. Sau khi chèn, script gọi chính service của `/scheduling/course-offering-candidates` và in số lượng cùng URL truy vấn để kiểm tra.
 
 ## Chạy lại
 
-Seed dùng ID cố định, chỉ bổ sung dòng còn thiếu trong một transaction, không xóa hay ghi đè dữ liệu có sẵn. Chạy lại không nhân đôi hồ sơ, nhóm hoặc gói học phần. Khi đã dùng giao diện để tạo lớp, học phần tương ứng có thể không còn là ứng viên; chạy seed lại không xóa lịch sử đó. Nếu cần bắt đầu lại từ đầu, dùng database development mới rồi migrate và seed.
+Seed dùng ID cố định, chỉ bổ sung dòng còn thiếu trong một transaction, không xóa hay ghi đè dữ liệu có sẵn. Chạy lại không nhân đôi hồ sơ, nhóm hoặc học phần trong CTĐT. Khi đã dùng giao diện để tạo lớp, học phần tương ứng có thể không còn là ứng viên; chạy seed lại không xóa lịch sử đó. Nếu cần bắt đầu lại từ đầu, dùng database development mới rồi migrate và seed.

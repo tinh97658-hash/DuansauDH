@@ -3,22 +3,32 @@ import { AuthenticatedGuard } from "../common/authenticated.guard.js";
 import { Roles } from "../common/auth-user.js";
 import { RolesGuard } from "../common/roles.guard.js";
 import {
-  CreateAdmissionRecordDto, CreateClassDto, CreateSubjectDto, CreateSubjectPackageDto,
-  UpdateAdmissionRecordDto, UpdateClassDto, UpdateSubjectDto, UpdateSubjectPackageDto,
+  CreateAdmissionRecordDto, CreateClassDto, CreateCurriculumDto, CreateSubjectDto,
+  SetClassElectivesDto, SetCurriculumSubjectsDto,
+  UpdateAdmissionRecordDto, UpdateClassDto, UpdateCurriculumDto, UpdateSubjectDto,
 } from "./dto/plan.dto.js";
+import { CurriculumService } from "./curriculum.service.js";
 import { PlanService } from "./plan.service.js";
 
 @Controller("plan")
 @UseGuards(AuthenticatedGuard)
 export class PlanController {
-  constructor(private readonly plan: PlanService) {}
+  constructor(
+    private readonly plan: PlanService,
+    private readonly curriculums: CurriculumService,
+  ) {}
 
   @Get("training-plan") trainingPlan(@Query("program") program?: string) { return this.plan.trainingPlan(program); }
   @Get("admission-targets") admissionTargets() { return this.plan.admissionTargets(); }
   @Get("annual-fees") annualFees() { return this.plan.annualFees(); }
 
-  // ===== Học phần theo chuyên ngành & bậc đào tạo =====
-  @Get("subjects") subjects(@Query("majorId") majorId?: string, @Query("program") program?: string) { return this.plan.listSubjects(majorId, program); }
+  @Get("subjects") subjects(
+    @Query("majorId") majorId?: string,
+    @Query("program") program?: string,
+    @Query("includeCommon") includeCommon?: string,
+  ) {
+    return this.plan.listSubjects(majorId, program, includeCommon === "true");
+  }
   @Post("subjects") @Roles("admin") @UseGuards(RolesGuard) createSubject(@Body() dto: CreateSubjectDto) { return this.plan.createSubject(dto); }
   @Put("subjects/:id") @Roles("admin") @UseGuards(RolesGuard) updateSubject(@Param("id") id: string, @Body() dto: UpdateSubjectDto) { return this.plan.updateSubject(id, dto); }
   @Delete("subjects/:id") @Roles("admin") @UseGuards(RolesGuard) removeSubject(@Param("id") id: string) { return this.plan.removeSubject(id); }
@@ -29,13 +39,18 @@ export class PlanController {
   @Put("classes/:id") @Roles("admin") @UseGuards(RolesGuard) updateClass(@Param("id") id: string, @Body() dto: UpdateClassDto) { return this.plan.updateClass(id, dto); }
   @Delete("classes/:id") @Roles("admin") @UseGuards(RolesGuard) removeClass(@Param("id") id: string) { return this.plan.removeClass(id); }
 
-  // ===== Gói học phần theo lớp =====
-  @Get("subject-packages") subjectPackages(@Query("classGroupId") classGroupId?: string) { return this.plan.listPackages(classGroupId); }
-  @Post("classes/:id/default-packages") @Roles("admin") @UseGuards(RolesGuard) createDefaultPackages(@Param("id") id: string) { return this.plan.createDefaultPackages(id); }
-  @Post("subject-packages") @Roles("admin") @UseGuards(RolesGuard) createPackage(@Body() dto: CreateSubjectPackageDto) { return this.plan.createPackage(dto); }
-  @Put("subject-packages/:id/set-official") @Roles("admin") @UseGuards(RolesGuard) setOfficialPackage(@Param("id") id: string) { return this.plan.setOfficialPackage(id); }
-  @Put("subject-packages/:id") @Roles("admin") @UseGuards(RolesGuard) updatePackage(@Param("id") id: string, @Body() dto: UpdateSubjectPackageDto) { return this.plan.updatePackage(id, dto); }
-  @Delete("subject-packages/:id") @Roles("admin") @UseGuards(RolesGuard) removePackage(@Param("id") id: string) { return this.plan.removePackage(id); }
+  // ===== Chương trình đào tạo (theo ngành + bậc + khóa) =====
+  @Get("curriculums") listCurriculums(@Query("majorId") majorId?: string, @Query("program") program?: string) { return this.curriculums.list(majorId, program); }
+  @Get("curriculums/:id") curriculum(@Param("id") id: string) { return this.curriculums.detail(id); }
+  @Post("curriculums") @Roles("admin") @UseGuards(RolesGuard) createCurriculum(@Body() dto: CreateCurriculumDto) { return this.curriculums.create(dto); }
+  @Put("curriculums/:id") @Roles("admin") @UseGuards(RolesGuard) updateCurriculum(@Param("id") id: string, @Body() dto: UpdateCurriculumDto) { return this.curriculums.update(id, dto); }
+  @Put("curriculums/:id/subjects") @Roles("admin") @UseGuards(RolesGuard) setCurriculumSubjects(@Param("id") id: string, @Body() dto: SetCurriculumSubjectsDto) { return this.curriculums.setSubjects(id, dto); }
+  @Delete("curriculums/:id") @Roles("admin") @UseGuards(RolesGuard) removeCurriculum(@Param("id") id: string) { return this.curriculums.remove(id); }
+
+  // ===== Học phần của lớp: kế thừa CTĐT + học phần tự chọn Viện chỉ định =====
+  @Get("classes/:id/subjects") classSubjects(@Param("id") id: string) { return this.curriculums.classSubjects(id); }
+  @Post("classes/:id/curriculum") @Roles("admin") @UseGuards(RolesGuard) ensureClassCurriculum(@Param("id") id: string) { return this.curriculums.ensureForClass(id); }
+  @Put("classes/:id/electives") @Roles("admin") @UseGuards(RolesGuard) setClassElectives(@Param("id") id: string, @Body() dto: SetClassElectivesDto) { return this.curriculums.setClassElectives(id, dto.curriculumSubjectIds); }
 
   // ===== Hồ sơ tuyển sinh (Admission Records) =====
   @Get("admission-records")
