@@ -150,16 +150,18 @@ export class MastersService {
   async batchCreateClassGroups(dto: import("./dto/masters-class-group.dto.js").BatchCreateMastersClassGroupsDto) {
     return this.sequelize.transaction(async (transaction) => {
       await this.requireMastersMajor(dto.majorId, transaction);
+      const nameSeparator = /[.\-_]$/.test(dto.namePrefix) ? "" : " ";
       const rows = Array.from({ length: dto.count }, (_, offset) => {
         const number = String(dto.startIndex + offset).padStart(2, "0");
         return {
           program: "masters",
           code: `${dto.codePrefix}${number}`,
-          name: `${dto.namePrefix} ${number}`,
+          name: `${dto.namePrefix}${nameSeparator}${number}`,
           majorId: dto.majorId || null,
           academicYear: dto.academicYear,
           maxStudents: dto.maxStudents,
-          status: "open",
+          status: dto.status || "open",
+          note: dto.note || null,
         };
       });
       const existing = await this.classGroups.findAll({

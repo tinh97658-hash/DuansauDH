@@ -11,6 +11,7 @@ describe("shared application typography", () => {
   });
 
   it("propagates the shared font and size to common MUI controls", () => {
+    expect(theme.components.MuiTypography.styleOverrides.root.fontFamily).toBe("inherit");
     expect(theme.components.MuiButton.styleOverrides.root.fontFamily).toBe("inherit");
     expect(theme.components.MuiButton.styleOverrides.root.fontSize).toBe("12.5px");
     expect(theme.components.MuiMenuItem.styleOverrides.root.fontSize).toBe("12.5px");

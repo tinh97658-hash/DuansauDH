@@ -67,10 +67,10 @@ const SubjectIdentityFields = ({
     >
       <Stack spacing={1.25}>
         <Box>
-          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#173B70" }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#173E75" }}>
             Học phần dùng chung giữa các ngành
           </Typography>
-          <Typography variant="caption" sx={{ color: "#68737D" }}>
+          <Typography variant="caption" sx={{ color: "#607486" }}>
             Chỉ cấu hình khi đây là học phần gốc dùng chung hoặc là bản ghi tương ứng của một ngành khác.
           </Typography>
         </Box>

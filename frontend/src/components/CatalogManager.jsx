@@ -212,7 +212,7 @@ const CatalogManager = ({
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <SearchRounded fontSize="small" sx={{ color: "#8A94A3" }} />
+                <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
               </InputAdornment>
             ),
           }}
@@ -254,7 +254,7 @@ const CatalogManager = ({
             ) : filtered.map((row, index) => (
               <TableRow key={row.id} hover>
                 <TableCell>{index + 1}</TableCell>
-                <TableCell><Typography variant="body2" sx={{ fontFamily: "monospace" }}>{row.code}</Typography></TableCell>
+                <TableCell><Typography variant="body2" sx={{ fontFamily: "inherit" }}>{row.code}</Typography></TableCell>
                 <TableCell>{row.name}</TableCell>
                 {parent && <TableCell>{parent.display ? parent.display(row) : row[parent.field]}</TableCell>}
                 {tableFields.map((f) => <TableCell key={f.key}>{renderFieldValue(row, f)}</TableCell>)}

@@ -211,10 +211,10 @@ const AppLayout = ({ children }) => {
           onError={(e) => { e.target.style.display = "none"; }}
         />
         <Box sx={{ minWidth: 0, flexGrow: 1 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#173B70", fontSize: 13, lineHeight: 1.2, letterSpacing: "0.2px" }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#173E75", fontSize: 13, lineHeight: 1.2, letterSpacing: "0.2px" }}>
             VIỆN SAU ĐẠI HỌC VMU
           </Typography>
-          <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11, display: "block", mt: 0.2 }}>
+          <Typography variant="caption" sx={{ color: "#607486", fontSize: 11, display: "block", mt: 0.2 }}>
             Quản lý đào tạo & nghiên cứu
           </Typography>
         </Box>
@@ -247,16 +247,16 @@ const AppLayout = ({ children }) => {
                   sx={{
                     fontSize: 11,
                     fontWeight: 700,
-                    color: "#68737D",
+                    color: "#607486",
                     letterSpacing: "0.5px",
                   }}
                 >
                   {group.title}
                 </Typography>
                 {isCollapsed ? (
-                  <ExpandMoreRounded sx={{ fontSize: 16, color: "#8a94a3" }} />
+                  <ExpandMoreRounded sx={{ fontSize: 16, color: "#8A9AAA" }} />
                 ) : (
-                  <ExpandLessRounded sx={{ fontSize: 16, color: "#8a94a3" }} />
+                  <ExpandLessRounded sx={{ fontSize: 16, color: "#8A9AAA" }} />
                 )}
               </Box>
 
@@ -278,7 +278,7 @@ const AppLayout = ({ children }) => {
                             px: 1.5,
                             borderRadius: "4px",
                             bgcolor: isActive ? "#0788B8 !important" : "transparent",
-                            color: isActive ? "#FFFFFF" : "#20262C",
+                            color: isActive ? "#FFFFFF" : "#172B3A",
                             "&:hover": {
                               bgcolor: isActive ? "#0788B8" : "#F0F4F8",
                             },
@@ -368,20 +368,20 @@ const AppLayout = ({ children }) => {
               aria-label="open drawer"
               edge="start"
               onClick={handleDrawerToggle}
-              sx={{ display: { md: "none" }, color: "#20262C" }}
+              sx={{ display: { md: "none" }, color: "#172B3A" }}
             >
               <MenuRounded />
             </IconButton>
 
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11, display: "block", lineHeight: 1.1 }}>
+              <Typography variant="caption" sx={{ color: "#607486", fontSize: 11, display: "block", lineHeight: 1.1 }}>
                 Hệ thống Sau đại học · {activeNavInfo.groupTitle}
               </Typography>
               <Typography
                 variant="subtitle2"
                 sx={{
                   fontWeight: 800,
-                  color: "#173B70",
+                  color: "#173E75",
                   fontSize: 14,
                   lineHeight: 1.2,
                   whiteSpace: "nowrap",
@@ -435,7 +435,7 @@ const AppLayout = ({ children }) => {
                 sx={{
                   width: 30,
                   height: 30,
-                  bgcolor: "#173B70",
+                  bgcolor: "#173E75",
                   color: "#FFFFFF",
                   fontSize: 12,
                   fontWeight: 800,
@@ -446,15 +446,15 @@ const AppLayout = ({ children }) => {
               </Avatar>
 
               <Box sx={{ display: { xs: "none", sm: "block" }, textAlign: "left" }}>
-                <Typography variant="body2" sx={{ fontSize: 12, fontWeight: 700, color: "#20262C", lineHeight: 1.1 }}>
+                <Typography variant="body2" sx={{ fontSize: 12, fontWeight: 700, color: "#172B3A", lineHeight: 1.1 }}>
                   {currentUser?.name || (role === "admin" ? "Nguyễn Văn A" : "Giảng viên")}
                 </Typography>
-                <Typography variant="caption" sx={{ fontSize: 10, color: "#68737D", display: "block" }}>
+                <Typography variant="caption" sx={{ fontSize: 10, color: "#607486", display: "block" }}>
                   {roleLabels[role] || role}
                 </Typography>
               </Box>
 
-              <ExpandMoreRounded sx={{ fontSize: 16, color: "#8a94a3" }} />
+              <ExpandMoreRounded sx={{ fontSize: 16, color: "#8A9AAA" }} />
             </Box>
 
             {/* Profile Dropdown Menu */}
@@ -478,7 +478,7 @@ const AppLayout = ({ children }) => {
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: 13 }}>
                   {currentUser?.name || "Tài khoản nội bộ"}
                 </Typography>
-                <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>
+                <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>
                   {currentUser?.email || roleLabels[role] || role}
                 </Typography>
               </Box>

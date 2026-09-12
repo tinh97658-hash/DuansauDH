@@ -155,8 +155,8 @@ const RibbonHeader = () => {
             <img src={BRAND.logoUrl} alt={`Biểu trưng ${BRAND.university}`} />
           </button>
           <div className="ribbon-title">
-            <strong>{BRAND.institute}</strong>
-            <span>{BRAND.university} · {BRAND.systemName}</span>
+            <strong>{BRAND.university}</strong>
+            <span>{BRAND.institute}</span>
           </div>
         </div>
         <div className="ribbon-user" title={`Vai trò: ${roleNames[role] || role}`}>

@@ -346,7 +346,7 @@ const AssignClassGroups = () => {
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <SearchRounded fontSize="small" sx={{ color: "#8A94A3" }} />
+                      <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
                     </InputAdornment>
                   ),
                 }}
@@ -426,7 +426,7 @@ const AssignClassGroups = () => {
                             />
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" sx={{ fontFamily: "monospace", fontWeight: 600 }}>
+                            <Typography variant="body2" sx={{ fontFamily: "inherit", fontWeight: 600 }}>
                               {s.code || "-"}
                             </Typography>
                           </TableCell>
@@ -544,7 +544,7 @@ const AssignClassGroups = () => {
                     groupMembers.map((m, idx) => (
                       <TableRow key={m.id} hover>
                         <TableCell>{idx + 1}</TableCell>
-                        <TableCell sx={{ fontFamily: "monospace", fontWeight: 600 }}>{m.code || "-"}</TableCell>
+                        <TableCell sx={{ fontFamily: "inherit", fontWeight: 600 }}>{m.code || "-"}</TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>{m.fullName}</TableCell>
                         <TableCell sx={{ fontSize: "0.8rem", color: "text.secondary" }}>{m.dob || "-"}</TableCell>
                         <TableCell align="right">

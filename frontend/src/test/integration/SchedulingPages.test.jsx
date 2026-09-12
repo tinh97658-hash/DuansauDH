@@ -23,6 +23,27 @@ const reach = async () => {
   fireEvent.click(await screen.findByRole("button", { name: /HP01.*Khai thác cảng/ }));
 };
 beforeEach(() => jest.clearAllMocks());
+it("labels only institute-level KC subjects as common", async () => {
+  const crossMajorSubject = { ...subject, subjectType: "CN", allowCrossMajor: true };
+  const commonSubject = { id: "common-subject", code: "HP02", name: "Học phần chung cấp Viện", subjectType: "KC", allowCrossMajor: true };
+  axios.get.mockImplementation(async (url) => ({ data:
+    url.endsWith("/auth/session") ? { user: { role: "admin" } }
+      : url.includes("/system/majors") ? [major]
+        : url.includes("/masters/class-groups") ? [group]
+          : url.includes("/course-offering-candidates") ? { subjects: [
+            { subject: crossMajorSubject, eligibleClassGroups: [group] },
+            { subject: commonSubject, eligibleClassGroups: [group] },
+          ] }
+            : [],
+  }));
+  axios.post.mockResolvedValue({ data: { participants: [], participantCount: 0 } });
+
+  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  await reach();
+
+  expect(within(screen.getByRole("button", { name: /HP01/ })).queryByText("Môn chung")).not.toBeInTheDocument();
+  expect(within(screen.getByRole("button", { name: /HP02/ })).getByText("Môn chung")).toBeInTheDocument();
+});
 it("shows each group's own major and submits mixed-major groups outside the working scope", async () => {
   mocks();
   const maritime = { id: "maritime", name: "Khoa học hàng hải", active: true };
@@ -206,8 +227,8 @@ it("renders course matrix across cohorts, displays KPIs and switches between vie
 
   render(<MemoryRouter initialEntries={["/masters/course-matrix"]}><CourseMatrixPage /></MemoryRouter>);
 
-  expect(await screen.findByText("MA TRẬN LỚP HỌC PHẦN THEO KHÓA")).toBeInTheDocument();
-  expect(screen.getByText("TỔNG SỐ LỚP HỌC PHẦN")).toBeInTheDocument();
+  expect(await screen.findByText("TỔNG SỐ LỚP HỌC PHẦN")).toBeInTheDocument();
+  expect(screen.queryByText("MA TRẬN LỚP HỌC PHẦN THEO KHÓA")).not.toBeInTheDocument();
   expect(screen.getByText("CHƯA XẾP LỊCH")).toBeInTheDocument();
 
   // Check cohort columns exist

@@ -115,7 +115,7 @@ const Rooms = () => {
               ) : filtered.map((room, index) => (
                 <TableRow key={room.id} hover>
                   <TableCell>{index + 1}</TableCell>
-                  <TableCell><Typography variant="body2" sx={{ fontFamily: "monospace", fontWeight: 700 }}>{room.code}</Typography></TableCell>
+                  <TableCell><Typography variant="body2" sx={{ fontFamily: "inherit", fontWeight: 700 }}>{room.code}</Typography></TableCell>
                   <TableCell>{room.name}</TableCell>
                   <TableCell align="center">{getRoomFloor(room.code) ?? "—"}</TableCell>
                   <TableCell align="center">{room.capacity ?? "Chưa khai báo"}</TableCell>

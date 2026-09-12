@@ -37,9 +37,11 @@ export class AutoAssignDto {
 export class BatchCreateMastersClassGroupsDto {
   @IsString() @MaxLength(20) @Transform(trimUpper) codePrefix!: string;
   @IsString() @MaxLength(160) @Transform(trim) namePrefix!: string;
-  @IsInt() @Min(1) @Max(20) count!: number;
+  @IsInt() @Min(1) @Max(10) count!: number;
   @IsInt() @Min(0) startIndex!: number;
   @IsOptional() @IsUUID() majorId?: string;
   @IsString() @MaxLength(20) @Transform(trim) academicYear!: string;
   @IsInt() @Min(1) @Max(200) maxStudents!: number;
+  @IsOptional() @IsEnum(["open", "closed"]) status?: "open" | "closed";
+  @IsOptional() @IsString() @MaxLength(1000) @Transform(trim) note?: string;
 }

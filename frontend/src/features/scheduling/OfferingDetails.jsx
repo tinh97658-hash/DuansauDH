@@ -232,16 +232,17 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
       <h3 className="sl-offering-groups-title" style={{ marginTop: 14 }}>DANH SÁCH HỌC VIÊN</h3>
       {roster.loading ? <Notice>Đang tải danh sách...</Notice> : roster.error ? <Notice error={roster.error} /> : (
         <>
-          <div style={{ maxHeight: 240, overflowY: "auto", border: "1px solid #d5dfe6", borderRadius: 4, background: "#fff" }}>
-            <table className="v20-table">
+          <div className="sl-offering-roster-wrap">
+            <table className="v20-table sl-offering-roster-table">
               <thead><tr><th>STT</th><th>HỌC VIÊN</th><th>GHI CHÚ</th></tr></thead>
               <tbody>
                 {(roster.data?.participants || []).map((row, index) => (
                   <tr key={row.id}>
                     <td>{index + 1}</td>
-                    <td><strong>{row.code}</strong><br /><span>{row.fullName}</span></td>
+                    <td className="sl-offering-student-cell"><strong>{row.fullName}</strong><small>{row.code}</small></td>
                     <td>
                       <input
+                        className="sl-offering-note-input"
                         aria-label={`Ghi chú ${row.code}`}
                         maxLength={2000}
                         disabled={!canNotes || saving}

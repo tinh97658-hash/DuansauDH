@@ -1,4 +1,5 @@
 :root {
+  --app-font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
   --canvas-bg: #F5F7F8;
   --surface-bg: #FFFFFF;
   --muted-surface: #F7F9FA;
@@ -19,18 +20,26 @@
   --danger-light: #FCE8E6;
   --radius-sm: 2px;
   --radius-md: 4px;
+  --bs-body-font-family: var(--app-font-family);
+  --bs-body-color: var(--text-primary);
+  --bs-link-color: var(--primary);
 }
 
 * {
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  font-family: var(--app-font-family);
+  color: var(--text-primary);
+}
+
 body {
   margin: 0;
   padding: 0;
   background-color: var(--canvas-bg);
-  color: var(--text-primary);
-  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12.5px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -47,9 +56,59 @@ textarea {
   font-size: inherit;
 }
 
+::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
 code, kbd, samp, pre {
-  font-family: "Cascadia Code", Consolas, Monaco, "Courier New", monospace;
+  font-family: var(--app-font-family);
   font-size: 12px;
+}
+
+/* Keep native, Bootstrap, Material UI and Ant Design typography on one system. */
+#root :where(
+  button, input, optgroup, select, textarea, table,
+  .MuiTypography-root, .MuiButton-root, .MuiInputBase-root, .MuiFormLabel-root,
+  .MuiTableCell-root, .MuiMenuItem-root, .MuiChip-root,
+  [class^="ant-"], [class*=" ant-"]
+) {
+  font-family: var(--app-font-family) !important;
+}
+
+#root :where(h1, h2, h3, h4, h5, h6) {
+  color: var(--secondary);
+  font-family: var(--app-font-family) !important;
+}
+
+/* Shared text hierarchy across the UI libraries used by the application. */
+#root :where(
+  .MuiTypography-colorTextSecondary,
+  .MuiFormHelperText-root,
+  .form-text,
+  .text-muted,
+  .ant-form-item-extra,
+  .ant-form-item-explain,
+  .ant-typography-secondary
+) {
+  color: var(--text-secondary) !important;
+}
+
+#root :where(
+  .MuiInputLabel-root,
+  .form-label,
+  .ant-form-item-label > label,
+  .ant-table-thead > tr > th
+) {
+  color: var(--text-secondary);
+}
+
+#root :where(.MuiTableCell-root, .table, .ant-table, .ant-list, .ant-descriptions) {
+  color: var(--text-primary);
+}
+
+#root .table {
+  --bs-table-color: var(--text-primary);
 }
 
 a {

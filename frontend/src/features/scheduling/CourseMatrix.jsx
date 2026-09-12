@@ -1,14 +1,65 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, groupsOf, labelOf, Notice, offeringTitle, rows, SearchSelect, subjectLabel, unique, useLoad } from "./shared";
+import {
+  AddRounded,
+  CalendarMonthRounded,
+  CheckCircleOutlineRounded,
+  GridViewRounded,
+  LayersRounded,
+  PendingActionsRounded,
+  SearchRounded,
+  TableChartRounded,
+  ViewColumnRounded,
+} from "@mui/icons-material";
+import { api, groupsOf, labelOf, Notice, offeringTitle, rows, subjectLabel, unique, useLoad } from "./shared";
+import { getBusinessTodayKey } from "../../utils/schedulingCalendar";
 import OfferingDetails from "./OfferingDetails";
+
+const vietnameseNameCollator = new Intl.Collator("vi", { sensitivity: "base", numeric: true });
+
+function scheduleCategory(offering) {
+  if (offering.status === "completed") return "completed";
+  return (offering.sessionSummary?.totalCount || 0) > 0 ? "scheduled" : "unscheduled";
+}
+
+function subjectName(offering) {
+  return offering.subject?.name || offering.subject?.code || offeringTitle(offering) || "";
+}
+
+function plannedDateDistance(offering, todayKey) {
+  const date = offering.sessionSummary?.nextSessionDate
+    || offering.sessionSummary?.nearestSessionDate
+    || offering.sessionSummary?.firstPlannedSessionDate;
+  const dateValue = Date.parse(`${date || ""}T12:00:00Z`);
+  const todayValue = Date.parse(`${todayKey}T12:00:00Z`);
+  return Number.isFinite(dateValue) && Number.isFinite(todayValue)
+    ? Math.abs(dateValue - todayValue)
+    : Number.POSITIVE_INFINITY;
+}
+
+export function sortCourseOfferings(offerings, todayKey = getBusinessTodayKey()) {
+  const rank = { unscheduled: 0, scheduled: 1, completed: 2 };
+  return [...offerings].sort((left, right) => {
+    const leftCategory = scheduleCategory(left);
+    const rightCategory = scheduleCategory(right);
+    const categoryOrder = rank[leftCategory] - rank[rightCategory];
+    if (categoryOrder !== 0) return categoryOrder;
+
+    if (leftCategory === "scheduled") {
+      const dateOrder = plannedDateDistance(left, todayKey) - plannedDateDistance(right, todayKey);
+      if (dateOrder !== 0) return dateOrder;
+    }
+
+    return vietnameseNameCollator.compare(subjectName(left), subjectName(right));
+  });
+}
 
 export default function CourseMatrix({ user }) {
   const navigate = useNavigate();
   const [majorId, setMajor] = useState("");
-  const [status, setStatus] = useState("all");
+  const [scheduleState, setScheduleState] = useState("all");
+  const [year, setYear] = useState("");
   const [query, setQuery] = useState("");
-  const [cohortFilter, setCohortFilter] = useState("all");
   const [viewMode, setViewMode] = useState("board"); // "board" | "pivot"
   const [detailOffering, setDetailOffering] = useState(null);
 
@@ -19,7 +70,7 @@ export default function CourseMatrix({ user }) {
   const all = useMemo(() => offerings.data || [], [offerings.data]);
 
   // Filter logic
-  const filtered = useLoadOfferings(all, majorId, status, query);
+  const filtered = useLoadOfferings(all, majorId, year, scheduleState, query);
 
   // Cohorts calculation
   const allCohorts = useMemo(() => {
@@ -35,12 +86,11 @@ export default function CourseMatrix({ user }) {
     let crossCohort = 0;
 
     for (const offering of filtered) {
-      const summary = offering.sessionSummary || {};
       const cohorts = unique(groupsOf(offering).map((g) => g.academicYear).filter(Boolean));
       if (cohorts.length > 1) crossCohort++;
-      if (offering.status === "completed") {
+      if (scheduleCategory(offering) === "completed") {
         completed++;
-      } else if (!summary.totalCount) {
+      } else if (scheduleCategory(offering) === "unscheduled") {
         unscheduled++;
       } else {
         scheduled++;
@@ -56,17 +106,10 @@ export default function CourseMatrix({ user }) {
   }, [filtered]);
 
   const displayedCohorts = useMemo(() => {
-    if (cohortFilter === "all") return allCohorts;
-    if (cohortFilter === "cross") return [];
-    return allCohorts.filter((c) => c === cohortFilter);
-  }, [allCohorts, cohortFilter]);
-
-  const crossCohortOfferings = useMemo(() => {
-    return filtered.filter((offering) => {
-      const cohorts = unique(groupsOf(offering).map((g) => g.academicYear).filter(Boolean));
-      return cohorts.length > 1;
-    });
-  }, [filtered]);
+    if (year) return [year];
+    return unique(filtered.flatMap(groupsOf).map((group) => group.academicYear).filter(Boolean))
+      .sort((a, b) => b.localeCompare(a, "vi", { numeric: true }));
+  }, [filtered, year]);
 
   const openSchedule = (offeringId) => {
     navigate(`/masters/schedule?offeringId=${offeringId}`);
@@ -80,17 +123,13 @@ export default function CourseMatrix({ user }) {
     <section className="sl-workspace sl-matrix-workspace" aria-label="Ma trận lớp học phần theo khóa">
       {/* Top Header */}
       <header className="sl-matrix-header">
-        <div className="sl-matrix-title-wrap">
-          <div className="sl-eyebrow">TỔNG QUAN ĐÀO TẠO & LỊCH HỌC</div>
-          <h1>MA TRẬN LỚP HỌC PHẦN THEO KHÓA</h1>
-        </div>
         <div className="sl-matrix-top-actions">
           <button
             type="button"
             className="sl-btn sl-btn-secondary"
             onClick={() => navigate("/masters/schedule")}
           >
-            📅 Sang Lịch biểu tuần
+            <CalendarMonthRounded aria-hidden="true" /> Lịch biểu tuần
           </button>
           {canEdit && (
             <button
@@ -98,7 +137,7 @@ export default function CourseMatrix({ user }) {
               className="sl-btn sl-btn-primary"
               onClick={() => navigate("/masters/course-offerings")}
             >
-              + Tạo lớp học phần mới
+              <AddRounded aria-hidden="true" /> Tạo lớp học phần
             </button>
           )}
         </div>
@@ -107,149 +146,134 @@ export default function CourseMatrix({ user }) {
       {/* KPI Stats Bar */}
       <div className="sl-matrix-kpi-bar" role="region" aria-label="Chỉ số tổng quan">
         <div className="sl-matrix-kpi">
-          <span>TỔNG SỐ LỚP HỌC PHẦN</span>
-          <strong>{kpis.total}</strong>
+          <span className="sl-matrix-kpi-icon"><LayersRounded aria-hidden="true" /></span>
+          <div><strong>{kpis.total}</strong><span>TỔNG SỐ LỚP HỌC PHẦN</span><small>Trong phạm vi đang lọc</small></div>
         </div>
         <div className={`sl-matrix-kpi ${kpis.unscheduled > 0 ? "kpi-warn" : ""}`}>
-          <span>CHƯA XẾP LỊCH</span>
-          <strong>{kpis.unscheduled}</strong>
-          {kpis.unscheduled > 0 && <small>Cần ưu tiên sắp xếp lịch</small>}
+          <span className="sl-matrix-kpi-icon"><PendingActionsRounded aria-hidden="true" /></span>
+          <div><strong>{kpis.unscheduled}</strong><span>CHƯA XẾP LỊCH</span><small>{kpis.unscheduled > 0 ? "Cần ưu tiên sắp xếp" : "Đã xử lý đầy đủ"}</small></div>
         </div>
         <div className="sl-matrix-kpi kpi-progress">
-          <span>ĐANG HỌC / ĐÃ XẾP LỊCH</span>
-          <strong>{kpis.scheduled}</strong>
-          <small>Đang diễn ra hoặc có lịch tuần tới</small>
+          <span className="sl-matrix-kpi-icon"><CalendarMonthRounded aria-hidden="true" /></span>
+          <div><strong>{kpis.scheduled}</strong><span>ĐANG HỌC / ĐÃ XẾP LỊCH</span><small>Đã có buổi học</small></div>
         </div>
-        <div className="sl-matrix-kpi">
-          <span>ĐÃ HOÀN THÀNH</span>
-          <strong>{kpis.completed}</strong>
+        <div className="sl-matrix-kpi kpi-complete">
+          <span className="sl-matrix-kpi-icon"><CheckCircleOutlineRounded aria-hidden="true" /></span>
+          <div><strong>{kpis.completed}</strong><span>ĐÃ HOÀN THÀNH</span><small>Đã kết thúc học phần</small></div>
         </div>
         <div className="sl-matrix-kpi kpi-cross">
-          <span>GHÉP LIÊN KHÓA</span>
-          <strong>{kpis.crossCohort}</strong>
-          <small>Lớp học chung 2 khóa trở lên</small>
+          <span className="sl-matrix-kpi-icon"><GridViewRounded aria-hidden="true" /></span>
+          <div><strong>{kpis.crossCohort}</strong><span>GHÉP LIÊN KHÓA</span><small>Học chung từ 2 khóa</small></div>
         </div>
       </div>
 
       {/* Filter and View Switcher Toolbar */}
       <div className="sl-matrix-toolbar">
+        <div className="sl-matrix-toolbar-head">
+          <div>
+            <h2>Bộ lọc dữ liệu</h2>
+            <span>Đang hiển thị {filtered.length} / {all.length} lớp học phần</span>
+          </div>
+          <div className="sl-matrix-view-toggle" aria-label="Kiểu hiển thị">
+            <button
+              type="button"
+              className={viewMode === "board" ? "active" : ""}
+              onClick={() => setViewMode("board")}
+              aria-pressed={viewMode === "board"}
+            >
+              <ViewColumnRounded aria-hidden="true" /> Dạng cột theo khóa
+            </button>
+            <button
+              type="button"
+              className={viewMode === "pivot" ? "active" : ""}
+              onClick={() => setViewMode("pivot")}
+              aria-pressed={viewMode === "pivot"}
+            >
+              <TableChartRounded aria-hidden="true" /> Bảng ma trận môn
+            </button>
+          </div>
+        </div>
         <div className="sl-matrix-filters">
-          <div className="sl-matrix-filter-item">
-            <label htmlFor="matrix-major-filter">Chuyên ngành</label>
-            <SearchSelect
-              id="matrix-major-filter"
-              label="Chuyên ngành"
-              value={majorId}
-              placeholder="Tất cả chuyên ngành"
-              options={[{ id: "", name: "Tất cả chuyên ngành" }, ...(majors.data || [])]}
-              onChange={setMajor}
-            />
+          <div className="sl-matrix-filter-item sl-matrix-search-item">
+            <label htmlFor="matrix-search-input">Tìm kiếm</label>
+            <div className="sl-matrix-search-wrap">
+              <SearchRounded aria-hidden="true" />
+              <input
+                id="matrix-search-input"
+                className="sl-search-input"
+                placeholder="Tên lớp, mã môn hoặc học phần..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="sl-matrix-filter-item">
-            <label htmlFor="matrix-status-filter">Trạng thái</label>
+            <label htmlFor="matrix-major-filter">Chuyên ngành</label>
             <select
-              id="matrix-status-filter"
+              id="matrix-major-filter"
               className="sl-select"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              value={majorId}
+              onChange={(e) => setMajor(e.target.value)}
             >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="active">Đang mở (chưa hoàn thành)</option>
-              <option value="completed">Đã hoàn thành</option>
+              <option value="">Tất cả chuyên ngành</option>
+              {(majors.data || []).map((major) => (
+                <option key={major.id} value={major.id}>
+                  {major.name}{major.code ? ` (${major.code})` : ""}
+                </option>
+              ))}
             </select>
           </div>
 
-          <div className="sl-matrix-filter-item sl-matrix-search-item">
-            <label htmlFor="matrix-search-input">Tìm kiếm</label>
-            <input
-              id="matrix-search-input"
-              className="sl-search-input"
-              placeholder="Tìm theo tên lớp, mã môn, học phần..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
+          <div className="sl-matrix-filter-item">
+            <label htmlFor="matrix-year-filter">Khóa / năm học</label>
+            <select
+              id="matrix-year-filter"
+              className="sl-select"
+              value={year}
+              onChange={(e) => setYear(e.target.value)}
+            >
+              <option value="">Tất cả khóa</option>
+              {allCohorts.map((cohort) => <option key={cohort} value={cohort}>Khóa {cohort}</option>)}
+            </select>
           </div>
-        </div>
 
-        <div className="sl-matrix-view-toggle">
-          <button
-            type="button"
-            className={viewMode === "board" ? "active" : ""}
-            onClick={() => setViewMode("board")}
-            aria-pressed={viewMode === "board"}
-          >
-            🗂️ Dạng cột theo khóa
-          </button>
-          <button
-            type="button"
-            className={viewMode === "pivot" ? "active" : ""}
-            onClick={() => setViewMode("pivot")}
-            aria-pressed={viewMode === "pivot"}
-          >
-            📊 Bảng ma trận môn
-          </button>
+          <div className="sl-matrix-filter-item">
+            <label htmlFor="matrix-status-filter">Tình trạng lịch</label>
+            <select
+              id="matrix-status-filter"
+              className="sl-select"
+              value={scheduleState}
+              onChange={(e) => setScheduleState(e.target.value)}
+            >
+              <option value="all">Tất cả tình trạng</option>
+              <option value="scheduled">Đã xếp lịch</option>
+              <option value="unscheduled">Chưa xếp lịch</option>
+              <option value="completed">Đã hoàn thành</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Cohort Quick Filter Tabs (When in Board View) */}
-      {viewMode === "board" && (
-        <div className="sl-matrix-cohort-tabs" role="tablist" aria-label="Bộ lọc khóa nhanh">
-          <button
-            type="button"
-            className={cohortFilter === "all" ? "active" : ""}
-            onClick={() => setCohortFilter("all")}
-          >
-            Tất cả các khóa ({allCohorts.length})
-          </button>
-          {allCohorts.map((cohort) => {
-            const count = filtered.filter((o) =>
-              groupsOf(o).some((g) => g.academicYear === cohort)
-            ).length;
-            return (
-              <button
-                key={cohort}
-                type="button"
-                className={cohortFilter === cohort ? "active" : ""}
-                onClick={() => setCohortFilter(cohort)}
-              >
-                Khóa {cohort} ({count})
-              </button>
-            );
-          })}
-          {kpis.crossCohort > 0 && (
-            <button
-              type="button"
-              className={`sl-tab-cross ${cohortFilter === "cross" ? "active" : ""}`}
-              onClick={() => setCohortFilter("cross")}
-            >
-              Chỉ lớp ghép đa khóa ({crossCohortOfferings.length})
-            </button>
-          )}
+      <div className="sl-matrix-content">
+        <div className="sl-matrix-content-head">
+          <div>
+            <h2>{viewMode === "board" ? "Lớp học phần theo khóa" : "Đối chiếu học phần giữa các khóa"}</h2>
+            <p>{viewMode === "board" ? (year ? `Danh sách lớp học phần của khóa ${year}.` : "Các khóa được tách thành từng nhóm độc lập.") : "Theo dõi nhanh học phần đã mở và tình trạng lịch ở từng khóa."}</p>
+          </div>
         </div>
-      )}
 
-      {/* Main Content Area */}
-      <div className="sl-matrix-body">
-        {offerings.loading ? (
-          <Notice>Đang tải dữ liệu lớp học phần...</Notice>
-        ) : offerings.error ? (
-          <Notice error={offerings.error} />
-        ) : filtered.length === 0 ? (
-          <Notice>Không tìm thấy lớp học phần phù hợp với bộ lọc hiện tại.</Notice>
-        ) : viewMode === "board" ? (
-          <div className="sl-matrix-board">
-            {cohortFilter === "cross" ? (
-              <CohortColumn
-                title="Lớp ghép đa khóa"
-                subtitle="Các lớp học phần có học viên từ 2 khóa trở lên"
-                offerings={crossCohortOfferings}
-                canEdit={canEdit}
-                onSelectOffering={openSchedule}
-                onViewDetails={setDetailOffering}
-              />
-            ) : (
-              displayedCohorts.map((cohort) => {
+        {/* Main Content Area */}
+        <div className="sl-matrix-body">
+          {offerings.loading ? (
+            <Notice>Đang tải dữ liệu lớp học phần...</Notice>
+          ) : offerings.error ? (
+            <Notice error={offerings.error} />
+          ) : filtered.length === 0 ? (
+            <Notice>Không tìm thấy lớp học phần phù hợp với bộ lọc hiện tại.</Notice>
+          ) : viewMode === "board" ? (
+            <div className="sl-matrix-board">
+              {displayedCohorts.map((cohort) => {
                 const cohortOfferings = filtered.filter((offering) =>
                   groupsOf(offering).some((group) => group.academicYear === cohort)
                 );
@@ -265,18 +289,18 @@ export default function CourseMatrix({ user }) {
                     onViewDetails={setDetailOffering}
                   />
                 );
-              })
-            )}
-          </div>
-        ) : (
-          <PivotMatrixView
-            offerings={filtered}
-            cohorts={allCohorts}
-            canEdit={canEdit}
-            onSelectOffering={openSchedule}
-            onViewDetails={setDetailOffering}
-          />
-        )}
+              })}
+            </div>
+          ) : (
+            <PivotMatrixView
+              offerings={filtered}
+              cohorts={displayedCohorts}
+              canEdit={canEdit}
+              onSelectOffering={openSchedule}
+              onViewDetails={setDetailOffering}
+            />
+          )}
+        </div>
       </div>
 
       {/* Offering Details Drawer Modal */}
@@ -295,6 +319,7 @@ export default function CourseMatrix({ user }) {
 
 // Sub-component: Column for a single Cohort
 function CohortColumn({ title, subtitle, offerings, canEdit, onSelectOffering, onViewDetails }) {
+  const orderedOfferings = sortCourseOfferings(offerings);
   return (
     <div className="sl-matrix-col" role="region" aria-label={title}>
       <div className="sl-matrix-col-header">
@@ -309,7 +334,7 @@ function CohortColumn({ title, subtitle, offerings, canEdit, onSelectOffering, o
         {offerings.length === 0 ? (
           <div className="sl-matrix-empty-col">Không có lớp học phần nào</div>
         ) : (
-          offerings.map((offering) => (
+          orderedOfferings.map((offering) => (
             <OfferingCard
               key={offering.id}
               offering={offering}
@@ -336,22 +361,24 @@ function OfferingCard({ offering, canEdit, onSelectOffering, onViewDetails }) {
   const futureSessions = summary.futurePlannedCount || 0;
 
   return (
-    <article className={`sl-matrix-card ${offering.status === "completed" ? "card-completed" : ""}`}>
+    <article className={`sl-matrix-card ${offering.status === "completed" ? "card-completed" : totalSessions === 0 ? "card-unscheduled" : "card-scheduled"}`}>
       <div className="sl-matrix-card-top">
         <div className="sl-matrix-card-title-row">
           <strong className="sl-matrix-card-title" title={offeringTitle(offering)}>
             {offeringTitle(offering)}
           </strong>
-          {(offering.subject?.subjectType === "KC" || offering.subject?.allowCrossMajor) && (
-            <span className="sl-matrix-cross-tag" style={{ background: "#F3E5F5", color: "#7B1FA2", borderColor: "#CE93D8" }} title="Học phần dùng chung cấp Viện">
-              Môn chung
-            </span>
-          )}
-          {isCrossCohort && (
-            <span className="sl-matrix-cross-tag" title={`Ghép giữa: ${cohorts.join(", ")}`}>
-              Ghép đa khóa
-            </span>
-          )}
+          <div className="sl-matrix-card-tags">
+            {(offering.subject?.subjectType === "KC" || offering.subject?.allowCrossMajor) && (
+              <span className="sl-matrix-cross-tag sl-matrix-common-tag" title="Học phần dùng chung cấp Viện">
+                Môn chung
+              </span>
+            )}
+            {isCrossCohort && (
+              <span className="sl-matrix-cross-tag" title={`Ghép giữa: ${cohorts.join(", ")}`}>
+                Đa khóa
+              </span>
+            )}
+          </div>
         </div>
         <div className="sl-matrix-card-subject">
           {subjectLabel(offering)}
@@ -386,7 +413,7 @@ function OfferingCard({ offering, canEdit, onSelectOffering, onViewDetails }) {
           className="sl-btn sl-btn-sm"
           onClick={() => onViewDetails(offering)}
         >
-          Chi tiết
+          Xem chi tiết
         </button>
         {canEdit && offering.status === "active" && (
           <button
@@ -394,7 +421,7 @@ function OfferingCard({ offering, canEdit, onSelectOffering, onViewDetails }) {
             className="sl-btn sl-btn-primary sl-btn-sm"
             onClick={() => onSelectOffering(offering.id)}
           >
-            🗓️ Xếp lịch
+            <CalendarMonthRounded aria-hidden="true" /> Xếp lịch
           </button>
         )}
       </div>
@@ -433,10 +460,10 @@ function PivotMatrixView({ offerings, cohorts, canEdit, onSelectOffering, onView
           {subjects.map((subject) => (
             <tr key={subject.id}>
               <td className="sl-pivot-subj-cell">
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <div className="sl-pivot-subject-code">
                   <strong>{subject.code}</strong>
                   {(subject.subjectType === "KC" || subject.allowCrossMajor) && (
-                    <span style={{ fontSize: "10px", background: "#F3E5F5", color: "#7B1FA2", padding: "1px 5px", borderRadius: "3px", fontWeight: 700 }}>
+                    <span className="sl-matrix-cross-tag sl-matrix-common-tag">
                       Môn chung
                     </span>
                   )}
@@ -502,16 +529,17 @@ function PivotMatrixView({ offerings, cohorts, canEdit, onSelectOffering, onView
 }
 
 // Hook helper for filtering offerings
-function useLoadOfferings(all, majorId, status, query) {
+function useLoadOfferings(all, majorId, year, scheduleState, query) {
   return useMemo(() => {
     return all.filter((offering) => {
       const groups = groupsOf(offering);
       const matchesMajor = !majorId || groups.some((g) => (g.majorId || g.major?.id) === majorId);
-      const matchesStatus = status === "all" || offering.status === status;
+      const matchesYear = !year || groups.some((g) => g.academicYear === year);
+      const matchesScheduleState = scheduleState === "all" || scheduleCategory(offering) === scheduleState;
       const searchStr = `${offering.name || ""} ${offering.subject?.code || ""} ${offering.subject?.name || ""} ${labelOf(offering)}`.toLowerCase();
       const matchesQuery = !query.trim() || searchStr.includes(query.trim().toLowerCase());
-      return matchesMajor && matchesStatus && matchesQuery;
+      return matchesMajor && matchesYear && matchesScheduleState && matchesQuery;
     });
-  }, [all, majorId, status, query]);
+  }, [all, majorId, year, scheduleState, query]);
 }
 

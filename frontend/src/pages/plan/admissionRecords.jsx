@@ -525,7 +525,7 @@ const AdmissionRecords = () => {
           <Stack direction="row" spacing={1} alignItems="center">
             <Tooltip title="Tải lại danh sách">
               <IconButton size="small" onClick={loadRecords} disabled={loading} sx={{ border: "1px solid #DFE4E8", borderRadius: "4px", p: "5px" }}>
-                <RefreshRounded fontSize="small" sx={{ color: "#68737D" }} />
+                <RefreshRounded fontSize="small" sx={{ color: "#607486" }} />
               </IconButton>
             </Tooltip>
 
@@ -563,17 +563,17 @@ const AdmissionRecords = () => {
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <SearchRounded fontSize="small" sx={{ color: "#8a94a3" }} />
+                <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
               </InputAdornment>
             ),
           }}
           sx={{ width: { xs: "100%", sm: 360 }, ...cellInputSx }}
         />
 
-        <Typography variant="caption" sx={{ color: "#68737D", fontWeight: 600 }}>
-          Tổng: <strong style={{ color: "#20262C" }}>{stats.total}</strong> hồ sơ · Thạc sĩ:{" "}
+        <Typography variant="caption" sx={{ color: "#607486", fontWeight: 600 }}>
+          Tổng: <strong style={{ color: "#172B3A" }}>{stats.total}</strong> hồ sơ · Thạc sĩ:{" "}
           <strong style={{ color: "#0788B8" }}>{stats.mastersCount}</strong> · Tiến sĩ:{" "}
-          <strong style={{ color: "#173B70" }}>{stats.doctoralCount}</strong> · Đủ điều kiện / Trúng tuyển:{" "}
+          <strong style={{ color: "#173E75" }}>{stats.doctoralCount}</strong> · Đủ điều kiện / Trúng tuyển:{" "}
           <strong style={{ color: "#137B3B" }}>{stats.eligibleCount}</strong>
         </Typography>
       </Stack>
@@ -596,7 +596,7 @@ const AdmissionRecords = () => {
         >
           <Table size="small" stickyHeader sx={{ minWidth: 1100 }}>
             <TableHead>
-              <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", color: "#20262C", fontWeight: 700, fontSize: 12, py: "7px", borderBottom: "2px solid #DFE4E8" } }}>
+              <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", color: "#172B3A", fontWeight: 700, fontSize: 12, py: "7px", borderBottom: "2px solid #DFE4E8" } }}>
                 <TableCell sx={{ width: 40, textAlign: "center" }}>STT</TableCell>
                 <TableCell sx={{ width: 50, textAlign: "center" }}>Ảnh</TableCell>
                 <TableCell sx={{ width: 100 }}>Mã HV</TableCell>
@@ -614,7 +614,7 @@ const AdmissionRecords = () => {
             <TableBody>
               {filteredRecords.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} align="center" sx={{ py: 6, color: "#68737D", fontSize: 13 }}>
+                  <TableCell colSpan={11} align="center" sx={{ py: 6, color: "#607486", fontSize: 13 }}>
                     Chưa có hồ sơ tuyển sinh nào theo điều kiện lọc.
                     {isAdmin && (
                       <Box sx={{ mt: 1.5 }}>
@@ -635,7 +635,7 @@ const AdmissionRecords = () => {
                       "& td": { py: "5px", fontSize: 12.5 },
                     }}
                   >
-                    <TableCell align="center" sx={{ color: "#68737D", fontSize: 11 }}>
+                    <TableCell align="center" sx={{ color: "#607486", fontSize: 11 }}>
                       {index + 1}
                     </TableCell>
 
@@ -648,7 +648,7 @@ const AdmissionRecords = () => {
                           borderRadius: "2px",
                           fontSize: 10,
                           bgcolor: "#DFE4E8",
-                          color: "#68737D",
+                          color: "#607486",
                           margin: "0 auto",
                           border: "1px solid #DFE4E8",
                         }}
@@ -658,7 +658,7 @@ const AdmissionRecords = () => {
                       </Avatar>
                     </TableCell>
 
-                    <TableCell sx={{ fontFamily: "monospace", fontWeight: 700, color: "#173B70" }}>
+                    <TableCell sx={{ fontFamily: "inherit", fontWeight: 700, color: "#173E75" }}>
                       {r.code || "—"}
                     </TableCell>
 
@@ -668,7 +668,7 @@ const AdmissionRecords = () => {
                         onClick={() => navigate(`/plan/admission-records/${r.id}`)}
                         sx={{
                           fontWeight: 700,
-                          color: "#173B70",
+                          color: "#173E75",
                           fontSize: 12.5,
                           cursor: "pointer",
                           "&:hover": { color: "#0788B8", textDecoration: "underline" },
@@ -677,13 +677,13 @@ const AdmissionRecords = () => {
                         {r.fullName}
                       </Typography>
                       {r.email && (
-                        <Typography variant="caption" sx={{ color: "#68737D", display: "block", fontSize: 11 }}>
+                        <Typography variant="caption" sx={{ color: "#607486", display: "block", fontSize: 11 }}>
                           {r.email}
                         </Typography>
                       )}
                     </TableCell>
 
-                    <TableCell align="center" sx={{ color: "#20262C" }}>
+                    <TableCell align="center" sx={{ color: "#172B3A" }}>
                       {r.dob || "—"}
                     </TableCell>
 
@@ -702,7 +702,7 @@ const AdmissionRecords = () => {
                       />
                     </TableCell>
 
-                    <TableCell sx={{ fontFamily: "monospace", color: "#20262C" }}>
+                    <TableCell sx={{ fontFamily: "inherit", color: "#172B3A" }}>
                       {r.idCard || "—"}
                     </TableCell>
 
@@ -720,12 +720,12 @@ const AdmissionRecords = () => {
                           mr: 0.5,
                         }}
                       />
-                      <Typography variant="caption" sx={{ fontWeight: 600, color: "#173B70", display: "block" }}>
+                      <Typography variant="caption" sx={{ fontWeight: 600, color: "#173E75", display: "block" }}>
                         {r.majorName || r.major?.name || "—"}
                       </Typography>
                     </TableCell>
 
-                    <TableCell sx={{ color: "#20262C", fontSize: 12 }}>
+                    <TableCell sx={{ color: "#172B3A", fontSize: 12 }}>
                       {r.phone || "—"}
                     </TableCell>
 
@@ -749,7 +749,7 @@ const AdmissionRecords = () => {
                               ? "#137B3B"
                               : r.studyStatus === "Đủ điều kiện dự tuyển"
                               ? "#0788B8"
-                              : "#68737D",
+                              : "#607486",
                         }}
                       />
                     </TableCell>
@@ -764,14 +764,14 @@ const AdmissionRecords = () => {
 
                         <Tooltip title="Xem & In Phiếu A4 chi tiết">
                           <IconButton size="small" color="inherit" onClick={() => handleOpenPrint(r)}>
-                            <PrintRounded sx={{ fontSize: 17, color: "#68737D" }} />
+                            <PrintRounded sx={{ fontSize: 17, color: "#607486" }} />
                           </IconButton>
                         </Tooltip>
 
                         {isAdmin && (
                           <Tooltip title="Sửa hồ sơ">
                             <IconButton size="small" color="inherit" onClick={() => handleOpenEdit(r)}>
-                              <EditRounded sx={{ fontSize: 17, color: "#68737D" }} />
+                              <EditRounded sx={{ fontSize: 17, color: "#607486" }} />
                             </IconButton>
                           </Tooltip>
                         )}
@@ -821,8 +821,8 @@ const AdmissionRecords = () => {
           }}
         >
           <Stack direction="row" spacing={1} alignItems="center">
-            <PersonRounded sx={{ color: "#173B70", fontSize: 20 }} />
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#173B70", fontSize: 14 }}>
+            <PersonRounded sx={{ color: "#173E75", fontSize: 20 }} />
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#173E75", fontSize: 14 }}>
               {formData.id ? "SỬA HỒ SƠ HỌC VIÊN" : "HỒ SƠ HỌC VIÊN - QUẢN LÝ HỌC VIÊN [MPS - VMU]"}
             </Typography>
           </Stack>
@@ -836,7 +836,7 @@ const AdmissionRecords = () => {
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" }, gap: 1.5 }}>
             {/* COLUMN 1: THÔNG TIN CÁ NHÂN + ẢNH 3x4 */}
             <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#FFFFFF", borderRadius: "3px", borderColor: "#DFE4E8" }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: "#173B70", display: "block", mb: 1, textTransform: "uppercase" }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", display: "block", mb: 1, textTransform: "uppercase" }}>
                 Thông tin cá nhân
               </Typography>
 
@@ -890,7 +890,7 @@ const AdmissionRecords = () => {
 
               <Stack spacing={1}>
                 <Box>
-                  <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Mã học viên / SBD</Typography>
+                  <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Mã học viên / SBD</Typography>
                   <TextField
                     size="small"
                     value={formData.code}
@@ -903,7 +903,7 @@ const AdmissionRecords = () => {
 
                 <Stack direction="row" spacing={1}>
                   <Box sx={{ flex: 2 }}>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Họ đệm *</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Họ đệm *</Typography>
                     <TextField
                       size="small"
                       value={formData.lastName}
@@ -915,7 +915,7 @@ const AdmissionRecords = () => {
                     />
                   </Box>
                   <Box sx={{ flex: 1.2 }}>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Tên *</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Tên *</Typography>
                     <TextField
                       size="small"
                       value={formData.firstName}
@@ -929,7 +929,7 @@ const AdmissionRecords = () => {
 
                 <Stack direction="row" spacing={1}>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Ngày sinh</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Ngày sinh</Typography>
                     <TextField
                       size="small"
                       type="date"
@@ -940,7 +940,7 @@ const AdmissionRecords = () => {
                     />
                   </Box>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Số CMND/CCCD</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Số CMND/CCCD</Typography>
                     <TextField
                       size="small"
                       value={formData.idCard}
@@ -953,7 +953,7 @@ const AdmissionRecords = () => {
                 </Stack>
 
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 0.2 }}>
-                  <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Giới tính:</Typography>
+                  <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Giới tính:</Typography>
                   <RadioGroup
                     row
                     value={formData.gender}
@@ -965,7 +965,7 @@ const AdmissionRecords = () => {
                 </Box>
 
                 <Box>
-                  <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Điện thoại</Typography>
+                  <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Điện thoại</Typography>
                   <TextField
                     size="small"
                     value={formData.phone}
@@ -977,7 +977,7 @@ const AdmissionRecords = () => {
                 </Box>
 
                 <Box>
-                  <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Email</Typography>
+                  <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Email</Typography>
                   <TextField
                     size="small"
                     value={formData.email}
@@ -989,7 +989,7 @@ const AdmissionRecords = () => {
                 </Box>
 
                 <Box>
-                  <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Nơi sinh</Typography>
+                  <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Nơi sinh</Typography>
                   <TextField
                     size="small"
                     value={formData.pob}
@@ -1002,7 +1002,7 @@ const AdmissionRecords = () => {
 
                 <Stack direction="row" spacing={1}>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Hình thức nhận hồ sơ</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Hình thức nhận hồ sơ</Typography>
                     <Select
                       size="small"
                       value={formData.receiptType}
@@ -1016,7 +1016,7 @@ const AdmissionRecords = () => {
                     </Select>
                   </Box>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Phân loại hồ sơ</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Phân loại hồ sơ</Typography>
                     <Select
                       size="small"
                       value={formData.profileCategory}
@@ -1032,7 +1032,7 @@ const AdmissionRecords = () => {
                 </Stack>
 
                 <Box>
-                  <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Ngày nhập học</Typography>
+                  <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Ngày nhập học</Typography>
                   <TextField
                     size="small"
                     type="date"
@@ -1050,7 +1050,7 @@ const AdmissionRecords = () => {
               {/* THỂ THỨC ĐÀO TẠO */}
               <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#FFFFFF", borderRadius: "3px", borderColor: "#DFE4E8" }}>
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: "#173B70", textTransform: "uppercase" }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", textTransform: "uppercase" }}>
                     Thể thức đào tạo
                   </Typography>
                   <FormControlLabel
@@ -1070,7 +1070,7 @@ const AdmissionRecords = () => {
                 <Stack spacing={1}>
                   <Stack direction="row" spacing={1}>
                     <Box sx={{ flex: 1 }}>
-                      <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Nhóm HT đào tạo</Typography>
+                      <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Nhóm HT đào tạo</Typography>
                       <Select
                         size="small"
                         value={formData.trainingModeGroup}
@@ -1084,7 +1084,7 @@ const AdmissionRecords = () => {
                       </Select>
                     </Box>
                     <Box sx={{ flex: 1 }}>
-                      <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Trình độ đào tạo</Typography>
+                      <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Trình độ đào tạo</Typography>
                       <Select
                         size="small"
                         value={formData.trainingLevel}
@@ -1101,7 +1101,7 @@ const AdmissionRecords = () => {
                           });
                         }}
                         fullWidth
-                        sx={{ height: 30, fontSize: 12, bgcolor: "#fff", fontWeight: 700, color: "#173B70" }}
+                        sx={{ height: 30, fontSize: 12, bgcolor: "#fff", fontWeight: 700, color: "#173E75" }}
                       >
                         {TRAINING_LEVELS.map((l) => (
                           <MenuItem key={l.value} value={l.value} sx={{ fontSize: 12 }}>{l.label}</MenuItem>
@@ -1111,7 +1111,7 @@ const AdmissionRecords = () => {
                   </Stack>
 
                   <Box>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Hình thức đào tạo</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Hình thức đào tạo</Typography>
                     <Select
                       size="small"
                       value={formData.trainingModeName}
@@ -1126,7 +1126,7 @@ const AdmissionRecords = () => {
                   </Box>
 
                   <Box>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Ngành học *</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Ngành học *</Typography>
                     <Select
                       size="small"
                       value={formData.majorId}
@@ -1136,7 +1136,7 @@ const AdmissionRecords = () => {
                         setFormData((p) => ({ ...p, majorId: mId, majorName: target?.name || "" }));
                       }}
                       fullWidth
-                      sx={{ height: 30, fontSize: 12, bgcolor: "#fff", fontWeight: 600, color: "#173B70" }}
+                      sx={{ height: 30, fontSize: 12, bgcolor: "#fff", fontWeight: 600, color: "#173E75" }}
                     >
                       <MenuItem value="" disabled>-- Chọn chuyên ngành --</MenuItem>
                       {selectableMajors.map((m) => (
@@ -1149,7 +1149,7 @@ const AdmissionRecords = () => {
 
                   <Stack direction="row" spacing={1}>
                     <Box sx={{ flex: 1 }}>
-                      <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Ngôn ngữ đào tạo</Typography>
+                      <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Ngôn ngữ đào tạo</Typography>
                       <Select
                         size="small"
                         value={formData.language}
@@ -1162,7 +1162,7 @@ const AdmissionRecords = () => {
                       </Select>
                     </Box>
                     <Box sx={{ flex: 1 }}>
-                      <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Trạng thái học</Typography>
+                      <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Trạng thái học</Typography>
                       <Select
                         size="small"
                         value={formData.studyStatus}
@@ -1183,30 +1183,30 @@ const AdmissionRecords = () => {
               <Box sx={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 1 }}>
                 {/* THÔNG TIN CHỖ Ở */}
                 <Paper variant="outlined" sx={{ p: 1.2, bgcolor: "#FFFFFF", borderRadius: "3px", borderColor: "#DFE4E8" }}>
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: "#173B70", display: "block", mb: 0.8, textTransform: "uppercase" }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", display: "block", mb: 0.8, textTransform: "uppercase" }}>
                     Thông tin chỗ ở
                   </Typography>
                   <Stack spacing={0.8}>
                     <Box>
-                      <Typography variant="caption" sx={{ color: "#68737D", fontSize: 10.5 }}>Quốc tịch</Typography>
+                      <Typography variant="caption" sx={{ color: "#607486", fontSize: 10.5 }}>Quốc tịch</Typography>
                       <TextField size="small" value={formData.nationality} onChange={(e) => setFormData((p) => ({ ...p, nationality: e.target.value }))} fullWidth sx={cellInputSx} />
                     </Box>
                     <Box>
-                      <Typography variant="caption" sx={{ color: "#68737D", fontSize: 10.5 }}>Dân tộc</Typography>
+                      <Typography variant="caption" sx={{ color: "#607486", fontSize: 10.5 }}>Dân tộc</Typography>
                       <TextField size="small" value={formData.ethnicity} onChange={(e) => setFormData((p) => ({ ...p, ethnicity: e.target.value }))} fullWidth sx={cellInputSx} />
                     </Box>
                     <Box>
-                      <Typography variant="caption" sx={{ color: "#68737D", fontSize: 10.5 }}>Tôn giáo</Typography>
+                      <Typography variant="caption" sx={{ color: "#607486", fontSize: 10.5 }}>Tôn giáo</Typography>
                       <TextField size="small" value={formData.religion} onChange={(e) => setFormData((p) => ({ ...p, religion: e.target.value }))} fullWidth sx={cellInputSx} />
                     </Box>
                     <Box>
-                      <Typography variant="caption" sx={{ color: "#68737D", fontSize: 10.5 }}>Thành phố</Typography>
+                      <Typography variant="caption" sx={{ color: "#607486", fontSize: 10.5 }}>Thành phố</Typography>
                       <Select size="small" value={formData.city} onChange={(e) => setFormData((p) => ({ ...p, city: e.target.value }))} fullWidth sx={{ height: 28, fontSize: 11, bgcolor: "#fff" }}>
                         {CITIES.map((c) => (<MenuItem key={c} value={c} sx={{ fontSize: 11 }}>{c}</MenuItem>))}
                       </Select>
                     </Box>
                     <Box>
-                      <Typography variant="caption" sx={{ color: "#68737D", fontSize: 10.5 }}>Phường xã / Đ/c</Typography>
+                      <Typography variant="caption" sx={{ color: "#607486", fontSize: 10.5 }}>Phường xã / Đ/c</Typography>
                       <TextField size="small" value={formData.ward} onChange={(e) => setFormData((p) => ({ ...p, ward: e.target.value }))} fullWidth sx={cellInputSx} placeholder="Số nhà, đường, phường..." />
                     </Box>
                   </Stack>
@@ -1214,7 +1214,7 @@ const AdmissionRecords = () => {
 
                 {/* GIẤY TỜ BỔ SUNG */}
                 <Paper variant="outlined" sx={{ p: 1.2, bgcolor: "#FFFFFF", borderRadius: "3px", borderColor: "#DFE4E8" }}>
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: "#173B70", display: "block", mb: 0.8, textTransform: "uppercase" }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", display: "block", mb: 0.8, textTransform: "uppercase" }}>
                     Giấy tờ nộp
                   </Typography>
                   <Stack spacing={0.2}>
@@ -1235,7 +1235,7 @@ const AdmissionRecords = () => {
                             sx={{ p: 0.3 }}
                           />
                         }
-                        label={<Typography sx={{ fontSize: 11, color: "#20262C" }}>{doc.label}</Typography>}
+                        label={<Typography sx={{ fontSize: 11, color: "#172B3A" }}>{doc.label}</Typography>}
                         sx={{ m: 0 }}
                       />
                     ))}
@@ -1246,57 +1246,57 @@ const AdmissionRecords = () => {
 
             {/* COLUMN 3: VĂN BẰNG ĐẠI HỌC (NĂNG LỰC ĐẦU VÀO) */}
             <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#FFFFFF", borderRadius: "3px", borderColor: "#DFE4E8" }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: "#173B70", display: "block", mb: 1, textTransform: "uppercase" }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", display: "block", mb: 1, textTransform: "uppercase" }}>
                 Văn bằng đại học (Đầu vào)
               </Typography>
 
               <Stack spacing={0.9}>
                 <Box>
-                  <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>ĐT Ưu tiên</Typography>
+                  <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>ĐT Ưu tiên</Typography>
                   <TextField size="small" value={formData.priorityObject} onChange={(e) => setFormData((p) => ({ ...p, priorityObject: e.target.value }))} fullWidth sx={cellInputSx} placeholder="VD: Con liệt sĩ, dân tộc thiểu số..." />
                 </Box>
 
                 <Box>
-                  <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Nơi làm việc</Typography>
+                  <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Nơi làm việc</Typography>
                   <TextField size="small" value={formData.workplace} onChange={(e) => setFormData((p) => ({ ...p, workplace: e.target.value }))} fullWidth sx={cellInputSx} placeholder="Cơ quan, đơn vị công tác..." />
                 </Box>
 
                 <Stack direction="row" spacing={1}>
                   <Box sx={{ flex: 1.5 }}>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Nghề nghiệp</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Nghề nghiệp</Typography>
                     <TextField size="small" value={formData.job} onChange={(e) => setFormData((p) => ({ ...p, job: e.target.value }))} fullWidth sx={cellInputSx} placeholder="Kỹ sư, giảng viên..." />
                   </Box>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Số môn BSKT</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Số môn BSKT</Typography>
                     <TextField size="small" type="number" value={formData.supplementSubjectsCount} onChange={(e) => setFormData((p) => ({ ...p, supplementSubjectsCount: e.target.value }))} fullWidth sx={cellInputSx} inputProps={{ min: 0 }} />
                   </Box>
                 </Stack>
 
                 <Box>
-                  <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Trường TN</Typography>
+                  <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Trường TN</Typography>
                   <TextField size="small" value={formData.gradSchool} onChange={(e) => setFormData((p) => ({ ...p, gradSchool: e.target.value }))} fullWidth sx={cellInputSx} />
                 </Box>
 
                 <Stack direction="row" spacing={1}>
                   <Box sx={{ flex: 1.3 }}>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Hệ ĐT</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Hệ ĐT</Typography>
                     <Select size="small" value={formData.gradDegreeType} onChange={(e) => setFormData((p) => ({ ...p, gradDegreeType: e.target.value }))} fullWidth sx={{ height: 30, fontSize: 11.5, bgcolor: "#fff" }}>
                       {DEGREE_TYPES.map((d) => (<MenuItem key={d} value={d} sx={{ fontSize: 11.5 }}>{d}</MenuItem>))}
                     </Select>
                   </Box>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Năm TN</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Năm TN</Typography>
                     <TextField size="small" value={formData.gradYear} onChange={(e) => setFormData((p) => ({ ...p, gradYear: e.target.value }))} fullWidth sx={cellInputSx} />
                   </Box>
                 </Stack>
 
                 <Stack direction="row" spacing={1}>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Điểm TB ĐH</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Điểm TB ĐH</Typography>
                     <TextField size="small" value={formData.gpa} onChange={(e) => setFormData((p) => ({ ...p, gpa: e.target.value }))} fullWidth sx={cellInputSx} placeholder="VD: 3.20" />
                   </Box>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Loại TN</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Loại TN</Typography>
                     <Select size="small" value={formData.gradClassification} onChange={(e) => setFormData((p) => ({ ...p, gradClassification: e.target.value }))} fullWidth sx={{ height: 30, fontSize: 11.5, bgcolor: "#fff" }}>
                       {GRAD_CLASSIFICATIONS.map((c) => (<MenuItem key={c} value={c} sx={{ fontSize: 11.5 }}>{c}</MenuItem>))}
                     </Select>
@@ -1304,23 +1304,23 @@ const AdmissionRecords = () => {
                 </Stack>
 
                 <Box>
-                  <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Chuyên Ngành ĐH</Typography>
+                  <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Chuyên Ngành ĐH</Typography>
                   <TextField size="small" value={formData.gradMajor} onChange={(e) => setFormData((p) => ({ ...p, gradMajor: e.target.value }))} fullWidth sx={cellInputSx} placeholder="VD: Công nghệ thông tin..." />
                 </Box>
 
                 <Stack direction="row" spacing={1}>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Số Văn bằng</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Số Văn bằng</Typography>
                     <TextField size="small" value={formData.diplomaNumber} onChange={(e) => setFormData((p) => ({ ...p, diplomaNumber: e.target.value }))} fullWidth sx={cellInputSx} />
                   </Box>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Số vào sổ gốc</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Số vào sổ gốc</Typography>
                     <TextField size="small" value={formData.registryBookNumber} onChange={(e) => setFormData((p) => ({ ...p, registryBookNumber: e.target.value }))} fullWidth sx={cellInputSx} />
                   </Box>
                 </Stack>
 
                 <Box>
-                  <Typography variant="caption" sx={{ color: "#68737D", fontSize: 11 }}>Ghi chú</Typography>
+                  <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Ghi chú</Typography>
                   <TextField size="small" value={formData.note} onChange={(e) => setFormData((p) => ({ ...p, note: e.target.value }))} fullWidth sx={cellInputSx} />
                 </Box>
               </Stack>
@@ -1411,7 +1411,7 @@ const AdmissionRecords = () => {
         }}
       >
         <DialogTitle sx={{ py: 1, px: 2, bgcolor: "#F0F4F8", borderBottom: "1px solid #DFE4E8", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#173B70" }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#173E75" }}>
             XEM TRƯỚC PHIẾU HỒ SƠ HỌC VIÊN (KHỔ A4)
           </Typography>
           <Stack direction="row" spacing={1}>
@@ -1445,7 +1445,7 @@ const AdmissionRecords = () => {
                 margin: "0 auto",
                 bgcolor: "#FFFFFF",
                 p: "10mm 13mm",
-                border: "1.5px solid #173B70",
+                border: "1.5px solid #173E75",
                 borderRadius: "1px",
                 boxShadow: "0 6px 24px rgba(0,0,0,0.22)",
                 boxSizing: "border-box",
@@ -1463,7 +1463,7 @@ const AdmissionRecords = () => {
               }}
             >
               {/* National & University Header */}
-              <Box sx={{ pb: 0.5, borderBottom: "1.5px solid #173B70" }}>
+              <Box sx={{ pb: 0.5, borderBottom: "1.5px solid #173E75" }}>
                 <Box sx={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", textAlign: "center" }}>
                   <Box>
                     <Typography sx={{ fontFamily: "inherit", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2px", lineHeight: 1.25 }}>
@@ -1510,7 +1510,7 @@ const AdmissionRecords = () => {
                   sx={{
                     width: 90,
                     height: 120,
-                    border: "1px solid #173B70",
+                    border: "1px solid #173E75",
                     borderRadius: "2px",
                     display: "flex",
                     alignItems: "center",

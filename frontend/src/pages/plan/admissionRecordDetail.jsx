@@ -411,7 +411,7 @@ const AdmissionRecordDetail = () => {
           }
           .a4-paper-sheet {
             box-shadow: none !important;
-            border: 1.5px solid #173B70 !important;
+            border: 1.5px solid #173E75 !important;
             margin: 0 !important;
             padding: 10mm 13mm !important;
             width: 210mm !important;
@@ -473,13 +473,13 @@ const AdmissionRecordDetail = () => {
 
           <Tooltip title="Tải lại dữ liệu">
             <IconButton size="small" onClick={fetchData} disabled={loading} sx={{ border: "1px solid #DFE4E8", borderRadius: "4px", p: "6px" }}>
-              <RefreshRounded fontSize="small" sx={{ color: "#68737D" }} />
+              <RefreshRounded fontSize="small" sx={{ color: "#607486" }} />
             </IconButton>
           </Tooltip>
 
           {record && (
             <>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#173B70", fontSize: 15, ml: 0.5 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#173E75", fontSize: 15, ml: 0.5 }}>
                 {formData?.fullName || record.fullName}
               </Typography>
               {record.code && (
@@ -487,7 +487,7 @@ const AdmissionRecordDetail = () => {
                   label={record.code}
                   size="small"
                   sx={{
-                    fontFamily: "monospace",
+                    fontFamily: "inherit",
                     fontWeight: 700,
                     fontSize: 12,
                     bgcolor: "#EBF5FB",
@@ -608,7 +608,7 @@ const AdmissionRecordDetail = () => {
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 14, bgcolor: "#FFFFFF", borderRadius: "6px", border: "1px solid #DFE4E8" }}>
           <CircularProgress size={38} sx={{ color: "#0788B8", mr: 2 }} />
-          <Typography variant="body2" sx={{ color: "#68737D", fontWeight: 600 }}>Đang tải dữ liệu hồ sơ tuyển sinh...</Typography>
+          <Typography variant="body2" sx={{ color: "#607486", fontWeight: 600 }}>Đang tải dữ liệu hồ sơ tuyển sinh...</Typography>
         </Box>
       ) : !formData ? (
         <Paper variant="outlined" sx={{ p: 6, textAlign: "center", borderRadius: "6px", borderColor: "#DFE4E8" }}>
@@ -1311,14 +1311,14 @@ const AdmissionRecordDetail = () => {
               fontSize: "12.5px",
               position: "relative",
               boxSizing: "border-box",
-              border: "1.5px solid #173B70",
+              border: "1.5px solid #173E75",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
             }}
           >
             {/* Header */}
-            <Box sx={{ pb: 0.5, borderBottom: "1.5px solid #173B70" }}>
+            <Box sx={{ pb: 0.5, borderBottom: "1.5px solid #173E75" }}>
               <Box sx={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", textAlign: "center" }}>
                 <Box>
                   <Typography sx={{ fontFamily: "inherit", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2px", lineHeight: 1.25 }}>
@@ -1365,7 +1365,7 @@ const AdmissionRecordDetail = () => {
                 sx={{
                   width: 90,
                   height: 120,
-                  border: "1px solid #173B70",
+                  border: "1px solid #173E75",
                   borderRadius: "2px",
                   display: "flex",
                   alignItems: "center",

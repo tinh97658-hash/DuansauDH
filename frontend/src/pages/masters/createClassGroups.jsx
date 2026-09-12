@@ -22,6 +22,7 @@ const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
 const initialForm = (year = String(currentYear)) => ({
   code: "",
   name: "",
+  count: 1,
   majorId: "",
   academicYear: year,
   maxStudents: 40,
@@ -118,6 +119,20 @@ const CreateClassGroups = () => {
     );
   }, [groups, search]);
 
+  const automaticNames = useMemo(() => {
+    const major = majors.find((item) => item.id === form.majorId);
+    if (!major?.code || !form.academicYear) return [];
+    const prefix = `${major.code.toUpperCase()}${form.academicYear}.`;
+    const usedIndexes = groups
+      .filter((group) => group.majorId === form.majorId && group.academicYear === form.academicYear)
+      .map((group) => String(group.name || ""))
+      .filter((name) => name.startsWith(prefix))
+      .map((name) => Number(name.slice(prefix.length)))
+      .filter(Number.isInteger);
+    const startIndex = Math.max(0, ...usedIndexes) + 1;
+    return Array.from({ length: Math.min(10, Math.max(0, Number(form.count) || 0)) }, (_, offset) => `${prefix}${String(startIndex + offset).padStart(2, "0")}`);
+  }, [form.academicYear, form.count, form.majorId, groups, majors]);
+
   // Actions
   const openAdd = () => {
     setEditingId(null);
@@ -141,6 +156,7 @@ const CreateClassGroups = () => {
     setForm({
       code: group.code,
       name: group.name,
+      count: 1,
       majorId: group.majorId || "",
       academicYear: group.academicYear || selectedYear,
       maxStudents: group.maxStudents || 40,
@@ -151,8 +167,11 @@ const CreateClassGroups = () => {
   };
 
   const handleSave = async () => {
-    if (!form.code?.trim()) return toast.error("Vui lòng nhập mã nhóm học phần.");
-    if (!form.name?.trim()) return toast.error("Vui lòng nhập tên nhóm học phần.");
+    if (editingId && !form.code?.trim()) return toast.error("Vui lòng nhập mã nhóm học phần.");
+    if (editingId && !form.name?.trim()) return toast.error("Vui lòng nhập tên nhóm học phần.");
+    if (!editingId && !form.majorId) return toast.error("Vui lòng chọn chuyên ngành.");
+    const count = Number(form.count || 0);
+    if (!editingId && (count < 1 || count > 10)) return toast.error("Số lượng nhóm cần tạo từ 1 đến 10.");
     setSaving(true);
     try {
       const payload = {
@@ -169,8 +188,31 @@ const CreateClassGroups = () => {
         await axios.put(`${API_BASE_URL}/masters/class-groups/${editingId}`, payload, { withCredentials: true });
         toast.success("Cập nhật nhóm học phần thành công.");
       } else {
-        await axios.post(`${API_BASE_URL}/masters/class-groups`, payload, { withCredentials: true });
-        toast.success("Tạo nhóm học phần thành công.");
+        const major = majors.find((item) => item.id === form.majorId);
+        if (!major?.code) throw new Error("Chuyên ngành chưa có tên viết tắt.");
+        const { data: currentGroupsData } = await axios.get(`${API_BASE_URL}/masters/class-groups?${new URLSearchParams({ majorId: form.majorId, academicYear: form.academicYear })}`, { withCredentials: true });
+        const currentGroups = Array.isArray(currentGroupsData) ? currentGroupsData : currentGroupsData.data || [];
+        const namePrefix = `${major.code.toUpperCase()}${form.academicYear}.`;
+        const codePrefix = `${String(form.academicYear).slice(-2)}${major.code.toUpperCase()}`;
+        const usedIndexes = currentGroups.flatMap((group) => {
+          const values = [];
+          if (String(group.name || "").startsWith(namePrefix)) values.push(Number(String(group.name).slice(namePrefix.length)));
+          if (String(group.code || "").startsWith(codePrefix)) values.push(Number(String(group.code).slice(codePrefix.length)));
+          return values.filter(Number.isInteger);
+        });
+        const startIndex = Math.max(0, ...usedIndexes) + 1;
+        await axios.post(`${API_BASE_URL}/masters/class-groups/batch`, {
+          codePrefix,
+          namePrefix,
+          count,
+          startIndex,
+          majorId: form.majorId,
+          academicYear: form.academicYear,
+          maxStudents: Number(form.maxStudents || 40),
+          status: form.status,
+          note: form.note?.trim() || undefined,
+        }, { withCredentials: true });
+        toast.success(`Đã tạo thành công ${count} nhóm học phần.`);
       }
       setDialogOpen(false);
       loadGroups();
@@ -183,7 +225,7 @@ const CreateClassGroups = () => {
 
   const handleBatchCreate = async () => {
     const count = Number(batchForm.count || 0);
-    if (count < 1 || count > 20) return toast.error("Số lượng nhóm cần tạo từ 1 đến 20.");
+    if (count < 1 || count > 10) return toast.error("Số lượng nhóm cần tạo từ 1 đến 10.");
     if (!batchForm.codePrefix?.trim()) return toast.error("Vui lòng nhập tiền tố mã nhóm.");
 
     setSaving(true);
@@ -284,7 +326,7 @@ const CreateClassGroups = () => {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchRounded fontSize="small" sx={{ color: "#8A94A3" }} />
+                  <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
                 </InputAdornment>
               ),
             }}
@@ -359,7 +401,7 @@ const CreateClassGroups = () => {
                   <TableRow key={row.id} hover>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontFamily: "monospace", fontWeight: 700, color: "#0788B8" }}>
+                      <Typography variant="body2" sx={{ fontFamily: "inherit", fontWeight: 700, color: "#0788B8" }}>
                         {row.code}
                       </Typography>
                     </TableCell>
@@ -421,100 +463,77 @@ const CreateClassGroups = () => {
       </TableContainer>
 
       {/* Add / Edit Dialog */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingId ? "Chỉnh sửa nhóm học phần" : "Thêm nhóm học phần mới"}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Stack direction="row" spacing={2}>
-              <TextField
-                label="Mã nhóm"
-                placeholder="VD: THS-CNTT-K32-N01"
-                value={form.code}
-                onChange={(e) => setForm((p) => ({ ...p, code: e.target.value.toUpperCase() }))}
-                fullWidth
-                size="small"
-                required
-              />
-              <TextField
-                label="Tên nhóm học phần"
-                placeholder="VD: Nhóm 1 - Khóa 32"
-                value={form.name}
-                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                fullWidth
-                size="small"
-                required
-              />
-            </Stack>
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth PaperProps={{ sx: { width: 720 } }}>
+        <DialogTitle sx={{ px: 3, py: 2 }}>
+          {editingId ? "Chỉnh sửa nhóm học phần" : "Thêm nhóm học phần mới"}
+        </DialogTitle>
+        <DialogContent sx={{ px: 3, py: 2.5 }}>
+          <Stack spacing={2.25}>
+            {editingId && <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1.35fr", gap: 2 }}>
+              <Box>
+                <Typography component="label" htmlFor="class-group-code" variant="caption" sx={{ display: "block", mb: 0.75, fontWeight: 700, color: "text.secondary" }}>MÃ NHÓM</Typography>
+                <TextField id="class-group-code" placeholder="VD: 26CNT01" value={form.code} onChange={(e) => setForm((p) => ({ ...p, code: e.target.value.toUpperCase() }))} fullWidth size="small" required />
+              </Box>
+              <Box>
+                <Typography component="label" htmlFor="class-group-name" variant="caption" sx={{ display: "block", mb: 0.75, fontWeight: 700, color: "text.secondary" }}>TÊN NHÓM HỌC PHẦN</Typography>
+                <TextField id="class-group-name" placeholder="VD: CNT2026.01" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} fullWidth size="small" required />
+              </Box>
+            </Box>}
 
-            <FormControl fullWidth size="small">
-              <InputLabel id="form-major-label">Ngành học</InputLabel>
-              <Select
-                labelId="form-major-label"
-                label="Ngành học"
-                value={form.majorId}
-                onChange={(e) => setForm((p) => ({ ...p, majorId: e.target.value }))}
-              >
-                <MenuItem value=""><em>(Không phân ngành / Dùng chung)</em></MenuItem>
-                {majors.map((m) => (
-                  <MenuItem key={m.id} value={m.id}>{m.name} ({m.code})</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <Stack direction="row" spacing={2}>
+            <Box>
+              <Typography variant="caption" sx={{ display: "block", mb: 0.75, fontWeight: 700, color: "text.secondary" }}>CHUYÊN NGÀNH</Typography>
               <FormControl fullWidth size="small">
-                <InputLabel id="form-year-label">Năm học / Khóa</InputLabel>
-                <Select
-                  labelId="form-year-label"
-                  label="Năm học / Khóa"
-                  value={form.academicYear}
-                  onChange={(e) => setForm((p) => ({ ...p, academicYear: e.target.value }))}
-                >
-                  {YEARS.map((y) => (
-                    <MenuItem key={y} value={y}>{y}</MenuItem>
-                  ))}
+                <Select value={form.majorId} inputProps={{ "aria-label": "Chuyên ngành" }} onChange={(e) => setForm((p) => ({ ...p, majorId: e.target.value }))}>
+                  <MenuItem value=""><em>(Không phân ngành / Dùng chung)</em></MenuItem>
+                  {majors.map((m) => <MenuItem key={m.id} value={m.id}>{m.name} ({m.code})</MenuItem>)}
                 </Select>
               </FormControl>
+            </Box>
 
-              <TextField
-                label="Sĩ số tối đa"
-                type="number"
-                value={form.maxStudents}
-                onChange={(e) => setForm((p) => ({ ...p, maxStudents: e.target.value }))}
-                fullWidth
-                size="small"
-                inputProps={{ min: 1, max: 200 }}
-              />
-            </Stack>
+            <Box sx={{ display: "grid", gridTemplateColumns: editingId ? "1fr 1fr" : "1fr 1fr 1fr", gap: 2 }}>
+              <Box>
+                <Typography variant="caption" sx={{ display: "block", mb: 0.75, fontWeight: 700, color: "text.secondary" }}>NĂM HỌC / KHÓA</Typography>
+                <FormControl fullWidth size="small">
+                  <Select value={form.academicYear} inputProps={{ "aria-label": "Năm học / Khóa" }} onChange={(e) => setForm((p) => ({ ...p, academicYear: e.target.value }))}>
+                    {YEARS.map((y) => <MenuItem key={y} value={y}>{y}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Box>
+              {!editingId && <Box>
+                <Typography component="label" htmlFor="class-group-count" variant="caption" sx={{ display: "block", mb: 0.75, fontWeight: 700, color: "text.secondary" }}>SỐ NHÓM CẦN TẠO</Typography>
+                <TextField id="class-group-count" type="number" value={form.count} onChange={(e) => setForm((p) => ({ ...p, count: e.target.value }))} fullWidth size="small" inputProps={{ min: 1, max: 10 }} />
+              </Box>}
+              <Box>
+                <Typography component="label" htmlFor="class-group-capacity" variant="caption" sx={{ display: "block", mb: 0.75, fontWeight: 700, color: "text.secondary" }}>SĨ SỐ TỐI ĐA / NHÓM</Typography>
+                <TextField id="class-group-capacity" type="number" value={form.maxStudents} onChange={(e) => setForm((p) => ({ ...p, maxStudents: e.target.value }))} fullWidth size="small" inputProps={{ min: 1, max: 200 }} />
+              </Box>
+            </Box>
 
-            <FormControl fullWidth size="small">
-              <InputLabel id="form-status-label">Trạng thái nhóm</InputLabel>
-              <Select
-                labelId="form-status-label"
-                label="Trạng thái nhóm"
-                value={form.status}
-                onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}
-              >
-                <MenuItem value="open">Đang mở (Cho phép phân học viên)</MenuItem>
-                <MenuItem value="closed">Đã đóng (Khóa nhóm)</MenuItem>
-              </Select>
-            </FormControl>
+            {!editingId && automaticNames.length > 0 && <Box sx={{ p: 2, border: "1px solid #B9DCEE", borderRadius: 1.5, bgcolor: "#F2F9FD" }}>
+              <Typography variant="caption" sx={{ display: "block", mb: 0.75, color: "#0788B8", fontWeight: 700 }}>TÊN NHÓM ĐƯỢC TẠO TỰ ĐỘNG</Typography>
+              <Typography sx={{ color: "#173E75", fontSize: 14, fontWeight: 700, lineHeight: 1.6 }}>{automaticNames.join("  •  ")}</Typography>
+            </Box>}
 
-            <TextField
-              label="Ghi chú"
-              multiline
-              rows={2}
-              value={form.note}
-              onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))}
-              fullWidth
-              size="small"
-            />
+            <Box>
+              <Typography variant="caption" sx={{ display: "block", mb: 0.75, fontWeight: 700, color: "text.secondary" }}>TRẠNG THÁI NHÓM</Typography>
+              <FormControl fullWidth size="small">
+                <Select value={form.status} inputProps={{ "aria-label": "Trạng thái nhóm" }} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}>
+                  <MenuItem value="open">Đang mở (Cho phép phân học viên)</MenuItem>
+                  <MenuItem value="closed">Đã đóng (Khóa nhóm)</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+
+            <Box>
+              <Typography component="label" htmlFor="class-group-note" variant="caption" sx={{ display: "block", mb: 0.75, fontWeight: 700, color: "text.secondary" }}>GHI CHÚ</Typography>
+              <TextField id="class-group-note" placeholder="Nhập ghi chú nếu cần..." multiline rows={2} value={form.note} onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))} fullWidth size="small" />
+            </Box>
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3, py: 1.5, gap: 1 }}>
           <Button onClick={() => setDialogOpen(false)} color="inherit">Hủy</Button>
           <Button variant="contained" onClick={handleSave} disabled={saving}>
-            {saving ? "Đang lưu..." : "Lưu nhóm"}
+            {saving ? "Đang lưu..." : editingId ? "Lưu nhóm" : `Tạo ${form.count || 0} nhóm`}
           </Button>
         </DialogActions>
       </Dialog>
@@ -556,7 +575,7 @@ const CreateClassGroups = () => {
                 onChange={(e) => setBatchForm((p) => ({ ...p, count: e.target.value }))}
                 fullWidth
                 size="small"
-                inputProps={{ min: 1, max: 20 }}
+                inputProps={{ min: 1, max: 10 }}
               />
               <TextField
                 label="Bắt đầu từ số"

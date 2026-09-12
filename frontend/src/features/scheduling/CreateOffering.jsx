@@ -110,45 +110,65 @@ export default function CreateOffering({ user }) {
   }
 
   if (roster) {
+    const [confirmationName, ...confirmationNameParts] = effectiveOfferingName.split(" - ");
+    const confirmationGroups = confirmationNameParts.length
+      ? confirmationNameParts.join(" - ")
+      : chosen.map((group) => group.name || group.code).join(" + ");
     return <section className="sl-create-flow-page sl-create-confirm-page" role="dialog" aria-label="Xem trước danh sách lớp">
       <div className="sl-create-confirm-card">
-        <header><h1>XÁC NHẬN LỚP HỌC PHẦN</h1></header>
-        <div className="sl-create-confirm-course">
-          <div className="sl-create-confirm-title"><h2>{effectiveOfferingName}</h2><div><span>{year}</span><span>{subject?.credits ?? subject?.creditCount ?? 3} tín chỉ</span></div></div>
-          <div className="sl-create-confirm-meta">
-            <div><small>HỌC PHẦN</small><strong>{subject?.code} · {subject?.name}</strong></div>
-            <div><small>CHUYÊN NGÀNH</small><strong>{participatingMajors}</strong></div>
-          </div>
-          <div className="sl-create-confirm-groups"><small>LỚP / KHÓA THAM GIA</small><div>{chosen.map((group) => <span key={group.id}>{group.name || group.code} · {group.academicYear}</span>)}</div></div>
+        <div className="sl-create-confirm-content">
+          <section className="sl-create-confirm-course" aria-label="Thông tin lớp học phần">
+            <div className="sl-create-confirm-kicker">XÁC NHẬN THÔNG TIN LỚP HỌC PHẦN</div>
+            <div className="sl-create-confirm-title">
+              <div>
+                <h2>{confirmationName}</h2>
+                <p>{confirmationGroups}</p>
+                {confirmationName !== effectiveOfferingName && <span className="sl-sr-only">{effectiveOfferingName}</span>}
+              </div>
+              <div className="sl-create-confirm-badges"><span>{year}</span><span>{subject?.credits ?? subject?.creditCount ?? 3} tín chỉ</span></div>
+            </div>
+            <div className="sl-create-confirm-meta">
+              <div><small>HỌC PHẦN</small><strong>{subject?.code} · {subject?.name}</strong></div>
+              <div><small>CHUYÊN NGÀNH</small><strong>{participatingMajors}</strong></div>
+            </div>
+            <div className="sl-create-confirm-groups">
+              <small>LỚP / KHÓA THAM GIA</small>
+              <p>{chosen.map((group) => `${group.name || group.code} · ${group.academicYear}`).join("  •  ")}</p>
+            </div>
+            <div className="sl-create-confirm-size"><small>QUY MÔ</small><strong>{roster.length} học viên · {groupIds.length} lớp/nhóm</strong></div>
+          </section>
+          <section className="sl-create-confirm-roster" aria-label="Danh sách học viên">
+            <div className="sl-create-confirm-roster-head">
+              <strong>Danh sách học viên</strong>
+              <span>{roster.length} học viên</span>
+            </div>
+            {saveError && <Notice error={saveError} />}
+            <div className="sl-create-confirm-table-wrap">
+              <table>
+                <thead><tr><th>STT</th><th>MÃ HỌC VIÊN</th><th>HỌ VÀ TÊN HỌC VIÊN</th><th>GHI CHÚ</th></tr></thead>
+                <tbody>{roster.map((row, index) => <tr key={row.id}>
+                  <td>{String(index + 1).padStart(2, "0")}</td>
+                  <td>{row.code}</td>
+                  <td>{row.fullName}</td>
+                  <td><input aria-label={`Ghi chú ${row.code}`} value={row.note} maxLength={2000} disabled={saving} placeholder="Nhập ghi chú..." onChange={(event) => { const note = event.target.value; setRoster((current) => current.map((item) => item.id === row.id ? { ...item, note } : item)); }} /></td>
+                </tr>)}</tbody>
+              </table>
+            </div>
+          </section>
         </div>
-        <div className="sl-create-confirm-roster">
-          <div className="sl-create-confirm-roster-head"><strong>DANH SÁCH HỌC VIÊN</strong><span>{roster.length} học viên</span></div>
-          {saveError && <Notice error={saveError} />}
-          <div className="sl-create-confirm-table-wrap">
-            <table>
-              <thead><tr><th>STT</th><th>MÃ HỌC VIÊN</th><th>HỌ VÀ TÊN HỌC VIÊN</th><th>GHI CHÚ</th></tr></thead>
-              <tbody>{roster.map((row, index) => <tr key={row.id}>
-                <td>{String(index + 1).padStart(2, "0")}</td>
-                <td>{row.code}</td>
-                <td>{row.fullName}</td>
-                <td><input aria-label={`Ghi chú ${row.code}`} value={row.note} maxLength={2000} disabled={saving} placeholder="Nhập ghi chú..." onChange={(event) => { const note = event.target.value; setRoster((current) => current.map((item) => item.id === row.id ? { ...item, note } : item)); }} /></td>
-              </tr>)}</tbody>
-            </table>
-          </div>
-        </div>
-        <footer><span>{roster.length} học viên · {groupIds.length} lớp / nhóm</span><div><button disabled={saving} onClick={() => setRoster(null)}>← Quay lại chỉnh sửa</button><button className="sl-primary" aria-label="Xác nhận tạo lớp" disabled={saving} onClick={create}>{saving ? "Đang lưu..." : "Xác nhận tạo lớp học phần"}</button></div></footer>
+        <footer><div><button disabled={saving} onClick={() => setRoster(null)}>←&nbsp; Quay lại chỉnh sửa</button><button className="sl-primary" aria-label="Xác nhận tạo lớp" disabled={saving} onClick={create}>{saving ? "Đang lưu..." : "Xác nhận tạo lớp học phần"}</button></div></footer>
       </div>
     </section>;
   }
 
   return <section className="sl-workspace sl-create-mode sl-create-figma">
     <aside className="sl-left">
-      <div className="sl-scope"><div className="sl-eyebrow">PHẠM VI TỔ CHỨC</div>
+      <div className="sl-scope"><div className="sl-eyebrow">PHẠM VI LÀM VIỆC</div>
         <div className="v20-scope-step"><b>1</b>CHUYÊN NGÀNH</div>
         <SearchSelect label="Chọn chuyên ngành" placeholder="Chọn chuyên ngành" value={majorId} disabled={majors.loading} options={majors.data || []} onChange={(value) => changeScope(() => { setMajor(value); setYear(""); })} />
         {majors.error && <Notice error={majors.error} />}
         <div className="v20-scope-step"><b>2</b>KHÓA / NĂM HỌC</div>
-        <select className="sl-create-year" aria-label="Khóa / Năm học" value={year} disabled={!majorId || groups.loading} onChange={(event) => changeScope(() => setYear(event.target.value))}><option value="">Chọn khóa / năm</option>{years.map((value) => <option key={value}>{value}</option>)}</select>
+        <select className={`sl-create-year${year ? "" : " sl-placeholder"}`} aria-label="Khóa / Năm học" value={year} disabled={!majorId || groups.loading} onChange={(event) => changeScope(() => setYear(event.target.value))}><option value="">Chọn khóa / năm</option>{years.map((value) => <option key={value}>{value}</option>)}</select>
         {groups.error && <Notice error={groups.error} />}
         {majorId && !groups.loading && !groups.error && !years.length && <Notice>Chưa có nhóm cho chuyên ngành này. <Link to="/masters/create-class-groups">Tạo nhóm học phần</Link></Notice>}
       </div>
@@ -156,7 +176,8 @@ export default function CreateOffering({ user }) {
         <div className="sl-create-subject-title"><div className="v20-scope-step"><b>3</b>HỌC PHẦN CÒN CẦN TỔ CHỨC</div><span>{filteredSubjects.length}</span></div>
         <div className="sl-create-subject-search"><span>⌕</span><input aria-label="Tìm học phần" placeholder="Tìm học phần..." value={query} onChange={(event) => setQuery(event.target.value)} /></div>
         {candidates.loading && majorId && year ? <Notice>Đang tải học phần...</Notice> : candidates.error ? <Notice error={candidates.error} /> : majorId && year ? <div className="sl-create-subject-list">{filteredSubjects.map((item) => {
-          const isCommon = item.subject.subjectType === "KC" || item.subject.allowCrossMajor;
+          // Liên ngành chỉ là quyền ghép nhóm; nhãn "Môn chung" chỉ dành cho học phần cấp Viện (KC).
+          const isCommon = item.subject.subjectType === "KC";
           return (
             <button key={item.subject.id} className={subjectId === item.subject.id ? "sl-selected" : ""} onClick={() => { resetSelection(); setSubject(item.subject.id); setGroupQuery(""); setIsCustomName(false); setOfferingName(""); }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>

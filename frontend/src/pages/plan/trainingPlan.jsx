@@ -20,11 +20,11 @@ import FeatureLayout from "../../components/FeatureLayout";
 import { normalizeSubjectIdentity } from "../../components/SubjectIdentityFields";
 
 const SUBJECT_TYPES = [
-  { value: "KC", label: "Kiến thức chung (KC)", color: "#173B70" },
+  { value: "KC", label: "Kiến thức chung (KC)", color: "#173E75" },
   { value: "CS", label: "Cơ sở (CS)", color: "#0788B8" },
   { value: "CN", label: "Chuyên ngành (CN)", color: "#137B3B" },
   { value: "TC", label: "Tự chọn (TC)", color: "#B86216" },
-  { value: "CH", label: "Chuyên đề (CH)", color: "#68737D" },
+  { value: "CH", label: "Chuyên đề (CH)", color: "#607486" },
 ];
 
 const currentYear = new Date().getFullYear();
@@ -151,22 +151,44 @@ const TrainingPlan = () => {
     return () => { mounted = false; };
   }, []);
 
-  // Load Subjects and Curriculums when major/level changes
+  // Load each resource independently. A missing curriculum endpoint must not hide
+  // a valid subject catalog (the scheduling module consumes that catalog too).
   const loadData = useCallback(async () => {
     if (!majorId) return;
     setLoading(true);
     try {
-      const [subjectsRes, curriculumsRes, catalogRes] = await Promise.all([
+      const [subjectsResult, curriculumsResult, catalogResult] = await Promise.allSettled([
         axios.get(`${API_BASE_URL}/plan/subjects?majorId=${majorId}&program=${level}`, { withCredentials: true }),
         axios.get(`${API_BASE_URL}/plan/curriculums?majorId=${majorId}&program=${level}`, { withCredentials: true }),
         axios.get(`${API_BASE_URL}/plan/subjects?majorId=${majorId}&program=${level}&includeCommon=true`, { withCredentials: true }),
       ]);
-      const fetchedSubjects = Array.isArray(subjectsRes.data) ? subjectsRes.data : [];
-      const fetchedCurriculums = Array.isArray(curriculumsRes.data) ? curriculumsRes.data : [];
-      const fetchedCatalog = Array.isArray(catalogRes.data) ? catalogRes.data : [];
+
+      const fetchedSubjects = subjectsResult.status === "fulfilled" && Array.isArray(subjectsResult.value.data)
+        ? subjectsResult.value.data
+        : [];
+      const fetchedCurriculums = curriculumsResult.status === "fulfilled" && Array.isArray(curriculumsResult.value.data)
+        ? curriculumsResult.value.data
+        : [];
+      const fetchedCatalog = catalogResult.status === "fulfilled" && Array.isArray(catalogResult.value.data)
+        ? catalogResult.value.data
+        : fetchedSubjects;
+
       setSubjects(fetchedSubjects);
       setCurriculums(fetchedCurriculums);
       setCatalogSubjects(fetchedCatalog);
+
+      if (subjectsResult.status === "rejected") {
+        const err = subjectsResult.reason;
+        toast.error(err.response?.status === 404
+          ? "Máy chủ chưa có API danh mục học phần (/plan/subjects). Vui lòng cập nhật và khởi động lại backend."
+          : err.response?.data?.message || "Không thể tải danh mục học phần");
+      }
+      if (curriculumsResult.status === "rejected") {
+        const err = curriculumsResult.reason;
+        toast.error(err.response?.status === 404
+          ? "Máy chủ chưa có API chương trình đào tạo (/plan/curriculums). Danh mục học phần vẫn có thể sử dụng."
+          : err.response?.data?.message || "Không thể tải chương trình đào tạo");
+      }
       if (fetchedCurriculums.length > 0) {
         setCurriculumId((prev) => {
           if (prev && fetchedCurriculums.some((c) => c.id === prev)) return prev;
@@ -338,7 +360,9 @@ const TrainingPlan = () => {
         setIsAddingSubject(false);
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || "Không thể thêm học phần");
+      toast.error(err.response?.status === 404
+        ? "Máy chủ chưa có đường dẫn tạo học phần (POST /plan/subjects). Vui lòng cập nhật và khởi động lại backend."
+        : err.response?.data?.message || "Không thể thêm học phần");
     }
   };
 
@@ -721,7 +745,7 @@ const TrainingPlan = () => {
                     setTab(0);
                   }
                 }}
-                startIcon={<StarRounded sx={{ color: isCommonCategory ? "#FFD700" : "#173B70" }} />}
+                startIcon={<StarRounded sx={{ color: isCommonCategory ? "#fff" : "#0788B8" }} />}
                 sx={{
                   height: 36,
                   px: 1.5,
@@ -729,12 +753,12 @@ const TrainingPlan = () => {
                   fontWeight: 700,
                   textTransform: "none",
                   borderRadius: "4px",
-                  bgcolor: isCommonCategory ? "#173B70" : "#fff",
-                  color: isCommonCategory ? "#fff" : "#173B70",
-                  borderColor: "#173B70",
+                  bgcolor: isCommonCategory ? "#0788B8" : "#fff",
+                  color: isCommonCategory ? "#fff" : "#0788B8",
+                  borderColor: "#0788B8",
                   "&:hover": {
-                    bgcolor: isCommonCategory ? "#0F284C" : "#F0F4F8",
-                    borderColor: "#0F284C",
+                    bgcolor: isCommonCategory ? "#06739C" : "#EBF5FA",
+                    borderColor: "#06739C",
                   },
                 }}
               >
@@ -776,7 +800,7 @@ const TrainingPlan = () => {
                   value={majorId}
                   onChange={(e) => setMajorId(e.target.value)}
                   displayEmpty
-                  sx={{ height: 36, fontSize: 13, fontWeight: 600, color: "#173B70", bgcolor: "#F7F9FA" }}
+                  sx={{ height: 36, fontSize: 13, fontWeight: 600, color: "#173E75", bgcolor: "#F7F9FA" }}
                 >
                   {specificMajors.map((m) => (
                     <MenuItem key={m.id} value={m.id} sx={{ fontSize: 13 }}>
@@ -787,7 +811,7 @@ const TrainingPlan = () => {
               </FormControl>
             ) : (
               <Box sx={{ display: "flex", alignItems: "center", px: 1.5, height: 36, bgcolor: "#F0F7FA", border: "1px solid #B8D9E8", borderRadius: "4px", flexGrow: 1 }}>
-                <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: "#173B70" }}>
+                <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: "#173E75" }}>
                   Quản lý tập trung các học phần dùng chung
                 </Typography>
               </Box>
@@ -803,7 +827,7 @@ const TrainingPlan = () => {
                 disabled={loading}
                 sx={{ border: "1px solid #DFE4E8", borderRadius: "4px", p: "6px" }}
               >
-                <RefreshRounded fontSize="small" sx={{ color: "#68737D" }} />
+                <RefreshRounded fontSize="small" sx={{ color: "#607486" }} />
               </IconButton>
             </Tooltip>
           </Stack>
@@ -825,7 +849,7 @@ const TrainingPlan = () => {
                 fontSize: 13,
                 fontWeight: 700,
                 textTransform: "none",
-                color: "#68737D",
+                color: "#607486",
                 "&.Mui-selected": {
                   color: "#0788B8",
                 },
@@ -859,11 +883,11 @@ const TrainingPlan = () => {
             borderRadius: "4px",
             bgcolor: "#F0F7FA",
             borderColor: "#B8D9E8",
-            color: "#173B70",
+            color: "#173E75",
             "& .MuiAlert-icon": { color: "#0788B8" },
           }}
         >
-          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#173B70" }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#173E75" }}>
             Học phần dùng chung cấp Viện (Khối kiến thức chung - KC)
           </Typography>
           <Typography variant="caption" sx={{ color: "#475569", display: "block", mt: 0.25 }}>
@@ -904,7 +928,7 @@ const TrainingPlan = () => {
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <SearchRounded fontSize="small" sx={{ color: "#8a94a3" }} />
+                      <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
                     </InputAdornment>
                   ),
                 }}
@@ -928,8 +952,8 @@ const TrainingPlan = () => {
             </Stack>
 
             <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end">
-              <Typography variant="caption" sx={{ color: "#68737D", fontWeight: 600, mr: 1 }}>
-                Tổng: <strong style={{ color: "#20262C" }}>{subjectStats.total}</strong> HP (
+              <Typography variant="caption" sx={{ color: "#607486", fontWeight: 600, mr: 1 }}>
+                Tổng: <strong style={{ color: "#172B3A" }}>{subjectStats.total}</strong> HP (
                 <strong style={{ color: "#0788B8" }}>{subjectStats.totalCredits}</strong> TC) · Bắt buộc:{" "}
                 <strong style={{ color: "#137B3B" }}>{subjectStats.required}</strong> · Tự chọn:{" "}
                 <strong style={{ color: "#B86216" }}>{subjectStats.optional}</strong>
@@ -971,7 +995,7 @@ const TrainingPlan = () => {
           >
             <Table size="small" stickyHeader sx={{ minWidth: 980 }}>
               <TableHead>
-                <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", color: "#20262C", fontWeight: 700, fontSize: 12, py: "8px", borderBottom: "2px solid #DFE4E8" } }}>
+                <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", color: "#172B3A", fontWeight: 700, fontSize: 12, py: "8px", borderBottom: "2px solid #DFE4E8" } }}>
                   <TableCell sx={{ width: 44, textAlign: "center" }}>STT</TableCell>
                   <TableCell sx={{ width: 95 }}>Mã số</TableCell>
                   <TableCell sx={{ width: 95 }}>Mã chữ</TableCell>
@@ -990,7 +1014,7 @@ const TrainingPlan = () => {
               <TableBody>
                 {filteredSubjects.length === 0 && !isAddingSubject ? (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 12 : 11} align="center" sx={{ py: 5, color: "#68737D" }}>
+                    <TableCell colSpan={isAdmin ? 12 : 11} align="center" sx={{ py: 5, color: "#607486" }}>
                       Chưa có học phần nào cho chuyên ngành <strong>{selectedMajor?.name}</strong>.
                       {isAdmin && (
                         <Box sx={{ mt: 1 }}>
@@ -1071,7 +1095,7 @@ const TrainingPlan = () => {
                           </TableCell>
                           <TableCell align="center">
                             {editingSubjectForm.subjectType === "KC" || isCommonCategory ? (
-                              <Chip size="small" label="Dùng chung" sx={{ bgcolor: "#E8F1F5", color: "#173B70", fontWeight: 700, fontSize: 11, border: "1px solid #CBD5E1" }} />
+                              <Chip size="small" label="Dùng chung" sx={{ bgcolor: "#E8F1F5", color: "#173E75", fontWeight: 700, fontSize: 11, border: "1px solid #CBD5E1" }} />
                             ) : (
                               <Chip size="small" label="Chuyên ngành" sx={{ bgcolor: "#EBF5FA", color: "#0788B8", fontSize: 11 }} />
                             )}
@@ -1138,13 +1162,13 @@ const TrainingPlan = () => {
                           "& td": { py: "6px", fontSize: 13 },
                         }}
                       >
-                        <TableCell align="center" sx={{ color: "#68737D", fontSize: 12 }}>
+                        <TableCell align="center" sx={{ color: "#607486", fontSize: 12 }}>
                           {index + 1}
                         </TableCell>
-                        <TableCell sx={{ fontFamily: "monospace", color: "#20262C" }}>
+                        <TableCell sx={{ fontFamily: "inherit", color: "#172B3A" }}>
                           {row.codeNumber}
                         </TableCell>
-                        <TableCell sx={{ fontFamily: "monospace", fontWeight: 700, color: "#173B70" }}>
+                        <TableCell sx={{ fontFamily: "inherit", fontWeight: 700, color: "#173E75" }}>
                           {row.codeText}
                         </TableCell>
                         <TableCell sx={{ fontWeight: 500 }}>
@@ -1162,18 +1186,18 @@ const TrainingPlan = () => {
                               fontSize: 11,
                               fontWeight: 700,
                               height: 22,
-                              borderColor: SUBJECT_TYPES.find((t) => t.value === row.subjectType)?.color || "#68737D",
-                              color: SUBJECT_TYPES.find((t) => t.value === row.subjectType)?.color || "#68737D",
+                              borderColor: SUBJECT_TYPES.find((t) => t.value === row.subjectType)?.color || "#607486",
+                              color: SUBJECT_TYPES.find((t) => t.value === row.subjectType)?.color || "#607486",
                             }}
                           />
                         </TableCell>
                         <TableCell align="center">
                           {row.subjectType === "KC" || isCommonCategory ? (
                             <Tooltip title="Học phần dùng chung cấp Viện (áp dụng toàn trường, tự động cho phép ghép liên ngành)">
-                              <Chip size="small" label="Dùng chung SĐH" sx={{ bgcolor: "#E8F1F5", color: "#173B70", fontWeight: 700, fontSize: 11, border: "1px solid #CBD5E1" }} />
+                              <Chip size="small" label="Dùng chung SĐH" sx={{ bgcolor: "#E8F1F5", color: "#173E75", fontWeight: 700, fontSize: 11, border: "1px solid #CBD5E1" }} />
                             </Tooltip>
                           ) : (
-                            <Chip size="small" label="Chuyên ngành" variant="outlined" sx={{ color: "#68737D", fontSize: 11 }} />
+                            <Chip size="small" label="Chuyên ngành" variant="outlined" sx={{ color: "#607486", fontSize: 11 }} />
                           )}
                         </TableCell>
                         <TableCell align="center">
@@ -1203,12 +1227,12 @@ const TrainingPlan = () => {
                               {row.isRequired ? (
                                 <CheckRounded fontSize="small" sx={{ color: "#137B3B", fontWeight: 900 }} />
                               ) : (
-                                <Typography variant="caption" sx={{ color: "#8a94a3" }}>—</Typography>
+                                <Typography variant="caption" sx={{ color: "#8A9AAA" }}>—</Typography>
                               )}
                             </IconButton>
                           </Tooltip>
                         </TableCell>
-                        <TableCell align="center" sx={{ color: "#68737D", fontSize: 12 }}>
+                        <TableCell align="center" sx={{ color: "#607486", fontSize: 12 }}>
                           {row.sortOrder ?? 0}
                         </TableCell>
                         <TableCell align="center">
@@ -1228,7 +1252,7 @@ const TrainingPlan = () => {
                                 height: 20,
                                 fontSize: 10,
                                 bgcolor: row.active ? "#E6F4EA" : "#F1F3F4",
-                                color: row.active ? "#137B3B" : "#68737D",
+                                color: row.active ? "#137B3B" : "#607486",
                               }}
                             />
                           )}
@@ -1354,7 +1378,7 @@ const TrainingPlan = () => {
                     </TableCell>
                     <TableCell align="center">
                       {isCommonCategory || subjectDraft.subjectType === "KC" ? (
-                        <Chip size="small" label="Dùng chung" sx={{ bgcolor: "#E8F1F5", color: "#173B70", fontWeight: 700, fontSize: 11, border: "1px solid #CBD5E1" }} />
+                        <Chip size="small" label="Dùng chung" sx={{ bgcolor: "#E8F1F5", color: "#173E75", fontWeight: 700, fontSize: 11, border: "1px solid #CBD5E1" }} />
                       ) : (
                         <Chip size="small" label="Chuyên ngành" sx={{ bgcolor: "#EBF5FA", color: "#0788B8", fontSize: 11 }} />
                       )}
@@ -1413,7 +1437,7 @@ const TrainingPlan = () => {
           </TableContainer>
 
           {/* Table Footer Instructions */}
-          <Stack direction="row" spacing={3} sx={{ mt: 1.5, color: "#68737D", fontSize: 12 }}>
+          <Stack direction="row" spacing={3} sx={{ mt: 1.5, color: "#607486", fontSize: 12 }}>
             <Typography variant="caption">
               💡 <strong>Mẹo thao tác Excel:</strong> Bấm <strong>Tab</strong> để chuyển ô · Bấm <strong>Enter</strong> để lưu và tạo dòng tiếp theo · Bấm <strong>Esc</strong> để hủy · Bấm đúp vào dòng để sửa.
             </Typography>
@@ -1437,7 +1461,7 @@ const TrainingPlan = () => {
               }}
             >
               <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#173B70" }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#173E75" }}>
                   Danh sách CTĐT theo khóa ({curriculums.length})
                 </Typography>
 
@@ -1478,7 +1502,7 @@ const TrainingPlan = () => {
                   <TableBody>
                     {curriculums.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={isAdmin ? 5 : 4} align="center" sx={{ py: 4, color: "#68737D", fontSize: 12 }}>
+                        <TableCell colSpan={isAdmin ? 5 : 4} align="center" sx={{ py: 4, color: "#607486", fontSize: 12 }}>
                           Chưa có chương trình đào tạo nào cho chuyên ngành này. Bấm <strong>"+ Lập CTĐT mới"</strong> để tạo khung CTĐT cho từng khóa học.
                         </TableCell>
                       </TableRow>
@@ -1500,7 +1524,7 @@ const TrainingPlan = () => {
                               "& td": { py: "8px", fontSize: 12 },
                             }}
                           >
-                            <TableCell align="center" sx={{ color: "#68737D", fontSize: 11 }}>
+                            <TableCell align="center" sx={{ color: "#607486", fontSize: 11 }}>
                               {index + 1}
                             </TableCell>
                             <TableCell>
@@ -1517,11 +1541,11 @@ const TrainingPlan = () => {
                                     borderRadius: "2px",
                                   }}
                                 />
-                                <Typography variant="caption" sx={{ fontFamily: "monospace", fontWeight: 700, color: "#173B70" }}>
+                                <Typography variant="caption" sx={{ fontFamily: "inherit", fontWeight: 700, color: "#173E75" }}>
                                   {c.code}
                                 </Typography>
                               </Stack>
-                              <Typography variant="caption" sx={{ color: "#20262C", display: "block", mt: 0.5, fontWeight: 500 }}>
+                              <Typography variant="caption" sx={{ color: "#172B3A", display: "block", mt: 0.5, fontWeight: 500 }}>
                                 {c.name}
                               </Typography>
                             </TableCell>
@@ -1547,7 +1571,7 @@ const TrainingPlan = () => {
                                   />
                                 </Tooltip>
                               ) : (
-                                <Typography variant="caption" sx={{ color: "#8a94a3", fontSize: 11 }}>
+                                <Typography variant="caption" sx={{ color: "#8A9AAA", fontSize: 11 }}>
                                   0 lớp
                                 </Typography>
                               )}
@@ -1625,7 +1649,7 @@ const TrainingPlan = () => {
                     sx={{ mb: 1.5 }}
                   >
                     <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#173B70" }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#173E75" }}>
                         {curriculum.name}
                       </Typography>
                       <Chip
@@ -1643,7 +1667,7 @@ const TrainingPlan = () => {
                           <Chip
                             size="small"
                             label={`${curriculum.classGroups.length} lớp đang áp dụng`}
-                            sx={{ height: 20, fontSize: 10, fontWeight: 600, bgcolor: "#F0F4F8", color: "#173B70" }}
+                            sx={{ height: 20, fontSize: 10, fontWeight: 600, bgcolor: "#F0F4F8", color: "#173E75" }}
                           />
                         </Tooltip>
                       )}
@@ -1696,16 +1720,16 @@ const TrainingPlan = () => {
                   </Stack>
 
                   <Stack direction="row" spacing={2} sx={{ mb: 1.5 }} flexWrap="wrap">
-                    <Typography variant="caption" sx={{ color: "#68737D", fontWeight: 700 }}>
+                    <Typography variant="caption" sx={{ color: "#607486", fontWeight: 700 }}>
                       Bắt buộc: <strong style={{ color: "#137B3B" }}>{requiredCredits} TC</strong>
                     </Typography>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontWeight: 700 }}>
+                    <Typography variant="caption" sx={{ color: "#607486", fontWeight: 700 }}>
                       Tự chọn: <strong style={{ color: "#B86216" }}>{electiveCredits} TC</strong>
                     </Typography>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontWeight: 700 }}>
-                      Tổng: <strong style={{ color: "#173B70" }}>{requiredCredits + electiveCredits} TC</strong> (Chuẩn: 60 TC)
+                    <Typography variant="caption" sx={{ color: "#607486", fontWeight: 700 }}>
+                      Tổng: <strong style={{ color: "#173E75" }}>{requiredCredits + electiveCredits} TC</strong> (Chuẩn: 60 TC)
                     </Typography>
-                    <Typography variant="caption" sx={{ color: "#68737D", fontWeight: 700 }}>
+                    <Typography variant="caption" sx={{ color: "#607486", fontWeight: 700 }}>
                       Quy mô CTĐT: <strong>{curriculumSubjects.length}</strong> học phần
                     </Typography>
                   </Stack>
@@ -1718,7 +1742,7 @@ const TrainingPlan = () => {
                   <TableContainer sx={{ maxHeight: "calc(100vh - 360px)", overflowY: "auto", border: "1px solid #DFE4E8", borderRadius: "2px" }}>
                     <Table size="small" stickyHeader sx={{ minWidth: 640 }}>
                       <TableHead>
-                        <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", color: "#20262C", fontWeight: 700, fontSize: 12, py: "6px" } }}>
+                        <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", color: "#172B3A", fontWeight: 700, fontSize: 12, py: "6px" } }}>
                           <TableCell sx={{ width: 36, textAlign: "center" }}>STT</TableCell>
                           <TableCell sx={{ width: 80 }}>Mã HP</TableCell>
                           <TableCell>Tên môn học</TableCell>
@@ -1732,29 +1756,29 @@ const TrainingPlan = () => {
                       <TableBody>
                         {curriculumSubjects.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={isAdmin ? 7 : 6} align="center" sx={{ py: 4, color: "#68737D", fontSize: 12 }}>
+                            <TableCell colSpan={isAdmin ? 7 : 6} align="center" sx={{ py: 4, color: "#607486", fontSize: 12 }}>
                               Chương trình đào tạo hiện chưa có môn học nào. Hãy bấm <strong>"Thêm học phần từ danh mục"</strong> ở trên để chọn các môn học cho khóa này.
                             </TableCell>
                           </TableRow>
                         ) : (
                           curriculumSubjects.map((entry, index) => (
                             <TableRow key={entry.id} hover sx={{ "& td": { py: "4px", fontSize: 12 } }}>
-                              <TableCell align="center" sx={{ color: "#68737D", fontSize: 11 }}>
+                              <TableCell align="center" sx={{ color: "#607486", fontSize: 11 }}>
                                 {index + 1}
                               </TableCell>
-                              <TableCell sx={{ fontFamily: "monospace", fontWeight: 700, color: "#173B70" }}>
+                              <TableCell sx={{ fontFamily: "inherit", fontWeight: 700, color: "#173E75" }}>
                                 {entry.code}
                               </TableCell>
                               <TableCell sx={{ fontWeight: 500 }}>{entry.name}</TableCell>
                               <TableCell align="center" sx={{ fontWeight: 600 }}>{entry.credits}</TableCell>
-                              <TableCell sx={{ color: "#68737D", fontSize: 11 }}>
+                              <TableCell sx={{ color: "#607486", fontSize: 11 }}>
                                 {entry.blockCode === "KC" ? (
                                   <Chip
                                     size="small"
                                     label="Khối kiến thức chung"
                                     sx={{
                                       bgcolor: "#E8F1F5",
-                                      color: "#173B70",
+                                      color: "#173E75",
                                       fontWeight: 700,
                                       height: 20,
                                       fontSize: 10,
@@ -1810,7 +1834,7 @@ const TrainingPlan = () => {
 
                   {(curriculum.electiveGroups || []).length > 0 && (
                     <Box sx={{ mt: 1.5 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 700, color: "#173B70", display: "block", mb: 0.5 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", display: "block", mb: 0.5 }}>
                         Nhóm tự chọn và số tín chỉ phải chọn
                       </Typography>
                       <Stack direction="row" spacing={1} flexWrap="wrap">
@@ -1819,7 +1843,7 @@ const TrainingPlan = () => {
                             key={group.id}
                             size="small"
                             label={`${group.name}: tối thiểu ${group.minCredits} TC${group.maxCredits > 0 ? `, tối đa ${group.maxCredits} TC` : ""}`}
-                            sx={{ height: 22, fontSize: 10, bgcolor: "#F7F9FA", color: "#20262C", border: "1px solid #DFE4E8" }}
+                            sx={{ height: 22, fontSize: 10, bgcolor: "#F7F9FA", color: "#172B3A", border: "1px solid #DFE4E8" }}
                           />
                         ))}
                       </Stack>
@@ -1839,9 +1863,9 @@ const TrainingPlan = () => {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle sx={{ fontWeight: 700, color: "#173B70", fontSize: 16, pb: 1 }}>
+        <DialogTitle sx={{ fontWeight: 700, color: "#173E75", fontSize: 16, pb: 1 }}>
           Thêm học phần vào CTĐT: {curriculum?.name || curriculum?.code}
-          <Typography variant="caption" sx={{ display: "block", color: "#68737D", fontWeight: 400, mt: 0.5 }}>
+          <Typography variant="caption" sx={{ display: "block", color: "#607486", fontWeight: 400, mt: 0.5 }}>
             Chọn các học phần từ Danh mục học phần chung của Viện hoặc học phần của ngành để đưa vào khung chương trình đào tạo của khóa {curriculum?.applicableFromYear || year}.
           </Typography>
         </DialogTitle>
@@ -1857,7 +1881,7 @@ const TrainingPlan = () => {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchRounded fontSize="small" sx={{ color: "#8a94a3" }} />
+                    <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
                   </InputAdornment>
                 ),
               }}
@@ -1914,7 +1938,7 @@ const TrainingPlan = () => {
                 <TableBody>
                   {filteredAvailableSubjects.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 3, color: "#68737D", fontSize: 12 }}>
+                      <TableCell colSpan={6} align="center" sx={{ py: 3, color: "#607486", fontSize: 12 }}>
                         Không tìm thấy học phần nào khớp với từ khóa tìm kiếm.
                       </TableCell>
                     </TableRow>
@@ -1923,7 +1947,7 @@ const TrainingPlan = () => {
                       const isSelected = selectedCatalogSubjectIds.includes(s.id);
                       const typeObj = SUBJECT_TYPES.find((t) => t.value === s.subjectType) || {
                         label: s.subjectType || "CN",
-                        color: "#173B70",
+                        color: "#173E75",
                       };
                       return (
                         <TableRow
@@ -1941,7 +1965,7 @@ const TrainingPlan = () => {
                               sx={{ p: 0.2 }}
                             />
                           </TableCell>
-                          <TableCell sx={{ fontFamily: "monospace", fontWeight: 700, color: "#173B70" }}>
+                          <TableCell sx={{ fontFamily: "inherit", fontWeight: 700, color: "#173E75" }}>
                             {s.codeText || s.codeNumber}
                           </TableCell>
                           <TableCell sx={{ fontWeight: 500 }}>{s.name}</TableCell>
@@ -2000,7 +2024,7 @@ const TrainingPlan = () => {
         </DialogContent>
         <Divider />
         <DialogActions sx={{ px: 2, py: 1.5, justifyContent: "space-between" }}>
-          <Typography variant="body2" sx={{ fontWeight: 600, color: "#173B70" }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: "#173E75" }}>
             Đã chọn: <strong>{selectedCatalogSubjectIds.length}</strong> môn (
             {selectedCatalogSubjectIds
               .map((id) => subjects.find((s) => s.id === id)?.credits || 0)
@@ -2044,9 +2068,9 @@ const TrainingPlan = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle sx={{ fontWeight: 700, color: "#173B70", fontSize: 16, pb: 1 }}>
+        <DialogTitle sx={{ fontWeight: 700, color: "#173E75", fontSize: 16, pb: 1 }}>
           Lập chương trình đào tạo theo khóa
-          <Typography variant="caption" sx={{ display: "block", color: "#68737D", fontWeight: 400, mt: 0.5 }}>
+          <Typography variant="caption" sx={{ display: "block", color: "#607486", fontWeight: 400, mt: 0.5 }}>
             Ngành: <strong>{selectedMajor?.name}</strong> ({selectedMajor?.code}) — Trình độ: {level === "doctorate" ? "Tiến sĩ" : "Thạc sĩ"}
           </Typography>
         </DialogTitle>
@@ -2055,7 +2079,7 @@ const TrainingPlan = () => {
           <Stack spacing={2}>
             <Stack direction="row" spacing={2}>
               <FormControl size="small" sx={{ width: 150 }}>
-                <Typography variant="caption" sx={{ fontWeight: 700, color: "#173B70", mb: 0.5 }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", mb: 0.5 }}>
                   Khóa áp dụng *
                 </Typography>
                 <Select
@@ -2082,7 +2106,7 @@ const TrainingPlan = () => {
               </FormControl>
 
               <Box sx={{ flexGrow: 1 }}>
-                <Typography variant="caption" sx={{ fontWeight: 700, color: "#173B70", mb: 0.5, display: "block" }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", mb: 0.5, display: "block" }}>
                   Mã CTĐT *
                 </Typography>
                 <TextField
@@ -2097,7 +2121,7 @@ const TrainingPlan = () => {
             </Stack>
 
             <Box>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: "#173B70", mb: 0.5, display: "block" }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", mb: 0.5, display: "block" }}>
                 Tên chương trình đào tạo *
               </Typography>
               <TextField
@@ -2111,7 +2135,7 @@ const TrainingPlan = () => {
             </Box>
 
             <Box>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: "#173B70", mb: 0.5, display: "block" }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", mb: 0.5, display: "block" }}>
                 Ghi chú
               </Typography>
               <TextField
@@ -2136,10 +2160,10 @@ const TrainingPlan = () => {
                 }
                 label={
                   <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: "#173B70" }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: "#173E75" }}>
                       Tự động nạp sẵn các học phần từ Danh mục môn học của ngành
                     </Typography>
-                    <Typography variant="caption" sx={{ color: "#68737D" }}>
+                    <Typography variant="caption" sx={{ color: "#607486" }}>
                       Nếu bỏ chọn, CTĐT ban đầu sẽ trống và bạn có thể tự chọn từng môn từ danh mục vào sau.
                     </Typography>
                   </Box>

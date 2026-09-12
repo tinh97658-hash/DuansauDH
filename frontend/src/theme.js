@@ -1,5 +1,7 @@
 import { createTheme } from "@mui/material/styles";
 
+export const APP_FONT_FAMILY = '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif';
+
 /**
  * Institutional Theme for University Postgraduate Operations System
  * Strictly following .rulesforai and operational workspace reference design
@@ -57,7 +59,7 @@ export const theme = createTheme({
     borderRadius: 3,
   },
   typography: {
-    fontFamily: '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif',
+    fontFamily: APP_FONT_FAMILY,
     fontSize: 12.5,
     h1: { fontSize: "24px", fontWeight: 700, color: "#173E75" },
     h2: { fontSize: "20px", fontWeight: 700, color: "#173E75" },
@@ -78,7 +80,7 @@ export const theme = createTheme({
         body: {
           backgroundColor: "#F5F7F8",
           color: "#172B3A",
-          fontFamily: '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif',
+          fontFamily: APP_FONT_FAMILY,
           fontSize: "12.5px",
           lineHeight: 1.5,
           margin: 0,
@@ -130,6 +132,13 @@ export const theme = createTheme({
             borderColor: "#0788B8",
             backgroundColor: "#EBF5FB",
           },
+        },
+      },
+    },
+    MuiTypography: {
+      styleOverrides: {
+        root: {
+          fontFamily: "inherit",
         },
       },
     },

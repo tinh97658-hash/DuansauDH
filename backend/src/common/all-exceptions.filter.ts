@@ -23,7 +23,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
         if (typeof body.code === "string") code = body.code;
         if (typeof body.details === "object" && body.details !== null) details = body.details;
       }
-      if (status === HttpStatus.NOT_FOUND) message = "Không tìm thấy đường dẫn yêu cầu";
+      // Nest's router emits `Cannot <METHOD> <PATH>` for an unknown endpoint.
+      // Preserve domain-level NotFoundException messages such as a missing
+      // subject/curriculum instead of incorrectly reporting them as bad routes.
+      if (status === HttpStatus.NOT_FOUND && /^Cannot\s+[A-Z]+\s+\//.test(String(message || ""))) {
+        message = "Không tìm thấy đường dẫn yêu cầu";
+      }
     } else if (error?.name === "SequelizeUniqueConstraintError") {
       message = "Resource already exists";
     }
