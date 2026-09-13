@@ -239,6 +239,18 @@ it("renders course matrix across cohorts, displays KPIs and switches between vie
   expect(screen.getByText("Lớp Khai thác cảng - 2026")).toBeInTheDocument();
   expect(screen.getByText("Lớp Khai thác cảng - 2024")).toBeInTheDocument();
 
+  // The whole card opens details; no separate visible "Xem chi tiết" button is needed.
+  const offeringCard = screen.getByText("Lớp Khai thác cảng - 2026").closest(".sl-matrix-card");
+  expect(within(offeringCard).queryByText("Xem chi tiết")).not.toBeInTheDocument();
+  fireEvent.click(within(offeringCard).getByRole("button", { name: /Xem chi tiết.*2026/ }));
+  expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Đóng" }));
+
+  // Selecting one cohort lays its ordered offerings out in four columns.
+  fireEvent.change(screen.getByLabelText("Khóa / năm học"), { target: { value: "2026" } });
+  expect(document.querySelector(".sl-matrix-col-cards")).toHaveClass("sl-matrix-col-cards-four");
+  fireEvent.change(screen.getByLabelText("Khóa / năm học"), { target: { value: "" } });
+
   // Check pivot table view switch
   fireEvent.click(screen.getByRole("button", { name: /Bảng ma trận môn/ }));
   expect(screen.getByRole("table")).toBeInTheDocument();

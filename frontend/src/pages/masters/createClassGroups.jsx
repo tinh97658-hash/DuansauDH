@@ -10,8 +10,8 @@ import {
   TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
-  AddRounded, AutoAwesomeRounded, DeleteRounded, EditRounded,
-  GroupWorkRounded, RefreshRounded, SearchRounded,
+  AddRounded, DeleteRounded, EditRounded, GroupWorkRounded,
+  RefreshRounded, SearchRounded,
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
@@ -28,16 +28,6 @@ const initialForm = (year = String(currentYear)) => ({
   maxStudents: 40,
   status: "open",
   note: "",
-});
-
-const initialBatchForm = (year = String(currentYear)) => ({
-  codePrefix: "THS-N",
-  namePrefix: "Nhóm học phần",
-  count: 2,
-  startIndex: 1,
-  majorId: "",
-  academicYear: year,
-  maxStudents: 40,
 });
 
 const CreateClassGroups = () => {
@@ -58,10 +48,8 @@ const CreateClassGroups = () => {
 
   // Dialogs
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [batchDialogOpen, setBatchDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(initialForm(String(currentYear)));
-  const [batchForm, setBatchForm] = useState(initialBatchForm(String(currentYear)));
   const [saving, setSaving] = useState(false);
   const [deletingGroup, setDeletingGroup] = useState(null);
 
@@ -143,14 +131,6 @@ const CreateClassGroups = () => {
     setDialogOpen(true);
   };
 
-  const openBatchAdd = () => {
-    setBatchForm({
-      ...initialBatchForm(selectedYear),
-      majorId: selectedMajor !== "ALL" ? selectedMajor : (majors[0]?.id || ""),
-    });
-    setBatchDialogOpen(true);
-  };
-
   const openEdit = (group) => {
     setEditingId(group.id);
     setForm({
@@ -223,32 +203,6 @@ const CreateClassGroups = () => {
     }
   };
 
-  const handleBatchCreate = async () => {
-    const count = Number(batchForm.count || 0);
-    if (count < 1 || count > 10) return toast.error("Số lượng nhóm cần tạo từ 1 đến 10.");
-    if (!batchForm.codePrefix?.trim()) return toast.error("Vui lòng nhập tiền tố mã nhóm.");
-
-    setSaving(true);
-    try {
-      const { data } = await axios.post(`${API_BASE_URL}/masters/class-groups/batch`, {
-        codePrefix: batchForm.codePrefix.trim().toUpperCase(),
-        namePrefix: batchForm.namePrefix.trim(),
-        count,
-        startIndex: Number(batchForm.startIndex || 1),
-        majorId: batchForm.majorId || undefined,
-        academicYear: batchForm.academicYear,
-        maxStudents: Number(batchForm.maxStudents || 40),
-      }, { withCredentials: true });
-      toast.success(`Đã tạo thành công ${data.count} nhóm học phần.`);
-      setBatchDialogOpen(false);
-      loadGroups();
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Không thể tạo hàng loạt nhóm học phần.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleDelete = async () => {
     if (!deletingGroup) return;
     setSaving(true);
@@ -275,7 +229,7 @@ const CreateClassGroups = () => {
       {/* Filter Bar */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2.5, bgcolor: "#fbfcfd" }}>
         <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="center">
-          <FormControl size="small" sx={{ minWidth: 120 }}>
+          <FormControl size="small" sx={{ flex: "1 1 190px", minWidth: 190 }}>
             <InputLabel id="year-filter-label">Năm học</InputLabel>
             <Select
               labelId="year-filter-label"
@@ -289,7 +243,7 @@ const CreateClassGroups = () => {
             </Select>
           </FormControl>
 
-          <FormControl size="small" sx={{ minWidth: 200 }}>
+          <FormControl size="small" sx={{ flex: "1 1 190px", minWidth: 190 }}>
             <InputLabel id="major-filter-label">Ngành học</InputLabel>
             <Select
               labelId="major-filter-label"
@@ -304,7 +258,7 @@ const CreateClassGroups = () => {
             </Select>
           </FormControl>
 
-          <FormControl size="small" sx={{ minWidth: 130 }}>
+          <FormControl size="small" sx={{ flex: "1 1 190px", minWidth: 190 }}>
             <InputLabel id="status-filter-label">Trạng thái</InputLabel>
             <Select
               labelId="status-filter-label"
@@ -330,7 +284,7 @@ const CreateClassGroups = () => {
                 </InputAdornment>
               ),
             }}
-            sx={{ flexGrow: 1, minWidth: 200 }}
+            sx={{ flex: "2 1 360px", minWidth: 280 }}
           />
 
           <IconButton color="primary" onClick={loadGroups} title="Tải lại">
@@ -338,24 +292,14 @@ const CreateClassGroups = () => {
           </IconButton>
 
           {isAdmin && (
-            <>
-              <Button
-                variant="outlined"
-                startIcon={<AutoAwesomeRounded />}
-                onClick={openBatchAdd}
-                sx={{ height: 36, borderColor: "#0788B8", color: "#0788B8", "&:hover": { borderColor: "#056A8F", bgcolor: "#f0f7fb" } }}
-              >
-                Tạo nhanh nhiều nhóm
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<AddRounded />}
-                onClick={openAdd}
-                sx={{ height: 36, bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F" } }}
-              >
-                Thêm nhóm mới
-              </Button>
-            </>
+            <Button
+              variant="contained"
+              startIcon={<AddRounded />}
+              onClick={openAdd}
+              sx={{ height: 36, bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F" } }}
+            >
+              Thêm nhóm mới
+            </Button>
           )}
         </Stack>
       </Paper>
@@ -387,7 +331,7 @@ const CreateClassGroups = () => {
             ) : filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} align="center" sx={{ py: 5, color: "text.secondary" }}>
-                  Chưa có nhóm học phần nào phù hợp. Bấm "Thêm nhóm mới" hoặc "Tạo nhanh nhiều nhóm" để bắt đầu.
+                  Chưa có nhóm học phần nào phù hợp. Bấm "Thêm nhóm mới" để bắt đầu.
                 </TableCell>
               </TableRow>
             ) : (
@@ -534,106 +478,6 @@ const CreateClassGroups = () => {
           <Button onClick={() => setDialogOpen(false)} color="inherit">Hủy</Button>
           <Button variant="contained" onClick={handleSave} disabled={saving}>
             {saving ? "Đang lưu..." : editingId ? "Lưu nhóm" : `Tạo ${form.count || 0} nhóm`}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Batch Create Dialog */}
-      <Dialog open={batchDialogOpen} onClose={() => setBatchDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Tạo nhanh nhiều nhóm học phần</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Hệ thống sẽ tự động sinh mã và tên nhóm theo số lượng bạn chỉ định (ví dụ: N01, N02, N03...).
-          </Typography>
-          <Stack spacing={2}>
-            <Stack direction="row" spacing={2}>
-              <TextField
-                label="Tiền tố mã nhóm"
-                placeholder="VD: THS-K32-N"
-                value={batchForm.codePrefix}
-                onChange={(e) => setBatchForm((p) => ({ ...p, codePrefix: e.target.value.toUpperCase() }))}
-                fullWidth
-                size="small"
-                required
-              />
-              <TextField
-                label="Tiền tố tên nhóm"
-                placeholder="VD: Nhóm"
-                value={batchForm.namePrefix}
-                onChange={(e) => setBatchForm((p) => ({ ...p, namePrefix: e.target.value }))}
-                fullWidth
-                size="small"
-                required
-              />
-            </Stack>
-
-            <Stack direction="row" spacing={2}>
-              <TextField
-                label="Số lượng nhóm cần tạo"
-                type="number"
-                value={batchForm.count}
-                onChange={(e) => setBatchForm((p) => ({ ...p, count: e.target.value }))}
-                fullWidth
-                size="small"
-                inputProps={{ min: 1, max: 10 }}
-              />
-              <TextField
-                label="Bắt đầu từ số"
-                type="number"
-                value={batchForm.startIndex}
-                onChange={(e) => setBatchForm((p) => ({ ...p, startIndex: e.target.value }))}
-                fullWidth
-                size="small"
-                inputProps={{ min: 1 }}
-              />
-            </Stack>
-
-            <FormControl fullWidth size="small">
-              <InputLabel id="batch-major-label">Ngành học</InputLabel>
-              <Select
-                labelId="batch-major-label"
-                label="Ngành học"
-                value={batchForm.majorId}
-                onChange={(e) => setBatchForm((p) => ({ ...p, majorId: e.target.value }))}
-              >
-                <MenuItem value=""><em>(Không phân ngành / Dùng chung)</em></MenuItem>
-                {majors.map((m) => (
-                  <MenuItem key={m.id} value={m.id}>{m.name} ({m.code})</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <Stack direction="row" spacing={2}>
-              <FormControl fullWidth size="small">
-                <InputLabel id="batch-year-label">Năm học</InputLabel>
-                <Select
-                  labelId="batch-year-label"
-                  label="Năm học"
-                  value={batchForm.academicYear}
-                  onChange={(e) => setBatchForm((p) => ({ ...p, academicYear: e.target.value }))}
-                >
-                  {YEARS.map((y) => (
-                    <MenuItem key={y} value={y}>{y}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <TextField
-                label="Sĩ số tối đa/nhóm"
-                type="number"
-                value={batchForm.maxStudents}
-                onChange={(e) => setBatchForm((p) => ({ ...p, maxStudents: e.target.value }))}
-                fullWidth
-                size="small"
-                inputProps={{ min: 1, max: 200 }}
-              />
-            </Stack>
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setBatchDialogOpen(false)} color="inherit">Hủy</Button>
-          <Button variant="contained" onClick={handleBatchCreate} disabled={saving}>
-            {saving ? "Đang tạo..." : `Tạo ${batchForm.count} nhóm`}
           </Button>
         </DialogActions>
       </Dialog>

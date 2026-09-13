@@ -259,7 +259,6 @@ export default function CourseMatrix({ user }) {
         <div className="sl-matrix-content-head">
           <div>
             <h2>{viewMode === "board" ? "Lớp học phần theo khóa" : "Đối chiếu học phần giữa các khóa"}</h2>
-            <p>{viewMode === "board" ? (year ? `Danh sách lớp học phần của khóa ${year}.` : "Các khóa được tách thành từng nhóm độc lập.") : "Theo dõi nhanh học phần đã mở và tình trạng lịch ở từng khóa."}</p>
           </div>
         </div>
 
@@ -285,6 +284,7 @@ export default function CourseMatrix({ user }) {
                     subtitle={`${cohortOfferings.length} lớp học phần`}
                     offerings={cohortOfferings}
                     canEdit={canEdit}
+                    fourColumns={Boolean(year)}
                     onSelectOffering={openSchedule}
                     onViewDetails={setDetailOffering}
                   />
@@ -296,6 +296,7 @@ export default function CourseMatrix({ user }) {
               offerings={filtered}
               cohorts={displayedCohorts}
               canEdit={canEdit}
+              threeColumns={Boolean(year)}
               onSelectOffering={openSchedule}
               onViewDetails={setDetailOffering}
             />
@@ -318,7 +319,7 @@ export default function CourseMatrix({ user }) {
 }
 
 // Sub-component: Column for a single Cohort
-function CohortColumn({ title, subtitle, offerings, canEdit, onSelectOffering, onViewDetails }) {
+function CohortColumn({ title, subtitle, offerings, canEdit, fourColumns, onSelectOffering, onViewDetails }) {
   const orderedOfferings = sortCourseOfferings(offerings);
   return (
     <div className="sl-matrix-col" role="region" aria-label={title}>
@@ -330,7 +331,7 @@ function CohortColumn({ title, subtitle, offerings, canEdit, onSelectOffering, o
         <b className="sl-matrix-col-badge">{offerings.length}</b>
       </div>
 
-      <div className="sl-matrix-col-cards">
+      <div className={`sl-matrix-col-cards ${fourColumns ? "sl-matrix-col-cards-four" : ""}`}>
         {offerings.length === 0 ? (
           <div className="sl-matrix-empty-col">Không có lớp học phần nào</div>
         ) : (
@@ -362,6 +363,13 @@ function OfferingCard({ offering, canEdit, onSelectOffering, onViewDetails }) {
 
   return (
     <article className={`sl-matrix-card ${offering.status === "completed" ? "card-completed" : totalSessions === 0 ? "card-unscheduled" : "card-scheduled"}`}>
+      <button
+        type="button"
+        className="sl-matrix-card-detail-trigger"
+        onClick={() => onViewDetails(offering)}
+        aria-label={`Xem chi tiết ${offeringTitle(offering)}`}
+        title="Bấm để xem chi tiết"
+      />
       <div className="sl-matrix-card-top">
         <div className="sl-matrix-card-title-row">
           <strong className="sl-matrix-card-title" title={offeringTitle(offering)}>
@@ -407,15 +415,8 @@ function OfferingCard({ offering, canEdit, onSelectOffering, onViewDetails }) {
         )}
       </div>
 
-      <div className="sl-matrix-card-actions">
-        <button
-          type="button"
-          className="sl-btn sl-btn-sm"
-          onClick={() => onViewDetails(offering)}
-        >
-          Xem chi tiết
-        </button>
-        {canEdit && offering.status === "active" && (
+      {canEdit && offering.status === "active" && (
+        <div className="sl-matrix-card-actions">
           <button
             type="button"
             className="sl-btn sl-btn-primary sl-btn-sm"
@@ -423,14 +424,14 @@ function OfferingCard({ offering, canEdit, onSelectOffering, onViewDetails }) {
           >
             <CalendarMonthRounded aria-hidden="true" /> Xếp lịch
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </article>
   );
 }
 
 // Sub-component: Pivot Matrix View (Subjects x Cohorts)
-function PivotMatrixView({ offerings, cohorts, canEdit, onSelectOffering, onViewDetails }) {
+function PivotMatrixView({ offerings, cohorts, canEdit, threeColumns, onSelectOffering, onViewDetails }) {
   // Extract distinct subjects
   const subjectsMap = new Map();
   for (const offering of offerings) {
@@ -450,7 +451,7 @@ function PivotMatrixView({ offerings, cohorts, canEdit, onSelectOffering, onView
             <th className="sl-pivot-subj-col">HỌC PHẦN</th>
             <th className="sl-pivot-credits-col">TC</th>
             {cohorts.map((cohort) => (
-              <th key={cohort} className="sl-pivot-cohort-col">
+              <th key={cohort} className={`sl-pivot-cohort-col ${threeColumns ? "sl-pivot-cohort-col-wide" : ""}`}>
                 KHÓA {cohort}
               </th>
             ))}
@@ -484,7 +485,7 @@ function PivotMatrixView({ offerings, cohorts, canEdit, onSelectOffering, onView
                     {cellOfferings.length === 0 ? (
                       <span className="sl-pivot-empty">—</span>
                     ) : (
-                      <div className="sl-pivot-cell-offerings">
+                      <div className={`sl-pivot-cell-offerings ${threeColumns ? "sl-pivot-cell-offerings-three" : ""}`}>
                         {cellOfferings.map((offering) => {
                           const summary = offering.sessionSummary || {};
                           const total = summary.totalCount || 0;
@@ -492,12 +493,14 @@ function PivotMatrixView({ offerings, cohorts, canEdit, onSelectOffering, onView
                             <div key={offering.id} className="sl-pivot-mini-card">
                               <button
                                 type="button"
-                                className="sl-pivot-card-title-btn"
+                                className="sl-pivot-card-detail-trigger"
                                 onClick={() => onViewDetails(offering)}
+                                aria-label={`Xem chi tiết ${offeringTitle(offering)}`}
                                 title="Bấm để xem chi tiết"
-                              >
+                              />
+                              <strong className="sl-pivot-card-title">
                                 {offeringTitle(offering)}
-                              </button>
+                              </strong>
                               <div className="sl-pivot-card-stats">
                                 <span className={total ? "has-sessions" : "no-sessions"}>
                                   {total ? `${total} buổi` : "Chưa có lịch"}
@@ -508,8 +511,11 @@ function PivotMatrixView({ offerings, cohorts, canEdit, onSelectOffering, onView
                                     className="sl-pivot-schedule-btn"
                                     onClick={() => onSelectOffering(offering.id)}
                                   >
-                                    Xếp lịch →
+                                    {total ? "Xếp thêm →" : "Xếp lịch →"}
                                   </button>
+                                )}
+                                {offering.status === "completed" && (
+                                  <span className="sl-pivot-completed-label">Đã hoàn thành</span>
                                 )}
                               </div>
                             </div>
