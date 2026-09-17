@@ -164,12 +164,18 @@ export default function CreateOffering({ user }) {
   return <section className="sl-workspace sl-create-mode sl-create-figma">
     <aside className="sl-left">
       <div className="sl-scope"><div className="sl-eyebrow">PHẠM VI LÀM VIỆC</div>
-        <div className="v20-scope-step"><b>1</b>CHUYÊN NGÀNH</div>
-        <SearchSelect label="Chọn chuyên ngành" placeholder="Chọn chuyên ngành" value={majorId} disabled={majors.loading} options={majors.data || []} onChange={(value) => changeScope(() => { setMajor(value); setYear(""); })} />
-        {majors.error && <Notice error={majors.error} />}
-        <div className="v20-scope-step"><b>2</b>KHÓA / NĂM HỌC</div>
-        <select className={`sl-create-year${year ? "" : " sl-placeholder"}`} aria-label="Khóa / Năm học" value={year} disabled={!majorId || groups.loading} onChange={(event) => changeScope(() => setYear(event.target.value))}><option value="">Chọn khóa / năm</option>{years.map((value) => <option key={value}>{value}</option>)}</select>
-        {groups.error && <Notice error={groups.error} />}
+        <div className="sl-create-scope-fields">
+          <div className="sl-create-scope-field">
+            <div className="v20-scope-step"><b>1</b>CHUYÊN NGÀNH</div>
+            <SearchSelect label="Chọn chuyên ngành" placeholder="Chọn chuyên ngành" value={majorId} disabled={majors.loading} options={majors.data || []} onChange={(value) => changeScope(() => { setMajor(value); setYear(""); })} />
+            {majors.error && <Notice error={majors.error} />}
+          </div>
+          <div className="sl-create-scope-field">
+            <div className="v20-scope-step"><b>2</b>KHÓA / NĂM HỌC</div>
+            <select className={`sl-create-year${year ? "" : " sl-placeholder"}`} aria-label="Khóa / Năm học" value={year} disabled={!majorId || groups.loading} onChange={(event) => changeScope(() => setYear(event.target.value))}><option value="">Chọn khóa / năm</option>{years.map((value) => <option key={value}>{value}</option>)}</select>
+            {groups.error && <Notice error={groups.error} />}
+          </div>
+        </div>
         {majorId && !groups.loading && !groups.error && !years.length && <Notice>Chưa có nhóm cho chuyên ngành này. <Link to="/masters/create-class-groups">Tạo nhóm học phần</Link></Notice>}
       </div>
       <div className="sl-worklist">

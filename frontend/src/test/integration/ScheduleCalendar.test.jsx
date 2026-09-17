@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import axios from "axios";
 import Schedule from "../../pages/masters/schedule";
@@ -23,7 +23,14 @@ it("shows the seven-day calendar and selects a persisted offering for scheduling
   expect(screen.getByText("ĐANG XẾP")).toBeInTheDocument();
   expect(screen.getByRole("table", { name: "Lịch học theo tuần" })).toBeInTheDocument();
   expect(screen.getByText("CN")).toBeInTheDocument();
+  expect(screen.getByLabelText("Hôm nay")).toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: /^Xếp (Sáng|Chiều)/ }).length).toBeGreaterThan(0);
+  const currentWeekButton = screen.getByRole("button", { name: "Tuần này" });
+  expect(currentWeekButton).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Tuần trước" }));
+  expect(currentWeekButton).toBeEnabled();
+  fireEvent.click(currentWeekButton);
+  expect(currentWeekButton).toBeDisabled();
 });
 it("loads institute availability and excludes busy and undersized rooms before saving", async () => {
   const saved = jest.fn();

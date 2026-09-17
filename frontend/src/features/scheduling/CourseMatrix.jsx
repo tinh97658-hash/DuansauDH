@@ -442,10 +442,19 @@ function PivotMatrixView({ offerings, cohorts, canEdit, threeColumns, onSelectOf
   const subjects = [...subjectsMap.values()].sort((a, b) =>
     (a.code || "").localeCompare(b.code || "", "vi")
   );
+  const cohortMinWidth = threeColumns ? 570 : 205;
+  const pivotMinWidth = 260 + 48 + (cohorts.length * cohortMinWidth);
 
   return (
     <div className="sl-matrix-pivot-wrap">
-      <table className="sl-matrix-pivot-table">
+      <table className="sl-matrix-pivot-table" style={{ minWidth: `${pivotMinWidth}px` }}>
+        <colgroup>
+          <col className="sl-pivot-subj-track" />
+          <col className="sl-pivot-credits-track" />
+          {cohorts.map((cohort) => (
+            <col key={cohort} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
             <th className="sl-pivot-subj-col">HỌC PHẦN</th>

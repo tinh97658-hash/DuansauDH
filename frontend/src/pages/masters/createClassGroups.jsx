@@ -342,7 +342,13 @@ const CreateClassGroups = () => {
                 const progressColor = pct >= 100 ? "error" : pct >= 80 ? "warning" : "primary";
 
                 return (
-                  <TableRow key={row.id} hover>
+                  <TableRow
+                    key={row.id}
+                    hover
+                    onDoubleClick={() => isAdmin && openEdit(row)}
+                    title={isAdmin ? "Nhấp đúp để chỉnh sửa" : undefined}
+                    sx={isAdmin ? { cursor: "pointer" } : undefined}
+                  >
                     <TableCell>{index + 1}</TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontFamily: "inherit", fontWeight: 700, color: "#0788B8" }}>
@@ -373,7 +379,7 @@ const CreateClassGroups = () => {
                         variant="outlined"
                       />
                     </TableCell>
-                    <TableCell align="right">
+                    <TableCell align="right" onDoubleClick={(event) => event.stopPropagation()}>
                       <Tooltip title="Phân học viên vào nhóm">
                         <IconButton
                           size="small"

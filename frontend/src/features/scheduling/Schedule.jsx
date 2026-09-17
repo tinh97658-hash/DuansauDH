@@ -8,12 +8,14 @@ import OfferingDetails from "./OfferingDetails";
 export default function Schedule({ user }) {
   const [params] = useSearchParams();
   const requested = params.get("offeringId") || "";
+  const todayKey = getBusinessTodayKey();
+  const currentWeek = formatDateKey(mondayOf(todayKey));
   const appliedRequest = useRef("");
   const [majorId, setMajor] = useState("");
   const [year, setYear] = useState("");
   const [status, setStatus] = useState("active");
   const [query, setQuery] = useState("");
-  const [week, setWeek] = useState(() => formatDateKey(mondayOf(getBusinessTodayKey())));
+  const [week, setWeek] = useState(() => currentWeek);
   const [selectedId, setSelected] = useState(requested);
   const [editor, setEditor] = useState(null);
   const [details, setDetails] = useState(null);
@@ -61,8 +63,10 @@ export default function Schedule({ user }) {
   const sessionState = (session) => session.status === "held" ? ["sl-held", "✓ ĐÃ DIỄN RA"] : session.status === "not_held" ? ["sl-not", "— KHÔNG DIỄN RA"] : isSessionPast(session) ? ["sl-wait", "● CHỜ XÁC NHẬN"] : ["", "○ ĐÃ XẾP"];
   const sessionCard = (session) => { const [style, state] = sessionState(session); return <button key={session.id} className={`sl-session ${style}`} onClick={() => openSession(session)}><strong>{offeringTitle(session.courseOffering)}</strong><span>{subjectLabel(session.courseOffering)}</span><small>{session.lecturer?.name || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><em>{state}</em></button>; };
   return <section className="sl-workspace sl-schedule-view"><aside className="sl-left"><div className="sl-scope"><div className="sl-eyebrow">PHẠM VI LÀM VIỆC</div>
-    <div className="v20-scope-step"><b>1</b>CHUYÊN NGÀNH</div><SearchSelect label="Chuyên ngành" value={majorId} placeholder="Tất cả chuyên ngành" options={[{ id: "", name: "Tất cả chuyên ngành" }, ...(majors.data || [])]} onChange={(value) => changeScope(() => { setMajor(value); setYear(""); })} />
-    <div className="v20-scope-step"><b>2</b>KHÓA / NĂM HỌC</div><select className={`sl-select sl-year-select${year ? "" : " sl-placeholder"}`} aria-label="Khóa / Năm" value={year} onChange={(event) => changeScope(() => setYear(event.target.value))}><option value="">Tất cả</option>{unique(all.flatMap(groupsOf).filter((group) => !majorId || group.majorId === majorId).map((group) => group.academicYear)).sort((a, b) => b.localeCompare(a, "vi", { numeric: true })).map((value) => <option key={value}>{value}</option>)}</select>
+    <div className="sl-schedule-scope-fields">
+      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>1</b>CHUYÊN NGÀNH</div><SearchSelect label="Chuyên ngành" value={majorId} placeholder="Tất cả chuyên ngành" options={[{ id: "", name: "Tất cả chuyên ngành" }, ...(majors.data || [])]} onChange={(value) => changeScope(() => { setMajor(value); setYear(""); })} /></div>
+      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>2</b>KHÓA / NĂM HỌC</div><select className={`sl-select sl-year-select${year ? "" : " sl-placeholder"}`} aria-label="Khóa / Năm" value={year} onChange={(event) => changeScope(() => setYear(event.target.value))}><option value="">Tất cả</option>{unique(all.flatMap(groupsOf).filter((group) => !majorId || group.majorId === majorId).map((group) => group.academicYear)).sort((a, b) => b.localeCompare(a, "vi", { numeric: true })).map((value) => <option key={value}>{value}</option>)}</select></div>
+    </div>
     {!canEdit && <div className="sl-attention">Quyền chỉ xem · Quản trị viên phân công người phụ trách tại Hệ thống → QL Người dùng.</div>}
     {majors.error && <Notice error={majors.error} />}
   </div><div className="sl-worklist"><div className="sl-search-wrap"><span>⌕</span><input className="sl-search" aria-label="Tìm môn / lớp" placeholder="Tìm lớp học phần..." value={query} onChange={(event) => setQuery(event.target.value)} /></div><div className="sl-card-scroll">{offerings.loading ? <Notice>Đang tải lớp học phần...</Notice> : offerings.error ? <Notice error={offerings.error} /> : <section className="sl-section"><h2><span>LỚP HỌC PHẦN</span><b>{listed.length}</b></h2>{listed.map((offering) => {
@@ -73,10 +77,14 @@ export default function Schedule({ user }) {
     </article>;
   })}{!listed.length && <Notice>Không có lớp học phần trong phạm vi đã chọn.</Notice>}</section>}</div></div></aside>
   <section className="sl-right"><div className="sl-schedule-head"><h1>XẾP LỊCH</h1><div className="sl-week"><button aria-label="Tuần trước" onClick={() => setWeek(formatDateKey(addDays(week, -7)))}>‹</button><strong>{vietnameseDate(week)} — {vietnameseDate(end)}</strong><button aria-label="Tuần sau" onClick={() => setWeek(formatDateKey(addDays(week, 7)))}>›</button></div>
-    <div className="sl-actions">{canEdit && <button className="sl-pending" onClick={() => setPendingOpen(true)}>{pending.loading ? "…" : pending.data?.length ?? "—"} chờ xác nhận</button>}</div>
+    <div className="sl-actions"><button className="sl-btn sl-today" disabled={week === currentWeek} onClick={() => setWeek(currentWeek)}>Tuần này</button>{canEdit && <button className="sl-pending" onClick={() => setPendingOpen(true)}>{pending.loading ? "…" : pending.data?.length ?? "—"} chờ xác nhận</button>}</div>
   </div>{selecting && <div className="sl-selected-strip"><span className="sl-selected-tag">ĐANG XẾP</span><div className="sl-selected-main"><strong>{selected.subject?.code} · {selected.subject?.name}</strong><span>{labelOf(selected)} · {selected.participantCount} HV</span></div><div className="sl-selected-next"><span>Ngày có thể xếp</span><strong>{daysLabel(selectedDays)}</strong></div><button className="sl-btn" onClick={() => setSelected("")}>Bỏ chọn</button></div>}
     {sessions.error && <Notice error={sessions.error} />}{error && <Notice error={error} />}
-    <div className={`sl-calendar-wrap ${selecting ? "sl-selecting" : ""}`} aria-busy={sessions.loading}><div className="sl-calendar" role="table" aria-label="Lịch học theo tuần"><div className="sl-corner">BUỔI</div>{weekDaysFrom(week).map((day) => <div className="sl-day" key={formatDateKey(day)}><strong>{vietnameseWeekdayShort(day)}</strong><span>{vietnameseDayMonth(day).replace("/", "-")}</span></div>)}
+    <div className={`sl-calendar-wrap ${selecting ? "sl-selecting" : ""}`} aria-busy={sessions.loading}><div className="sl-calendar" role="table" aria-label="Lịch học theo tuần"><div className="sl-corner">BUỔI</div>{weekDaysFrom(week).map((day) => {
+      const dateKey = formatDateKey(day);
+      const isToday = dateKey === todayKey;
+      return <div className={`sl-day ${isToday ? "sl-is-today" : ""}`} key={dateKey}><strong>{vietnameseWeekdayShort(day)}</strong><span>{vietnameseDayMonth(day).replace("/", "-")}</span>{isToday && <i className="sl-today-indicator" aria-label="Hôm nay" title="Hôm nay" />}</div>;
+    })}
       {["MORNING", "AFTERNOON"].map((period) => <React.Fragment key={period}><div className="sl-period"><span>{period === "MORNING" ? "SÁNG" : "CHIỀU"}</span></div>{weekDaysFrom(week).map((day) => {
         const date = formatDateKey(day);
         const past = isSessionPast({ sessionDate: date, endTime: period === "MORNING" ? "12:00" : "23:59" });
