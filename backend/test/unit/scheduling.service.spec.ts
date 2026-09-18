@@ -740,7 +740,7 @@ describe("SchedulingService.createCourseOffering", () => {
 });
 
 describe("SchedulingService persisted reads", () => {
-  it("returns only the class progress summary and representative teaching data", async () => {
+  it("returns the class progress summary and every teaching session", async () => {
     const { service, majors, packages, classGroupElectives, classGroups, offeringGroups, courseOfferings, teachingSessions } = buildService();
     const selectedGroup = { ...group("group-1", "CNT2027.01"), curriculum: { id: curriculumIdFor("group-1"), code: "CNTT-2027", name: "CTĐT CNTT 2027", totalCredits: 60 } };
     const secondSubject = { ...subject, id: "subject-2", code: "HP02", name: "Học phần chưa học" };
@@ -770,10 +770,9 @@ describe("SchedulingService persisted reads", () => {
       summary: { totalSubjectCount: 2, inProgressSubjectCount: 1, scheduledSubjectCount: 0, notStartedSubjectCount: 1, completedSubjectCount: 0 },
     }));
     expect(result.classes[0].subjects).toEqual([
-      expect.objectContaining({ curriculumSubjectId: "entry-1", code: subject.code, name: subject.name, status: "in_progress", heldSessionCount: 1, sessionCount: 1, lecturer: { name: session.lecturer.name }, room: { code: session.room.code }, schedule: expect.objectContaining({ sessionDate: session.sessionDate }) }),
-      expect.objectContaining({ curriculumSubjectId: "entry-2", code: secondSubject.code, name: secondSubject.name, status: "not_started", heldSessionCount: 0, sessionCount: 0, lecturer: null, room: null, schedule: null }),
+      expect.objectContaining({ curriculumSubjectId: "entry-1", code: subject.code, name: subject.name, status: "in_progress", heldSessionCount: 1, sessionCount: 1, sessions: [expect.objectContaining({ id: session.id, sessionDate: session.sessionDate, lecturer: { name: session.lecturer.name }, room: { code: session.room.code }, status: "held" })] }),
+      expect.objectContaining({ curriculumSubjectId: "entry-2", code: secondSubject.code, name: secondSubject.name, status: "not_started", heldSessionCount: 0, sessionCount: 0, sessions: [] }),
     ]);
-    expect(result.classes[0].subjects[0]).not.toHaveProperty("sessions");
     expect(classGroups.findAll).toHaveBeenCalledWith(expect.objectContaining({
       where: { program: "masters", majorId: "major-1", academicYear: "2027", groupType: "ADMINISTRATIVE" },
     }));

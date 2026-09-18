@@ -24,8 +24,11 @@ beforeEach(() => {
       scope: { major, academicYear: "2027" },
       classes: [
         { ...groups[0], memberCount: 31, major, curriculum: { code: "K67" }, summary: baseSummary, subjects: [
-          { curriculumSubjectId: "subject-1", code: "NCKH01", name: "Phương pháp nghiên cứu khoa học", status: "in_progress", heldSessionCount: 3, sessionCount: 4, lecturer: { name: "TS. Trần Minh Bình" }, room: { code: "P.402" }, schedule: { sessionDate: "2027-09-20", startTime: "13:30:00", period: "AFTERNOON" } },
-          { curriculumSubjectId: "subject-2", code: "HPT02", name: "Hệ phân tán", status: "not_started", heldSessionCount: 0, sessionCount: 0, lecturer: null, room: null, schedule: null },
+          { curriculumSubjectId: "subject-1", code: "NCKH01", name: "Phương pháp nghiên cứu khoa học", status: "in_progress", heldSessionCount: 1, sessionCount: 2, sessions: [
+            { id: "session-1", sessionDate: "2027-09-20", startTime: "13:30:00", endTime: "16:30:00", period: "AFTERNOON", status: "held", lecturer: { name: "TS. Trần Minh Bình" }, room: { code: "P.402" } },
+            { id: "session-2", sessionDate: "2027-09-27", startTime: "13:30:00", endTime: "16:30:00", period: "AFTERNOON", status: "planned", lecturer: { name: "TS. Trần Minh Bình" }, room: { code: "P.305" } },
+          ] },
+          { curriculumSubjectId: "subject-2", code: "HPT02", name: "Hệ phân tán", status: "not_started", heldSessionCount: 0, sessionCount: 0, sessions: [] },
         ] },
         { ...groups[1], memberCount: 28, major, curriculum: { code: "K67" }, summary: { ...baseSummary, inProgressSubjectCount: 0, notStartedSubjectCount: 2 }, subjects: [] },
       ],
@@ -45,12 +48,13 @@ it("shows class overview cards and the selected class progress table", async () 
   expect(screen.getByRole("button", { name: /CNT2027.02/ })).toBeInTheDocument();
   expect(screen.getByText("Phương pháp nghiên cứu khoa học")).toBeInTheDocument();
   expect(screen.getByText("NCKH01")).toBeInTheDocument();
-  expect(screen.getByText("TS. Trần Minh Bình")).toBeInTheDocument();
-  expect(screen.getByText("20/09 · Chiều")).toBeInTheDocument();
-  expect(screen.getByText("P.402")).toBeInTheDocument();
-
   fireEvent.click(screen.getByRole("row", { name: "Nhấn để xem chi tiết Phương pháp nghiên cứu khoa học" }));
-  expect(screen.getByText(/Tổng lịch/)).toBeInTheDocument();
+  expect(screen.getAllByText("TS. Trần Minh Bình")).toHaveLength(2);
+  expect(screen.getByText("P.402")).toBeInTheDocument();
+  expect(screen.getByText("P.305")).toBeInTheDocument();
+  expect(screen.getByText("20/09")).toBeInTheDocument();
+  expect(screen.getByText("27/09")).toBeInTheDocument();
+  expect(screen.getByText(/Đã học/)).toBeInTheDocument();
 
   fireEvent.change(screen.getByLabelText("Trạng thái"), { target: { value: "not_started" } });
   expect(screen.getByText("Hệ phân tán")).toBeInTheDocument();

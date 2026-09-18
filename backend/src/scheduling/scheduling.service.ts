@@ -180,9 +180,6 @@ export class SchedulingService {
         const plannedSessionCount = matchingSessions.filter((session) => session.status === "planned").length;
         const completed = matchingOfferings.some((offering) => offering.status === "completed");
         const status = completed ? "completed" : heldSessionCount > 0 ? "in_progress" : plannedSessionCount > 0 ? "scheduled" : "not_started";
-        const representativeSession = [...matchingSessions].reverse().find((session) => session.status === "held")
-          || matchingSessions.find((session) => session.status === "planned")
-          || null;
         return {
           curriculumSubjectId: entry.id,
           code: entry.subject?.code || "",
@@ -190,13 +187,16 @@ export class SchedulingService {
           status,
           heldSessionCount,
           sessionCount: matchingSessions.length,
-          lecturer: representativeSession?.lecturer ? { name: representativeSession.lecturer.name } : null,
-          room: representativeSession?.room ? { code: representativeSession.room.code } : null,
-          schedule: representativeSession ? {
-            sessionDate: representativeSession.sessionDate,
-            startTime: representativeSession.startTime,
-            period: representativeSession.period,
-          } : null,
+          sessions: matchingSessions.map((session) => ({
+            id: session.id,
+            sessionDate: session.sessionDate,
+            startTime: session.startTime,
+            endTime: session.endTime,
+            period: session.period,
+            status: session.status,
+            lecturer: session.lecturer ? { name: session.lecturer.name } : null,
+            room: session.room ? { code: session.room.code } : null,
+          })),
         };
       });
 

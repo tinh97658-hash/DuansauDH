@@ -16,6 +16,11 @@ const statusInfo = {
   not_started: { label: "Chưa tổ chức", tone: "gray" },
 };
 const periodName = { MORNING: "Sáng", AFTERNOON: "Chiều" };
+const sessionStatusInfo = {
+  held: { label: "Đã diễn ra", tone: "green" },
+  planned: { label: "Đã xếp lịch", tone: "blue" },
+  not_held: { label: "Không diễn ra", tone: "gray" },
+};
 const shortDate = (value) => {
   if (!value) return "—";
   const [, month, day] = String(value).slice(0, 10).split("-");
@@ -28,6 +33,11 @@ function SelectFilter({ label, value, onChange, children, disabled }) {
 
 function StatusBadge({ status }) {
   const info = statusInfo[status] || statusInfo.not_started;
+  return <span className={`tp-status tp-${info.tone}`}><i />{info.label}</span>;
+}
+
+function SessionStatusBadge({ status }) {
+  const info = sessionStatusInfo[status] || sessionStatusInfo.planned;
   return <span className={`tp-status tp-${info.tone}`}><i />{info.label}</span>;
 }
 
@@ -95,7 +105,8 @@ export default function ClassCourseHistory() {
   const currentClass = report?.classes.find((classGroup) => classGroup.id === classId);
   const visibleSubjects = useMemo(() => (currentClass?.subjects || []).filter((subject) => {
     if (status !== "all" && subject.status !== status) return false;
-    const haystack = `${subject.code || ""} ${subject.name} ${subject.lecturer?.name || ""}`;
+    const lecturers = (subject.sessions || []).map((session) => session.lecturer?.name || "").join(" ");
+    const haystack = `${subject.code || ""} ${subject.name} ${lecturers}`;
     return !search.trim() || normalize(haystack).includes(normalize(search));
   }), [currentClass, search, status]);
 
@@ -152,7 +163,7 @@ export default function ClassCourseHistory() {
           </header>
 
           <div className="tp-table-wrap"><table className="tp-table">
-            <thead><tr><th>Mã học phần</th><th>Học phần</th><th>Trạng thái</th><th>Giảng viên</th><th>Thời gian</th><th>Phòng</th><th>Buổi</th></tr></thead>
+            <thead><tr><th>Mã học phần</th><th>Tên học phần</th><th>Trạng thái</th><th>Buổi đã học</th></tr></thead>
             <tbody>{visibleSubjects.map((subject) => <React.Fragment key={subject.curriculumSubjectId}>
               <tr
                 className="tp-subject-row"
@@ -168,12 +179,23 @@ export default function ClassCourseHistory() {
                 <td className="tp-course-code">{subject.code || "—"}</td>
                 <td className="tp-course">{subject.name}</td>
                 <td><StatusBadge status={subject.status} /></td>
-                <td>{subject.lecturer?.name || "—"}</td>
-                <td>{subject.schedule ? `${shortDate(subject.schedule.sessionDate)} · ${periodName[subject.schedule.period] || subject.schedule.startTime?.slice(0, 5)}` : "—"}</td>
-                <td>{subject.room?.code || "—"}</td>
-                <td>{subject.status === "scheduled" ? subject.sessionCount : subject.heldSessionCount}</td>
+                <td>{subject.heldSessionCount}</td>
               </tr>
-              {expandedSubjectId === subject.curriculumSubjectId && <tr className="tp-expanded"><td colSpan={7}>Đã học <strong>{subject.heldSessionCount}</strong> buổi · Tổng lịch <strong>{subject.sessionCount}</strong> buổi · {subject.lecturer?.name || "Chưa phân công giảng viên"} · {subject.room?.code || "Chưa xếp phòng"}</td></tr>}
+              {expandedSubjectId === subject.curriculumSubjectId && <tr className="tp-expanded"><td colSpan={4}>
+                {(subject.sessions || []).length ? <div className="tp-session-list">
+                  <div className="tp-session-summary">Đã học <strong>{subject.heldSessionCount}</strong> / <strong>{subject.sessionCount}</strong> buổi</div>
+                  <table><thead><tr><th>Buổi</th><th>Ngày học</th><th>Ca / giờ học</th><th>Phòng</th><th>Giảng viên</th><th>Trạng thái</th></tr></thead>
+                    <tbody>{subject.sessions.map((session, index) => <tr key={session.id}>
+                      <td>{index + 1}</td>
+                      <td>{shortDate(session.sessionDate)}</td>
+                      <td>{periodName[session.period] || "—"} · {session.startTime?.slice(0, 5)}–{session.endTime?.slice(0, 5)}</td>
+                      <td>{session.room?.code || "—"}</td>
+                      <td>{session.lecturer?.name || "—"}</td>
+                      <td><SessionStatusBadge status={session.status} /></td>
+                    </tr>)}</tbody>
+                  </table>
+                </div> : <div className="tp-no-sessions">Chưa có buổi học nào được xếp lịch.</div>}
+              </td></tr>}
             </React.Fragment>)}</tbody>
           </table></div>
           {!visibleSubjects.length && <div className="tp-empty">Không có học phần phù hợp với bộ lọc.</div>}
