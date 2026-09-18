@@ -10,6 +10,7 @@ import {
   MeetingRoomRounded,
   SystemUpdateRounded, TableChartRounded, TrackChangesRounded, UploadFileRounded,
   VerifiedRounded, WorkspacePremiumRounded,
+  HistoryEduRounded,
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../config/http";
 import { BRAND } from "../config/branding";
@@ -71,6 +72,7 @@ export const ribbons = {
       action("Điểm thi đầu vào thạc sĩ", "/masters/admission-scores", ScoreboardRounded, "#c0792a"),
       action("Tạo nhóm học phần", "/masters/create-class-groups", GroupAddRounded, "#168b7c"),
       action("Phân nhóm học phần", "/masters/assign-class-groups", GroupWorkRounded, "#81952c"),
+      action("Thống kê tiến độ", "/masters/class-course-history", HistoryEduRounded, "#a04f86"),
     ]),
     group("QUÁ TRÌNH HỌC TẬP", [
       action("Tạo lớp học phần", "/masters/course-offerings", NoteAddRounded, "#0788b8"),

@@ -11,6 +11,7 @@ import { Major } from "../database/models/common/major.model.js";
 import { Lecturer } from "../database/models/common/lecturer.model.js";
 import { Room } from "../database/models/common/room.model.js";
 import { Subject } from "../database/models/plan/subject.model.js";
+import { Curriculum } from "../database/models/plan/curriculum.model.js";
 import { CurriculumSubject } from "../database/models/plan/curriculum-subject.model.js";
 import { ClassGroupElective } from "../database/models/training/class-group-elective.model.js";
 import { Staff } from "../database/models/staff.model.js";
@@ -24,6 +25,7 @@ import { CourseOfferingClassGroup } from "../database/models/training/course-off
 import { TeachingSession } from "../database/models/training/teaching-session.model.js";
 import {
   CourseOfferingCandidatesQueryDto,
+  ClassCurriculumProgressQueryDto,
   CreateCourseOfferingDto,
   CreateTeachingSessionDto,
   ListCourseOfferingsQueryDto,
@@ -85,6 +87,139 @@ export class SchedulingService {
           canonicalSubjectId: local.canonicalSubjectId || null,
         },
       } : {}),
+    };
+  }
+
+  async getClassCurriculumProgress(query: ClassCurriculumProgressQueryDto) {
+    const program = "masters";
+    const major = await this.majors.findOne({ where: { id: query.majorId, program, active: true } });
+    if (!major) throw new NotFoundException("Không tìm thấy ngành Thạc sĩ đang hoạt động.");
+
+    const groups = await this.classGroups.findAll({
+      where: { program, majorId: query.majorId, academicYear: query.academicYear, groupType: "ADMINISTRATIVE" },
+      include: [
+        { model: Major, as: "major", attributes: ["id", "code", "name"] },
+        { model: Curriculum, as: "curriculum", attributes: ["id", "code"] },
+      ],
+      order: [["code", "ASC"]],
+    });
+    if (groups.length === 0) {
+      return { scope: { program, major, academicYear: query.academicYear }, summary: { classCount: 0 }, classes: [] };
+    }
+
+    const groupIds = groups.map((group) => group.id);
+    const progressMembers = await this.classGroupMembers.findAll({
+      where: { classGroupId: { [Op.in]: groupIds } },
+      attributes: ["id", "classGroupId", "studentId", "admissionRecordId"],
+    });
+    const curriculumIds = [...new Set(groups.map((group) => group.curriculumId).filter((id): id is string => Boolean(id)))];
+    const curriculumRows = curriculumIds.length === 0 ? [] : await this.curriculumSubjects.findAll({
+      where: { curriculumId: { [Op.in]: curriculumIds } },
+      include: [
+        { model: Subject, as: "subject", required: true, where: { program } },
+      ],
+      order: [["sortOrder", "ASC"]],
+    });
+    const selectedElectives = await this.classGroupElectives.findAll({
+      where: { classGroupId: { [Op.in]: groupIds } },
+      attributes: ["classGroupId", "curriculumSubjectId"],
+    });
+    const electiveIdsByGroup = new Map<string, Set<string>>();
+    selectedElectives.forEach((selection) => {
+      const ids = electiveIdsByGroup.get(selection.classGroupId) || new Set<string>();
+      ids.add(selection.curriculumSubjectId);
+      electiveIdsByGroup.set(selection.classGroupId, ids);
+    });
+
+    const links = await this.offeringGroups.findAll({
+      where: { classGroupId: { [Op.in]: groupIds } },
+      attributes: ["classGroupId", "courseOfferingId"],
+    });
+    const offeringIds = [...new Set(links.map((link) => link.courseOfferingId))];
+    const offerings = offeringIds.length === 0 ? [] : await this.courseOfferings.findAll({
+      where: { id: { [Op.in]: offeringIds } },
+      include: [{ model: Subject, as: "subject", required: true, where: { program } }],
+    });
+    const sessions = offeringIds.length === 0 ? [] : await this.teachingSessions.findAll({
+      where: { courseOfferingId: { [Op.in]: offeringIds } },
+      include: [
+        { model: Lecturer, as: "lecturer", attributes: ["id", "code", "name"] },
+        { model: Room, as: "room", attributes: ["id", "code", "name"] },
+      ],
+      order: [["sessionDate", "ASC"], ["startTime", "ASC"], ["id", "ASC"]],
+    });
+
+    const offeringById = new Map(offerings.map((offering) => [offering.id, offering]));
+    const offeringIdsByGroup = new Map<string, string[]>();
+    links.forEach((link) => {
+      const ids = offeringIdsByGroup.get(link.classGroupId) || [];
+      ids.push(link.courseOfferingId);
+      offeringIdsByGroup.set(link.classGroupId, ids);
+    });
+    const sessionsByOffering = new Map<string, TeachingSession[]>();
+    sessions.forEach((session) => {
+      const bucket = sessionsByOffering.get(session.courseOfferingId) || [];
+      bucket.push(session);
+      sessionsByOffering.set(session.courseOfferingId, bucket);
+    });
+    const logicalSubjectId = (subject: Subject | any) => subject?.canonicalSubjectId || subject?.id;
+
+    const classes = groups.map((group) => {
+      const electiveIds = electiveIdsByGroup.get(group.id) || new Set<string>();
+      const expectedRows = curriculumRows
+        .filter((row) => row.curriculumId === group.curriculumId && (row.isRequired || electiveIds.has(row.id)))
+        .sort((left: any, right: any) => left.sortOrder - right.sortOrder);
+      const groupOfferings = (offeringIdsByGroup.get(group.id) || []).map((id) => offeringById.get(id)).filter(Boolean) as CourseOffering[];
+
+      const subjects = expectedRows.map((entry: any) => {
+        const subjectId = logicalSubjectId(entry.subject);
+        const matchingOfferings = groupOfferings.filter((offering) => logicalSubjectId(offering.subject) === subjectId);
+        const matchingSessions = matchingOfferings.flatMap((offering) => sessionsByOffering.get(offering.id) || [])
+          .sort((a, b) => a.sessionDate.localeCompare(b.sessionDate) || a.startTime.localeCompare(b.startTime));
+        const heldSessionCount = matchingSessions.filter((session) => session.status === "held").length;
+        const plannedSessionCount = matchingSessions.filter((session) => session.status === "planned").length;
+        const completed = matchingOfferings.some((offering) => offering.status === "completed");
+        const status = completed ? "completed" : heldSessionCount > 0 ? "in_progress" : plannedSessionCount > 0 ? "scheduled" : "not_started";
+        const representativeSession = [...matchingSessions].reverse().find((session) => session.status === "held")
+          || matchingSessions.find((session) => session.status === "planned")
+          || null;
+        return {
+          curriculumSubjectId: entry.id,
+          code: entry.subject?.code || "",
+          name: entry.subject?.name || "",
+          status,
+          heldSessionCount,
+          sessionCount: matchingSessions.length,
+          lecturer: representativeSession?.lecturer ? { name: representativeSession.lecturer.name } : null,
+          room: representativeSession?.room ? { code: representativeSession.room.code } : null,
+          schedule: representativeSession ? {
+            sessionDate: representativeSession.sessionDate,
+            startTime: representativeSession.startTime,
+            period: representativeSession.period,
+          } : null,
+        };
+      });
+
+      return {
+        id: group.id,
+        code: group.code,
+        memberCount: new Set(progressMembers.filter((member) => member.classGroupId === group.id).map((member) => this.memberIdentity(member))).size,
+        major: group.major ? { name: group.major.name } : null,
+        academicYear: group.academicYear,
+        curriculum: group.curriculum ? { code: group.curriculum.code } : null,
+        summary: {
+          totalSubjectCount: subjects.length,
+          inProgressSubjectCount: subjects.filter((subject) => subject.status === "in_progress").length,
+          scheduledSubjectCount: subjects.filter((subject) => subject.status === "scheduled").length,
+          notStartedSubjectCount: subjects.filter((subject) => subject.status === "not_started").length,
+          completedSubjectCount: subjects.filter((subject) => subject.status === "completed").length,
+        },
+        subjects,
+      };
+    });
+
+    return {
+      classes,
     };
   }
 

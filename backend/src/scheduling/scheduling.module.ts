@@ -10,6 +10,7 @@ import { Lecturer } from "../database/models/common/lecturer.model.js";
 import { Room } from "../database/models/common/room.model.js";
 import { Subject } from "../database/models/plan/subject.model.js";
 import { CurriculumSubject } from "../database/models/plan/curriculum-subject.model.js";
+import { Curriculum } from "../database/models/plan/curriculum.model.js";
 import { ClassGroupElective } from "../database/models/training/class-group-elective.model.js";
 import { Staff } from "../database/models/staff.model.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
@@ -26,6 +27,7 @@ import { SchedulingService } from "./scheduling.service.js";
     CourseOfferingStudent, AdmissionRecord,
     CourseOfferingClassGroup,
     Subject,
+    Curriculum,
     CurriculumSubject,
     ClassGroupElective,
     ClassGroup,

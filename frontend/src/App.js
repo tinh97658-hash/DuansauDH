@@ -50,6 +50,7 @@ import MastersBridgeCourse from "./pages/masters/bridgeCourse";
 import MastersAdmissionScores from "./pages/masters/admissionScores";
 import MastersCreateClassGroups from "./pages/masters/createClassGroups";
 import MastersAssignClassGroups from "./pages/masters/assignClassGroups";
+import ClassCourseHistory from "./pages/masters/classCourseHistory";
 import MastersCourseOfferings from "./pages/masters/courseOfferings";
 import MastersSchedule from "./pages/masters/schedule";
 import MastersCourseMatrix from "./pages/masters/courseMatrix";
@@ -141,6 +142,7 @@ function App() {
             <Route path="masters/admission-scores" element={<MastersAdmissionScores />} />
             <Route path="masters/create-class-groups" element={<MastersCreateClassGroups />} />
             <Route path="masters/assign-class-groups" element={<MastersAssignClassGroups />} />
+            <Route path="masters/class-course-history" element={<ClassCourseHistory />} />
             <Route path="masters/course-offerings" element={<MastersCourseOfferings />} />
             <Route path="masters/schedule" element={<MastersSchedule />} />
             <Route path="masters/course-matrix" element={<MastersCourseMatrix />} />

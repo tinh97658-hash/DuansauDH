@@ -68,6 +68,11 @@ export class ListCourseOfferingsQueryDto {
   @IsOptional() @IsIn(["active", "completed"]) status?: "active" | "completed";
 }
 
+export class ClassCurriculumProgressQueryDto {
+  @IsUUID() majorId!: string;
+  @IsString() @MinLength(1) @MaxLength(20) @Transform(trim) academicYear!: string;
+}
+
 export class AssignSchedulingManagerDto {
   @IsUUID() staffId!: string;
 }

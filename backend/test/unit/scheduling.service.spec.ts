@@ -12,7 +12,7 @@ const buildService = () => {
   // `packages` giữ tên cũ cho dễ đọc: đây là danh mục học phần của CTĐT mà lớp kế thừa.
   const curriculumSubjects = { findAll: jest.fn().mockResolvedValue([]) };
   const classGroupElectives = { findAll: jest.fn().mockResolvedValue([]) };
-  const classGroups = { findAll: jest.fn() };
+  const classGroups = { findAll: jest.fn(), findByPk: jest.fn() };
   const classGroupMembers = { findAll: jest.fn().mockResolvedValue([]) };
   const majors = { findOne: jest.fn() };
   const staff = { findByPk: jest.fn(), update: jest.fn() };
@@ -740,6 +740,46 @@ describe("SchedulingService.createCourseOffering", () => {
 });
 
 describe("SchedulingService persisted reads", () => {
+  it("returns only the class progress summary and representative teaching data", async () => {
+    const { service, majors, packages, classGroupElectives, classGroups, offeringGroups, courseOfferings, teachingSessions } = buildService();
+    const selectedGroup = { ...group("group-1", "CNT2027.01"), curriculum: { id: curriculumIdFor("group-1"), code: "CNTT-2027", name: "CTĐT CNTT 2027", totalCredits: 60 } };
+    const secondSubject = { ...subject, id: "subject-2", code: "HP02", name: "Học phần chưa học" };
+    const offering = { id: "offering-1", name: "Lớp học phần CNTT", status: "active", subject };
+    const session = {
+      id: "session-1", courseOfferingId: offering.id, sessionDate: "2027-04-12",
+      startTime: "08:00:00", endTime: "11:00:00", period: "MORNING", status: "held",
+      lecturer: { id: "lecturer-1", code: "GV01", name: "Nguyễn An" },
+      room: { id: "room-1", code: "P301", name: "Phòng 301" },
+    };
+    majors.findOne.mockResolvedValue({ id: "major-1", code: "CNTT", name: "Công nghệ thông tin" });
+    classGroups.findAll.mockResolvedValue([selectedGroup]);
+    packages.findAll.mockResolvedValue([
+      { id: "entry-1", curriculumId: selectedGroup.curriculumId, subjectId: subject.id, subject, isRequired: true, credits: 3, sortOrder: 1, block: { id: "block", code: "CS", name: "Cơ sở", sortOrder: 1 } },
+      { id: "entry-2", curriculumId: selectedGroup.curriculumId, subjectId: secondSubject.id, subject: secondSubject, isRequired: true, credits: 3, sortOrder: 2, block: { id: "block", code: "CS", name: "Cơ sở", sortOrder: 1 } },
+    ]);
+    classGroupElectives.findAll.mockResolvedValue([]);
+    offeringGroups.findAll.mockResolvedValue([{ classGroupId: selectedGroup.id, courseOfferingId: offering.id }]);
+    courseOfferings.findAll.mockResolvedValue([offering]);
+    teachingSessions.findAll.mockResolvedValue([session]);
+
+    const result: any = await service.getClassCurriculumProgress({ majorId: "major-1", academicYear: "2027" });
+
+    expect(result.classes[0]).toEqual(expect.objectContaining({
+      code: "CNT2027.01",
+      memberCount: 0,
+      summary: { totalSubjectCount: 2, inProgressSubjectCount: 1, scheduledSubjectCount: 0, notStartedSubjectCount: 1, completedSubjectCount: 0 },
+    }));
+    expect(result.classes[0].subjects).toEqual([
+      expect.objectContaining({ curriculumSubjectId: "entry-1", code: subject.code, name: subject.name, status: "in_progress", heldSessionCount: 1, sessionCount: 1, lecturer: { name: session.lecturer.name }, room: { code: session.room.code }, schedule: expect.objectContaining({ sessionDate: session.sessionDate }) }),
+      expect.objectContaining({ curriculumSubjectId: "entry-2", code: secondSubject.code, name: secondSubject.name, status: "not_started", heldSessionCount: 0, sessionCount: 0, lecturer: null, room: null, schedule: null }),
+    ]);
+    expect(result.classes[0].subjects[0]).not.toHaveProperty("sessions");
+    expect(classGroups.findAll).toHaveBeenCalledWith(expect.objectContaining({
+      where: { program: "masters", majorId: "major-1", academicYear: "2027", groupType: "ADMINISTRATIVE" },
+    }));
+    expect(courseOfferings.findAll.mock.calls[0][0].include.find((include: any) => include.as === "subject").where).toEqual({ program: "masters" });
+  });
+
   it("scopes the list through Subject.program so another program cannot leak into Masters", async () => {
     const { service, courseOfferings } = buildService();
     const mastersOffering = { id: "offering-masters", subject };

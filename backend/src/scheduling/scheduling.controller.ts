@@ -5,6 +5,7 @@ import { SchedulingWriteGuard } from "../common/scheduling-write.guard.js";
 import { CourseOfferingWriteGuard } from "../common/course-offering-write.guard.js";
 import {
   AssignSchedulingManagerDto,
+  ClassCurriculumProgressQueryDto,
   ConfirmTeachingSessionDto,
   CourseOfferingCandidatesQueryDto,
   CreateCourseOfferingDto,
@@ -26,6 +27,11 @@ export class SchedulingController {
   @Get("course-offering-candidates")
   candidates(@Query() query: CourseOfferingCandidatesQueryDto) {
     return this.scheduling.listCourseOfferingCandidates(query);
+  }
+
+  @Get("class-curriculum-progress")
+  classCurriculumProgress(@Query() query: ClassCurriculumProgressQueryDto) {
+    return this.scheduling.getClassCurriculumProgress(query);
   }
 
   @Post("course-offerings")

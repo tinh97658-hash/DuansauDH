@@ -8,6 +8,9 @@
   border-bottom: 1px solid var(--border-color, #DFE4E8);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   font-family: var(--app-font-family);
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
+  text-rendering: optimizeLegibility;
 }
 
 /* 1. Titlebar */
@@ -204,16 +207,16 @@
   align-items: center;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
-  padding: 4px 2px;
+  gap: 3px;
+  padding: 3px 2px;
   border: 1px solid transparent;
   border-radius: 3px;
-  color: var(--text-primary, #172B3A);
+  color: #102A3A;
   background: transparent;
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 10.5px;
+  font-weight: 600;
   font-family: inherit;
-  line-height: 1.2;
+  line-height: 1.15;
   text-align: center;
   cursor: pointer;
   transition: all 0.12s ease;
@@ -249,8 +252,8 @@
 }
 
 .ribbon-action-icon {
-  width: 26px !important;
-  height: 26px !important;
+  width: 25px !important;
+  height: 25px !important;
   transition: transform 0.12s ease;
 }
 
@@ -273,8 +276,8 @@
   bottom: 2px;
   left: 4px;
   overflow: hidden;
-  color: var(--text-muted);
-  font-size: 9.5px;
+  color: var(--text-secondary, #607486);
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.4px;
   text-transform: uppercase;

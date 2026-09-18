@@ -20,6 +20,11 @@ describe("Masters scheduling ribbon", () => {
         expect.objectContaining({ label: "Ma trận lớp học phần", route: "/masters/course-matrix" }),
       ])
     );
+    expect(entryGroup.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "Thống kê tiến độ", route: "/masters/class-course-history" }),
+      ])
+    );
   });
 
   it("does not expose Masters scheduling routes in the Doctoral ribbon", () => {
