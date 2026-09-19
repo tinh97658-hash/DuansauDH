@@ -177,11 +177,12 @@ describe("SchedulingService TeachingSession", () => {
   });
 
   it.each(["planned", "held", "not_held"].flatMap((status) => ["ROOM_CONFLICT", "LECTURER_CONFLICT", "CLASS_GROUP_CONFLICT"].map((code) => [status, code])))
-    ("%s has correct exact-overlap resource semantics for %s", async (status, code) => {
+    ("%s has correct date-and-period resource semantics for %s", async (status, code) => {
       const mocks = buildService();
       arrangeValid(mocks);
       const existing = session({
         sessionDate: "2026-09-12", status,
+        startTime: "08:00:00", endTime: "09:00:00",
         roomId: code === "ROOM_CONFLICT" ? "room-1" : "other-room",
         lecturerId: code === "LECTURER_CONFLICT" ? "lecturer-1" : "other-lecturer",
         courseOffering: { groupLinks: [{ classGroupId: code === "CLASS_GROUP_CONFLICT" ? "group-1" : "other-group" }] },
@@ -189,19 +190,48 @@ describe("SchedulingService TeachingSession", () => {
       mocks.teachingSessions.findAll.mockImplementation(async (query: any) => {
         expect(query.where.status).toEqual({ [Op.ne]: "not_held" });
         expect(query.where.sessionDate).toBe("2026-09-12");
-        expect(query.where.startTime[Op.lt]).toBe("10:00:00");
-        expect(query.where.endTime[Op.gt]).toBe("08:00:00");
+        expect(query.where.period).toBe("MORNING");
+        expect(query.where.startTime).toBeUndefined();
+        expect(query.where.endTime).toBeUndefined();
         return [existing].filter((item) => item.status !== query.where.status[Op.ne]);
       });
       if (status === "not_held") {
-        await expect(mocks.service.createTeachingSession(createDto())).resolves.toBeDefined();
+        await expect(mocks.service.createTeachingSession(createDto({ startTime: "10:00", endTime: "11:00" }))).resolves.toBeDefined();
         expect(mocks.teachingSessions.create).toHaveBeenCalled();
       } else {
-        await expectConflictCode(mocks.service.createTeachingSession(createDto()), code);
+        await expectConflictCode(mocks.service.createTeachingSession(createDto({ startTime: "10:00", endTime: "11:00" })), code);
         expect(mocks.teachingSessions.create).not.toHaveBeenCalled();
       }
       expect(existing.destroy).not.toHaveBeenCalled();
     });
+
+  it("rejects a second session for the same offering in the same date and period even when clock ranges do not overlap", async () => {
+    const mocks = buildService();
+    arrangeValid(mocks);
+    mocks.teachingSessions.findAll.mockResolvedValue([session({
+      startTime: "08:00:00", endTime: "09:00:00",
+      roomId: "other-room", lecturerId: "other-lecturer",
+    })]);
+
+    await expectConflictCode(
+      mocks.service.createTeachingSession(createDto({ startTime: "10:00", endTime: "11:00" })),
+      "CLASS_GROUP_CONFLICT",
+    );
+  });
+
+  it("allows the same date in a different period when no other invariant conflicts", async () => {
+    const mocks = buildService();
+    arrangeValid(mocks);
+    const existing = session({ period: "MORNING" });
+    mocks.teachingSessions.findAll.mockImplementation(async (query: any) => {
+      expect(query.where.period).toBe("AFTERNOON");
+      return existing.period === query.where.period ? [existing] : [];
+    });
+
+    await expect(mocks.service.createTeachingSession(createDto({
+      period: "AFTERNOON", startTime: "13:00", endTime: "17:00",
+    }))).resolves.toBeDefined();
+  });
 
   it("creates a persisted session after locking Room, Lecturer and ClassGroups in a stable order", async () => {
     const mocks = buildService();
@@ -315,16 +345,18 @@ describe("SchedulingService TeachingSession", () => {
     await expectConflictCode(mocks.service.createTeachingSession(createDto()), "CLASS_GROUP_CONFLICT");
   });
 
-  it("uses strict overlap so a touching boundary is not a conflict", async () => {
+  it("treats touching clock ranges in the same period as one conflicting slot", async () => {
     const mocks = buildService();
     arrangeValid(mocks);
     mocks.teachingSessions.findAll.mockImplementation(async (query: any) => {
-      expect(query.where.startTime[Op.lt]).toBe("11:00:00");
-      expect(query.where.endTime[Op.gt]).toBe("10:00:00");
-      return [];
+      expect(query.where.period).toBe("MORNING");
+      return [session({ startTime: "08:00:00", endTime: "10:00:00" })];
     });
 
-    await expect(mocks.service.createTeachingSession(createDto({ startTime: "10:00", endTime: "11:00" }))).resolves.toBeDefined();
+    await expectConflictCode(
+      mocks.service.createTeachingSession(createDto({ startTime: "10:00", endTime: "11:00" })),
+      "ROOM_CONFLICT",
+    );
   });
 
   it("excludes the session itself during update conflict checking", async () => {
@@ -348,10 +380,12 @@ describe("SchedulingService TeachingSession", () => {
     arrangeValid(mocks, { rooms: [room(), room("room-2")] });
     const current = session();
     mocks.teachingSessions.findByPk.mockResolvedValue(current);
-    mocks.teachingSessions.findAll.mockResolvedValue([session({ id: "session-2", roomId: "room-2" })]);
+    mocks.teachingSessions.findAll.mockResolvedValue([session({
+      id: "session-2", roomId: "room-2", startTime: "08:00:00", endTime: "09:00:00",
+    })]);
 
     await expectConflictCode(
-      mocks.service.updateTeachingSession(current.id, { roomId: "room-2" }),
+      mocks.service.updateTeachingSession(current.id, { roomId: "room-2", startTime: "10:00", endTime: "11:00" }),
       "ROOM_CONFLICT",
     );
     expect(current.update).not.toHaveBeenCalled();

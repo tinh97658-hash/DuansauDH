@@ -71,7 +71,8 @@ it("shows each group's own major and submits mixed-major groups outside the work
   await waitFor(() => expect(next).toBeEnabled());
   fireEvent.click(next);
   const dialog = screen.getByRole("dialog", { name: "Xem trước danh sách lớp" });
-  expect(within(dialog).getByText(`${maritime.name} · ${computing.name}`)).toBeInTheDocument();
+  expect(within(dialog).getByText(maritime.name)).toBeInTheDocument();
+  expect(within(dialog).getByText(computing.name)).toBeInTheDocument();
   fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận tạo lớp" }));
   await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringMatching(/course-offerings$/), expect.objectContaining({
     subjectId: subject.id, classGroupIds: [maritimeGroup.id, computingGroup.id], majorId: major.id,

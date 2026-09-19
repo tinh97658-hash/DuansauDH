@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { api, groupsOf, message, Modal, Notice, offeringTitle, rows, subjectLabel, useLoad } from "./shared";
-import { getBusinessTodayKey, getRoomFloor, isPeriodTimeConsistent, isSessionPast, shortTime, timesOverlap, vietnameseDate } from "../../utils/schedulingCalendar";
+import { getBusinessTodayKey, getRoomFloor, isPeriodTimeConsistent, isSessionPast, shortTime, vietnameseDate } from "../../utils/schedulingCalendar";
 
 const periodTimes = (period) => period === "AFTERNOON"
   ? { startTime: "13:00", endTime: "17:00" }
@@ -24,7 +24,7 @@ export default function SessionEditor({ session, offering, date, period, user, o
   const canManage = user.canManageScheduling === true && currentOffering.status !== "completed";
   const editable = canManage && editing && (!session || future);
   const validTime = isPeriodTimeConsistent(form.period, form.startTime, form.endTime);
-  const conflicts = validTime ? (availability.data || []).filter((row) => row.id !== session?.id && row.status !== "not_held" && timesOverlap(`${form.startTime}:00`, `${form.endTime}:00`, row.startTime.length === 5 ? `${row.startTime}:00` : row.startTime, row.endTime.length === 5 ? `${row.endTime}:00` : row.endTime)) : [];
+  const conflicts = (availability.data || []).filter((row) => row.id !== session?.id && row.status !== "not_held" && row.period === form.period);
   const ownGroups = new Set(groupsOf(currentOffering).map((group) => group.id));
   const classConflict = conflicts.find((row) => row.courseOfferingId === offering.id || groupsOf(row.courseOffering).some((group) => ownGroups.has(group.id)));
   const lecturers = catalog.data?.lecturers || [];
@@ -61,7 +61,6 @@ export default function SessionEditor({ session, offering, date, period, user, o
     return "TRỐNG";
   };
   return <Modal wide hideHeader className="sl-session-editor-dialog" bodyClassName="sl-session-editor-body" title={`${!session ? "XẾP BUỔI" : editing ? "CHỈNH SỬA LỊCH" : "CHI TIẾT BUỔI HỌC"} · ${vietnameseDate(form.sessionDate)} · ${periodLabel}`} onClose={onClose} busy={saving} actions={<>
-    <span className="sl-editor-room-picked">Phòng đã chọn: <strong>{rooms.find((room) => room.id === form.roomId)?.code || "Chưa chọn"}</strong></span>
     {canManage && future && !editing && <><button className="sl-btn sl-btn-danger" disabled={saving} onClick={() => setDeleting(true)}>Xóa buổi học</button><button className="sl-btn" onClick={() => setEditing(true)}>Chỉnh sửa</button></>}
     {canManage && pending && <><button className="sl-btn" disabled={saving} onClick={() => mutate(() => api.put(`/scheduling/teaching-sessions/${session.id}/confirmation`, { status: "not_held" }))}>Không diễn ra</button><button className="sl-btn sl-btn-primary" disabled={saving} onClick={() => mutate(() => api.put(`/scheduling/teaching-sessions/${session.id}/confirmation`, { status: "held" }))}>Đã diễn ra</button></>}
     <button className="sl-btn" disabled={saving} onClick={onClose}>{editable ? "Hủy" : "Đóng"}</button>{editable && <button className="sl-btn sl-btn-primary" aria-label="Lưu buổi học" disabled={saving || catalog.loading || availability.loading || !!catalog.error || !!availability.error} onClick={save}>{saving ? "Đang lưu..." : "Lưu lịch"}</button>}

@@ -1,8 +1,9 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import axios from "axios";
 import Schedule from "../../pages/masters/schedule";
+import ScheduleView from "../../features/scheduling/Schedule";
 import SessionEditor from "../../features/scheduling/SessionEditor";
 import OfferingDetails from "../../features/scheduling/OfferingDetails";
 
@@ -43,13 +44,19 @@ it("loads institute availability and excludes busy and undersized rooms before s
   await waitFor(() => expect(screen.getByRole("button", { name: /301.*40 chỗ/ })).toBeEnabled());
   expect(screen.getByRole("button", { name: /302.*5 chỗ/ })).toBeDisabled();
   fireEvent.change(screen.getByLabelText("Giảng viên"), { target: { value: "l" } });
-  fireEvent.click(screen.getByRole("button", { name: /301.*40 chỗ/ }));
+  const selectedRoom = screen.getByRole("button", { name: /301.*40 chỗ/ });
+  fireEvent.click(selectedRoom);
+  expect(selectedRoom).toHaveAttribute("aria-pressed", "true");
+  expect(screen.queryByText(/Phòng đã chọn:/)).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Lưu buổi học" }));
   await waitFor(() => expect(saved).toHaveBeenCalled());
   expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/teaching-sessions"), expect.objectContaining({ courseOfferingId: "offering", sessionDate: "2099-01-05", period: "MORNING", roomId: "r", lecturerId: "l", startTime: "07:00", endTime: "12:00" }), { withCredentials: true });
 });
 it("updates the automatic time range and lecturer conflicts when changing period", async () => {
-  axios.get.mockImplementation(async (url) => ({ data: url.includes("/lecturers") ? lecturers : url.includes("/rooms") ? rooms : url.includes("/teaching-sessions?") ? [{ id: "busy", lecturerId: "l", roomId: "r", startTime: "08:00:00", endTime: "10:00:00", status: "planned" }] : offering }));
+  axios.get.mockImplementation(async (url) => ({ data: url.includes("/lecturers") ? lecturers : url.includes("/rooms") ? rooms : url.includes("/teaching-sessions?") ? [
+    { id: "busy", lecturerId: "l", roomId: "r", period: "MORNING", startTime: "00:00:00", endTime: "00:01:00", status: "planned" },
+    { id: "not-held", lecturerId: "l", roomId: "r", period: "AFTERNOON", startTime: "13:00:00", endTime: "17:00:00", status: "not_held" },
+  ] : offering }));
   render(<SessionEditor offering={offering} date="2099-01-05" period="MORNING" user={{ canManageScheduling: true }} onClose={jest.fn()} onSaved={jest.fn()} />);
   expect(await screen.findByRole("option", { name: "Nguyễn Bình · Đang bận" })).toBeDisabled();
   fireEvent.change(screen.getByLabelText("Buổi"), { target: { value: "AFTERNOON" } });
@@ -57,6 +64,84 @@ it("updates the automatic time range and lecturer conflicts when changing period
   expect(screen.getByRole("option", { name: "Nguyễn Bình" })).toBeEnabled();
   expect(screen.getByRole("button", { name: /301.*40 chỗ/ })).toBeEnabled();
 });
+it("suppresses occupied date-period slots from complete week data while preserving create and detail flows", async () => {
+  const addDate = (date, days) => {
+    const value = new Date(`${date}T12:00:00Z`);
+    value.setUTCDate(value.getUTCDate() + days);
+    return value.toISOString().slice(0, 10);
+  };
+  const sharedOutsideScope = { id: "g-shared", code: "KTHH-2025", majorId: "m", academicYear: "2025", allowedWeekdays: [1, 2, 3, 4, 5, 6, 0] };
+  const selectedOffering = {
+    ...offering,
+    id: "selected",
+    name: "Lớp đã chọn",
+    groupLinks: [
+      ...offering.groupLinks,
+      { classGroupId: sharedOutsideScope.id, classGroup: sharedOutsideScope },
+    ],
+  };
+  const outsideOffering = {
+    ...offering,
+    id: "outside",
+    name: "Lớp ngoài phạm vi",
+    groupLinks: [{ classGroupId: sharedOutsideScope.id, classGroup: sharedOutsideScope }],
+  };
+  let weekDates = [];
+  axios.get.mockImplementation(async (url) => {
+    if (url.includes("/course-offerings?")) return { data: [selectedOffering, outsideOffering] };
+    if (url.includes("/majors")) return { data: [] };
+    if (url.includes("/pending-teaching-sessions")) return { data: [] };
+    if (url.endsWith("/course-offerings/selected")) return { data: selectedOffering };
+    if (url.includes("/lecturers")) return { data: lecturers };
+    if (url.includes("/rooms")) return { data: rooms };
+    if (url.includes("/teaching-sessions?")) {
+      const query = new URLSearchParams(url.split("?")[1]);
+      const from = query.get("from");
+      const to = query.get("to");
+      if (from === to) return { data: [] };
+      weekDates = Array.from({ length: 7 }, (_, index) => addDate(from, index));
+      const makeSession = (id, courseOffering, day, period = "MORNING", status = "planned") => ({
+        id, courseOfferingId: courseOffering.id, courseOffering,
+        sessionDate: weekDates[day], period, status,
+        startTime: period === "MORNING" ? "08:00:00" : "13:00:00",
+        endTime: period === "MORNING" ? "09:00:00" : "14:00:00",
+        lecturerId: "l", roomId: "r", lecturer: lecturers[0], room: rooms[0],
+      });
+      return { data: [
+        makeSession("same-offering", selectedOffering, 0),
+        makeSession("shared-group-outside-scope", outsideOffering, 1),
+        makeSession("not-held", selectedOffering, 2, "MORNING", "not_held"),
+        makeSession("other-period", selectedOffering, 3, "MORNING"),
+      ] };
+    }
+    return { data: [] };
+  });
+
+  render(<MemoryRouter><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>);
+  await screen.findByRole("option", { name: "2026" });
+  fireEvent.change(screen.getByLabelText("Khóa / Năm"), { target: { value: "2026" } });
+  await waitFor(() => expect(screen.queryByText("Lớp ngoài phạm vi")).not.toBeInTheDocument());
+  fireEvent.click(screen.getByRole("button", { name: "Xếp lịch" }));
+  fireEvent.click(screen.getByRole("button", { name: "Tuần sau" }));
+  await waitFor(() => expect(screen.getAllByRole("button", { name: /Lớp đã chọn.*(ĐÃ XẾP|KHÔNG DIỄN RA)/ })).toHaveLength(3));
+
+  expect(screen.queryByText("Lớp ngoài phạm vi")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: `Xếp Sáng ${weekDates[0]}` })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: `Xếp Sáng ${weekDates[1]}` })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: `Xếp Sáng ${weekDates[2]}` })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: `Xếp Sáng ${weekDates[3]}` })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: `Xếp Chiều ${weekDates[3]}` })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: `Xếp Sáng ${weekDates[4]}` }));
+  let dialog = screen.getByRole("dialog");
+  expect(dialog).toHaveTextContent("XẾP BUỔI");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Đóng chi tiết buổi học" }));
+
+  fireEvent.click(screen.getAllByRole("button", { name: /Lớp đã chọn.*ĐÃ XẾP/ })[0]);
+  dialog = screen.getByRole("dialog");
+  expect(dialog).toHaveTextContent("CHI TIẾT BUỔI HỌC");
+});
+
 it("retains the editor and reports a server conflict instead of claiming success", async () => {
   const saved = jest.fn(); axios.put.mockRejectedValue({ response: { status: 409, data: { message: "Phòng học đã có lịch" } } });
   const session = { id: "session", courseOfferingId: "offering", sessionDate: "2099-01-05", period: "MORNING", status: "planned", startTime: "08:00", endTime: "11:00", lecturerId: "l", roomId: "r" };
@@ -68,17 +153,71 @@ it("retains the editor and reports a server conflict instead of claiming success
 });
 it("confirms an ended session through the API without edit controls", async () => {
   const saved = jest.fn();
-  render(<SessionEditor session={{ id: "past", status: "planned", sessionDate: "2020-01-05", period: "MORNING", startTime: "08:00", endTime: "11:00" }} offering={offering} user={{ canManageScheduling: true }} onClose={jest.fn()} onSaved={saved} />);
+  const onClose = jest.fn();
+  render(<SessionEditor session={{ id: "past", status: "planned", sessionDate: "2020-01-05", period: "MORNING", startTime: "08:00", endTime: "11:00" }} offering={offering} user={{ canManageScheduling: true }} onClose={onClose} onSaved={saved} />);
   expect(screen.queryByRole("button", { name: "Chỉnh sửa" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Đóng chi tiết buổi học" }));
+  expect(onClose).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole("button", { name: "Đã diễn ra" }));
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.stringContaining("/past/confirmation"), { status: "held" }, { withCredentials: true }));
 });
-it("saves and clears per-learner notes on a persisted roster", async () => {
-  render(<OfferingDetails offering={offering} user={{ role: "admin" }} onClose={jest.fn()} />);
+it("switches course-class tabs without refetching or losing a learner note", async () => {
+  const onClose = jest.fn();
+  const onSelect = jest.fn();
+  const offeringWithGroups = {
+    ...offering,
+    groupLinks: Array.from({ length: 4 }, (_, index) => ({
+      classGroupId: `g-${index + 1}`,
+      classGroup: { id: `g-${index + 1}`, code: `KTHH2026.0${index + 1}`, major: { name: "Khai thác hàng hải" }, memberCount: index + 1 },
+    })),
+  };
+  axios.get.mockImplementation(async (url) => ({
+    data: url.endsWith("/course-offerings/offering") ? offeringWithGroups
+      : url.endsWith("/roster") ? { participants: [{ id: "student:one", code: "HV001", fullName: "Nguyễn An", note: "" }] }
+      : [],
+  }));
+  render(<OfferingDetails offering={offeringWithGroups} user={{ role: "admin", canManageScheduling: true }} onClose={onClose} onSelect={onSelect} />);
+
+  const scheduleTab = screen.getByRole("tab", { name: "LỊCH HỌC" });
+  const peopleTab = screen.getByRole("tab", { name: "LỚP & HỌC VIÊN" });
+  expect(scheduleTab).toHaveAttribute("aria-selected", "true");
+  expect(peopleTab).toHaveAttribute("aria-selected", "false");
+  expect(await screen.findByText("LỊCH HỌC ĐÃ XẾP")).toBeInTheDocument();
+  expect(await screen.findByText("Chưa có buổi học nào được xếp lịch cho lớp học phần này.")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Đã xếp sắp tới/ })).not.toBeInTheDocument();
+  expect(screen.queryByText("LỚP / NHÓM THAM GIA")).not.toBeInTheDocument();
+  await waitFor(() => expect(axios.get).toHaveBeenCalledTimes(4));
+  const requestCount = axios.get.mock.calls.length;
+
+  fireEvent.click(peopleTab);
+  expect(peopleTab).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByText("LỚP / NHÓM THAM GIA")).toBeInTheDocument();
+  expect(screen.getByText("DANH SÁCH HỌC VIÊN")).toBeInTheDocument();
+  expect(screen.getAllByText(/^KTHH2026\.0[1-4]$/)).toHaveLength(4);
+  expect(screen.queryByRole("button", { name: /^Tất cả/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^Sắp tới/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^Chờ xác nhận/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^Đã diễn ra/ })).not.toBeInTheDocument();
   const input = await screen.findByRole("textbox", { name: "Ghi chú HV001" });
-  expect(input).toHaveValue(""); fireEvent.change(input, { target: { value: "Miễn TA" } });
+  expect(input).toHaveValue("");
+  fireEvent.change(input, { target: { value: "Miễn TA" } });
+
+  fireEvent.click(scheduleTab);
+  expect(screen.getByText("LỊCH HỌC ĐÃ XẾP")).toBeInTheDocument();
+  expect(screen.queryByRole("textbox", { name: "Ghi chú HV001" })).not.toBeInTheDocument();
+  fireEvent.click(peopleTab);
+  expect(screen.getByRole("textbox", { name: "Ghi chú HV001" })).toHaveValue("Miễn TA");
+  expect(axios.get).toHaveBeenCalledTimes(requestCount);
+  expect(screen.getByRole("button", { name: "Xếp lịch / Xếp thêm" })).toBeInTheDocument();
+
   fireEvent.click(screen.getByRole("button", { name: "Lưu ghi chú" }));
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.stringContaining("/roster-notes"), { participantNotes: [{ participantId: "student:one", note: "Miễn TA" }] }, { withCredentials: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Xếp lịch / Xếp thêm" }));
+  expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "offering" }));
+  const closeButton = screen.getByRole("button", { name: "Đóng" });
+  await waitFor(() => expect(closeButton).toBeEnabled());
+  fireEvent.click(closeButton);
+  expect(onClose).toHaveBeenCalledTimes(1);
 });
 it("renders the list of scheduled sessions and filters them by status", async () => {
   const mockSessions = [
@@ -114,10 +253,22 @@ it("renders the list of scheduled sessions and filters them by status", async ()
   render(<OfferingDetails offering={{ ...offering, sessionSummary: { heldCount: 1, futurePlannedCount: 1, pendingCount: 0 } }} user={{ role: "admin", canManageScheduling: true }} onClose={jest.fn()} />);
 
   expect(await screen.findByText("LỊCH HỌC ĐÃ XẾP (2 buổi)")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Tất cả (2)" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Chờ xác nhận (0)" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Đã xếp sắp tới/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "CA HỌC" })).toBeInTheDocument();
   expect(screen.getByText("P.301")).toBeInTheDocument();
   expect(screen.getByText("P.302")).toBeInTheDocument();
   expect(screen.getByText("TS. Nguyễn Bình")).toBeInTheDocument();
   expect(screen.getByText("PGS. Trần Văn C")).toBeInTheDocument();
+  expect(screen.getByText("Sáng")).toBeInTheDocument();
+  expect(screen.getByText("Chiều")).toBeInTheDocument();
+  expect(screen.queryByText("Phòng 301 Nhà A")).not.toBeInTheDocument();
+  expect(screen.queryByText("Phòng 302 Nhà A")).not.toBeInTheDocument();
+  expect(screen.queryByText("GV01")).not.toBeInTheDocument();
+  expect(screen.queryByText("GV02")).not.toBeInTheDocument();
+  expect(screen.queryByText("08:00 - 11:30")).not.toBeInTheDocument();
+  expect(screen.queryByText("13:30 - 17:00")).not.toBeInTheDocument();
 
   // Filter to upcoming
   fireEvent.click(screen.getByRole("button", { name: "Sắp tới (1)" }));

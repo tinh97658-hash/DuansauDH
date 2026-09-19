@@ -48,6 +48,7 @@ export default function Schedule({ user }) {
   const listed = scoped.filter((offering) => offering.status === status && normalize(`${offering.subject?.code} ${offering.subject?.name} ${labelOf(offering)}`).includes(normalize(query)));
   const visibleSessions = (sessions.data || []).filter((session) => inScope(session.courseOffering));
   const selectedDays = selected?.allowedWeekdays || intersectDays(groupsOf(selected));
+  const selectedGroupIds = new Set(groupsOf(selected).map((group) => group.id));
   const selecting = canEdit && selected?.status === "active";
   const refresh = () => { offerings.reload(); sessions.reload(); pending.reload(); };
   const saved = () => { setEditor(null); setDetails(null); setError(""); refresh(); };
@@ -90,10 +91,11 @@ export default function Schedule({ user }) {
         const past = isSessionPast({ sessionDate: date, endTime: period === "MORNING" ? "12:00" : "23:59" });
         const incompatible = selecting && !selectedDays.includes(day.getDay());
         const items = visibleSessions.filter((session) => session.sessionDate === date && session.period === period);
+        const occupied = selecting && (sessions.data || []).some((session) => session.status !== "not_held" && session.sessionDate === date && session.period === period && (session.courseOfferingId === selected.id || groupsOf(session.courseOffering).some((group) => selectedGroupIds.has(group.id))));
         return <div key={date} className={`sl-slot ${past ? "sl-past" : ""} ${incompatible ? "sl-incompatible" : ""}`}><div className="v20-slot-items">
           {sessions.loading ? <span className="v20-hint">Đang tải...</span> : items.slice(0, 2).map(sessionCard)}
           {items.length > 2 && <button className="sl-other" onClick={() => setSlotDetails({ date, period, items })}>+ {items.length - 2} buổi khác</button>}
-          {selecting && !past && !incompatible && <button className="v20-add-slot" aria-label={`Xếp ${period === "MORNING" ? "Sáng" : "Chiều"} ${date}`} disabled={sessions.loading || !!sessions.error} onClick={() => setEditor({ offering: selected, date, period })}>+ Xếp buổi</button>}
+          {selecting && !past && !incompatible && !occupied && <button className="v20-add-slot" aria-label={`Xếp ${period === "MORNING" ? "Sáng" : "Chiều"} ${date}`} disabled={sessions.loading || !!sessions.error} onClick={() => setEditor({ offering: selected, date, period })}>+ Xếp buổi</button>}
           {!items.length && !selecting && !sessions.loading && <span className="v20-hint">{past ? "Buổi đã qua" : "Chưa có lịch"}</span>}
           {incompatible && <span className="v20-hint">Không thuộc ngày học chung</span>}
         </div></div>;

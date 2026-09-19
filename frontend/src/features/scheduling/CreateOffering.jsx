@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import successCircle from "../../assets/create-offering-success.svg";
 import { api, intersectDays, message, normalize, Notice, rows, SearchSelect, suggestOfferingName, unique, useLoad } from "./shared";
@@ -20,6 +20,35 @@ export default function CreateOffering({ user }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [created, setCreated] = useState(null);
+  const confirmationPanelRef = useRef(null);
+  const [confirmationScroll, setConfirmationScroll] = useState({ visible: false, offset: 0, height: 80 });
+
+  useEffect(() => {
+    const panel = confirmationPanelRef.current;
+    if (!panel || !roster) return undefined;
+    const updateScrollbar = () => {
+      const viewportHeight = panel.clientHeight;
+      const maxScroll = Math.max(0, panel.scrollHeight - viewportHeight);
+      const thumbHeight = Math.min(80, Math.max(40, viewportHeight - 16));
+      const maxOffset = Math.max(0, viewportHeight - 16 - thumbHeight);
+      const next = {
+        visible: maxScroll > 1,
+        offset: maxScroll ? (panel.scrollTop / maxScroll) * maxOffset : 0,
+        height: thumbHeight,
+      };
+      setConfirmationScroll((current) => current.visible === next.visible && current.offset === next.offset && current.height === next.height ? current : next);
+    };
+    updateScrollbar();
+    panel.addEventListener("scroll", updateScrollbar, { passive: true });
+    window.addEventListener("resize", updateScrollbar);
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateScrollbar);
+    resizeObserver?.observe(panel);
+    return () => {
+      panel.removeEventListener("scroll", updateScrollbar);
+      window.removeEventListener("resize", updateScrollbar);
+      resizeObserver?.disconnect();
+    };
+  }, [roster]);
 
   const majors = useLoad(async () => rows(await api.get("/system/majors?program=masters")).filter((item) => item.active !== false && item.code !== "CHUNG"), []);
   const groups = useLoad(async () => majorId ? rows(await api.get(`/masters/class-groups?${new URLSearchParams({ majorId })}`)) : [], [majorId]);
@@ -82,8 +111,13 @@ export default function CreateOffering({ user }) {
     || majors.data?.find((item) => item.id === group.majorId)?.name
     || "Chưa xác định chuyên ngành";
   const participatingGroups = created?.selectedClassGroups || chosen;
-  const participatingMajors = unique(participatingGroups.map(groupMajorName)).join(" · ");
+  const participatingMajorNames = unique(participatingGroups.map(groupMajorName));
+  const participatingMajors = participatingMajorNames.join(" · ");
   const participatingYears = unique(participatingGroups.map((group) => group.academicYear).filter(Boolean)).join(" · ");
+  const participatingGroupValues = participatingGroups.flatMap((group) => [
+    { key: `${group.id}:code`, label: group.code },
+    { key: `${group.id}:name`, label: group.name },
+  ].filter((item) => item.label));
   const years = unique((groups.data || []).map((group) => group.academicYear)).sort((a, b) => b.localeCompare(a, "vi", { numeric: true }));
   const visibleGroups = eligible
     .filter((group) => normalize(`${group.code} ${group.name} ${groupMajorName(group)} ${group.academicYear || ""}`).includes(normalize(groupQuery)));
@@ -98,8 +132,11 @@ export default function CreateOffering({ user }) {
         <h1>{created.name || effectiveOfferingName}</h1>
         <p>{participatingMajors} · Năm {participatingYears || year}</p>
         <div className="sl-create-success-summary">
-          <div><strong>{groupIds.length} lớp / nhóm</strong><strong>{created.participantCount ?? preview.data?.participantCount ?? 0} học viên</strong></div>
-          <p>{participatingGroups.map(groupLabel).join(" · ")}</p>
+          <div className="sl-create-success-metrics">
+            <div><strong>{groupIds.length}</strong><span>lớp / nhóm</span></div>
+            <div><strong>{created.participantCount ?? preview.data?.participantCount ?? 0}</strong><span>học viên</span></div>
+          </div>
+          <div className="sl-create-success-chips">{participatingGroupValues.map((item) => <span key={item.key}>{item.label}</span>)}</div>
         </div>
         <div className="sl-create-success-actions">
           <button onClick={() => { resetSelection(); setSubject(""); setOfferingName(""); setIsCustomName(false); }}>Tạo lớp học phần khác</button>
@@ -117,7 +154,7 @@ export default function CreateOffering({ user }) {
     return <section className="sl-create-flow-page sl-create-confirm-page" role="dialog" aria-label="Xem trước danh sách lớp">
       <div className="sl-create-confirm-card">
         <div className="sl-create-confirm-content">
-          <section className="sl-create-confirm-course" aria-label="Thông tin lớp học phần">
+          <section ref={confirmationPanelRef} className="sl-create-confirm-course" aria-label="Thông tin lớp học phần">
             <div className="sl-create-confirm-kicker">XÁC NHẬN THÔNG TIN LỚP HỌC PHẦN</div>
             <div className="sl-create-confirm-title">
               <div>
@@ -129,13 +166,14 @@ export default function CreateOffering({ user }) {
             </div>
             <div className="sl-create-confirm-meta">
               <div><small>HỌC PHẦN</small><strong>{subject?.code} · {subject?.name}</strong></div>
-              <div><small>CHUYÊN NGÀNH</small><strong>{participatingMajors}</strong></div>
+              <div><small>CHUYÊN NGÀNH</small><div className="sl-create-confirm-chip-list">{participatingMajorNames.map((name) => <span key={name}>{name}</span>)}</div></div>
             </div>
             <div className="sl-create-confirm-groups">
               <small>LỚP / KHÓA THAM GIA</small>
-              <p>{chosen.map((group) => `${group.name || group.code} · ${group.academicYear}`).join("  •  ")}</p>
+              <div className="sl-create-confirm-chip-list">{chosen.map((group) => <span key={group.id}>{group.name || group.code} · {group.academicYear}</span>)}</div>
             </div>
             <div className="sl-create-confirm-size"><small>QUY MÔ</small><strong>{roster.length} học viên · {groupIds.length} lớp/nhóm</strong></div>
+            {confirmationScroll.visible && <span className="sl-create-confirm-scrollbar" aria-hidden="true"><span style={{ height: confirmationScroll.height, transform: `translateY(${confirmationScroll.offset}px)` }} /></span>}
           </section>
           <section className="sl-create-confirm-roster" aria-label="Danh sách học viên">
             <div className="sl-create-confirm-roster-head">

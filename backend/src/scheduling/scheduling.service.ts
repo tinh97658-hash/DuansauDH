@@ -1094,6 +1094,7 @@ export class SchedulingService {
       sessionDate: string;
       startTime: string;
       endTime: string;
+      period: "MORNING" | "AFTERNOON";
       roomId: string;
       lecturerId: string;
       classGroupIds: string[];
@@ -1104,9 +1105,8 @@ export class SchedulingService {
   ) {
     const where: Record<string | symbol, unknown> = {
       sessionDate: values.sessionDate,
+      period: values.period,
       status: { [Op.ne]: "not_held" },
-      startTime: { [Op.lt]: values.endTime },
-      endTime: { [Op.gt]: values.startTime },
     };
     if (excludeSessionId) where.id = { [Op.ne]: excludeSessionId };
     const overlaps = await this.teachingSessions.findAll({

@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { api, groupsOf, message, Modal, Notice, offeringTitle, rows, subjectLabel, useLoad } from "./shared";
-import { shortTime, vietnameseDate, vietnameseDayLabel, isSessionPast } from "../../utils/schedulingCalendar";
+import { vietnameseDate, vietnameseDayLabel, isSessionPast } from "../../utils/schedulingCalendar";
 
 export default function OfferingDetails({ offering, user, onClose, onSaved, onOpenSession, onSelect }) {
   const detail = useLoad(() => api.get(`/scheduling/course-offerings/${offering.id}`), [offering.id]);
   const roster = useLoad(() => api.get(`/scheduling/course-offerings/${offering.id}/roster`), [offering.id]);
   const sessions = useLoad(async () => rows(await api.get(`/scheduling/course-offerings/${offering.id}/teaching-sessions`)), [offering.id]);
   const unresolved = useLoad(async () => rows(await api.get(`/scheduling/course-offerings/${offering.id}/unresolved-teaching-sessions`)), [offering.id]);
+  const [activeTab, setActiveTab] = useState("schedule");
   const [sessionFilter, setSessionFilter] = useState("all");
   const [notes, setNotes] = useState({});
   const [error, setError] = useState("");
@@ -44,12 +45,6 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
     return getSessionCategory(s) === sessionFilter;
   });
 
-  const statCards = [
-    { key: "held", count: summary.heldCount || 0, label: "Đã diễn ra" },
-    { key: "pending", count: summary.pendingCount || 0, label: "Chờ xác nhận" },
-    { key: "future", count: summary.futurePlannedCount || 0, label: "Đã xếp sắp tới" },
-  ];
-
   const mutate = async (action, done) => {
     setSaving(true); setError(""); setSuccess("");
     try { await action(); if (done) done(); }
@@ -65,26 +60,39 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
   </>}>
     <header className="sl-offering-hero"><div><div className="sl-eyebrow">LỚP HỌC PHẦN</div><h2>{offeringTitle(value)}</h2><strong>{subjectLabel(value)}</strong><p>{groupsOf(value).length} lớp/nhóm · {value.participantCount ?? 0} học viên</p><span className={`sl-state ${value.status === "completed" ? "sl-complete" : "sl-progress"}`}>{value.status === "completed" ? "HOÀN THÀNH" : "ĐANG DẠY"}</span></div><button className="sl-drawer-close" aria-label="Đóng" disabled={saving} onClick={onClose}>×</button></header>
     <div className="sl-offering-content">{detail.error && <Notice error={detail.error} />}{error && <Notice error={error} />}{success && <Notice>{success}</Notice>}
-      <div className="sl-offering-stats">
-        {statCards.map((item) => {
-          const isActive = sessionFilter === item.key;
-          return (
-            <div
-              key={item.key}
-              className={`sl-stat-clickable ${isActive ? "sl-stat-active" : ""}`}
-              role="button"
-              tabIndex={0}
-              onClick={() => setSessionFilter((prev) => (prev === item.key ? "all" : item.key))}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setSessionFilter((prev) => (prev === item.key ? "all" : item.key)); }}
-              title={`Bấm để lọc các buổi ${item.label.toLowerCase()}`}
-            >
-              <strong>{item.count}</strong>
-              <span>{item.label}</span>
-            </div>
-          );
-        })}
+      <div className="sl-offering-tabs" role="tablist" aria-label="Nội dung lớp học phần">
+        <button
+          type="button"
+          id="sl-offering-tab-schedule"
+          className={`sl-offering-tab ${activeTab === "schedule" ? "active" : ""}`}
+          role="tab"
+          aria-selected={activeTab === "schedule"}
+          aria-controls="sl-offering-panel-schedule"
+          tabIndex={activeTab === "schedule" ? 0 : -1}
+          onClick={() => setActiveTab("schedule")}
+        >
+          LỊCH HỌC
+        </button>
+        <button
+          type="button"
+          id="sl-offering-tab-people"
+          className={`sl-offering-tab ${activeTab === "people" ? "active" : ""}`}
+          role="tab"
+          aria-selected={activeTab === "people"}
+          aria-controls="sl-offering-panel-people"
+          tabIndex={activeTab === "people" ? 0 : -1}
+          onClick={() => setActiveTab("people")}
+        >
+          LỚP &amp; HỌC VIÊN
+        </button>
       </div>
 
+      {activeTab === "schedule" && <section
+        id="sl-offering-panel-schedule"
+        className="sl-offering-tab-panel"
+        role="tabpanel"
+        aria-labelledby="sl-offering-tab-schedule"
+      >
       {/* Danh sách lịch học đã xếp */}
       <div className="sl-offering-schedule-head">
         <h3 className="sl-offering-groups-title">
@@ -93,28 +101,28 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
         <div className="sl-offering-filters">
           <button
             type="button"
-            className={`sl-filter-chip ${sessionFilter === "all" ? "active" : ""}`}
+            className={`sl-filter-chip sl-filter-all ${sessionFilter === "all" ? "active" : ""}`}
             onClick={() => setSessionFilter("all")}
           >
             Tất cả ({allSessions.length})
           </button>
           <button
             type="button"
-            className={`sl-filter-chip ${sessionFilter === "future" ? "active" : ""}`}
+            className={`sl-filter-chip sl-filter-future ${sessionFilter === "future" ? "active" : ""}`}
             onClick={() => setSessionFilter("future")}
           >
             Sắp tới ({summary.futurePlannedCount || 0})
           </button>
           <button
             type="button"
-            className={`sl-filter-chip ${sessionFilter === "pending" ? "active" : ""}`}
+            className={`sl-filter-chip sl-filter-pending ${sessionFilter === "pending" ? "active" : ""}`}
             onClick={() => setSessionFilter("pending")}
           >
             Chờ xác nhận ({summary.pendingCount || 0})
           </button>
           <button
             type="button"
-            className={`sl-filter-chip ${sessionFilter === "held" ? "active" : ""}`}
+            className={`sl-filter-chip sl-filter-held ${sessionFilter === "held" ? "active" : ""}`}
             onClick={() => setSessionFilter("held")}
           >
             Đã diễn ra ({summary.heldCount || 0})
@@ -148,9 +156,9 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
               <tr>
                 <th style={{ width: 44, textAlign: "center" }}>STT</th>
                 <th style={{ width: 145 }}>NGÀY HỌC</th>
-                <th style={{ width: 135 }}>CA / GIỜ HỌC</th>
-                <th>PHÒNG HỌC</th>
-                <th>GIẢNG VIÊN</th>
+                <th className="sl-session-centered" style={{ width: 105 }}>CA HỌC</th>
+                <th className="sl-session-centered">PHÒNG HỌC</th>
+                <th className="sl-session-centered">GIẢNG VIÊN</th>
                 <th style={{ width: 125, textAlign: "center" }}>TRẠNG THÁI</th>
                 {(onOpenSession || onSelect) && <th style={{ width: 90, textAlign: "right" }}>THAO TÁC</th>}
               </tr>
@@ -159,7 +167,6 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
               {filteredSessions.map((session, index) => {
                 const badge = getSessionBadge(session);
                 const periodText = session.period === "MORNING" ? "Sáng" : "Chiều";
-                const timeText = `${shortTime(session.startTime)} - ${shortTime(session.endTime)}`;
                 return (
                   <tr
                     key={session.id}
@@ -171,17 +178,14 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
                       <strong style={{ color: "#173e75" }}>{vietnameseDayLabel(session.sessionDate)}</strong>
                       <div style={{ fontSize: "11.5px", color: "#64748b" }}>{vietnameseDate(session.sessionDate)}</div>
                     </td>
-                    <td>
+                    <td className="sl-session-centered">
                       <span style={{ fontWeight: 600, color: session.period === "MORNING" ? "#0b7285" : "#d9480f" }}>{periodText}</span>
-                      <div style={{ fontSize: "12px", color: "#475569" }}>{timeText}</div>
                     </td>
-                    <td>
+                    <td className="sl-session-centered">
                       <strong>{session.room?.code || "Chưa xếp"}</strong>
-                      {session.room?.name && <div style={{ fontSize: "11.5px", color: "#64748b" }}>{session.room.name}</div>}
                     </td>
-                    <td>
+                    <td className="sl-session-centered">
                       <strong>{session.lecturer?.name || "Chưa phân công"}</strong>
-                      {session.lecturer?.code && <div style={{ fontSize: "11.5px", color: "#64748b" }}>{session.lecturer.code}</div>}
                     </td>
                     <td style={{ textAlign: "center" }}>
                       <span style={{
@@ -227,6 +231,14 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
           </table>
         </div>
       )}
+      </section>}
+
+      {activeTab === "people" && <section
+        id="sl-offering-panel-people"
+        className="sl-offering-tab-panel sl-offering-people-panel"
+        role="tabpanel"
+        aria-labelledby="sl-offering-tab-people"
+      >
       <h3 className="sl-offering-groups-title">LỚP / NHÓM THAM GIA</h3>
       <div className="sl-offering-groups">{groupsOf(value).map((group) => <div key={group.id}><strong>{group.name || group.code}</strong><span>{group.major?.name || value.subject?.major?.name || "Chưa có chuyên ngành"} · {group.memberCount ?? 0} học viên</span></div>)}</div>
       <h3 className="sl-offering-groups-title" style={{ marginTop: 14 }}>DANH SÁCH HỌC VIÊN</h3>
@@ -273,6 +285,7 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
           )}
         </>
       )}
+      </section>}
     </div>
     {completing && <Modal title="Hoàn thành giảng dạy" onClose={() => setCompleting(false)} busy={saving} actions={<><button className="sl-btn" disabled={saving} onClick={() => setCompleting(false)}>Hủy</button><button className="sl-btn sl-btn-primary" disabled={saving} onClick={() => mutate(() => api.put(`/scheduling/course-offerings/${value.id}/completion`, {}), onSaved)}>Xác nhận hoàn thành</button></>}><p>Xác nhận lớp {value.subject?.code} đã hoàn thành giảng dạy? Lớp hoàn thành sẽ không được xếp thêm buổi học.</p>{error && <Notice error={error} />}</Modal>}
     {retakeOpen && <Modal title="Ghi nhận nhu cầu học lại" onClose={() => setRetakeOpen(false)} busy={saving} actions={<><button className="sl-btn" disabled={saving} onClick={() => setRetakeOpen(false)}>Hủy</button><button className="sl-btn sl-btn-primary" disabled={saving || !retakeId} onClick={() => mutate(() => api.post("/scheduling/retakes", { sourceCourseOfferingId: value.id, participantId: retakeId }), () => { setRetakeOpen(false); setSuccess("Đã ghi nhận nhu cầu học lại. Học viên sẽ xuất hiện khi tổ chức học phần phù hợp cho khóa sau."); })}>Ghi nhận học lại</button></>}>
