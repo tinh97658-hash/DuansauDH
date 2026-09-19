@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  AddRounded,
   CalendarMonthRounded,
   CheckCircleOutlineRounded,
   GridViewRounded,
@@ -16,6 +15,7 @@ import { getBusinessTodayKey } from "../../utils/schedulingCalendar";
 import OfferingDetails from "./OfferingDetails";
 
 const vietnameseNameCollator = new Intl.Collator("vi", { sensitivity: "base", numeric: true });
+const COHORT_WINDOW_SIZE = 4;
 
 function scheduleCategory(offering) {
   if (offering.status === "completed") return "completed";
@@ -121,28 +121,6 @@ export default function CourseMatrix({ user }) {
 
   return (
     <section className="sl-workspace sl-matrix-workspace" aria-label="Ma trận lớp học phần theo khóa">
-      {/* Top Header */}
-      <header className="sl-matrix-header">
-        <div className="sl-matrix-top-actions">
-          <button
-            type="button"
-            className="sl-btn sl-btn-secondary"
-            onClick={() => navigate("/masters/schedule")}
-          >
-            <CalendarMonthRounded aria-hidden="true" /> Lịch biểu tuần
-          </button>
-          {canEdit && (
-            <button
-              type="button"
-              className="sl-btn sl-btn-primary"
-              onClick={() => navigate("/masters/course-offerings")}
-            >
-              <AddRounded aria-hidden="true" /> Tạo lớp học phần
-            </button>
-          )}
-        </div>
-      </header>
-
       {/* KPI Stats Bar */}
       <div className="sl-matrix-kpi-bar" role="region" aria-label="Chỉ số tổng quan">
         <div className="sl-matrix-kpi">
@@ -268,7 +246,7 @@ export default function CourseMatrix({ user }) {
             <Notice>Đang tải dữ liệu lớp học phần...</Notice>
           ) : offerings.error ? (
             <Notice error={offerings.error} />
-          ) : filtered.length === 0 ? (
+          ) : filtered.length === 0 && (viewMode === "board" || all.length === 0) ? (
             <Notice>Không tìm thấy lớp học phần phù hợp với bộ lọc hiện tại.</Notice>
           ) : viewMode === "board" ? (
             <div className="sl-matrix-board">
@@ -293,10 +271,11 @@ export default function CourseMatrix({ user }) {
             </div>
           ) : (
             <PivotMatrixView
+              key={`${year}|${allCohorts.join("|")}`}
               offerings={filtered}
-              cohorts={displayedCohorts}
+              cohorts={allCohorts}
+              selectedYear={year}
               canEdit={canEdit}
-              threeColumns={Boolean(year)}
               onSelectOffering={openSchedule}
               onViewDetails={setDetailOffering}
             />
@@ -352,17 +331,11 @@ function CohortColumn({ title, subtitle, offerings, canEdit, fourColumns, onSele
 
 // Sub-component: Card for an offering in the matrix
 function OfferingCard({ offering, canEdit, onSelectOffering, onViewDetails }) {
-  const summary = offering.sessionSummary || {};
   const groups = groupsOf(offering);
   const cohorts = unique(groups.map((g) => g.academicYear).filter(Boolean));
-  const isCrossCohort = cohorts.length > 1;
-
-  const totalSessions = summary.totalCount || 0;
-  const heldSessions = summary.heldCount || 0;
-  const futureSessions = summary.futurePlannedCount || 0;
 
   return (
-    <article className={`sl-matrix-card ${offering.status === "completed" ? "card-completed" : totalSessions === 0 ? "card-unscheduled" : "card-scheduled"}`}>
+    <article className={`sl-matrix-card card-${scheduleCategory(offering)}`}>
       <button
         type="button"
         className="sl-matrix-card-detail-trigger"
@@ -370,68 +343,73 @@ function OfferingCard({ offering, canEdit, onSelectOffering, onViewDetails }) {
         aria-label={`Xem chi tiết ${offeringTitle(offering)}`}
         title="Bấm để xem chi tiết"
       />
-      <div className="sl-matrix-card-top">
-        <div className="sl-matrix-card-title-row">
-          <strong className="sl-matrix-card-title" title={offeringTitle(offering)}>
-            {offeringTitle(offering)}
-          </strong>
-          <div className="sl-matrix-card-tags">
-            {(offering.subject?.subjectType === "KC" || offering.subject?.allowCrossMajor) && (
-              <span className="sl-matrix-cross-tag sl-matrix-common-tag" title="Học phần dùng chung cấp Viện">
-                Môn chung
-              </span>
-            )}
-            {isCrossCohort && (
-              <span className="sl-matrix-cross-tag" title={`Ghép giữa: ${cohorts.join(", ")}`}>
-                Đa khóa
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="sl-matrix-card-subject">
-          {subjectLabel(offering)}
-        </div>
-        <div className="sl-matrix-card-meta">
-          <span>{groups.length} lớp/nhóm ({offering.participantCount ?? 0} HV)</span>
-          {offering.status === "completed" && <span className="sl-status-done">Đã hoàn thành</span>}
-        </div>
+      <div className="sl-matrix-card-title-row">
+        <strong className="sl-matrix-card-title" title={offeringTitle(offering)}>
+          {offeringTitle(offering)}
+        </strong>
+        <OfferingStatus offering={offering} />
       </div>
-
-      <div className="sl-matrix-card-schedule-info">
-        {totalSessions === 0 ? (
-          <div className="sl-matrix-schedule-status status-empty">
-            <span className="dot dot-warn" />
-            <span>Chưa xếp lịch học nào</span>
-          </div>
-        ) : (
-          <div className="sl-matrix-schedule-status status-active">
-            <span className="dot dot-green" />
-            <span>
-              Đã xếp <strong>{totalSessions}</strong> buổi
-              {heldSessions > 0 && ` (${heldSessions} đã học)`}
-              {futureSessions > 0 && ` · ${futureSessions} sắp tới`}
-            </span>
-          </div>
-        )}
+      <div className="sl-matrix-card-subject" title={subjectLabel(offering)}>
+        {subjectLabel(offering)}
       </div>
-
-      {canEdit && offering.status === "active" && (
-        <div className="sl-matrix-card-actions">
-          <button
-            type="button"
-            className="sl-btn sl-btn-primary sl-btn-sm"
-            onClick={() => onSelectOffering(offering.id)}
-          >
-            <CalendarMonthRounded aria-hidden="true" /> Xếp lịch
-          </button>
+      {(cohorts.length > 1 || offering.subject?.subjectType === "KC" || offering.subject?.allowCrossMajor) && (
+        <div className="sl-matrix-card-tags">
+          {(offering.subject?.subjectType === "KC" || offering.subject?.allowCrossMajor) && (
+            <span className="sl-matrix-common-tag" title="Học phần dùng chung cấp Viện">Môn chung</span>
+          )}
+          <CrossCohortBadge cohorts={cohorts} />
         </div>
       )}
+      <div className="sl-matrix-card-meta">
+        <span>{groups.length} lớp/nhóm · {offering.participantCount ?? 0} HV</span>
+        {canEdit && offering.status === "active" && (
+          <button
+            type="button"
+            className="sl-matrix-schedule-link"
+            onClick={() => onSelectOffering(offering.id)}
+          >
+            Xếp lịch →
+          </button>
+        )}
+      </div>
     </article>
   );
 }
 
+function OfferingStatus({ offering }) {
+  const category = scheduleCategory(offering);
+  return (
+    <span className={`sl-matrix-status status-${category}`}>
+      {category === "completed" ? <><span aria-hidden="true">✓</span> Hoàn thành</>
+        : category === "unscheduled" ? <><span aria-hidden="true">●</span> Chưa xếp lịch</>
+          : `${offering.sessionSummary.totalCount} buổi`}
+    </span>
+  );
+}
+
+function CrossCohortBadge({ cohorts }) {
+  if (cohorts.length <= 1) return null;
+  const label = [...cohorts].sort((a, b) => b.localeCompare(a, "vi", { numeric: true })).join(" · ");
+  return <span className="sl-matrix-cross-tag" title={`Một lớp học phần ghép các khóa: ${label}`}>GHÉP {label}</span>;
+}
+
 // Sub-component: Pivot Matrix View (Subjects x Cohorts)
-function PivotMatrixView({ offerings, cohorts, canEdit, threeColumns, onSelectOffering, onViewDetails }) {
+function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, onSelectOffering, onViewDetails }) {
+  // Anchor to unfiltered, known years; missing years remain empty comparison columns.
+  // Reset only when the source years or explicit year selection change.
+  const [windowStart, setWindowStart] = useState(0);
+  const knownYears = cohorts.filter((year) => /^[1-9]\d{3}$/.test(year)).map(Number);
+  const newestYear = knownYears.length ? Math.max(...knownYears) : null;
+  const oldestYear = knownYears.length ? Math.min(...knownYears) : null;
+  const lastStart = selectedYear || newestYear === null ? 0
+    : Math.max(0, newestYear - oldestYear - (COHORT_WINDOW_SIZE - 1));
+  const visibleCohorts = selectedYear ? [selectedYear] : newestYear === null ? []
+    : Array.from({ length: COHORT_WINDOW_SIZE }, (_, index) => String(newestYear - windowStart - index));
+
+  if (visibleCohorts.length === 0) {
+    return <Notice>Chưa có khóa / năm học dạng năm hợp lệ để hiển thị ma trận.</Notice>;
+  }
+
   // Extract distinct subjects
   const subjectsMap = new Map();
   for (const offering of offerings) {
@@ -442,103 +420,122 @@ function PivotMatrixView({ offerings, cohorts, canEdit, threeColumns, onSelectOf
   const subjects = [...subjectsMap.values()].sort((a, b) =>
     (a.code || "").localeCompare(b.code || "", "vi")
   );
-  const cohortMinWidth = threeColumns ? 570 : 205;
-  const pivotMinWidth = 260 + 48 + (cohorts.length * cohortMinWidth);
+  const pivotMinWidth = 240 + 48 + (visibleCohorts.length * 210);
+  const pivotMaxWidth = 240 + 48 + (visibleCohorts.length * 320);
 
   return (
-    <div className="sl-matrix-pivot-wrap">
-      <table className="sl-matrix-pivot-table" style={{ minWidth: `${pivotMinWidth}px` }}>
-        <colgroup>
-          <col className="sl-pivot-subj-track" />
-          <col className="sl-pivot-credits-track" />
-          {cohorts.map((cohort) => (
-            <col key={cohort} />
-          ))}
-        </colgroup>
-        <thead>
-          <tr>
-            <th className="sl-pivot-subj-col">HỌC PHẦN</th>
-            <th className="sl-pivot-credits-col">TC</th>
-            {cohorts.map((cohort) => (
-              <th key={cohort} className={`sl-pivot-cohort-col ${threeColumns ? "sl-pivot-cohort-col-wide" : ""}`}>
-                KHÓA {cohort}
-              </th>
+    <div className="sl-matrix-pivot" style={selectedYear ? { maxWidth: `${pivotMaxWidth}px` } : undefined}>
+      {lastStart > 0 && (
+        <div className="sl-matrix-cohort-window" role="group" aria-label="Chuyển khoảng khóa">
+          {windowStart > 0 && (
+            <button type="button" aria-label="Xem khóa mới hơn"
+              onClick={() => setWindowStart((start) => Math.max(0, start - 1))}>‹</button>
+          )}
+          <span aria-live="polite">Khóa {visibleCohorts[0]} – {visibleCohorts[visibleCohorts.length - 1]}</span>
+          {windowStart < lastStart && (
+            <button type="button" aria-label="Xem khóa cũ hơn"
+              onClick={() => setWindowStart((start) => Math.min(lastStart, start + 1))}>›</button>
+          )}
+        </div>
+      )}
+      <div className="sl-matrix-pivot-wrap">
+        <table className="sl-matrix-pivot-table" aria-label="Ma trận học phần theo khóa" style={{ minWidth: `${pivotMinWidth}px` }}>
+          <colgroup>
+            <col className="sl-pivot-subj-track" />
+            <col className="sl-pivot-credits-track" />
+            {visibleCohorts.map((cohort) => (
+              <col key={cohort} />
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          {subjects.map((subject) => (
-            <tr key={subject.id}>
-              <td className="sl-pivot-subj-cell">
-                <div className="sl-pivot-subject-code">
-                  <strong>{subject.code}</strong>
-                  {(subject.subjectType === "KC" || subject.allowCrossMajor) && (
-                    <span className="sl-matrix-cross-tag sl-matrix-common-tag">
-                      Môn chung
-                    </span>
-                  )}
-                </div>
-                <span>{subject.name}</span>
-              </td>
-              <td className="sl-pivot-credits-cell">
-                {subject.credits ?? subject.creditCount ?? 3}
-              </td>
-              {cohorts.map((cohort) => {
-                const cellOfferings = offerings.filter(
-                  (o) =>
-                    o.subjectId === subject.id &&
-                    groupsOf(o).some((g) => g.academicYear === cohort)
-                );
-                return (
-                  <td key={cohort} className="sl-pivot-cell">
-                    {cellOfferings.length === 0 ? (
-                      <span className="sl-pivot-empty">—</span>
-                    ) : (
-                      <div className={`sl-pivot-cell-offerings ${threeColumns ? "sl-pivot-cell-offerings-three" : ""}`}>
-                        {cellOfferings.map((offering) => {
-                          const summary = offering.sessionSummary || {};
-                          const total = summary.totalCount || 0;
-                          return (
-                            <div key={offering.id} className="sl-pivot-mini-card">
-                              <button
-                                type="button"
-                                className="sl-pivot-card-detail-trigger"
-                                onClick={() => onViewDetails(offering)}
-                                aria-label={`Xem chi tiết ${offeringTitle(offering)}`}
-                                title="Bấm để xem chi tiết"
-                              />
-                              <strong className="sl-pivot-card-title">
-                                {offeringTitle(offering)}
-                              </strong>
-                              <div className="sl-pivot-card-stats">
-                                <span className={total ? "has-sessions" : "no-sessions"}>
-                                  {total ? `${total} buổi` : "Chưa có lịch"}
-                                </span>
-                                {canEdit && offering.status === "active" && (
-                                  <button
-                                    type="button"
-                                    className="sl-pivot-schedule-btn"
-                                    onClick={() => onSelectOffering(offering.id)}
-                                  >
-                                    {total ? "Xếp thêm →" : "Xếp lịch →"}
-                                  </button>
-                                )}
-                                {offering.status === "completed" && (
-                                  <span className="sl-pivot-completed-label">Đã hoàn thành</span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </td>
-                );
-              })}
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col" className="sl-pivot-subj-col">HỌC PHẦN</th>
+              <th scope="col" className="sl-pivot-credits-col">TC</th>
+              {visibleCohorts.map((cohort) => (
+                <th scope="col" key={cohort} className="sl-pivot-cohort-col">
+                  KHÓA {cohort}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {subjects.length === 0 && (
+              <tr><td colSpan={visibleCohorts.length + 2}>
+                <Notice>Không tìm thấy lớp học phần phù hợp với bộ lọc hiện tại.</Notice>
+              </td></tr>
+            )}
+            {subjects.map((subject) => (
+              <tr key={subject.id}>
+                <td className="sl-pivot-subj-cell">
+                  <div className="sl-pivot-subject-code">
+                    <strong>{subject.code}</strong>
+                    {(subject.subjectType === "KC" || subject.allowCrossMajor) && (
+                      <span className="sl-matrix-common-tag">
+                        Môn chung
+                      </span>
+                    )}
+                  </div>
+                  <span>{subject.name}</span>
+                </td>
+                <td className="sl-pivot-credits-cell">
+                  {subject.credits ?? subject.creditCount ?? 3}
+                </td>
+                {visibleCohorts.map((cohort) => {
+                  const cellOfferings = offerings.filter(
+                    (o) =>
+                      o.subjectId === subject.id &&
+                      groupsOf(o).some((g) => g.academicYear === cohort)
+                  );
+                  return (
+                    <td key={cohort} className="sl-pivot-cell">
+                      {cellOfferings.length === 0 ? (
+                        <span className="sl-pivot-empty">—</span>
+                      ) : (
+                        <div className="sl-pivot-cell-offerings">
+                          {cellOfferings.map((offering) => {
+                            const summary = offering.sessionSummary || {};
+                            const total = summary.totalCount || 0;
+                            const groups = groupsOf(offering);
+                            const linkedCohorts = unique(groups.map((group) => group.academicYear).filter(Boolean));
+                            return (
+                              <div key={offering.id} className="sl-pivot-mini-card">
+                                <button
+                                  type="button"
+                                  className="sl-pivot-card-detail-trigger"
+                                  onClick={() => onViewDetails(offering)}
+                                  aria-label={`Xem chi tiết ${offeringTitle(offering)}`}
+                                  title="Bấm để xem chi tiết"
+                                />
+                                <strong className="sl-pivot-card-title" title={offeringTitle(offering)}>
+                                  {offeringTitle(offering)}
+                                </strong>
+                                <span className="sl-pivot-card-meta">{groups.length} lớp/nhóm · {offering.participantCount ?? 0} HV</span>
+                                <CrossCohortBadge cohorts={linkedCohorts} />
+                                <div className="sl-pivot-card-stats">
+                                  <OfferingStatus offering={offering} />
+                                  {canEdit && offering.status === "active" && (
+                                    <button
+                                      type="button"
+                                      className="sl-pivot-schedule-btn sl-matrix-schedule-link"
+                                      onClick={() => onSelectOffering(offering.id)}
+                                    >
+                                      {total ? "Xếp thêm →" : "Xếp lịch →"}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

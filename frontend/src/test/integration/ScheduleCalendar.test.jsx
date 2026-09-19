@@ -33,6 +33,26 @@ it("shows the seven-day calendar and selects a persisted offering for scheduling
   fireEvent.click(currentWeekButton);
   expect(currentWeekButton).toBeDisabled();
 });
+it("shows all pending confirmations independently of the displayed week and sorts oldest first", async () => {
+  const pendingSessions = [
+    { id: "newer", sessionDate: "2026-09-12", endTime: "12:00:00", period: "MORNING", courseOffering: { ...offering, name: "Lớp mới hơn" }, lecturer: { name: "Giảng viên B" }, room: { code: "P.202" } },
+    { id: "older", sessionDate: "2026-09-02", endTime: "17:00:00", period: "AFTERNOON", courseOffering: { ...offering, name: "Lớp cũ hơn" }, lecturer: { name: "Giảng viên A" }, room: { code: "P.201" } },
+  ];
+  axios.get.mockImplementation(async (url) => ({ data: url.includes("/course-offerings?") ? [offering] : url.includes("/pending-teaching-sessions") ? pendingSessions : [] }));
+
+  render(<MemoryRouter><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole("button", { name: "2 chờ xác nhận" }));
+
+  const dialog = screen.getByRole("dialog", { name: "BUỔI CHỜ XÁC NHẬN · 2" });
+  const cards = within(dialog).getAllByRole("article");
+  expect(cards[0]).toHaveTextContent("02/09/2026");
+  expect(cards[0]).toHaveTextContent("Lớp cũ hơn");
+  expect(cards[1]).toHaveTextContent("12/09/2026");
+  expect(cards[1]).toHaveTextContent("Lớp mới hơn");
+  expect(within(dialog).getAllByRole("button", { name: "Không diễn ra" })).toHaveLength(2);
+  expect(within(dialog).getAllByRole("button", { name: "✓ Đã diễn ra" })).toHaveLength(2);
+  expect(axios.get).toHaveBeenCalledWith("/api/scheduling/pending-teaching-sessions", { withCredentials: true });
+});
 it("loads institute availability and excludes busy and undersized rooms before saving", async () => {
   const saved = jest.fn();
   render(<SessionEditor offering={offering} date="2099-01-05" period="MORNING" user={{ canManageScheduling: true }} onClose={jest.fn()} onSaved={saved} />);
