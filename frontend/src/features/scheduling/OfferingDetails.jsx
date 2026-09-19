@@ -45,9 +45,9 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
   });
 
   const statCards = [
-    { key: "held", count: summary.heldCount || 0, label: "Đã diễn ra", color: "#1b8754" },
-    { key: "pending", count: summary.pendingCount || 0, label: "Chờ xác nhận", color: "#c57a00" },
-    { key: "future", count: summary.futurePlannedCount || 0, label: "Đã xếp sắp tới", color: "#0d6efd" },
+    { key: "held", count: summary.heldCount || 0, label: "Đã diễn ra" },
+    { key: "pending", count: summary.pendingCount || 0, label: "Chờ xác nhận" },
+    { key: "future", count: summary.futurePlannedCount || 0, label: "Đã xếp sắp tới" },
   ];
 
   const mutate = async (action, done) => {
@@ -78,7 +78,7 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setSessionFilter((prev) => (prev === item.key ? "all" : item.key)); }}
               title={`Bấm để lọc các buổi ${item.label.toLowerCase()}`}
             >
-              <strong style={{ color: isActive ? item.color : undefined }}>{item.count}</strong>
+              <strong>{item.count}</strong>
               <span>{item.label}</span>
             </div>
           );
@@ -86,11 +86,11 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
       </div>
 
       {/* Danh sách lịch học đã xếp */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "24px 0 10px", flexWrap: "wrap", gap: 8 }}>
-        <h3 className="sl-offering-groups-title" style={{ margin: 0 }}>
+      <div className="sl-offering-schedule-head">
+        <h3 className="sl-offering-groups-title">
           LỊCH HỌC ĐÃ XẾP {allSessions.length > 0 && `(${allSessions.length} buổi)`}
         </h3>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        <div className="sl-offering-filters">
           <button
             type="button"
             className={`sl-filter-chip ${sessionFilter === "all" ? "active" : ""}`}
@@ -127,22 +127,22 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
       ) : sessions.error ? (
         <Notice error={sessions.error} />
       ) : filteredSessions.length === 0 ? (
-        <div style={{ padding: "18px", textAlign: "center", background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: 6, color: "#64748b" }}>
+        <div className="sl-offering-empty">
           {allSessions.length === 0 ? (
             <>
-              <p style={{ margin: "0 0 10px 0", fontSize: "14px" }}>Chưa có buổi học nào được xếp lịch cho lớp học phần này.</p>
+              <p>Chưa có buổi học nào được xếp lịch cho lớp học phần này.</p>
               {canManage && value.status === "active" && onSelect && (
-                <button type="button" className="sl-btn sl-btn-primary" style={{ padding: "6px 16px", fontSize: "13px" }} onClick={() => onSelect(value)}>
+                <button type="button" className="sl-btn sl-btn-primary sl-offering-empty-action" onClick={() => onSelect(value)}>
                   🗓️ Xếp lịch ngay
                 </button>
               )}
             </>
           ) : (
-            <p style={{ margin: 0, fontSize: "13px" }}>Không có buổi học nào phù hợp với bộ lọc hiện tại.</p>
+            <p>Không có buổi học nào phù hợp với bộ lọc hiện tại.</p>
           )}
         </div>
       ) : (
-        <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid #d5dfe6", borderRadius: 4, background: "#fff" }}>
+        <div className="sl-offering-sessions-wrap">
           <table className="v20-table sl-sessions-table">
             <thead>
               <tr>

@@ -182,6 +182,7 @@ export class SchedulingService {
         const status = completed ? "completed" : heldSessionCount > 0 ? "in_progress" : plannedSessionCount > 0 ? "scheduled" : "not_started";
         return {
           curriculumSubjectId: entry.id,
+          credits: entry.credits,
           code: entry.subject?.code || "",
           name: entry.subject?.name || "",
           status,

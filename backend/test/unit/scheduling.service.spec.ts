@@ -755,7 +755,7 @@ describe("SchedulingService persisted reads", () => {
     classGroups.findAll.mockResolvedValue([selectedGroup]);
     packages.findAll.mockResolvedValue([
       { id: "entry-1", curriculumId: selectedGroup.curriculumId, subjectId: subject.id, subject, isRequired: true, credits: 3, sortOrder: 1, block: { id: "block", code: "CS", name: "Cơ sở", sortOrder: 1 } },
-      { id: "entry-2", curriculumId: selectedGroup.curriculumId, subjectId: secondSubject.id, subject: secondSubject, isRequired: true, credits: 3, sortOrder: 2, block: { id: "block", code: "CS", name: "Cơ sở", sortOrder: 1 } },
+      { id: "entry-2", curriculumId: selectedGroup.curriculumId, subjectId: secondSubject.id, subject: secondSubject, isRequired: true, credits: 2, sortOrder: 2, block: { id: "block", code: "CS", name: "Cơ sở", sortOrder: 1 } },
     ]);
     classGroupElectives.findAll.mockResolvedValue([]);
     offeringGroups.findAll.mockResolvedValue([{ classGroupId: selectedGroup.id, courseOfferingId: offering.id }]);
@@ -763,6 +763,8 @@ describe("SchedulingService persisted reads", () => {
     teachingSessions.findAll.mockResolvedValue([session]);
 
     const result: any = await service.getClassCurriculumProgress({ majorId: "major-1", academicYear: "2027" });
+    // The curriculum entry can override the catalog subject's credits (3).
+    expect(result.classes[0].subjects.map((row: any) => row.credits)).toEqual([3, 2]);
 
     expect(result.classes[0]).toEqual(expect.objectContaining({
       code: "CNT2027.01",
