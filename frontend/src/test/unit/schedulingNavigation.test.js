@@ -1,11 +1,29 @@
-// Decorative icons are not under test; keep real Ribbon buttons and routing.
-jest.mock("@mui/icons-material", () => new Proxy({}, { get: () => () => null }));
-
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import RibbonHeader, { isRibbonRouteActive, ribbons } from "../../components/RibbonHeader";
 
+// Decorative icons are not under test; keep real Ribbon buttons and routing.
+jest.mock("@mui/icons-material", () => new Proxy({}, { get: () => () => null }));
+
 describe("Masters scheduling ribbon", () => {
+  it("keeps section navigation outside the collapsible action rail and supports action focus", async () => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ message: "admin" }) });
+    try {
+      render(<MemoryRouter initialEntries={["/masters/class-course-history"]}><RibbonHeader /></MemoryRouter>);
+      const sectionNavigation = await screen.findByRole("navigation", { name: "Nhóm chức năng" });
+      const actionRail = screen.getByRole("region", { name: "Tác vụ chức năng" });
+      const action = within(actionRail).getByRole("button", { name: "Thống kê tiến độ" });
+
+      expect(sectionNavigation).not.toContainElement(actionRail);
+      expect(actionRail).toContainElement(action);
+      action.focus();
+      expect(action).toHaveFocus();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
   it("moves both scheduling actions into the learning-process group without changing routes", () => {
     const entryGroup = ribbons.masters.find((section) => section.label === "THỦ TỤC ĐẦU VÀO");
     const learningGroup = ribbons.masters.find((section) => section.label === "QUÁ TRÌNH HỌC TẬP");
@@ -43,22 +61,22 @@ describe("Masters scheduling ribbon", () => {
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ message: "admin" }) });
     try {
-      await act(async () => { render(<MemoryRouter initialEntries={[path]}><RibbonHeader /></MemoryRouter>); });
-      const active = screen.getByRole("button", { name: activeLabel });
+      render(<MemoryRouter initialEntries={[path]}><RibbonHeader /></MemoryRouter>);
+      const active = await screen.findByRole("button", { name: activeLabel });
       const other = screen.getByRole("button", { name: otherLabel });
       expect(active).toHaveAttribute("aria-current", "page");
       expect(active).toHaveClass("active");
       expect(other).not.toHaveAttribute("aria-current");
       expect(other).not.toHaveClass("active");
-      await act(async () => { fireEvent.click(other); });
+      fireEvent.click(other);
       expect(other).toHaveAttribute("aria-current", "page");
       expect(other).toHaveClass("active");
       expect(active).not.toHaveAttribute("aria-current");
-      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tạo nhóm học phần" })); });
+      fireEvent.click(screen.getByRole("button", { name: "Tạo nhóm học viên" }));
       expect(active).not.toHaveAttribute("aria-current");
       expect(other).not.toHaveAttribute("aria-current");
-      expect(screen.getByRole("button", { name: "Tạo nhóm học phần" })).toHaveClass("active");
-      expect(screen.getByRole("button", { name: "Tạo nhóm học phần" })).toHaveAttribute("aria-current", "page");
+      expect(screen.getByRole("button", { name: "Tạo nhóm học viên" })).toHaveClass("active");
+      expect(screen.getByRole("button", { name: "Tạo nhóm học viên" })).toHaveAttribute("aria-current", "page");
     } finally {
       global.fetch = originalFetch;
     }

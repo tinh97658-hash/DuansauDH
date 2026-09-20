@@ -6,6 +6,7 @@ import Schedule from "../../pages/masters/schedule";
 import ScheduleView from "../../features/scheduling/Schedule";
 import SessionEditor from "../../features/scheduling/SessionEditor";
 import OfferingDetails from "../../features/scheduling/OfferingDetails";
+import { addDays, formatDateKey, getBusinessTodayKey, mondayOf, vietnameseDate } from "../../utils/schedulingCalendar";
 
 jest.mock("axios");
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
@@ -32,6 +33,172 @@ it("shows the seven-day calendar and selects a persisted offering for scheduling
   expect(currentWeekButton).toBeEnabled();
   fireEvent.click(currentWeekButton);
   expect(currentWeekButton).toBeDisabled();
+});
+it("collapses the work-scope sidebar without clearing its filters and restores the controls", async () => {
+  render(<MemoryRouter><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>);
+  const major = await screen.findByLabelText("Chuyên ngành");
+  const search = screen.getByLabelText("Tìm môn / lớp");
+  fireEvent.change(search, { target: { value: "Khai thác" } });
+
+  const collapse = screen.getByRole("button", { name: "Thu gọn phạm vi làm việc" });
+  const workspace = screen.getByRole("region", { name: "Không gian xếp lịch" });
+  const sidebar = screen.getByRole("complementary");
+  fireEvent.click(collapse);
+  expect(workspace).toHaveClass("sl-sidebar-collapsed");
+  expect(sidebar).toHaveAttribute("data-collapsed", "true");
+  expect(screen.getByRole("button", { name: "Mở phạm vi làm việc" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Mở phạm vi làm việc" })).toHaveAttribute("aria-expanded", "false");
+
+  fireEvent.click(screen.getByRole("button", { name: "Mở phạm vi làm việc" }));
+  expect(workspace).not.toHaveClass("sl-sidebar-collapsed");
+  expect(sidebar).toHaveAttribute("data-collapsed", "false");
+  expect(major).toBeInTheDocument();
+  expect(search).toHaveValue("Khai thác");
+  expect(axios.get.mock.calls.filter(([url]) => url.includes("/course-offerings?"))).toHaveLength(1);
+});
+it("keeps Day Focus and its weekday while navigating weeks until the explicit week-view action", async () => {
+  const currentMonday = mondayOf(getBusinessTodayKey());
+  const fridayDate = formatDateKey(addDays(currentMonday, 4));
+  const originalFocus = `Lịch ngày ${vietnameseDate(fridayDate)}`;
+  const nextFridayFocus = `Lịch ngày ${vietnameseDate(formatDateKey(addDays(currentMonday, 11)))}`;
+  const futureFridayDate = formatDateKey(addDays(currentMonday, 18));
+  const futureFridayFocus = `Lịch ngày ${vietnameseDate(futureFridayDate)}`;
+  render(<MemoryRouter><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>);
+  await screen.findByRole("table", { name: "Lịch học theo tuần" });
+
+  const friday = screen.getAllByRole("button", { name: /Xem lịch .*: 0 lớp/ })[4];
+  fireEvent.click(friday);
+  expect(screen.getByRole("region", { name: originalFocus })).toBeInTheDocument();
+  expect(screen.getByText(/^T6 · .* · 0 lớp$/)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Tuần sau" }));
+  await screen.findByRole("region", { name: nextFridayFocus });
+  expect(screen.getByText(/^T6 · .* · 0 lớp$/)).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "SÁNG · 0 lớp" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "CHIỀU · 0 lớp" })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Tuần trước" }));
+  await waitFor(() => expect(screen.getByRole("region", { name: originalFocus })).toBeInTheDocument());
+
+  fireEvent.click(screen.getByRole("button", { name: "Tuần trước" }));
+  fireEvent.click(screen.getByRole("button", { name: "Tuần này" }));
+  await waitFor(() => expect(screen.getByRole("region", { name: originalFocus })).toBeInTheDocument());
+  expect(screen.getByText(/^T6 · .* · 0 lớp$/)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Tuần sau" }));
+  await screen.findByRole("region", { name: nextFridayFocus });
+  fireEvent.click(screen.getByRole("button", { name: "Tuần sau" }));
+  await screen.findByRole("region", { name: futureFridayFocus });
+  fireEvent.click(screen.getByRole("button", { name: "← Tuần" }));
+
+  expect(screen.getByRole("table", { name: "Lịch học theo tuần" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: `Xem lịch ${vietnameseDate(futureFridayDate)}: 0 lớp` })).toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: /Lịch ngày/ })).not.toBeInTheDocument();
+});
+it("summarizes a busy day in the week and exposes every session in day focus", async () => {
+  let busyDate = "";
+  axios.get.mockImplementation(async (url) => {
+    if (url.includes("/course-offerings?")) return { data: [offering] };
+    if (url.includes("/teaching-sessions?")) {
+      const query = new URLSearchParams(url.split("?")[1]);
+      if (query.get("from") === query.get("to")) return { data: [] };
+      busyDate = query.get("from");
+      const makeSession = (index, period) => ({
+        id: `busy-${index}`,
+        courseOfferingId: offering.id,
+        courseOffering: { ...offering, name: index === 1 ? "Lớp buổi 1 với tên rất dài cần được rút gọn nhưng vẫn truy cập đầy đủ" : `Lớp buổi ${index}` },
+        sessionDate: busyDate,
+        period,
+        status: index === 1 || index === 6 ? "held" : index === 2 || index === 7 ? "not_held" : "planned",
+        startTime: period === "MORNING" ? "08:00:00" : "13:00:00",
+        endTime: period === "MORNING" ? "11:00:00" : "17:00:00",
+        lecturer: lecturers[0],
+        room: rooms[0],
+      });
+      return { data: [
+        ...Array.from({ length: 5 }, (_, index) => makeSession(index + 1, "MORNING")),
+        ...Array.from({ length: 2 }, (_, index) => makeSession(index + 6, "AFTERNOON")),
+      ] };
+    }
+    return { data: [] };
+  });
+
+  render(<MemoryRouter><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>);
+  fireEvent.click(screen.getByRole("button", { name: "Tuần trước" }));
+  const busyDay = await screen.findByRole("button", { name: /Xem lịch .*: 7 lớp/ });
+  expect(screen.getByRole("button", { name: /Xem thêm 2 lớp ngày/ })).toHaveTextContent("+2 lớp");
+  expect(screen.getAllByRole("button", { name: /Lớp buổi/ })).toHaveLength(5);
+  expect(screen.queryByText(/08:00|11:00|13:00|17:00/)).not.toBeInTheDocument();
+
+  fireEvent.click(busyDay);
+  const focus = screen.getByRole("region", { name: /Lịch ngày/ });
+  const morning = within(focus).getByRole("region", { name: "SÁNG · 5 lớp" });
+  const afternoon = within(focus).getByRole("region", { name: "CHIỀU · 2 lớp" });
+  expect(within(morning).getByRole("region", { name: "ĐÃ XẾP · 3 lớp" })).toHaveTextContent("3");
+  expect(within(morning).getByRole("region", { name: "ĐÃ DIỄN RA · 1 lớp" })).toHaveTextContent("1");
+  expect(within(morning).getByRole("region", { name: "KHÔNG DIỄN RA · 1 lớp" })).toHaveTextContent("1");
+  expect(within(afternoon).getByRole("region", { name: "ĐÃ XẾP · 0 lớp" })).toHaveTextContent("0");
+  expect(within(afternoon).getByRole("region", { name: "ĐÃ DIỄN RA · 1 lớp" })).toHaveTextContent("1");
+  expect(within(afternoon).getByRole("region", { name: "KHÔNG DIỄN RA · 1 lớp" })).toHaveTextContent("1");
+  expect(within(focus).getAllByRole("button", { name: /Lớp buổi/ })).toHaveLength(7);
+  expect(within(focus).queryByRole("region", { name: /CHỜ XÁC NHẬN/ })).not.toBeInTheDocument();
+  const longLabelCard = within(focus).getByRole("button", { name: /Lớp buổi 1 với tên rất dài/ });
+  const longLabel = within(focus).getByTitle("Lớp buổi 1 với tên rất dài cần được rút gọn nhưng vẫn truy cập đầy đủ");
+  expect(longLabel).toHaveTextContent("Lớp buổi 1 với tên rất dài cần được rút gọn nhưng vẫn truy cập đầy đủ");
+  expect(longLabelCard).toHaveClass("sl-focus-session");
+  expect(within(morning).getByRole("region", { name: "ĐÃ DIỄN RA · 1 lớp" })).toContainElement(longLabelCard);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+  fireEvent.click(within(focus).getByRole("button", { name: /Lớp buổi 7/ }));
+  expect(screen.getByRole("dialog")).toHaveTextContent("CHI TIẾT BUỔI HỌC");
+  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Đóng chi tiết buổi học" }));
+  fireEvent.click(screen.getByRole("button", { name: "← Tuần" }));
+  expect(screen.getByRole("table", { name: "Lịch học theo tuần" })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: new RegExp(`Xem lịch .*: 7 lớp`) }));
+  fireEvent.click(screen.getByRole("button", { name: "Tuần sau" }));
+  expect(await screen.findByRole("region", { name: /Lịch ngày/ })).toBeInTheDocument();
+  expect(screen.queryByRole("table", { name: "Lịch học theo tuần" })).not.toBeInTheDocument();
+  expect(busyDate).not.toBe("");
+});
+it("keeps future planned sessions in the primary scheduled lane", async () => {
+  let initialWeek = "";
+  axios.get.mockImplementation(async (url) => {
+    if (url.includes("/course-offerings?")) return { data: [offering] };
+    if (url.includes("/teaching-sessions?")) {
+      const query = new URLSearchParams(url.split("?")[1]);
+      if (query.get("from") === query.get("to")) return { data: [] };
+      if (!initialWeek) { initialWeek = query.get("from"); return { data: [] }; }
+      const date = query.get("from");
+      return { data: [{
+        id: "future-planned",
+        courseOfferingId: offering.id,
+        courseOffering: { ...offering, name: "Lớp tương lai" },
+        sessionDate: date,
+        period: "MORNING",
+        status: "planned",
+        startTime: "08:00:00",
+        endTime: "11:00:00",
+        lecturer: lecturers[0],
+        room: rooms[0],
+      }] };
+    }
+    return { data: [] };
+  });
+
+  render(<MemoryRouter><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>);
+  await screen.findByRole("table", { name: "Lịch học theo tuần" });
+  fireEvent.click(screen.getByRole("button", { name: "Tuần sau" }));
+  fireEvent.click(await screen.findByRole("button", { name: /Xem lịch .*: 1 lớp/ }));
+
+  const morning = screen.getByRole("region", { name: "SÁNG · 1 lớp" });
+  const planned = within(morning).getByRole("region", { name: "ĐÃ XẾP · 1 lớp" });
+  expect(within(planned).getByRole("button", { name: /Lớp tương lai/ })).toBeInTheDocument();
+  expect(within(morning).getByLabelText("Trạng thái SÁNG")).toBeInTheDocument();
+  expect(within(morning).getByRole("region", { name: "ĐÃ DIỄN RA · 0 lớp" })).toBeInTheDocument();
+  expect(within(morning).getByRole("region", { name: "KHÔNG DIỄN RA · 0 lớp" })).toBeInTheDocument();
+  expect(within(morning).queryByRole("region", { name: /CHỜ XÁC NHẬN/ })).not.toBeInTheDocument();
+  expect(within(morning).getAllByRole("button", { name: /Lớp tương lai/ })).toHaveLength(1);
 });
 it("shows all pending confirmations independently of the displayed week and sorts oldest first", async () => {
   const pendingSessions = [

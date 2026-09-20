@@ -2,7 +2,6 @@ import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CalendarMonthRounded,
-  CheckCircleOutlineRounded,
   GridViewRounded,
   LayersRounded,
   PendingActionsRounded,
@@ -67,7 +66,10 @@ export default function CourseMatrix({ user }) {
   const offerings = useLoad(async () => rows(await api.get("/scheduling/course-offerings?program=masters")), []);
   const majors = useLoad(async () => rows(await api.get("/system/majors?program=masters")), []);
 
-  const all = useMemo(() => offerings.data || [], [offerings.data]);
+  const all = useMemo(
+    () => (offerings.data || []).filter((offering) => offering.status !== "completed"),
+    [offerings.data]
+  );
 
   // Filter logic
   const filtered = useLoadOfferings(all, majorId, year, scheduleState, query);
@@ -82,15 +84,12 @@ export default function CourseMatrix({ user }) {
   const kpis = useMemo(() => {
     let unscheduled = 0;
     let scheduled = 0;
-    let completed = 0;
     let crossCohort = 0;
 
     for (const offering of filtered) {
       const cohorts = unique(groupsOf(offering).map((g) => g.academicYear).filter(Boolean));
       if (cohorts.length > 1) crossCohort++;
-      if (scheduleCategory(offering) === "completed") {
-        completed++;
-      } else if (scheduleCategory(offering) === "unscheduled") {
+      if (scheduleCategory(offering) === "unscheduled") {
         unscheduled++;
       } else {
         scheduled++;
@@ -100,7 +99,6 @@ export default function CourseMatrix({ user }) {
       total: filtered.length,
       unscheduled,
       scheduled,
-      completed,
       crossCohort,
     };
   }, [filtered]);
@@ -134,10 +132,6 @@ export default function CourseMatrix({ user }) {
         <div className="sl-matrix-kpi kpi-progress">
           <span className="sl-matrix-kpi-icon"><CalendarMonthRounded aria-hidden="true" /></span>
           <div><strong>{kpis.scheduled}</strong><span>ĐANG HỌC / ĐÃ XẾP LỊCH</span><small>Đã có buổi học</small></div>
-        </div>
-        <div className="sl-matrix-kpi kpi-complete">
-          <span className="sl-matrix-kpi-icon"><CheckCircleOutlineRounded aria-hidden="true" /></span>
-          <div><strong>{kpis.completed}</strong><span>ĐÃ HOÀN THÀNH</span><small>Đã kết thúc học phần</small></div>
         </div>
         <div className="sl-matrix-kpi kpi-cross">
           <span className="sl-matrix-kpi-icon"><GridViewRounded aria-hidden="true" /></span>
@@ -227,7 +221,6 @@ export default function CourseMatrix({ user }) {
               <option value="all">Tất cả tình trạng</option>
               <option value="scheduled">Đã xếp lịch</option>
               <option value="unscheduled">Chưa xếp lịch</option>
-              <option value="completed">Đã hoàn thành</option>
             </select>
           </div>
         </div>
@@ -420,11 +413,10 @@ function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, onSelectOf
   const subjects = [...subjectsMap.values()].sort((a, b) =>
     (a.code || "").localeCompare(b.code || "", "vi")
   );
-  const pivotMinWidth = 240 + 48 + (visibleCohorts.length * 210);
-  const pivotMaxWidth = 240 + 48 + (visibleCohorts.length * 320);
+  const pivotMinWidth = 240 + 48 + (selectedYear ? 660 : visibleCohorts.length * 210);
 
   return (
-    <div className="sl-matrix-pivot" style={selectedYear ? { maxWidth: `${pivotMaxWidth}px` } : undefined}>
+    <div className="sl-matrix-pivot">
       {lastStart > 0 && (
         <div className="sl-matrix-cohort-window" role="group" aria-label="Chuyển khoảng khóa">
           {windowStart > 0 && (
@@ -439,7 +431,7 @@ function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, onSelectOf
         </div>
       )}
       <div className="sl-matrix-pivot-wrap">
-        <table className="sl-matrix-pivot-table" aria-label="Ma trận học phần theo khóa" style={{ minWidth: `${pivotMinWidth}px` }}>
+        <table className={`sl-matrix-pivot-table ${selectedYear ? "sl-matrix-pivot-table-selected-year" : ""}`} aria-label="Ma trận học phần theo khóa" style={{ minWidth: `${pivotMinWidth}px` }}>
           <colgroup>
             <col className="sl-pivot-subj-track" />
             <col className="sl-pivot-credits-track" />
@@ -497,8 +489,17 @@ function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, onSelectOf
                             const total = summary.totalCount || 0;
                             const groups = groupsOf(offering);
                             const linkedCohorts = unique(groups.map((group) => group.academicYear).filter(Boolean));
+                            const linkedGroupLabel = groups
+                              .map((group) => group.code || group.name)
+                              .filter(Boolean)
+                              .join(" · ");
                             return (
-                              <div key={offering.id} className="sl-pivot-mini-card">
+                              <div
+                                key={offering.id}
+                                className={`sl-pivot-mini-card ${selectedYear ? "sl-pivot-mini-card-wide" : ""}`}
+                                role={selectedYear ? "group" : undefined}
+                                aria-label={selectedYear ? `Bản ghi ${offeringTitle(offering)}` : undefined}
+                              >
                                 <button
                                   type="button"
                                   className="sl-pivot-card-detail-trigger"
@@ -509,6 +510,11 @@ function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, onSelectOf
                                 <strong className="sl-pivot-card-title" title={offeringTitle(offering)}>
                                   {offeringTitle(offering)}
                                 </strong>
+                                {selectedYear && (
+                                  <span className="sl-pivot-card-groups" title={linkedGroupLabel || "Chưa có lớp/nhóm"}>
+                                    {linkedGroupLabel || "Chưa có lớp/nhóm"}
+                                  </span>
+                                )}
                                 <span className="sl-pivot-card-meta">{groups.length} lớp/nhóm · {offering.participantCount ?? 0} HV</span>
                                 <CrossCohortBadge cohorts={linkedCohorts} />
                                 <div className="sl-pivot-card-stats">

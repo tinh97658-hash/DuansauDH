@@ -214,7 +214,7 @@ export default function CreateOffering({ user }) {
             {groups.error && <Notice error={groups.error} />}
           </div>
         </div>
-        {majorId && !groups.loading && !groups.error && !years.length && <Notice>Chưa có nhóm cho chuyên ngành này. <Link to="/masters/create-class-groups">Tạo nhóm học phần</Link></Notice>}
+        {majorId && !groups.loading && !groups.error && !years.length && <Notice>Chưa có nhóm cho chuyên ngành này. <Link to="/masters/create-class-groups">Tạo nhóm học viên</Link></Notice>}
       </div>
       <div className="sl-worklist">
         <div className="sl-create-subject-title"><div className="v20-scope-step"><b>3</b>HỌC PHẦN CÒN CẦN TỔ CHỨC</div><span>{filteredSubjects.length}</span></div>

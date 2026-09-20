@@ -17,18 +17,21 @@ const FeatureLayout = ({
   hideHeader = true,
   workspaceMode = false,
 }) => (
-  <Box data-feature-workspace={workspaceMode ? "true" : "false"} sx={{
+  <Box data-testid="feature-layout" data-feature-workspace={workspaceMode ? "true" : "false"} sx={{
     minHeight: "100vh", display: "flex", flexDirection: "column", bgcolor: "var(--canvas-bg, #F5F7F8)",
-    ...(workspaceMode ? { "@media (min-width:1200px)": { height: "100dvh", minHeight: 0, overflow: "hidden" } } : {}),
+    ...(workspaceMode ? { "@media (min-width:761px)": { height: "100dvh", minHeight: 0, overflow: "hidden" } } : {}),
   }}>
     <Box sx={{ flex: "none" }}>
       <ResponsiveAppBar />
     </Box>
     <Box
       component="main"
+      data-testid="feature-main"
+      data-feature-main="true"
       sx={{
-        flex: 1, p: "10px 16px 20px", width: "100%", maxWidth: fluid ? "100%" : (maxWidth || 1400), mx: "auto",
-        ...(workspaceMode ? { "@media (min-width:1200px)": { minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" } } : {}),
+        flex: 1, minHeight: 0, display: "flex", flexDirection: "column",
+        p: "10px 16px 20px", width: "100%", maxWidth: fluid ? "100%" : (maxWidth || 1400), mx: "auto",
+        ...(workspaceMode ? { "@media (min-width:761px)": { overflow: "hidden" } } : {}),
       }}
     >
       {!hideHeader && title && (
@@ -60,7 +63,7 @@ const FeatureLayout = ({
         </Box>
       )}
 
-      <Box sx={workspaceMode ? { flex: 1, minHeight: 0, "@media (max-width:1199.95px)": { flex: "initial" } } : undefined}>
+      <Box data-testid="feature-content" data-feature-content="true" sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         {children || (
           <Card variant="outlined" sx={{ borderRadius: "4px", borderColor: "#DFE4E8", bgcolor: "#FFFFFF", p: 3 }}>
             <Typography variant="body2" sx={{ color: "var(--text-secondary, #607486)", textAlign: "center" }}>

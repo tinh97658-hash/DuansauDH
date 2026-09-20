@@ -246,7 +246,7 @@ const AssignClassGroups = () => {
 
   return (
     <FeatureLayout
-      title="Phân nhóm học phần Thạc sĩ"
+      title="Phân nhóm học viên Thạc sĩ"
       group="Thủ tục đầu vào"
       desc="Phân bổ và sắp xếp học viên Thạc sĩ vào các nhóm học phần theo chuyên ngành."
     >
@@ -513,7 +513,7 @@ const AssignClassGroups = () => {
               </Box>
             ) : (
               <Alert severity="info" sx={{ mb: 2 }}>
-                Vui lòng chọn hoặc tạo một nhóm học phần ở trang "Tạo nhóm học phần" để bắt đầu phân học viên.
+                Vui lòng chọn hoặc tạo một nhóm học viên ở trang "Tạo nhóm học viên" để bắt đầu phân học viên.
               </Alert>
             )}
 

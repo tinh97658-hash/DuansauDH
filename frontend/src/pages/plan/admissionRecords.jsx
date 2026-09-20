@@ -205,7 +205,7 @@ const AdmissionRecords = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formData, setFormData] = useState(createEmptyForm(String(currentYear)));
   const [isPrintOpen, setIsPrintOpen] = useState(false);
-  const [printRecord, setPrintRecord] = useState(null);
+  const [printRecord] = useState(null);
   const [deletingRecord, setDeletingRecord] = useState(null);
 
   const selectableMajors = useMemo(
@@ -443,12 +443,6 @@ const AdmissionRecords = () => {
     } catch (err) {
       toast.error(err.response?.data?.message || "Không thể xóa hồ sơ");
     }
-  };
-
-  // Open A4 Print View
-  const handleOpenPrint = (rec) => {
-    setPrintRecord(rec);
-    setIsPrintOpen(true);
   };
 
   const handleTriggerPrint = () => {
@@ -759,12 +753,6 @@ const AdmissionRecords = () => {
                         <Tooltip title="Xem chi tiết hồ sơ (Trang A4)">
                           <IconButton size="small" color="primary" onClick={() => navigate(`/plan/admission-records/${r.id}`)}>
                             <VisibilityRounded sx={{ fontSize: 17, color: "#0788B8" }} />
-                          </IconButton>
-                        </Tooltip>
-
-                        <Tooltip title="Xem & In Phiếu A4 chi tiết">
-                          <IconButton size="small" color="inherit" onClick={() => handleOpenPrint(r)}>
-                            <PrintRounded sx={{ fontSize: 17, color: "#607486" }} />
                           </IconButton>
                         </Tooltip>
 

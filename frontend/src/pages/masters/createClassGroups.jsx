@@ -220,7 +220,7 @@ const CreateClassGroups = () => {
 
   return (
     <FeatureLayout
-      title="Tạo nhóm học phần"
+      title="Tạo nhóm học viên"
       group="Thủ tục đầu vào"
       desc="Quản lý và mở các nhóm học phần cho học viên Thạc sĩ theo từng ngành học và khóa tuyển sinh."
     >

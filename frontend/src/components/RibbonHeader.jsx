@@ -70,8 +70,8 @@ export const ribbons = {
     group("THỦ TỤC ĐẦU VÀO", [
       action("Học bổ sung kiến thức", "/masters/bridge-course", AddTaskRounded, "#168bc2"),
       action("Điểm thi đầu vào thạc sĩ", "/masters/admission-scores", ScoreboardRounded, "#c0792a"),
-      action("Tạo nhóm học phần", "/masters/create-class-groups", GroupAddRounded, "#168b7c"),
-      action("Phân nhóm học phần", "/masters/assign-class-groups", GroupWorkRounded, "#81952c"),
+      action("Tạo nhóm học viên", "/masters/create-class-groups", GroupAddRounded, "#168b7c"),
+      action("Phân nhóm học viên", "/masters/assign-class-groups", GroupWorkRounded, "#81952c"),
       action("Thống kê tiến độ", "/masters/class-course-history", HistoryEduRounded, "#a04f86"),
     ]),
     group("QUÁ TRÌNH HỌC TẬP", [
@@ -172,7 +172,7 @@ const RibbonHeader = () => {
       <nav className="ribbon-tabs" aria-label="Nhóm chức năng">
         {tabs.map(([id, label]) => <button key={id} type="button" className={activeTab === id ? "active" : ""} onClick={() => setActiveTab(id)}>{label}</button>)}
       </nav>
-      <div className="ribbon-command-scroll"><div className="ribbon-commands">
+      <div className="ribbon-command-scroll" role="region" aria-label="Tác vụ chức năng"><div className="ribbon-commands">
         {ribbons[activeTab].map((itemGroup) => {
           const visibleActions = itemGroup.actions.filter((item) => !item.roles || item.roles.includes(role));
           if (!visibleActions.length) return null;

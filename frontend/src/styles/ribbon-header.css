@@ -286,6 +286,53 @@
   white-space: nowrap;
 }
 
+/* Desktop action rail: section tabs stay visible while actions yield page height. */
+@media (min-width: 761px) and (hover: hover) and (pointer: fine) {
+  .ribbon-command-scroll {
+    position: relative;
+    height: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    transition: height 0.16s ease;
+  }
+
+  .ribbon-command-scroll::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 50%;
+    width: 42px;
+    height: 3px;
+    border-top: 1px solid #AEBCC8;
+    border-bottom: 1px solid #D5DEE6;
+    transform: translateX(-50%);
+    pointer-events: none;
+    transition: opacity 0.1s ease;
+  }
+
+  .ribbon-command-scroll .ribbon-commands {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.1s ease;
+  }
+
+  .ribbon-command-scroll:hover,
+  .ribbon-command-scroll:focus-within {
+    height: 87px;
+  }
+
+  .ribbon-command-scroll:hover::after,
+  .ribbon-command-scroll:focus-within::after {
+    opacity: 0;
+  }
+
+  .ribbon-command-scroll:hover .ribbon-commands,
+  .ribbon-command-scroll:focus-within .ribbon-commands {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 @media (max-width: 760px) {
   .ribbon-titlebar {
     grid-template-columns: minmax(0, 1fr) auto;

@@ -6,17 +6,19 @@ jest.mock("../../components/footer", () => function FooterMock() { return <div d
 
 describe("FeatureLayout workspace mode", () => {
   it("keeps the existing document layout as the default", () => {
-    const { container } = render(<FeatureLayout title="Trang thường"><div>Nội dung</div></FeatureLayout>);
+    render(<FeatureLayout title="Trang thường"><div>Nội dung</div></FeatureLayout>);
 
-    expect(container.firstChild).toHaveAttribute("data-feature-workspace", "false");
+    expect(screen.getByTestId("feature-layout")).toHaveAttribute("data-feature-workspace", "false");
     expect(screen.getByTestId("navbar")).toBeInTheDocument();
     expect(screen.getByTestId("footer")).toBeInTheDocument();
+    expect(screen.getByTestId("feature-main")).toHaveAttribute("data-feature-main", "true");
+    expect(screen.getByTestId("feature-content")).toHaveAttribute("data-feature-content", "true");
   });
 
   it("removes the Footer only for an explicit workspace", () => {
-    const { container } = render(<FeatureLayout title="Workspace" workspaceMode><div>Nội dung</div></FeatureLayout>);
+    render(<FeatureLayout title="Workspace" workspaceMode><div>Nội dung</div></FeatureLayout>);
 
-    expect(container.firstChild).toHaveAttribute("data-feature-workspace", "true");
+    expect(screen.getByTestId("feature-layout")).toHaveAttribute("data-feature-workspace", "true");
     expect(screen.getByTestId("navbar")).toBeInTheDocument();
     expect(screen.queryByTestId("footer")).not.toBeInTheDocument();
   });

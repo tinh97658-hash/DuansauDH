@@ -46,8 +46,8 @@ const NAV_GROUPS = [
     items: [
       { label: "Học bổ sung kiến thức", path: "/masters/bridge-course", icon: AddTaskRounded },
       { label: "Điểm thi đầu vào thạc sĩ", path: "/masters/admission-scores", icon: ScoreboardRounded },
-      { label: "Tạo nhóm học phần", path: "/masters/create-class-groups", icon: GroupAddRounded },
-      { label: "Phân nhóm học phần", path: "/masters/assign-class-groups", icon: GroupWorkRounded },
+      { label: "Tạo nhóm học viên", path: "/masters/create-class-groups", icon: GroupAddRounded },
+      { label: "Phân nhóm học viên", path: "/masters/assign-class-groups", icon: GroupWorkRounded },
       { label: "Thống kê tiến độ", path: "/masters/class-course-history", icon: HistoryEduRounded },
       { label: "Tạo lớp học phần", path: "/masters/course-offerings", icon: NoteAddRounded },
       { label: "Xếp lịch", path: "/masters/schedule", icon: EventNoteRounded },
