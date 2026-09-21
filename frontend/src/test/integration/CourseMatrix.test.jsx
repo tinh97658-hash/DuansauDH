@@ -179,7 +179,7 @@ it("keeps empty cells, multiple offerings, and a repeated cross-cohort offering 
   expect(screen.getAllByText("GHÉP 2028 · 2027")).toHaveLength(2);
 });
 
-it("keeps a selected year as a real filter and expands its matrix column for multiple offerings", async () => {
+it("keeps a selected year as a real filter and presents its offerings in the single-year grid", async () => {
   const sharedSubject = "subject-selected-year";
   const active2026 = [
     offering({ id: "selected-first", cohort: "2026", subjectId: sharedSubject, subjectName: "Học phần năm đã chọn" }),
@@ -198,9 +198,9 @@ it("keeps a selected year as a real filter and expands its matrix column for mul
   expect(selectedYearMatrix).toHaveClass("sl-matrix-pivot-table-selected-year");
   expect(within(selectedYearMatrix).getByText(active2026[0].name)).toBeInTheDocument();
   expect(within(selectedYearMatrix).getByText(active2026[1].name)).toBeInTheDocument();
-  const wideRecords = within(selectedYearMatrix).getAllByRole("group", { name: /Bản ghi Lớp Học phần năm đã chọn/ });
-  expect(wideRecords).toHaveLength(2);
-  wideRecords.forEach((record) => expect(record).toHaveClass("sl-pivot-mini-card-wide"));
+  const selectedYearGrid = within(selectedYearMatrix).getByRole("group", { name: "Lưới lớp học phần khóa 2026" });
+  expect(selectedYearGrid).toHaveClass("sl-pivot-cell-offerings-single-year");
+  expect(within(selectedYearGrid).getAllByRole("button", { name: /Xem chi tiết Lớp Học phần năm đã chọn/ })).toHaveLength(2);
   expect(within(selectedYearMatrix).getAllByText("K2026-1")).toHaveLength(2);
   expect(within(selectedYearMatrix).queryByText(active2025.name)).not.toBeInTheDocument();
   expect(within(selectedYearMatrix).queryByText(completed2026.name)).not.toBeInTheDocument();

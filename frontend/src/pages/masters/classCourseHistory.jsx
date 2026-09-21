@@ -199,7 +199,7 @@ export default function ClassCourseHistory() {
             </tr></thead>
             <tbody>{visibleSubjects.map((row) => <tr key={row.curriculumSubjectId}>
               <td className="tp-sticky tp-sticky-code tp-course-code">{row.code || "—"}</td>
-              <td className="tp-sticky tp-sticky-name tp-course">{row.name}</td>
+              <td className="tp-sticky tp-sticky-name tp-course" title={row.name}>{row.name}</td>
               <td className="tp-sticky tp-sticky-credits tp-centered">{row.credits ?? "—"}</td>
               {classes.map((classGroup) => {
                 const subject = row.byClass[classGroup.id];

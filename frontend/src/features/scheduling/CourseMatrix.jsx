@@ -483,7 +483,11 @@ function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, onSelectOf
                       {cellOfferings.length === 0 ? (
                         <span className="sl-pivot-empty">—</span>
                       ) : (
-                        <div className="sl-pivot-cell-offerings">
+                        <div
+                          className={`sl-pivot-cell-offerings ${selectedYear ? "sl-pivot-cell-offerings-single-year" : ""}`}
+                          role={selectedYear ? "group" : undefined}
+                          aria-label={selectedYear ? `Lưới lớp học phần khóa ${selectedYear}` : undefined}
+                        >
                           {cellOfferings.map((offering) => {
                             const summary = offering.sessionSummary || {};
                             const total = summary.totalCount || 0;
@@ -496,9 +500,7 @@ function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, onSelectOf
                             return (
                               <div
                                 key={offering.id}
-                                className={`sl-pivot-mini-card ${selectedYear ? "sl-pivot-mini-card-wide" : ""}`}
-                                role={selectedYear ? "group" : undefined}
-                                aria-label={selectedYear ? `Bản ghi ${offeringTitle(offering)}` : undefined}
+                                className="sl-pivot-mini-card"
                               >
                                 <button
                                   type="button"

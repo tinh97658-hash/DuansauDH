@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
-import { api, daysLabel, groupsOf, intersectDays, labelOf, message, Modal, normalize, Notice, offeringTitle, rows, SearchSelect, subjectLabel, unique, useLoad } from "./shared";
+import { api, groupsOf, intersectDays, labelOf, message, Modal, normalize, Notice, offeringTitle, rows, SearchSelect, subjectLabel, unique, useLoad } from "./shared";
 import { addDays, formatDateKey, getBusinessTodayKey, isSessionPast, mondayOf, vietnameseDate, vietnameseDayMonth, vietnameseWeekdayShort, weekDaysFrom } from "../../utils/schedulingCalendar";
 import SessionEditor from "./SessionEditor";
 import OfferingDetails from "./OfferingDetails";
@@ -11,6 +12,115 @@ const DAY_FOCUS_STATUS_LANES = [
   { key: "held", label: "ĐÃ DIỄN RA", symbol: "✓" },
   { key: "not", label: "KHÔNG DIỄN RA", symbol: "—" },
 ];
+
+function WeekOverflowPreview({ date, dayLabel, period, hiddenSessions, onOpenDay }) {
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({ top: -9999, left: -9999 });
+  const triggerRef = useRef(null);
+  const popoverRef = useRef(null);
+  const openTimer = useRef(null);
+  const closeTimer = useRef(null);
+  const previewId = `week-overflow-${date}-${period.toLowerCase()}`;
+  const periodLabel = period === "MORNING" ? "SÁNG" : "CHIỀU";
+
+  const clearOpenTimer = () => window.clearTimeout(openTimer.current);
+  const clearCloseTimer = () => window.clearTimeout(closeTimer.current);
+  const queueOpen = () => {
+    clearCloseTimer();
+    clearOpenTimer();
+    openTimer.current = window.setTimeout(() => setOpen(true), 150);
+  };
+  const queueClose = () => {
+    clearOpenTimer();
+    clearCloseTimer();
+    closeTimer.current = window.setTimeout(() => setOpen(false), 180);
+  };
+  useEffect(() => () => {
+    window.clearTimeout(openTimer.current);
+    window.clearTimeout(closeTimer.current);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        window.clearTimeout(openTimer.current);
+        window.clearTimeout(closeTimer.current);
+        setOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    const updatePosition = () => {
+      const trigger = triggerRef.current;
+      const popover = popoverRef.current;
+      if (!trigger || !popover) return;
+      const triggerRect = trigger.getBoundingClientRect();
+      const popoverRect = popover.getBoundingClientRect();
+      const edge = 12;
+      let left = triggerRect.left;
+      if (left + popoverRect.width > window.innerWidth - edge) left = window.innerWidth - edge - popoverRect.width;
+      left = Math.max(edge, left);
+      let top = triggerRect.bottom + 8;
+      if (top + popoverRect.height > window.innerHeight - edge) top = Math.max(edge, triggerRect.top - popoverRect.height - 8);
+      setPosition({ top, left });
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open]);
+
+  const preview = open && createPortal(
+    <aside
+      id={previewId}
+      ref={popoverRef}
+      className="sl-week-overflow-popover"
+      role="tooltip"
+      style={position}
+      onMouseEnter={clearCloseTimer}
+      onMouseLeave={queueClose}
+    >
+      <header><strong>{dayLabel} · {periodLabel}</strong><span>{hiddenSessions.length} lớp còn lại</span></header>
+      <div className="sl-week-overflow-list">
+        {hiddenSessions.map((session) => {
+          const title = offeringTitle(session.courseOffering);
+          const room = session.room?.code || "Chưa có phòng";
+          return <article key={session.id}><strong title={title}>{title}</strong><span title={room}>{room}</span></article>;
+        })}
+      </div>
+    </aside>,
+    document.body
+  );
+
+  return <>
+    <button
+      ref={triggerRef}
+      type="button"
+      className="sl-other"
+      aria-label={`Xem thêm ${hiddenSessions.length} lớp ngày ${date}`}
+      aria-describedby={open ? previewId : undefined}
+      aria-expanded={open}
+      onMouseEnter={queueOpen}
+      onMouseLeave={queueClose}
+      onFocus={queueOpen}
+      onBlur={(event) => {
+        if (!popoverRef.current?.contains(event.relatedTarget)) queueClose();
+      }}
+      onClick={onOpenDay}
+    >
+      +{hiddenSessions.length} lớp
+    </button>
+    {preview}
+  </>;
+}
 
 export default function Schedule({ user }) {
   const [params] = useSearchParams();
@@ -102,9 +212,18 @@ export default function Schedule({ user }) {
       occupied: selecting && (sessions.data || []).some((session) => session.status !== "not_held" && session.sessionDate === date && session.period === period && (session.courseOfferingId === selected.id || groupsOf(session.courseOffering).some((group) => selectedGroupIds.has(group.id)))),
     };
   };
-  const addSessionButton = (day, period) => {
-    const { date, past, incompatible, occupied } = slotState(day, period);
-    return selecting && !past && !incompatible && !occupied && <button className="v20-add-slot" aria-label={`Xếp ${period === "MORNING" ? "Sáng" : "Chiều"} ${date}`} disabled={sessions.loading || !!sessions.error} onClick={() => setEditor({ offering: selected, date, period })}>+ Xếp buổi</button>;
+  const schedulingAvailability = ({ past, incompatible }) => {
+    const visible = selecting && !past && !incompatible;
+    return { visible, enabled: visible && !sessions.loading && !sessions.error };
+  };
+  const openSlotScheduler = (slot, period) => {
+    if (!schedulingAvailability(slot).enabled) return;
+    setEditor({ offering: selected, date: slot.date, period });
+  };
+  const addSessionButton = (day, period, existingSlot) => {
+    const slot = existingSlot || slotState(day, period);
+    const availability = schedulingAvailability(slot);
+    return availability.visible && <button type="button" className="v20-add-slot" aria-label={`Xếp ${period === "MORNING" ? "Sáng" : "Chiều"} ${slot.date}`} disabled={!availability.enabled} onClick={() => openSlotScheduler(slot, period)}>+ Xếp buổi</button>;
   };
   const focusedDay = focusedDate ? weekDays.find((day) => formatDateKey(day) === focusedDate) : null;
   return <section className={`sl-workspace sl-schedule-view ${sidebarCollapsed ? "sl-sidebar-collapsed" : ""}`} aria-label="Không gian xếp lịch"><aside className="sl-left" data-collapsed={sidebarCollapsed}>
@@ -125,7 +244,7 @@ export default function Schedule({ user }) {
   })}{!listed.length && <Notice>Không có lớp học phần trong phạm vi đã chọn.</Notice>}</section>}</div></div></div></aside>
   <section className="sl-right"><div className="sl-schedule-head"><h1>XẾP LỊCH</h1><div className="sl-week"><button aria-label="Tuần trước" onClick={() => changeWeek(formatDateKey(addDays(week, -7)))}>‹</button><strong>{vietnameseDate(week)} — {vietnameseDate(end)}</strong><button aria-label="Tuần sau" onClick={() => changeWeek(formatDateKey(addDays(week, 7)))}>›</button></div>
     <div className="sl-actions"><button className="sl-btn sl-today" disabled={week === currentWeek && !focusedDate} onClick={() => changeWeek(currentWeek)}>Tuần này</button>{canEdit && <button className="sl-pending" onClick={() => setPendingOpen(true)}>{pending.loading ? "…" : pending.data?.length ?? "—"} chờ xác nhận</button>}</div>
-  </div>{selecting && <div className="sl-selected-strip"><span className="sl-selected-tag">ĐANG XẾP</span><div className="sl-selected-main"><strong>{selected.subject?.code} · {selected.subject?.name}</strong><span>{labelOf(selected)} · {selected.participantCount} HV</span></div><div className="sl-selected-next"><span>Ngày có thể xếp</span><strong>{daysLabel(selectedDays)}</strong></div><button className="sl-btn" onClick={() => setSelected("")}>Bỏ chọn</button></div>}
+  </div>{selecting && <div className="sl-selected-strip"><span className="sl-selected-tag">ĐANG XẾP</span><strong className="sl-selected-offering" title={offeringTitle(selected)}>{offeringTitle(selected)}</strong><span className="sl-selected-meta">{selected.subject?.code ? `${selected.subject.code} · ` : ""}{groupsOf(selected).length} lớp/nhóm · {selected.participantCount ?? 0} HV</span><button type="button" className="sl-btn sl-selected-clear" onClick={() => setSelected("")}>Bỏ chọn</button></div>}
     {sessions.error && <Notice error={sessions.error} />}{error && <Notice error={error} />}
     <div className={`sl-calendar-wrap ${selecting ? "sl-selecting" : ""}`} aria-busy={sessions.loading}>{focusedDay ? <section className="sl-day-focus" aria-label={`Lịch ngày ${vietnameseDate(focusedDate)}`}>
       <header className="sl-day-focus-head"><button type="button" className="sl-focus-back" onClick={() => setFocusedDate("")}>← Tuần</button><strong>{vietnameseWeekdayShort(focusedDay)} · {vietnameseDate(focusedDate)} · {sessionsOn(focusedDate).length} lớp</strong></header>
@@ -135,7 +254,8 @@ export default function Schedule({ user }) {
         return <button type="button" key={date} className={date === focusedDate ? "sl-active" : ""} title={`${vietnameseDate(date)} · ${count} lớp`} aria-label={`${vietnameseWeekdayShort(day)} ${vietnameseDate(date)} · ${count} lớp`} aria-pressed={date === focusedDate} onClick={() => setFocusedDate(date)}><strong>{vietnameseWeekdayShort(day)}</strong><b>{count}</b></button>;
       })}</nav>
       <div className="sl-day-focus-periods">{["MORNING", "AFTERNOON"].map((period) => {
-        const { items, past, incompatible } = slotState(focusedDay, period);
+        const slot = slotState(focusedDay, period);
+        const { items, past, incompatible } = slot;
         const periodLabel = period === "MORNING" ? "SÁNG" : "CHIỀU";
         const grouped = { planned: [], held: [], not: [] };
         items.forEach((session) => grouped[dayFocusStatusKey(session)].push(session));
@@ -145,7 +265,7 @@ export default function Schedule({ user }) {
             {!items.length && <span className="sl-focus-empty">{past ? "Buổi đã qua" : "Chưa có lịch"}</span>}
           </>}
           {incompatible && <span className="sl-focus-empty">Không thuộc ngày học chung</span>}
-          {addSessionButton(focusedDay, period)}
+          {addSessionButton(focusedDay, period, slot)}
         </div></section>;
       })}</div>
     </section> : <div className="sl-calendar" role="table" aria-label="Lịch học theo tuần"><div className="sl-corner">BUỔI</div>{weekDays.map((day) => {
@@ -155,11 +275,20 @@ export default function Schedule({ user }) {
       return <button type="button" className={`sl-day ${isToday ? "sl-is-today" : ""}`} key={dateKey} aria-label={`Xem lịch ${vietnameseDate(dateKey)}: ${count} lớp`} onClick={() => setFocusedDate(dateKey)}><strong>{vietnameseWeekdayShort(day)}</strong><span>{vietnameseDayMonth(day).replace("/", "-")}</span><b>{count}</b>{isToday && <i className="sl-today-indicator" aria-label="Hôm nay" title="Hôm nay" />}</button>;
     })}
       {["MORNING", "AFTERNOON"].map((period) => <React.Fragment key={period}><div className="sl-period"><span>{period === "MORNING" ? "SÁNG" : "CHIỀU"}</span></div>{weekDays.map((day) => {
-        const { date, past, incompatible, items } = slotState(day, period);
-        return <div key={date} className={`sl-slot ${past ? "sl-past" : ""} ${incompatible ? "sl-incompatible" : ""}`}><div className="v20-slot-items">
+        const slot = slotState(day, period);
+        const { date, past, incompatible, items } = slot;
+        const availability = schedulingAvailability(slot);
+        const handleSlotSelection = (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (availability.enabled) openSlotScheduler(slot, period);
+        };
+        return <div key={date} className={`sl-slot ${past ? "sl-past" : ""} ${incompatible ? "sl-incompatible" : ""} ${availability.enabled ? "sl-slot-schedulable" : ""}`} onClickCapture={availability.visible ? handleSlotSelection : undefined}>
+          {availability.visible && <button type="button" className="sl-slot-schedule-target" aria-label={`Xếp ${period === "MORNING" ? "Sáng" : "Chiều"} ${date}`} disabled={!availability.enabled} />}
+          <div className="v20-slot-items">
           {sessions.loading ? <span className="v20-hint">Đang tải...</span> : items.slice(0, WEEK_SLOT_LIMIT).map((session) => sessionCard(session, true))}
-          {items.length > WEEK_SLOT_LIMIT && <button className="sl-other" aria-label={`Xem thêm ${items.length - WEEK_SLOT_LIMIT} lớp ngày ${date}`} onClick={() => setFocusedDate(date)}>+{items.length - WEEK_SLOT_LIMIT} lớp</button>}
-          {addSessionButton(day, period)}
+          {items.length > WEEK_SLOT_LIMIT && <WeekOverflowPreview date={date} dayLabel={vietnameseWeekdayShort(day)} period={period} hiddenSessions={items.slice(WEEK_SLOT_LIMIT)} onOpenDay={() => setFocusedDate(date)} />}
+          {!items.length && availability.visible && <span className={`v20-add-slot sl-week-slot-affordance${availability.enabled ? "" : " sl-disabled"}`} aria-hidden="true">+ Xếp buổi</span>}
           {!items.length && !selecting && !sessions.loading && <span className="v20-hint">{past ? "Buổi đã qua" : "Chưa có lịch"}</span>}
           {incompatible && <span className="v20-hint">Không thuộc ngày học chung</span>}
         </div></div>;
