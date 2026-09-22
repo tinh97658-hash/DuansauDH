@@ -82,7 +82,7 @@ async function openMatrix() {
 beforeEach(() => jest.clearAllMocks());
 afterEach(cleanup);
 
-it.each([1, 2, 3, 4])("fills a four-year matrix window from %i actual cohorts", async (count) => {
+it.each([1, 2, 3, 4])("shows and evenly fills only %i actual cohort columns", async (count) => {
   const offerings = Array.from({ length: count }, (_, index) => offering({
     id: String(2030 - index),
     cohort: String(2030 - index),
@@ -92,25 +92,23 @@ it.each([1, 2, 3, 4])("fills a four-year matrix window from %i actual cohorts", 
   await screen.findByRole("region", { name: "Khóa 2030" });
   const matrix = await openMatrix();
 
-  expect(cohortHeaders()).toEqual(["KHÓA 2030", "KHÓA 2029", "KHÓA 2028", "KHÓA 2027"]);
-  expect(within(matrix).getAllByText("—")).toHaveLength(count * 3);
+  expect(cohortHeaders()).toEqual(
+    Array.from({ length: count }, (_, index) => `KHÓA ${2030 - index}`)
+  );
+  expect(within(matrix).queryAllByText("—")).toHaveLength(count * (count - 1));
   expect(screen.queryByRole("button", { name: "Xem khóa mới hơn" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Xem khóa cũ hơn" })).not.toBeInTheDocument();
   expect(within(matrix).getAllByRole("button", { name: /Xem chi tiết Lớp Học phần 20/ })).toHaveLength(count);
 });
 
-it("uses consecutive years for sparse history and hides unavailable window directions", async () => {
+it("omits missing years from sparse history and hides unavailable window directions", async () => {
   const offerings = ["2026", "2025", "2022"].map((cohort) => offering({ id: `offering-${cohort}`, cohort }));
   renderMatrix(offerings);
 
   await openMatrix();
-  expect(cohortHeaders()).toEqual(["KHÓA 2026", "KHÓA 2025", "KHÓA 2024", "KHÓA 2023"]);
+  expect(cohortHeaders()).toEqual(["KHÓA 2026", "KHÓA 2025", "KHÓA 2022"]);
   expect(screen.queryByRole("button", { name: "Xem khóa mới hơn" })).not.toBeInTheDocument();
-  const older = screen.getByRole("button", { name: "Xem khóa cũ hơn" });
-  fireEvent.click(older);
-  expect(cohortHeaders()).toEqual(["KHÓA 2025", "KHÓA 2024", "KHÓA 2023", "KHÓA 2022"]);
   expect(screen.queryByRole("button", { name: "Xem khóa cũ hơn" })).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Xem khóa mới hơn" })).toBeInTheDocument();
 });
 
 it("moves an eleven-year history by one year without refetching and keeps the window stable through filters", async () => {
@@ -173,7 +171,7 @@ it("keeps empty cells, multiple offerings, and a repeated cross-cohort offering 
   expect(screen.getByText("Lớp Học phần chung first")).toBeInTheDocument();
   expect(screen.getByText("Lớp Học phần chung second")).toBeInTheDocument();
   const emptySubjectRow = within(matrix).getByRole("row", { name: /SUBJECT-EMPTY.*Học phần có ô trống/ });
-  expect(within(emptySubjectRow).getAllByText("—")).toHaveLength(3);
+  expect(within(emptySubjectRow).getAllByText("—")).toHaveLength(1);
 
   fireEvent.click(screen.getByRole("button", { name: "Dạng cột theo khóa" }));
   expect(screen.getAllByText("GHÉP 2028 · 2027")).toHaveLength(2);
@@ -190,7 +188,7 @@ it("keeps a selected year as a real filter and presents its offerings in the sin
   renderMatrix([...active2026, active2025, completed2026]);
 
   await openMatrix();
-  expect(cohortHeaders()).toEqual(["KHÓA 2026", "KHÓA 2025", "KHÓA 2024", "KHÓA 2023"]);
+  expect(cohortHeaders()).toEqual(["KHÓA 2026", "KHÓA 2025"]);
 
   fireEvent.change(screen.getByLabelText("Khóa / năm học"), { target: { value: "2026" } });
   const selectedYearMatrix = screen.getByRole("table", { name: "Ma trận học phần theo khóa" });
@@ -252,13 +250,13 @@ it("excludes completed offerings from the active board, matrix, KPIs, filters, a
   expect(screen.queryByRole("option", { name: "Đã hoàn thành" })).not.toBeInTheDocument();
 
   const matrix = await openMatrix();
-  expect(cohortHeaders()).toEqual(["KHÓA 2028", "KHÓA 2027", "KHÓA 2026", "KHÓA 2025"]);
+  expect(cohortHeaders()).toEqual(["KHÓA 2028"]);
   expect(within(matrix).getAllByText("Chưa xếp lịch")).toHaveLength(2);
   expect(within(matrix).getByText("3 buổi")).toBeInTheDocument();
   expect(within(matrix).queryByText("Hoàn thành")).not.toBeInTheDocument();
   expect(within(matrix).queryByText(completedOnlySubject.subject.name)).not.toBeInTheDocument();
   const historicalSubjectRow = within(matrix).getByRole("row", { name: /SUBJECT-COMPLETED-CELL.*Học phần có lịch sử hoàn thành/ });
-  expect(within(historicalSubjectRow).getAllByText("—")).toHaveLength(3);
+  expect(within(historicalSubjectRow).queryAllByText("—")).toHaveLength(0);
   expect(within(matrix).queryByText(completedSameCell.name)).not.toBeInTheDocument();
   expect(within(matrix).getAllByRole("button", { name: `Xem chi tiết ${activeScheduled.name}` })).toHaveLength(1);
 

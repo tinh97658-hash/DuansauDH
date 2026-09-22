@@ -388,16 +388,15 @@ function CrossCohortBadge({ cohorts }) {
 
 // Sub-component: Pivot Matrix View (Subjects x Cohorts)
 function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, onSelectOffering, onViewDetails }) {
-  // Anchor to unfiltered, known years; missing years remain empty comparison columns.
-  // Reset only when the source years or explicit year selection change.
+  // Page through real cohorts only; missing years must not become empty columns.
+  // Reset only when the source cohorts or explicit year selection change.
   const [windowStart, setWindowStart] = useState(0);
-  const knownYears = cohorts.filter((year) => /^[1-9]\d{3}$/.test(year)).map(Number);
-  const newestYear = knownYears.length ? Math.max(...knownYears) : null;
-  const oldestYear = knownYears.length ? Math.min(...knownYears) : null;
-  const lastStart = selectedYear || newestYear === null ? 0
-    : Math.max(0, newestYear - oldestYear - (COHORT_WINDOW_SIZE - 1));
-  const visibleCohorts = selectedYear ? [selectedYear] : newestYear === null ? []
-    : Array.from({ length: COHORT_WINDOW_SIZE }, (_, index) => String(newestYear - windowStart - index));
+  const actualCohorts = unique(cohorts.filter((cohort) => /^[1-9]\d{3}$/.test(cohort)))
+    .sort((a, b) => b.localeCompare(a, "vi", { numeric: true }));
+  const lastStart = selectedYear ? 0 : Math.max(0, actualCohorts.length - COHORT_WINDOW_SIZE);
+  const visibleCohorts = selectedYear
+    ? [selectedYear]
+    : actualCohorts.slice(windowStart, windowStart + COHORT_WINDOW_SIZE);
 
   if (visibleCohorts.length === 0) {
     return <Notice>Chưa có khóa / năm học dạng năm hợp lệ để hiển thị ma trận.</Notice>;
