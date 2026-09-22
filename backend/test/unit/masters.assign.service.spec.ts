@@ -15,7 +15,7 @@ const buildService = () => {
   const sequelize = {
     transaction: jest.fn((cb: (tx: unknown) => Promise<unknown>) => cb({ LOCK: { UPDATE: "UPDATE" } })),
   };
-  const classGroupsService = {};
+  const classGroupsService = { create: jest.fn() };
   const service = new MastersService(
     classGroups as never,
     classGroupMembers as never,
@@ -25,7 +25,7 @@ const buildService = () => {
     sequelize as never,
     classGroupsService as never,
   );
-  return { service, classGroups, classGroupMembers, admissionRecords, majors };
+  return { service, classGroups, classGroupMembers, admissionRecords, majors, classGroupsService, sequelize };
 };
 
 const openGroup = {
@@ -102,36 +102,91 @@ describe("MastersService.assignMembers", () => {
 });
 
 describe("MastersService.autoAssign", () => {
-  it("distributes students evenly across groups with the same scope", async () => {
+  it("sorts by name and distributes contiguous balanced blocks", async () => {
     const { service, classGroups, classGroupMembers, admissionRecords } = buildService();
     const g1 = { ...openGroup, code: "N01" };
     const g2 = { ...openGroup, id: "g2", code: "N02" };
-    classGroups.findAll.mockResolvedValue([g1, g2]);
+    const g3 = { ...openGroup, id: "g3", code: "N03" };
+    classGroups.findAll.mockResolvedValue([g1, g2, g3]);
     admissionRecords.findAll.mockResolvedValue([
-      { id: "a1", studentId: null, firstName: "Nam", fullName: "Nguyễn Văn Nam" },
-      { id: "a2", studentId: null, firstName: "An", fullName: "Trần Văn An" },
-      { id: "a3", studentId: null, firstName: "Bình", fullName: "Lê Thị Bình" },
-      { id: "a4", studentId: null, firstName: "Cường", fullName: "Phạm Văn Cường" },
+      { id: "a5", studentId: null, firstName: "E", fullName: "Học viên E" },
+      { id: "a1", studentId: null, firstName: "A", fullName: "Học viên A" },
+      { id: "a4", studentId: null, firstName: "D", fullName: "Học viên D" },
+      { id: "a2", studentId: null, firstName: "B", fullName: "Học viên B" },
+      { id: "a3", studentId: null, firstName: "C", fullName: "Học viên C" },
     ]);
     classGroupMembers.findAll.mockResolvedValue([]);
     classGroupMembers.count.mockResolvedValue(0);
     classGroupMembers.bulkCreate.mockResolvedValue([{}]);
 
     const result = await service.autoAssign({
-      classGroupIds: ["g1", "g2"],
-      admissionRecordIds: ["a1", "a2", "a3", "a4"],
-      method: "round_robin",
+      classGroupIds: ["g1", "g2", "g3"],
+      admissionRecordIds: ["a1", "a2", "a3", "a4", "a5"],
+      method: "alphabetical",
     });
 
-    expect(classGroupMembers.bulkCreate).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({ classGroupId: "g1" }),
-        expect.objectContaining({ classGroupId: "g2" }),
-      ]),
-      expect.anything(),
-    );
-    expect(result.distributed).toHaveLength(2);
-    expect(result.distributed.reduce((sum: number, d: { count: number }) => sum + d.count, 0)).toBe(4);
+    const memberships = classGroupMembers.bulkCreate.mock.calls[0][0];
+    expect(memberships.map((item: { classGroupId: string; admissionRecordId: string }) => [item.classGroupId, item.admissionRecordId])).toEqual([
+      ["g1", "a1"], ["g1", "a2"],
+      ["g2", "a3"], ["g2", "a4"],
+      ["g3", "a5"],
+    ]);
+    expect(result.distributed.map((item: { count: number }) => item.count)).toEqual([2, 2, 1]);
+  });
+
+  it("fills groups to capacity in order for fill-first", async () => {
+    const { service, classGroups, classGroupMembers, admissionRecords } = buildService();
+    const groups = [
+      { ...openGroup, code: "N01" },
+      { ...openGroup, id: "g2", code: "N02" },
+      { ...openGroup, id: "g3", code: "N03" },
+    ];
+    classGroups.findAll.mockResolvedValue(groups);
+    admissionRecords.findAll.mockResolvedValue(Array.from({ length: 50 }, (_, index) => ({
+      id: `a${index + 1}`,
+      studentId: null,
+      firstName: String(index + 1).padStart(2, "0"),
+      fullName: `Học viên ${index + 1}`,
+    })));
+    classGroupMembers.findAll.mockResolvedValue([]);
+    classGroupMembers.count.mockResolvedValue(0);
+    classGroupMembers.bulkCreate.mockResolvedValue([{}]);
+
+    const result = await service.autoAssign({
+      classGroupIds: groups.map((group) => group.id),
+      admissionRecordIds: Array.from({ length: 50 }, (_, index) => `a${index + 1}`),
+      method: "fill_first",
+    });
+
+    expect(result.distributed.map((item: { count: number }) => item.count)).toEqual([40, 10, 0]);
+  });
+
+  it("uses exact custom block counts", async () => {
+    const { service, classGroups, classGroupMembers, admissionRecords } = buildService();
+    const groups = [
+      { ...openGroup, code: "N01" },
+      { ...openGroup, id: "g2", code: "N02" },
+      { ...openGroup, id: "g3", code: "N03" },
+    ];
+    classGroups.findAll.mockResolvedValue(groups);
+    admissionRecords.findAll.mockResolvedValue(Array.from({ length: 6 }, (_, index) => ({
+      id: `a${index + 1}`,
+      studentId: null,
+      firstName: String(index + 1),
+      fullName: `Học viên ${index + 1}`,
+    })));
+    classGroupMembers.findAll.mockResolvedValue([]);
+    classGroupMembers.count.mockResolvedValue(0);
+    classGroupMembers.bulkCreate.mockResolvedValue([{}]);
+
+    const result = await service.autoAssign({
+      classGroupIds: groups.map((group) => group.id),
+      admissionRecordIds: Array.from({ length: 6 }, (_, index) => `a${index + 1}`),
+      method: "custom",
+      targetCounts: [3, 2, 1],
+    });
+
+    expect(result.distributed.map((item: { count: number }) => item.count)).toEqual([3, 2, 1]);
   });
 
   it("does not redistribute students who already have a class", async () => {
@@ -171,6 +226,46 @@ describe("MastersService.autoAssign", () => {
     await expect(service.autoAssign({
       classGroupIds: ["g1", "g2"],
       admissionRecordIds: ["a1", "a2"],
-    })).rejects.toThrow("Các nhóm chia đều phải cùng chuyên ngành");
+    })).rejects.toThrow("Các nhóm phải cùng chuyên ngành");
+  });
+});
+
+describe("MastersService.batchCreateClassGroups with auto assignment", () => {
+  it("creates and assigns in the same transaction and propagates assignment failure", async () => {
+    const { service, classGroups, classGroupMembers, admissionRecords, majors, classGroupsService } = buildService();
+    const g1 = { ...openGroup, id: "g1", code: "26CNTT01", name: "CNTT2026.01" };
+    const g2 = { ...openGroup, id: "g2", code: "26CNTT02", name: "CNTT2026.02" };
+    majors.findByPk.mockResolvedValue({ id: "major-1", active: true, program: "masters" });
+    classGroups.findAll
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([g1, g2]);
+    classGroupsService.create.mockResolvedValueOnce(g1).mockResolvedValueOnce(g2);
+    admissionRecords.findAll.mockResolvedValue([
+      { id: "a1", studentId: null, firstName: "An", fullName: "Học viên An" },
+      { id: "a2", studentId: null, firstName: "Bình", fullName: "Học viên Bình" },
+    ]);
+    classGroupMembers.findAll.mockResolvedValue([]);
+    classGroupMembers.count.mockResolvedValue(0);
+    classGroupMembers.bulkCreate.mockRejectedValue(new Error("assignment failed"));
+
+    await expect(service.batchCreateClassGroups({
+      codePrefix: "26CNTT",
+      namePrefix: "CNTT2026.",
+      nameTemplate: "CNTT2026.{n}",
+      count: 2,
+      startIndex: 1,
+      majorId: "major-1",
+      academicYear: "2026",
+      maxStudents: 40,
+      status: "open",
+      autoAssign: true,
+      assignmentMethod: "balanced",
+      admissionRecordIds: ["a1", "a2"],
+    })).rejects.toThrow("assignment failed");
+
+    const transaction = classGroupsService.create.mock.calls[0][1];
+    expect(classGroupsService.create).toHaveBeenNthCalledWith(2, expect.anything(), transaction);
+    expect(classGroupMembers.bulkCreate).toHaveBeenCalledWith(expect.anything(), { transaction });
   });
 });
