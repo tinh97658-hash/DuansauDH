@@ -13,6 +13,117 @@ const DAY_FOCUS_STATUS_LANES = [
   { key: "not", label: "KHÔNG DIỄN RA", symbol: "—" },
 ];
 
+function SessionMagnifier({ session, stateClass, stateLabel, className, onClick, children }) {
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({ top: -9999, left: -9999 });
+  const triggerRef = useRef(null);
+  const previewRef = useRef(null);
+  const openTimer = useRef(null);
+  const previewId = `session-magnifier-${session.id}`;
+  const title = offeringTitle(session.courseOffering);
+  const subject = subjectLabel(session.courseOffering);
+  const lecturer = session.lecturer?.name || "Chưa có giảng viên";
+  const room = session.room?.code || "Chưa có phòng";
+  const period = session.period === "MORNING" ? "Sáng" : "Chiều";
+  const time = session.startTime && session.endTime
+    ? `${session.startTime.slice(0, 5)}–${session.endTime.slice(0, 5)}`
+    : "Chưa có giờ";
+
+  const close = () => {
+    window.clearTimeout(openTimer.current);
+    setOpen(false);
+  };
+  const openSoon = () => {
+    window.clearTimeout(openTimer.current);
+    openTimer.current = window.setTimeout(() => setOpen(true), 180);
+  };
+  const openNow = () => {
+    window.clearTimeout(openTimer.current);
+    setOpen(true);
+  };
+
+  useEffect(() => () => window.clearTimeout(openTimer.current), []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") close();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    const updatePosition = () => {
+      const trigger = triggerRef.current;
+      const preview = previewRef.current;
+      if (!trigger || !preview) return;
+      const triggerRect = trigger.getBoundingClientRect();
+      const previewRect = preview.getBoundingClientRect();
+      const edge = 12;
+      const gap = 12;
+      const fitsRight = triggerRect.right + gap + previewRect.width <= window.innerWidth - edge;
+      const fitsLeft = triggerRect.left - gap - previewRect.width >= edge;
+      let left = fitsRight
+        ? triggerRect.right + gap
+        : fitsLeft
+          ? triggerRect.left - gap - previewRect.width
+          : triggerRect.left + (triggerRect.width - previewRect.width) / 2;
+      left = Math.min(Math.max(edge, left), window.innerWidth - edge - previewRect.width);
+      let top = triggerRect.top + (triggerRect.height - previewRect.height) / 2;
+      top = Math.min(Math.max(edge, top), window.innerHeight - edge - previewRect.height);
+      setPosition({ top, left });
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open]);
+
+  const preview = open && createPortal(
+    <aside
+      id={previewId}
+      ref={previewRef}
+      className={`sl-session-magnifier ${stateClass}`}
+      role="tooltip"
+      style={position}
+    >
+      <div className="sl-magnifier-eyebrow"><span aria-hidden="true">Aa</span>XEM NHANH LỚP HỌC</div>
+      <strong className="sl-magnifier-title">{title}</strong>
+      <span className="sl-magnifier-subject">{subject}</span>
+      <dl>
+        <div><dt>Thời gian</dt><dd>{vietnameseDate(session.sessionDate)} · {period} · {time}</dd></div>
+        <div><dt>Giảng viên</dt><dd>{lecturer}</dd></div>
+        <div><dt>Phòng học</dt><dd>{room}</dd></div>
+      </dl>
+      <em>{stateLabel}</em>
+      <small>Nhấn Enter để xem chi tiết</small>
+    </aside>,
+    document.body
+  );
+
+  return <>
+    <button
+      ref={triggerRef}
+      type="button"
+      className={className}
+      aria-describedby={open ? previewId : undefined}
+      onMouseEnter={openSoon}
+      onMouseLeave={close}
+      onFocus={openNow}
+      onBlur={close}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+    {preview}
+  </>;
+}
+
 function WeekOverflowPreview({ date, dayLabel, period, hiddenSessions, onOpenDay }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: -9999, left: -9999 });
@@ -183,14 +294,18 @@ export default function Schedule({ user }) {
   const sessionStatusKey = (session) => session.status === "held" ? "held" : session.status === "not_held" ? "not" : isSessionPast(session) ? "wait" : "planned";
   const dayFocusStatusKey = (session) => session.status === "held" ? "held" : session.status === "not_held" ? "not" : "planned";
   const sessionState = (session) => ({ held: ["sl-held", "✓ ĐÃ DIỄN RA"], not: ["sl-not", "— KHÔNG DIỄN RA"], wait: ["sl-wait", "● CHỜ XÁC NHẬN"], planned: ["", "○ ĐÃ XẾP"] }[sessionStatusKey(session)]);
-  const sessionCard = (session, compact = false) => { const [style, state] = sessionState(session); return <button key={session.id} className={`sl-session ${compact ? "sl-session-compact" : ""} ${style}`} onClick={() => openSession(session)}><strong>{offeringTitle(session.courseOffering)}</strong><span>{subjectLabel(session.courseOffering)}</span><small>{session.lecturer?.name || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><em>{state}</em></button>; };
+  const sessionCard = (session, compact = false) => {
+    const [style, state] = sessionState(session);
+    return <SessionMagnifier key={session.id} session={session} stateClass={style} stateLabel={state} className={`sl-session ${compact ? "sl-session-compact" : ""} ${style}`} onClick={() => openSession(session)}><strong>{offeringTitle(session.courseOffering)}</strong><span>{subjectLabel(session.courseOffering)}</span><small>{session.lecturer?.name || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><em>{state}</em></SessionMagnifier>;
+  };
   const dayFocusSessionCard = (session) => {
     const style = { held: "sl-held", not: "sl-not", planned: "" }[dayFocusStatusKey(session)];
     const title = offeringTitle(session.courseOffering);
     const subject = subjectLabel(session.courseOffering);
     const subjectCode = session.courseOffering?.subject?.code || subject || "Chưa có mã học phần";
     const room = session.room?.code || "Chưa có phòng";
-    return <button key={session.id} className={`sl-session sl-focus-session ${style}`} onClick={() => openSession(session)}><strong title={title}>{title}</strong><span className="sl-focus-meta" title={`${subject} · ${room}`}><span>{subjectCode}</span><span>· {room}</span></span></button>;
+    const state = sessionState(session)[1];
+    return <SessionMagnifier key={session.id} session={session} stateClass={style} stateLabel={state} className={`sl-session sl-focus-session ${style}`} onClick={() => openSession(session)}><strong title={title}>{title}</strong><span className="sl-focus-meta" title={`${subject} · ${room}`}><span>{subjectCode}</span><span>· {room}</span></span></SessionMagnifier>;
   };
   const changeWeek = (nextWeek) => {
     const focusedWeekdayIndex = focusedDate

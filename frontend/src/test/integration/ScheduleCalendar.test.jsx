@@ -161,6 +161,46 @@ it("summarizes a busy day in the week and exposes every session in day focus", a
   expect(screen.queryByRole("table", { name: "Lịch học theo tuần" })).not.toBeInTheDocument();
   expect(busyDate).not.toBe("");
 });
+it("magnifies a scheduled class on hover or keyboard focus without opening it", async () => {
+  axios.get.mockImplementation(async (url) => {
+    if (url.includes("/course-offerings?")) return { data: [offering] };
+    if (url.includes("/teaching-sessions?")) {
+      const date = new URLSearchParams(url.split("?")[1]).get("from");
+      return { data: [{
+        id: "magnified-session",
+        courseOfferingId: offering.id,
+        courseOffering: { ...offering, name: "Lớp chuyên đề cần xem rõ" },
+        sessionDate: date,
+        period: "MORNING",
+        status: "held",
+        startTime: "08:00:00",
+        endTime: "11:00:00",
+        lecturer: lecturers[0],
+        room: rooms[0],
+      }] };
+    }
+    return { data: [] };
+  });
+
+  render(<MemoryRouter><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>);
+  const card = await screen.findByRole("button", { name: /Lớp chuyên đề cần xem rõ/ });
+  fireEvent.mouseEnter(card);
+
+  const magnifier = await screen.findByRole("tooltip");
+  expect(magnifier).toHaveTextContent("XEM NHANH LỚP HỌC");
+  expect(magnifier).toHaveTextContent("Lớp chuyên đề cần xem rõ");
+  expect(magnifier).toHaveTextContent("Nguyễn Bình");
+  expect(magnifier).toHaveTextContent("301");
+  expect(magnifier).toHaveTextContent("08:00–11:00");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+  fireEvent.mouseLeave(card);
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  fireEvent.focus(card);
+  expect(screen.getByRole("tooltip")).toBeInTheDocument();
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+});
 it("keeps future planned sessions in the primary scheduled lane", async () => {
   let initialWeek = "";
   axios.get.mockImplementation(async (url) => {
