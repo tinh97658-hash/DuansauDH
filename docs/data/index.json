@@ -1,0 +1,30 @@
+{
+    "team": [
+        {
+            "name": "Ariyawansha P.H.J.U.",
+            "email": "e18028@eng.pdn.ac.lk",
+            "eNumber": "E/18/028"
+        },
+        {
+            "name": "Kasthuripitiya K.A.I.M.",
+            "email": "e18173@eng.pdn.ac.lk",
+            "eNumber": "E/18/173"
+        },
+        {
+            "name": "Ranasinghe S.M.T.S.C.",
+            "email": "e18285@eng.pdn.ac.lk",
+            "eNumber": "E/18/285"
+        }
+    ],
+    "supervisors": [
+        {
+            "name": "Dr. Upul Jayasinghe",
+            "email": "upuljm@eng.pdn.ac.lk"
+        },
+        {
+            "name": "Ms. Lankani Perera",
+            "email": "lankaniperera@eng.pdn.ac.lk"
+        }
+    ],
+    "tags": ["Web"]
+}

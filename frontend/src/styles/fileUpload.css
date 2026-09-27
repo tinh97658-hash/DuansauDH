@@ -1,0 +1,39 @@
+.card {  
+    margin-top: 20px;  
+  }  
+  .btn-upload {  
+      padding: 10px 20px;  
+      margin-left: 10px;  
+  }  
+  .btn-success:not(:disabled):not(.disabled).active, .btn-success:not(:disabled):not(.disabled):active, .show>.btn-success.dropdown-toggle {  
+      color: #fff;  
+      background-color: #0062cc;  
+      border-color: #1c7430;  
+  }  
+  /* h1 {  
+  font-family: 'Indie Flower', cursive;  
+  font-size: 32px;  
+    color: black;  
+    font-weight: bold;  
+  }   */
+  /* body {  
+    margin: 0;  
+    padding: 0;  
+    color: var(--clr-black);  
+    font-family: 'Poppins', sans-serif;  
+    font-size: 1.125rem;  
+    min-height: 100vh;  
+    display: flex;  
+    justify-content: center;  
+    align-items: center;  
+    background-image: linear-gradient(45deg, rgba(194, 233, 221, 0.5) 1%, rgba(104, 119, 132, 0.5) 100%), linear-gradient(-45deg, #494d71 0%, rgba(217, 230, 185, 0.5) 80%);  
+  }   */
+  .upload-input-group {  
+      margin-bottom: 10px;  
+  }  
+  .input-group>.custom-select:not(:last-child) {  
+    height: 45px;  
+  }  
+  /* .input-group>.form-control:not(:last-child) {  
+    height: 35px; 
+  } */
