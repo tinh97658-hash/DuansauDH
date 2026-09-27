@@ -14,6 +14,7 @@ export class Lecturer extends Model {
   @Column({ type: DataType.STRING(50), allowNull: true }) declare academicDegree: string | null;
   @Column({ type: DataType.STRING(50), allowNull: true }) declare teachingType: string | null;
   @Column(DataType.STRING(50)) declare title: string | null;
+  @Column(DataType.STRING(150)) declare faculty: string | null;
   @Column(DataType.STRING(150)) declare department: string | null;
   @Default(true) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare active: boolean;
 }

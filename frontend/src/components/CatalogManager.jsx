@@ -26,7 +26,7 @@ const buildEmptyForm = (parent, fields, sortable) => {
 
 const CatalogManager = ({
   title, group, desc, endpoint, itemName, nameLabel = "Tên", codeLabel = "Mã",
-  sortable = true, parent = null, fields = [],
+  sortable = true, parent = null, fields = [], editOnDoubleClick = false, showEditAction = true,
 }) => {
   const [rows, setRows] = useState([]);
   const [options, setOptions] = useState([]);
@@ -252,14 +252,16 @@ const CatalogManager = ({
             ) : filtered.length === 0 ? (
               <TableRow><TableCell colSpan={colSpan} align="center" sx={{ py: 4, color: "text.secondary" }}>Chưa có dữ liệu.</TableCell></TableRow>
             ) : filtered.map((row, index) => (
-              <TableRow key={row.id} hover>
+              <TableRow key={row.id} hover onDoubleClick={isAdmin && editOnDoubleClick ? () => openEdit(row) : undefined}
+                title={isAdmin && editOnDoubleClick ? "Nhấp đúp để sửa" : undefined}
+                sx={isAdmin && editOnDoubleClick ? { cursor: "pointer" } : undefined}>
                 <TableCell>{index + 1}</TableCell>
                 <TableCell><Typography variant="body2" sx={{ fontFamily: "inherit" }}>{row.code}</Typography></TableCell>
                 <TableCell>{row.name}</TableCell>
                 {parent && <TableCell>{parent.display ? parent.display(row) : row[parent.field]}</TableCell>}
                 {tableFields.map((f) => <TableCell key={f.key}>{renderFieldValue(row, f)}</TableCell>)}
                 {sortable && <TableCell align="center">{row.sortOrder}</TableCell>}
-                <TableCell align="center">
+                <TableCell align="center" onDoubleClick={(event) => event.stopPropagation()}>
                   {isAdmin ? (
                     <Tooltip title={row.active ? "Đang hoạt động" : "Đã ẩn"}>
                       <Switch size="small" checked={Boolean(row.active)} onChange={() => toggleActive(row)} />
@@ -269,8 +271,8 @@ const CatalogManager = ({
                   )}
                 </TableCell>
                 {isAdmin && (
-                  <TableCell align="right">
-                    <Tooltip title="Sửa"><IconButton size="small" color="primary" onClick={() => openEdit(row)}><EditRounded fontSize="small" /></IconButton></Tooltip>
+                  <TableCell align="right" onDoubleClick={(event) => event.stopPropagation()}>
+                    {showEditAction && <Tooltip title="Sửa"><IconButton size="small" color="primary" onClick={() => openEdit(row)}><EditRounded fontSize="small" /></IconButton></Tooltip>}
                     <Tooltip title="Xóa"><IconButton size="small" color="error" onClick={() => setDeleting(row)}><DeleteRounded fontSize="small" /></IconButton></Tooltip>
                   </TableCell>
                 )}

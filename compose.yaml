@@ -47,4 +47,6 @@ configs:
 
 volumes:
   postgres_data:
+    external: true
+    name: duansaudh_postgres_data
   pgadmin_data:

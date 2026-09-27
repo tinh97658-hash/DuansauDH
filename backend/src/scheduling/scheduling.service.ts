@@ -947,7 +947,7 @@ export class SchedulingService {
           },
         ],
       },
-      { model: Lecturer, as: "lecturer", attributes: ["id", "code", "name", "active"] },
+      { model: Lecturer, as: "lecturer", attributes: ["id", "code", "name", "faculty", "department", "active"] },
       { model: Room, as: "room", attributes: ["id", "code", "name", "capacity", "isActive"] },
       { model: Staff, as: "confirmedBy", attributes: ["id", "name", "email"] },
     ];
@@ -961,6 +961,34 @@ export class SchedulingService {
       transaction,
     });
     return [...new Set(links.map((link) => link.classGroupId))].sort();
+  }
+
+  private async assertOfferingLecturer(
+    courseOfferingId: string,
+    lecturerId: string,
+    transaction: Transaction,
+    excludeSessionId?: string,
+  ) {
+    const where: Record<string | symbol, unknown> = { courseOfferingId };
+    if (excludeSessionId) where.id = { [Op.ne]: excludeSessionId };
+    const assignedSession = await this.teachingSessions.findOne({
+      where,
+      attributes: ["id", "lecturerId"],
+      order: [["createdAt", "ASC"], ["id", "ASC"]],
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+    if (assignedSession && assignedSession.lecturerId !== lecturerId) {
+      throw new ConflictException({
+        code: "COURSE_OFFERING_LECTURER_FIXED",
+        message: "Lớp học phần đã được phân công một giảng viên cố định. Các buổi học chỉ được thay đổi phòng học.",
+        details: {
+          courseOfferingId,
+          lecturerId: assignedSession.lecturerId,
+          teachingSessionId: assignedSession.id,
+        },
+      });
+    }
   }
 
   private async lockAndValidateSessionResources(
@@ -1221,6 +1249,7 @@ export class SchedulingService {
     this.assertTargetSessionNotEnded(dto.sessionDate, startTime, endTime);
     return this.sequelize.transaction(async (transaction) => {
       await this.sequelize.query("SELECT pg_advisory_xact_lock(21025)", { transaction });
+      await this.assertOfferingLecturer(dto.courseOfferingId, dto.lecturerId, transaction);
       const classGroupIds = await this.offeringGroupIds(dto.courseOfferingId, transaction);
       const resources = await this.lockAndValidateSessionResources(
         dto.courseOfferingId,
@@ -1272,6 +1301,7 @@ export class SchedulingService {
       this.validateTimeRange(startTime, endTime);
       this.assertPeriodTimeConsistency(dto.period ?? session.period, startTime, endTime);
       this.assertTargetSessionNotEnded(sessionDate, startTime, endTime);
+      await this.assertOfferingLecturer(session.courseOfferingId, lecturerId, transaction, session.id);
       const classGroupIds = await this.offeringGroupIds(session.courseOfferingId, transaction);
       const resources = await this.lockAndValidateSessionResources(
         session.courseOfferingId,

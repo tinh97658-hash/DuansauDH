@@ -62,6 +62,7 @@ export const intersectDays = (groups) => groups.length ? [1, 2, 3, 4, 5, 6, 0].f
 export function useLoad(loader, dependencies) {
   const [state, setState] = useState({ data: null, loading: true, error: "" });
   const [revision, setRevision] = useState(0);
+  const lastRevalidation = useRef(0);
   useEffect(() => {
     let active = true;
     setState({ data: null, loading: true, error: "" });
@@ -71,6 +72,20 @@ export function useLoad(loader, dependencies) {
     // Callers supply the values used by their loader, as with useEffect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...dependencies, revision]);
+  useEffect(() => {
+    const revalidate = (event) => {
+      if (event?.type === "focus" && event.target !== window) return;
+      if (document.visibilityState === "hidden" || Date.now() - lastRevalidation.current < 250) return;
+      lastRevalidation.current = Date.now();
+      setRevision((value) => value + 1);
+    };
+    window.addEventListener("focus", revalidate);
+    document.addEventListener("visibilitychange", revalidate);
+    return () => {
+      window.removeEventListener("focus", revalidate);
+      document.removeEventListener("visibilitychange", revalidate);
+    };
+  }, []);
   return { ...state, reload: () => setRevision((value) => value + 1) };
 }
 

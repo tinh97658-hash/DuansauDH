@@ -327,8 +327,8 @@ export default function Schedule({ user }) {
       occupied: selecting && (sessions.data || []).some((session) => session.status !== "not_held" && session.sessionDate === date && session.period === period && (session.courseOfferingId === selected.id || groupsOf(session.courseOffering).some((group) => selectedGroupIds.has(group.id)))),
     };
   };
-  const schedulingAvailability = ({ past, incompatible }) => {
-    const visible = selecting && !past && !incompatible;
+  const schedulingAvailability = ({ past, incompatible, occupied }) => {
+    const visible = selecting && !past && !incompatible && !occupied;
     return { visible, enabled: visible && !sessions.loading && !sessions.error };
   };
   const openSlotScheduler = (slot, period) => {

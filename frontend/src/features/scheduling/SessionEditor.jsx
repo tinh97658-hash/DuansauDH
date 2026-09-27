@@ -1,10 +1,57 @@
-import React, { useState } from "react";
-import { api, groupsOf, message, Modal, Notice, offeringTitle, rows, subjectLabel, useLoad } from "./shared";
+import React, { useEffect, useRef, useState } from "react";
+import { api, groupsOf, message, Modal, normalize, Notice, offeringTitle, rows, subjectLabel, useLoad } from "./shared";
 import { getBusinessTodayKey, getRoomFloor, isPeriodTimeConsistent, isSessionPast, shortTime, vietnameseDate } from "../../utils/schedulingCalendar";
+import { lecturerBelongsToOfferingFaculty, lecturerTeachingGroup, teachingFacultyForOffering } from "../../utils/lecturerQualification";
 
 const periodTimes = (period) => period === "AFTERNOON"
   ? { startTime: "13:00", endTime: "17:00" }
   : { startTime: "07:00", endTime: "12:00" };
+
+function LecturerPicker({ value, lecturers, offering, conflicts, disabled, locked, onChange }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const wrapper = useRef(null);
+  const selected = lecturers.find((item) => item.id === value);
+  useEffect(() => {
+    const close = (event) => { if (!wrapper.current?.contains(event.target)) setOpen(false); };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, []);
+  const available = lecturers.filter((row) => row.active !== false || row.id === value).map((row) => ({
+    ...row,
+    recommended: lecturerBelongsToOfferingFaculty(row, offering),
+    teachingGroup: lecturerTeachingGroup(row),
+    busy: conflicts.some((item) => item.lecturerId === row.id),
+  })).sort((a, b) => Number(b.recommended) - Number(a.recommended)
+    || a.teachingGroup.localeCompare(b.teachingGroup, "vi")
+    || a.name.localeCompare(b.name, "vi"));
+  const visible = available.filter((row) => normalize(`${row.name} ${row.code || ""} ${row.faculty || ""} ${row.teachingGroup}`).includes(normalize(query)));
+
+  if (locked) return <div className="sl-fixed-lecturer" aria-label="Giảng viên cố định">
+    <strong>{selected?.name || "Giảng viên đã phân công"}</strong>
+    <span>{selected?.faculty || "Đã cố định theo buổi học đầu tiên"}</span>
+    <small>Giảng viên cố định của lớp · Các buổi sau chỉ thay đổi phòng học</small>
+  </div>;
+
+  return <div className="sl-lecturer-picker" ref={wrapper}>
+    <button type="button" className="sl-lecturer-trigger" aria-label="Giảng viên" aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onClick={() => { setQuery(""); setOpen((current) => !current); }}>
+      <span>{selected?.name || "Chọn giảng viên"}</span><b aria-hidden="true">⌄</b>
+    </button>
+    {open && <div className="sl-lecturer-popover">
+      <input autoFocus aria-label="Tìm giảng viên" placeholder="Tìm theo tên giảng viên..." value={query} onChange={(event) => setQuery(event.target.value)} />
+      <div className="sl-lecturer-list" role="listbox" aria-label="Danh sách giảng viên">
+        {visible.map((row, index) => <React.Fragment key={row.id}>
+          {(index === 0 || visible[index - 1].recommended !== row.recommended || visible[index - 1].teachingGroup !== row.teachingGroup) && <div className={`sl-lecturer-group ${row.recommended ? "sl-recommended" : ""}`}>{row.teachingGroup}{row.recommended ? " · Đề xuất" : ""}</div>}
+          <button type="button" role="option" aria-selected={row.id === value} disabled={row.busy || row.active === false} onClick={() => { onChange(row.id); setOpen(false); }}>
+            <span><strong>{row.name}</strong><small>{row.faculty || row.code || "Chưa khai báo khoa / viện"}</small></span>
+            <em>{row.busy ? "Đang bận" : row.recommended ? "Cùng khoa" : "Khoa khác"}</em>
+          </button>
+        </React.Fragment>)}
+        {!visible.length && <p>Không tìm thấy giảng viên phù hợp.</p>}
+      </div>
+    </div>}
+  </div>;
+}
 
 export default function SessionEditor({ session, offering, date, period, user, onClose, onSaved, onViewOffering }) {
   const [form, setForm] = useState({ sessionDate: session?.sessionDate || date, period: session?.period || period,
@@ -14,8 +61,8 @@ export default function SessionEditor({ session, offering, date, period, user, o
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
   const catalog = useLoad(async () => {
-    const [lecturers, rooms, detail] = await Promise.all([api.get("/system/lecturers"), api.get("/system/rooms?includeInactive=true"), api.get(`/scheduling/course-offerings/${offering.id}`)]);
-    return { lecturers: rows(lecturers), rooms: rows(rooms), offering: detail };
+    const [lecturers, rooms, detail, offeringSessions] = await Promise.all([api.get("/system/lecturers"), api.get("/system/rooms?includeInactive=true"), api.get(`/scheduling/course-offerings/${offering.id}`), api.get(`/scheduling/course-offerings/${offering.id}/teaching-sessions`)]);
+    return { lecturers: rows(lecturers), rooms: rows(rooms), offering: detail, offeringSessions: Array.isArray(offeringSessions) ? offeringSessions : [] };
   }, [offering.id]);
   const availability = useLoad(async () => rows(await api.get(`/scheduling/teaching-sessions?${new URLSearchParams({ from: form.sessionDate, to: form.sessionDate })}`)), [form.sessionDate]);
   const currentOffering = catalog.data?.offering || offering;
@@ -29,6 +76,12 @@ export default function SessionEditor({ session, offering, date, period, user, o
   const classConflict = conflicts.find((row) => row.courseOfferingId === offering.id || groupsOf(row.courseOffering).some((group) => ownGroups.has(group.id)));
   const lecturers = catalog.data?.lecturers || [];
   const rooms = catalog.data?.rooms || [];
+  const teachingFaculty = teachingFacultyForOffering(currentOffering);
+  const assignedSession = (catalog.data?.offeringSessions || []).find((row) => row.id !== session?.id);
+  const lecturerLocked = !!assignedSession;
+  useEffect(() => {
+    if (assignedSession?.lecturerId) setForm((current) => current.lecturerId === assignedSession.lecturerId ? current : { ...current, lecturerId: assignedSession.lecturerId });
+  }, [assignedSession?.lecturerId]);
   const roomFloor = (room) => getRoomFloor(room.code) ?? (Number(String(room.code || "").match(/^[^0-9]*([0-9])/)?.[1] || NaN) || null);
   const roomReason = (room) => room.isActive === false ? "Ngừng sử dụng" : room.capacity == null ? "Chưa có sức chứa" : room.capacity < (currentOffering.participantCount || 0) ? "Không đủ chỗ" : conflicts.some((row) => row.roomId === room.id) ? "Đang bận" : "";
   const floors = [...new Set(rooms.map(roomFloor))].sort((a, b) => (a ?? 99) - (b ?? 99));
@@ -70,7 +123,7 @@ export default function SessionEditor({ session, offering, date, period, user, o
     <div className="v20-composer"><div className="sl-editor-info"><h4>THÔNG TIN BUỔI HỌC</h4><strong className="sl-editor-date">{vietnameseDate(form.sessionDate)} · {periodLabel}</strong>
       <div className="sl-editor-hidden-controls"><label>Ngày học<input aria-label="Ngày học" type="date" min={getBusinessTodayKey()} value={form.sessionDate} disabled={!editable || saving} onChange={(event) => { if (event.target.value) setField("sessionDate", event.target.value); }} /></label><label>Buổi<select aria-label="Buổi" value={form.period} disabled={!editable || saving} onChange={(event) => setField("period", event.target.value)}><option value="MORNING">Sáng</option><option value="AFTERNOON">Chiều</option></select></label></div>
       <p className="v20-hint sl-editor-time">Khung giờ buổi học: {form.startTime}–{form.endTime}</p>
-      <label className="v20-field">Giảng viên<select aria-label="Giảng viên" value={form.lecturerId} disabled={!editable || catalog.loading || !!catalog.error || saving} onChange={(event) => setField("lecturerId", event.target.value)}><option value="">Chọn giảng viên</option>{lecturers.filter((row) => row.active !== false || row.id === form.lecturerId).map((row) => { const busy = conflicts.some((item) => item.lecturerId === row.id); return <option key={row.id} value={row.id} disabled={busy || row.active === false}>{row.name}{busy ? " · Đang bận" : ""}</option>; })}</select></label>
+      <label className="v20-field">Giảng viên<LecturerPicker value={form.lecturerId} lecturers={lecturers} offering={currentOffering} conflicts={conflicts} locked={lecturerLocked} disabled={!editable || catalog.loading || !!catalog.error || saving} onChange={(value) => setField("lecturerId", value)} />{teachingFaculty && <small className="sl-teaching-unit-hint">Khoa / Viện phụ trách: {teachingFaculty}</small>}</label>
       {!catalog.loading && !catalog.error && !lecturers.some((row) => row.active !== false) && <Notice>Chưa có giảng viên đang hoạt động. Khai báo tại Hệ thống → Giảng viên.</Notice>}
       <label className="v20-field">Ghi chú<textarea aria-label="Ghi chú buổi học" placeholder="Nhập ghi chú..." maxLength={2000} value={form.note} disabled={!editable || saving} onChange={(event) => setField("note", event.target.value)} /></label>
       {classConflict && <Notice error={`Lớp / nhóm đang bận: ${classConflict.courseOffering?.subject?.name || "Buổi học khác"} · ${shortTime(classConflict.startTime)}–${shortTime(classConflict.endTime)}`} />}

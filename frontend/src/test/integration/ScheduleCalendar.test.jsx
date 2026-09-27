@@ -270,7 +270,9 @@ it("loads institute availability and excludes busy and undersized rooms before s
   await waitFor(() => expect(screen.getByLabelText("Giảng viên")).toBeEnabled());
   await waitFor(() => expect(screen.getByRole("button", { name: /301.*40 chỗ/ })).toBeEnabled());
   expect(screen.getByRole("button", { name: /302.*5 chỗ/ })).toBeDisabled();
-  fireEvent.change(screen.getByLabelText("Giảng viên"), { target: { value: "l" } });
+  fireEvent.click(screen.getByLabelText("Giảng viên"));
+  fireEvent.change(screen.getByLabelText("Tìm giảng viên"), { target: { value: "Bình" } });
+  fireEvent.click(screen.getByRole("option", { name: /Nguyễn Bình/ }));
   const selectedRoom = screen.getByRole("button", { name: /301.*40 chỗ/ });
   fireEvent.click(selectedRoom);
   expect(selectedRoom).toHaveAttribute("aria-pressed", "true");
@@ -279,16 +281,61 @@ it("loads institute availability and excludes busy and undersized rooms before s
   await waitFor(() => expect(saved).toHaveBeenCalled());
   expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/teaching-sessions"), expect.objectContaining({ courseOfferingId: "offering", sessionDate: "2099-01-05", period: "MORNING", roomId: "r", lecturerId: "l", startTime: "07:00", endTime: "12:00" }), { withCredentials: true });
 });
+it("prioritizes the subject faculty then groups lecturers by major A-Z", async () => {
+  const specializedOffering = {
+    ...offering,
+    groupLinks: [{ classGroupId: "g", classGroup: { ...offering.groupLinks[0].classGroup, major: { code: "CNTT", name: "Công nghệ thông tin" } } }],
+  };
+  const candidates = [
+    { id: "business", code: "GV-QTKD-01", name: "TS. Trần An", faculty: "Khoa Kinh tế", active: true },
+    { id: "foreign-z", code: "GV-ATM-02", name: "TS. Vũ Yến", faculty: "Khoa Ngoại ngữ", active: true },
+    { id: "it", code: "GV-CNTT-01", name: "TS. Lê Bình", faculty: "Khoa Công nghệ thông tin", active: true },
+    { id: "foreign-a", code: "GV-ATM-01", name: "TS. Bùi Anh", faculty: "Khoa Ngoại ngữ", active: true },
+  ];
+  axios.get.mockImplementation(async (url) => ({ data: url.includes("/lecturers") ? candidates : url.includes("/rooms") ? rooms : url.endsWith("/course-offerings/offering") ? specializedOffering : [] }));
+
+  render(<SessionEditor offering={specializedOffering} date="2099-01-05" period="MORNING" user={{ canManageScheduling: true }} onClose={jest.fn()} onSaved={jest.fn()} />);
+  await waitFor(() => expect(screen.getByLabelText("Giảng viên")).toBeEnabled());
+  fireEvent.click(screen.getByLabelText("Giảng viên"));
+  const lecturerList = screen.getByRole("listbox", { name: "Danh sách giảng viên" });
+  const options = within(lecturerList).getAllByRole("option");
+  expect(options[0]).toHaveTextContent("Lê Bình");
+  expect(options.map((option) => option.textContent)).toEqual(expect.arrayContaining([expect.stringContaining("Bùi Anh"), expect.stringContaining("Vũ Yến")]));
+  expect(options.findIndex((option) => option.textContent.includes("Bùi Anh"))).toBeLessThan(options.findIndex((option) => option.textContent.includes("Vũ Yến")));
+  expect(within(lecturerList).getAllByText(/CNTT · Đề xuất|ATM|QTKD/).map((heading) => heading.textContent)).toEqual(["CNTT · Đề xuất", "ATM", "QTKD"]);
+  expect(options).toHaveLength(4);
+  expect(options[1]).toBeEnabled();
+
+  fireEvent.change(screen.getByLabelText("Tìm giảng viên"), { target: { value: "tran" } });
+  expect(within(lecturerList).getAllByRole("option")).toHaveLength(1);
+  expect(within(lecturerList).getByRole("option")).toHaveTextContent("Trần An");
+});
+it("prefills and locks the lecturer after the first course-offering session", async () => {
+  const assigned = { id: "assigned", name: "TS. Lê Bình", faculty: "Khoa Công nghệ thông tin", active: true };
+  axios.get.mockImplementation(async (url) => ({ data: url.includes("/lecturers") ? [assigned] : url.includes("/rooms") ? rooms : url.endsWith("/course-offerings/offering/teaching-sessions") ? [{ id: "first", lecturerId: "assigned" }] : url.endsWith("/course-offerings/offering") ? offering : [] }));
+  const saved = jest.fn();
+
+  render(<SessionEditor offering={offering} date="2099-01-05" period="MORNING" user={{ canManageScheduling: true }} onClose={jest.fn()} onSaved={saved} />);
+  await waitFor(() => expect(screen.getByLabelText("Giảng viên cố định")).toHaveTextContent("Lê Bình"));
+  expect(screen.queryByLabelText("Giảng viên")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /301.*40 chỗ/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Lưu buổi học" }));
+
+  await waitFor(() => expect(saved).toHaveBeenCalled());
+  expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/teaching-sessions"), expect.objectContaining({ lecturerId: "assigned", roomId: "r" }), { withCredentials: true });
+});
 it("updates the automatic time range and lecturer conflicts when changing period", async () => {
   axios.get.mockImplementation(async (url) => ({ data: url.includes("/lecturers") ? lecturers : url.includes("/rooms") ? rooms : url.includes("/teaching-sessions?") ? [
     { id: "busy", lecturerId: "l", roomId: "r", period: "MORNING", startTime: "00:00:00", endTime: "00:01:00", status: "planned" },
     { id: "not-held", lecturerId: "l", roomId: "r", period: "AFTERNOON", startTime: "13:00:00", endTime: "17:00:00", status: "not_held" },
   ] : offering }));
   render(<SessionEditor offering={offering} date="2099-01-05" period="MORNING" user={{ canManageScheduling: true }} onClose={jest.fn()} onSaved={jest.fn()} />);
-  expect(await screen.findByRole("option", { name: "Nguyễn Bình · Đang bận" })).toBeDisabled();
+  await waitFor(() => expect(screen.getByLabelText("Giảng viên")).toBeEnabled());
+  fireEvent.click(screen.getByLabelText("Giảng viên"));
+  expect(screen.getByRole("option", { name: /Nguyễn Bình/ })).toBeDisabled();
   fireEvent.change(screen.getByLabelText("Buổi"), { target: { value: "AFTERNOON" } });
   expect(screen.getByText("Khung giờ buổi học: 13:00–17:00")).toBeInTheDocument();
-  expect(screen.getByRole("option", { name: "Nguyễn Bình" })).toBeEnabled();
+  expect(screen.getByRole("option", { name: /Nguyễn Bình/ })).toBeEnabled();
   expect(screen.getByRole("button", { name: /301.*40 chỗ/ })).toBeEnabled();
 });
 it("suppresses occupied date-period slots from complete week data while preserving create and detail flows", async () => {
@@ -353,8 +400,10 @@ it("suppresses occupied date-period slots from complete week data while preservi
   await waitFor(() => expect(screen.getAllByRole("button", { name: /Lớp đã chọn.*(ĐÃ XẾP|KHÔNG DIỄN RA)/ })).toHaveLength(3));
 
   expect(screen.queryByText("Lớp ngoài phạm vi")).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: `Xếp Sáng ${weekDates[0]}` })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: `Xếp Sáng ${weekDates[1]}` })).not.toBeInTheDocument();
+  await waitFor(() => {
+    expect(screen.queryByRole("button", { name: `Xếp Sáng ${weekDates[0]}` })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: `Xếp Sáng ${weekDates[1]}` })).not.toBeInTheDocument();
+  });
   expect(screen.getByRole("button", { name: `Xếp Sáng ${weekDates[2]}` })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: `Xếp Sáng ${weekDates[3]}` })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: `Xếp Chiều ${weekDates[3]}` })).toBeInTheDocument();

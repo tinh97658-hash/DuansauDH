@@ -304,7 +304,7 @@ export class SystemService {
     if (dto.email) await this.ensureEmailUnique(dto.email);
     if (dto.staffId !== undefined && dto.staffId !== null) await this.requireParent(this.staff, dto.staffId, "Tài khoản nhân sự");
     return this.lecturers.create(this.pick(dto, [
-      "staffId", "code", "name", "phone", "email", "academicRank", "academicDegree", "teachingType", "title", "department", "active"
+      "staffId", "code", "name", "phone", "email", "academicRank", "academicDegree", "teachingType", "title", "faculty", "department", "active"
     ]) as any);
   }
   async updateLecturer(id: string, dto: UpdateCatalogDto) {
@@ -313,7 +313,7 @@ export class SystemService {
     if (dto.email && dto.email !== row.email) await this.ensureEmailUnique(dto.email, id);
     if (dto.staffId !== undefined && dto.staffId !== null) await this.requireParent(this.staff, dto.staffId, "Tài khoản nhân sự");
     await row.update(this.pick(dto, [
-      "staffId", "code", "name", "phone", "email", "academicRank", "academicDegree", "teachingType", "title", "department", "active"
+      "staffId", "code", "name", "phone", "email", "academicRank", "academicDegree", "teachingType", "title", "faculty", "department", "active"
     ]) as any);
     return row;
   }

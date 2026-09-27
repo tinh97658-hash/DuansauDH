@@ -28,6 +28,7 @@ export class CreateCatalogDto {
   @IsOptional() @IsString() @MaxLength(50) @Transform(trim) academicDegree?: string;
   @IsOptional() @IsString() @MaxLength(50) @Transform(trim) teachingType?: string;
   @IsOptional() @IsString() @MaxLength(50) @Transform(trim) title?: string;
+  @IsOptional() @IsString() @MaxLength(150) @Transform(trim) faculty?: string;
   @IsOptional() @IsString() @MaxLength(150) @Transform(trim) department?: string;
 }
 
@@ -53,6 +54,7 @@ export class UpdateCatalogDto {
   @IsOptional() @IsString() @MaxLength(50) @Transform(trim) academicDegree?: string;
   @IsOptional() @IsString() @MaxLength(50) @Transform(trim) teachingType?: string;
   @IsOptional() @IsString() @MaxLength(50) @Transform(trim) title?: string;
+  @IsOptional() @IsString() @MaxLength(150) @Transform(trim) faculty?: string;
   @IsOptional() @IsString() @MaxLength(150) @Transform(trim) department?: string;
 }
 

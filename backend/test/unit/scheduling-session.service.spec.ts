@@ -110,6 +110,30 @@ const expectConflictCode = async (promise: Promise<unknown>, code: string) => {
 };
 
 describe("SchedulingService TeachingSession", () => {
+  it("reuses the lecturer already assigned to the course offering", async () => {
+    const mocks = buildService();
+    arrangeValid(mocks, { lecturers: [lecturer(), lecturer("lecturer-2")] });
+    mocks.teachingSessions.findOne.mockResolvedValue(session({ id: "first-session", lecturerId: "lecturer-1" }));
+
+    await expectConflictCode(
+      mocks.service.createTeachingSession(createDto({ lecturerId: "lecturer-2" })),
+      "COURSE_OFFERING_LECTURER_FIXED",
+    );
+    expect(mocks.teachingSessions.create).not.toHaveBeenCalled();
+  });
+
+  it("allows another room while retaining the assigned lecturer", async () => {
+    const mocks = buildService();
+    arrangeValid(mocks, { rooms: [room(), room("room-2")] });
+    mocks.teachingSessions.findOne.mockResolvedValue(session({ id: "first-session", lecturerId: "lecturer-1" }));
+
+    await expect(mocks.service.createTeachingSession(createDto({ roomId: "room-2" }))).resolves.toBeDefined();
+    expect(mocks.teachingSessions.create).toHaveBeenCalledWith(expect.objectContaining({
+      lecturerId: "lecturer-1",
+      roomId: "room-2",
+    }), { transaction });
+  });
+
   it("includes separately selected students in room capacity", async () => {
     const mocks = buildService();
     arrangeValid(mocks, { rooms: [room("room-1", 1)] });

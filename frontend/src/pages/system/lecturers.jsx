@@ -11,6 +11,8 @@ const Lecturers = () => (
     codeLabel="Mã giảng viên"
     nameLabel="Họ và tên"
     sortable={false}
+    editOnDoubleClick
+    showEditAction={false}
     fields={[
       { key: "phone", label: "Số điện thoại", type: "tel" },
       {
@@ -31,7 +33,7 @@ const Lecturers = () => (
         type: "select",
         options: ["Cơ hữu", "Thỉnh giảng", "Kiêm nhiệm"],
       },
-      { key: "department", label: "Đơn vị", type: "text" },
+      { key: "faculty", label: "Khoa / Viện", type: "text", required: true },
     ]}
   />
 );
