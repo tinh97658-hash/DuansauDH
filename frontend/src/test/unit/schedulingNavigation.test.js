@@ -24,6 +24,26 @@ describe("Masters scheduling ribbon", () => {
     }
   });
 
+  it("keeps the action menu open until its toggle is clicked", async () => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ message: "admin" }) });
+    try {
+      const { container } = render(<MemoryRouter initialEntries={["/system/majors"]}><RibbonHeader /></MemoryRouter>);
+      const collapse = await screen.findByRole("button", { name: "Thu gọn menu tác vụ" });
+      const header = container.querySelector(".ribbon-header");
+
+      expect(header).not.toHaveClass("ribbon-commands-collapsed");
+      expect(collapse).toHaveAttribute("aria-expanded", "true");
+      fireEvent.click(collapse);
+      expect(header).toHaveClass("ribbon-commands-collapsed");
+      expect(screen.getByRole("button", { name: "Mở menu tác vụ" })).toHaveAttribute("aria-expanded", "false");
+      fireEvent.click(screen.getByRole("button", { name: "Mở menu tác vụ" }));
+      expect(header).not.toHaveClass("ribbon-commands-collapsed");
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
   it("moves both scheduling actions into the learning-process group without changing routes", () => {
     const entryGroup = ribbons.masters.find((section) => section.label === "THỦ TỤC ĐẦU VÀO");
     const learningGroup = ribbons.masters.find((section) => section.label === "QUÁ TRÌNH HỌC TẬP");
@@ -40,6 +60,7 @@ describe("Masters scheduling ribbon", () => {
     );
     expect(entryGroup.actions).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({ label: "Hồ sơ trúng tuyển", route: "/masters/admitted-records" }),
         expect.objectContaining({ label: "Thống kê tiến độ", route: "/masters/class-course-history" }),
       ])
     );

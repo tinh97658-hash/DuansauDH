@@ -281,16 +281,16 @@ it("loads institute availability and excludes busy and undersized rooms before s
   await waitFor(() => expect(saved).toHaveBeenCalled());
   expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/teaching-sessions"), expect.objectContaining({ courseOfferingId: "offering", sessionDate: "2099-01-05", period: "MORNING", roomId: "r", lecturerId: "l", startTime: "07:00", endTime: "12:00" }), { withCredentials: true });
 });
-it("prioritizes the subject faculty then groups lecturers by major A-Z", async () => {
+it("prioritizes the subject major, then the same discipline, then other disciplines", async () => {
   const specializedOffering = {
     ...offering,
-    groupLinks: [{ classGroupId: "g", classGroup: { ...offering.groupLinks[0].classGroup, major: { code: "CNTT", name: "Công nghệ thông tin" } } }],
+    subject: { ...offering.subject, majorId: "major-it", major: { id: "major-it", code: "CNTT", name: "Công nghệ thông tin", disciplineId: "discipline-it" } },
   };
   const candidates = [
-    { id: "business", code: "GV-QTKD-01", name: "TS. Trần An", faculty: "Khoa Kinh tế", active: true },
-    { id: "foreign-z", code: "GV-ATM-02", name: "TS. Vũ Yến", faculty: "Khoa Ngoại ngữ", active: true },
-    { id: "it", code: "GV-CNTT-01", name: "TS. Lê Bình", faculty: "Khoa Công nghệ thông tin", active: true },
-    { id: "foreign-a", code: "GV-ATM-01", name: "TS. Bùi Anh", faculty: "Khoa Ngoại ngữ", active: true },
+    { id: "business", code: "GV-QTKD-01", name: "TS. Trần An", disciplineId: "discipline-business", majorId: "major-business", discipline: { code: "7340101", name: "Quản trị kinh doanh" }, major: { code: "QTKD", name: "Quản trị kinh doanh" }, active: true },
+    { id: "it-other", code: "GV-KTPM-01", name: "TS. Bùi Anh", disciplineId: "discipline-it", majorId: "major-software", discipline: { code: "7480201", name: "Khoa học máy tính" }, major: { code: "KTPM", name: "Kỹ thuật phần mềm" }, active: true },
+    { id: "it", code: "GV-CNTT-01", name: "TS. Lê Bình", disciplineId: "discipline-it", majorId: "major-it", discipline: { code: "7480201", name: "Khoa học máy tính" }, major: { code: "CNTT", name: "Công nghệ thông tin" }, active: true },
+    { id: "foreign", code: "GV-ATM-01", name: "TS. Vũ Yến", disciplineId: "discipline-language", majorId: "major-language", discipline: { code: "7220201", name: "Ngôn ngữ Anh" }, major: { code: "ATM", name: "Ngôn ngữ Anh" }, active: true },
   ];
   axios.get.mockImplementation(async (url) => ({ data: url.includes("/lecturers") ? candidates : url.includes("/rooms") ? rooms : url.endsWith("/course-offerings/offering") ? specializedOffering : [] }));
 
@@ -300,9 +300,12 @@ it("prioritizes the subject faculty then groups lecturers by major A-Z", async (
   const lecturerList = screen.getByRole("listbox", { name: "Danh sách giảng viên" });
   const options = within(lecturerList).getAllByRole("option");
   expect(options[0]).toHaveTextContent("Lê Bình");
-  expect(options.map((option) => option.textContent)).toEqual(expect.arrayContaining([expect.stringContaining("Bùi Anh"), expect.stringContaining("Vũ Yến")]));
+  expect(options[0]).toHaveTextContent("Đúng chuyên ngành");
+  expect(options[1]).toHaveTextContent("Bùi Anh");
+  expect(options[1]).toHaveTextContent("Cùng ngành");
   expect(options.findIndex((option) => option.textContent.includes("Bùi Anh"))).toBeLessThan(options.findIndex((option) => option.textContent.includes("Vũ Yến")));
-  expect(within(lecturerList).getAllByText(/CNTT · Đề xuất|ATM|QTKD/).map((heading) => heading.textContent)).toEqual(["CNTT · Đề xuất", "ATM", "QTKD"]);
+  expect(within(lecturerList).getByText("CNTT · Công nghệ thông tin · Đề xuất")).toBeInTheDocument();
+  expect(within(lecturerList).getByText("KTPM · Kỹ thuật phần mềm · Cùng ngành")).toBeInTheDocument();
   expect(options).toHaveLength(4);
   expect(options[1]).toBeEnabled();
 

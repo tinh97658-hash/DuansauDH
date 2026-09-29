@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import successCircle from "../../assets/create-offering-success.svg";
 import { api, intersectDays, message, normalize, Notice, rows, SearchSelect, suggestOfferingName, unique, useLoad } from "./shared";
 import { isCommonMajor } from "../../utils/majorScope";
+import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 
 const groupLabel = (group) => [group?.code, group?.name].filter(Boolean).join(" · ");
 
@@ -10,6 +11,7 @@ export default function CreateOffering({ user }) {
   const navigate = useNavigate();
   const canEdit = user.role === "admin" || user.canManageScheduling === true;
   const [majorId, setMajor] = useState("");
+  const [disciplineId, setDiscipline] = useState("");
   const [year, setYear] = useState("");
   const [subjectId, setSubject] = useState("");
   const [offeringName, setOfferingName] = useState("");
@@ -52,6 +54,8 @@ export default function CreateOffering({ user }) {
   }, [roster]);
 
   const majors = useLoad(async () => rows(await api.get("/system/majors?program=masters")).filter((item) => item.active !== false && !isCommonMajor(item)), []);
+  const disciplines = disciplinesFromMajors(majors.data || []);
+  const visibleMajors = majorsForDiscipline(majors.data || [], disciplineId);
   const groups = useLoad(async () => majorId ? rows(await api.get(`/masters/class-groups?${new URLSearchParams({ majorId })}`)) : [], [majorId]);
   const candidates = useLoad(async () => majorId && year ? (await api.get(`/scheduling/course-offering-candidates?${new URLSearchParams({ program: "masters", majorId, academicYear: year })}`)).subjects : [], [majorId, year, created?.id]);
   const candidate = candidates.data?.find((item) => item.subject.id === subjectId);
@@ -204,13 +208,17 @@ export default function CreateOffering({ user }) {
     <aside className="sl-left">
       <div className="sl-scope"><div className="sl-eyebrow">PHẠM VI LÀM VIỆC</div>
         <div className="sl-create-scope-fields">
-          <div className="sl-create-scope-field">
-            <div className="v20-scope-step"><b>1</b>CHUYÊN NGÀNH</div>
-            <SearchSelect label="Chọn chuyên ngành" placeholder="Chọn chuyên ngành" value={majorId} disabled={majors.loading} options={majors.data || []} onChange={(value) => changeScope(() => { setMajor(value); setYear(""); })} />
+          <div className="sl-create-scope-field sl-create-scope-discipline">
+            <div className="v20-scope-step"><b>1</b>NGÀNH</div>
+            <SearchSelect label="Ngành" placeholder="Tất cả ngành" value={disciplineId} disabled={majors.loading} options={[{ id: "", name: "Tất cả ngành" }, ...disciplines.map((item) => ({ ...item, name: disciplineOptionLabel(item), code: "" }))]} onChange={(value) => changeScope(() => { setDiscipline(value); setMajor(""); setYear(""); })} />
+          </div>
+          <div className="sl-create-scope-field sl-create-scope-major">
+            <div className="v20-scope-step"><b>2</b>CHUYÊN NGÀNH</div>
+            <SearchSelect label="Chọn chuyên ngành" placeholder="Chọn chuyên ngành" value={majorId} disabled={majors.loading} options={visibleMajors} onChange={(value) => changeScope(() => { setMajor(value); setYear(""); })} />
             {majors.error && <Notice error={majors.error} />}
           </div>
-          <div className="sl-create-scope-field">
-            <div className="v20-scope-step"><b>2</b>KHÓA / NĂM HỌC</div>
+          <div className="sl-create-scope-field sl-create-scope-year">
+            <div className="v20-scope-step"><b>3</b>KHÓA / NĂM HỌC</div>
             <select className={`sl-create-year${year ? "" : " sl-placeholder"}`} aria-label="Khóa / Năm học" value={year} disabled={!majorId || groups.loading} onChange={(event) => changeScope(() => setYear(event.target.value))}><option value="">Chọn khóa / năm</option>{years.map((value) => <option key={value}>{value}</option>)}</select>
             {groups.error && <Notice error={groups.error} />}
           </div>
@@ -218,7 +226,7 @@ export default function CreateOffering({ user }) {
         {majorId && !groups.loading && !groups.error && !years.length && <Notice>Chưa có nhóm cho chuyên ngành này. <Link to="/masters/create-class-groups">Tạo nhóm học viên</Link></Notice>}
       </div>
       <div className="sl-worklist">
-        <div className="sl-create-subject-title"><div className="v20-scope-step"><b>3</b>HỌC PHẦN CÒN CẦN TỔ CHỨC</div><span>{filteredSubjects.length}</span></div>
+        <div className="sl-create-subject-title"><div className="v20-scope-step"><b>4</b>HỌC PHẦN CÒN CẦN TỔ CHỨC</div><span>{filteredSubjects.length}</span></div>
         <div className="sl-create-subject-search"><span>⌕</span><input aria-label="Tìm học phần" placeholder="Tìm học phần..." value={query} onChange={(event) => setQuery(event.target.value)} /></div>
         {candidates.loading && majorId && year ? <Notice>Đang tải học phần...</Notice> : candidates.error ? <Notice error={candidates.error} /> : majorId && year ? <div className="sl-create-subject-list">{filteredSubjects.map((item) => {
           // Liên ngành chỉ là quyền ghép nhóm; nhãn "Môn chung" dành cho khối kiến thức chung (KC).

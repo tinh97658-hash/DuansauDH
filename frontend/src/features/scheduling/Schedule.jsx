@@ -5,6 +5,7 @@ import { api, groupsOf, intersectDays, labelOf, message, Modal, normalize, Notic
 import { addDays, formatDateKey, getBusinessTodayKey, isSessionPast, mondayOf, vietnameseDate, vietnameseDayMonth, vietnameseWeekdayShort, weekDaysFrom } from "../../utils/schedulingCalendar";
 import SessionEditor from "./SessionEditor";
 import OfferingDetails from "./OfferingDetails";
+import { disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 
 const WEEK_SLOT_LIMIT = 3;
 const DAY_FOCUS_STATUS_LANES = [
@@ -240,6 +241,7 @@ export default function Schedule({ user }) {
   const currentWeek = formatDateKey(mondayOf(todayKey));
   const appliedRequest = useRef("");
   const [majorId, setMajor] = useState("");
+  const [disciplineId, setDiscipline] = useState("");
   const [year, setYear] = useState("");
   const [status, setStatus] = useState("active");
   const [query, setQuery] = useState("");
@@ -255,6 +257,9 @@ export default function Schedule({ user }) {
   const canEdit = user.canManageScheduling === true;
   const offerings = useLoad(async () => rows(await api.get("/scheduling/course-offerings?program=masters")), []);
   const majors = useLoad(async () => rows(await api.get("/system/majors?program=masters")), []);
+  const disciplines = disciplinesFromMajors(majors.data || []);
+  const visibleMajors = majorsForDiscipline(majors.data || [], disciplineId);
+  const visibleMajorIds = new Set(visibleMajors.map((major) => major.id));
   const end = formatDateKey(addDays(week, 6));
   const sessions = useLoad(async () => rows(await api.get(`/scheduling/teaching-sessions?${new URLSearchParams({ from: week, to: end })}`)), [week, end]);
   const pending = useLoad(async () => canEdit ? rows(await api.get("/scheduling/pending-teaching-sessions")) : [], [canEdit]);
@@ -272,7 +277,12 @@ export default function Schedule({ user }) {
     // Apply the navigation target once, not after every save/refresh.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requested, offerings.data]);
-  const inScope = (offering) => groupsOf(offering).some((group) => (!majorId || (group.majorId || group.major?.id) === majorId) && (!year || group.academicYear === year));
+  const inScope = (offering) => groupsOf(offering).some((group) => {
+    const groupMajorId = group.majorId || group.major?.id;
+    return (!disciplineId || visibleMajorIds.has(groupMajorId))
+      && (!majorId || groupMajorId === majorId)
+      && (!year || group.academicYear === year);
+  });
   const scoped = all.filter(inScope);
   const listed = scoped.filter((offering) => offering.status === status && normalize(`${offering.subject?.code} ${offering.subject?.name} ${labelOf(offering)}`).includes(normalize(query)));
   const visibleSessions = (sessions.data || []).filter((session) => inScope(session.courseOffering));
@@ -345,8 +355,9 @@ export default function Schedule({ user }) {
     <button type="button" className="sl-sidebar-toggle" aria-label={sidebarCollapsed ? "Mở phạm vi làm việc" : "Thu gọn phạm vi làm việc"} aria-expanded={!sidebarCollapsed} onClick={() => setSidebarCollapsed((value) => !value)}>{sidebarCollapsed ? "›" : "‹"}</button>
     <div className="sl-sidebar-content"><div className="sl-scope"><div className="sl-eyebrow">PHẠM VI LÀM VIỆC</div>
     <div className="sl-schedule-scope-fields">
-      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>1</b>CHUYÊN NGÀNH</div><SearchSelect label="Chuyên ngành" value={majorId} placeholder="Tất cả chuyên ngành" options={[{ id: "", name: "Tất cả chuyên ngành" }, ...(majors.data || [])]} onChange={(value) => changeScope(() => { setMajor(value); setYear(""); })} /></div>
-      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>2</b>KHÓA / NĂM HỌC</div><select className={`sl-select sl-year-select${year ? "" : " sl-placeholder"}`} aria-label="Khóa / Năm" value={year} onChange={(event) => changeScope(() => setYear(event.target.value))}><option value="">Tất cả</option>{unique(all.flatMap(groupsOf).filter((group) => !majorId || group.majorId === majorId).map((group) => group.academicYear)).sort((a, b) => b.localeCompare(a, "vi", { numeric: true })).map((value) => <option key={value}>{value}</option>)}</select></div>
+      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>1</b>NGÀNH</div><SearchSelect label="Ngành" value={disciplineId} placeholder="Tất cả ngành" options={[{ id: "", name: "Tất cả ngành" }, ...disciplines.map((item) => ({ ...item, name: item.name, code: "" }))]} onChange={(value) => changeScope(() => { setDiscipline(value); setMajor(""); setYear(""); })} /></div>
+      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>2</b>CHUYÊN NGÀNH</div><SearchSelect label="Chuyên ngành" value={majorId} placeholder="Tất cả chuyên ngành" options={[{ id: "", name: "Tất cả chuyên ngành" }, ...visibleMajors]} onChange={(value) => changeScope(() => { setMajor(value); setYear(""); })} /></div>
+      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>3</b>KHÓA / NĂM HỌC</div><select className={`sl-select sl-year-select${year ? "" : " sl-placeholder"}`} aria-label="Khóa / Năm" value={year} onChange={(event) => changeScope(() => setYear(event.target.value))}><option value="">Tất cả</option>{unique(all.flatMap(groupsOf).filter((group) => (!disciplineId || visibleMajorIds.has(group.majorId || group.major?.id)) && (!majorId || (group.majorId || group.major?.id) === majorId)).map((group) => group.academicYear)).sort((a, b) => b.localeCompare(a, "vi", { numeric: true })).map((value) => <option key={value}>{value}</option>)}</select></div>
     </div>
     {!canEdit && <div className="sl-attention">Quyền chỉ xem · Quản trị viên phân công người phụ trách tại Hệ thống → QL Người dùng.</div>}
     {majors.error && <Notice error={majors.error} />}

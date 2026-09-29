@@ -8,6 +8,7 @@ import { Op } from "sequelize";
 import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { Major } from "../database/models/common/major.model.js";
+import { Discipline } from "../database/models/common/discipline.model.js";
 import { Lecturer } from "../database/models/common/lecturer.model.js";
 import { Room } from "../database/models/common/room.model.js";
 import { Subject } from "../database/models/plan/subject.model.js";
@@ -349,6 +350,12 @@ export class SchedulingService {
         as: "subject",
         required: true,
         ...(subjectWhere ? { where: subjectWhere } : {}),
+        include: [{
+          model: Major,
+          as: "major",
+          attributes: ["id", "code", "name", "disciplineId"],
+          include: [{ model: Discipline, as: "discipline", attributes: ["id", "code", "name"] }],
+        }],
       },
       {
         model: CourseOfferingClassGroup,
@@ -1094,7 +1101,7 @@ export class SchedulingService {
           },
         ],
       },
-      { model: Lecturer, as: "lecturer", attributes: ["id", "code", "name", "faculty", "department", "active"] },
+      { model: Lecturer, as: "lecturer", attributes: ["id", "code", "name", "disciplineId", "majorId", "active"] },
       { model: Room, as: "room", attributes: ["id", "code", "name", "capacity", "isActive"] },
       { model: Staff, as: "confirmedBy", attributes: ["id", "name", "email"] },
     ];

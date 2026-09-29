@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import { jest } from "@jest/globals";
+import { Op } from "sequelize";
 import { PlanService } from "../../src/plan/plan.service.js";
 
 const buildService = () => {
@@ -11,6 +12,7 @@ const buildService = () => {
     {} as never,
     majors as never,
     admissionRecords as never,
+    {} as never,
     {} as never,
     {} as never,
     {} as never,
@@ -78,6 +80,57 @@ describe("PlanService admission major synchronization", () => {
   });
 });
 
+describe("PlanService admission record pagination", () => {
+  it("loads only the requested 20-record page and returns filtered totals", async () => {
+    const admissionRecords = {
+      findAndCountAll: jest.fn().mockResolvedValue({
+        rows: Array.from({ length: 20 }, (_, index) => ({ id: `record-${index + 21}` })),
+        count: 45,
+      }),
+      count: jest.fn()
+        .mockResolvedValueOnce(40)
+        .mockResolvedValueOnce(5)
+        .mockResolvedValueOnce(30),
+    };
+    const classGroupMembers = {
+      findAll: jest.fn().mockResolvedValue([{
+        admissionRecordId: "record-21",
+        studentId: null,
+        classGroup: { id: "group-1", name: "CNT2026.01", code: "26CNT01", academicYear: "2026" },
+      }]),
+    };
+    const service = new PlanService(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      admissionRecords as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      classGroupMembers as never,
+    );
+
+    const result = await service.listAdmissionRecords(
+      undefined, undefined, "2026", undefined, undefined, undefined, "2", "20", "Đã trúng tuyển", true,
+    );
+
+    expect(admissionRecords.findAndCountAll).toHaveBeenCalledWith(expect.objectContaining({
+      limit: 20,
+      offset: 20,
+    }));
+    const query = admissionRecords.findAndCountAll.mock.calls[0][0] as any;
+    expect(query.where.studyStatus[Op.ne]).toBe("Đã trúng tuyển");
+    expect(result.data).toHaveLength(20);
+    expect(result.data[0].assignedGroup).toEqual({
+      id: "group-1", name: "CNT2026.01", code: "26CNT01", academicYear: "2026",
+    });
+    expect(result.pagination).toEqual({ page: 2, pageSize: 20, total: 45, totalPages: 3 });
+    expect(result.stats).toEqual({ total: 45, mastersCount: 40, doctoralCount: 5, eligibleCount: 30 });
+  });
+});
+
 describe("PlanService major-scoped subject catalogs", () => {
   it("trainingPlan excludes the legacy CHUNG pseudo-major", async () => {
     const majors = {
@@ -97,6 +150,7 @@ describe("PlanService major-scoped subject catalogs", () => {
       {} as never,
       {} as never,
       majors as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,

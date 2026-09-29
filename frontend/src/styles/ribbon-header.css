@@ -286,51 +286,53 @@
   white-space: nowrap;
 }
 
-/* Desktop action rail: section tabs stay visible while actions yield page height. */
-@media (min-width: 761px) and (hover: hover) and (pointer: fine) {
-  .ribbon-command-scroll {
-    position: relative;
-    height: 10px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    transition: height 0.16s ease;
-  }
+.ribbon-command-scroll {
+  max-height: 87px;
+  overflow-y: hidden;
+  transition: max-height 0.16s ease, border-color 0.16s ease;
+}
 
-  .ribbon-command-scroll::after {
-    content: "";
-    position: absolute;
-    top: 3px;
-    left: 50%;
-    width: 42px;
-    height: 3px;
-    border-top: 1px solid #AEBCC8;
-    border-bottom: 1px solid #D5DEE6;
-    transform: translateX(-50%);
-    pointer-events: none;
-    transition: opacity 0.1s ease;
-  }
+.ribbon-command-toggle {
+  position: absolute;
+  z-index: 2;
+  right: 12px;
+  bottom: -12px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid #D2DEE8;
+  border-radius: 50%;
+  background: #F8FBFD;
+  color: #6B8194;
+  box-shadow: 0 1px 3px rgba(18, 59, 99, 0.08);
+  opacity: 0.86;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+}
 
-  .ribbon-command-scroll .ribbon-commands {
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.1s ease;
-  }
+.ribbon-command-toggle svg {
+  width: 15px;
+  height: 15px;
+}
 
-  .ribbon-command-scroll:hover,
-  .ribbon-command-scroll:focus-within {
-    height: 87px;
-  }
+.ribbon-command-toggle:hover {
+  border-color: #8CB8D0;
+  background: #EFF8FC;
+  color: #087FA5;
+  box-shadow: 0 2px 6px rgba(18, 91, 128, 0.14);
+  opacity: 1;
+}
 
-  .ribbon-command-scroll:hover::after,
-  .ribbon-command-scroll:focus-within::after {
-    opacity: 0;
-  }
+.ribbon-command-toggle:focus-visible {
+  outline: 2px solid #0B7F9C;
+  outline-offset: 1px;
+}
 
-  .ribbon-command-scroll:hover .ribbon-commands,
-  .ribbon-command-scroll:focus-within .ribbon-commands {
-    opacity: 1;
-    pointer-events: auto;
-  }
+.ribbon-header.ribbon-commands-collapsed .ribbon-command-scroll {
+  max-height: 0;
+  border-bottom-color: transparent;
 }
 
 @media (max-width: 760px) {

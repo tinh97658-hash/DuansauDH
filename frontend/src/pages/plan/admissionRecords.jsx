@@ -6,20 +6,24 @@ import "react-toastify/dist/ReactToastify.css";
 import {
   Avatar, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, FormControl, FormControlLabel,
-  IconButton, InputAdornment, MenuItem, Paper, Radio, RadioGroup, Select,
-  Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  IconButton, InputAdornment, InputLabel, MenuItem, Paper, Radio, RadioGroup, Select,
+  Pagination, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
   AddPhotoAlternateRounded, AddRounded, CheckCircleRounded, CloseRounded,
-  DeleteRounded, EditRounded, PersonRounded, PrintRounded, RefreshRounded, SearchRounded,
+  DeleteRounded, EditRounded, PersonRounded, PrintRounded, SearchRounded,
   VisibilityRounded,
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
 import { getSelectableMajors, normalizeMajorsResponse, selectMajorForLevel } from "../../utils/majors";
+import {
+  disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline,
+} from "../../utils/disciplineScope";
 
 const currentYear = new Date().getFullYear();
+const PAGE_SIZE = 20;
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
 
 const TRAINING_LEVELS = [
@@ -184,18 +188,25 @@ const cellInputSx = {
   },
 };
 
-const AdmissionRecords = () => {
+const AdmissionRecords = ({ mode = "applications" }) => {
   const navigate = useNavigate();
+  const isAdmittedMasters = mode === "admitted-masters";
+  const recordDetailBase = isAdmittedMasters ? "/masters/admitted-records" : "/plan/admission-records";
 
   // Global Filter State
   const [year, setYear] = useState(String(currentYear));
-  const [levelFilter, setLevelFilter] = useState("ALL");
+  const [levelFilter, setLevelFilter] = useState(isAdmittedMasters ? "Thạc sĩ" : "ALL");
+  const [disciplineFilter, setDisciplineFilter] = useState("");
   const [majorFilter, setMajorFilter] = useState("ALL");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState(isAdmittedMasters ? "Đã trúng tuyển" : "ALL");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   // Data State
   const [records, setRecords] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 1 });
+  const [stats, setStats] = useState({ total: 0, mastersCount: 0, doctoralCount: 0, eligibleCount: 0 });
   const [majors, setMajors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -204,6 +215,7 @@ const AdmissionRecords = () => {
   // Dialog State
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formData, setFormData] = useState(createEmptyForm(String(currentYear)));
+  const [formDisciplineId, setFormDisciplineId] = useState("");
   const [isPrintOpen, setIsPrintOpen] = useState(false);
   const [printRecord] = useState(null);
   const [deletingRecord, setDeletingRecord] = useState(null);
@@ -217,6 +229,16 @@ const AdmissionRecords = () => {
       ? normalizeMajorsResponse(majors).filter((major) => major.active !== false)
       : getSelectableMajors(majors, levelFilter),
     [majors, levelFilter],
+  );
+  const filterDisciplines = useMemo(() => disciplinesFromMajors(filterMajors), [filterMajors]);
+  const visibleFilterMajors = useMemo(
+    () => majorsForDiscipline(filterMajors, disciplineFilter),
+    [filterMajors, disciplineFilter],
+  );
+  const formDisciplines = useMemo(() => disciplinesFromMajors(selectableMajors), [selectableMajors]);
+  const visibleSelectableMajors = useMemo(
+    () => majorsForDiscipline(selectableMajors, formDisciplineId),
+    [selectableMajors, formDisciplineId],
   );
 
   const fileInputRef = useRef(null);
@@ -243,7 +265,7 @@ const AdmissionRecords = () => {
   }, []);
 
   // Load Records
-  const loadRecords = useCallback(async () => {
+  const loadRecords = useCallback(async (signal) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -251,43 +273,42 @@ const AdmissionRecords = () => {
       if (levelFilter !== "ALL") params.append("trainingLevel", levelFilter);
       if (majorFilter !== "ALL") params.append("majorId", majorFilter);
       if (statusFilter !== "ALL") params.append("status", statusFilter);
+      if (!isAdmittedMasters) params.append("excludeStatus", "Đã trúng tuyển");
+      if (isAdmittedMasters) params.append("includeGroup", "true");
+      if (disciplineFilter) params.append("disciplineId", disciplineFilter);
+      if (debouncedSearch) params.append("search", debouncedSearch);
+      params.append("page", String(page));
+      params.append("pageSize", String(PAGE_SIZE));
 
-      const { data } = await axios.get(`${API_BASE_URL}/plan/admission-records?${params.toString()}`, { withCredentials: true });
-      setRecords(Array.isArray(data) ? data : []);
+      const { data } = await axios.get(`${API_BASE_URL}/plan/admission-records?${params.toString()}`, {
+        withCredentials: true,
+        signal,
+      });
+      setRecords(Array.isArray(data?.data) ? data.data : []);
+      setPagination(data?.pagination || { page, pageSize: PAGE_SIZE, total: 0, totalPages: 1 });
+      setStats(data?.stats || { total: 0, mastersCount: 0, doctoralCount: 0, eligibleCount: 0 });
     } catch (err) {
+      if (axios.isCancel(err) || err.code === "ERR_CANCELED") return;
       toast.error(err.response?.data?.message || "Không thể tải danh sách hồ sơ tuyển sinh");
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  }, [year, levelFilter, majorFilter, statusFilter]);
+  }, [year, levelFilter, majorFilter, statusFilter, disciplineFilter, debouncedSearch, page, isAdmittedMasters]);
 
   useEffect(() => {
-    loadRecords();
+    const controller = new AbortController();
+    loadRecords(controller.signal);
+    return () => controller.abort();
   }, [loadRecords]);
 
-  // Filtered in-memory list by search term
-  const filteredRecords = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return records;
-    return records.filter((r) => {
-      const matchName = (r.fullName || "").toLowerCase().includes(q);
-      const matchCode = (r.code || "").toLowerCase().includes(q);
-      const matchPhone = (r.phone || "").includes(q);
-      const matchEmail = (r.email || "").toLowerCase().includes(q);
-      const matchIdCard = (r.idCard || "").includes(q);
-      const matchMajor = (r.majorName || r.major?.name || "").toLowerCase().includes(q);
-      return matchName || matchCode || matchPhone || matchEmail || matchIdCard || matchMajor;
-    });
-  }, [records, search]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
-  // Summary statistics
-  const stats = useMemo(() => {
-    const total = records.length;
-    const mastersCount = records.filter((r) => r.trainingLevel === "Thạc sĩ").length;
-    const doctoralCount = records.filter((r) => r.trainingLevel === "Tiến sĩ").length;
-    const eligibleCount = records.filter((r) => r.studyStatus === "Đủ điều kiện dự tuyển" || r.studyStatus === "Đã trúng tuyển").length;
-    return { total, mastersCount, doctoralCount, eligibleCount };
-  }, [records]);
+  useEffect(() => {
+    setPage(1);
+  }, [year, levelFilter, disciplineFilter, majorFilter, statusFilter, debouncedSearch]);
 
   // Handle Photo Upload (Base64)
   const handlePhotoUpload = (e) => {
@@ -317,7 +338,8 @@ const AdmissionRecords = () => {
       nextForm.majorId = defaultMajor.id;
       nextForm.majorName = defaultMajor.name;
     }
-    nextForm.code = `HV${year.slice(-2)}${String(records.length + 1).padStart(3, "0")}`;
+    setFormDisciplineId(majorDisciplineId(defaultMajor));
+    nextForm.code = `HV${year.slice(-2)}${String(stats.total + 1).padStart(3, "0")}`;
     setFormData(nextForm);
     setIsFormOpen(true);
   };
@@ -327,6 +349,7 @@ const AdmissionRecords = () => {
     const docs = rec.documents || {};
     const trainingLevel = rec.trainingLevel || "Thạc sĩ";
     const selectedMajor = selectMajorForLevel(majors, trainingLevel, rec.majorId);
+    setFormDisciplineId(majorDisciplineId(selectedMajor));
     setFormData({
       id: rec.id,
       code: rec.code || "",
@@ -416,15 +439,14 @@ const AdmissionRecords = () => {
     setSaving(true);
     try {
       if (formData.id) {
-        const { data: updated } = await axios.put(`${API_BASE_URL}/plan/admission-records/${formData.id}`, payload, { withCredentials: true });
+        await axios.put(`${API_BASE_URL}/plan/admission-records/${formData.id}`, payload, { withCredentials: true });
         toast.success("Cập nhật hồ sơ thành công");
-        setRecords((prev) => prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)));
       } else {
-        const { data: created } = await axios.post(`${API_BASE_URL}/plan/admission-records`, payload, { withCredentials: true });
+        await axios.post(`${API_BASE_URL}/plan/admission-records`, payload, { withCredentials: true });
         toast.success("Thêm mới hồ sơ học viên thành công");
-        setRecords((prev) => [created, ...prev]);
       }
       setIsFormOpen(false);
+      await loadRecords();
     } catch (err) {
       toast.error(err.response?.data?.message || "Không thể lưu hồ sơ học viên");
     } finally {
@@ -438,8 +460,9 @@ const AdmissionRecords = () => {
     try {
       await axios.delete(`${API_BASE_URL}/plan/admission-records/${deletingRecord.id}`, { withCredentials: true });
       toast.success(`Đã xóa hồ sơ "${deletingRecord.fullName}"`);
-      setRecords((prev) => prev.filter((r) => r.id !== deletingRecord.id));
       setDeletingRecord(null);
+      if (records.length === 1 && page > 1) setPage((current) => current - 1);
+      else await loadRecords();
     } catch (err) {
       toast.error(err.response?.data?.message || "Không thể xóa hồ sơ");
     }
@@ -451,10 +474,12 @@ const AdmissionRecords = () => {
 
   return (
     <FeatureLayout
-      title="Nhập hồ sơ tuyển sinh"
-      group="Kế hoạch khóa mới"
-      desc="Quản lý thông tin hồ sơ thí sinh dự tuyển, nhập liệu theo form A4 và xuất phiếu hồ sơ học viên chi tiết."
-      maxWidth={1440}
+      title={isAdmittedMasters ? "Hồ sơ trúng tuyển" : "Nhập hồ sơ tuyển sinh"}
+      group={isAdmittedMasters ? "Thủ tục đầu vào" : "Kế hoạch khóa mới"}
+      desc={isAdmittedMasters
+        ? "Quản lý hồ sơ học viên Thạc sĩ đã trúng tuyển và thực hiện các thủ tục đầu vào."
+        : "Quản lý hồ sơ thí sinh đang dự tuyển, nhập liệu theo form A4 và xuất phiếu hồ sơ chi tiết."}
+      maxWidth={1880}
     >
       <ToastContainer position="top-right" newestOnTop autoClose={2500} limit={3} />
 
@@ -462,115 +487,171 @@ const AdmissionRecords = () => {
       <Paper
         variant="outlined"
         sx={{
-          p: 1.25,
+          p: 1.5,
           mb: 1.5,
-          bgcolor: "#FFFFFF",
-          borderColor: "#DFE4E8",
-          borderRadius: "4px",
+          bgcolor: "#FBFDFF",
+          borderColor: "#D8E5EF",
+          borderRadius: "12px",
+          boxShadow: "0 4px 14px rgba(23, 62, 117, 0.05)",
+          "& .MuiInputLabel-root": { color: "#607486" },
+          "& .MuiOutlinedInput-root": {
+            bgcolor: "#F5F8FC",
+            borderRadius: "8px",
+            "& fieldset": { borderColor: "#D8E5EF" },
+          },
         }}
       >
         <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems="center" justifyContent="space-between">
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="center" sx={{ width: { xs: "100%", md: "auto" }, flexGrow: 1 }} flexWrap="wrap">
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <Select value={year} onChange={(e) => setYear(e.target.value)} sx={{ height: 32, fontSize: 12, bgcolor: "#F7F9FA" }}>
+            <FormControl size="small" sx={{ minWidth: 108 }}>
+              <InputLabel shrink>Năm</InputLabel>
+              <Select label="Năm" value={year} onChange={(e) => setYear(e.target.value)} sx={{ height: 40, fontSize: 12 }}>
                 {YEARS.map((y) => (
                   <MenuItem key={y} value={y} sx={{ fontSize: 12 }}>
-                    Năm: <strong>{y}</strong>
+                    {y}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
 
-            <FormControl size="small" sx={{ minWidth: 130 }}>
+            {!isAdmittedMasters && <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel shrink>Trình độ</InputLabel>
               <Select
+                label="Trình độ"
                 value={levelFilter}
                 onChange={(e) => {
                   setLevelFilter(e.target.value);
+                  setDisciplineFilter("");
                   setMajorFilter("ALL");
                 }}
-                sx={{ height: 32, fontSize: 12, bgcolor: "#F7F9FA" }}
+                sx={{ height: 40, fontSize: 12 }}
               >
                 <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả trình độ</MenuItem>
                 {TRAINING_LEVELS.map((l) => (
                   <MenuItem key={l.value} value={l.value} sx={{ fontSize: 12 }}>{l.label}</MenuItem>
                 ))}
               </Select>
+            </FormControl>}
+
+            <FormControl size="small" sx={{ minWidth: 190 }}>
+              <InputLabel shrink>Ngành</InputLabel>
+              <Select
+                label="Ngành"
+                value={disciplineFilter}
+                onChange={(e) => {
+                  setDisciplineFilter(e.target.value);
+                  setMajorFilter("ALL");
+                }}
+                displayEmpty
+                sx={{ height: 40, fontSize: 12 }}
+              >
+                <MenuItem value="" sx={{ fontSize: 12 }}>Tất cả ngành</MenuItem>
+                {filterDisciplines.map((discipline) => (
+                  <MenuItem key={discipline.id} value={discipline.id} sx={{ fontSize: 12 }}>
+                    {disciplineOptionLabel(discipline)}
+                  </MenuItem>
+                ))}
+              </Select>
             </FormControl>
 
             <FormControl size="small" sx={{ minWidth: 220, flexGrow: 1 }}>
-              <Select value={majorFilter} onChange={(e) => setMajorFilter(e.target.value)} sx={{ height: 32, fontSize: 12, bgcolor: "#F7F9FA" }}>
-                <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả chuyên ngành ({majors.length})</MenuItem>
-                {filterMajors.map((m) => (
+              <InputLabel shrink>Chuyên ngành</InputLabel>
+              <Select label="Chuyên ngành" value={majorFilter} onChange={(e) => setMajorFilter(e.target.value)} sx={{ height: 40, fontSize: 12 }}>
+                <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả chuyên ngành ({visibleFilterMajors.length})</MenuItem>
+                {visibleFilterMajors.map((m) => (
                   <MenuItem key={m.id} value={m.id} sx={{ fontSize: 12 }}>{m.code} — {m.name}</MenuItem>
                 ))}
               </Select>
             </FormControl>
 
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} sx={{ height: 32, fontSize: 12, bgcolor: "#F7F9FA" }}>
+            {!isAdmittedMasters && <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel shrink>Trạng thái</InputLabel>
+              <Select label="Trạng thái" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} sx={{ height: 40, fontSize: 12 }}>
                 <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả trạng thái</MenuItem>
-                {STUDY_STATUSES.map((s) => (
+                {STUDY_STATUSES.filter((s) => s !== "Đã trúng tuyển").map((s) => (
                   <MenuItem key={s} value={s} sx={{ fontSize: 12 }}>{s}</MenuItem>
                 ))}
               </Select>
-            </FormControl>
+            </FormControl>}
+
+            {!isAdmittedMasters && (
+              <TextField
+                size="small"
+                label="Tìm kiếm"
+                placeholder="Tìm theo họ tên, mã HV, CCCD, điện thoại, email..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
+                    </InputAdornment>
+                  ),
+                }}
+                InputLabelProps={{ shrink: true }}
+                sx={{
+                  width: { xs: "100%", sm: 360 },
+                  flexGrow: 1,
+                  ...cellInputSx,
+                  "& .MuiInputBase-root": { height: 40, fontSize: 12.5 },
+                }}
+              />
+            )}
+
+            {isAdmittedMasters && (
+              <TextField
+                size="small"
+                label="Tìm kiếm"
+                placeholder="Tìm theo họ tên, mã HV, CCCD, điện thoại, email..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
+                    </InputAdornment>
+                  ),
+                }}
+                InputLabelProps={{ shrink: true }}
+                sx={{
+                  width: { xs: "100%", sm: 430 },
+                  flexGrow: 1,
+                  ...cellInputSx,
+                  "& .MuiInputBase-root": {
+                    height: 40,
+                    fontSize: 12.5,
+                    bgcolor: "#F5F8FC",
+                    borderRadius: "8px",
+                  },
+                }}
+              />
+            )}
           </Stack>
 
           <Stack direction="row" spacing={1} alignItems="center">
-            <Tooltip title="Tải lại danh sách">
-              <IconButton size="small" onClick={loadRecords} disabled={loading} sx={{ border: "1px solid #DFE4E8", borderRadius: "4px", p: "5px" }}>
-                <RefreshRounded fontSize="small" sx={{ color: "#607486" }} />
-              </IconButton>
-            </Tooltip>
-
-            {isAdmin && (
+            {isAdmin && !isAdmittedMasters && (
               <Button
                 variant="contained"
                 size="small"
                 startIcon={<AddRounded />}
                 onClick={handleOpenAdd}
                 sx={{
-                  height: 32,
+                  height: 40,
                   bgcolor: "#0788B8",
                   fontSize: 12,
                   fontWeight: 700,
                   textTransform: "none",
-                  borderRadius: "2px",
+                  borderRadius: "8px",
                   boxShadow: "none",
                   "&:hover": { bgcolor: "#056A8F" },
                 }}
               >
-                + Thêm hồ sơ (A4)
+                Thêm hồ sơ (A4)
               </Button>
             )}
           </Stack>
         </Stack>
       </Paper>
-
-      {/* 2. SUMMARY COUNTERS & SEARCH */}
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
-        <TextField
-          size="small"
-          placeholder="Tìm theo họ tên, mã HV, CCCD, điện thoại, email..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
-              </InputAdornment>
-            ),
-          }}
-          sx={{ width: { xs: "100%", sm: 360 }, ...cellInputSx }}
-        />
-
-        <Typography variant="caption" sx={{ color: "#607486", fontWeight: 600 }}>
-          Tổng: <strong style={{ color: "#172B3A" }}>{stats.total}</strong> hồ sơ · Thạc sĩ:{" "}
-          <strong style={{ color: "#0788B8" }}>{stats.mastersCount}</strong> · Tiến sĩ:{" "}
-          <strong style={{ color: "#173E75" }}>{stats.doctoralCount}</strong> · Đủ điều kiện / Trúng tuyển:{" "}
-          <strong style={{ color: "#137B3B" }}>{stats.eligibleCount}</strong>
-        </Typography>
-      </Stack>
 
       {/* 3. MAIN TABLE GRID */}
       {loading ? (
@@ -578,22 +659,25 @@ const AdmissionRecords = () => {
           <CircularProgress size={32} sx={{ color: "#0788B8" }} />
         </Box>
       ) : (
+        <Stack spacing={1.25}>
         <TableContainer
           component={Paper}
           variant="outlined"
           sx={{
-            borderColor: "#DFE4E8",
-            borderRadius: "4px",
-            maxHeight: "calc(100vh - 270px)",
-            overflowY: "auto",
+            borderColor: "#D7E4EE",
+            borderRadius: "12px",
+            overflow: "hidden",
+            boxShadow: "0 5px 18px rgba(23, 62, 117, 0.06)",
           }}
         >
-          <Table size="small" stickyHeader sx={{ minWidth: 1100 }}>
+          <Table size="small" stickyHeader sx={{ minWidth: isAdmittedMasters ? 1350 : 1100 }}>
             <TableHead>
-              <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", color: "#172B3A", fontWeight: 700, fontSize: 12, py: "7px", borderBottom: "2px solid #DFE4E8" } }}>
+              <TableRow sx={{ "& th": { bgcolor: "#EDF4FA", color: "#172B3A", fontWeight: 700, fontSize: 12, py: "9px", borderBottom: "1px solid #D7E4EE" } }}>
                 <TableCell sx={{ width: 40, textAlign: "center" }}>STT</TableCell>
                 <TableCell sx={{ width: 50, textAlign: "center" }}>Ảnh</TableCell>
                 <TableCell sx={{ width: 100 }}>Mã HV</TableCell>
+                {isAdmittedMasters && <TableCell sx={{ width: 150 }}>Nhóm học phần</TableCell>}
+                {isAdmittedMasters && <TableCell sx={{ width: 110 }}>Mã nhóm</TableCell>}
                 <TableCell sx={{ minWidth: 160 }}>Họ và tên</TableCell>
                 <TableCell sx={{ width: 90, textAlign: "center" }}>Ngày sinh</TableCell>
                 <TableCell sx={{ width: 70, textAlign: "center" }}>Giới tính</TableCell>
@@ -606,11 +690,11 @@ const AdmissionRecords = () => {
             </TableHead>
 
             <TableBody>
-              {filteredRecords.length === 0 ? (
+              {records.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} align="center" sx={{ py: 6, color: "#607486", fontSize: 13 }}>
+                  <TableCell colSpan={isAdmittedMasters ? 13 : 11} align="center" sx={{ py: 6, color: "#607486", fontSize: 13 }}>
                     Chưa có hồ sơ tuyển sinh nào theo điều kiện lọc.
-                    {isAdmin && (
+                    {isAdmin && !isAdmittedMasters && (
                       <Box sx={{ mt: 1.5 }}>
                         <Button size="small" variant="outlined" startIcon={<AddRounded />} onClick={handleOpenAdd}>
                           Nhập hồ sơ mới ngay
@@ -620,17 +704,21 @@ const AdmissionRecords = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredRecords.map((r, index) => (
+                records.map((r, index) => (
                   <TableRow
                     key={r.id}
                     hover
                     sx={{
-                      "&:hover": { bgcolor: "#F7F9FA" },
-                      "& td": { py: "5px", fontSize: 12.5 },
+                      "&:hover": { bgcolor: "#F5FAFE" },
+                      "& td": {
+                        py: "7px",
+                        fontSize: 12.5,
+                        borderColor: "#E2EBF2",
+                      },
                     }}
                   >
                     <TableCell align="center" sx={{ color: "#607486", fontSize: 11 }}>
-                      {index + 1}
+                      {(page - 1) * PAGE_SIZE + index + 1}
                     </TableCell>
 
                     <TableCell align="center">
@@ -639,12 +727,12 @@ const AdmissionRecords = () => {
                         sx={{
                           width: 28,
                           height: 36,
-                          borderRadius: "2px",
+                          borderRadius: "8px",
                           fontSize: 10,
-                          bgcolor: "#DFE4E8",
+                          bgcolor: "#EEF3F8",
                           color: "#607486",
                           margin: "0 auto",
-                          border: "1px solid #DFE4E8",
+                          border: "1px solid #E1EAF1",
                         }}
                         variant="rounded"
                       >
@@ -656,10 +744,22 @@ const AdmissionRecords = () => {
                       {r.code || "—"}
                     </TableCell>
 
+                    {isAdmittedMasters && (
+                      <TableCell sx={{ color: r.assignedGroup ? "#173E75" : "#8A9AAA", fontWeight: 600 }}>
+                        {r.assignedGroup?.name || "Chưa phân nhóm"}
+                      </TableCell>
+                    )}
+
+                    {isAdmittedMasters && (
+                      <TableCell sx={{ color: r.assignedGroup ? "#172B3A" : "#8A9AAA", fontWeight: 700 }}>
+                        {r.assignedGroup?.code || "—"}
+                      </TableCell>
+                    )}
+
                     <TableCell>
                       <Typography
                         variant="body2"
-                        onClick={() => navigate(`/plan/admission-records/${r.id}`)}
+                        onClick={() => navigate(`${recordDetailBase}/${r.id}`)}
                         sx={{
                           fontWeight: 700,
                           color: "#173E75",
@@ -691,7 +791,7 @@ const AdmissionRecords = () => {
                           fontWeight: 600,
                           bgcolor: r.gender === "Nữ" ? "#FCE8E6" : "#EBF5FB",
                           color: r.gender === "Nữ" ? "#B52D2D" : "#0788B8",
-                          borderRadius: "2px",
+                          borderRadius: "999px",
                         }}
                       />
                     </TableCell>
@@ -710,7 +810,7 @@ const AdmissionRecords = () => {
                           fontWeight: 700,
                           bgcolor: r.trainingLevel === "Tiến sĩ" ? "#FEF7E0" : "#E6F4EA",
                           color: r.trainingLevel === "Tiến sĩ" ? "#B86216" : "#137B3B",
-                          borderRadius: "2px",
+                          borderRadius: "999px",
                           mr: 0.5,
                         }}
                       />
@@ -731,7 +831,7 @@ const AdmissionRecords = () => {
                           height: 20,
                           fontSize: 10.5,
                           fontWeight: 600,
-                          borderRadius: "2px",
+                          borderRadius: "999px",
                           bgcolor:
                             r.studyStatus === "Đã trúng tuyển" || r.studyStatus === "Đang học"
                               ? "#E6F4EA"
@@ -751,7 +851,7 @@ const AdmissionRecords = () => {
                     <TableCell align="center">
                       <Stack direction="row" spacing={0.5} justifyContent="center">
                         <Tooltip title="Xem chi tiết hồ sơ (Trang A4)">
-                          <IconButton size="small" color="primary" onClick={() => navigate(`/plan/admission-records/${r.id}`)}>
+                          <IconButton size="small" color="primary" onClick={() => navigate(`${recordDetailBase}/${r.id}`)}>
                             <VisibilityRounded sx={{ fontSize: 17, color: "#0788B8" }} />
                           </IconButton>
                         </Tooltip>
@@ -779,6 +879,31 @@ const AdmissionRecords = () => {
             </TableBody>
           </Table>
         </TableContainer>
+        {pagination.totalPages > 1 && (
+          <Box sx={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 48, px: 0.5, pb: 0.5 }}>
+            <Typography variant="caption" sx={{ position: "absolute", left: 4, color: "#607486", fontWeight: 600 }}>
+              Hiển thị {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, pagination.total)} trên {pagination.total} hồ sơ
+            </Typography>
+            <Pagination
+              page={page}
+              count={pagination.totalPages}
+              onChange={(_event, nextPage) => setPage(nextPage)}
+              color="primary"
+              size="medium"
+              showFirstButton
+              showLastButton
+              sx={{
+                "& .MuiPaginationItem-root": {
+                  minWidth: 38,
+                  height: 38,
+                  fontSize: 14,
+                  fontWeight: 600,
+                },
+              }}
+            />
+          </Box>
+        )}
+        </Stack>
       )}
 
       {/* ========================================================================= */}
@@ -787,13 +912,14 @@ const AdmissionRecords = () => {
       <Dialog
         open={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        maxWidth="lg"
+        maxWidth={false}
         fullWidth
         PaperProps={{
           sx: {
             borderRadius: "4px",
             border: "1px solid #DFE4E8",
-            maxWidth: 1180,
+            width: "calc(100vw - 32px)",
+            maxWidth: "1800px",
           },
         }}
       >
@@ -1078,8 +1204,9 @@ const AdmissionRecords = () => {
                         value={formData.trainingLevel}
                         onChange={(e) => {
                           const trainingLevel = e.target.value;
+                          const selected = selectMajorForLevel(majors, trainingLevel, formData.majorId);
+                          setFormDisciplineId(majorDisciplineId(selected));
                           setFormData((previous) => {
-                            const selected = selectMajorForLevel(majors, trainingLevel, previous.majorId);
                             return {
                               ...previous,
                               trainingLevel,
@@ -1114,7 +1241,34 @@ const AdmissionRecords = () => {
                   </Box>
 
                   <Box>
-                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Ngành học *</Typography>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Ngành</Typography>
+                    <Select
+                      size="small"
+                      value={formDisciplineId}
+                      onChange={(e) => {
+                        const nextDisciplineId = e.target.value;
+                        setFormDisciplineId(nextDisciplineId);
+                        if (nextDisciplineId && majorDisciplineId(
+                          selectableMajors.find((major) => major.id === formData.majorId),
+                        ) !== nextDisciplineId) {
+                          setFormData((previous) => ({ ...previous, majorId: "", majorName: "" }));
+                        }
+                      }}
+                      displayEmpty
+                      fullWidth
+                      sx={{ height: 30, fontSize: 12, bgcolor: "#fff" }}
+                    >
+                      <MenuItem value="">Tất cả ngành</MenuItem>
+                      {formDisciplines.map((discipline) => (
+                        <MenuItem key={discipline.id} value={discipline.id} sx={{ fontSize: 12 }}>
+                          {disciplineOptionLabel(discipline)}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Chuyên ngành *</Typography>
                     <Select
                       size="small"
                       value={formData.majorId}
@@ -1127,7 +1281,7 @@ const AdmissionRecords = () => {
                       sx={{ height: 30, fontSize: 12, bgcolor: "#fff", fontWeight: 600, color: "#173E75" }}
                     >
                       <MenuItem value="" disabled>-- Chọn chuyên ngành --</MenuItem>
-                      {selectableMajors.map((m) => (
+                      {visibleSelectableMajors.map((m) => (
                         <MenuItem key={m.id} value={m.id} sx={{ fontSize: 12 }}>
                           {m.code} — {m.name}
                         </MenuItem>
@@ -1343,7 +1497,7 @@ const AdmissionRecords = () => {
               startIcon={<VisibilityRounded />}
               onClick={() => {
                 setIsFormOpen(false);
-                navigate(`/plan/admission-records/${formData.id}`);
+                navigate(`${recordDetailBase}/${formData.id}`);
               }}
               sx={{
                 height: 36,
@@ -1358,7 +1512,7 @@ const AdmissionRecords = () => {
                 "&:hover": { bgcolor: "#EBF5FB" },
               }}
             >
-              Xem trang A4
+              Xem chi tiết
             </Button>
           )}
 

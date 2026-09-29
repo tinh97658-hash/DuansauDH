@@ -144,16 +144,64 @@ const Rooms = () => {
         {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
         {feedback && <Alert severity="success" onClose={() => setFeedback("")}>{feedback}</Alert>}
         {!loading && !isAdmin && <Alert severity="info">Chỉ quản trị viên được thêm, sửa hoặc thay đổi trạng thái phòng học.</Alert>}
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-          <TextField
-            size="small" placeholder="Tìm theo mã hoặc tên phòng" value={search} onChange={(event) => setSearch(event.target.value)}
-            InputProps={{ startAdornment: <InputAdornment position="start"><SearchRounded fontSize="small" /></InputAdornment> }} sx={{ flexGrow: 1 }}
-          />
-          {isAdmin && <Button variant="contained" startIcon={<AddRounded />} onClick={openCreate}>Thêm phòng</Button>}
-        </Stack>
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 1.5,
+            bgcolor: "#FBFDFF",
+            borderColor: "#D8E5EF",
+            borderRadius: "12px",
+            boxShadow: "0 4px 14px rgba(23, 62, 117, 0.05)",
+            "& .MuiOutlinedInput-root": {
+              height: 40,
+              bgcolor: "#F5F8FC",
+              borderRadius: "8px",
+              fontSize: 12.5,
+            },
+            "& .MuiOutlinedInput-notchedOutline": { borderColor: "#D7E3ED" },
+          }}
+        >
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="center">
+            <TextField
+              size="small"
+              placeholder="Tìm theo mã hoặc tên phòng"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ width: { xs: "100%", sm: "auto" }, flexGrow: 1 }}
+            />
+            {isAdmin && (
+              <Button
+                variant="contained"
+                startIcon={<AddRounded />}
+                onClick={openCreate}
+                sx={{
+                  height: 40,
+                  px: 2,
+                  width: { xs: "100%", sm: "auto" },
+                  flexShrink: 0,
+                  bgcolor: "#0788B8",
+                  borderRadius: "8px",
+                  boxShadow: "none",
+                  textTransform: "none",
+                  fontWeight: 700,
+                  "&:hover": { bgcolor: "#056A8F", boxShadow: "none" },
+                }}
+              >
+                Thêm phòng
+              </Button>
+            )}
+          </Stack>
+        </Paper>
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
-            <TableHead><TableRow><TableCell sx={{ width: 60 }}>#</TableCell><TableCell>Mã phòng</TableCell><TableCell>Tên phòng</TableCell><TableCell align="center">Tầng</TableCell><TableCell align="center">Sức chứa</TableCell><TableCell align="center">Trạng thái</TableCell>{isAdmin && <TableCell align="right">Thao tác</TableCell>}</TableRow></TableHead>
+            <TableHead><TableRow><TableCell sx={{ width: 60 }}>STT</TableCell><TableCell>Mã phòng</TableCell><TableCell>Tên phòng</TableCell><TableCell align="center">Tầng</TableCell><TableCell align="center">Sức chứa</TableCell><TableCell align="center">Trạng thái</TableCell>{isAdmin && <TableCell align="right">Thao tác</TableCell>}</TableRow></TableHead>
             <TableBody>
               {loading ? (
                 <TableRow><TableCell colSpan={isAdmin ? 7 : 6} align="center" sx={{ py: 4 }}><CircularProgress size={28} /></TableCell></TableRow>

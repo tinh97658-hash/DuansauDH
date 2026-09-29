@@ -48,6 +48,7 @@ import AdmissionRecordDetail from "./pages/plan/admissionRecordDetail";
 
 // ===== ĐÀO TẠO THẠC SĨ =====
 import MastersBridgeCourse from "./pages/masters/bridgeCourse";
+import MastersAdmittedRecords from "./pages/masters/admittedRecords";
 import MastersAdmissionScores from "./pages/masters/admissionScores";
 import MastersCreateClassGroups from "./pages/masters/createClassGroups";
 import MastersAssignClassGroups from "./pages/masters/assignClassGroups";
@@ -140,6 +141,8 @@ function App() {
             <Route path="plan/admission-records/detail/:id" element={<AdmissionRecordDetail />} />
 
             {/* ĐÀO TẠO THẠC SĨ */}
+            <Route path="masters/admitted-records" element={<MastersAdmittedRecords />} />
+            <Route path="masters/admitted-records/:id" element={<AdmissionRecordDetail returnPath="/masters/admitted-records" />} />
             <Route path="masters/bridge-course" element={<MastersBridgeCourse />} />
             <Route path="masters/admission-scores" element={<MastersAdmissionScores />} />
             <Route path="masters/create-class-groups" element={<MastersCreateClassGroups />} />

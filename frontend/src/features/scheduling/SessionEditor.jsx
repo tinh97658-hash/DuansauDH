@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api, groupsOf, message, Modal, normalize, Notice, offeringTitle, rows, subjectLabel, useLoad } from "./shared";
 import { getBusinessTodayKey, getRoomFloor, isPeriodTimeConsistent, isSessionPast, shortTime, vietnameseDate } from "../../utils/schedulingCalendar";
-import { lecturerBelongsToOfferingFaculty, lecturerTeachingGroup, teachingFacultyForOffering } from "../../utils/lecturerQualification";
+import { lecturerRecommendationRank, lecturerTeachingGroup, teachingMajorForOffering } from "../../utils/lecturerQualification";
 
 const periodTimes = (period) => period === "AFTERNOON"
   ? { startTime: "13:00", endTime: "17:00" }
@@ -19,17 +19,17 @@ function LecturerPicker({ value, lecturers, offering, conflicts, disabled, locke
   }, []);
   const available = lecturers.filter((row) => row.active !== false || row.id === value).map((row) => ({
     ...row,
-    recommended: lecturerBelongsToOfferingFaculty(row, offering),
+    recommendationRank: lecturerRecommendationRank(row, offering),
     teachingGroup: lecturerTeachingGroup(row),
     busy: conflicts.some((item) => item.lecturerId === row.id),
-  })).sort((a, b) => Number(b.recommended) - Number(a.recommended)
+  })).sort((a, b) => b.recommendationRank - a.recommendationRank
     || a.teachingGroup.localeCompare(b.teachingGroup, "vi")
     || a.name.localeCompare(b.name, "vi"));
-  const visible = available.filter((row) => normalize(`${row.name} ${row.code || ""} ${row.faculty || ""} ${row.teachingGroup}`).includes(normalize(query)));
+  const visible = available.filter((row) => normalize(`${row.name} ${row.code || ""} ${row.discipline?.name || ""} ${row.major?.name || ""} ${row.teachingGroup}`).includes(normalize(query)));
 
   if (locked) return <div className="sl-fixed-lecturer" aria-label="Giảng viên cố định">
     <strong>{selected?.name || "Giảng viên đã phân công"}</strong>
-    <span>{selected?.faculty || "Đã cố định theo buổi học đầu tiên"}</span>
+    <span>{selected?.major ? `${selected.major.code} · ${selected.major.name}` : "Đã cố định theo buổi học đầu tiên"}</span>
     <small>Giảng viên cố định của lớp · Các buổi sau chỉ thay đổi phòng học</small>
   </div>;
 
@@ -41,10 +41,10 @@ function LecturerPicker({ value, lecturers, offering, conflicts, disabled, locke
       <input autoFocus aria-label="Tìm giảng viên" placeholder="Tìm theo tên giảng viên..." value={query} onChange={(event) => setQuery(event.target.value)} />
       <div className="sl-lecturer-list" role="listbox" aria-label="Danh sách giảng viên">
         {visible.map((row, index) => <React.Fragment key={row.id}>
-          {(index === 0 || visible[index - 1].recommended !== row.recommended || visible[index - 1].teachingGroup !== row.teachingGroup) && <div className={`sl-lecturer-group ${row.recommended ? "sl-recommended" : ""}`}>{row.teachingGroup}{row.recommended ? " · Đề xuất" : ""}</div>}
+          {(index === 0 || visible[index - 1].recommendationRank !== row.recommendationRank || visible[index - 1].teachingGroup !== row.teachingGroup) && <div className={`sl-lecturer-group ${row.recommendationRank === 2 ? "sl-recommended" : ""}`}>{row.teachingGroup}{row.recommendationRank === 2 ? " · Đề xuất" : row.recommendationRank === 1 ? " · Cùng ngành" : ""}</div>}
           <button type="button" role="option" aria-selected={row.id === value} disabled={row.busy || row.active === false} onClick={() => { onChange(row.id); setOpen(false); }}>
-            <span><strong>{row.name}</strong><small>{row.faculty || row.code || "Chưa khai báo khoa / viện"}</small></span>
-            <em>{row.busy ? "Đang bận" : row.recommended ? "Cùng khoa" : "Khoa khác"}</em>
+            <span><strong>{row.name}</strong><small>{row.discipline?.name || row.code || "Chưa khai báo ngành"}</small></span>
+            <em>{row.busy ? "Đang bận" : row.recommendationRank === 2 ? "Đúng chuyên ngành" : row.recommendationRank === 1 ? "Cùng ngành" : "Ngành khác"}</em>
           </button>
         </React.Fragment>)}
         {!visible.length && <p>Không tìm thấy giảng viên phù hợp.</p>}
@@ -76,7 +76,7 @@ export default function SessionEditor({ session, offering, date, period, user, o
   const classConflict = conflicts.find((row) => row.courseOfferingId === offering.id || groupsOf(row.courseOffering).some((group) => ownGroups.has(group.id)));
   const lecturers = catalog.data?.lecturers || [];
   const rooms = catalog.data?.rooms || [];
-  const teachingFaculty = teachingFacultyForOffering(currentOffering);
+  const teachingMajor = teachingMajorForOffering(currentOffering);
   const assignedSession = (catalog.data?.offeringSessions || []).find((row) => row.id !== session?.id);
   const lecturerLocked = !!assignedSession;
   useEffect(() => {
@@ -123,7 +123,7 @@ export default function SessionEditor({ session, offering, date, period, user, o
     <div className="v20-composer"><div className="sl-editor-info"><h4>THÔNG TIN BUỔI HỌC</h4><strong className="sl-editor-date">{vietnameseDate(form.sessionDate)} · {periodLabel}</strong>
       <div className="sl-editor-hidden-controls"><label>Ngày học<input aria-label="Ngày học" type="date" min={getBusinessTodayKey()} value={form.sessionDate} disabled={!editable || saving} onChange={(event) => { if (event.target.value) setField("sessionDate", event.target.value); }} /></label><label>Buổi<select aria-label="Buổi" value={form.period} disabled={!editable || saving} onChange={(event) => setField("period", event.target.value)}><option value="MORNING">Sáng</option><option value="AFTERNOON">Chiều</option></select></label></div>
       <p className="v20-hint sl-editor-time">Khung giờ buổi học: {form.startTime}–{form.endTime}</p>
-      <label className="v20-field">Giảng viên<LecturerPicker value={form.lecturerId} lecturers={lecturers} offering={currentOffering} conflicts={conflicts} locked={lecturerLocked} disabled={!editable || catalog.loading || !!catalog.error || saving} onChange={(value) => setField("lecturerId", value)} />{teachingFaculty && <small className="sl-teaching-unit-hint">Khoa / Viện phụ trách: {teachingFaculty}</small>}</label>
+      <label className="v20-field">Giảng viên<LecturerPicker value={form.lecturerId} lecturers={lecturers} offering={currentOffering} conflicts={conflicts} locked={lecturerLocked} disabled={!editable || catalog.loading || !!catalog.error || saving} onChange={(value) => setField("lecturerId", value)} />{teachingMajor && <small className="sl-teaching-unit-hint">Chuyên ngành của học phần: {teachingMajor.code ? `${teachingMajor.code} · ` : ""}{teachingMajor.name || "Đang xác định"}</small>}</label>
       {!catalog.loading && !catalog.error && !lecturers.some((row) => row.active !== false) && <Notice>Chưa có giảng viên đang hoạt động. Khai báo tại Hệ thống → Giảng viên.</Notice>}
       <label className="v20-field">Ghi chú<textarea aria-label="Ghi chú buổi học" placeholder="Nhập ghi chú..." maxLength={2000} value={form.note} disabled={!editable || saving} onChange={(event) => setField("note", event.target.value)} /></label>
       {classConflict && <Notice error={`Lớp / nhóm đang bận: ${classConflict.courseOffering?.subject?.name || "Buổi học khác"} · ${shortTime(classConflict.startTime)}–${shortTime(classConflict.endTime)}`} />}

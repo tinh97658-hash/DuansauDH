@@ -44,6 +44,7 @@ const NAV_GROUPS = [
   {
     title: "ĐÀO TẠO THẠC SĨ",
     items: [
+      { label: "Hồ sơ trúng tuyển", path: "/masters/admitted-records", icon: CheckCircleRounded },
       { label: "Học bổ sung kiến thức", path: "/masters/bridge-course", icon: AddTaskRounded },
       { label: "Điểm thi đầu vào thạc sĩ", path: "/masters/admission-scores", icon: ScoreboardRounded },
       { label: "Tạo nhóm học viên", path: "/masters/create-class-groups", icon: GroupAddRounded },

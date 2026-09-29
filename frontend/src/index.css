@@ -5,6 +5,11 @@
   --muted-surface: #F7F9FA;
   --border-color: #DFE4E8;
   --border-light: #EDF2F7;
+  --table-border-color: #D7E4EE;
+  --table-row-border-color: #E2EBF2;
+  --table-header-bg: #EDF4FA;
+  --table-radius: 12px;
+  --control-radius: 8px;
   --text-primary: #172B3A;
   --text-secondary: #607486;
   --text-muted: #8A9AAA;
@@ -109,6 +114,163 @@ code, kbd, samp, pre {
 
 #root .table {
   --bs-table-color: var(--text-primary);
+}
+
+/*
+ * Shared data-table treatment.
+ *
+ * The application contains Material UI, Bootstrap and native HTML tables.
+ * Keeping the visual contract here prevents feature pages from drifting apart.
+ */
+#root .MuiTableContainer-root {
+  border: 1px solid var(--table-border-color) !important;
+  border-radius: var(--table-radius) !important;
+  background: var(--surface-bg);
+  box-shadow: 0 5px 18px rgba(23, 62, 117, 0.06) !important;
+  overflow: auto;
+}
+
+#root .MuiTableHead-root .MuiTableCell-root {
+  border-bottom-color: var(--table-border-color) !important;
+  background-color: var(--table-header-bg) !important;
+  color: var(--text-primary) !important;
+  font-weight: 700;
+}
+
+#root .MuiTableBody-root .MuiTableCell-root {
+  border-bottom-color: var(--table-row-border-color) !important;
+}
+
+#root .MuiTableBody-root .MuiTableRow-root:last-child .MuiTableCell-root {
+  border-bottom: 0;
+}
+
+#root :where(.MuiOutlinedInput-root, .form-control, .form-select, .ant-input, .ant-input-affix-wrapper, .ant-select-selector) {
+  border-radius: var(--control-radius) !important;
+}
+
+#root :where(
+  input:not([type]),
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="date"],
+  input[type="password"],
+  select,
+  textarea
+) {
+  border-radius: var(--control-radius) !important;
+  font-family: var(--app-font-family) !important;
+}
+
+#root .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline {
+  border-color: var(--table-border-color) !important;
+}
+
+#root .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: #9FB5C6 !important;
+}
+
+#root .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: var(--primary) !important;
+}
+
+#root :where(.table-responsive, .ant-table-container) {
+  border: 1px solid var(--table-border-color) !important;
+  border-radius: var(--table-radius) !important;
+  background: var(--surface-bg);
+  box-shadow: 0 5px 18px rgba(23, 62, 117, 0.06);
+  overflow: auto;
+}
+
+#root table.table {
+  margin-bottom: 0;
+  border: 1px solid var(--table-border-color);
+  border-radius: var(--table-radius);
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+}
+
+#root .table-responsive > table.table {
+  border: 0;
+  border-radius: 0;
+}
+
+#root table.table > thead > tr > th,
+#root .ant-table-thead > tr > th {
+  border-bottom-color: var(--table-border-color) !important;
+  background: var(--table-header-bg) !important;
+  color: var(--text-primary) !important;
+  font-weight: 700;
+}
+
+#root table.table > tbody > tr > td,
+#root .ant-table-tbody > tr > td {
+  border-color: var(--table-row-border-color) !important;
+}
+
+/* Native tables used by scheduling and course-progress screens. */
+#root :where(
+  .sl-create-confirm-table-wrap,
+  .sl-offering-sessions-wrap,
+  .sl-offering-roster-wrap,
+  .sl-matrix-pivot-wrap,
+  .tp-table-wrap
+) {
+  border: 1px solid var(--table-border-color) !important;
+  border-radius: var(--table-radius) !important;
+  background: var(--surface-bg);
+  box-shadow: 0 5px 18px rgba(23, 62, 117, 0.06) !important;
+  overflow: auto;
+}
+
+#root :where(
+  .sl-create-confirm-table-wrap,
+  .sl-offering-sessions-wrap,
+  .sl-offering-roster-wrap,
+  .sl-matrix-pivot-wrap,
+  .tp-table-wrap
+) table {
+  font-family: var(--app-font-family) !important;
+}
+
+#root :where(
+  .sl-create-confirm-table-wrap,
+  .sl-offering-sessions-wrap,
+  .sl-offering-roster-wrap,
+  .sl-matrix-pivot-wrap,
+  .tp-table-wrap
+) thead th {
+  border-color: var(--table-border-color) !important;
+  background: var(--table-header-bg) !important;
+  color: var(--text-primary) !important;
+  font-family: var(--app-font-family) !important;
+  font-weight: 700;
+}
+
+#root :where(
+  .sl-create-confirm-table-wrap,
+  .sl-offering-sessions-wrap,
+  .sl-offering-roster-wrap,
+  .sl-matrix-pivot-wrap,
+  .tp-table-wrap
+) tbody td {
+  border-color: var(--table-row-border-color) !important;
+}
+
+#root :where(
+  .sl-create-confirm-table-wrap,
+  .sl-offering-sessions-wrap,
+  .sl-offering-roster-wrap,
+  .sl-matrix-pivot-wrap,
+  .tp-table-wrap
+) :where(input, select, textarea) {
+  border-color: var(--table-border-color) !important;
+  border-radius: var(--control-radius) !important;
+  font-family: var(--app-font-family) !important;
 }
 
 a {

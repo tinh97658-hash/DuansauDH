@@ -12,6 +12,8 @@ const Majors = () => (
     codeLabel="Mã chuyên ngành"
     nameLabel="Tên chuyên ngành"
     sortable={false}
+    editOnDoubleClick
+    parentBeforeName
     parent={{
       field: "disciplineId",
       label: "Ngành đào tạo",

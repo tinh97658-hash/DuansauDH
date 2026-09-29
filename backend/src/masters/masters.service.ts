@@ -206,19 +206,7 @@ export class MastersService {
       for (const row of rows) {
         created.push(await this.classGroupsService.create(row, transaction));
       }
-      let assignment = null;
-      if (dto.autoAssign) {
-        if (!dto.admissionRecordIds?.length) {
-          throw new BadRequestException("Không có học viên chưa phân nhóm để thực hiện phân tự động.");
-        }
-        assignment = await this.autoAssignInTransaction({
-          classGroupIds: created.map((group) => group.id),
-          admissionRecordIds: dto.admissionRecordIds,
-          method: dto.assignmentMethod || "balanced",
-          targetCounts: dto.targetCounts,
-        }, transaction);
-      }
-      return { success: true, count: created.length, groups: created, assignment };
+      return { success: true, count: created.length, groups: created };
     });
   }
 

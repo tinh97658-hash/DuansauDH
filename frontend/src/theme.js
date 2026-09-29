@@ -1,6 +1,11 @@
 import { createTheme } from "@mui/material/styles";
 
 export const APP_FONT_FAMILY = '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif';
+export const TABLE_BORDER_COLOR = "#D7E4EE";
+export const TABLE_ROW_BORDER_COLOR = "#E2EBF2";
+export const TABLE_HEADER_BACKGROUND = "#EDF4FA";
+export const TABLE_BORDER_RADIUS = 12;
+export const CONTROL_BORDER_RADIUS = 8;
 
 /**
  * Institutional Theme for University Postgraduate Operations System
@@ -56,7 +61,7 @@ export const theme = createTheme({
     },
   },
   shape: {
-    borderRadius: 3,
+    borderRadius: CONTROL_BORDER_RADIUS,
   },
   typography: {
     fontFamily: APP_FONT_FAMILY,
@@ -181,7 +186,7 @@ export const theme = createTheme({
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
-          borderRadius: 3,
+          borderRadius: CONTROL_BORDER_RADIUS,
           backgroundColor: "#FFFFFF",
           fontSize: 13,
           color: "#172B3A",
@@ -256,19 +261,30 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           borderCollapse: "collapse",
+          fontFamily: "inherit",
+        },
+      },
+    },
+    MuiTableContainer: {
+      styleOverrides: {
+        root: {
+          border: `1px solid ${TABLE_BORDER_COLOR}`,
+          borderRadius: TABLE_BORDER_RADIUS,
+          backgroundColor: "#FFFFFF",
+          boxShadow: "0 5px 18px rgba(23, 62, 117, 0.06)",
         },
       },
     },
     MuiTableHead: {
       styleOverrides: {
         root: {
-          backgroundColor: "#F0F4F8",
+          backgroundColor: TABLE_HEADER_BACKGROUND,
           "& .MuiTableCell-root": {
-            backgroundColor: "#F0F4F8",
+            backgroundColor: TABLE_HEADER_BACKGROUND,
             color: "#172B3A",
             fontWeight: 700,
             fontSize: "12px",
-            borderBottom: "2px solid #DFE4E8",
+            borderBottom: `1px solid ${TABLE_BORDER_COLOR}`,
             py: "8px",
           },
         },
@@ -277,9 +293,10 @@ export const theme = createTheme({
     MuiTableCell: {
       styleOverrides: {
         root: {
-          borderColor: "#DFE4E8",
+          borderColor: TABLE_ROW_BORDER_COLOR,
           padding: "7px 10px",
           fontSize: "12.5px",
+          fontFamily: "inherit",
         },
         sizeSmall: {
           padding: "5px 8px",
@@ -302,7 +319,7 @@ export const theme = createTheme({
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: 3,
+          borderRadius: 999,
           fontWeight: 600,
           fontSize: "11px",
           height: "22px",

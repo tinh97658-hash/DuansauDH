@@ -104,7 +104,14 @@ export function buildBulkFixtures(options: BulkOptions): FixtureBatch[] {
     const n = c + 1;
     const majorIndex = c % majors.length;
     const major = majors[majorIndex];
-    const lecturer = add("Lecturer", { code: `${prefix}GV${n}`, name: `Giảng viên kiểm thử ${n}`, email: `${prefix.toLowerCase()}.gv${n}@example.invalid`, active: true });
+    const lecturer = add("Lecturer", {
+      code: `${prefix}GV${n}`,
+      name: `Giảng viên kiểm thử ${n}`,
+      email: `${prefix.toLowerCase()}.gv${n}@example.invalid`,
+      disciplineId: discipline.id,
+      majorId: major.id,
+      active: true,
+    });
     const room = add("Room", { code: `${prefix}P${n}`, name: `Phòng kiểm thử ${n}`, capacity: students + 10, isActive: true });
     const group = add("ClassGroup", { code: `${prefix}L${n}`, name: `Lớp thạc sĩ kiểm thử ${n}`, majorId: major.id,
       curriculumId: curriculums[majorIndex].id, program: "masters", academicYear, maxStudents: students, status: "open", note: prefix });

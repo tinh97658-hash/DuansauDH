@@ -1,5 +1,7 @@
 import { BelongsTo, Column, DataType, Default, ForeignKey, Model, Table } from "sequelize-typescript";
 import { Staff } from "../staff.model.js";
+import { Discipline } from "./discipline.model.js";
+import { Major } from "./major.model.js";
 
 @Table({ tableName: "lecturers", underscored: true, timestamps: true })
 export class Lecturer extends Model {
@@ -16,5 +18,9 @@ export class Lecturer extends Model {
   @Column(DataType.STRING(50)) declare title: string | null;
   @Column(DataType.STRING(150)) declare faculty: string | null;
   @Column(DataType.STRING(150)) declare department: string | null;
+  @ForeignKey(() => Discipline) @Column({ type: DataType.UUID, allowNull: true }) declare disciplineId: string | null;
+  @BelongsTo(() => Discipline) declare discipline: Discipline | null;
+  @ForeignKey(() => Major) @Column({ type: DataType.UUID, allowNull: true }) declare majorId: string | null;
+  @BelongsTo(() => Major) declare major: Major | null;
   @Default(true) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare active: boolean;
 }

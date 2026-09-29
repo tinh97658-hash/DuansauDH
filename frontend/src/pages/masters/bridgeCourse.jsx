@@ -10,6 +10,7 @@ import {
 import { AddRounded, DeleteRounded, EditRounded, RefreshRounded, SearchRounded } from "@mui/icons-material";
 import FeatureLayout from "../../components/FeatureLayout";
 import { API_BASE_URL } from "../../config/http";
+import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 
 const now = new Date().getFullYear();
 const YEARS = Array.from({ length: 8 }, (_, i) => String(now - 5 + i));
@@ -73,6 +74,7 @@ const CompactField = ({ label, htmlFor, helper, error = false, children, sx }) =
 export default function BridgeCourse() {
   const [rows, setRows] = useState([]), [subjects, setSubjects] = useState([]), [majors, setMajors] = useState([]), [candidates, setCandidates] = useState([]);
   const [summary, setSummary] = useState({}), [year, setYear] = useState(String(now)), [status, setStatus] = useState("ALL"), [major, setMajor] = useState("ALL"), [search, setSearch] = useState("");
+  const [disciplineId, setDisciplineId] = useState("");
   const [loading, setLoading] = useState(true), [error, setError] = useState(""), [admin, setAdmin] = useState(false);
   const [open, setOpen] = useState(false), [editing, setEditing] = useState(null), [form, setForm] = useState(blank(String(now))), [saving, setSaving] = useState(false), [deleting, setDeleting] = useState(null);
 
@@ -97,17 +99,29 @@ export default function BridgeCourse() {
     finally { setLoading(false); }
   }, [year, status, major]);
   useEffect(() => { load(); }, [load]);
+  const disciplines = useMemo(() => disciplinesFromMajors(majors), [majors]);
+  const visibleMajors = useMemo(() => majorsForDiscipline(majors, disciplineId), [majors, disciplineId]);
 
   const visible = useMemo(() => {
     const key = search.trim().toLocaleLowerCase("vi");
-    return key ? rows.filter((r) => [r.admissionRecord?.code, r.admissionRecord?.fullName, r.subject?.code, r.subject?.name].some((v) => String(v || "").toLocaleLowerCase("vi").includes(key))) : rows;
-  }, [rows, search]);
+    const allowedMajorIds = new Set(visibleMajors.map((item) => item.id));
+    return rows.filter((r) => {
+      const recordMajorId = r.admissionRecord?.majorId || r.admissionRecord?.major?.id;
+      if (disciplineId && !allowedMajorIds.has(recordMajorId)) return false;
+      return !key || [r.admissionRecord?.code, r.admissionRecord?.fullName, r.subject?.code, r.subject?.name]
+        .some((v) => String(v || "").toLocaleLowerCase("vi").includes(key));
+    });
+  }, [disciplineId, rows, search, visibleMajors]);
 
   const create = async () => {
     try {
       const p = new URLSearchParams(); if (major !== "ALL") p.set("majorId", major);
       const { data } = await axios.get(`${API_BASE_URL}/masters/bridge-course/candidates?${p}`);
-      setCandidates(Array.isArray(data) ? data : []);
+      const allRows = Array.isArray(data) ? data : [];
+      const allowedMajorIds = new Set(visibleMajors.map((item) => item.id));
+      setCandidates(disciplineId && major === "ALL"
+        ? allRows.filter((candidate) => allowedMajorIds.has(candidate.majorId || candidate.major?.id))
+        : allRows);
     } catch { setCandidates([]); }
     setEditing(null); setForm(blank(year)); setOpen(true);
   };
@@ -142,7 +156,8 @@ export default function BridgeCourse() {
     <Paper variant="outlined" sx={{ p: 2, mb: 2 }}><Stack direction="row" spacing={1.2} flexWrap="wrap" alignItems="center">
       <FormControl size="small" sx={{ minWidth: 110 }}><InputLabel>Năm học</InputLabel><Select label="Năm học" value={year} onChange={(e) => setYear(e.target.value)}>{YEARS.map((v) => <MenuItem key={v} value={v}>{v}</MenuItem>)}</Select></FormControl>
       <FormControl size="small" sx={{ minWidth: 155 }}><InputLabel>Trạng thái</InputLabel><Select label="Trạng thái" value={status} onChange={(e) => setStatus(e.target.value)}><MenuItem value="ALL">Tất cả</MenuItem>{Object.entries(STATES).map(([k, v]) => <MenuItem key={k} value={k}>{v[0]}</MenuItem>)}</Select></FormControl>
-      <FormControl size="small" sx={{ minWidth: 210 }}><InputLabel>Chuyên ngành</InputLabel><Select label="Chuyên ngành" value={major} onChange={(e) => setMajor(e.target.value)}><MenuItem value="ALL">Tất cả chuyên ngành</MenuItem>{majors.map((m) => <MenuItem key={m.id} value={m.id}>{m.code} - {m.name}</MenuItem>)}</Select></FormControl>
+      <FormControl size="small" sx={{ minWidth: 210 }}><InputLabel shrink>Ngành</InputLabel><Select displayEmpty label="Ngành" value={disciplineId} onChange={(e) => { setDisciplineId(e.target.value); setMajor("ALL"); }}><MenuItem value="">Tất cả ngành</MenuItem>{disciplines.map((item) => <MenuItem key={item.id} value={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}</Select></FormControl>
+      <FormControl size="small" sx={{ minWidth: 210 }}><InputLabel shrink>Chuyên ngành</InputLabel><Select displayEmpty label="Chuyên ngành" value={major} onChange={(e) => setMajor(e.target.value)}><MenuItem value="ALL">Tất cả chuyên ngành</MenuItem>{visibleMajors.map((m) => <MenuItem key={m.id} value={m.id}>{m.code} - {m.name}</MenuItem>)}</Select></FormControl>
       <TextField size="small" placeholder="Tìm học viên, học phần..." value={search} onChange={(e) => setSearch(e.target.value)} InputProps={{ startAdornment: <SearchRounded fontSize="small" sx={{ mr: 1 }} /> }} sx={{ minWidth: 220, flex: 1 }} />
       <Tooltip title="Tải lại"><IconButton onClick={load}><RefreshRounded /></IconButton></Tooltip>{admin && <Button variant="contained" startIcon={<AddRounded />} onClick={create}>Đăng ký học phần</Button>}
     </Stack></Paper>

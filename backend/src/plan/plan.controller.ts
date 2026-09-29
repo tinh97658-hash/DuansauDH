@@ -65,8 +65,17 @@ export class PlanController {
     @Query("trainingLevel") trainingLevel?: string,
     @Query("academicYear") academicYear?: string,
     @Query("status") status?: string,
+    @Query("disciplineId") disciplineId?: string,
+    @Query("search") search?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("excludeStatus") excludeStatus?: string,
+    @Query("includeGroup") includeGroup?: string,
   ) {
-    return this.plan.listAdmissionRecords(majorId, trainingLevel, academicYear, status);
+    return this.plan.listAdmissionRecords(
+      majorId, trainingLevel, academicYear, status, disciplineId, search, page, pageSize,
+      excludeStatus, includeGroup === "true",
+    );
   }
 
   @Get("admission-records/:id")

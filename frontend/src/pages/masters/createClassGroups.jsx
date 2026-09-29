@@ -4,24 +4,19 @@ import { useNavigate } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
-  Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
-  DialogTitle, FormControl, FormControlLabel, IconButton, InputAdornment, InputLabel, LinearProgress,
+  Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
+  DialogTitle, FormControl, IconButton, InputAdornment, InputLabel, LinearProgress,
   MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
+  TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
   AddRounded, DeleteRounded, EditRounded, GroupWorkRounded,
-  RefreshRounded, SearchRounded,
+  SearchRounded,
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
-import {
-  AUTO_ASSIGN_METHODS,
-  buildGroupNames,
-  calculateDistribution,
-  getNextGroupIndex,
-  validateNameTemplate,
-} from "./createClassGroups.logic";
+import { disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline } from "../../utils/disciplineScope";
+import { buildGroupNames, getNextGroupIndex, validateNameTemplate } from "./createClassGroups.logic";
 
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
@@ -122,6 +117,7 @@ const CreateClassGroups = () => {
   const [majors, setMajors] = useState([]);
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [selectedMajor, setSelectedMajor] = useState("ALL");
+  const [selectedDiscipline, setSelectedDiscipline] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("ALL");
   const [search, setSearch] = useState("");
 
@@ -135,19 +131,14 @@ const CreateClassGroups = () => {
 
   // Dialogs
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogDisciplineId, setDialogDisciplineId] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(initialForm(String(currentYear)));
   const [saving, setSaving] = useState(false);
   const [deletingGroup, setDeletingGroup] = useState(null);
   const [dialogScopeGroups, setDialogScopeGroups] = useState([]);
-  const [eligibleStudents, setEligibleStudents] = useState([]);
-  const [eligibleLoading, setEligibleLoading] = useState(false);
   const [dialogScopeLoading, setDialogScopeLoading] = useState(false);
   const [dialogScopeError, setDialogScopeError] = useState("");
-  const [eligibleError, setEligibleError] = useState("");
-  const [autoAssignEnabled, setAutoAssignEnabled] = useState(false);
-  const [assignmentMethod, setAssignmentMethod] = useState(AUTO_ASSIGN_METHODS.BALANCED);
-  const [customCounts, setCustomCounts] = useState([""]);
 
   // Load majors
   useEffect(() => {
@@ -194,14 +185,19 @@ const CreateClassGroups = () => {
   // Filtered rows
   const filtered = useMemo(() => {
     const kw = search.trim().toLowerCase();
-    if (!kw) return groups;
-    return groups.filter((g) =>
-      (g.code || "").toLowerCase().includes(kw) ||
-      (g.name || "").toLowerCase().includes(kw) ||
-      (g.major?.name || "").toLowerCase().includes(kw) ||
-      (g.note || "").toLowerCase().includes(kw)
-    );
-  }, [groups, search]);
+    const allowedMajorIds = new Set(majorsForDiscipline(majors, selectedDiscipline).map((major) => major.id));
+    return groups.filter((g) => {
+      if (selectedDiscipline && !allowedMajorIds.has(g.majorId || g.major?.id)) return false;
+      return !kw
+        || (g.code || "").toLowerCase().includes(kw)
+        || (g.name || "").toLowerCase().includes(kw)
+        || (g.major?.name || "").toLowerCase().includes(kw)
+        || (g.note || "").toLowerCase().includes(kw);
+    });
+  }, [groups, majors, search, selectedDiscipline]);
+  const disciplines = useMemo(() => disciplinesFromMajors(majors), [majors]);
+  const visibleMajors = useMemo(() => majorsForDiscipline(majors, selectedDiscipline), [majors, selectedDiscipline]);
+  const dialogMajors = useMemo(() => majorsForDiscipline(majors, dialogDisciplineId), [majors, dialogDisciplineId]);
 
   const selectedFormMajor = useMemo(
     () => majors.find((item) => item.id === form.majorId),
@@ -224,19 +220,6 @@ const CreateClassGroups = () => {
     () => (nameTemplateError ? [] : buildGroupNames(form.nameTemplate, startIndex, form.count)),
     [form.count, form.nameTemplate, nameTemplateError, startIndex],
   );
-  const unassignedStudents = useMemo(
-    () => eligibleStudents.filter((student) => !student.assignedGroup),
-    [eligibleStudents],
-  );
-  const distribution = useMemo(() => calculateDistribution({
-    method: assignmentMethod,
-    totalStudents: unassignedStudents.length,
-    groupCount: form.count,
-    maxStudents: form.maxStudents,
-    customValues: customCounts,
-    groupNames: automaticNames,
-  }), [assignmentMethod, automaticNames, customCounts, form.count, form.maxStudents, unassignedStudents.length]);
-
   useEffect(() => {
     if (!dialogOpen || editingId || !form.majorId || !form.academicYear) return undefined;
     let active = true;
@@ -280,74 +263,26 @@ const CreateClassGroups = () => {
     return () => { active = false; };
   }, [dialogOpen, form.academicYear, form.majorId]);
 
-  useEffect(() => {
-    if (!dialogOpen || editingId || !autoAssignEnabled || !form.majorId || !form.academicYear) {
-      setEligibleStudents([]);
-      setEligibleError("");
-      setEligibleLoading(false);
-      return undefined;
-    }
-    let active = true;
-    setEligibleLoading(true);
-    setEligibleError("");
-    axios.get(`${API_BASE_URL}/masters/class-groups/eligible-students?${new URLSearchParams({ majorId: form.majorId, academicYear: form.academicYear })}`, {
-      withCredentials: true,
-    }).then(({ data }) => {
-      if (active) setEligibleStudents(Array.isArray(data) ? data : data.data || []);
-    }).catch(() => {
-      if (active) {
-        setEligibleStudents([]);
-        setEligibleError("Không thể tải danh sách học viên chưa phân nhóm.");
-      }
-    }).finally(() => {
-      if (active) setEligibleLoading(false);
-    });
-    return () => { active = false; };
-  }, [autoAssignEnabled, dialogOpen, editingId, form.academicYear, form.majorId]);
-
-  useEffect(() => {
-    const count = Math.min(10, Math.max(1, Number(form.count) || 1));
-    setCustomCounts((previous) => Array.from(
-      { length: count },
-      (_, index) => (index === count - 1 ? "" : previous[index] ?? ""),
-    ));
-  }, [form.count]);
-
-  const autoValidationError = useMemo(() => {
-    if (!autoAssignEnabled) return "";
-    if (eligibleLoading) return "Đang tải danh sách học viên...";
-    if (eligibleError) return eligibleError;
-    if (Number(form.count) < 2) return "Cần ít nhất 2 nhóm để phân học viên tự động.";
-    if (form.status !== "open") return "Các nhóm phải ở trạng thái Đang mở để phân học viên tự động.";
-    if (unassignedStudents.length === 0) return "Hiện không có học viên chưa phân nhóm.";
-    if (assignmentMethod === AUTO_ASSIGN_METHODS.LOCATION) return "Theo địa bàn chưa khả dụng do chưa có quy tắc nghiệp vụ.";
-    if (distribution.error) return distribution.error;
-    if (!distribution.complete) return `Còn ${distribution.remaining} học viên cần phân.`;
-    return "";
-  }, [assignmentMethod, autoAssignEnabled, distribution, eligibleError, eligibleLoading, form.count, form.status, unassignedStudents.length]);
-
   // Actions
   const openAdd = () => {
     const majorId = selectedMajor !== "ALL" ? selectedMajor : (majors[0]?.id || "");
     const major = majors.find((item) => item.id === majorId);
+    setDialogDisciplineId(selectedDiscipline || majorDisciplineId(major));
     setEditingId(null);
     setForm({
       ...initialForm(selectedYear),
       majorId,
       nameTemplate: major?.code ? `${major.code.toUpperCase()}${selectedYear}.{n}` : "",
     });
-    setAutoAssignEnabled(false);
-    setAssignmentMethod(AUTO_ASSIGN_METHODS.BALANCED);
-    setCustomCounts([""]);
-    setEligibleStudents([]);
     setDialogScopeGroups([]);
     setDialogScopeLoading(false);
     setDialogScopeError("");
-    setEligibleError("");
     setDialogOpen(true);
   };
 
   const openEdit = (group) => {
+    const groupMajor = majors.find((item) => item.id === group.majorId);
+    setDialogDisciplineId(majorDisciplineId(groupMajor));
     setEditingId(group.id);
     setForm({
       code: group.code,
@@ -372,7 +307,13 @@ const CreateClassGroups = () => {
       curriculumId: "",
       nameTemplate: major?.code ? `${major.code.toUpperCase()}${previous.academicYear}.{n}` : "",
     }));
-    setCustomCounts(Array.from({ length: Math.min(10, Math.max(1, Number(form.count) || 1)) }, () => ""));
+  };
+
+  const handleDialogDisciplineChange = (disciplineId) => {
+    setDialogDisciplineId(disciplineId);
+    const currentMajor = majors.find((item) => item.id === form.majorId);
+    if (!disciplineId || majorDisciplineId(currentMajor) === disciplineId) return;
+    setForm((previous) => ({ ...previous, majorId: "", curriculumId: "", nameTemplate: "" }));
   };
 
   const handleCreateYearChange = (academicYear) => {
@@ -383,20 +324,6 @@ const CreateClassGroups = () => {
       curriculumId: "",
       nameTemplate: major?.code ? `${major.code.toUpperCase()}${academicYear}.{n}` : "",
     }));
-    setCustomCounts(Array.from({ length: Math.min(10, Math.max(1, Number(form.count) || 1)) }, () => ""));
-  };
-
-  // Đổi phương thức phân bổ: xóa số lượng tùy chỉnh cũ để không giữ lại giá trị của phương thức trước.
-  const handleMethodChange = (method) => {
-    setAssignmentMethod(method);
-    if (method === AUTO_ASSIGN_METHODS.CUSTOM) {
-      setCustomCounts((previous) => Array.from(
-        { length: Math.min(10, Math.max(1, Number(form.count) || 1)) },
-        (_, index) => previous[index] ?? "",
-      ));
-    } else {
-      setCustomCounts([""]);
-    }
   };
 
   const handleSave = async () => {
@@ -412,7 +339,6 @@ const CreateClassGroups = () => {
     if (!editingId && dialogScopeGroups.some((group) => automaticNames.includes(group.name))) return toast.error("Tên nhóm đã tồn tại trong chuyên ngành và khóa này.");
     if (!editingId && dialogScopeError) return toast.error(dialogScopeError);
     if (!editingId && dialogScopeLoading) return toast.error("Đang kiểm tra các nhóm đã tồn tại.");
-    if (!editingId && autoAssignEnabled && autoValidationError) return toast.error(autoValidationError);
     setSaving(true);
     try {
       const payload = {
@@ -444,16 +370,8 @@ const CreateClassGroups = () => {
           maxStudents: Number(form.maxStudents || 40),
           status: form.status,
           note: form.note?.trim() || undefined,
-          autoAssign: autoAssignEnabled,
-          ...(autoAssignEnabled ? {
-            assignmentMethod,
-            admissionRecordIds: unassignedStudents.map((student) => student.id),
-            ...(assignmentMethod === AUTO_ASSIGN_METHODS.CUSTOM ? { targetCounts: distribution.counts } : {}),
-          } : {}),
         }, { withCredentials: true });
-        toast.success(autoAssignEnabled
-          ? `Đã tạo ${count} nhóm và phân ${unassignedStudents.length} học viên.`
-          : `Đã tạo thành công ${count} nhóm học viên.`);
+        toast.success(`Đã tạo thành công ${count} nhóm học viên.`);
       }
       setDialogOpen(false);
       loadGroups();
@@ -484,19 +402,40 @@ const CreateClassGroups = () => {
       title="Tạo nhóm học viên"
       group="Thủ tục đầu vào"
       desc="Quản lý và mở các nhóm học phần cho học viên Thạc sĩ theo từng ngành học và khóa tuyển sinh."
+      maxWidth={1880}
     >
       <ToastContainer position="top-center" newestOnTop limit={3} />
 
       {/* Filter Bar */}
-      <Paper variant="outlined" sx={{ p: 2, mb: 2.5, bgcolor: "#fbfcfd" }}>
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 1.5,
+          mb: 1.5,
+          bgcolor: "#FBFDFF",
+          borderColor: "#D8E5EF",
+          borderRadius: "12px",
+          boxShadow: "0 4px 14px rgba(23, 62, 117, 0.05)",
+          "& .MuiInputLabel-root": { color: "#111827", fontSize: 12 },
+          "& .MuiOutlinedInput-root": {
+            height: 40,
+            bgcolor: "#F5F8FC",
+            color: "#111111",
+            borderRadius: "8px",
+            fontSize: 12.5,
+          },
+          "& .MuiOutlinedInput-notchedOutline": { borderColor: "#D7E3ED" },
+        }}
+      >
         <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="center">
           <FormControl size="small" sx={{ flex: "1 1 190px", minWidth: 190 }}>
-            <InputLabel id="year-filter-label">Năm học</InputLabel>
+            <InputLabel id="year-filter-label" shrink>Năm học</InputLabel>
             <Select
               labelId="year-filter-label"
               label="Năm học"
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
+              displayEmpty
             >
               {YEARS.map((y) => (
                 <MenuItem key={y} value={y}>{y}</MenuItem>
@@ -504,30 +443,40 @@ const CreateClassGroups = () => {
             </Select>
           </FormControl>
 
-          <FormControl size="small" sx={{ flex: "1 1 190px", minWidth: 190 }}>
-            <InputLabel id="major-filter-label">Ngành học</InputLabel>
+          <FormControl size="small" sx={{ flex: "1 1 210px", minWidth: 210 }}>
+            <InputLabel id="discipline-filter-label" shrink>Ngành</InputLabel>
+            <Select labelId="discipline-filter-label" label="Ngành" value={selectedDiscipline} displayEmpty onChange={(e) => { setSelectedDiscipline(e.target.value); setSelectedMajor("ALL"); }}>
+              <MenuItem value="">Tất cả ngành</MenuItem>
+              {disciplines.map((item) => <MenuItem key={item.id} value={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ flex: "1 1 210px", minWidth: 210 }}>
+            <InputLabel id="major-filter-label" shrink>Chuyên ngành</InputLabel>
             <Select
               labelId="major-filter-label"
-              label="Ngành học"
+              label="Chuyên ngành"
               value={selectedMajor}
               onChange={(e) => setSelectedMajor(e.target.value)}
+              displayEmpty
             >
-              <MenuItem value="ALL">-- Tất cả ngành --</MenuItem>
-              {majors.map((m) => (
+              <MenuItem value="ALL">Tất cả chuyên ngành</MenuItem>
+              {visibleMajors.map((m) => (
                 <MenuItem key={m.id} value={m.id}>{m.name} ({m.code})</MenuItem>
               ))}
             </Select>
           </FormControl>
 
           <FormControl size="small" sx={{ flex: "1 1 190px", minWidth: 190 }}>
-            <InputLabel id="status-filter-label">Trạng thái</InputLabel>
+            <InputLabel id="status-filter-label" shrink>Trạng thái</InputLabel>
             <Select
               labelId="status-filter-label"
               label="Trạng thái"
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
+              displayEmpty
             >
-              <MenuItem value="ALL">-- Tất cả --</MenuItem>
+              <MenuItem value="ALL">Tất cả</MenuItem>
               <MenuItem value="open">Đang mở</MenuItem>
               <MenuItem value="closed">Đã đóng</MenuItem>
             </Select>
@@ -535,7 +484,8 @@ const CreateClassGroups = () => {
 
           <TextField
             size="small"
-            placeholder="Tìm theo mã nhóm, tên nhóm..."
+            label="Tìm kiếm"
+            placeholder="Tìm theo mã nhóm, tên nhóm, ngành học..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             InputProps={{
@@ -545,19 +495,16 @@ const CreateClassGroups = () => {
                 </InputAdornment>
               ),
             }}
+            InputLabelProps={{ shrink: true }}
             sx={{ flex: "2 1 360px", minWidth: 280 }}
           />
-
-          <IconButton color="primary" onClick={loadGroups} title="Tải lại">
-            <RefreshRounded />
-          </IconButton>
 
           {isAdmin && (
             <Button
               variant="contained"
               startIcon={<AddRounded />}
               onClick={openAdd}
-              sx={{ height: 36, bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F" } }}
+              sx={{ height: 40, px: 2, bgcolor: "#0788B8", borderRadius: "8px", boxShadow: "none", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}
             >
               Thêm nhóm mới
             </Button>
@@ -568,11 +515,20 @@ const CreateClassGroups = () => {
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       {/* Class Groups Table */}
-      <TableContainer component={Paper} variant="outlined">
+      <TableContainer
+        component={Paper}
+        variant="outlined"
+        sx={{
+          borderColor: "#D7E4EE",
+          borderRadius: "12px",
+          overflow: "hidden",
+          boxShadow: "0 5px 18px rgba(23, 62, 117, 0.06)",
+        }}
+      >
         <Table size="small">
           <TableHead>
-            <TableRow sx={{ bgcolor: "#f0f4fa" }}>
-              <TableCell sx={{ width: 48, fontWeight: 700 }}>#</TableCell>
+            <TableRow sx={{ bgcolor: "#EDF4FA", "& th": { color: "#111111", py: 1.25, borderColor: "#D7E4EE" } }}>
+              <TableCell align="center" sx={{ width: 64, fontWeight: 700 }}>STT</TableCell>
               <TableCell sx={{ fontWeight: 700, width: 140 }}>Mã nhóm</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Tên nhóm học phần</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Ngành học</TableCell>
@@ -580,7 +536,7 @@ const CreateClassGroups = () => {
               <TableCell align="center" sx={{ fontWeight: 700, width: 90 }}>Năm học</TableCell>
               <TableCell sx={{ fontWeight: 700, width: 150 }}>Sĩ số</TableCell>
               <TableCell align="center" sx={{ fontWeight: 700, width: 110 }}>Trạng thái</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 700, width: 170 }}>Thao tác</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 700, width: 170 }}>Thao tác</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -609,17 +565,21 @@ const CreateClassGroups = () => {
                     hover
                     onDoubleClick={() => isAdmin && openEdit(row)}
                     title={isAdmin ? "Nhấp đúp để chỉnh sửa" : undefined}
-                    sx={isAdmin ? { cursor: "pointer" } : undefined}
+                    sx={{
+                      ...(isAdmin ? { cursor: "pointer" } : {}),
+                      "&:hover": { bgcolor: "#F5FAFE!important" },
+                      "& td": { color: "#111111", py: 1.05, borderColor: "#E2EBF2" },
+                    }}
                   >
-                    <TableCell>{index + 1}</TableCell>
+                    <TableCell align="center">{index + 1}</TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontFamily: "inherit", fontWeight: 700, color: "#0788B8" }}>
                         {row.code}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.name}</Typography>
-                      {row.note && <Typography variant="caption" color="text.secondary">{row.note}</Typography>}
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: "#111111" }}>{row.name}</Typography>
+                      {row.note && <Typography variant="caption" sx={{ color: "#111111" }}>{row.note}</Typography>}
                     </TableCell>
                     <TableCell>{row.major?.name || "-"}</TableCell>
                     <TableCell>{row.curriculum ? `${row.curriculum.code} — ${row.curriculum.name}` : "Chưa chọn"}</TableCell>
@@ -629,7 +589,7 @@ const CreateClassGroups = () => {
                         <Box sx={{ flexGrow: 1 }}>
                           <LinearProgress variant="determinate" value={pct} color={progressColor} sx={{ height: 6, borderRadius: 3 }} />
                         </Box>
-                        <Typography variant="caption" sx={{ fontWeight: 700, minWidth: 42 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 700, minWidth: 42, color: "#111111" }}>
                           {count}/{max}
                         </Typography>
                       </Box>
@@ -639,33 +599,43 @@ const CreateClassGroups = () => {
                         size="small"
                         label={row.status === "open" ? "Đang mở" : "Đã đóng"}
                         color={row.status === "open" ? "success" : "default"}
-                        variant="outlined"
+                        variant="filled"
+                        sx={{
+                          height: 24,
+                          borderRadius: "999px",
+                          bgcolor: row.status === "open" ? "#E5F7EC" : "#F0F2F4",
+                          color: "#111111",
+                          fontWeight: 700,
+                          fontSize: 11,
+                        }}
                       />
                     </TableCell>
-                    <TableCell align="right" onDoubleClick={(event) => event.stopPropagation()}>
-                      <Tooltip title="Phân học viên vào nhóm">
-                        <IconButton
-                          size="small"
-                          color="success"
-                          onClick={() => navigate(`/masters/assign-class-groups?groupId=${row.id}&majorId=${row.majorId || ""}&year=${row.academicYear || ""}`)}
-                        >
-                          <GroupWorkRounded fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      {isAdmin && (
-                        <>
-                          <Tooltip title="Chỉnh sửa">
-                            <IconButton size="small" color="primary" onClick={() => openEdit(row)}>
-                              <EditRounded fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Xóa">
-                            <IconButton size="small" color="error" onClick={() => setDeletingGroup(row)}>
-                              <DeleteRounded fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </>
-                      )}
+                    <TableCell align="center" onDoubleClick={(event) => event.stopPropagation()}>
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.25 }}>
+                        <Tooltip title="Phân học viên vào nhóm">
+                          <IconButton
+                            size="small"
+                            color="success"
+                            onClick={() => navigate(`/masters/assign-class-groups?groupId=${row.id}&majorId=${row.majorId || ""}&year=${row.academicYear || ""}`)}
+                          >
+                            <GroupWorkRounded fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        {isAdmin && (
+                          <>
+                            <Tooltip title="Chỉnh sửa">
+                              <IconButton size="small" color="primary" onClick={() => openEdit(row)}>
+                                <EditRounded fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Xóa">
+                              <IconButton size="small" color="error" onClick={() => setDeletingGroup(row)}>
+                                <DeleteRounded fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </>
+                        )}
+                      </Box>
                     </TableCell>
                   </TableRow>
                 );
@@ -704,7 +674,15 @@ const CreateClassGroups = () => {
             <Stack spacing="14px">
               <Box sx={{ p: 1.75, border: "1px solid #d7e1e8", borderRadius: "8px", backgroundColor: "#fbfcfd" }}>
                 <Stack spacing="13px">
-                  <Box sx={{ display: "grid", gridTemplateColumns: "minmax(0, 7fr) minmax(120px, 3fr)", gap: 1.5 }}>
+                  <Box sx={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.4fr) minmax(120px, .7fr)", gap: 1.5 }}>
+                    <CompactField label="NGÀNH" htmlFor="edit-discipline">
+                      <FormControl fullWidth size="small" sx={compactControlSx}>
+                        <Select id="edit-discipline" value={dialogDisciplineId} inputProps={{ "aria-label": "Ngành" }} onChange={(e) => handleDialogDisciplineChange(e.target.value)}>
+                          <MenuItem value="">Tất cả ngành</MenuItem>
+                          {disciplines.map((item) => <MenuItem key={item.id} value={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}
+                        </Select>
+                      </FormControl>
+                    </CompactField>
                     <CompactField label="CHUYÊN NGÀNH" htmlFor="edit-major">
                       <FormControl fullWidth size="small" sx={compactControlSx}>
                         <Select
@@ -713,7 +691,7 @@ const CreateClassGroups = () => {
                           inputProps={{ "aria-label": "Chuyên ngành" }}
                           onChange={(e) => setForm((p) => ({ ...p, majorId: e.target.value, curriculumId: "" }))}
                         >
-                          {majors.map((major) => (
+                          {dialogMajors.map((major) => (
                             <MenuItem key={major.id} value={major.id}>
                               {major.name} ({major.code})
                             </MenuItem>
@@ -833,11 +811,19 @@ const CreateClassGroups = () => {
             <Stack spacing="14px">
               <Box sx={{ p: 1.75, border: "1px solid #d7e1e8", borderRadius: "8px", backgroundColor: "#fbfcfd" }}>
                 <Stack spacing="13px">
-                  <Box sx={{ display: "grid", gridTemplateColumns: "minmax(0, 7fr) minmax(120px, 3fr)", gap: 1.5 }}>
+                  <Box sx={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.4fr) minmax(120px, .7fr)", gap: 1.5 }}>
+                    <CompactField label="NGÀNH" htmlFor="create-discipline">
+                      <FormControl fullWidth size="small" sx={compactControlSx}>
+                        <Select id="create-discipline" value={dialogDisciplineId} inputProps={{ "aria-label": "Ngành" }} onChange={(e) => handleDialogDisciplineChange(e.target.value)}>
+                          <MenuItem value="">Tất cả ngành</MenuItem>
+                          {disciplines.map((item) => <MenuItem key={item.id} value={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}
+                        </Select>
+                      </FormControl>
+                    </CompactField>
                     <CompactField label="CHUYÊN NGÀNH" htmlFor="create-major">
                       <FormControl fullWidth size="small" sx={compactControlSx}>
                         <Select id="create-major" value={form.majorId} inputProps={{ "aria-label": "Chuyên ngành" }} onChange={(e) => handleCreateMajorChange(e.target.value)}>
-                          {majors.map((major) => <MenuItem key={major.id} value={major.id}>{major.name} ({major.code})</MenuItem>)}
+                          {dialogMajors.map((major) => <MenuItem key={major.id} value={major.id}>{major.name} ({major.code})</MenuItem>)}
                         </Select>
                       </FormControl>
                     </CompactField>
@@ -893,6 +879,9 @@ const CreateClassGroups = () => {
 
               {dialogScopeError && <Alert severity="error" sx={compactAlertSx}>{dialogScopeError}</Alert>}
 
+              {/* Automatic assignment was removed from group creation. Students are added manually
+                  from the dedicated "Phân nhóm học viên" screen. */}
+              {/*
               <Box sx={{ pt: 1.25, borderTop: "1px solid #d7e1e8" }}>
                 <FormControlLabel
                   sx={{ m: 0, alignItems: "flex-start" }}
@@ -1022,6 +1011,7 @@ const CreateClassGroups = () => {
                   </Box>
                 )}
               </Box>
+              */}
 
               <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "160px 1fr" }, gap: 1.5 }}>
                 <CompactField label="TRẠNG THÁI" htmlFor="create-status">
@@ -1052,17 +1042,10 @@ const CreateClassGroups = () => {
               || Boolean(nameTemplateError)
               || Boolean(dialogScopeError)
               || dialogScopeLoading
-              || (autoAssignEnabled && Boolean(autoValidationError))
             ))}
             sx={{ minHeight: 36, px: 2, py: 0.75, borderRadius: "6px", backgroundColor: "#087eae", boxShadow: "none", fontSize: "12.5px", fontWeight: 700, "&:hover": { backgroundColor: "#066e99", boxShadow: "none" } }}
           >
-            {saving
-              ? "Đang lưu..."
-              : editingId
-                ? "Lưu nhóm"
-                : autoAssignEnabled
-                  ? `Tạo ${form.count || 0} nhóm & phân ${unassignedStudents.length} học viên`
-                  : `Tạo ${form.count || 0} nhóm`}
+            {saving ? "Đang lưu..." : editingId ? "Lưu nhóm" : `Tạo ${form.count || 0} nhóm`}
           </Button>
         </DialogActions>
       </Dialog>

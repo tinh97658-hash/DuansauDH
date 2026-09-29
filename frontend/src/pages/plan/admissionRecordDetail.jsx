@@ -18,6 +18,9 @@ import {
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../../config/http";
 import { getSelectableMajors, normalizeMajorsResponse, selectMajorForLevel } from "../../utils/majors";
+import {
+  disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline,
+} from "../../utils/disciplineScope";
 import FeatureLayout from "../../components/FeatureLayout";
 
 const DOCUMENT_ITEMS = [
@@ -268,7 +271,7 @@ const mapRecordToFormState = (data, majorList = []) => {
   };
 };
 
-const AdmissionRecordDetail = () => {
+const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
@@ -279,9 +282,11 @@ const AdmissionRecordDetail = () => {
   const [formData, setFormData] = useState(null);
   const [initialData, setInitialData] = useState(null);
   const [majors, setMajors] = useState([]);
+  const [disciplineId, setDisciplineId] = useState("");
   const [transferHistory, setTransferHistory] = useState([]);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferForm, setTransferForm] = useState({ toMajorId: "", reason: "" });
+  const [transferDisciplineId, setTransferDisciplineId] = useState("");
   const [decisionTransfer, setDecisionTransfer] = useState(null);
   const [decisionForm, setDecisionForm] = useState({ decision: "approved", toCurriculumId: "", note: "" });
   const [decisionCurriculums, setDecisionCurriculums] = useState([]);
@@ -303,6 +308,15 @@ const AdmissionRecordDetail = () => {
   const selectableMajors = useMemo(
     () => getSelectableMajors(majors, formData?.trainingLevel),
     [majors, formData?.trainingLevel],
+  );
+  const disciplines = useMemo(() => disciplinesFromMajors(selectableMajors), [selectableMajors]);
+  const visibleSelectableMajors = useMemo(
+    () => majorsForDiscipline(selectableMajors, disciplineId),
+    [selectableMajors, disciplineId],
+  );
+  const visibleTransferMajors = useMemo(
+    () => majorsForDiscipline(selectableMajors, transferDisciplineId),
+    [selectableMajors, transferDisciplineId],
   );
 
   // Check for unsaved changes
@@ -361,6 +375,7 @@ const AdmissionRecordDetail = () => {
         majorId: selectedMajor?.id || "",
         majorName: selectedMajor?.name || "",
       };
+      setDisciplineId(majorDisciplineId(selectedMajor));
       setFormData(formState);
       setInitialData(JSON.parse(JSON.stringify(formState)));
     } catch (err) {
@@ -419,6 +434,7 @@ const AdmissionRecordDetail = () => {
       setRecord(updated);
 
       const syncedState = mapRecordToFormState(updated, majors);
+      setDisciplineId(majorDisciplineId(majors.find((major) => major.id === syncedState.majorId)));
       setFormData(syncedState);
       setInitialData(JSON.parse(JSON.stringify(syncedState)));
     } catch (err) {
@@ -445,7 +461,7 @@ const AdmissionRecordDetail = () => {
     if (isDirty) {
       setShowConfirmLeave(true);
     } else {
-      navigate("/plan/admission-records");
+      navigate(returnPath);
     }
   };
 
@@ -841,6 +857,7 @@ const AdmissionRecordDetail = () => {
             startIcon={<SwapHorizRounded />}
             onClick={() => {
               setTransferForm({ toMajorId: "", reason: "" });
+              setTransferDisciplineId("");
               setTransferOpen(true);
             }}
             disabled={saving || transferHistory.some((item) => item.status === "pending")}
@@ -905,7 +922,7 @@ const AdmissionRecordDetail = () => {
           <Typography variant="h6" sx={{ color: "#B52D2D", fontWeight: 700, mb: 1 }}>
             Không tìm thấy thông tin hồ sơ tuyển sinh!
           </Typography>
-          <Button variant="contained" size="small" onClick={() => navigate("/plan/admission-records")} sx={{ bgcolor: "#0788B8", mt: 1 }}>
+          <Button variant="contained" size="small" onClick={() => navigate(returnPath)} sx={{ bgcolor: "#0788B8", mt: 1 }}>
             Trở về danh sách hồ sơ
           </Button>
         </Paper>
@@ -1331,7 +1348,7 @@ const AdmissionRecordDetail = () => {
               II. Thể thức & chương trình đào tạo
             </Typography>
 
-            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" }, gap: 2.5 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(4, 1fr)" }, gap: 2.5 }}>
               <Box>
                 <Typography sx={fieldLabelSx}>Trình độ đào tạo</Typography>
                 <Select
@@ -1340,8 +1357,9 @@ const AdmissionRecordDetail = () => {
                   value={formData.trainingLevel}
                   onChange={(e) => {
                     const trainingLevel = e.target.value;
+                    const selected = selectMajorForLevel(majors, trainingLevel, formData.majorId);
+                    setDisciplineId(majorDisciplineId(selected));
                     setFormData((previous) => {
-                      const selected = selectMajorForLevel(majors, trainingLevel, previous.majorId);
                       return {
                         ...previous,
                         trainingLevel,
@@ -1354,6 +1372,33 @@ const AdmissionRecordDetail = () => {
                 >
                   {TRAINING_LEVELS.map((t) => (
                     <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>
+                  ))}
+                </Select>
+              </Box>
+
+              <Box>
+                <Typography sx={fieldLabelSx}>Ngành</Typography>
+                <Select
+                  size="small"
+                  fullWidth
+                  value={disciplineId}
+                  onChange={(e) => {
+                    const nextDisciplineId = e.target.value;
+                    setDisciplineId(nextDisciplineId);
+                    if (nextDisciplineId && majorDisciplineId(
+                      selectableMajors.find((major) => major.id === formData.majorId),
+                    ) !== nextDisciplineId) {
+                      setFormData((previous) => ({ ...previous, majorId: "", majorName: "" }));
+                    }
+                  }}
+                  sx={selectSx}
+                  displayEmpty
+                >
+                  <MenuItem value="">Tất cả ngành</MenuItem>
+                  {disciplines.map((discipline) => (
+                    <MenuItem key={discipline.id} value={discipline.id}>
+                      {disciplineOptionLabel(discipline)}
+                    </MenuItem>
                   ))}
                 </Select>
               </Box>
@@ -1376,7 +1421,7 @@ const AdmissionRecordDetail = () => {
                   displayEmpty
                 >
                   <MenuItem value="" disabled>-- Chọn chuyên ngành --</MenuItem>
-                  {selectableMajors.map((m) => (
+                  {visibleSelectableMajors.map((m) => (
                     <MenuItem key={m.id} value={m.id}>
                       {m.code ? `${m.code} - ${m.name}` : m.name}
                     </MenuItem>
@@ -1766,9 +1811,24 @@ const AdmissionRecordDetail = () => {
         <DialogTitle>Chuyển chuyên ngành</DialogTitle>
         <DialogContent><Stack spacing={2} sx={{ mt: 1 }}>
           <Typography variant="body2">Mã học viên và toàn bộ lịch sử học tập được giữ nguyên. Hồ sơ sẽ trở về trạng thái nộp hồ sơ, chờ hội đồng xét.</Typography>
+          <Select
+            fullWidth
+            size="small"
+            displayEmpty
+            value={transferDisciplineId}
+            onChange={(e) => {
+              setTransferDisciplineId(e.target.value);
+              setTransferForm((previous) => ({ ...previous, toMajorId: "" }));
+            }}
+          >
+            <MenuItem value="">Tất cả ngành</MenuItem>
+            {disciplines.map((discipline) => (
+              <MenuItem key={discipline.id} value={discipline.id}>{disciplineOptionLabel(discipline)}</MenuItem>
+            ))}
+          </Select>
           <Select fullWidth size="small" displayEmpty value={transferForm.toMajorId} onChange={(e) => setTransferForm((p) => ({ ...p, toMajorId: e.target.value }))}>
             <MenuItem value="">Chọn chuyên ngành mới</MenuItem>
-            {selectableMajors.filter((major) => major.id !== record?.majorId).map((major) => <MenuItem key={major.id} value={major.id}>{major.name} ({major.code})</MenuItem>)}
+            {visibleTransferMajors.filter((major) => major.id !== record?.majorId).map((major) => <MenuItem key={major.id} value={major.id}>{major.name} ({major.code})</MenuItem>)}
           </Select>
           <TextField label="Lý do chuyển" multiline minRows={3} value={transferForm.reason} onChange={(e) => setTransferForm((p) => ({ ...p, reason: e.target.value }))} />
         </Stack></DialogContent>
@@ -2159,7 +2219,7 @@ const AdmissionRecordDetail = () => {
             color="error"
             onClick={() => {
               setShowConfirmLeave(false);
-              navigate("/plan/admission-records");
+              navigate(returnPath);
             }}
             sx={{ textTransform: "none", fontWeight: 700 }}
           >

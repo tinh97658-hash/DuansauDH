@@ -230,9 +230,9 @@ describe("MastersService.autoAssign", () => {
   });
 });
 
-describe("MastersService.batchCreateClassGroups with auto assignment", () => {
-  it("creates and assigns in the same transaction and propagates assignment failure", async () => {
-    const { service, classGroups, classGroupMembers, admissionRecords, majors, classGroupsService } = buildService();
+describe("MastersService.batchCreateClassGroups", () => {
+  it("creates empty groups without assigning students", async () => {
+    const { service, classGroups, classGroupMembers, majors, classGroupsService } = buildService();
     const g1 = { ...openGroup, id: "g1", code: "26CNTT01", name: "CNTT2026.01" };
     const g2 = { ...openGroup, id: "g2", code: "26CNTT02", name: "CNTT2026.02" };
     majors.findByPk.mockResolvedValue({ id: "major-1", active: true, program: "masters" });
@@ -241,15 +241,7 @@ describe("MastersService.batchCreateClassGroups with auto assignment", () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([g1, g2]);
     classGroupsService.create.mockResolvedValueOnce(g1).mockResolvedValueOnce(g2);
-    admissionRecords.findAll.mockResolvedValue([
-      { id: "a1", studentId: null, firstName: "An", fullName: "Học viên An" },
-      { id: "a2", studentId: null, firstName: "Bình", fullName: "Học viên Bình" },
-    ]);
-    classGroupMembers.findAll.mockResolvedValue([]);
-    classGroupMembers.count.mockResolvedValue(0);
-    classGroupMembers.bulkCreate.mockRejectedValue(new Error("assignment failed"));
-
-    await expect(service.batchCreateClassGroups({
+    const result = await service.batchCreateClassGroups({
       codePrefix: "26CNTT",
       namePrefix: "CNTT2026.",
       nameTemplate: "CNTT2026.{n}",
@@ -259,13 +251,11 @@ describe("MastersService.batchCreateClassGroups with auto assignment", () => {
       academicYear: "2026",
       maxStudents: 40,
       status: "open",
-      autoAssign: true,
-      assignmentMethod: "balanced",
-      admissionRecordIds: ["a1", "a2"],
-    })).rejects.toThrow("assignment failed");
+    });
 
     const transaction = classGroupsService.create.mock.calls[0][1];
     expect(classGroupsService.create).toHaveBeenNthCalledWith(2, expect.anything(), transaction);
-    expect(classGroupMembers.bulkCreate).toHaveBeenCalledWith(expect.anything(), { transaction });
+    expect(classGroupMembers.bulkCreate).not.toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({ success: true, count: 2, groups: [g1, g2] }));
   });
 });

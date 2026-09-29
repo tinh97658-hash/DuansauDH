@@ -12,11 +12,12 @@ import {
 import {
   AddRounded, CheckBoxOutlineBlankRounded, CheckBoxRounded, CheckRounded,
   CloseRounded, DeleteOutlineRounded, DeleteRounded, EditRounded, LibraryBooksRounded,
-  PlaylistAddRounded, RefreshRounded, SaveRounded, SearchRounded, ClassRounded,
+  PlaylistAddRounded, SaveRounded, SearchRounded, ClassRounded,
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
 import SubjectSharingCheckbox from "../../components/SubjectSharingCheckbox";
+import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 import {
   compactClassCodes, countGroupClasses, groupCurriculumsByYear, suggestCurriculumCode,
 } from "./trainingPlan.logic";
@@ -30,6 +31,7 @@ const SUBJECT_TYPES = [
 ];
 
 const currentYear = new Date().getFullYear();
+// Used by the curriculum creation dialog; the top-level year filter is intentionally hidden.
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
 const LEVELS = [
   { value: "masters", label: "Thạc sĩ" },
@@ -81,8 +83,9 @@ const cellInputSx = {
 const TrainingPlan = () => {
   // Global Filters
   const [majors, setMajors] = useState([]);
-  const [year, setYear] = useState(String(currentYear));
+  const year = String(currentYear);
   const [level, setLevel] = useState("masters");
+  const [disciplineId, setDisciplineId] = useState("");
   const [majorId, setMajorId] = useState("");
   const [tab, setTab] = useState(0); // 0: Học phần chuyên ngành, 1: Lớp học & Chương trình đào tạo
   const [isAdmin, setIsAdmin] = useState(false);
@@ -128,10 +131,15 @@ const TrainingPlan = () => {
       const list = Array.isArray(data) ? data : data.data || [];
       setMajors(list);
       if (list.length > 0) {
-        if (!majorId || !list.some((m) => m.id === majorId)) {
-          setMajorId(list[0].id);
-        }
+        const selected = list.find((m) => m.id === majorId) || list[0];
+        setDisciplineId((previous) => (
+          previous && list.some((major) => (major.disciplineId || major.discipline?.id) === previous)
+            ? previous
+            : ""
+        ));
+        setMajorId(selected.id);
       } else {
+        setDisciplineId("");
         setMajorId("");
         setSubjects([]);
         setCurriculums([]);
@@ -241,6 +249,17 @@ const TrainingPlan = () => {
   }, [isAddingSubject]);
 
   const selectedMajor = useMemo(() => majors.find((m) => m.id === majorId), [majors, majorId]);
+  const disciplines = useMemo(() => disciplinesFromMajors(majors), [majors]);
+  const filteredMajors = useMemo(
+    () => majorsForDiscipline(majors, disciplineId),
+    [majors, disciplineId]
+  );
+
+  const handleDisciplineChange = (nextDisciplineId) => {
+    setDisciplineId(nextDisciplineId);
+    const nextMajors = majorsForDiscipline(majors, nextDisciplineId);
+    if (!nextMajors.some((major) => major.id === majorId)) setMajorId(nextMajors[0]?.id || "");
+  };
 
   // Nhóm CTĐT theo khóa áp dụng để phân biệt rõ chương trình của từng khóa.
   const curriculumGroups = useMemo(() => groupCurriculumsByYear(curriculums), [curriculums]);
@@ -735,34 +754,20 @@ const TrainingPlan = () => {
     >
       <ToastContainer position="top-right" newestOnTop autoClose={2500} limit={3} />
 
-      {/* 1. TOP TOOLBAR: YEAR, LEVEL, MAJOR & GLOBAL STATS */}
+      {/* 1. TOP TOOLBAR: LEVEL, DISCIPLINE & MAJOR */}
       <Paper
         variant="outlined"
         sx={{
           p: 1.5,
-          mb: 2,
-          bgcolor: "#FFFFFF",
-          borderColor: "#DFE4E8",
-          borderRadius: "4px",
+          mb: 1.5,
+          bgcolor: "#FBFDFF",
+          borderColor: "#D8E5EF",
+          borderRadius: "12px",
+          boxShadow: "0 4px 14px rgba(23, 62, 117, 0.05)",
         }}
       >
         <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems="center" justifyContent="space-between">
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="center" sx={{ width: { xs: "100%", md: "auto" }, flexGrow: 1 }}>
-            <FormControl size="small" sx={{ minWidth: 140, width: { xs: "100%", sm: "auto" } }}>
-              <Select
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-                displayEmpty
-                sx={{ height: 36, fontSize: 13, bgcolor: "#F7F9FA" }}
-              >
-                {YEARS.map((y) => (
-                  <MenuItem key={y} value={y} sx={{ fontSize: 13 }}>
-                    Năm: <strong>{y}</strong>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
             <FormControl size="small" sx={{ minWidth: 140, width: { xs: "100%", sm: "auto" } }}>
               <Select
                 value={level}
@@ -777,6 +782,22 @@ const TrainingPlan = () => {
               </Select>
             </FormControl>
 
+            <FormControl size="small" sx={{ minWidth: 250, width: { xs: "100%", sm: "auto" } }}>
+              <Select
+                value={disciplineId}
+                onChange={(e) => handleDisciplineChange(e.target.value)}
+                displayEmpty
+                sx={{ height: 36, fontSize: 13, fontWeight: 600, color: "#173E75", bgcolor: "#F7F9FA" }}
+              >
+                <MenuItem value="" sx={{ fontSize: 13 }}>Tất cả ngành</MenuItem>
+                {disciplines.map((discipline) => (
+                  <MenuItem key={discipline.id} value={discipline.id} sx={{ fontSize: 13 }}>
+                    {disciplineOptionLabel(discipline)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
             <FormControl size="small" sx={{ minWidth: 320, flexGrow: 1, width: { xs: "100%", sm: "auto" } }}>
               <Select
                 value={majorId}
@@ -784,7 +805,7 @@ const TrainingPlan = () => {
                 displayEmpty
                 sx={{ height: 36, fontSize: 13, fontWeight: 600, color: "#173E75", bgcolor: "#F7F9FA" }}
               >
-                {majors.map((m) => (
+                {filteredMajors.map((m) => (
                   <MenuItem key={m.id} value={m.id} sx={{ fontSize: 13 }}>
                     {m.code} — {m.name} ({m.subjectCount} học phần)
                   </MenuItem>
@@ -793,19 +814,6 @@ const TrainingPlan = () => {
             </FormControl>
           </Stack>
 
-          {/* Refresh button */}
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Tooltip title="Tải lại dữ liệu">
-              <IconButton
-                size="small"
-                onClick={loadData}
-                disabled={loading}
-                sx={{ border: "1px solid #DFE4E8", borderRadius: "4px", p: "6px" }}
-              >
-                <RefreshRounded fontSize="small" sx={{ color: "#607486" }} />
-              </IconButton>
-            </Tooltip>
-          </Stack>
         </Stack>
       </Paper>
 
@@ -818,10 +826,12 @@ const TrainingPlan = () => {
               minHeight: 38,
               "& .MuiTab-root": {
                 minHeight: 38,
+                maxWidth: "none",
                 py: 0.8,
                 px: 2.5,
                 fontSize: 13,
                 fontWeight: 700,
+                whiteSpace: "nowrap",
                 textTransform: "none",
                 color: "#607486",
                 "&.Mui-selected": {
@@ -1398,20 +1408,28 @@ const TrainingPlan = () => {
 
       {!loading && majorId && tab === 1 && (
         /* TAB 2: CHƯƠNG TRÌNH ĐÀO TẠO THEO KHÓA */
-        <Stack direction={{ xs: "column", lg: "row" }} spacing={2.5} alignItems="flex-start">
+        <Stack
+          direction={{ xs: "column", lg: "row" }}
+          spacing={1.25}
+          alignItems="stretch"
+          sx={{ minHeight: { xs: "auto", lg: 360 } }}
+        >
           {/* LEFT PANE: CURRICULUMS LIST */}
-          <Box sx={{ width: { xs: "100%", lg: "38%" } }}>
+          <Box sx={{ width: { xs: "100%", lg: "32%" }, display: "flex" }}>
             <Paper
               variant="outlined"
               sx={{
-                p: 2,
-                borderColor: "#DFE4E8",
-                borderRadius: "4px",
+                p: 1.25,
+                width: "100%",
+                minHeight: { xs: 320, lg: 360 },
+                borderColor: "#D7E4EE",
+                borderRadius: "10px",
                 bgcolor: "#FFFFFF",
+                boxShadow: "none",
               }}
             >
-              <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#173E75" }}>
+              <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#173E75", fontSize: 12 }}>
                   CTĐT theo từng khóa
                   <Typography component="span" variant="caption" sx={{ ml: 0.75, color: "#607486", fontWeight: 600 }}>
                     ({curriculumGroups.length} khóa · {curriculums.length} CTĐT)
@@ -1426,21 +1444,21 @@ const TrainingPlan = () => {
                     onClick={handleOpenCreateCurriculum}
                     sx={{
                       height: 28,
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: 700,
                       textTransform: "none",
-                      borderRadius: "2px",
+                      borderRadius: "8px",
                       bgcolor: "#0788B8",
                       boxShadow: "none",
                       "&:hover": { bgcolor: "#06729b", boxShadow: "none" },
                     }}
                   >
-                    + Lập CTĐT mới
+                   Lập CTĐT mới
                   </Button>
                 )}
               </Stack>
 
-              <TableContainer sx={{ maxHeight: 480, overflowY: "auto", border: "1px solid #DFE4E8", borderRadius: "2px" }}>
+              <TableContainer sx={{ maxHeight: 480, overflowY: "auto", border: "1px solid #D7E4EE", borderRadius: "8px", boxShadow: "none !important" }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", fontWeight: 700, fontSize: 11, py: "6px" } }}>
@@ -1577,14 +1595,19 @@ const TrainingPlan = () => {
           </Box>
 
           {/* RIGHT PANE: CHƯƠNG TRÌNH ĐÀO TẠO CỦA KHÓA */}
-          <Box sx={{ width: { xs: "100%", lg: "62%" } }}>
+          <Box sx={{ width: { xs: "100%", lg: "68%" }, display: "flex" }}>
             <Paper
               variant="outlined"
               sx={{
-                p: 2,
-                borderColor: "#DFE4E8",
-                borderRadius: "4px",
+                p: 1.25,
+                width: "100%",
+                minHeight: { xs: 360, lg: 360 },
+                display: "flex",
+                flexDirection: "column",
+                borderColor: "#D7E4EE",
+                borderRadius: "10px",
                 bgcolor: "#FFFFFF",
+                boxShadow: "none",
               }}
             >
               {!curriculumId || !curriculum ? (
@@ -1612,42 +1635,42 @@ const TrainingPlan = () => {
                   )}
                 </Box>
               ) : (
-                <Box>
+                <Box sx={{ display: "flex", minHeight: 0, flex: 1, flexDirection: "column" }}>
                   <Stack
                     direction={{ xs: "column", sm: "row" }}
-                    spacing={1.5}
+                    spacing={1}
                     alignItems={{ xs: "flex-start", sm: "center" }}
                     justifyContent="space-between"
-                    sx={{ mb: 1.5 }}
+                    sx={{ mb: 0.75 }}
                   >
                     <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#173E75" }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#173E75", fontSize: 14 }}>
                         {curriculum.name}
                       </Typography>
                       <Chip
                         size="small"
                         label={curriculum.code}
-                        sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: "#E6F4EA", color: "#137B3B", border: "1px solid #137B3B" }}
+                        sx={{ height: 24, fontSize: 11, fontWeight: 700, bgcolor: "#E6F4EA", color: "#137B3B", border: "1px solid #137B3B" }}
                       />
                       <Chip
                         size="small"
                         label={`Khóa ${curriculum.applicableFromYear || "—"}`}
-                        sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: "#E1F0F8", color: "#0788B8", border: "1px solid #0788B8" }}
+                        sx={{ height: 24, fontSize: 11, fontWeight: 700, bgcolor: "#E1F0F8", color: "#0788B8", border: "1px solid #0788B8" }}
                       />
-                      {(curriculum.classGroups || []).length > 0 && (
-                        <Tooltip title={`Các lớp áp dụng CTĐT này: ${curriculum.classGroups.map((g) => g.code).join(", ")}`}>
-                          <Chip
-                            size="small"
-                            label={`${curriculum.classGroups.length} lớp đang áp dụng`}
-                            sx={{ height: 20, fontSize: 10, fontWeight: 600, bgcolor: "#F0F4F8", color: "#173E75" }}
-                          />
-                        </Tooltip>
-                      )}
                       {matrixSaving && <CircularProgress size={14} sx={{ color: "#0788B8" }} />}
+                      {(curriculum.classGroups || []).length > 0 && (
+                        <Box sx={{ flexBasis: "100%", mt: "2px !important" }}>
+                          <Tooltip title={`Các lớp áp dụng CTĐT này: ${curriculum.classGroups.map((g) => g.code).join(", ")}`}>
+                            <Typography component="span" sx={{ color: "#607486", fontSize: 12, fontWeight: 500 }}>
+                              {curriculum.classGroups.length} lớp đang áp dụng
+                            </Typography>
+                          </Tooltip>
+                        </Box>
+                      )}
                     </Stack>
 
                     {isAdmin && (
-                      <Stack direction="row" spacing={1} alignItems="center">
+                      <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
                         <Button
                           size="small"
                           variant="contained"
@@ -1659,9 +1682,10 @@ const TrainingPlan = () => {
                             fontSize: 11,
                             fontWeight: 700,
                             textTransform: "none",
-                            borderRadius: "2px",
+                            borderRadius: "8px",
                             bgcolor: "#0788B8",
                             boxShadow: "none",
+                            whiteSpace: "nowrap",
                             "&:hover": { bgcolor: "#06729b", boxShadow: "none" },
                           }}
                         >
@@ -1681,7 +1705,8 @@ const TrainingPlan = () => {
                               fontSize: 11,
                               fontWeight: 700,
                               textTransform: "none",
-                              borderRadius: "2px",
+                              borderRadius: "8px",
+                              whiteSpace: "nowrap",
                             }}
                           >
                             Làm sạch CTĐT
@@ -1691,30 +1716,53 @@ const TrainingPlan = () => {
                     )}
                   </Stack>
 
-                  <Stack direction="row" spacing={2} sx={{ mb: 1.5 }} flexWrap="wrap">
-                    <Typography variant="caption" sx={{ color: "#607486", fontWeight: 700 }}>
-                      Bắt buộc: <strong style={{ color: "#137B3B" }}>{requiredCredits} TC</strong>
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: "#607486", fontWeight: 700 }}>
-                      Tự chọn: <strong style={{ color: "#B86216" }}>{electiveCredits} TC</strong>
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: "#607486", fontWeight: 700 }}>
-                      Tổng: <strong style={{ color: "#173E75" }}>{requiredCredits + electiveCredits} TC</strong> (Chuẩn: 60 TC)
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: "#607486", fontWeight: 700 }}>
-                      Quy mô CTĐT: <strong>{curriculumSubjects.length}</strong> học phần
-                    </Typography>
+                  <Stack direction="row" spacing={0.75} sx={{ mb: 0.75 }} flexWrap="wrap" useFlexGap>
+                    <Chip
+                      size="small"
+                      label={`Bắt buộc: ${requiredCredits} TC`}
+                      sx={{ height: 24, bgcolor: "#E6F4EA", color: "#137B3B", fontSize: 11, fontWeight: 700 }}
+                    />
+                    <Chip
+                      size="small"
+                      label={`Tự chọn: ${electiveCredits} TC`}
+                      sx={{ height: 24, bgcolor: "#FEF3E2", color: "#B86216", fontSize: 11, fontWeight: 700 }}
+                    />
+                    <Chip
+                      size="small"
+                      label={`Tổng: ${requiredCredits + electiveCredits} TC / Chuẩn 60 TC`}
+                      sx={{ height: 24, bgcolor: "#EAF4FB", color: "#0788B8", fontSize: 11, fontWeight: 700 }}
+                    />
+                    <Chip
+                      size="small"
+                      label={`${curriculumSubjects.length} học phần`}
+                      sx={{ height: 24, bgcolor: "#F0F4F8", color: "#607486", fontSize: 11, fontWeight: 600 }}
+                    />
                   </Stack>
 
-                  <Alert severity="info" sx={{ mb: 1.5, borderRadius: "2px", fontSize: 12 }}>
-                    <strong>Loại</strong>: bấm vào nhãn để chuyển học phần giữa <strong>Bắt buộc</strong> và{" "}
-                    <strong>Tự chọn</strong> trong CTĐT. Bấm icon 🗑 để <strong>loại môn thừa</strong> khỏi CTĐT của khóa.
+                  <Alert
+                    severity="info"
+                    sx={{
+                      mb: 0.75,
+                      minHeight: 32,
+                      py: 0,
+                      px: 1,
+                      border: "1px solid #DCE7EF",
+                      borderRadius: "8px",
+                      bgcolor: "#F8FAFC",
+                      color: "#607486",
+                      fontSize: 11,
+                      alignItems: "center",
+                      "& .MuiAlert-icon": { mr: 0.75, py: 0, fontSize: 15 },
+                      "& .MuiAlert-message": { py: 0.5 },
+                    }}
+                  >
+                    Bấm nhãn <strong>Loại</strong> để chuyển giữa Bắt buộc và Tự chọn. Dùng nút xóa để loại học phần khỏi CTĐT.
                   </Alert>
 
-                  <TableContainer sx={{ maxHeight: "calc(100vh - 360px)", overflowY: "auto", border: "1px solid #DFE4E8", borderRadius: "2px" }}>
+                  <TableContainer sx={{ maxHeight: "calc(100vh - 360px)", overflowY: "auto", border: "1px solid #D7E4EE", borderRadius: "8px", boxShadow: "none !important" }}>
                     <Table size="small" stickyHeader sx={{ minWidth: 640 }}>
                       <TableHead>
-                        <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", color: "#172B3A", fontWeight: 700, fontSize: 12, py: "6px" } }}>
+                        <TableRow sx={{ height: 42, "& th": { bgcolor: "#F0F4F8", color: "#172B3A", fontWeight: 700, fontSize: 13, py: "8px" } }}>
                           <TableCell sx={{ width: 36, textAlign: "center" }}>STT</TableCell>
                           <TableCell sx={{ width: 80 }}>Mã HP</TableCell>
                           <TableCell>Tên môn học</TableCell>
@@ -1734,8 +1782,8 @@ const TrainingPlan = () => {
                           </TableRow>
                         ) : (
                           curriculumSubjects.map((entry, index) => (
-                            <TableRow key={entry.id} hover sx={{ "& td": { py: "4px", fontSize: 12 } }}>
-                              <TableCell align="center" sx={{ color: "#607486", fontSize: 11 }}>
+                            <TableRow key={entry.id} hover sx={{ height: 56, "& td": { py: "7px", fontSize: 13, verticalAlign: "middle" } }}>
+                              <TableCell align="center" sx={{ color: "#607486", fontSize: 12 }}>
                                 {index + 1}
                               </TableCell>
                               <TableCell sx={{ fontFamily: "inherit", fontWeight: 700, color: "#173E75" }}>
@@ -1743,7 +1791,7 @@ const TrainingPlan = () => {
                               </TableCell>
                               <TableCell sx={{ fontWeight: 500 }}>{entry.name}</TableCell>
                               <TableCell align="center" sx={{ fontWeight: 600 }}>{entry.credits}</TableCell>
-                              <TableCell sx={{ color: "#607486", fontSize: 11 }}>
+                              <TableCell sx={{ color: "#607486", fontSize: 12 }}>
                                 {entry.blockCode === "KC" ? (
                                   <Chip
                                     size="small"
@@ -1752,8 +1800,8 @@ const TrainingPlan = () => {
                                       bgcolor: "#E8F1F5",
                                       color: "#173E75",
                                       fontWeight: 700,
-                                      height: 20,
-                                      fontSize: 10,
+                                      height: 24,
+                                      fontSize: 11,
                                       border: "1px solid #CBD5E1",
                                     }}
                                   />
@@ -1769,8 +1817,8 @@ const TrainingPlan = () => {
                                     label={entry.isRequired ? "Bắt buộc" : "Tự chọn"}
                                     onClick={() => handleToggleRequired(entry)}
                                     sx={{
-                                      height: 20,
-                                      fontSize: 10,
+                                      height: 24,
+                                      fontSize: 11,
                                       fontWeight: 700,
                                       cursor: isAdmin ? "pointer" : "default",
                                       borderColor: entry.isRequired ? "#137B3B" : "#B86216",

@@ -16,6 +16,7 @@ export class CreateCatalogDto {
   @IsOptional() @IsUUID() trainingLevelId?: string;
   /** Ngành (cấp 1) của chuyên ngành — bảng `disciplines`. */
   @IsOptional() @IsUUID() disciplineId?: string;
+  @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsIn(["masters", "doctoral"]) program?: string;
   @IsOptional() @IsUUID() staffId?: string;
   // Trường bổ sung theo từng danh mục
@@ -47,6 +48,7 @@ export class UpdateCatalogDto {
   @IsOptional() @IsUUID() trainingLevelId?: string;
   /** Ngành (cấp 1) của chuyên ngành — bảng `disciplines`. */
   @IsOptional() @IsUUID() disciplineId?: string;
+  @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsIn(["masters", "doctoral"]) program?: string;
   @IsOptional() @IsUUID() staffId?: string;
   @IsOptional() @IsBoolean() isAdmissionScreening?: boolean;

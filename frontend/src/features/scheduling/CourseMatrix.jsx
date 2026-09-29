@@ -12,6 +12,7 @@ import {
 import { api, groupsOf, labelOf, Notice, offeringTitle, rows, subjectLabel, unique, useLoad } from "./shared";
 import { getBusinessTodayKey } from "../../utils/schedulingCalendar";
 import OfferingDetails from "./OfferingDetails";
+import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 
 const vietnameseNameCollator = new Intl.Collator("vi", { sensitivity: "base", numeric: true });
 const COHORT_WINDOW_SIZE = 4;
@@ -56,6 +57,7 @@ export function sortCourseOfferings(offerings, todayKey = getBusinessTodayKey())
 export default function CourseMatrix({ user }) {
   const navigate = useNavigate();
   const [majorId, setMajor] = useState("");
+  const [disciplineId, setDiscipline] = useState("");
   const [scheduleState, setScheduleState] = useState("all");
   const [year, setYear] = useState("");
   const [query, setQuery] = useState("");
@@ -65,6 +67,9 @@ export default function CourseMatrix({ user }) {
   const canEdit = user.canManageScheduling === true;
   const offerings = useLoad(async () => rows(await api.get("/scheduling/course-offerings?program=masters")), []);
   const majors = useLoad(async () => rows(await api.get("/system/majors?program=masters")), []);
+  const disciplines = useMemo(() => disciplinesFromMajors(majors.data || []), [majors.data]);
+  const visibleMajors = useMemo(() => majorsForDiscipline(majors.data || [], disciplineId), [disciplineId, majors.data]);
+  const visibleMajorIds = useMemo(() => new Set(visibleMajors.map((major) => major.id)), [visibleMajors]);
 
   const all = useMemo(
     () => (offerings.data || []).filter((offering) => offering.status !== "completed"),
@@ -72,7 +77,7 @@ export default function CourseMatrix({ user }) {
   );
 
   // Filter logic
-  const filtered = useLoadOfferings(all, majorId, year, scheduleState, query);
+  const filtered = useLoadOfferings(all, disciplineId, visibleMajorIds, majorId, year, scheduleState, query);
 
   // Cohorts calculation
   const allCohorts = useMemo(() => {
@@ -181,6 +186,19 @@ export default function CourseMatrix({ user }) {
           </div>
 
           <div className="sl-matrix-filter-item">
+            <label htmlFor="matrix-discipline-filter">Ngành</label>
+            <select
+              id="matrix-discipline-filter"
+              className="sl-select"
+              value={disciplineId}
+              onChange={(e) => { setDiscipline(e.target.value); setMajor(""); }}
+            >
+              <option value="">Tất cả ngành</option>
+              {disciplines.map((discipline) => <option key={discipline.id} value={discipline.id}>{disciplineOptionLabel(discipline)}</option>)}
+            </select>
+          </div>
+
+          <div className="sl-matrix-filter-item">
             <label htmlFor="matrix-major-filter">Chuyên ngành</label>
             <select
               id="matrix-major-filter"
@@ -189,7 +207,7 @@ export default function CourseMatrix({ user }) {
               onChange={(e) => setMajor(e.target.value)}
             >
               <option value="">Tất cả chuyên ngành</option>
-              {(majors.data || []).map((major) => (
+              {visibleMajors.map((major) => (
                 <option key={major.id} value={major.id}>
                   {major.name}{major.code ? ` (${major.code})` : ""}
                 </option>
@@ -548,17 +566,18 @@ function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, onSelectOf
 }
 
 // Hook helper for filtering offerings
-function useLoadOfferings(all, majorId, year, scheduleState, query) {
+function useLoadOfferings(all, disciplineId, visibleMajorIds, majorId, year, scheduleState, query) {
   return useMemo(() => {
     return all.filter((offering) => {
       const groups = groupsOf(offering);
+      const matchesDiscipline = !disciplineId || groups.some((g) => visibleMajorIds.has(g.majorId || g.major?.id));
       const matchesMajor = !majorId || groups.some((g) => (g.majorId || g.major?.id) === majorId);
       const matchesYear = !year || groups.some((g) => g.academicYear === year);
       const matchesScheduleState = scheduleState === "all" || scheduleCategory(offering) === scheduleState;
       const searchStr = `${offering.name || ""} ${offering.subject?.code || ""} ${offering.subject?.name || ""} ${labelOf(offering)}`.toLowerCase();
       const matchesQuery = !query.trim() || searchStr.includes(query.trim().toLowerCase());
-      return matchesMajor && matchesYear && matchesScheduleState && matchesQuery;
+      return matchesDiscipline && matchesMajor && matchesYear && matchesScheduleState && matchesQuery;
     });
-  }, [all, majorId, year, scheduleState, query]);
+  }, [all, disciplineId, visibleMajorIds, majorId, year, scheduleState, query]);
 }
 

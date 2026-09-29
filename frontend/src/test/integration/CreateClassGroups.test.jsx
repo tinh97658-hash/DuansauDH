@@ -9,17 +9,10 @@ jest.mock("axios");
 const year = String(new Date().getFullYear());
 const major = { id: "major-1", code: "CNTT", name: "Công nghệ thông tin" };
 const curriculum = { id: "curriculum-1", code: `CT-CNTT-${year}`, name: "CTĐT CNTT", applicableFromYear: year, active: true };
-const eligibleStudents = Array.from({ length: 50 }, (_, index) => ({
-  id: `student-${index + 1}`,
-  fullName: `Học viên ${index + 1}`,
-  assignedGroup: null,
-}));
-
 const mockRequests = () => {
   axios.get.mockImplementation(async (url) => {
     if (url.includes("/system/majors")) return { data: [major] };
     if (url.includes("/auth/isStaff")) return { data: { message: "admin" } };
-    if (url.includes("/eligible-students")) return { data: eligibleStudents };
     if (url.includes("/plan/curriculums")) return { data: [curriculum] };
     if (url.includes("/masters/class-groups")) return { data: [] };
     return { data: [] };
@@ -44,23 +37,13 @@ beforeEach(() => {
   mockRequests();
 });
 
-test("auto assignment is off by default and progressively reveals its controls", async () => {
+test("does not expose automatic student assignment while creating groups", async () => {
   await openCreateDialog();
-  const checkbox = screen.getByRole("checkbox", { name: /Phân học viên tự động/ });
-
-  expect(checkbox).not.toBeChecked();
-  expect(screen.queryByRole("button", { name: "Cân bằng sĩ số" })).not.toBeInTheDocument();
-
-  fireEvent.change(screen.getByLabelText("Số nhóm cần tạo"), { target: { value: "2" } });
-  fireEvent.click(checkbox);
-  expect(await screen.findByRole("button", { name: "Cân bằng sĩ số" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Theo địa bàn" })).toBeDisabled();
-
-  fireEvent.click(checkbox);
+  expect(screen.queryByRole("checkbox", { name: /Phân học viên tự động/ })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Cân bằng sĩ số" })).not.toBeInTheDocument();
 });
 
-test("changing group count refreshes names and the auto action summary", async () => {
+test("changing group count refreshes names and keeps a create-only action", async () => {
   await openCreateDialog();
   fireEvent.change(screen.getByLabelText("Số nhóm cần tạo"), { target: { value: "3" } });
 
@@ -68,11 +51,10 @@ test("changing group count refreshes names and the auto action summary", async (
   expect(screen.getByText(`CNTT${year}.02`)).toBeInTheDocument();
   expect(screen.getByText(`CNTT${year}.03`)).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole("checkbox", { name: /Phân học viên tự động/ }));
-  expect(await screen.findByRole("button", { name: "Tạo 3 nhóm & phân 50 học viên" })).toBeEnabled();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Tạo 3 nhóm" })).toBeEnabled());
 });
 
-test("shell creation stays available when auto assignment is off", async () => {
+test("creates empty group shells without automatic assignment fields", async () => {
   await openCreateDialog();
   fireEvent.change(screen.getByLabelText("Số nhóm cần tạo"), { target: { value: "3" } });
   const createButton = await screen.findByRole("button", { name: "Tạo 3 nhóm" });
@@ -81,7 +63,7 @@ test("shell creation stays available when auto assignment is off", async () => {
 
   await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
     expect.stringContaining("/masters/class-groups/batch"),
-    expect.objectContaining({ count: 3, autoAssign: false }),
+    expect.not.objectContaining({ autoAssign: expect.anything() }),
     { withCredentials: true },
   ));
 });
@@ -104,7 +86,6 @@ test("opens edit dialog with Image 2 compact layout and updates class group", as
   axios.get.mockImplementation(async (url) => {
     if (url.includes("/system/majors")) return { data: [major] };
     if (url.includes("/auth/isStaff")) return { data: { message: "admin" } };
-    if (url.includes("/eligible-students")) return { data: eligibleStudents };
     if (url.includes("/plan/curriculums")) return { data: [curriculum] };
     if (url.includes("/masters/class-groups")) return { data: [existingGroup] };
     return { data: [] };

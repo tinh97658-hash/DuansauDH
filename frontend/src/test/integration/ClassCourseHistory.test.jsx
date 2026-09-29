@@ -44,7 +44,7 @@ function mount(query = "") {
 
 async function chooseScope({ expectTable = true } = {}) {
   await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveValue(major.id));
-  expect(screen.getByLabelText("Khóa / năm học")).toHaveValue("2027");
+  expect(screen.getByLabelText("Khóa / năm học")).toHaveTextContent("2027");
   if (expectTable) return screen.findByRole("table", { name: "Ma trận tiến độ học phần theo lớp" });
   return null;
 }
@@ -109,15 +109,18 @@ it("renders progress when classes in one major-year use different curriculums", 
   expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/class-curriculum-progress"), expect.anything());
 });
 
-it("keeps years separate when changing the required academic-year filter", async () => {
+it("allows selecting multiple academic years and combines their progress", async () => {
   const classes2028 = makeClasses("2028");
-  mockData({ catalog: [...makeClasses(), ...classes2028] });
+  const classes2026 = makeClasses("2026");
+  mockData({ catalog: [...makeClasses(), ...classes2028, ...classes2026] });
   mount();
   await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/class-curriculum-progress"), {
-    params: { majorId: major.id, academicYear: "2028" }, withCredentials: true,
+    params: { majorId: major.id, academicYear: "2026" }, withCredentials: true,
   }));
-  expect(await screen.findByRole("heading", { name: "Không có lớp phù hợp" })).toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText("Khóa / năm học"), { target: { value: "2027" } });
+  fireEvent.click(screen.getByLabelText("Khóa / năm học"));
+  fireEvent.click(screen.getByLabelText("2027"));
+  fireEvent.click(screen.getByLabelText("2028"));
+  expect(screen.getByLabelText("Khóa / năm học")).toHaveTextContent("2026, 2027, 2028");
   expect(await screen.findByRole("table", { name: "Ma trận tiến độ học phần theo lớp" })).toBeInTheDocument();
   await waitFor(() => expect(screen.queryByRole("progressbar")).not.toBeInTheDocument());
   expect(screen.queryByRole("columnheader", { name: "CNT2028.01" })).not.toBeInTheDocument();
@@ -141,7 +144,7 @@ it("prefers the current year and recomputes it when the major changes", async ()
   mount();
   await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveValue(major.id));
   fireEvent.change(screen.getByLabelText("Chuyên ngành"), { target: { value: secondMajor.id } });
-  expect(screen.getByLabelText("Khóa / năm học")).toHaveValue(currentYear);
+  expect(screen.getByLabelText("Khóa / năm học")).toHaveTextContent(currentYear);
   await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/class-curriculum-progress"), {
     params: { majorId: secondMajor.id, academicYear: currentYear }, withCredentials: true,
   }));

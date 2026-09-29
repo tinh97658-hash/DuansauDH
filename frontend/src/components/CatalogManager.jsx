@@ -73,7 +73,8 @@ const CompactField = ({ label, htmlFor, helper, error = false, children, sx }) =
 
 const CatalogManager = ({
   title, group, desc, endpoint, itemName, nameLabel = "Tên", codeLabel = "Mã",
-  sortable = true, parent = null, fields = [], editOnDoubleClick = false, showEditAction = true,
+  sortable = true, parent = null, parentBeforeName = false, fields = [], editOnDoubleClick = false,
+  showEditAction = true, showDeleteAction = true,
 }) => {
   const [rows, setRows] = useState([]);
   const [options, setOptions] = useState([]);
@@ -120,7 +121,11 @@ const CatalogManager = ({
       .then(({ data }) => {
         if (!mounted) return;
         const list = Array.isArray(data) ? data : data.data || [];
-        setOptions(list.map((item) => ({ value: item.id, label: item.name })));
+        setOptions(list.map((item) => ({
+          value: item.id,
+          label: parent.optionLabel ? parent.optionLabel(item) : item.name,
+          raw: item,
+        })));
       })
       .catch(() => mounted && setOptions([]));
     return () => { mounted = false; };
@@ -135,7 +140,7 @@ const CatalogManager = ({
         const { data } = await axios.get(`${API_BASE_URL}${f.optionsEndpoint}`, { withCredentials: true });
         const list = Array.isArray(data) ? data : data.data || [];
         return [f.key, list.map((item) => (
-          typeof item === "string" ? { value: item, label: item } : { value: item.id, label: (f.optionLabel ? f.optionLabel(item) : item.name) }
+          typeof item === "string" ? { value: item, label: item, raw: item } : { value: item.id, label: (f.optionLabel ? f.optionLabel(item) : item.name), raw: item }
         ))];
       } catch {
         return [f.key, []];
@@ -152,13 +157,14 @@ const CatalogManager = ({
     if (!keyword) return rows;
     const haystacks = (row) => [
       row.code, row.name,
-      ...tableFields.map((f) => row[f.key]),
+      ...tableFields.map((f) => f.searchValue ? f.searchValue(row) : row[f.key]),
       parent ? (parent.display ? parent.display(row) : row[parent.field]) : "",
     ];
     return rows.filter((row) => haystacks(row).some((v) => String(v ?? "").toLowerCase().includes(keyword)));
   }, [rows, search, parent, tableFields]);
 
-  const colSpan = 3 + (parent ? 1 : 0) + tableFields.length + (sortable ? 1 : 0) + 1 + (isAdmin ? 1 : 0);
+  const showActions = isAdmin && (showEditAction || showDeleteAction);
+  const colSpan = 3 + (parent ? 1 : 0) + tableFields.length + (sortable ? 1 : 0) + 1 + (showActions ? 1 : 0);
 
   const openAdd = () => { setEditingId(null); setForm(buildEmptyForm(parent, fields, sortable)); setDialogOpen(true); };
   const openEdit = (row) => {
@@ -177,6 +183,11 @@ const CatalogManager = ({
   const closeDialog = () => { setDialogOpen(false); setSaving(false); };
 
   const setField = (key) => (event) => setForm((prev) => ({ ...prev, [key]: event.target.value }));
+  const setParentField = (event) => setForm((prev) => ({
+    ...prev,
+    [parent.field]: event.target.value,
+    ...(parent.resetFields || []).reduce((values, key) => ({ ...values, [key]: "" }), {}),
+  }));
 
   const submit = async () => {
     if (!form.code?.trim()) return toast.error(`Vui lòng nhập ${codeLabel.toLowerCase()}`);
@@ -201,7 +212,7 @@ const CatalogManager = ({
         body[f.key] = num;
       } else {
         const value = String(raw ?? "").trim();
-        if (f.required && !value) return toast.error(`Vui lòng nhập ${f.label}`);
+        if (f.required && !value) return toast.error(`Vui lòng ${f.type === "select" ? "chọn" : "nhập"} ${f.label}`);
         if (f.type === "email" && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return toast.error(`${f.label} không hợp lệ`);
         body[f.key] = value || null;
       }
@@ -271,32 +282,62 @@ const CatalogManager = ({
   return (
     <FeatureLayout title={title} group={group} desc={desc}>
       <ToastContainer position="top-center" newestOnTop limit={3} />
-      <Stack direction="row" spacing={1.5} sx={{ mb: 2, flexWrap: "wrap", alignItems: "center" }}>
-        <TextField
-          size="small"
-          placeholder={`Tìm theo ${codeLabel.toLowerCase()} hoặc tên...`}
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
-              </InputAdornment>
-            ),
-          }}
-          sx={{ minWidth: 280, flexGrow: 1 }}
-        />
-        {isAdmin && (
-          <Button
-            variant="contained"
-            startIcon={<AddRounded />}
-            onClick={openAdd}
-            sx={{ height: 36, bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F" } }}
-          >
-            Thêm mới
-          </Button>
-        )}
-      </Stack>
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 1.5,
+          mb: 1.5,
+          bgcolor: "#FBFDFF",
+          borderColor: "#D8E5EF",
+          borderRadius: "12px",
+          boxShadow: "0 4px 14px rgba(23, 62, 117, 0.05)",
+          "& .MuiOutlinedInput-root": {
+            height: 40,
+            bgcolor: "#F5F8FC",
+            borderRadius: "8px",
+            fontSize: 12.5,
+          },
+          "& .MuiOutlinedInput-notchedOutline": { borderColor: "#D7E3ED" },
+        }}
+      >
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="center">
+          <TextField
+            size="small"
+            placeholder={`Tìm theo ${codeLabel.toLowerCase()} hoặc tên...`}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ minWidth: { xs: 0, sm: 280 }, width: { xs: "100%", sm: "auto" }, flexGrow: 1 }}
+          />
+          {isAdmin && (
+            <Button
+              variant="contained"
+              startIcon={<AddRounded />}
+              onClick={openAdd}
+              sx={{
+                height: 40,
+                px: 2,
+                width: { xs: "100%", sm: "auto" },
+                flexShrink: 0,
+                bgcolor: "#0788B8",
+                borderRadius: "8px",
+                boxShadow: "none",
+                textTransform: "none",
+                fontWeight: 700,
+                "&:hover": { bgcolor: "#056A8F", boxShadow: "none" },
+              }}
+            >
+              Thêm mới
+            </Button>
+          )}
+        </Stack>
+      </Paper>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
@@ -304,14 +345,15 @@ const CatalogManager = ({
         <Table size="small">
           <TableHead>
             <TableRow sx={{ bgcolor: "#f0f4fa" }}>
-              <TableCell sx={{ width: 48, fontWeight: 700 }}>#</TableCell>
+              <TableCell sx={{ width: 60, fontWeight: 700 }}>STT</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>{codeLabel}</TableCell>
+              {parent && parentBeforeName && <TableCell sx={{ fontWeight: 700 }}>{parent.columnLabel || parent.label}</TableCell>}
               <TableCell sx={{ fontWeight: 700 }}>{nameLabel}</TableCell>
-              {parent && <TableCell sx={{ fontWeight: 700 }}>{parent.columnLabel || parent.label}</TableCell>}
+              {parent && !parentBeforeName && <TableCell sx={{ fontWeight: 700 }}>{parent.columnLabel || parent.label}</TableCell>}
               {tableFields.map((f) => <TableCell key={f.key} sx={{ fontWeight: 700 }}>{f.label}</TableCell>)}
               {sortable && <TableCell align="center" sx={{ fontWeight: 700, width: 90 }}>Thứ tự</TableCell>}
               <TableCell align="center" sx={{ fontWeight: 700, width: 110 }}>Trạng thái</TableCell>
-              {isAdmin && <TableCell align="right" sx={{ fontWeight: 700, width: 110 }}>Thao tác</TableCell>}
+              {showActions && <TableCell align="right" sx={{ fontWeight: 700, width: 110 }}>Thao tác</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -325,8 +367,9 @@ const CatalogManager = ({
                 sx={isAdmin && editOnDoubleClick ? { cursor: "pointer" } : undefined}>
                 <TableCell>{index + 1}</TableCell>
                 <TableCell><Typography variant="body2" sx={{ fontFamily: "inherit" }}>{row.code}</Typography></TableCell>
+                {parent && parentBeforeName && <TableCell>{parent.display ? parent.display(row) : row[parent.field]}</TableCell>}
                 <TableCell>{row.name}</TableCell>
-                {parent && <TableCell>{parent.display ? parent.display(row) : row[parent.field]}</TableCell>}
+                {parent && !parentBeforeName && <TableCell>{parent.display ? parent.display(row) : row[parent.field]}</TableCell>}
                 {tableFields.map((f) => <TableCell key={f.key}>{renderFieldValue(row, f)}</TableCell>)}
                 {sortable && <TableCell align="center">{row.sortOrder}</TableCell>}
                 <TableCell align="center" onDoubleClick={(event) => event.stopPropagation()}>
@@ -338,10 +381,10 @@ const CatalogManager = ({
                     <Chip size="small" label={row.active ? "Hoạt động" : "Ẩn"} color={row.active ? "success" : "default"} variant="outlined" />
                   )}
                 </TableCell>
-                {isAdmin && (
+                {showActions && (
                   <TableCell align="right" onDoubleClick={(event) => event.stopPropagation()}>
                     {showEditAction && <Tooltip title="Sửa"><IconButton size="small" color="primary" onClick={() => openEdit(row)}><EditRounded fontSize="small" /></IconButton></Tooltip>}
-                    <Tooltip title="Xóa"><IconButton size="small" color="error" onClick={() => setDeleting(row)}><DeleteRounded fontSize="small" /></IconButton></Tooltip>
+                    {showDeleteAction && <Tooltip title="Xóa"><IconButton size="small" color="error" onClick={() => setDeleting(row)}><DeleteRounded fontSize="small" /></IconButton></Tooltip>}
                   </TableCell>
                 )}
               </TableRow>
@@ -388,7 +431,7 @@ const CatalogManager = ({
                 {parent && (
                   <CompactField label={parent.label.toUpperCase()} htmlFor="catalog-parent">
                     <FormControl fullWidth size="small" sx={compactControlSx}>
-                      <Select id="catalog-parent" value={form[parent.field]} inputProps={{ "aria-label": parent.label }} onChange={setField(parent.field)}>
+                      <Select id="catalog-parent" value={form[parent.field]} inputProps={{ "aria-label": parent.label }} onChange={setParentField}>
                         {parent.optional && <MenuItem value="">(Không)</MenuItem>}
                         {options.map((opt) => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
                       </Select>
@@ -436,7 +479,8 @@ const CatalogManager = ({
                     );
                   }
                   if (f.type === "select" && (fieldOptions[f.key] || Array.isArray(f.options))) {
-                    const selectOptions = fieldOptions[f.key] || f.options;
+                    const selectOptions = (fieldOptions[f.key] || f.options)
+                      .filter((option) => !f.filterOption || f.filterOption(option?.raw ?? option, form));
                     return (
                       <CompactField key={f.key} label={f.label.toUpperCase()} htmlFor={`catalog-${f.key}`}>
                         <FormControl key={f.key} fullWidth size="small" sx={compactControlSx}>

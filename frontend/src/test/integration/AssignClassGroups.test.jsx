@@ -64,13 +64,13 @@ describe("AssignClassGroups", () => {
     axios.post.mockResolvedValue({ data: { message: "Đã phân lớp" } });
   });
 
-  it("only allows students without a class to be selected and submitted", async () => {
+  it("only shows students without a class and submits the selected student", async () => {
     await act(async () => {
       render(<MemoryRouter><AssignClassGroups /></MemoryRouter>);
     });
 
-    const assignedCheckbox = await screen.findByRole("checkbox", { name: "Học viên đã có lớp đã được phân lớp" });
-    expect(assignedCheckbox).toBeDisabled();
+    expect(await screen.findByRole("checkbox", { name: "Chọn Học viên chưa có lớp" })).toBeInTheDocument();
+    expect(screen.queryByText("Học viên đã có lớp")).not.toBeInTheDocument();
 
     // Keep the request pending: this test verifies the submitted payload, not the refresh cycle.
     axios.post.mockReturnValue(new Promise(() => {}));
@@ -84,7 +84,7 @@ describe("AssignClassGroups", () => {
     ));
   });
 
-  it("shows existing class members even when the eligible-student year filter returns no records", async () => {
+  it("keeps existing class members only in the target-group panel", async () => {
     const historicalGroup = {
       ...group,
       code: "25ATM01",
@@ -120,7 +120,32 @@ describe("AssignClassGroups", () => {
 
     expect(await screen.findByText("Sĩ số: 1 / 40 học viên")).toBeInTheDocument();
     expect(screen.getByText("Danh sách học viên trong nhóm (1):")).toBeInTheDocument();
-    expect(screen.getAllByText("Nguyễn Văn Lịch Sử")).toHaveLength(2);
-    expect(screen.getAllByText("HV-LEGACY")).toHaveLength(2);
+    expect(screen.getByText("Không còn học viên chưa được phân nhóm.")).toBeInTheDocument();
+    expect(screen.getAllByText("Nguyễn Văn Lịch Sử")).toHaveLength(1);
+    expect(screen.getAllByText("HV-LEGACY")).toHaveLength(1);
+  });
+
+  it("does not allow selecting more students than the target group's remaining capacity", async () => {
+    const oneSeatGroup = { ...group, maxStudents: 1, memberCount: 0 };
+    const secondUnassigned = {
+      ...unassigned,
+      id: "record-second",
+      code: "HV003",
+      fullName: "Học viên thứ hai",
+    };
+    axios.get.mockImplementation((url) => {
+      if (url.includes("/system/majors")) return Promise.resolve({ data: [] });
+      if (url.includes("/eligible-students")) return Promise.resolve({ data: [unassigned, secondUnassigned] });
+      if (url.includes("/masters/class-groups?")) return Promise.resolve({ data: [oneSeatGroup] });
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+
+    await act(async () => {
+      render(<MemoryRouter><AssignClassGroups /></MemoryRouter>);
+    });
+
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Chọn Học viên chưa có lớp" }));
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Chọn Học viên thứ hai" })).toBeDisabled());
+    expect(screen.getByText(/Đã chọn:/)).toHaveTextContent("Đã chọn: 1 / 1 chỗ còn lại");
   });
 });

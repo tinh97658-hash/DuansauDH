@@ -14,6 +14,7 @@ const Disciplines = () => (
     itemName="ngành đào tạo"
     codeLabel="Mã ngành"
     nameLabel="Tên ngành"
+    editOnDoubleClick
     fields={[
       { key: "description", label: "Mô tả", type: "multiline" },
     ]}

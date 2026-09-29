@@ -57,6 +57,8 @@ async function run() {
       title: index % 2 === 0 ? "Trưởng bộ môn" : "Giảng viên",
       faculty: teachingUnits[major.code].faculty,
       department: teachingUnits[major.code].departments[Math.floor(index / 2)],
+      disciplineId: major.disciplineId,
+      majorId: major.id,
       active: true,
     })));
 
@@ -73,7 +75,13 @@ async function run() {
       for (const data of desired) {
         const current = await Lecturer.findOne({ where: { code: data.code }, transaction, lock: transaction.LOCK.UPDATE });
         if (current) {
-          await current.update({ faculty: data.faculty, department: data.department, active: true }, { transaction });
+          await current.update({
+            faculty: data.faculty,
+            department: data.department,
+            disciplineId: data.disciplineId,
+            majorId: data.majorId,
+            active: true,
+          }, { transaction });
           updated++;
           continue;
         }

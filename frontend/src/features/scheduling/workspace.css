@@ -14,23 +14,27 @@
 
 /* Figma v2 · create offering flow. The shared application navigation is intentionally untouched. */
 .v20-create-workspace{min-height:0}
-.sl-create-figma{--sl-scope-inline:15px;--sl-scope-control-height:34px;--sl-create-top-row-height:124px;grid-template-columns:480px minmax(0,1fr);gap:0;padding:0;background:#fff;border:1px solid #d7e1e9;border-radius:4px;overflow:hidden;color:#172b3a}
+.sl-create-figma{--sl-scope-inline:18px;--sl-scope-control-height:36px;--sl-create-top-row-height:164px;grid-template-columns:560px minmax(0,1fr);gap:0;padding:0;background:#fff;border:1px solid #d7e1e9;border-radius:4px;overflow:hidden;color:#172b3a}
 .sl-create-figma .sl-left{border:0;border-right:1px solid #d7e1e9;background:#f8fafc;display:flex;flex-direction:column;min-height:0;overflow:hidden}
-.sl-create-figma .sl-scope{padding:7px var(--sl-scope-inline) 4px;border:0;background:#f8fafc;flex:none}
-.sl-workspace.sl-create-mode.sl-create-figma .sl-scope,.sl-create-figma .sl-create-name{height:var(--sl-create-top-row-height)}
-.sl-create-figma .sl-scope>.sl-eyebrow{margin-bottom:2px;color:#607486;font-size:11.5px;font-weight:700}
-.sl-create-scope-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.sl-create-figma .sl-scope{padding:8px var(--sl-scope-inline) 7px;border:0;background:#f8fafc;flex:none}
+.sl-workspace.sl-create-mode.sl-create-figma .sl-scope,.sl-create-figma .sl-create-name{height:var(--sl-create-top-row-height);box-sizing:border-box}
+.sl-create-figma .sl-scope>.sl-eyebrow{margin-bottom:3px;color:#607486;font-size:11.5px;font-weight:700}
+.sl-create-scope-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;row-gap:5px}
 .sl-create-scope-field{min-width:0}
-.sl-create-figma .v20-scope-step{display:flex;align-items:center;gap:9px;margin:0;padding:3px 0;border-top:1px solid #d7e1e9;color:#607486;font-size:12.8px;font-weight:700}
+.sl-create-scope-discipline{grid-column:1/-1}
+.sl-create-figma .v20-scope-step{display:flex;align-items:center;gap:8px;margin:0;padding:0 0 3px;border:0;color:#526a82;font-size:12.5px;font-weight:750;white-space:nowrap}
 .sl-create-figma .v20-scope-step:first-of-type{border-top:0}
-.sl-create-figma .v20-scope-step b{width:22px;height:22px;margin:0;border-radius:5px;background:#eaf4fa;color:#1689b4;font-size:12px}
+.sl-create-figma .v20-scope-step b{width:21px;height:21px;margin:0;flex:0 0 21px;border-radius:5px;background:#eaf4fa;color:#1689b4;font-size:11.5px}
 .sl-create-figma .sl-combo{margin:0 0 2px}
-.sl-create-figma .sl-combo input,.sl-create-figma .sl-create-year{display:block;width:100%;height:var(--sl-scope-control-height);box-sizing:border-box;padding:0 38px 0 12px;border:1px solid #bfcedb;border-radius:4px;background-color:#fff;color:var(--text-primary);font-family:var(--app-font-family);font-size:13px;font-weight:400;line-height:normal}
+.sl-create-figma .sl-combo input,.sl-create-figma .sl-create-year{display:block;width:100%;height:var(--sl-scope-control-height);box-sizing:border-box;padding:0 42px 0 13px;border:1px solid #b9cad8;border-radius:7px;background-color:#fff;color:var(--text-primary);font-family:var(--app-font-family);font-size:13.5px;font-weight:500;line-height:normal}
 .sl-create-figma .sl-create-year{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M2 2l4 4 4-4' fill='none' stroke='%23607486' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;background-size:12px 8px;cursor:pointer}
 .sl-create-figma .sl-create-year.sl-placeholder,.sl-create-figma .sl-create-year:disabled{color:var(--text-muted);opacity:1}
 .sl-create-figma .sl-create-year:disabled{cursor:not-allowed;background-color:#fff}
-.sl-create-figma .sl-combo>button{top:1px;height:32px;color:transparent;font-size:0;background-color:#fff;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M2 2l4 4 4-4' fill='none' stroke='%23607486' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:center;background-size:12px 8px}
+.sl-create-figma .sl-combo>button{top:1px;height:34px;width:38px;border-radius:0 7px 7px 0;color:transparent;font-size:0;background-color:#fff;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M2 2l4 4 4-4' fill='none' stroke='%23607486' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:center;background-size:12px 8px}
 .sl-create-figma .sl-combo input:focus,.sl-create-figma .sl-create-year:focus{outline:0;border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
+.sl-create-figma .sl-combo-list{top:38px;right:auto;left:0;width:max-content;min-width:100%;max-width:420px;max-height:260px;border:1px solid #b9cad8;border-radius:7px;box-shadow:0 12px 28px rgba(23,62,117,.18);overflow-x:hidden}
+.sl-create-figma .sl-combo-list button{min-height:42px;gap:18px;padding:10px 13px;align-items:center;color:#173e75;font-size:13.5px;line-height:1.35}
+.sl-create-figma .sl-combo-list small{flex:none;min-width:52px;text-align:right;color:#607486;font-size:11.5px}
 .sl-workspace.sl-create-mode.sl-create-figma .sl-worklist{padding:6px var(--sl-scope-inline) 12px;border-top:1px solid #d7e1e9;background:#f8fafc;overflow:hidden;flex:1;min-height:0;display:flex;flex-direction:column}
 .sl-create-subject-title{display:flex;align-items:center;justify-content:space-between;flex:none}
 .sl-create-subject-title .v20-scope-step{flex:1;border:0}
@@ -164,10 +168,11 @@
 .sl-schedule-view.sl-sidebar-collapsed .sl-sidebar-toggle{top:50%;right:-31px;transform:translateY(-50%);border:1px solid #bfcedb;border-left:0;border-radius:0 5px 5px 0}
 .sl-schedule-view .sl-scope{height:calc(var(--sl-schedule-head-height) + var(--sl-schedule-day-head-height) + 1px);padding:4px var(--sl-scope-inline) 0;border-bottom:1px solid #d7e1e9;background:#f8fafc}
 .sl-schedule-view .sl-eyebrow{margin-bottom:2px;color:#607486;font-size:11.5px;font-weight:700;letter-spacing:.02em}
-.sl-schedule-scope-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.sl-schedule-scope-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 112px;gap:10px}
 .sl-schedule-scope-field{min-width:0}
-.sl-schedule-view .v20-scope-step{display:flex;align-items:center;gap:9px;margin:0;padding:3px 0;border-top:1px solid #d7e1e9;color:#607486;font-size:12.8px;font-weight:700}
+.sl-schedule-view .v20-scope-step{display:flex;align-items:center;gap:6px;margin:0;padding:3px 0;border-top:1px solid #d7e1e9;color:#607486;font-size:12.8px;font-weight:700;white-space:nowrap}
 .sl-schedule-view .v20-scope-step:first-of-type{border-top:0}
+.sl-schedule-scope-field:last-child .v20-scope-step{gap:6px}
 .sl-schedule-view .v20-scope-step b{width:22px;height:22px;margin:0;display:grid;place-items:center;border-radius:5px;background:#eaf4fa;color:#1689b4;font-size:12px}
 .sl-schedule-view .sl-combo{margin:0 0 2px}
 .sl-schedule-view .sl-combo input,.sl-schedule-view .sl-year-select,.sl-schedule-view .sl-search{display:block;width:100%;height:var(--sl-scope-control-height);box-sizing:border-box;border:1px solid #bfcedb;border-radius:4px;color:#172b3a;font-size:13px;font-weight:400}
@@ -483,7 +488,7 @@
 .sl-matrix-toolbar-head h2,.sl-matrix-content-head h2{margin:0;color:#123b63;font-size:13px;font-weight:600}
 .sl-matrix-toolbar-head>div:first-child{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .sl-matrix-toolbar-head>div:first-child>span{color:#5f748c;font-size:11px;font-weight:400}
-.sl-matrix-filters{display:grid;grid-template-columns:minmax(200px,1.45fr) minmax(160px,1fr) minmax(140px,.7fr) minmax(160px,.8fr);gap:8px;padding:5px 10px 7px;background:#f7fafc;border-radius:0 0 8px 8px}
+.sl-matrix-filters{display:grid;grid-template-columns:minmax(200px,1.35fr) minmax(170px,1fr) minmax(170px,1fr) minmax(140px,.7fr) minmax(160px,.8fr);gap:8px;padding:5px 10px 7px;background:#f7fafc;border-radius:0 0 8px 8px}
 .sl-matrix-filter-item{min-width:0;color:#526a82;font-size:11px;font-weight:600}
 .sl-matrix-filter-item label,.sl-matrix-filter-label{display:block;margin-bottom:2px;white-space:nowrap}
 .sl-matrix-filter-item .sl-combo{margin-top:0}

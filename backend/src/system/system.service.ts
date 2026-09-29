@@ -375,7 +375,11 @@ export class SystemService {
   // ===== Giảng viên =====
   async listLecturers() {
     return this.lecturers.findAll({
-      include: [{ model: Staff, as: "staff", attributes: ["id", "name", "email"] }],
+      include: [
+        { model: Staff, as: "staff", attributes: ["id", "name", "email"] },
+        { model: Discipline, as: "discipline", attributes: ["id", "code", "name"] },
+        { model: Major, as: "major", attributes: ["id", "code", "name", "disciplineId", "program"] },
+      ],
       order: [["name", "ASC"]],
     });
   }
@@ -385,8 +389,9 @@ export class SystemService {
     await this.ensureCodeUnique(this.lecturers, dto.code);
     if (dto.email) await this.ensureEmailUnique(dto.email);
     if (dto.staffId !== undefined && dto.staffId !== null) await this.requireParent(this.staff, dto.staffId, "Tài khoản nhân sự");
+    await this.validateLecturerScope(dto.disciplineId, dto.majorId);
     return this.lecturers.create(this.pick(dto, [
-      "staffId", "code", "name", "phone", "email", "academicRank", "academicDegree", "teachingType", "title", "faculty", "department", "active"
+      "staffId", "code", "name", "phone", "email", "academicRank", "academicDegree", "teachingType", "title", "faculty", "department", "disciplineId", "majorId", "active"
     ]) as any);
   }
   async updateLecturer(id: string, dto: UpdateCatalogDto) {
@@ -394,12 +399,31 @@ export class SystemService {
     if (dto.code && dto.code !== row.code) await this.ensureCodeUnique(this.lecturers, dto.code, id);
     if (dto.email && dto.email !== row.email) await this.ensureEmailUnique(dto.email, id);
     if (dto.staffId !== undefined && dto.staffId !== null) await this.requireParent(this.staff, dto.staffId, "Tài khoản nhân sự");
+    if (dto.disciplineId !== undefined || dto.majorId !== undefined) {
+      await this.validateLecturerScope(dto.disciplineId ?? row.disciplineId, dto.majorId ?? row.majorId);
+    }
     await row.update(this.pick(dto, [
-      "staffId", "code", "name", "phone", "email", "academicRank", "academicDegree", "teachingType", "title", "faculty", "department", "active"
+      "staffId", "code", "name", "phone", "email", "academicRank", "academicDegree", "teachingType", "title", "faculty", "department", "disciplineId", "majorId", "active"
     ]) as any);
     return row;
   }
   async removeLecturer(id: string) { return this.removeSimple(this.lecturers, id, "Giảng viên"); }
+
+  private async validateLecturerScope(disciplineId?: string | null, majorId?: string | null) {
+    if (!disciplineId) throw new BadRequestException("Vui lòng chọn ngành của giảng viên.");
+    if (!majorId) throw new BadRequestException("Vui lòng chọn chuyên ngành của giảng viên.");
+    const discipline = await this.disciplines.findByPk(disciplineId);
+    if (!discipline || discipline.active === false) {
+      throw new BadRequestException("Ngành của giảng viên không tồn tại hoặc đã ngừng sử dụng.");
+    }
+    const major = await this.majors.findByPk(majorId);
+    if (!major || major.active === false) {
+      throw new BadRequestException("Chuyên ngành của giảng viên không tồn tại hoặc đã ngừng sử dụng.");
+    }
+    if (major.disciplineId !== disciplineId) {
+      throw new BadRequestException("Chuyên ngành không thuộc ngành đã chọn.");
+    }
+  }
 
   // ===== Phòng học dùng chung =====
   async listRooms(includeInactive = false) {

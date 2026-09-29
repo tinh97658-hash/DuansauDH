@@ -40,6 +40,7 @@ const buildService = () => {
     {} as never,
     courseOfferings as never,
     {} as never,
+    {} as never,
   );
   return { service, subjects, majors, courseOfferings };
 };

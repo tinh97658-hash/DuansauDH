@@ -39,21 +39,21 @@ const DISCIPLINES: Array<{
     name: "Khoa học máy tính",
     description: "Ngành Khoa học máy tính — Viện Đào tạo Sau đại học, Trường Đại học Hàng hải Việt Nam.",
     sortOrder: 1,
-    majorCodes: ["CNTT", "KTPM"],
+    majorCodes: ["CNT", "CNTT", "KTPM"],
   },
   {
     code: "7340101",
     name: "Quản trị kinh doanh",
     description: "Ngành Quản trị kinh doanh — Viện Đào tạo Sau đại học, Trường Đại học Hàng hải Việt Nam.",
     sortOrder: 2,
-    majorCodes: ["QTKD"],
+    majorCodes: ["QKD", "QTKD"],
   },
   {
     code: "7840101",
     name: "Khai thác hàng hải",
     description: "Ngành Khai thác hàng hải — Viện Đào tạo Sau đại học, Trường Đại học Hàng hải Việt Nam.",
     sortOrder: 3,
-    majorCodes: ["KTHH", "DKTB", "KHHH-TS"],
+    majorCodes: ["KTHH", "KTHH-TS", "DKTB", "KHHH-TS"],
   },
   {
     code: "7840104",
@@ -102,14 +102,21 @@ const DISCIPLINES: Array<{
     name: "Kế toán",
     description: "Ngành Kế toán — Viện Đào tạo Sau đại học, Trường Đại học Hàng hải Việt Nam.",
     sortOrder: 10,
-    majorCodes: [],
+    majorCodes: ["KTK"],
+  },
+  {
+    code: "7220201",
+    name: "Ngôn ngữ Anh",
+    description: "Ngành Ngôn ngữ Anh — Viện Đào tạo Sau đại học, Trường Đại học Hàng hải Việt Nam.",
+    sortOrder: 11,
+    majorCodes: ["ATM"],
   },
   {
     code: "7850101",
     name: "Quản lý tài nguyên và môi trường",
     description: "Ngành Quản lý tài nguyên và môi trường (đào tạo Thạc sĩ) — Viện Đào tạo Sau đại học, Trường Đại học Hàng hải Việt Nam.",
     sortOrder: 12,
-    majorCodes: [],
+    majorCodes: ["KMT"],
   },
 ];
 
@@ -168,6 +175,21 @@ export async function up({ context: qi }: any) {
     }
 
     // ===== 5. Pseudo-major `CHUNG` -> chuyên ngành dùng chung thật =====
+    // Đổi mã ngay trên bản ghi cũ để giữ nguyên mọi khóa ngoại từ học phần,
+    // chương trình, lớp và các dữ liệu nghiệp vụ đã tồn tại.
+    await qi.sequelize.query(
+      `UPDATE majors SET
+         code = :code,
+         name = :name,
+         discipline_id = (SELECT id FROM disciplines WHERE code = :disciplineCode),
+         description = :description,
+         updated_at = NOW()
+       WHERE code = 'CHUNG'`,
+      {
+        replacements: { ...COMMON_MAJOR, disciplineCode: COMMON_DISCIPLINE.code },
+        transaction,
+      },
+    );
     await qi.sequelize.query(
       `INSERT INTO majors (id, code, name, discipline_id, program, is_admission_screening, duration_years,
                            max_overtime_years, description, active, created_at, updated_at)
@@ -185,29 +207,7 @@ export async function up({ context: qi }: any) {
         transaction,
       },
     );
-    await qi.sequelize.query(
-      `UPDATE subjects SET major_id = (SELECT id FROM majors WHERE code = :newCode)
-       WHERE major_id = (SELECT id FROM majors WHERE code = 'CHUNG')`,
-      { replacements: { newCode: COMMON_MAJOR.code }, transaction },
-    );
-
-    // ===== 6. Xoá chuyên ngành cũ theo yêu cầu nghiệp vụ =====
-    // Dữ liệu phái sinh của chuyên ngành cũ được xoá trước để không vướng khoá ngoại.
-    // Các bảng danh mục dùng chung (hình thức đào tạo, giảng viên, phòng học, đợt tuyển
-    // sinh ở cấp chương trình đào tạo) giữ nguyên.
-    await qi.sequelize.query(`DELETE FROM annual_fees WHERE plan_id IN (SELECT id FROM training_plans)`, { transaction });
-    await qi.sequelize.query(`DELETE FROM admission_targets`, { transaction });
-    await qi.sequelize.query(`DELETE FROM training_plans`, { transaction });
-    await qi.sequelize.query(`DELETE FROM major_transfers`, { transaction });
-    await qi.sequelize.query(`DELETE FROM class_groups`, { transaction });
-    await qi.sequelize.query(`DELETE FROM curriculums`, { transaction });
-    await qi.sequelize.query(`DELETE FROM subjects`, { transaction });
-    await qi.sequelize.query(`UPDATE training_programs SET major_id = NULL`, { transaction });
-    await qi.sequelize.query(`DELETE FROM majors WHERE code <> :keep`, {
-      replacements: { keep: COMMON_MAJOR.code }, transaction,
-    });
-
-    // ===== 7. Bắt buộc có ngành + ràng buộc mã chuyên ngành trong phạm vi ngành =====
+    // ===== 6. Bắt buộc có ngành + ràng buộc mã chuyên ngành trong phạm vi ngành =====
     // Chốt an toàn: mọi chuyên ngành còn lại nhưng chưa gán ngành đều thuộc ngành dùng chung.
     await qi.sequelize.query(
       `UPDATE majors SET discipline_id = (SELECT id FROM disciplines WHERE code = :code)

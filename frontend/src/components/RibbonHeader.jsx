@@ -5,6 +5,7 @@ import {
   EventRounded, EventNoteRounded, FactCheckRounded, FlagRounded, FolderOpenRounded,
   GavelRounded, GradingRounded, GroupAddRounded, GroupsRounded, GroupWorkRounded,
   InfoRounded, LanguageRounded, ListAltRounded, LocationCityRounded, LockRounded, LogoutRounded,
+  KeyboardArrowDownRounded, KeyboardArrowUpRounded,
   ManageAccountsRounded, MenuBookRounded, NoteAddRounded, PaymentsRounded, RuleRounded,
   SchoolRounded, ScoreboardRounded, SendRounded, SummarizeRounded, SupervisorAccountRounded,
   MeetingRoomRounded,
@@ -69,6 +70,7 @@ export const ribbons = {
   ],
   masters: [
     group("THỦ TỤC ĐẦU VÀO", [
+      action("Hồ sơ trúng tuyển", "/masters/admitted-records", CheckCircleRounded, "#137b3b"),
       action("Học bổ sung kiến thức", "/masters/bridge-course", AddTaskRounded, "#168bc2"),
       action("Điểm thi đầu vào thạc sĩ", "/masters/admission-scores", ScoreboardRounded, "#c0792a"),
       action("Tạo nhóm học viên", "/masters/create-class-groups", GroupAddRounded, "#168b7c"),
@@ -132,6 +134,7 @@ const RibbonHeader = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState("system");
+  const [commandsCollapsed, setCommandsCollapsed] = useState(false);
   const [role, setRole] = useState();
   useEffect(() => {
     let mounted = true;
@@ -151,7 +154,7 @@ const RibbonHeader = () => {
   if (!role) return null;
   const runAction = (item) => item.action === "logout" ? window.location.assign(`${API_BASE_URL}/user/logout`) : navigate(item.route);
   return (
-    <header className="ribbon-header">
+    <header className={`ribbon-header${commandsCollapsed ? " ribbon-commands-collapsed" : ""}`}>
       <div className="ribbon-titlebar">
         <div className="ribbon-brand-group">
           <button className="ribbon-brand" type="button" onClick={() => navigate("/")} aria-label="Về trang chủ">
@@ -189,6 +192,15 @@ const RibbonHeader = () => {
           </div><div className="ribbon-group-label">{itemGroup.label}</div></section>;
         })}
       </div></div>
+      <button
+        type="button"
+        className="ribbon-command-toggle"
+        aria-label={commandsCollapsed ? "Mở menu tác vụ" : "Thu gọn menu tác vụ"}
+        aria-expanded={!commandsCollapsed}
+        onClick={() => setCommandsCollapsed((value) => !value)}
+      >
+        {commandsCollapsed ? <KeyboardArrowDownRounded /> : <KeyboardArrowUpRounded />}
+      </button>
     </header>
   );
 };

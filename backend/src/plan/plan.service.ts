@@ -5,7 +5,9 @@ import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { COMMON_MAJOR_CODE } from "../common/major-scope.js";
 import { Major } from "../database/models/common/major.model.js";
+import { Discipline } from "../database/models/common/discipline.model.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
+import { ClassGroupMember } from "../database/models/training/class-group-member.model.js";
 import { Subject } from "../database/models/plan/subject.model.js";
 import { Curriculum } from "../database/models/plan/curriculum.model.js";
 import { CurriculumSubject } from "../database/models/plan/curriculum-subject.model.js";
@@ -31,6 +33,7 @@ export class PlanService {
     private readonly classGroupsService: ClassGroupService,
     @InjectModel(CourseOffering) private readonly courseOfferings: typeof CourseOffering,
     private readonly recognitions: SubjectRecognitionService,
+    @InjectModel(ClassGroupMember) private readonly classGroupMembers: typeof ClassGroupMember,
   ) {}
 
   // ===== Các chức năng khác (chưa triển khai) =====
@@ -98,7 +101,8 @@ export class PlanService {
     if (program) majorWhere.program = program;
     const majors = await this.majors.findAll({
       where: majorWhere,
-      attributes: ["id", "code", "name", "program"],
+      attributes: ["id", "code", "name", "program", "disciplineId"],
+      include: [{ model: Discipline, attributes: ["id", "code", "name"], required: false }],
       order: [["name", "ASC"]],
     });
     const counts: Record<string, number> = {};
@@ -118,6 +122,12 @@ export class PlanService {
         code: m.code,
         name: m.name,
         program: m.program,
+        disciplineId: m.disciplineId,
+        discipline: m.discipline ? {
+          id: m.discipline.id,
+          code: m.discipline.code,
+          name: m.discipline.name,
+        } : null,
         subjectCount: counts[m.id] || 0,
       }))
       .sort((a, b) => a.name.localeCompare(b.name, "vi"));
@@ -382,18 +392,110 @@ export class PlanService {
   // Cùng ngành + khóa có thể có nhiều CTĐT khác nhau; không có lớp "gói học phần" trung gian.
 
   // ===== HỒ SƠ TUYỂN SINH (ADMISSION RECORDS) =====
-  async listAdmissionRecords(majorId?: string, trainingLevel?: string, academicYear?: string, status?: string) {
-    const where: Record<string, unknown> = {};
+  async listAdmissionRecords(
+    majorId?: string,
+    trainingLevel?: string,
+    academicYear?: string,
+    status?: string,
+    disciplineId?: string,
+    search?: string,
+    pageParam?: string,
+    pageSizeParam?: string,
+    excludeStatus?: string,
+    includeGroup = false,
+  ) {
+    const page = Math.max(1, Number.parseInt(pageParam || "1", 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number.parseInt(pageSizeParam || "20", 10) || 20));
+    const where: any = {};
     if (majorId) where.majorId = majorId;
     if (trainingLevel) where.trainingLevel = trainingLevel;
     if (academicYear) where.academicYear = academicYear;
-    if (status && status !== "ALL") where.status = status;
+    if (status && status !== "ALL") where.studyStatus = status;
+    else if (excludeStatus) where.studyStatus = { [Op.ne]: excludeStatus };
 
-    return this.admissionRecordsModel.findAll({
-      where,
-      include: [{ model: Major, as: "major", attributes: ["id", "code", "name"] }],
-      order: [["createdAt", "DESC"]],
+    const keyword = search?.trim().slice(0, 100);
+    if (keyword) {
+      const pattern = `%${keyword}%`;
+      where[Op.or] = ["fullName", "code", "idCard", "phone", "email", "majorName"].map((field) => ({
+        [field]: { [Op.iLike]: pattern },
+      }));
+    }
+
+    const includeMajor = {
+      model: Major,
+      as: "major",
+      attributes: ["id", "code", "name", "disciplineId"],
+      ...(disciplineId ? { where: { disciplineId }, required: true } : {}),
+    };
+
+    const countWith = (extraWhere: Record<string, unknown> = {}) => this.admissionRecordsModel.count({
+      where: Object.keys(extraWhere).length ? { [Op.and]: [where, extraWhere] } : where,
+      include: [includeMajor],
+      distinct: true,
     });
+
+    const [result, mastersCount, doctoralCount, eligibleCount] = await Promise.all([
+      this.admissionRecordsModel.findAndCountAll({
+        where,
+        include: [includeMajor],
+        order: [["createdAt", "DESC"]],
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+        distinct: true,
+      }),
+      countWith({ trainingLevel: "Thạc sĩ" }),
+      countWith({ trainingLevel: "Tiến sĩ" }),
+      countWith({ studyStatus: { [Op.in]: ["Đủ điều kiện dự tuyển", "Đã trúng tuyển"] } }),
+    ]);
+
+    const total = result.count;
+    let rows: any[] = result.rows;
+
+    if (includeGroup && rows.length > 0) {
+      const admissionRecordIds = rows.map((row) => row.id);
+      const studentIds = rows.map((row) => row.studentId).filter(Boolean);
+      const membershipWhere = {
+        [Op.or]: [
+          { admissionRecordId: { [Op.in]: admissionRecordIds } },
+          ...(studentIds.length > 0 ? [{ studentId: { [Op.in]: studentIds } }] : []),
+        ],
+      };
+      const memberships = await this.classGroupMembers.findAll({
+        where: membershipWhere,
+        include: [{
+          model: ClassGroup,
+          as: "classGroup",
+          where: { program: "masters" },
+          attributes: ["id", "code", "name", "academicYear"],
+          required: true,
+        }],
+      });
+      const byRecordId = new Map<string, any>();
+      const byStudentId = new Map<string, any>();
+      for (const membership of memberships) {
+        if (membership.admissionRecordId) byRecordId.set(membership.admissionRecordId, membership.classGroup);
+        if (membership.studentId) byStudentId.set(membership.studentId, membership.classGroup);
+      }
+      rows = rows.map((row) => {
+        const plain = typeof row.toJSON === "function" ? row.toJSON() : row;
+        const group = byRecordId.get(row.id) || (row.studentId ? byStudentId.get(row.studentId) : null);
+        return {
+          ...plain,
+          assignedGroup: group ? {
+            id: group.id,
+            code: group.code,
+            name: group.name,
+            academicYear: group.academicYear,
+          } : null,
+        };
+      });
+    }
+
+    return {
+      data: rows,
+      pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+      stats: { total, mastersCount, doctoralCount, eligibleCount },
+    };
   }
 
   async getAdmissionRecord(id: string) {
