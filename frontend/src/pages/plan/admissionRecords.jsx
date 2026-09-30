@@ -5,18 +5,20 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
   Avatar, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions,
-  DialogContent, DialogTitle, FormControl, FormControlLabel,
-  IconButton, InputAdornment, InputLabel, MenuItem, Paper, Radio, RadioGroup, Select,
+  DialogContent, DialogTitle, FormControlLabel,
+  IconButton, MenuItem, Paper, Radio, RadioGroup, Select,
   Pagination, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
   AddPhotoAlternateRounded, AddRounded, CheckCircleRounded, CloseRounded,
-  DeleteRounded, EditRounded, PersonRounded, PrintRounded, SearchRounded,
+  DeleteRounded, EditRounded, PersonRounded, PrintRounded,
   VisibilityRounded,
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
+import FilterSearchField from "../../components/FilterSearchField";
+import FilterSelectField from "../../components/FilterSelectField";
 import { getSelectableMajors, normalizeMajorsResponse, selectMajorForLevel } from "../../utils/majors";
 import {
   disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline,
@@ -489,61 +491,42 @@ const AdmissionRecords = ({ mode = "applications" }) => {
         sx={{
           p: 1.5,
           mb: 1.5,
-          bgcolor: "#FBFDFF",
-          borderColor: "#D8E5EF",
-          borderRadius: "12px",
-          boxShadow: "0 4px 14px rgba(23, 62, 117, 0.05)",
-          "& .MuiInputLabel-root": { color: "#607486" },
-          "& .MuiOutlinedInput-root": {
-            bgcolor: "#F5F8FC",
-            borderRadius: "8px",
-            "& fieldset": { borderColor: "#D8E5EF" },
-          },
+          bgcolor: "#FFF",
+          borderColor: "#C6D5E1",
+          borderRadius: "10px",
+          boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
         }}
       >
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems="center" justifyContent="space-between">
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="center" sx={{ width: { xs: "100%", md: "auto" }, flexGrow: 1 }} flexWrap="wrap">
-            <FormControl size="small" sx={{ minWidth: 108 }}>
-              <InputLabel shrink>Năm</InputLabel>
-              <Select label="Năm" value={year} onChange={(e) => setYear(e.target.value)} sx={{ height: 40, fontSize: 12 }}>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems="flex-end" justifyContent="space-between">
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="flex-end" sx={{ width: { xs: "100%", md: "auto" }, flexGrow: 1 }} flexWrap="wrap">
+            <FilterSelectField label="Năm" value={year} onChange={(e) => setYear(e.target.value)} sx={{ flex: "1 1 108px", minWidth: 108 }}>
                 {YEARS.map((y) => (
                   <MenuItem key={y} value={y} sx={{ fontSize: 12 }}>
                     {y}
                   </MenuItem>
                 ))}
-              </Select>
-            </FormControl>
+            </FilterSelectField>
 
-            {!isAdmittedMasters && <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel shrink>Trình độ</InputLabel>
-              <Select
-                label="Trình độ"
+            {!isAdmittedMasters && <FilterSelectField label="Trình độ" sx={{ flex: "1 1 150px", minWidth: 150 }}
                 value={levelFilter}
                 onChange={(e) => {
                   setLevelFilter(e.target.value);
                   setDisciplineFilter("");
                   setMajorFilter("ALL");
                 }}
-                sx={{ height: 40, fontSize: 12 }}
               >
                 <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả trình độ</MenuItem>
                 {TRAINING_LEVELS.map((l) => (
                   <MenuItem key={l.value} value={l.value} sx={{ fontSize: 12 }}>{l.label}</MenuItem>
                 ))}
-              </Select>
-            </FormControl>}
+            </FilterSelectField>}
 
-            <FormControl size="small" sx={{ minWidth: 190 }}>
-              <InputLabel shrink>Ngành</InputLabel>
-              <Select
-                label="Ngành"
+            <FilterSelectField label="Ngành" sx={{ flex: "1 1 190px", minWidth: 190 }}
                 value={disciplineFilter}
                 onChange={(e) => {
                   setDisciplineFilter(e.target.value);
                   setMajorFilter("ALL");
                 }}
-                displayEmpty
-                sx={{ height: 40, fontSize: 12 }}
               >
                 <MenuItem value="" sx={{ fontSize: 12 }}>Tất cả ngành</MenuItem>
                 {filterDisciplines.map((discipline) => (
@@ -551,84 +534,48 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                     {disciplineOptionLabel(discipline)}
                   </MenuItem>
                 ))}
-              </Select>
-            </FormControl>
+            </FilterSelectField>
 
-            <FormControl size="small" sx={{ minWidth: 220, flexGrow: 1 }}>
-              <InputLabel shrink>Chuyên ngành</InputLabel>
-              <Select label="Chuyên ngành" value={majorFilter} onChange={(e) => setMajorFilter(e.target.value)} sx={{ height: 40, fontSize: 12 }}>
+            <FilterSelectField label="Chuyên ngành" value={majorFilter} onChange={(e) => setMajorFilter(e.target.value)} sx={{ flex: "1 1 220px", minWidth: 220 }}>
                 <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả chuyên ngành ({visibleFilterMajors.length})</MenuItem>
                 {visibleFilterMajors.map((m) => (
                   <MenuItem key={m.id} value={m.id} sx={{ fontSize: 12 }}>{m.code} — {m.name}</MenuItem>
                 ))}
-              </Select>
-            </FormControl>
+            </FilterSelectField>
 
-            {!isAdmittedMasters && <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel shrink>Trạng thái</InputLabel>
-              <Select label="Trạng thái" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} sx={{ height: 40, fontSize: 12 }}>
+            {!isAdmittedMasters && <FilterSelectField label="Trạng thái" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} sx={{ flex: "1 1 150px", minWidth: 150 }}>
                 <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả trạng thái</MenuItem>
                 {STUDY_STATUSES.filter((s) => s !== "Đã trúng tuyển").map((s) => (
                   <MenuItem key={s} value={s} sx={{ fontSize: 12 }}>{s}</MenuItem>
                 ))}
-              </Select>
-            </FormControl>}
+            </FilterSelectField>}
 
             {!isAdmittedMasters && (
-              <TextField
-                size="small"
-                label="Tìm kiếm"
+              <FilterSearchField
                 placeholder="Tìm theo họ tên, mã HV, CCCD, điện thoại, email..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
-                    </InputAdornment>
-                  ),
-                }}
-                InputLabelProps={{ shrink: true }}
                 sx={{
                   width: { xs: "100%", sm: 360 },
                   flexGrow: 1,
-                  ...cellInputSx,
-                  "& .MuiInputBase-root": { height: 40, fontSize: 12.5 },
                 }}
               />
             )}
 
             {isAdmittedMasters && (
-              <TextField
-                size="small"
-                label="Tìm kiếm"
+              <FilterSearchField
                 placeholder="Tìm theo họ tên, mã HV, CCCD, điện thoại, email..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
-                    </InputAdornment>
-                  ),
-                }}
-                InputLabelProps={{ shrink: true }}
                 sx={{
                   width: { xs: "100%", sm: 430 },
                   flexGrow: 1,
-                  ...cellInputSx,
-                  "& .MuiInputBase-root": {
-                    height: 40,
-                    fontSize: 12.5,
-                    bgcolor: "#F5F8FC",
-                    borderRadius: "8px",
-                  },
                 }}
               />
             )}
           </Stack>
 
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Stack direction="row" spacing={1} alignItems="flex-end">
             {isAdmin && !isAdmittedMasters && (
               <Button
                 variant="contained"
@@ -646,7 +593,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                   "&:hover": { bgcolor: "#056A8F" },
                 }}
               >
-                Thêm hồ sơ (A4)
+                Thêm hồ sơ mới
               </Button>
             )}
           </Stack>

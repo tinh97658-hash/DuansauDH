@@ -4,13 +4,14 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
-  DialogTitle, FormControl, FormControlLabel, IconButton, InputAdornment, MenuItem, Paper, Select, Stack,
+  DialogTitle, FormControl, FormControlLabel, IconButton, MenuItem, Paper, Select, Stack,
   Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField,
   Tooltip, Typography,
 } from "@mui/material";
-import { AddRounded, DeleteRounded, EditRounded, SearchRounded } from "@mui/icons-material";
+import { AddRounded, DeleteRounded, EditRounded } from "@mui/icons-material";
 import { API_BASE_URL } from "../config/http";
 import FeatureLayout from "./FeatureLayout";
+import FilterSearchField from "./FilterSearchField";
 
 const buildEmptyForm = (parent, fields, sortable) => {
   const form = { code: "", name: "", active: true };
@@ -287,32 +288,17 @@ const CatalogManager = ({
         sx={{
           p: 1.5,
           mb: 1.5,
-          bgcolor: "#FBFDFF",
-          borderColor: "#D8E5EF",
-          borderRadius: "12px",
-          boxShadow: "0 4px 14px rgba(23, 62, 117, 0.05)",
-          "& .MuiOutlinedInput-root": {
-            height: 40,
-            bgcolor: "#F5F8FC",
-            borderRadius: "8px",
-            fontSize: 12.5,
-          },
-          "& .MuiOutlinedInput-notchedOutline": { borderColor: "#D7E3ED" },
+          bgcolor: "#FFF",
+          borderColor: "#C6D5E1",
+          borderRadius: "10px",
+          boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
         }}
       >
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="center">
-          <TextField
-            size="small"
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="flex-end">
+          <FilterSearchField
             placeholder={`Tìm theo ${codeLabel.toLowerCase()} hoặc tên...`}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
-                </InputAdornment>
-              ),
-            }}
             sx={{ minWidth: { xs: 0, sm: 280 }, width: { xs: "100%", sm: "auto" }, flexGrow: 1 }}
           />
           {isAdmin && (

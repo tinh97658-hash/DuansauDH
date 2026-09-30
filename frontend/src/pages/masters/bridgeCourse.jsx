@@ -4,11 +4,13 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControl, IconButton, InputLabel, MenuItem, Paper, Select, Stack, Table, TableBody,
+  FormControl, IconButton, MenuItem, Paper, Select, Stack, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
-import { AddRounded, DeleteRounded, EditRounded, RefreshRounded, SearchRounded } from "@mui/icons-material";
+import { AddRounded, DeleteRounded, EditRounded, RefreshRounded } from "@mui/icons-material";
 import FeatureLayout from "../../components/FeatureLayout";
+import FilterSearchField from "../../components/FilterSearchField";
+import FilterSelectField from "../../components/FilterSelectField";
 import { API_BASE_URL } from "../../config/http";
 import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 
@@ -153,12 +155,12 @@ export default function BridgeCourse() {
     <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ mb: 2 }}>
       {[["Tổng đăng ký", summary.total, "#087da5"], ["Đã phân công", summary.assigned, "#667085"], ["Đang học", summary.studying, "#168bc2"], ["Đạt / miễn", summary.passed, "#168b63"], ["Không đạt", summary.failed, "#c0392b"]].map(([label, value, color]) => <Paper key={label} variant="outlined" sx={{ px: 2, py: 1.25, flex: 1 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography variant="h5" fontWeight={700} sx={{ color }}>{value || 0}</Typography></Paper>)}
     </Stack>
-    <Paper variant="outlined" sx={{ p: 2, mb: 2 }}><Stack direction="row" spacing={1.2} flexWrap="wrap" alignItems="center">
-      <FormControl size="small" sx={{ minWidth: 110 }}><InputLabel>Năm học</InputLabel><Select label="Năm học" value={year} onChange={(e) => setYear(e.target.value)}>{YEARS.map((v) => <MenuItem key={v} value={v}>{v}</MenuItem>)}</Select></FormControl>
-      <FormControl size="small" sx={{ minWidth: 155 }}><InputLabel>Trạng thái</InputLabel><Select label="Trạng thái" value={status} onChange={(e) => setStatus(e.target.value)}><MenuItem value="ALL">Tất cả</MenuItem>{Object.entries(STATES).map(([k, v]) => <MenuItem key={k} value={k}>{v[0]}</MenuItem>)}</Select></FormControl>
-      <FormControl size="small" sx={{ minWidth: 210 }}><InputLabel shrink>Ngành</InputLabel><Select displayEmpty label="Ngành" value={disciplineId} onChange={(e) => { setDisciplineId(e.target.value); setMajor("ALL"); }}><MenuItem value="">Tất cả ngành</MenuItem>{disciplines.map((item) => <MenuItem key={item.id} value={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}</Select></FormControl>
-      <FormControl size="small" sx={{ minWidth: 210 }}><InputLabel shrink>Chuyên ngành</InputLabel><Select displayEmpty label="Chuyên ngành" value={major} onChange={(e) => setMajor(e.target.value)}><MenuItem value="ALL">Tất cả chuyên ngành</MenuItem>{visibleMajors.map((m) => <MenuItem key={m.id} value={m.id}>{m.code} - {m.name}</MenuItem>)}</Select></FormControl>
-      <TextField size="small" placeholder="Tìm học viên, học phần..." value={search} onChange={(e) => setSearch(e.target.value)} InputProps={{ startAdornment: <SearchRounded fontSize="small" sx={{ mr: 1 }} /> }} sx={{ minWidth: 220, flex: 1 }} />
+    <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderColor: "#C6D5E1", borderRadius: "10px", boxShadow: "0 2px 6px rgba(18,59,98,.07)" }}><Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="flex-end">
+      <FilterSelectField label="Năm học" value={year} onChange={(e) => setYear(e.target.value)} sx={{ flex: "1 1 140px", minWidth: 140 }}>{YEARS.map((v) => <MenuItem key={v} value={v}>{v}</MenuItem>)}</FilterSelectField>
+      <FilterSelectField label="Ngành" value={disciplineId} onChange={(e) => { setDisciplineId(e.target.value); setMajor("ALL"); }} sx={{ flex: "1 1 210px", minWidth: 210 }}><MenuItem value="">Tất cả ngành</MenuItem>{disciplines.map((item) => <MenuItem key={item.id} value={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}</FilterSelectField>
+      <FilterSelectField label="Chuyên ngành" value={major} onChange={(e) => setMajor(e.target.value)} sx={{ flex: "1 1 210px", minWidth: 210 }}><MenuItem value="ALL">Tất cả chuyên ngành</MenuItem>{visibleMajors.map((m) => <MenuItem key={m.id} value={m.id}>{m.code} - {m.name}</MenuItem>)}</FilterSelectField>
+      <FilterSelectField label="Trạng thái" value={status} onChange={(e) => setStatus(e.target.value)} sx={{ flex: "1 1 155px", minWidth: 155 }}><MenuItem value="ALL">Tất cả</MenuItem>{Object.entries(STATES).map(([k, v]) => <MenuItem key={k} value={k}>{v[0]}</MenuItem>)}</FilterSelectField>
+      <FilterSearchField placeholder="Tìm học viên, học phần..." value={search} onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: 220, flex: 1 }} />
       <Tooltip title="Tải lại"><IconButton onClick={load}><RefreshRounded /></IconButton></Tooltip>{admin && <Button variant="contained" startIcon={<AddRounded />} onClick={create}>Đăng ký học phần</Button>}
     </Stack></Paper>
     {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}

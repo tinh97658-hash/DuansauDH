@@ -6,17 +6,18 @@ import "react-toastify/dist/ReactToastify.css";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress,
   FormControl,
-  Grid, IconButton, InputAdornment, InputLabel, LinearProgress, MenuItem, Paper,
+  Grid, IconButton, InputLabel, LinearProgress, MenuItem, Paper,
   Select, Stack, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, TextField, Tooltip, Typography,
+  TableHead, TableRow, Tooltip, Typography,
 } from "@mui/material";
 import {
   ArrowForwardRounded,
   DeleteOutlineRounded, GroupWorkRounded, PersonRounded,
-  SearchRounded,
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
+import FilterSearchField from "../../components/FilterSearchField";
+import FilterSelectField from "../../components/FilterSelectField";
 import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 
 const currentYear = new Date().getFullYear();
@@ -279,57 +280,35 @@ const AssignClassGroups = () => {
       <Paper variant="outlined" sx={{
         p: 1.5,
         mb: 1.5,
-        bgcolor: "#FBFDFF",
-        borderColor: "#D8E5EF",
-        borderRadius: "12px",
-        boxShadow: "0 4px 14px rgba(23, 62, 117, 0.05)",
-        "& .MuiInputLabel-root": { color: "#52677A" },
-        "& .MuiOutlinedInput-root": {
-          height: 40,
-          bgcolor: "#F7FAFD",
-          borderRadius: "8px",
-          "& fieldset": { borderColor: "#D5E2EC" },
-        },
+        bgcolor: "#FFF",
+        borderColor: "#C6D5E1",
+        borderRadius: "10px",
+        boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
       }}>
-        <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="center">
-          <FormControl size="small" sx={{ minWidth: 135 }}>
-            <InputLabel id="year-select-label" shrink>Năm tuyển sinh</InputLabel>
-            <Select
-              labelId="year-select-label"
-              label="Năm tuyển sinh"
+        <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="flex-end">
+          <FilterSelectField label="Năm tuyển sinh" sx={{ flex: "1 1 150px", minWidth: 150 }}
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
-              displayEmpty
             >
               {YEARS.map((y) => (
                 <MenuItem key={y} value={y}>{y}</MenuItem>
               ))}
-            </Select>
-          </FormControl>
+          </FilterSelectField>
 
-          <FormControl size="small" sx={{ minWidth: 260 }}>
-            <InputLabel id="discipline-select-label" shrink>Ngành</InputLabel>
-            <Select labelId="discipline-select-label" label="Ngành" value={selectedDiscipline} displayEmpty onChange={(e) => { setSelectedDiscipline(e.target.value); setSelectedMajor("ALL"); }}>
+          <FilterSelectField label="Ngành" sx={{ flex: "1 1 260px", minWidth: 260 }} value={selectedDiscipline} onChange={(e) => { setSelectedDiscipline(e.target.value); setSelectedMajor("ALL"); }}>
               <MenuItem value="">Tất cả ngành</MenuItem>
               {disciplines.map((item) => <MenuItem key={item.id} value={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}
-            </Select>
-          </FormControl>
+          </FilterSelectField>
 
-          <FormControl size="small" sx={{ minWidth: 280 }}>
-            <InputLabel id="major-select-label" shrink>Chuyên ngành</InputLabel>
-            <Select
-              labelId="major-select-label"
-              label="Chuyên ngành"
+          <FilterSelectField label="Chuyên ngành" sx={{ flex: "1 1 280px", minWidth: 280 }}
               value={selectedMajor}
               onChange={(e) => setSelectedMajor(e.target.value)}
-              displayEmpty
             >
               <MenuItem value="ALL">Tất cả chuyên ngành</MenuItem>
               {visibleMajors.map((m) => (
                 <MenuItem key={m.id} value={m.id}>{m.name} ({m.code})</MenuItem>
               ))}
-            </Select>
-          </FormControl>
+          </FilterSelectField>
 
         </Stack>
       </Paper>
@@ -363,23 +342,11 @@ const AssignClassGroups = () => {
 
             {/* Left Search Bar */}
             <Stack direction="row" spacing={1} sx={{ mb: 1.5 }} alignItems="center">
-              <TextField
-                size="small"
-                fullWidth
+              <FilterSearchField
                 placeholder="Tìm học viên theo mã, họ tên, số điện thoại..."
                 value={studentSearch}
                 onChange={(e) => setStudentSearch(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  "& .MuiOutlinedInput-root": { height: 40, bgcolor: "#F7FAFD", borderRadius: "8px" },
-                  "& fieldset": { borderColor: "#D8E5EF" },
-                }}
+                sx={{ width: "100%" }}
               />
             </Stack>
 

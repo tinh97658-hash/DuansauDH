@@ -5,17 +5,19 @@ import "react-toastify/dist/ReactToastify.css";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, FormControl, FormControlLabel,
-  IconButton, InputAdornment, MenuItem, Paper, Select, Stack, Switch, Tab, Tabs,
+  IconButton, MenuItem, Paper, Select, Stack, Switch, Tab, Tabs,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField,
   Tooltip, Typography,
 } from "@mui/material";
 import {
   AddRounded, CheckBoxOutlineBlankRounded, CheckBoxRounded, CheckRounded,
   CloseRounded, DeleteOutlineRounded, DeleteRounded, EditRounded, LibraryBooksRounded,
-  PlaylistAddRounded, SaveRounded, SearchRounded, ClassRounded,
+  PlaylistAddRounded, SaveRounded, ClassRounded,
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
+import FilterSearchField from "../../components/FilterSearchField";
+import FilterSelectField from "../../components/FilterSelectField";
 import SubjectSharingCheckbox from "../../components/SubjectSharingCheckbox";
 import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 import {
@@ -23,11 +25,11 @@ import {
 } from "./trainingPlan.logic";
 
 const SUBJECT_TYPES = [
-  { value: "KC", label: "Kiến thức chung (KC)", color: "#173E75" },
-  { value: "CS", label: "Cơ sở (CS)", color: "#0788B8" },
-  { value: "CN", label: "Chuyên ngành (CN)", color: "#137B3B" },
-  { value: "TC", label: "Tự chọn (TC)", color: "#B86216" },
-  { value: "CH", label: "Chuyên đề (CH)", color: "#607486" },
+  { value: "KC", label: "Khối kiến thức chung", color: "#173E75" },
+  { value: "CS", label: "Khối kiến thức cơ sở", color: "#0788B8" },
+  { value: "CN", label: "Khối kiến thức chuyên ngành", color: "#137B3B" },
+  { value: "TC", label: "Khối kiến thức tự chọn", color: "#B86216" },
+  { value: "CH", label: "Khối chuyên đề", color: "#607486" },
 ];
 
 const currentYear = new Date().getFullYear();
@@ -106,6 +108,7 @@ const TrainingPlan = () => {
   const [subjectDraft, setSubjectDraft] = useState(initialSubjectDraft(1));
   const [editingSubjectId, setEditingSubjectId] = useState(null);
   const [editingSubjectForm, setEditingSubjectForm] = useState(null);
+  const [updatingSubjectTypeId, setUpdatingSubjectTypeId] = useState(null);
   const [deletingSubjectId, setDeletingSubjectId] = useState(null);
   const [sharedCodesOpen, setSharedCodesOpen] = useState(false);
   const [sharedCodes, setSharedCodes] = useState([]);
@@ -481,6 +484,30 @@ const TrainingPlan = () => {
     }
   };
 
+  // Loại học phần được chỉnh ngay tại Danh mục, không tải lại trang.
+  const handleSubjectTypeChange = async (subject, subjectType) => {
+    if (!isAdmin || subjectType === subject.subjectType || updatingSubjectTypeId) return;
+    const previousType = subject.subjectType;
+    setUpdatingSubjectTypeId(subject.id);
+    setSubjects((current) => current.map((item) => (
+      item.id === subject.id ? { ...item, subjectType } : item
+    )));
+    try {
+      await axios.put(
+        `${API_BASE_URL}/plan/subjects/${subject.id}`,
+        { subjectType },
+        { withCredentials: true }
+      );
+    } catch (err) {
+      setSubjects((current) => current.map((item) => (
+        item.id === subject.id ? { ...item, subjectType: previousType } : item
+      )));
+      toast.error(err.response?.data?.message || "Không thể cập nhật loại học phần");
+    } finally {
+      setUpdatingSubjectTypeId(null);
+    }
+  };
+
   const handleConfirmSharedCodes = () => {
     if (sharedCodes.some((item) => !item.codeNumber || !item.codeText?.trim())) {
       toast.error("Vui lòng nhập đủ mã số và mã chữ cho tất cả chuyên ngành");
@@ -598,32 +625,6 @@ const TrainingPlan = () => {
       await loadData();
     } catch (err) {
       toast.error(err.response?.data?.message || "Không thể xóa chương trình đào tạo");
-    } finally {
-      setMatrixSaving(false);
-    }
-  };
-
-  // Bắt buộc / tự chọn là thuộc tính **của CTĐT** (không phải của danh mục học phần),
-  // nên Viện chỉnh ngay trong bảng CTĐT của lớp.
-  const handleToggleRequired = async (entry) => {
-    if (!isAdmin || matrixSaving || !curriculum) return;
-    const nextEntries = curriculumSubjects.map((row) => ({
-      subjectId: row.subjectId,
-      blockCode: row.blockCode || undefined,
-      isRequired: row.id === entry.id ? !row.isRequired : Boolean(row.isRequired),
-      credits: row.credits,
-    }));
-    try {
-      setMatrixSaving(true);
-      await axios.put(
-        `${API_BASE_URL}/plan/curriculums/${curriculum.id}/subjects`,
-        { subjects: nextEntries },
-        { withCredentials: true }
-      );
-      await loadCurriculumDetail(curriculum.id);
-      loadData();
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Không thể đổi loại học phần trong chương trình đào tạo");
     } finally {
       setMatrixSaving(false);
     }
@@ -760,34 +761,28 @@ const TrainingPlan = () => {
         sx={{
           p: 1.5,
           mb: 1.5,
-          bgcolor: "#FBFDFF",
-          borderColor: "#D8E5EF",
-          borderRadius: "12px",
-          boxShadow: "0 4px 14px rgba(23, 62, 117, 0.05)",
+          bgcolor: "#FFF",
+          borderColor: "#C6D5E1",
+          borderRadius: "10px",
+          boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
         }}
       >
         <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems="center" justifyContent="space-between">
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="center" sx={{ width: { xs: "100%", md: "auto" }, flexGrow: 1 }}>
-            <FormControl size="small" sx={{ minWidth: 140, width: { xs: "100%", sm: "auto" } }}>
-              <Select
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="flex-end" sx={{ width: { xs: "100%", md: "auto" }, flexGrow: 1 }}>
+            <FilterSelectField label="Trình độ" sx={{ flex: "1 1 160px", minWidth: 160, width: { xs: "100%", sm: "auto" } }}
                 value={level}
                 onChange={(e) => setLevel(e.target.value)}
-                sx={{ height: 36, fontSize: 13, bgcolor: "#F7F9FA" }}
               >
                 {LEVELS.map((l) => (
                   <MenuItem key={l.value} value={l.value} sx={{ fontSize: 13 }}>
                     {l.label}
                   </MenuItem>
                 ))}
-              </Select>
-            </FormControl>
+            </FilterSelectField>
 
-            <FormControl size="small" sx={{ minWidth: 250, width: { xs: "100%", sm: "auto" } }}>
-              <Select
+            <FilterSelectField label="Ngành" sx={{ flex: "1 1 250px", minWidth: 250, width: { xs: "100%", sm: "auto" } }}
                 value={disciplineId}
                 onChange={(e) => handleDisciplineChange(e.target.value)}
-                displayEmpty
-                sx={{ height: 36, fontSize: 13, fontWeight: 600, color: "#173E75", bgcolor: "#F7F9FA" }}
               >
                 <MenuItem value="" sx={{ fontSize: 13 }}>Tất cả ngành</MenuItem>
                 {disciplines.map((discipline) => (
@@ -795,23 +790,18 @@ const TrainingPlan = () => {
                     {disciplineOptionLabel(discipline)}
                   </MenuItem>
                 ))}
-              </Select>
-            </FormControl>
+            </FilterSelectField>
 
-            <FormControl size="small" sx={{ minWidth: 320, flexGrow: 1, width: { xs: "100%", sm: "auto" } }}>
-              <Select
+            <FilterSelectField label="Chuyên ngành" sx={{ flex: "2 1 320px", minWidth: 320, width: { xs: "100%", sm: "auto" } }}
                 value={majorId}
                 onChange={(e) => setMajorId(e.target.value)}
-                displayEmpty
-                sx={{ height: 36, fontSize: 13, fontWeight: 600, color: "#173E75", bgcolor: "#F7F9FA" }}
               >
                 {filteredMajors.map((m) => (
                   <MenuItem key={m.id} value={m.id} sx={{ fontSize: 13 }}>
                     {m.code} — {m.name} ({m.subjectCount} học phần)
                   </MenuItem>
                 ))}
-              </Select>
-            </FormControl>
+            </FilterSelectField>
           </Stack>
 
         </Stack>
@@ -876,31 +866,21 @@ const TrainingPlan = () => {
           <Stack
             direction={{ xs: "column", sm: "row" }}
             spacing={1.5}
-            alignItems={{ xs: "stretch", sm: "center" }}
+            alignItems={{ xs: "stretch", sm: "flex-end" }}
             justifyContent="space-between"
             sx={{ mb: 1.5 }}
           >
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <TextField
-                size="small"
+            <Stack direction="row" spacing={1} alignItems="flex-end" flexWrap="wrap">
+              <FilterSearchField
                 placeholder="Tìm kiếm mã HP, tên học phần..."
                 value={subjectSearch}
                 onChange={(e) => setSubjectSearch(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{ width: { xs: "100%", sm: 260 }, ...cellInputSx }}
+                sx={{ width: { xs: "100%", sm: 260 } }}
               />
 
-              <FormControl size="small" sx={{ minWidth: 150 }}>
-                <Select
+              <FilterSelectField label="Loại học phần" sx={{ minWidth: 150 }}
                   value={subjectTypeFilter}
                   onChange={(e) => setSubjectTypeFilter(e.target.value)}
-                  sx={{ height: 32, fontSize: 12, bgcolor: "#ffffff" }}
                 >
                   <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả loại HP</MenuItem>
                   {SUBJECT_TYPES.map((t) => (
@@ -908,8 +888,7 @@ const TrainingPlan = () => {
                       {t.label}
                     </MenuItem>
                   ))}
-                </Select>
-              </FormControl>
+              </FilterSelectField>
             </Stack>
 
             <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end">
@@ -950,11 +929,9 @@ const TrainingPlan = () => {
             sx={{
               borderColor: "#DFE4E8",
               borderRadius: "4px",
-              maxHeight: "calc(100vh - 280px)",
-              overflowY: "auto",
             }}
           >
-            <Table size="small" stickyHeader sx={{ minWidth: 980 }}>
+            <Table size="small" sx={{ minWidth: 980 }}>
               <TableHead>
                 <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", color: "#172B3A", fontWeight: 700, fontSize: 12, py: "8px", borderBottom: "2px solid #DFE4E8" } }}>
                   <TableCell sx={{ width: 44, textAlign: "center" }}>STT</TableCell>
@@ -1139,18 +1116,35 @@ const TrainingPlan = () => {
                           {row.credits}
                         </TableCell>
                         <TableCell align="center">
-                          <Chip
+                          <Select
                             size="small"
-                            label={row.subjectType}
-                            variant="outlined"
+                            value={row.subjectType || "CN"}
+                            disabled={!isAdmin || updatingSubjectTypeId === row.id}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) => handleSubjectTypeChange(row, event.target.value)}
                             sx={{
                               fontSize: 11,
                               fontWeight: 700,
-                              height: 22,
-                              borderColor: SUBJECT_TYPES.find((t) => t.value === row.subjectType)?.color || "#607486",
+                              width: 72,
+                              height: 28,
                               color: SUBJECT_TYPES.find((t) => t.value === row.subjectType)?.color || "#607486",
+                              bgcolor: "#fff",
+                              borderRadius: "14px",
+                              "& .MuiSelect-select": { py: 0, pl: 1.25, pr: "24px !important" },
+                              "& .MuiOutlinedInput-notchedOutline": {
+                                borderColor: SUBJECT_TYPES.find((t) => t.value === row.subjectType)?.color || "#607486",
+                              },
+                              "&:hover .MuiOutlinedInput-notchedOutline": {
+                                borderColor: SUBJECT_TYPES.find((t) => t.value === row.subjectType)?.color || "#607486",
+                              },
                             }}
-                          />
+                          >
+                            {SUBJECT_TYPES.map((type) => (
+                              <MenuItem key={type.value} value={type.value} sx={{ fontSize: 12 }}>
+                                {type.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
                         </TableCell>
                         <TableCell align="center">
                           <SubjectSharingCheckbox
@@ -1756,11 +1750,11 @@ const TrainingPlan = () => {
                       "& .MuiAlert-message": { py: 0.5 },
                     }}
                   >
-                    Bấm nhãn <strong>Loại</strong> để chuyển giữa Bắt buộc và Tự chọn. Dùng nút xóa để loại học phần khỏi CTĐT.
+                    Loại học phần và trạng thái Bắt buộc / Tự chọn được chỉnh tại tab <strong>Danh mục học phần chuyên ngành</strong>. Dùng nút xóa để loại học phần khỏi CTĐT.
                   </Alert>
 
-                  <TableContainer sx={{ maxHeight: "calc(100vh - 360px)", overflowY: "auto", border: "1px solid #D7E4EE", borderRadius: "8px", boxShadow: "none !important" }}>
-                    <Table size="small" stickyHeader sx={{ minWidth: 640 }}>
+                  <TableContainer sx={{ border: "1px solid #D7E4EE", borderRadius: "8px", boxShadow: "none !important" }}>
+                    <Table size="small" sx={{ minWidth: 640 }}>
                       <TableHead>
                         <TableRow sx={{ height: 42, "& th": { bgcolor: "#F0F4F8", color: "#172B3A", fontWeight: 700, fontSize: 13, py: "8px" } }}>
                           <TableCell sx={{ width: 36, textAlign: "center" }}>STT</TableCell>
@@ -1792,40 +1786,25 @@ const TrainingPlan = () => {
                               <TableCell sx={{ fontWeight: 500 }}>{entry.name}</TableCell>
                               <TableCell align="center" sx={{ fontWeight: 600 }}>{entry.credits}</TableCell>
                               <TableCell sx={{ color: "#607486", fontSize: 12 }}>
-                                {entry.blockCode === "KC" ? (
-                                  <Chip
-                                    size="small"
-                                    label="Khối kiến thức chung"
-                                    sx={{
-                                      bgcolor: "#E8F1F5",
-                                      color: "#173E75",
-                                      fontWeight: 700,
-                                      height: 24,
-                                      fontSize: 11,
-                                      border: "1px solid #CBD5E1",
-                                    }}
-                                  />
-                                ) : (
-                                  entry.blockName || entry.blockCode || "—"
-                                )}
+                                {SUBJECT_TYPES.find((type) => type.value === entry.blockCode)?.label
+                                  || entry.blockName
+                                  || entry.blockCode
+                                  || "—"}
                               </TableCell>
                               <TableCell align="center">
-                                <Tooltip title={isAdmin ? "Bấm để chuyển Bắt buộc / Tự chọn trong CTĐT" : ""}>
-                                  <Chip
-                                    size="small"
-                                    variant="outlined"
-                                    label={entry.isRequired ? "Bắt buộc" : "Tự chọn"}
-                                    onClick={() => handleToggleRequired(entry)}
-                                    sx={{
-                                      height: 24,
-                                      fontSize: 11,
-                                      fontWeight: 700,
-                                      cursor: isAdmin ? "pointer" : "default",
-                                      borderColor: entry.isRequired ? "#137B3B" : "#B86216",
-                                      color: entry.isRequired ? "#137B3B" : "#B86216",
-                                    }}
-                                  />
-                                </Tooltip>
+                                <Chip
+                                  size="small"
+                                  variant="outlined"
+                                  label={entry.isRequired ? "Bắt buộc" : "Tự chọn"}
+                                  sx={{
+                                    height: 24,
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    cursor: "default",
+                                    borderColor: entry.isRequired ? "#137B3B" : "#B86216",
+                                    color: entry.isRequired ? "#137B3B" : "#B86216",
+                                  }}
+                                />
                               </TableCell>
                               {isAdmin && (
                                 <TableCell align="center">
@@ -1929,26 +1908,16 @@ const TrainingPlan = () => {
         <Divider />
         <DialogContent sx={{ p: 2 }}>
           {/* Search & Filter */}
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
-            <TextField
-              size="small"
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="flex-end" sx={{ mb: 2 }}>
+            <FilterSearchField
               placeholder="Tìm theo mã hoặc tên học phần..."
               value={addSubjectSearch}
               onChange={(e) => setAddSubjectSearch(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{ ...cellInputSx, flexGrow: 1, width: { xs: "100%", sm: "auto" } }}
+              sx={{ flexGrow: 1, width: { xs: "100%", sm: "auto" } }}
             />
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <Select
+            <FilterSelectField label="Khối học phần" sx={{ minWidth: 150, width: { xs: "100%", sm: "auto" } }}
                 value={addSubjectTypeFilter}
                 onChange={(e) => setAddSubjectTypeFilter(e.target.value)}
-                sx={{ height: 32, fontSize: 12, bgcolor: "#ffffff" }}
               >
                 <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả khối HP</MenuItem>
                 {SUBJECT_TYPES.map((t) => (
@@ -1956,8 +1925,7 @@ const TrainingPlan = () => {
                     {t.label}
                   </MenuItem>
                 ))}
-              </Select>
-            </FormControl>
+            </FilterSelectField>
           </Stack>
 
           {/* List of available subjects */}

@@ -5,16 +5,17 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
-  DialogTitle, FormControl, IconButton, InputAdornment, InputLabel, LinearProgress,
+  DialogTitle, FormControl, IconButton, LinearProgress,
   MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
   AddRounded, DeleteRounded, EditRounded, GroupWorkRounded,
-  SearchRounded,
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
+import FilterSearchField from "../../components/FilterSearchField";
+import FilterSelectField from "../../components/FilterSelectField";
 import { disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline } from "../../utils/disciplineScope";
 import { buildGroupNames, getNextGroupIndex, validateNameTemplate } from "./createClassGroups.logic";
 
@@ -412,90 +413,50 @@ const CreateClassGroups = () => {
         sx={{
           p: 1.5,
           mb: 1.5,
-          bgcolor: "#FBFDFF",
-          borderColor: "#D8E5EF",
-          borderRadius: "12px",
-          boxShadow: "0 4px 14px rgba(23, 62, 117, 0.05)",
-          "& .MuiInputLabel-root": { color: "#111827", fontSize: 12 },
-          "& .MuiOutlinedInput-root": {
-            height: 40,
-            bgcolor: "#F5F8FC",
-            color: "#111111",
-            borderRadius: "8px",
-            fontSize: 12.5,
-          },
-          "& .MuiOutlinedInput-notchedOutline": { borderColor: "#D7E3ED" },
+          bgcolor: "#FFF",
+          borderColor: "#C6D5E1",
+          borderRadius: "10px",
+          boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
         }}
       >
-        <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="center">
-          <FormControl size="small" sx={{ flex: "1 1 190px", minWidth: 190 }}>
-            <InputLabel id="year-filter-label" shrink>Năm học</InputLabel>
-            <Select
-              labelId="year-filter-label"
-              label="Năm học"
+        <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="flex-end">
+          <FilterSelectField label="Năm học" sx={{ flex: "1 1 190px", minWidth: 190 }}
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
-              displayEmpty
             >
               {YEARS.map((y) => (
                 <MenuItem key={y} value={y}>{y}</MenuItem>
               ))}
-            </Select>
-          </FormControl>
+          </FilterSelectField>
 
-          <FormControl size="small" sx={{ flex: "1 1 210px", minWidth: 210 }}>
-            <InputLabel id="discipline-filter-label" shrink>Ngành</InputLabel>
-            <Select labelId="discipline-filter-label" label="Ngành" value={selectedDiscipline} displayEmpty onChange={(e) => { setSelectedDiscipline(e.target.value); setSelectedMajor("ALL"); }}>
+          <FilterSelectField label="Ngành" sx={{ flex: "1 1 210px", minWidth: 210 }} value={selectedDiscipline} onChange={(e) => { setSelectedDiscipline(e.target.value); setSelectedMajor("ALL"); }}>
               <MenuItem value="">Tất cả ngành</MenuItem>
               {disciplines.map((item) => <MenuItem key={item.id} value={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}
-            </Select>
-          </FormControl>
+          </FilterSelectField>
 
-          <FormControl size="small" sx={{ flex: "1 1 210px", minWidth: 210 }}>
-            <InputLabel id="major-filter-label" shrink>Chuyên ngành</InputLabel>
-            <Select
-              labelId="major-filter-label"
-              label="Chuyên ngành"
+          <FilterSelectField label="Chuyên ngành" sx={{ flex: "1 1 210px", minWidth: 210 }}
               value={selectedMajor}
               onChange={(e) => setSelectedMajor(e.target.value)}
-              displayEmpty
             >
               <MenuItem value="ALL">Tất cả chuyên ngành</MenuItem>
               {visibleMajors.map((m) => (
                 <MenuItem key={m.id} value={m.id}>{m.name} ({m.code})</MenuItem>
               ))}
-            </Select>
-          </FormControl>
+          </FilterSelectField>
 
-          <FormControl size="small" sx={{ flex: "1 1 190px", minWidth: 190 }}>
-            <InputLabel id="status-filter-label" shrink>Trạng thái</InputLabel>
-            <Select
-              labelId="status-filter-label"
-              label="Trạng thái"
+          <FilterSelectField label="Trạng thái" sx={{ flex: "1 1 190px", minWidth: 190 }}
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              displayEmpty
             >
               <MenuItem value="ALL">Tất cả</MenuItem>
               <MenuItem value="open">Đang mở</MenuItem>
               <MenuItem value="closed">Đã đóng</MenuItem>
-            </Select>
-          </FormControl>
+          </FilterSelectField>
 
-          <TextField
-            size="small"
-            label="Tìm kiếm"
+          <FilterSearchField
             placeholder="Tìm theo mã nhóm, tên nhóm, ngành học..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchRounded fontSize="small" sx={{ color: "#8A9AAA" }} />
-                </InputAdornment>
-              ),
-            }}
-            InputLabelProps={{ shrink: true }}
             sx={{ flex: "2 1 360px", minWidth: 280 }}
           />
 
