@@ -6,7 +6,7 @@ import "react-toastify/dist/ReactToastify.css";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress,
   FormControl,
-  Grid, IconButton, InputLabel, LinearProgress, MenuItem, Paper,
+  Grid, IconButton, LinearProgress, MenuItem, Paper,
   Select, Stack, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Tooltip, Typography,
 } from "@mui/material";
@@ -478,17 +478,39 @@ const AssignClassGroups = () => {
             </Box>
 
             {/* Target Group Selector */}
-            <FormControl fullWidth size="small" sx={{
-              mb: 1.5,
-              "& .MuiOutlinedInput-root": { height: 40, bgcolor: "#F7FAFD", borderRadius: "8px" },
-              "& fieldset": { borderColor: "#D8E5EF" },
-            }}>
-              <InputLabel id="target-group-label">Chọn nhóm học phần</InputLabel>
+            <FormControl fullWidth size="small" sx={{ mb: 1.5 }}>
+              <Typography
+                component="label"
+                htmlFor="target-group-select"
+                sx={{
+                  mb: 0.75,
+                  color: "#526A82",
+                  fontSize: "10.5px",
+                  fontWeight: 700,
+                  letterSpacing: ".025em",
+                  lineHeight: 1.2,
+                  textTransform: "uppercase",
+                }}
+              >
+                Chọn nhóm học phần
+              </Typography>
               <Select
-                labelId="target-group-label"
-                label="Chọn nhóm học phần"
+                id="target-group-select"
                 value={targetGroupId}
                 onChange={(e) => setTargetGroupId(e.target.value)}
+                displayEmpty
+                MenuProps={{
+                  PaperProps: {
+                    sx: { maxHeight: 320, mt: 0.5, borderRadius: "8px" },
+                  },
+                  MenuListProps: { dense: true },
+                }}
+                sx={{
+                  height: 40,
+                  bgcolor: "#F7FAFD",
+                  borderRadius: "8px",
+                  "& fieldset": { borderColor: "#D8E5EF" },
+                }}
               >
                 {groups.length === 0 ? (
                   <MenuItem value="" disabled><em>(Chưa có nhóm học phần nào đang mở)</em></MenuItem>
@@ -534,8 +556,15 @@ const AssignClassGroups = () => {
             </Box>
 
             {/* Target Group Members Table */}
-            <TableContainer sx={{ flexGrow: 1, maxHeight: 460, border: "1px solid #D8E5EF", borderRadius: "10px", overflow: "auto" }}>
-              <Table size="small" stickyHeader>
+            <TableContainer sx={{
+              flexGrow: 1,
+              maxHeight: groupMembers.length > 25 ? 460 : "none",
+              border: "1px solid #D8E5EF",
+              borderRadius: "10px",
+              overflowY: groupMembers.length > 25 ? "auto" : "visible",
+              overflowX: "hidden",
+            }}>
+              <Table size="small" stickyHeader={groupMembers.length > 25}>
                 <TableHead>
                   <TableRow sx={{ "& th": { bgcolor: "#EDF4FA", color: "#111827", borderColor: "#D8E5EF", fontWeight: 700 } }}>
                     <TableCell align="center" sx={{ width: 48, fontWeight: 700 }}>STT</TableCell>

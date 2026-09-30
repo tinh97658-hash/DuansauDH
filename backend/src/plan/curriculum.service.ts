@@ -164,7 +164,10 @@ export class CurriculumService {
 
       const subjectRows = rows.map((row: any) => {
         const plain = typeof row.get === "function" ? row.get({ plain: true }) : row;
-        const isRequired = Boolean(plain.isRequired);
+        // The catalog is the source of truth for required/elective status.
+        // Falling back to the entry keeps older/incomplete relations readable,
+        // while also repairing the display of entries saved before sync existed.
+        const isRequired = Boolean(plain.subject?.isRequired ?? plain.isRequired);
         const block = plain.blockId ? blockById.get(plain.blockId) : undefined;
         const group = plain.electiveGroupId ? groupById.get(plain.electiveGroupId) : undefined;
         return {
@@ -177,7 +180,9 @@ export class CurriculumService {
           isRequired,
           active: plain.subject?.active !== false,
           blockId: plain.blockId,
-          blockCode: plain.block?.code || blockById.get(plain.blockId)?.code || "",
+          // Catalog type is authoritative; the stored block is retained as a
+          // fallback for legacy/incomplete subject relations.
+          blockCode: plain.subject?.subjectType || plain.block?.code || blockById.get(plain.blockId)?.code || "",
           blockName: block?.name || "",
           electiveGroupId: plain.electiveGroupId,
           electiveGroupCode: group?.code || "",

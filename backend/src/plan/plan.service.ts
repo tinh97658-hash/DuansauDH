@@ -202,6 +202,38 @@ export class PlanService {
         payload.code = String(dto.codeNumber);
       }
       await subject.update(payload, { transaction });
+
+      // Curriculum entries store a snapshot of the required/elective flag.
+      // Keep that snapshot aligned with the catalog, which is the UI's source
+      // of truth for this property.
+      if (dto.isRequired !== undefined) {
+        await this.curriculumEntries.update(
+          {
+            isRequired: dto.isRequired,
+            ...(dto.isRequired ? { electiveGroupId: null } : {}),
+          },
+          { where: { subjectId: id }, transaction },
+        );
+      }
+
+      // A curriculum entry also snapshots the catalog's knowledge-block type.
+      // Move existing entries to the matching block in their own curriculum
+      // whenever that type changes in the catalog.
+      if (dto.subjectType !== undefined) {
+        await this.sequelize.query(
+          `UPDATE curriculum_subjects AS cs
+           SET block_id = cb.id, updated_at = NOW()
+           FROM curriculum_blocks AS cb
+           WHERE cs.subject_id = :subjectId
+             AND cb.curriculum_id = cs.curriculum_id
+             AND cb.code = :blockCode`,
+          {
+            replacements: { subjectId: id, blockCode: dto.subjectType },
+            transaction,
+          },
+        );
+      }
+
       return this.subjects.findByPk(id, {
         include: [
           { model: Major, as: "major", attributes: ["id", "code", "name"] },

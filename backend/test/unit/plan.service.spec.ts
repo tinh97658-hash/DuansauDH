@@ -167,3 +167,43 @@ describe("PlanService major-scoped subject catalogs", () => {
   });
 });
 
+describe("PlanService subject requirement synchronization", () => {
+  it("updates existing curriculum entries when a catalog subject becomes elective", async () => {
+    const subject = {
+      id: "subject-1", majorId: "major-1", program: "masters",
+      codeNumber: 1, codeText: "ATBM", sharedMajorIds: [], allowCrossMajor: false,
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    const subjects = {
+      findByPk: jest.fn().mockResolvedValue(subject),
+      findOne: jest.fn().mockResolvedValue(null),
+      count: jest.fn().mockResolvedValue(0),
+    };
+    const curriculumEntries = { update: jest.fn().mockResolvedValue([1]) };
+    const majors = { findByPk: jest.fn().mockResolvedValue({ id: "major-1", program: "masters", active: true }) };
+    const transaction = { LOCK: { UPDATE: "UPDATE" } };
+    const sequelize = {
+      transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)),
+      query: jest.fn().mockResolvedValue([[], 1]),
+    };
+    const service = new PlanService(
+      subjects as never, curriculumEntries as never, {} as never, majors as never,
+      {} as never, sequelize as never, {} as never, {} as never, {} as never, {} as never,
+    );
+
+    await service.updateSubject(subject.id, { isRequired: false, subjectType: "TC" });
+
+    expect(curriculumEntries.update).toHaveBeenCalledWith(
+      { isRequired: false },
+      { where: { subjectId: subject.id }, transaction },
+    );
+    expect(sequelize.query).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE curriculum_subjects"),
+      expect.objectContaining({
+        replacements: { subjectId: subject.id, blockCode: "TC" },
+        transaction,
+      }),
+    );
+  });
+});
+

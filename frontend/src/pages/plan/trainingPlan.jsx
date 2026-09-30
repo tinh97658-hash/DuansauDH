@@ -100,6 +100,7 @@ const TrainingPlan = () => {
   // CTĐT của khóa đang chọn
   const [curriculum, setCurriculum] = useState(null);
   const [curriculumSubjects, setCurriculumSubjects] = useState([]);
+  const [curriculumSubjectSearch, setCurriculumSubjectSearch] = useState("");
 
   // Subject Table State (Excel-like)
   const [subjectSearch, setSubjectSearch] = useState("");
@@ -277,6 +278,14 @@ const TrainingPlan = () => {
       .reduce((total, s) => total + (Number(s.credits) || 0), 0),
     [curriculumSubjects]
   );
+  const filteredCurriculumSubjects = useMemo(() => {
+    const query = curriculumSubjectSearch.trim().toLocaleLowerCase("vi");
+    if (!query) return curriculumSubjects;
+    return curriculumSubjects.filter((subject) => (
+      String(subject.code || "").toLocaleLowerCase("vi").includes(query)
+      || String(subject.name || "").toLocaleLowerCase("vi").includes(query)
+    ));
+  }, [curriculumSubjects, curriculumSubjectSearch]);
 
   // Available subjects in catalog that are not yet in the active curriculum
   const existingCurriculumSubjectIds = useMemo(
@@ -391,6 +400,11 @@ const TrainingPlan = () => {
         ? `Đã tạo học phần "${created.name}" cho ${createdRows.length} chuyên ngành`
         : `Đã thêm học phần "${created.name}"`);
       setSubjects((prev) => [...prev, created]);
+      setCatalogSubjects((prev) => (
+        prev.some((subject) => subject.id === created.id)
+          ? prev.map((subject) => (subject.id === created.id ? created : subject))
+          : [...prev, created]
+      ));
       setSharedCodesOpen(false);
       loadMajors();
 
@@ -461,6 +475,12 @@ const TrainingPlan = () => {
       );
       toast.success("Cập nhật học phần thành công");
       setSubjects((prev) => prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)));
+      setCatalogSubjects((prev) => prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)));
+      setCurriculumSubjects((prev) => prev.map((entry) => (
+        entry.subjectId === updated.id
+          ? { ...entry, isRequired: updated.isRequired, blockCode: updated.subjectType }
+          : entry
+      )));
       setEditingSubjectId(null);
       setEditingSubjectForm(null);
     } catch (err) {
@@ -473,12 +493,18 @@ const TrainingPlan = () => {
     if (!isAdmin) return;
     const newValue = !subject[field];
     try {
-      await axios.put(
+      const { data: updated } = await axios.put(
         `${API_BASE_URL}/plan/subjects/${subject.id}`,
         { [field]: newValue },
         { withCredentials: true }
       );
-      setSubjects((prev) => prev.map((s) => (s.id === subject.id ? { ...s, [field]: newValue } : s)));
+      setSubjects((prev) => prev.map((s) => (s.id === subject.id ? { ...s, ...updated } : s)));
+      setCatalogSubjects((prev) => prev.map((s) => (s.id === subject.id ? { ...s, ...updated } : s)));
+      if (field === "isRequired") {
+        setCurriculumSubjects((prev) => prev.map((entry) => (
+          entry.subjectId === subject.id ? { ...entry, isRequired: newValue } : entry
+        )));
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || "Không thể cập nhật trạng thái");
     }
@@ -492,14 +518,23 @@ const TrainingPlan = () => {
     setSubjects((current) => current.map((item) => (
       item.id === subject.id ? { ...item, subjectType } : item
     )));
+    setCatalogSubjects((current) => current.map((item) => (
+      item.id === subject.id ? { ...item, subjectType } : item
+    )));
     try {
       await axios.put(
         `${API_BASE_URL}/plan/subjects/${subject.id}`,
         { subjectType },
         { withCredentials: true }
       );
+      setCurriculumSubjects((current) => current.map((entry) => (
+        entry.subjectId === subject.id ? { ...entry, blockCode: subjectType } : entry
+      )));
     } catch (err) {
       setSubjects((current) => current.map((item) => (
+        item.id === subject.id ? { ...item, subjectType: previousType } : item
+      )));
+      setCatalogSubjects((current) => current.map((item) => (
         item.id === subject.id ? { ...item, subjectType: previousType } : item
       )));
       toast.error(err.response?.data?.message || "Không thể cập nhật loại học phần");
@@ -523,6 +558,7 @@ const TrainingPlan = () => {
       { withCredentials: true }
     );
     setSubjects((prev) => prev.map((item) => (item.id === subject.id ? { ...item, ...updated } : item)));
+    setCatalogSubjects((prev) => prev.map((item) => (item.id === subject.id ? { ...item, ...updated } : item)));
   };
 
   const handleDeleteSubject = async (subject) => {
@@ -530,6 +566,7 @@ const TrainingPlan = () => {
       await axios.delete(`${API_BASE_URL}/plan/subjects/${subject.id}`, { withCredentials: true });
       toast.success(`Đã xóa học phần "${subject.name}"`);
       setSubjects((prev) => prev.filter((s) => s.id !== subject.id));
+      setCatalogSubjects((prev) => prev.filter((s) => s.id !== subject.id));
       setDeletingSubjectId(null);
       loadMajors();
       if (curriculumId) loadCurriculumDetail(curriculumId);
@@ -907,13 +944,13 @@ const TrainingPlan = () => {
                   onClick={handleStartAddSubject}
                   sx={{
                     height: 32,
-                    bgcolor: "#137B3B",
+                    bgcolor: "#0788B8",
                     fontSize: 12,
                     fontWeight: 700,
                     textTransform: "none",
-                    borderRadius: "2px",
+                    borderRadius: "8px",
                     boxShadow: "none",
-                    "&:hover": { bgcolor: "#0f612f", boxShadow: "none" },
+                    "&:hover": { bgcolor: "#056A8F", boxShadow: "none" },
                   }}
                 >
                   Thêm dòng mới
@@ -931,15 +968,15 @@ const TrainingPlan = () => {
               borderRadius: "4px",
             }}
           >
-            <Table size="small" sx={{ minWidth: 980 }}>
+            <Table size="small" sx={{ minWidth: 1250, tableLayout: "fixed" }}>
               <TableHead>
                 <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", color: "#172B3A", fontWeight: 700, fontSize: 12, py: "8px", borderBottom: "2px solid #DFE4E8" } }}>
                   <TableCell sx={{ width: 44, textAlign: "center" }}>STT</TableCell>
                   <TableCell sx={{ width: 95 }}>Mã số</TableCell>
                   <TableCell sx={{ width: 95 }}>Mã chữ</TableCell>
-                  <TableCell>Tên môn học</TableCell>
-                  <TableCell sx={{ width: 70, textAlign: "center" }}>Số TC</TableCell>
-                  <TableCell sx={{ width: 100, textAlign: "center" }}>Loại HP</TableCell>
+                  <TableCell sx={{ width: "24%" }}>Tên môn học</TableCell>
+                  <TableCell sx={{ width: 48, textAlign: "center", px: 0 }}>Số TC</TableCell>
+                  <TableCell sx={{ width: 270, textAlign: "center", whiteSpace: "nowrap" }}>Loại học phần</TableCell>
                   <TableCell sx={{ width: 120, textAlign: "center" }}>Học chung</TableCell>
                   <TableCell sx={{ width: 95, textAlign: "center" }}>Bài tập lớn</TableCell>
                   <TableCell sx={{ width: 90, textAlign: "center" }}>Bắt buộc</TableCell>
@@ -1021,11 +1058,17 @@ const TrainingPlan = () => {
                               size="small"
                               value={editingSubjectForm.subjectType}
                               onChange={(e) => setEditingSubjectForm((p) => ({ ...p, subjectType: e.target.value }))}
-                              sx={{ height: 32, fontSize: 12, bgcolor: "#fff", width: "100%" }}
+                              sx={{
+                                height: 32,
+                                fontSize: 12,
+                                bgcolor: "#fff",
+                                width: "100%",
+                                "& .MuiSelect-select": { whiteSpace: "nowrap", textOverflow: "clip" },
+                              }}
                             >
                               {SUBJECT_TYPES.map((t) => (
                                 <MenuItem key={t.value} value={t.value} sx={{ fontSize: 12 }}>
-                                  {t.value}
+                                  {t.label}
                                 </MenuItem>
                               ))}
                             </Select>
@@ -1125,12 +1168,18 @@ const TrainingPlan = () => {
                             sx={{
                               fontSize: 11,
                               fontWeight: 700,
-                              width: 72,
+                              width: 250,
                               height: 28,
-                              color: SUBJECT_TYPES.find((t) => t.value === row.subjectType)?.color || "#607486",
+                              color: "#172B3A",
                               bgcolor: "#fff",
                               borderRadius: "14px",
-                              "& .MuiSelect-select": { py: 0, pl: 1.25, pr: "24px !important" },
+                              "& .MuiSelect-select": {
+                                py: 0,
+                                pl: 1.25,
+                                pr: "24px !important",
+                                whiteSpace: "nowrap",
+                                textOverflow: "clip",
+                              },
                               "& .MuiOutlinedInput-notchedOutline": {
                                 borderColor: SUBJECT_TYPES.find((t) => t.value === row.subjectType)?.color || "#607486",
                               },
@@ -1664,7 +1713,12 @@ const TrainingPlan = () => {
                     </Stack>
 
                     {isAdmin && (
-                      <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
+                      <Stack
+                        direction="row"
+                        spacing={0.75}
+                        alignItems="center"
+                        sx={{ width: 420, maxWidth: "100%", flexShrink: 0, transform: "translateY(-8px)" }}
+                      >
                         <Button
                           size="small"
                           variant="contained"
@@ -1672,7 +1726,9 @@ const TrainingPlan = () => {
                           onClick={handleOpenAddSubjects}
                           disabled={matrixSaving}
                           sx={{
-                            height: 28,
+                            height: 32,
+                            flex: 1,
+                            px: 1.25,
                             fontSize: 11,
                             fontWeight: 700,
                             textTransform: "none",
@@ -1685,7 +1741,6 @@ const TrainingPlan = () => {
                         >
                           Thêm học phần từ danh mục
                         </Button>
-
                         {curriculumSubjects.length > 0 && (
                           <Button
                             size="small"
@@ -1694,88 +1749,83 @@ const TrainingPlan = () => {
                             startIcon={<DeleteOutlineRounded />}
                             onClick={handleClearAllSubjectsFromCurriculum}
                             disabled={matrixSaving}
-                            sx={{
-                              height: 28,
-                              fontSize: 11,
-                              fontWeight: 700,
-                              textTransform: "none",
-                              borderRadius: "8px",
-                              whiteSpace: "nowrap",
-                            }}
+                            sx={{ height: 32, flex: 1, px: 1.25, fontSize: 11, fontWeight: 700, textTransform: "none", borderRadius: "8px", whiteSpace: "nowrap" }}
                           >
                             Làm sạch CTĐT
                           </Button>
                         )}
                       </Stack>
                     )}
+
                   </Stack>
 
-                  <Stack direction="row" spacing={0.75} sx={{ mb: 0.75 }} flexWrap="wrap" useFlexGap>
-                    <Chip
+                  <Stack
+                    direction={{ xs: "column", lg: "row" }}
+                    spacing={1}
+                    alignItems={{ xs: "stretch", lg: "center" }}
+                    justifyContent="space-between"
+                    sx={{ mb: 0.75 }}
+                  >
+                    <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ flexShrink: 0 }}>
+                      <Chip
                       size="small"
                       label={`Bắt buộc: ${requiredCredits} TC`}
                       sx={{ height: 24, bgcolor: "#E6F4EA", color: "#137B3B", fontSize: 11, fontWeight: 700 }}
-                    />
-                    <Chip
+                      />
+                      <Chip
                       size="small"
                       label={`Tự chọn: ${electiveCredits} TC`}
                       sx={{ height: 24, bgcolor: "#FEF3E2", color: "#B86216", fontSize: 11, fontWeight: 700 }}
-                    />
-                    <Chip
+                      />
+                      <Chip
                       size="small"
                       label={`Tổng: ${requiredCredits + electiveCredits} TC / Chuẩn 60 TC`}
                       sx={{ height: 24, bgcolor: "#EAF4FB", color: "#0788B8", fontSize: 11, fontWeight: 700 }}
-                    />
-                    <Chip
+                      />
+                      <Chip
                       size="small"
                       label={`${curriculumSubjects.length} học phần`}
                       sx={{ height: 24, bgcolor: "#F0F4F8", color: "#607486", fontSize: 11, fontWeight: 600 }}
-                    />
+                      />
+                    </Stack>
+
+                    <Stack direction="row" alignItems="center" justifyContent="flex-end" sx={{ width: 420, maxWidth: "100%", minWidth: 0, flexShrink: 0 }}>
+                      <FilterSearchField
+                        label=""
+                        inputLabel="Tìm kiếm học phần trong chương trình đào tạo"
+                        placeholder="Tìm kiếm theo Mã HP và Tên học phần...."
+                        value={curriculumSubjectSearch}
+                        onChange={(event) => setCurriculumSubjectSearch(event.target.value)}
+                        sx={{ width: "100%", "& .MuiOutlinedInput-root": { height: 32 } }}
+                      />
+                    </Stack>
                   </Stack>
 
-                  <Alert
-                    severity="info"
-                    sx={{
-                      mb: 0.75,
-                      minHeight: 32,
-                      py: 0,
-                      px: 1,
-                      border: "1px solid #DCE7EF",
-                      borderRadius: "8px",
-                      bgcolor: "#F8FAFC",
-                      color: "#607486",
-                      fontSize: 11,
-                      alignItems: "center",
-                      "& .MuiAlert-icon": { mr: 0.75, py: 0, fontSize: 15 },
-                      "& .MuiAlert-message": { py: 0.5 },
-                    }}
-                  >
-                    Loại học phần và trạng thái Bắt buộc / Tự chọn được chỉnh tại tab <strong>Danh mục học phần chuyên ngành</strong>. Dùng nút xóa để loại học phần khỏi CTĐT.
-                  </Alert>
-
                   <TableContainer sx={{ border: "1px solid #D7E4EE", borderRadius: "8px", boxShadow: "none !important" }}>
-                    <Table size="small" sx={{ minWidth: 640 }}>
+                    <Table size="small" sx={{ minWidth: 900, tableLayout: "fixed" }}>
                       <TableHead>
                         <TableRow sx={{ height: 42, "& th": { bgcolor: "#F0F4F8", color: "#172B3A", fontWeight: 700, fontSize: 13, py: "8px" } }}>
                           <TableCell sx={{ width: 36, textAlign: "center" }}>STT</TableCell>
                           <TableCell sx={{ width: 80 }}>Mã HP</TableCell>
-                          <TableCell>Tên môn học</TableCell>
-                          <TableCell sx={{ width: 50, textAlign: "center" }}>TC</TableCell>
-                          <TableCell sx={{ width: 140 }}>Khối kiến thức</TableCell>
+                          <TableCell sx={{ width: "42%" }}>Tên học phần</TableCell>
+                          <TableCell sx={{ width: 48, px: 0, textAlign: "center" }}>TC</TableCell>
+                          <TableCell sx={{ width: 230, whiteSpace: "nowrap" }}>Khối kiến thức</TableCell>
                           <TableCell sx={{ width: 95, textAlign: "center" }}>Loại</TableCell>
                           {isAdmin && <TableCell sx={{ width: 45, textAlign: "center" }}>Xóa</TableCell>}
                         </TableRow>
                       </TableHead>
 
                       <TableBody>
-                        {curriculumSubjects.length === 0 ? (
+                        {filteredCurriculumSubjects.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={isAdmin ? 7 : 6} align="center" sx={{ py: 4, color: "#607486", fontSize: 12 }}>
-                              Chương trình đào tạo hiện chưa có môn học nào. Hãy bấm <strong>"Thêm học phần từ danh mục"</strong> ở trên để chọn các môn học cho khóa này.
+                              {curriculumSubjects.length === 0
+                                ? <>Chương trình đào tạo hiện chưa có học phần nào. Hãy bấm <strong>"Thêm học phần từ danh mục"</strong> ở trên để chọn các học phần cho khóa này.</>
+                                : "Không tìm thấy học phần phù hợp."}
                             </TableCell>
                           </TableRow>
                         ) : (
-                          curriculumSubjects.map((entry, index) => (
+                          filteredCurriculumSubjects.map((entry, index) => (
                             <TableRow key={entry.id} hover sx={{ height: 56, "& td": { py: "7px", fontSize: 13, verticalAlign: "middle" } }}>
                               <TableCell align="center" sx={{ color: "#607486", fontSize: 12 }}>
                                 {index + 1}
@@ -1785,7 +1835,7 @@ const TrainingPlan = () => {
                               </TableCell>
                               <TableCell sx={{ fontWeight: 500 }}>{entry.name}</TableCell>
                               <TableCell align="center" sx={{ fontWeight: 600 }}>{entry.credits}</TableCell>
-                              <TableCell sx={{ color: "#607486", fontSize: 12 }}>
+                              <TableCell sx={{ color: "#607486", fontSize: 12, whiteSpace: "nowrap" }}>
                                 {SUBJECT_TYPES.find((type) => type.value === entry.blockCode)?.label
                                   || entry.blockName
                                   || entry.blockCode
