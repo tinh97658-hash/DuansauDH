@@ -12,7 +12,7 @@ jest.mock("axios");
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
 const offering = { id: "offering", subject: { id: "s", code: "HP01", name: "Khai thác cảng" }, status: "active", participantCount: 20,
   groupLinks: [{ classGroupId: "g", classGroup: { id: "g", code: "KTHH-2026", majorId: "m", academicYear: "2026", allowedWeekdays: [1, 2, 3, 4, 5, 6, 0] } }], sessionSummary: { heldCount: 2 } };
-const rooms = [{ id: "r", code: "301", capacity: 40, isActive: true }, { id: "small", code: "302", capacity: 5, isActive: true }];
+const rooms = [{ id: "r", code: "301", capacity: 40, isActive: true }, { id: "tolerated", code: "303", capacity: 11, isActive: true }, { id: "small", code: "302", capacity: 5, isActive: true }];
 const lecturers = [{ id: "l", name: "Nguyễn Bình", active: true }];
 beforeEach(() => {
   jest.clearAllMocks();
@@ -187,11 +187,12 @@ it("magnifies a scheduled class on hover or keyboard focus without opening it", 
   fireEvent.mouseEnter(card);
 
   const magnifier = await screen.findByRole("tooltip");
-  expect(magnifier).toHaveTextContent("XEM NHANH LỚP HỌC");
   expect(magnifier).toHaveTextContent("Lớp chuyên đề cần xem rõ");
-  expect(magnifier).toHaveTextContent("Nguyễn Bình");
   expect(magnifier).toHaveTextContent("301");
-  expect(magnifier).toHaveTextContent("08:00–11:00");
+  expect(magnifier).not.toHaveTextContent("08:00–11:00");
+  expect(magnifier).toHaveTextContent("Phòng học · 301");
+  expect(magnifier).toHaveTextContent("Giảng viên · Nguyễn Bình");
+  expect(magnifier).not.toHaveTextContent("XEM NHANH LỚP HỌC");
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
   fireEvent.mouseLeave(card);
@@ -269,6 +270,7 @@ it("loads institute availability and excludes busy and undersized rooms before s
   expect(screen.queryByLabelText("Kết thúc")).not.toBeInTheDocument();
   await waitFor(() => expect(screen.getByLabelText("Giảng viên")).toBeEnabled());
   await waitFor(() => expect(screen.getByRole("button", { name: /301.*40 chỗ/ })).toBeEnabled());
+  expect(screen.getByRole("button", { name: /303.*11 chỗ/ })).toBeEnabled();
   expect(screen.getByRole("button", { name: /302.*5 chỗ/ })).toBeDisabled();
   fireEvent.click(screen.getByLabelText("Giảng viên"));
   fireEvent.change(screen.getByLabelText("Tìm giảng viên"), { target: { value: "Bình" } });

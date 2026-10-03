@@ -1,7 +1,9 @@
 import {
   compactClassCodes,
   countGroupClasses,
+  findSimilarSubjects,
   groupCurriculumsByYear,
+  normalizeSubjectName,
   suggestCurriculumCode,
 } from "../../pages/plan/trainingPlan.logic";
 
@@ -11,6 +13,31 @@ const curriculum = (code, year, classCodes = []) => ({
   name: `CTĐT ${code}`,
   applicableFromYear: year,
   classGroups: classCodes.map((groupCode) => ({ id: groupCode, code: groupCode })),
+});
+
+describe("subject name suggestions", () => {
+  const subjects = [
+    { id: "1", name: "Cơ sở dữ liệu" },
+    { id: "2", name: "Khoa học chung" },
+    { id: "3", name: "Hệ thống nhúng" },
+  ];
+
+  test("matches partial names without requiring accents", () => {
+    expect(findSimilarSubjects(subjects, "co").map((subject) => subject.id)).toContain("1");
+    expect(findSimilarSubjects(subjects, "khoa hoc").map((subject) => subject.id)).toContain("2");
+  });
+
+  test("matches small typing mistakes", () => {
+    expect(findSimilarSubjects(subjects, "khoa hoq").map((subject) => subject.id)).toContain("2");
+  });
+
+  test("can exclude the subject currently being edited", () => {
+    expect(findSimilarSubjects(subjects, "co", { excludeId: "1" })).toEqual([]);
+  });
+
+  test("normalizes Vietnamese names consistently", () => {
+    expect(normalizeSubjectName("  CƠ  SỞ dữ liệu ")).toBe("co so du lieu");
+  });
 });
 
 describe("training plan curriculum grouping", () => {

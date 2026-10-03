@@ -17,7 +17,7 @@ import { ClassGroupService } from "./class-group.service.js";
 import { SubjectRecognitionService } from "./subject-recognition.service.js";
 import {
   CreateAdmissionRecordDto, CreateClassDto, CreateSubjectDto,
-  CreateSharedSubjectsDto,
+  CreateSharedSubjectsDto, CreateSubjectFromExistingDto,
   UpdateAdmissionRecordDto, UpdateClassDto, UpdateSubjectDto,
 } from "./dto/plan.dto.js";
 
@@ -97,11 +97,11 @@ export class PlanService {
   }
 
   async trainingPlan(program?: string) {
-    const majorWhere: Record<string, unknown> = { code: { [Op.ne]: COMMON_MAJOR_CODE } };
+    const majorWhere: Record<string, unknown> = { code: { [Op.ne]: COMMON_MAJOR_CODE }, active: true };
     if (program) majorWhere.program = program;
     const majors = await this.majors.findAll({
       where: majorWhere,
-      attributes: ["id", "code", "name", "program", "disciplineId"],
+      attributes: ["id", "code", "name", "program", "disciplineId", "active"],
       include: [{ model: Discipline, attributes: ["id", "code", "name"], required: false }],
       order: [["name", "ASC"]],
     });
@@ -278,6 +278,99 @@ export class PlanService {
         } as any, { transaction }));
       }
       return { subjects: created };
+    });
+  }
+
+  async createSubjectFromExisting(dto: CreateSubjectFromExistingDto) {
+    const source = dto.source;
+    const program = source.program || "masters";
+    return this.sequelize.transaction(async (transaction) => {
+      await this.requireMajorForProgram(source.majorId, program, transaction);
+      const existingSubjectIds = dto.existingSubjectIds || [];
+      const counterparts = dto.counterparts || [];
+      if (existingSubjectIds.length === 0 && counterparts.length === 0) {
+        throw new BadRequestException("Vui lòng chọn ít nhất một chuyên ngành học chung.");
+      }
+      const existingSubjects = await this.subjects.findAll({
+        where: { id: { [Op.in]: existingSubjectIds } },
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (existingSubjects.length !== existingSubjectIds.length) {
+        throw new BadRequestException("Có học phần gợi ý không còn tồn tại.");
+      }
+
+      const existingMajorIds = existingSubjects.map((subject) => subject.majorId);
+      const counterpartMajorIds = counterparts.map((counterpart) => counterpart.majorId);
+      const targetMajorIds = [...new Set([...existingMajorIds, ...counterpartMajorIds])];
+      if (targetMajorIds.length !== existingSubjects.length + counterparts.length || targetMajorIds.includes(source.majorId)) {
+        throw new BadRequestException("Mỗi chuyên ngành học chung chỉ được chọn một học phần có sẵn.");
+      }
+      const targetMajors = await this.majors.findAll({
+        where: { id: { [Op.in]: targetMajorIds }, program, active: true },
+        transaction,
+      });
+      if (targetMajors.length !== targetMajorIds.length) {
+        throw new BadRequestException("Có chuyên ngành học chung không tồn tại, đã ngừng sử dụng hoặc khác bậc đào tạo.");
+      }
+
+      const normalizedSourceName = source.name.trim().replace(/\s+/g, " ").toLocaleLowerCase("vi");
+      if (existingSubjects.some((subject) => (
+        subject.program !== program
+        || subject.name.trim().replace(/\s+/g, " ").toLocaleLowerCase("vi") !== normalizedSourceName
+        || Number(subject.credits) !== Number(source.credits || 0)
+      ))) {
+        throw new BadRequestException("Học phần học chung phải cùng tên, cùng số tín chỉ và cùng bậc đào tạo.");
+      }
+
+      await this.ensureUnique(this.subjects, "codeNumber", String(source.codeNumber), undefined, { majorId: source.majorId, program });
+      await this.ensureUnique(this.subjects, "codeText", source.codeText, undefined, { majorId: source.majorId, program });
+      for (const counterpart of counterparts) {
+        await this.ensureUnique(this.subjects, "codeNumber", String(counterpart.codeNumber), undefined, { majorId: counterpart.majorId, program });
+        await this.ensureUnique(this.subjects, "codeText", counterpart.codeText, undefined, { majorId: counterpart.majorId, program });
+      }
+      const payload = this.pick(source, [
+        "codeNumber", "codeText", "name", "majorId", "program", "credits",
+        "majorAssignment", "subjectType", "isRequired", "sortOrder", "active",
+      ]);
+      payload.program = program;
+      payload.code = source.codeText || String(source.codeNumber || "");
+      payload.canonicalSubjectId = null;
+      payload.allowCrossMajor = true;
+      payload.sharedMajorIds = targetMajorIds;
+      const created = await this.subjects.create(payload as any, { transaction });
+
+      const completeScope = [source.majorId, ...targetMajorIds];
+      const createdCounterparts: Subject[] = [];
+      for (const counterpart of counterparts) {
+        createdCounterparts.push(await this.subjects.create({
+          ...this.pick(source, ["name", "credits", "majorAssignment", "subjectType", "isRequired", "sortOrder", "active"]),
+          majorId: counterpart.majorId,
+          program,
+          codeNumber: counterpart.codeNumber,
+          codeText: counterpart.codeText,
+          code: counterpart.codeText,
+          canonicalSubjectId: null,
+          allowCrossMajor: true,
+          sharedMajorIds: completeScope.filter((id) => id !== counterpart.majorId),
+        } as any, { transaction }));
+      }
+      for (const subject of existingSubjects) {
+        const sharedMajorIds = [...new Set([
+          ...(subject.sharedMajorIds || []),
+          ...completeScope.filter((id) => id !== subject.majorId),
+        ])];
+        await subject.update({ allowCrossMajor: true, sharedMajorIds }, { transaction });
+      }
+
+      return {
+        subject: await this.subjects.findByPk(created.id, {
+          include: [{ model: Major, as: "major", attributes: ["id", "code", "name"] }],
+          transaction,
+        }),
+        linkedSubjects: existingSubjects,
+        createdCounterparts,
+      };
     });
   }
 

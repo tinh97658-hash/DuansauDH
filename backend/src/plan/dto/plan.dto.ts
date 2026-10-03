@@ -52,6 +52,15 @@ export class CreateSharedSubjectsDto {
   counterparts!: SharedSubjectCodeDto[];
 }
 
+export class CreateSubjectFromExistingDto {
+  @ValidateNested() @Type(() => CreateSubjectDto) source!: CreateSubjectDto;
+  @IsOptional() @IsArray() @ArrayUnique() @IsUUID("4", { each: true })
+  existingSubjectIds?: string[];
+  @IsOptional() @IsArray() @ArrayUnique((item: SharedSubjectCodeDto) => item.majorId)
+  @ValidateNested({ each: true }) @Type(() => SharedSubjectCodeDto)
+  counterparts?: SharedSubjectCodeDto[];
+}
+
 // ===== Chương trình đào tạo (CTĐT theo ngành + bậc + khóa) =====
 export class CurriculumBlockDto {
   @IsString() @MaxLength(30) @Transform(trimUpper) code!: string;

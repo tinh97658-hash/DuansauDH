@@ -14,7 +14,7 @@ const DAY_FOCUS_STATUS_LANES = [
   { key: "not", label: "KHÔNG DIỄN RA", symbol: "—" },
 ];
 
-function SessionMagnifier({ session, stateClass, stateLabel, className, onClick, children }) {
+function SessionMagnifier({ session, stateClass, className, onClick, children }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: -9999, left: -9999 });
   const triggerRef = useRef(null);
@@ -25,10 +25,6 @@ function SessionMagnifier({ session, stateClass, stateLabel, className, onClick,
   const subject = subjectLabel(session.courseOffering);
   const lecturer = session.lecturer?.name || "Chưa có giảng viên";
   const room = session.room?.code || "Chưa có phòng";
-  const period = session.period === "MORNING" ? "Sáng" : "Chiều";
-  const time = session.startTime && session.endTime
-    ? `${session.startTime.slice(0, 5)}–${session.endTime.slice(0, 5)}`
-    : "Chưa có giờ";
 
   const close = () => {
     window.clearTimeout(openTimer.current);
@@ -36,7 +32,7 @@ function SessionMagnifier({ session, stateClass, stateLabel, className, onClick,
   };
   const openSoon = () => {
     window.clearTimeout(openTimer.current);
-    openTimer.current = window.setTimeout(() => setOpen(true), 180);
+    openTimer.current = window.setTimeout(() => setOpen(true), 500);
   };
   const openNow = () => {
     window.clearTimeout(openTimer.current);
@@ -93,16 +89,9 @@ function SessionMagnifier({ session, stateClass, stateLabel, className, onClick,
       role="tooltip"
       style={position}
     >
-      <div className="sl-magnifier-eyebrow"><span aria-hidden="true">Aa</span>XEM NHANH LỚP HỌC</div>
-      <strong className="sl-magnifier-title">{title}</strong>
-      <span className="sl-magnifier-subject">{subject}</span>
-      <dl>
-        <div><dt>Thời gian</dt><dd>{vietnameseDate(session.sessionDate)} · {period} · {time}</dd></div>
-        <div><dt>Giảng viên</dt><dd>{lecturer}</dd></div>
-        <div><dt>Phòng học</dt><dd>{room}</dd></div>
-      </dl>
-      <em>{stateLabel}</em>
-      <small>Nhấn Enter để xem chi tiết</small>
+      <strong className="sl-magnifier-title">{subject}</strong>
+      <span className="sl-magnifier-subject">{title}</span>
+      <small><span>Phòng học · {room}</span><span>Giảng viên · {lecturer}</span></small>
     </aside>,
     document.body
   );
@@ -301,12 +290,12 @@ export default function Schedule({ user }) {
     catch (failure) { setError(message(failure)); }
     finally { setSaving(false); }
   };
-  const sessionStatusKey = (session) => session.status === "held" ? "held" : session.status === "not_held" ? "not" : isSessionPast(session) ? "wait" : "planned";
+  const sessionStatusKey = (session) => session.status === "held" ? "held" : session.status === "not_held" ? "not" : isSessionPast({ ...session, endTime: session.period === "MORNING" ? "12:00" : "23:59" }) ? "wait" : "planned";
   const dayFocusStatusKey = (session) => session.status === "held" ? "held" : session.status === "not_held" ? "not" : "planned";
   const sessionState = (session) => ({ held: ["sl-held", "✓ ĐÃ DIỄN RA"], not: ["sl-not", "— KHÔNG DIỄN RA"], wait: ["sl-wait", "● CHỜ XÁC NHẬN"], planned: ["", "○ ĐÃ XẾP"] }[sessionStatusKey(session)]);
   const sessionCard = (session, compact = false) => {
     const [style, state] = sessionState(session);
-    return <SessionMagnifier key={session.id} session={session} stateClass={style} stateLabel={state} className={`sl-session ${compact ? "sl-session-compact" : ""} ${style}`} onClick={() => openSession(session)}><strong>{offeringTitle(session.courseOffering)}</strong><span>{subjectLabel(session.courseOffering)}</span><small>{session.lecturer?.name || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><em>{state}</em></SessionMagnifier>;
+    return <SessionMagnifier key={session.id} session={session} stateClass={style} className={`sl-session ${compact ? "sl-session-compact" : ""} ${style}`} onClick={() => openSession(session)}><strong>{offeringTitle(session.courseOffering)}</strong><span>{subjectLabel(session.courseOffering)}</span><small>{session.lecturer?.name || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><em>{state}</em></SessionMagnifier>;
   };
   const dayFocusSessionCard = (session) => {
     const style = { held: "sl-held", not: "sl-not", planned: "" }[dayFocusStatusKey(session)];
@@ -314,8 +303,7 @@ export default function Schedule({ user }) {
     const subject = subjectLabel(session.courseOffering);
     const subjectCode = session.courseOffering?.subject?.code || subject || "Chưa có mã học phần";
     const room = session.room?.code || "Chưa có phòng";
-    const state = sessionState(session)[1];
-    return <SessionMagnifier key={session.id} session={session} stateClass={style} stateLabel={state} className={`sl-session sl-focus-session ${style}`} onClick={() => openSession(session)}><strong title={title}>{title}</strong><span className="sl-focus-meta" title={`${subject} · ${room}`}><span>{subjectCode}</span><span>· {room}</span></span></SessionMagnifier>;
+    return <SessionMagnifier key={session.id} session={session} stateClass={style} className={`sl-session sl-focus-session ${style}`} onClick={() => openSession(session)}><strong title={title}>{title}</strong><span className="sl-focus-meta" title={`${subject} · ${room}`}><span>{subjectCode}</span><span>· {room}</span></span></SessionMagnifier>;
   };
   const changeWeek = (nextWeek) => {
     const focusedWeekdayIndex = focusedDate
@@ -423,7 +411,7 @@ export default function Schedule({ user }) {
   </section>
   {editor && <SessionEditor key={editor.session?.id || `${editor.date}-${editor.period}`} {...editor} user={user} onClose={() => setEditor(null)} onSaved={saved} onViewOffering={(offering) => { setEditor(null); setDetails(offering); }} />}
   {details && <OfferingDetails offering={details} user={user} onClose={() => setDetails(null)} onSaved={saved} onOpenSession={openSession} onSelect={select} />}
-  {pendingOpen && <Modal wide className="sl-pending-drawer" bodyClassName="sl-pending-body" title={`BUỔI CHỜ XÁC NHẬN · ${pending.data?.length ?? 0}`} busy={saving} onClose={() => setPendingOpen(false)}>{pending.loading ? <Notice>Đang tải...</Notice> : pending.error ? <Notice error={pending.error} /> : <>{error && <Notice error={error} />}{[...(pending.data || [])].sort((left, right) => `${left.sessionDate} ${left.endTime}`.localeCompare(`${right.sessionDate} ${right.endTime}`)).map((session) => {
+  {pendingOpen && <Modal wide className="sl-pending-drawer" bodyClassName="sl-pending-body" title={`BUỔI CHỜ XÁC NHẬN · ${pending.data?.length ?? 0}`} busy={saving} onClose={() => setPendingOpen(false)}>{pending.loading ? <Notice>Đang tải...</Notice> : pending.error ? <Notice error={pending.error} /> : <>{error && <Notice error={error} />}{[...(pending.data || [])].sort((left, right) => `${left.sessionDate} ${left.period}`.localeCompare(`${right.sessionDate} ${right.period}`)).map((session) => {
     const title = offeringTitle(session.courseOffering);
     return <article className="sl-pending-card" key={session.id}>
       <div className="sl-pending-date"><strong>{vietnameseDate(session.sessionDate)}</strong><span>{session.period === "MORNING" ? "SÁNG" : "CHIỀU"}</span></div>

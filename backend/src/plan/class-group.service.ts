@@ -6,6 +6,7 @@ import { Sequelize } from "sequelize-typescript";
 import { COMMON_MAJOR_CODE } from "../common/major-scope.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
 import { ClassGroupMember } from "../database/models/training/class-group-member.model.js";
+import { CourseOfferingClassGroup } from "../database/models/training/course-offering-class-group.model.js";
 import { Major } from "../database/models/common/major.model.js";
 import { CurriculumService } from "./curriculum.service.js";
 
@@ -46,7 +47,7 @@ export interface ClassGroupFilters {
  * - Chuyên ngành phải tồn tại, còn hoạt động và khớp bậc đào tạo (masters/doctoral).
  * - Mã nhóm duy nhất trong phạm vi bậc đào tạo.
  * - Sĩ số tối đa không được nhỏ hơn số học viên hiện có.
- * - Không xóa nhóm đang có học viên.
+ * - Không xóa nhóm đang có học viên hoặc đang được dùng trong lớp học phần.
  *
  * Lớp **kế thừa chương trình đào tạo** của ngành + khóa (xem `CurriculumService`);
  * đổi ngành, bậc hoặc khóa thì lớp được gắn lại CTĐT tương ứng.
@@ -59,6 +60,7 @@ export class ClassGroupService {
   constructor(
     @InjectModel(ClassGroup) private readonly classGroups: typeof ClassGroup,
     @InjectModel(ClassGroupMember) private readonly classGroupMembers: typeof ClassGroupMember,
+    @InjectModel(CourseOfferingClassGroup) private readonly offeringGroups: typeof CourseOfferingClassGroup,
     @InjectModel(Major) private readonly majors: typeof Major,
     private readonly curriculums: CurriculumService,
     private readonly sequelize: Sequelize,
@@ -159,6 +161,10 @@ export class ClassGroupService {
     if (!group) throw new NotFoundException("Không tìm thấy nhóm học phần.");
     const memberCount = await this.classGroupMembers.count({ where: { classGroupId: id }, transaction });
     if (memberCount > 0) throw new ConflictException("Không thể xóa nhóm đang có học viên.");
+    const offeringCount = await this.offeringGroups.count({ where: { classGroupId: id }, transaction });
+    if (offeringCount > 0) {
+      throw new ConflictException(`Không thể xóa nhóm "${group.code}" vì đang được sử dụng trong ${offeringCount} lớp học phần.`);
+    }
     await group.destroy({ transaction });
     return { success: true, message: "Đã xóa nhóm học phần." };
   }

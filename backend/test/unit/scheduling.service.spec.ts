@@ -988,7 +988,6 @@ describe("SchedulingService persisted reads", () => {
       pendingCount: 1,
       futurePlannedCount: 1,
       firstPlannedSessionDate: "2000-01-02",
-      latestTimesByPeriod: {},
     });
 
     const detail = await service.getCourseOffering("offering-1");
@@ -1006,15 +1005,19 @@ describe("SchedulingService persisted reads", () => {
     ];
     teachingSessions.findAll.mockResolvedValue(mockSessions);
     const result = await service.listTeachingSessionsForOffering(persisted.id);
-    expect(result).toEqual(mockSessions);
+    expect(result).toEqual([expect.objectContaining({
+      id: "session-1", courseOfferingId: persisted.id, sessionDate: "2099-01-01", status: "planned",
+    })]);
+    expect(result[0]).not.toHaveProperty("startTime");
+    expect(result[0]).not.toHaveProperty("endTime");
     expect(teachingSessions.findAll).toHaveBeenCalledWith(expect.objectContaining({
       where: { courseOfferingId: persisted.id },
       order: [["sessionDate", "ASC"], ["startTime", "ASC"], ["id", "ASC"]],
     }));
   });
 });
-describe("Persisted latest same-period time suggestions", () => {
-  it("reads across weeks, groups by offering/period and leaves a missing period empty", async () => {
+describe("Course-offering summaries", () => {
+  it("does not expose persisted time suggestions through the API summary", async () => {
     const { service, courseOfferings, teachingSessions } = buildService();
     const first = { id: "offering-1", subject, groupLinks: [] };
     const second = { id: "offering-2", subject, groupLinks: [] };
@@ -1029,11 +1032,7 @@ describe("Persisted latest same-period time suggestions", () => {
       ];
     });
     const rows = await service.listCourseOfferings({ program: "masters" });
-    expect((rows[0] as any).sessionSummary.latestTimesByPeriod).toEqual({
-      MORNING: { sessionId: "newest", sessionDate: "2026-10-12", startTime: "08:15:00", endTime: "10:30:00" },
-    });
-    expect((rows[1] as any).sessionSummary.latestTimesByPeriod).toEqual({
-      AFTERNOON: { sessionId: "other", sessionDate: "2026-10-11", startTime: "19:00:00", endTime: "21:00:00" },
-    });
+    expect((rows[0] as any).sessionSummary).not.toHaveProperty("latestTimesByPeriod");
+    expect((rows[1] as any).sessionSummary).not.toHaveProperty("latestTimesByPeriod");
   });
 });

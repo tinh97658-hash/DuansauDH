@@ -81,16 +81,21 @@ export class MajorTransferService {
       };
       const membership = await this.memberships.findOne({
         where: membershipWhere as never,
-        include: [{ model: ClassGroup, as: "classGroup" }] as never,
         transaction,
         lock: transaction.LOCK.UPDATE,
       });
+      // PostgreSQL không cho `FOR UPDATE` trên phía có thể null của LEFT JOIN.
+      // Khóa riêng bản ghi thành viên rồi mới đọc lớp giúp việc chuyển ngành an toàn
+      // mà không khóa/join thừa bảng class_groups.
+      const previousClassGroup = membership
+        ? await membership.$get("classGroup", { transaction }) as ClassGroup | null
+        : null;
       const transfer = await this.transfers.create({
         admissionRecordId,
         fromMajorId: record.majorId,
         toMajorId: targetMajor.id,
         fromClassGroupId: membership?.classGroupId || null,
-        fromCurriculumId: membership?.classGroup?.curriculumId || null,
+        fromCurriculumId: previousClassGroup?.curriculumId || null,
         status: "pending",
         reason: dto.reason || null,
         previousAdmissionStatus: record.status,
@@ -98,27 +103,8 @@ export class MajorTransferService {
         requestedAt: new Date(),
       } as never, { transaction });
 
-      // Preserve completed-course history before detaching the learner from the old class.
-      if (membership) {
-        const links = await this.offeringGroups.findAll({
-          where: { classGroupId: membership.classGroupId },
-          include: [{ model: CourseOffering, as: "courseOffering", where: { status: "completed" }, required: true }] as never,
-          transaction,
-        });
-        if (links.length > 0) {
-          await this.offeringStudents.bulkCreate(
-            links.map((link) => ({ courseOfferingId: link.courseOfferingId, admissionRecordId })) as never,
-            { transaction, ignoreDuplicates: true },
-          );
-        }
-      }
-      await this.memberships.destroy({ where: membershipWhere as never, transaction });
-      await record.update({
-        majorId: targetMajor.id,
-        majorName: targetMajor.name,
-        status: "pending",
-        studyStatus: "Nộp hồ sơ đầu vào",
-      } as never, { transaction });
+      // Yêu cầu đang chờ hội đồng chỉ ghi lịch sử đề nghị. Chuyên ngành, trạng thái
+      // và lớp hiện tại của học viên chỉ thay đổi sau khi hội đồng duyệt.
       return this.transfers.findByPk(transfer.id, { include: this.include as never, transaction });
     });
   }
@@ -162,6 +148,37 @@ export class MajorTransferService {
           curriculumId: curriculum.id,
           majorTransferId: transfer.id,
         }, transaction);
+        const membershipWhere = {
+          [Op.or]: [
+            { admissionRecordId: record.id },
+            ...(record.studentId ? [{ studentId: record.studentId }] : []),
+          ],
+        };
+        // Lưu quyền tham gia các lớp đã hoàn thành trước khi tách khỏi nhóm cũ.
+        if (transfer.fromClassGroupId) {
+          const links = await this.offeringGroups.findAll({
+            where: { classGroupId: transfer.fromClassGroupId },
+            include: [{ model: CourseOffering, as: "courseOffering", where: { status: "completed" }, required: true }] as never,
+            transaction,
+          });
+          if (links.length > 0) {
+            await this.offeringStudents.bulkCreate(
+              links.map((link) => ({ courseOfferingId: link.courseOfferingId, admissionRecordId: record.id })) as never,
+              { transaction, ignoreDuplicates: true },
+            );
+          }
+        }
+        const targetMajor = await this.majors.findByPk(transfer.toMajorId, { transaction });
+        if (!targetMajor || targetMajor.active === false) {
+          throw new BadRequestException("Chuyên ngành mới không còn tồn tại hoặc đã ngừng sử dụng.");
+        }
+        await this.memberships.destroy({ where: membershipWhere as never, transaction });
+        await record.update({
+          majorId: targetMajor.id,
+          majorName: targetMajor.name,
+          status: "pending",
+          studyStatus: "Nộp hồ sơ đầu vào",
+        } as never, { transaction });
         await transfer.update({ toCurriculumId: curriculum.id } as never, { transaction });
       }
       await transfer.update({ status: dto.decision, decisionNote: dto.note || null, decidedAt: new Date() } as never, { transaction });

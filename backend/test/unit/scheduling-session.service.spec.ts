@@ -140,7 +140,7 @@ describe("SchedulingService TeachingSession", () => {
     const mocks = buildService();
     arrangeValid(mocks, { rooms: [room("room-1", 1)] });
     mocks.classGroupMembers.findAll.mockResolvedValue([{ admissionRecordId: "group-student" }]);
-    mocks.individualStudents.findAll.mockResolvedValue([{ admissionRecordId: "extra-student" }]);
+    mocks.individualStudents.findAll.mockResolvedValue(Array.from({ length: 10 }, (_, index) => ({ admissionRecordId: `extra-student-${index}` })));
     await expectConflictCode(mocks.service.createTeachingSession(createDto()), "ROOM_CAPACITY_EXCEEDED");
     expect(mocks.teachingSessions.create).not.toHaveBeenCalled();
   });
@@ -429,12 +429,25 @@ describe("SchedulingService TeachingSession", () => {
   it("rejects a Room smaller than the deduplicated CourseOffering participant count", async () => {
     const mocks = buildService();
     arrangeValid(mocks, { rooms: [room("room-1", 1)] });
-    mocks.classGroupMembers.findAll.mockResolvedValue([
-      { id: "member-1", classGroupId: "group-1", studentId: "student-1" },
-      { id: "member-2", classGroupId: "group-1", studentId: "student-2" },
-    ]);
+    mocks.classGroupMembers.findAll.mockResolvedValue(Array.from({ length: 11 }, (_, index) => ({
+      id: `member-${index}`,
+      classGroupId: "group-1",
+      studentId: `student-${index}`,
+    })));
 
     await expectConflictCode(mocks.service.createTeachingSession(createDto()), "ROOM_CAPACITY_EXCEEDED");
+  });
+
+  it("allows a Room when it is short by fewer than ten seats", async () => {
+    const mocks = buildService();
+    arrangeValid(mocks, { rooms: [room("room-1", 30)] });
+    mocks.classGroupMembers.findAll.mockResolvedValue(Array.from({ length: 39 }, (_, index) => ({
+      id: `member-${index}`,
+      classGroupId: "group-1",
+      studentId: `student-${index}`,
+    })));
+
+    await expect(mocks.service.createTeachingSession(createDto())).resolves.toBeDefined();
   });
 
   it("deduplicates the same Student across mixed ClassGroups for capacity", async () => {
@@ -485,7 +498,10 @@ describe("SchedulingService TeachingSession", () => {
     const held = session({ id: "held", sessionDate: "2000-09-12", status: "held" });
     mocks.teachingSessions.findAll.mockResolvedValue([past, future, held]);
 
-    await expect(mocks.service.listPendingTeachingSessions()).resolves.toEqual([past]);
+    const result = await mocks.service.listPendingTeachingSessions();
+    expect(result).toEqual([expect.objectContaining({ id: "past", sessionDate: "2000-09-12", period: "MORNING" })]);
+    expect(result[0]).not.toHaveProperty("startTime");
+    expect(result[0]).not.toHaveProperty("endTime");
 
     const query = mocks.teachingSessions.findAll.mock.calls[0][0] as any;
     expect(query.where).toEqual({ status: "planned" });

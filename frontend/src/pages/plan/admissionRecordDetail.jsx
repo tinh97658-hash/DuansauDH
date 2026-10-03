@@ -688,6 +688,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
             padding: 0 !important;
             width: 210mm !important;
             height: 297mm !important;
+            overflow: hidden !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
@@ -696,10 +697,16 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
           }
           .a4-print-only-container {
             display: block !important;
+            visibility: visible !important;
+            position: absolute !important;
+            inset: 0 !important;
             width: 210mm !important;
             height: 297mm !important;
             margin: 0 !important;
             padding: 0 !important;
+          }
+          .a4-print-only-container * {
+            visibility: visible !important;
           }
           .a4-paper-sheet {
             box-shadow: none !important;
@@ -1972,11 +1979,11 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
             }}
           >
             {/* Header */}
-            <Box sx={{ pb: 0.5, borderBottom: "1.5px solid #173E75" }}>
+            <Box sx={{ pb: 0.5 }}>
               <Box sx={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", textAlign: "center" }}>
                 <Box>
                   <Typography sx={{ fontFamily: "inherit", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2px", lineHeight: 1.25 }}>
-                    BỘ GIAO THÔNG VẬN TẢI
+                    BỘ XÂY DỰNG
                   </Typography>
                   <Typography sx={{ fontFamily: "inherit", fontSize: "12px", fontWeight: 700, textTransform: "uppercase", borderBottom: "1.2px solid #000", display: "inline-block", pb: 0.1, lineHeight: 1.25 }}>
                     TRƯỜNG ĐẠI HỌC HÀNG HẢI VIỆT NAM
@@ -2043,7 +2050,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
               </Box>
 
               <Box sx={{ flexGrow: 1 }}>
-                <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", borderBottom: "1px dotted #64748B", pb: 0.2 }}>
+                <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", pb: 0.2 }}>
                   I. THÔNG TIN CÁ NHÂN & LIÊN LẠC
                 </Typography>
 
@@ -2067,7 +2074,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
 
             {/* Section II: Training Mode & Program */}
             <Box>
-              <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", borderBottom: "1px dotted #64748B", pb: 0.2 }}>
+              <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", pb: 0.2 }}>
                 II. THỂ THỨC & CHƯƠNG TRÌNH ĐÀO TẠO
               </Typography>
               <Box sx={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", rowGap: 0.25, fontSize: "12px", lineHeight: 1.3 }}>
@@ -2086,7 +2093,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
 
             {/* Section III: Undergraduate Qualifications */}
             <Box>
-              <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", borderBottom: "1px dotted #64748B", pb: 0.2 }}>
+              <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", pb: 0.2 }}>
                 III. VĂN BẰNG ĐẠI HỌC / NĂNG LỰC ĐẦU VÀO
               </Typography>
               <Box sx={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", rowGap: 0.25, fontSize: "12px", lineHeight: 1.3 }}>
@@ -2112,7 +2119,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
 
             {/* Section IV: Attached Documents Checklist */}
             <Box>
-              <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", borderBottom: "1px dotted #64748B", pb: 0.2 }}>
+              <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", pb: 0.2 }}>
                 IV. DANH MỤC HỒ SƠ & GIẤY TỜ ĐÍNH KÈM
               </Typography>
               <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", rowGap: 0.35, columnGap: 1, fontSize: "11.5px", lineHeight: 1.2 }}>

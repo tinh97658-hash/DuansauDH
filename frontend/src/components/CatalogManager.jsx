@@ -75,7 +75,7 @@ const CompactField = ({ label, htmlFor, helper, error = false, children, sx }) =
 const CatalogManager = ({
   title, group, desc, endpoint, itemName, nameLabel = "Tên", codeLabel = "Mã",
   sortable = true, parent = null, parentBeforeName = false, fields = [], editOnDoubleClick = false,
-  showEditAction = true, showDeleteAction = true,
+  showEditAction = true, showDeleteAction = true, showSortColumn = sortable,
 }) => {
   const [rows, setRows] = useState([]);
   const [options, setOptions] = useState([]);
@@ -165,7 +165,7 @@ const CatalogManager = ({
   }, [rows, search, parent, tableFields]);
 
   const showActions = isAdmin && (showEditAction || showDeleteAction);
-  const colSpan = 3 + (parent ? 1 : 0) + tableFields.length + (sortable ? 1 : 0) + 1 + (showActions ? 1 : 0);
+  const colSpan = 3 + (parent ? 1 : 0) + tableFields.length + (showSortColumn ? 1 : 0) + 1 + (showActions ? 1 : 0);
 
   const openAdd = () => { setEditingId(null); setForm(buildEmptyForm(parent, fields, sortable)); setDialogOpen(true); };
   const openEdit = (row) => {
@@ -337,7 +337,7 @@ const CatalogManager = ({
               <TableCell sx={{ fontWeight: 700 }}>{nameLabel}</TableCell>
               {parent && !parentBeforeName && <TableCell sx={{ fontWeight: 700 }}>{parent.columnLabel || parent.label}</TableCell>}
               {tableFields.map((f) => <TableCell key={f.key} sx={{ fontWeight: 700 }}>{f.label}</TableCell>)}
-              {sortable && <TableCell align="center" sx={{ fontWeight: 700, width: 90 }}>Thứ tự</TableCell>}
+              {showSortColumn && <TableCell align="center" sx={{ fontWeight: 700, width: 90 }}>Thứ tự</TableCell>}
               <TableCell align="center" sx={{ fontWeight: 700, width: 110 }}>Trạng thái</TableCell>
               {showActions && <TableCell align="right" sx={{ fontWeight: 700, width: 110 }}>Thao tác</TableCell>}
             </TableRow>
@@ -357,7 +357,7 @@ const CatalogManager = ({
                 <TableCell>{row.name}</TableCell>
                 {parent && !parentBeforeName && <TableCell>{parent.display ? parent.display(row) : row[parent.field]}</TableCell>}
                 {tableFields.map((f) => <TableCell key={f.key}>{renderFieldValue(row, f)}</TableCell>)}
-                {sortable && <TableCell align="center">{row.sortOrder}</TableCell>}
+                {showSortColumn && <TableCell align="center">{row.sortOrder}</TableCell>}
                 <TableCell align="center" onDoubleClick={(event) => event.stopPropagation()}>
                   {isAdmin ? (
                     <Tooltip title={row.active ? "Đang hoạt động" : "Đã ẩn"}>

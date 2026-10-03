@@ -4,6 +4,7 @@ import { Roles } from "../common/auth-user.js";
 import { RolesGuard } from "../common/roles.guard.js";
 import {
   CreateAdmissionRecordDto, CreateClassDto, CreateCurriculumDto, CreateLearningResultDto, CreateSharedSubjectsDto, CreateSubjectDto,
+  CreateSubjectFromExistingDto,
   DecideMajorTransferDto, DecideRecognitionDto, ProposeRecognitionsDto, RequestMajorTransferDto, UpdateSubjectRecognitionDto,
   UpdateLearningResultDto,
   SetCurriculumSubjectsDto,
@@ -36,6 +37,7 @@ export class PlanController {
     return this.plan.listSubjects(majorId, program, includeCommon === "true");
   }
   @Post("subjects") @Roles("admin") @UseGuards(RolesGuard) createSubject(@Body() dto: CreateSubjectDto) { return this.plan.createSubject(dto); }
+  @Post("subjects/link-existing") @Roles("admin") @UseGuards(RolesGuard) createSubjectFromExisting(@Body() dto: CreateSubjectFromExistingDto) { return this.plan.createSubjectFromExisting(dto); }
   @Post("subjects/shared") @Roles("admin") @UseGuards(RolesGuard) createSharedSubjects(@Body() dto: CreateSharedSubjectsDto) { return this.plan.createSharedSubjects(dto); }
   @Put("subjects/:id") @Roles("admin") @UseGuards(RolesGuard) updateSubject(@Param("id") id: string, @Body() dto: UpdateSubjectDto) { return this.plan.updateSubject(id, dto); }
   @Delete("subjects/:id") @Roles("admin") @UseGuards(RolesGuard) removeSubject(@Param("id") id: string) { return this.plan.removeSubject(id); }

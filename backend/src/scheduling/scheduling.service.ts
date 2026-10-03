@@ -40,6 +40,8 @@ import { enabledSchedulingPrograms, isSchedulingProgramEnabled } from "./schedul
 
 type OfferingStatus = "active" | "completed";
 
+const ROOM_CAPACITY_DEFICIT_LIMIT = 10;
+
 const normalizeSubjectName = (value: unknown) => String(value || "")
   .normalize("NFC")
   .trim()
@@ -190,8 +192,6 @@ export class SchedulingService {
           sessions: matchingSessions.map((session) => ({
             id: session.id,
             sessionDate: session.sessionDate,
-            startTime: session.startTime,
-            endTime: session.endTime,
             period: session.period,
             status: session.status,
             lecturer: session.lecturer ? { name: session.lecturer.name } : null,
@@ -619,7 +619,6 @@ export class SchedulingService {
       pendingCount: 0,
       futurePlannedCount: 0,
       firstPlannedSessionDate: null as string | null,
-      latestTimesByPeriod: {} as Record<string, { sessionId: string; sessionDate: string; startTime: string; endTime: string }>,
     });
     const byOffering = new Map<string, ReturnType<typeof emptySummary>>();
     if (offeringIds.length > 0) {
@@ -632,13 +631,6 @@ export class SchedulingService {
       const now = new Date();
       for (const session of sessions) {
         const summary = byOffering.get(session.courseOfferingId) || emptySummary();
-        // Latest scheduled date/time across all weeks; only persisted sessions supply defaults.
-        if (session.period && !summary.latestTimesByPeriod[session.period]) {
-          summary.latestTimesByPeriod[session.period] = {
-            sessionId: session.id, sessionDate: session.sessionDate,
-            startTime: session.startTime, endTime: session.endTime,
-          };
-        }
         summary.totalCount += 1;
         if (session.status === "held") summary.heldCount += 1;
         else if (session.status === "not_held") summary.notHeldCount += 1;
@@ -1211,7 +1203,7 @@ export class SchedulingService {
         details: { roomId: targetRoom.id, roomCode: targetRoom.code, participantCount },
       });
     }
-    if (targetRoom.capacity < participantCount) {
+    if (participantCount - targetRoom.capacity >= ROOM_CAPACITY_DEFICIT_LIMIT) {
       throw new ConflictException({
         code: "ROOM_CAPACITY_EXCEEDED",
         message: "Sức chứa phòng học không đủ cho lớp học phần.",
@@ -1347,7 +1339,7 @@ export class SchedulingService {
       order: [["sessionDate", "ASC"], ["startTime", "ASC"], ["id", "ASC"]],
     });
     await this.attachParticipantCounts(sessions.map((session) => session.courseOffering).filter(Boolean));
-    return sessions;
+    return sessions.map((session) => this.publicTeachingSession(session));
   }
 
   async listPendingTeachingSessions() {
@@ -1358,7 +1350,7 @@ export class SchedulingService {
     });
     const pending = sessions.filter((session) => session.status === "planned" && this.sessionHasEnded(session));
     await this.attachParticipantCounts(pending.map((session) => session.courseOffering).filter(Boolean));
-    return pending;
+    return pending.map((session) => this.publicTeachingSession(session));
   }
 
   async listUnresolvedTeachingSessions(courseOfferingId: string) {
@@ -1373,7 +1365,7 @@ export class SchedulingService {
       order: [["sessionDate", "ASC"], ["startTime", "ASC"], ["id", "ASC"]],
     });
     await this.attachParticipantCounts(sessions.map((session) => session.courseOffering).filter(Boolean));
-    return sessions;
+    return sessions.map((session) => this.publicTeachingSession(session));
   }
 
   async listTeachingSessionsForOffering(courseOfferingId: string) {
@@ -1388,7 +1380,7 @@ export class SchedulingService {
       order: [["sessionDate", "ASC"], ["startTime", "ASC"], ["id", "ASC"]],
     });
     await this.attachParticipantCounts(sessions.map((session) => session.courseOffering).filter(Boolean));
-    return sessions;
+    return sessions.map((session) => this.publicTeachingSession(session));
   }
 
   async getTeachingSession(id: string) {
@@ -1576,7 +1568,15 @@ export class SchedulingService {
     if (!session) throw new NotFoundException("Không tìm thấy buổi học.");
     this.requireEnabledProgram(session.courseOffering.subject.program);
     await this.attachParticipantCounts([session.courseOffering], transaction);
-    return session;
+    return this.publicTeachingSession(session);
+  }
+
+  /** Giờ cụ thể vẫn được lưu nội bộ để kiểm tra lịch, nhưng tạm thời không công khai qua API. */
+  private publicTeachingSession(session: TeachingSession | any) {
+    const value = typeof session?.get === "function" ? session.get({ plain: true }) : { ...session };
+    delete value.startTime;
+    delete value.endTime;
+    return value;
   }
 
   private async findCourseOfferingById(id: string, transaction?: Transaction) {

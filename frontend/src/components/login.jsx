@@ -8,6 +8,15 @@ import LoginIllustration from "../images/loginSide.webp";
 import { BRAND } from "../config/branding";
 import { API_BASE_URL } from "../config/http";
 
+export const loginErrorMessage = (error) => {
+  const payload = error?.response?.data;
+  const message = typeof payload === "string" ? payload : payload?.message;
+  if (message) return message;
+  return error?.response
+    ? "Không thể đăng nhập. Vui lòng thử lại."
+    : "Không thể kết nối tới máy chủ. Vui lòng kiểm tra backend và thử lại.";
+};
+
 const Login = () => {
   const navigate = useNavigate();
   const [values, setValues] = useState({ email: "", password: "" });
@@ -34,9 +43,7 @@ const Login = () => {
       toast.success("Đăng nhập thành công", { position: "top-center", autoClose: 900 });
       navigate("/", { replace: true });
     } catch (error) {
-      const payload = error.response?.data;
-      const message = typeof payload === "string" ? payload : payload?.message;
-      toast.error(message || "Email hoặc mật khẩu không chính xác", { position: "top-center", autoClose: 2500 });
+      toast.error(loginErrorMessage(error), { position: "top-center", autoClose: 2500 });
     } finally {
       setSubmitting(false);
     }

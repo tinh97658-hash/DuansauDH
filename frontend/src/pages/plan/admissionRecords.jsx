@@ -1552,11 +1552,11 @@ const AdmissionRecords = ({ mode = "applications" }) => {
               }}
             >
               {/* National & University Header */}
-              <Box sx={{ pb: 0.5, borderBottom: "1.5px solid #173E75" }}>
+              <Box sx={{ pb: 0.5 }}>
                 <Box sx={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", textAlign: "center" }}>
                   <Box>
                     <Typography sx={{ fontFamily: "inherit", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2px", lineHeight: 1.25 }}>
-                      BỘ GIAO THÔNG VẬN TẢI
+                      BỘ XÂY DỰNG
                     </Typography>
                     <Typography sx={{ fontFamily: "inherit", fontSize: "12px", fontWeight: 700, textTransform: "uppercase", borderBottom: "1.2px solid #000", display: "inline-block", pb: 0.1, lineHeight: 1.25 }}>
                       TRƯỜNG ĐẠI HỌC HÀNG HẢI VIỆT NAM
@@ -1624,7 +1624,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
 
                 {/* Personal Info Grid */}
                 <Box sx={{ flexGrow: 1 }}>
-                  <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", borderBottom: "1px dotted #64748B", pb: 0.2 }}>
+                  <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", pb: 0.2 }}>
                     I. THÔNG TIN CÁ NHÂN & LIÊN LẠC
                   </Typography>
                   <Box sx={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", rowGap: 0.25, fontSize: "12px", lineHeight: 1.3 }}>
@@ -1647,7 +1647,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
 
               {/* Section II: Thể thức đào tạo */}
               <Box>
-                <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", borderBottom: "1px dotted #64748B", pb: 0.2 }}>
+                <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", pb: 0.2 }}>
                   II. THỂ THỨC & CHƯƠNG TRÌNH ĐÀO TẠO
                 </Typography>
                 <Box sx={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", rowGap: 0.25, fontSize: "12px", lineHeight: 1.3 }}>
@@ -1666,7 +1666,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
 
               {/* Section III: Văn bằng đại học đầu vào */}
               <Box>
-                <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", borderBottom: "1px dotted #64748B", pb: 0.2 }}>
+                <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", pb: 0.2 }}>
                   III. VĂN BẰNG ĐẠI HỌC / NĂNG LỰC ĐẦU VÀO
                 </Typography>
                 <Box sx={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", rowGap: 0.25, fontSize: "12px", lineHeight: 1.3 }}>
@@ -1692,7 +1692,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
 
               {/* Section IV: Danh mục hồ sơ giấy tờ kèm theo */}
               <Box>
-                <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", borderBottom: "1px dotted #64748B", pb: 0.2 }}>
+                <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", pb: 0.2 }}>
                   IV. DANH MỤC HỒ SƠ & GIẤY TỜ ĐÍNH KÈM
                 </Typography>
                 <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", rowGap: 0.35, columnGap: 1, fontSize: "11.5px", lineHeight: 1.2 }}>

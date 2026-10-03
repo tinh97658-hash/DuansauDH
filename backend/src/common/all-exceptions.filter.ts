@@ -6,10 +6,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
   catch(error: any, host: ArgumentsHost) {
     const response = host.switchToHttp().getResponse();
+    const isUniqueConstraint = error?.name === "SequelizeUniqueConstraintError";
+    const isForeignKeyConstraint = error?.name === "SequelizeForeignKeyConstraintError";
+    const isValidationError = error?.name === "SequelizeValidationError";
     const status = error instanceof HttpException
       ? error.getStatus()
-      : error?.name === "SequelizeUniqueConstraintError"
+      : isUniqueConstraint || isForeignKeyConstraint
         ? HttpStatus.CONFLICT
+        : isValidationError
+          ? HttpStatus.BAD_REQUEST
         : error?.status || HttpStatus.INTERNAL_SERVER_ERROR;
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) this.logger.error(error?.message || String(error), error?.stack);
 
@@ -29,8 +34,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       if (status === HttpStatus.NOT_FOUND && /^Cannot\s+[A-Z]+\s+\//.test(String(message || ""))) {
         message = "Không tìm thấy đường dẫn yêu cầu";
       }
-    } else if (error?.name === "SequelizeUniqueConstraintError") {
-      message = "Resource already exists";
+    } else if (isUniqueConstraint) {
+      message = "Dữ liệu đã tồn tại, vui lòng kiểm tra lại thông tin nhập.";
+    } else if (isForeignKeyConstraint) {
+      message = "Không thể xóa hoặc thay đổi dữ liệu vì đang được sử dụng ở chức năng khác.";
+    } else if (isValidationError) {
+      message = "Dữ liệu không hợp lệ, vui lòng kiểm tra lại thông tin nhập.";
     }
     if (Array.isArray(message)) message = message.join(", ");
     response.status(status).json({

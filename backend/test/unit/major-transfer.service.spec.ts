@@ -22,7 +22,7 @@ const buildService = () => {
 };
 
 describe("MajorTransferService", () => {
-  it("keeps the learner code, records history, resets status and detaches the old class", async () => {
+  it("keeps the learner unchanged while the transfer is waiting for council review", async () => {
     const mocks = buildService();
     const record = {
       id: "record-1", code: "HV26001", studentId: "student-1", majorId: "major-old", majorName: "Ngành cũ",
@@ -33,7 +33,11 @@ describe("MajorTransferService", () => {
     mocks.records.findByPk.mockResolvedValue(record);
     mocks.transfers.findOne.mockResolvedValue(null);
     mocks.majors.findByPk.mockResolvedValue({ id: "major-new", name: "Ngành mới", program: "masters", active: true });
-    mocks.memberships.findOne.mockResolvedValue({ classGroupId: "class-old", classGroup: { curriculumId: "curriculum-old" } });
+    const membership = {
+      classGroupId: "class-old",
+      $get: jest.fn().mockResolvedValue({ id: "class-old", curriculumId: "curriculum-old" }),
+    };
+    mocks.memberships.findOne.mockResolvedValue(membership);
     mocks.transfers.create.mockResolvedValue(transfer);
     mocks.transfers.findByPk.mockResolvedValue(transfer);
 
@@ -44,10 +48,35 @@ describe("MajorTransferService", () => {
       fromClassGroupId: "class-old", fromCurriculumId: "curriculum-old",
       previousAdmissionStatus: "approved", previousStudyStatus: "Đang học",
     }), { transaction });
+    expect(record.update).not.toHaveBeenCalled();
+    expect(membership.$get).toHaveBeenCalledWith("classGroup", { transaction });
+    expect(mocks.memberships.findOne).toHaveBeenCalledWith(expect.not.objectContaining({ include: expect.anything() }));
+    expect(mocks.memberships.destroy).not.toHaveBeenCalled();
+    expect(mocks.offeringStudents.bulkCreate).not.toHaveBeenCalled();
+  });
+
+  it("changes the major and detaches the old class only after approval", async () => {
+    const mocks = buildService();
+    const transfer = {
+      id: "transfer-1", admissionRecordId: "record-1", fromMajorId: "major-old", toMajorId: "major-new",
+      fromClassGroupId: "class-old", status: "pending", update: jest.fn().mockResolvedValue(undefined),
+    };
+    const record = {
+      id: "record-1", code: "HV26001", studentId: "student-1", majorId: "major-old", majorName: "Ngành cũ",
+      trainingLevel: "Thạc sĩ", academicYear: "2026", update: jest.fn().mockResolvedValue(undefined),
+    };
+    mocks.transfers.findByPk.mockResolvedValueOnce(transfer).mockResolvedValueOnce(transfer);
+    mocks.records.findByPk.mockResolvedValue(record);
+    mocks.curriculums.findByPk.mockResolvedValue({ id: "curriculum-new", majorId: "major-new", program: "masters", applicableFromYear: "2026" });
+    mocks.majors.findByPk.mockResolvedValue({ id: "major-new", name: "Ngành mới", active: true });
+
+    await mocks.service.decide(transfer.id, { decision: "approved", toCurriculumId: "curriculum-new" });
+
     expect(record.update).toHaveBeenCalledWith({
       majorId: "major-new", majorName: "Ngành mới", status: "pending", studyStatus: "Nộp hồ sơ đầu vào",
     }, { transaction });
     expect(record.update.mock.calls[0][0]).not.toHaveProperty("code");
+    expect(record.update.mock.calls[0][0]).not.toHaveProperty("studentId");
     expect(mocks.memberships.destroy).toHaveBeenCalled();
   });
 

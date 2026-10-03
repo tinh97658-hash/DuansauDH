@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api, groupsOf, message, Modal, normalize, Notice, offeringTitle, rows, subjectLabel, useLoad } from "./shared";
-import { getBusinessTodayKey, getRoomFloor, isPeriodTimeConsistent, isSessionPast, shortTime, vietnameseDate } from "../../utils/schedulingCalendar";
+import { getBusinessTodayKey, getRoomFloor, isPeriodTimeConsistent, isSessionPast, vietnameseDate } from "../../utils/schedulingCalendar";
 import { lecturerRecommendationRank, lecturerTeachingGroup, teachingMajorForOffering } from "../../utils/lecturerQualification";
 
 const periodTimes = (period) => period === "AFTERNOON"
   ? { startTime: "13:00", endTime: "17:00" }
   : { startTime: "07:00", endTime: "12:00" };
+
+const ROOM_CAPACITY_DEFICIT_LIMIT = 10;
 
 function LecturerPicker({ value, lecturers, offering, conflicts, disabled, locked, onChange }) {
   const [query, setQuery] = useState("");
@@ -54,8 +56,9 @@ function LecturerPicker({ value, lecturers, offering, conflicts, disabled, locke
 }
 
 export default function SessionEditor({ session, offering, date, period, user, onClose, onSaved, onViewOffering }) {
-  const [form, setForm] = useState({ sessionDate: session?.sessionDate || date, period: session?.period || period,
-    ...(session ? { startTime: shortTime(session.startTime), endTime: shortTime(session.endTime) } : periodTimes(period)), lecturerId: session?.lecturerId || "", roomId: session?.roomId || "", note: session?.note || "" });
+  const initialPeriod = session?.period || period;
+  const [form, setForm] = useState({ sessionDate: session?.sessionDate || date, period: initialPeriod,
+    ...periodTimes(initialPeriod), lecturerId: session?.lecturerId || "", roomId: session?.roomId || "", note: session?.note || "" });
   const [editing, setEditing] = useState(!session);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -66,8 +69,9 @@ export default function SessionEditor({ session, offering, date, period, user, o
   }, [offering.id]);
   const availability = useLoad(async () => rows(await api.get(`/scheduling/teaching-sessions?${new URLSearchParams({ from: form.sessionDate, to: form.sessionDate })}`)), [form.sessionDate]);
   const currentOffering = catalog.data?.offering || offering;
-  const future = session?.status === "planned" && !isSessionPast(session);
-  const pending = session?.status === "planned" && isSessionPast(session);
+  const sessionForPeriod = session ? { ...session, endTime: periodTimes(session.period).endTime } : null;
+  const future = session?.status === "planned" && !isSessionPast(sessionForPeriod);
+  const pending = session?.status === "planned" && isSessionPast(sessionForPeriod);
   const canManage = user.canManageScheduling === true && currentOffering.status !== "completed";
   const editable = canManage && editing && (!session || future);
   const validTime = isPeriodTimeConsistent(form.period, form.startTime, form.endTime);
@@ -83,7 +87,7 @@ export default function SessionEditor({ session, offering, date, period, user, o
     if (assignedSession?.lecturerId) setForm((current) => current.lecturerId === assignedSession.lecturerId ? current : { ...current, lecturerId: assignedSession.lecturerId });
   }, [assignedSession?.lecturerId]);
   const roomFloor = (room) => getRoomFloor(room.code) ?? (Number(String(room.code || "").match(/^[^0-9]*([0-9])/)?.[1] || NaN) || null);
-  const roomReason = (room) => room.isActive === false ? "Ngừng sử dụng" : room.capacity == null ? "Chưa có sức chứa" : room.capacity < (currentOffering.participantCount || 0) ? "Không đủ chỗ" : conflicts.some((row) => row.roomId === room.id) ? "Đang bận" : "";
+  const roomReason = (room) => room.isActive === false ? "Ngừng sử dụng" : room.capacity == null ? "Chưa có sức chứa" : (currentOffering.participantCount || 0) - room.capacity >= ROOM_CAPACITY_DEFICIT_LIMIT ? "Không đủ chỗ" : conflicts.some((row) => row.roomId === room.id) ? "Đang bận" : "";
   const floors = [...new Set(rooms.map(roomFloor))].sort((a, b) => (a ?? 99) - (b ?? 99));
   const setField = (name, value) => { setForm((current) => ({ ...current, [name]: value, ...(name === "period" ? periodTimes(value) : {}) })); setError(""); };
   const mutate = async (action) => {
@@ -122,11 +126,10 @@ export default function SessionEditor({ session, offering, date, period, user, o
     <div className="sl-editor-notices">{error && <Notice error={error} />}{catalog.error && <Notice error={catalog.error} />}{availability.error && <Notice error={availability.error} />}{pending && <div className="sl-attention">Buổi học đã kết thúc · Chờ xác nhận kết quả diễn ra.</div>}</div>
     <div className="v20-composer"><div className="sl-editor-info"><h4>THÔNG TIN BUỔI HỌC</h4><strong className="sl-editor-date">{vietnameseDate(form.sessionDate)} · {periodLabel}</strong>
       <div className="sl-editor-hidden-controls"><label>Ngày học<input aria-label="Ngày học" type="date" min={getBusinessTodayKey()} value={form.sessionDate} disabled={!editable || saving} onChange={(event) => { if (event.target.value) setField("sessionDate", event.target.value); }} /></label><label>Buổi<select aria-label="Buổi" value={form.period} disabled={!editable || saving} onChange={(event) => setField("period", event.target.value)}><option value="MORNING">Sáng</option><option value="AFTERNOON">Chiều</option></select></label></div>
-      <p className="v20-hint sl-editor-time">Khung giờ buổi học: {form.startTime}–{form.endTime}</p>
       <label className="v20-field">Giảng viên<LecturerPicker value={form.lecturerId} lecturers={lecturers} offering={currentOffering} conflicts={conflicts} locked={lecturerLocked} disabled={!editable || catalog.loading || !!catalog.error || saving} onChange={(value) => setField("lecturerId", value)} />{teachingMajor && <small className="sl-teaching-unit-hint">Chuyên ngành của học phần: {teachingMajor.code ? `${teachingMajor.code} · ` : ""}{teachingMajor.name || "Đang xác định"}</small>}</label>
       {!catalog.loading && !catalog.error && !lecturers.some((row) => row.active !== false) && <Notice>Chưa có giảng viên đang hoạt động. Khai báo tại Hệ thống → Giảng viên.</Notice>}
       <label className="v20-field">Ghi chú<textarea aria-label="Ghi chú buổi học" placeholder="Nhập ghi chú..." maxLength={2000} value={form.note} disabled={!editable || saving} onChange={(event) => setField("note", event.target.value)} /></label>
-      {classConflict && <Notice error={`Lớp / nhóm đang bận: ${classConflict.courseOffering?.subject?.name || "Buổi học khác"} · ${shortTime(classConflict.startTime)}–${shortTime(classConflict.endTime)}`} />}
+      {classConflict && <Notice error={`Lớp / nhóm đang bận: ${classConflict.courseOffering?.subject?.name || "Buổi học khác"} · ${classConflict.period === "MORNING" ? "Sáng" : "Chiều"}`} />}
     </div><section className="sl-editor-rooms"><h4>PHÒNG HỌC TOÀN VIỆN</h4><p className="v20-hint">Tình trạng theo {vietnameseDate(form.sessionDate)} · {periodLabel}</p>
       {(catalog.loading || availability.loading) && <Notice>Đang kiểm tra phòng và giảng viên...</Notice>}
       {floors.map((floor) => <div className="v20-room-floor" key={floor ?? "other"}><h4>{floor == null ? "PHÒNG KHÁC" : `TẦNG ${floor}`}</h4><div className="v20-room-grid">{rooms.filter((room) => roomFloor(room) === floor).map((room) => { const reason = roomReason(room); return <button key={room.id} aria-pressed={form.roomId === room.id} className={`v20-room ${form.roomId === room.id ? "sl-on" : ""} ${reason === "Đang bận" ? "v20-busy" : reason ? "v20-unavailable" : ""}`} disabled={!editable || saving || !validTime || availability.loading || !!availability.error || !!reason} onClick={() => setField("roomId", room.id)}><strong>{room.code}</strong><span>{room.capacity == null ? "Chưa khai báo sức chứa" : `${room.capacity} chỗ`}</span><small>{roomStateLabel(room)}</small></button>; })}</div></div>)}

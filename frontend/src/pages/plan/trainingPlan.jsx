@@ -21,7 +21,8 @@ import FilterSelectField from "../../components/FilterSelectField";
 import SubjectSharingCheckbox from "../../components/SubjectSharingCheckbox";
 import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 import {
-  compactClassCodes, countGroupClasses, groupCurriculumsByYear, suggestCurriculumCode,
+  compactClassCodes, countGroupClasses, groupCurriculumsByYear,
+  normalizeSubjectName, suggestCurriculumCode,
 } from "./trainingPlan.logic";
 
 const SUBJECT_TYPES = [
@@ -54,6 +55,12 @@ const initialSubjectDraft = (nextSortOrder = 1, isCommon = false) => ({
   sharedMajorIds: [],
   canonicalSubjectId: null,
 });
+
+const capitalizeFirstCharacter = (value = "") => {
+  const firstCharacterIndex = value.search(/\S/);
+  if (firstCharacterIndex < 0) return value;
+  return `${value.slice(0, firstCharacterIndex)}${value[firstCharacterIndex].toLocaleUpperCase("vi-VN")}${value.slice(firstCharacterIndex + 1)}`;
+};
 
 const initialCurriculumForm = (year = String(currentYear), major = null) => ({
   applicableFromYear: year,
@@ -95,6 +102,7 @@ const TrainingPlan = () => {
 
   // Data
   const [subjects, setSubjects] = useState([]);
+  const [programSubjects, setProgramSubjects] = useState([]);
   const [curriculums, setCurriculums] = useState([]);
   const [curriculumId, setCurriculumId] = useState("");
   // CTĐT của khóa đang chọn
@@ -114,6 +122,11 @@ const TrainingPlan = () => {
   const [sharedCodesOpen, setSharedCodesOpen] = useState(false);
   const [sharedCodes, setSharedCodes] = useState([]);
   const [sharedKeepOpen, setSharedKeepOpen] = useState(false);
+  const [sharingPromptOpen, setSharingPromptOpen] = useState(false);
+  const [sharingPromptSelecting, setSharingPromptSelecting] = useState(false);
+  const [sharingPromptMajorIds, setSharingPromptMajorIds] = useState([]);
+  const [sharingPromptKeepOpen, setSharingPromptKeepOpen] = useState(false);
+  const [sharedExistingSubjectIds, setSharedExistingSubjectIds] = useState(null);
   const firstDraftInputRef = useRef(null);
 
   // Curriculum Creation Dialog State
@@ -175,8 +188,9 @@ const TrainingPlan = () => {
     if (!majorId) return;
     setLoading(true);
     try {
-      const [subjectsResult, curriculumsResult] = await Promise.allSettled([
+      const [subjectsResult, programSubjectsResult, curriculumsResult] = await Promise.allSettled([
         axios.get(`${API_BASE_URL}/plan/subjects?majorId=${majorId}&program=${level}`, { withCredentials: true }),
+        axios.get(`${API_BASE_URL}/plan/subjects?program=${level}`, { withCredentials: true }),
         axios.get(`${API_BASE_URL}/plan/curriculums?majorId=${majorId}&program=${level}`, { withCredentials: true }),
       ]);
 
@@ -187,6 +201,9 @@ const TrainingPlan = () => {
         ? curriculumsResult.value.data
         : [];
       setSubjects(fetchedSubjects);
+      setProgramSubjects(programSubjectsResult.status === "fulfilled" && Array.isArray(programSubjectsResult.value.data)
+        ? programSubjectsResult.value.data
+        : []);
       setCurriculums(fetchedCurriculums);
       setCatalogSubjects(fetchedSubjects);
 
@@ -258,6 +275,34 @@ const TrainingPlan = () => {
     () => majorsForDiscipline(majors, disciplineId),
     [majors, disciplineId]
   );
+
+  const sharingCandidateMajors = useMemo(
+    () => majors.filter((major) => major.id !== majorId && major.active !== false && major.program === level),
+    [level, majorId, majors],
+  );
+  const sharingCandidateMajorIds = useMemo(
+    () => new Set(sharingCandidateMajors.map((major) => major.id)),
+    [sharingCandidateMajors],
+  );
+
+  const shareableExistingSubjects = useMemo(() => {
+    const normalizedName = normalizeSubjectName(subjectDraft.name);
+    const seenMajorIds = new Set();
+    return programSubjects.filter((subject) => {
+      const matches = sharingCandidateMajorIds.has(subject.majorId)
+        && normalizeSubjectName(subject.name) === normalizedName
+        && Number(subject.credits) === Number(subjectDraft.credits || 0)
+        && !seenMajorIds.has(subject.majorId);
+      if (matches) seenMajorIds.add(subject.majorId);
+      return matches;
+    });
+  }, [programSubjects, sharingCandidateMajorIds, subjectDraft.credits, subjectDraft.name]);
+
+  const matchingMajorLabels = useMemo(() => shareableExistingSubjects.map((subject) => {
+    const subjectMajor = majors.find((major) => major.id === subject.majorId);
+    if (!subjectMajor) return "chuyên ngành khác";
+    return [subjectMajor.code, subjectMajor.name].filter(Boolean).join(" — ");
+  }), [majors, shareableExistingSubjects]);
 
   const handleDisciplineChange = (nextDisciplineId) => {
     setDisciplineId(nextDisciplineId);
@@ -343,7 +388,11 @@ const TrainingPlan = () => {
     setIsAddingSubject(false);
   };
 
-  const handleSaveSubjectDraft = async (keepOpenForNext = false, counterpartCodes = null) => {
+  const handleSaveSubjectDraft = async (
+    keepOpenForNext = false,
+    counterpartCodes = null,
+    { skipSharingPrompt = false, existingSubjectIds = [], combineExisting = false } = {},
+  ) => {
     if (!subjectDraft.codeNumber) {
       toast.error("Vui lòng nhập mã học phần số");
       return;
@@ -354,6 +403,17 @@ const TrainingPlan = () => {
     }
     if (!subjectDraft.name?.trim()) {
       toast.error("Vui lòng nhập tên học phần");
+      return;
+    }
+
+    if (!skipSharingPrompt
+      && existingSubjectIds.length === 0
+      && (subjectDraft.sharedMajorIds || []).length === 0
+      && shareableExistingSubjects.length > 0) {
+      setSharingPromptMajorIds(shareableExistingSubjects.map((subject) => subject.majorId));
+      setSharingPromptKeepOpen(keepOpenForNext);
+      setSharingPromptSelecting(false);
+      setSharingPromptOpen(true);
       return;
     }
 
@@ -379,12 +439,22 @@ const TrainingPlan = () => {
       sortOrder: Number(subjectDraft.sortOrder || 0),
       active: Boolean(subjectDraft.active),
       allowCrossMajor: Boolean(subjectDraft.allowCrossMajor),
-      sharedMajorIds: subjectDraft.sharedMajorIds || [],
+      sharedMajorIds: (subjectDraft.sharedMajorIds || []).filter((id) => sharingCandidateMajorIds.has(id)),
       canonicalSubjectId: null,
     };
 
     try {
-      const response = counterpartCodes
+      const response = combineExisting || existingSubjectIds.length > 0
+        ? await axios.post(`${API_BASE_URL}/plan/subjects/link-existing`, {
+          source: payload,
+          existingSubjectIds,
+          counterparts: (counterpartCodes || []).map((item) => ({
+            majorId: item.majorId,
+            codeNumber: Number(item.codeNumber),
+            codeText: item.codeText.trim().toUpperCase(),
+          })),
+        }, { withCredentials: true })
+        : counterpartCodes
         ? await axios.post(`${API_BASE_URL}/plan/subjects/shared`, {
           source: payload,
           counterparts: counterpartCodes.map((item) => ({
@@ -394,9 +464,13 @@ const TrainingPlan = () => {
           })),
         }, { withCredentials: true })
         : await axios.post(`${API_BASE_URL}/plan/subjects`, payload, { withCredentials: true });
-      const createdRows = counterpartCodes ? response.data.subjects : [response.data];
+      const createdRows = combineExisting || existingSubjectIds.length > 0
+        ? [response.data.subject, ...(response.data.createdCounterparts || [])]
+        : counterpartCodes ? response.data.subjects : [response.data];
       const created = createdRows.find((item) => item.majorId === majorId) || createdRows[0];
-      toast.success(counterpartCodes
+      toast.success(combineExisting || existingSubjectIds.length > 0
+        ? `Đã thêm học phần "${created.name}" và thiết lập học chung với ${createdRows.length - 1 + existingSubjectIds.length} chuyên ngành`
+        : counterpartCodes
         ? `Đã tạo học phần "${created.name}" cho ${createdRows.length} chuyên ngành`
         : `Đã thêm học phần "${created.name}"`);
       setSubjects((prev) => [...prev, created]);
@@ -405,7 +479,16 @@ const TrainingPlan = () => {
           ? prev.map((subject) => (subject.id === created.id ? created : subject))
           : [...prev, created]
       ));
+      setProgramSubjects((prev) => {
+        const linkedById = new Map((response.data.linkedSubjects || []).map((subject) => [subject.id, subject]));
+        const next = prev.map((subject) => linkedById.get(subject.id) || subject);
+        return createdRows.reduce((rows, row) => (
+          rows.some((subject) => subject.id === row.id) ? rows : [...rows, row]
+        ), next);
+      });
       setSharedCodesOpen(false);
+      setSharedExistingSubjectIds(null);
+      setSharingPromptOpen(false);
       loadMajors();
 
       if (keepOpenForNext) {
@@ -435,8 +518,9 @@ const TrainingPlan = () => {
       sortOrder: s.sortOrder ?? 0,
       active: Boolean(s.active),
       canonicalSubjectId: null,
-      allowCrossMajor: Array.isArray(s.sharedMajorIds) && s.sharedMajorIds.length > 0,
-      sharedMajorIds: s.sharedMajorIds || [],
+      allowCrossMajor: Array.isArray(s.sharedMajorIds)
+        && s.sharedMajorIds.some((id) => sharingCandidateMajorIds.has(id)),
+      sharedMajorIds: (s.sharedMajorIds || []).filter((id) => sharingCandidateMajorIds.has(id)),
     });
   };
 
@@ -463,7 +547,7 @@ const TrainingPlan = () => {
       sortOrder: Number(editingSubjectForm.sortOrder || 0),
       active: Boolean(editingSubjectForm.active),
       allowCrossMajor: Boolean(editingSubjectForm.allowCrossMajor),
-      sharedMajorIds: editingSubjectForm.sharedMajorIds || [],
+      sharedMajorIds: (editingSubjectForm.sharedMajorIds || []).filter((id) => sharingCandidateMajorIds.has(id)),
       canonicalSubjectId: null,
     };
 
@@ -476,6 +560,7 @@ const TrainingPlan = () => {
       toast.success("Cập nhật học phần thành công");
       setSubjects((prev) => prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)));
       setCatalogSubjects((prev) => prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)));
+      setProgramSubjects((prev) => prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)));
       setCurriculumSubjects((prev) => prev.map((entry) => (
         entry.subjectId === updated.id
           ? { ...entry, isRequired: updated.isRequired, blockCode: updated.subjectType }
@@ -548,7 +633,36 @@ const TrainingPlan = () => {
       toast.error("Vui lòng nhập đủ mã số và mã chữ cho tất cả chuyên ngành");
       return;
     }
-    handleSaveSubjectDraft(sharedKeepOpen, sharedCodes);
+    handleSaveSubjectDraft(sharedKeepOpen, sharedCodes, sharedExistingSubjectIds === null ? undefined : {
+      skipSharingPrompt: true,
+      existingSubjectIds: sharedExistingSubjectIds,
+      combineExisting: true,
+    });
+  };
+
+  const handleConfirmSuggestedSharing = () => {
+    const existingByMajorId = new Map(shareableExistingSubjects.map((subject) => [subject.majorId, subject]));
+    const existingSubjectIds = sharingPromptMajorIds
+      .map((targetMajorId) => existingByMajorId.get(targetMajorId)?.id)
+      .filter(Boolean);
+    const missingMajorIds = sharingPromptMajorIds.filter((targetMajorId) => !existingByMajorId.has(targetMajorId));
+
+    if (missingMajorIds.length > 0) {
+      setSharedCodes(missingMajorIds.map((targetMajorId) => ({
+        majorId: targetMajorId, codeNumber: "", codeText: "",
+      })));
+      setSharedExistingSubjectIds(existingSubjectIds);
+      setSharedKeepOpen(sharingPromptKeepOpen);
+      setSharingPromptOpen(false);
+      setSharedCodesOpen(true);
+      return;
+    }
+
+    handleSaveSubjectDraft(sharingPromptKeepOpen, null, {
+      skipSharingPrompt: true,
+      existingSubjectIds,
+      combineExisting: true,
+    });
   };
 
   const handleSubjectSharingChange = async (subject, identity) => {
@@ -966,6 +1080,7 @@ const TrainingPlan = () => {
             sx={{
               borderColor: "#DFE4E8",
               borderRadius: "4px",
+              overflow: "visible !important",
             }}
           >
             <Table size="small" sx={{ minWidth: 1250, tableLayout: "fixed" }}>
@@ -1041,6 +1156,7 @@ const TrainingPlan = () => {
                               onChange={(e) => setEditingSubjectForm((p) => ({ ...p, name: e.target.value }))}
                               sx={{ ...cellInputSx, width: "100%" }}
                               placeholder="Tên học phần..."
+                              inputProps={{ autoComplete: "off" }}
                             />
                           </TableCell>
                           <TableCell align="center">
@@ -1350,8 +1466,12 @@ const TrainingPlan = () => {
                         size="small"
                         placeholder="Nhập tên học phần..."
                         value={subjectDraft.name}
-                        onChange={(e) => setSubjectDraft((p) => ({ ...p, name: e.target.value }))}
+                        onChange={(e) => setSubjectDraft((p) => ({
+                          ...p,
+                          name: capitalizeFirstCharacter(e.target.value),
+                        }))}
                         sx={{ ...cellInputSx, width: "100%" }}
+                        inputProps={{ autoComplete: "off" }}
                       />
                     </TableCell>
                     <TableCell align="center">
@@ -1904,6 +2024,174 @@ const TrainingPlan = () => {
           </Box>
         </Stack>
       )}
+
+      <Dialog
+        open={sharingPromptOpen}
+        onClose={() => setSharingPromptOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        BackdropProps={{
+          sx: {
+            bgcolor: "rgba(23, 43, 58, 0.52)",
+            backdropFilter: "blur(1px)",
+          },
+        }}
+        PaperProps={{
+          sx: {
+            border: "1px solid #D7E4EE",
+            borderRadius: "10px",
+            boxShadow: "0 18px 48px rgba(23, 62, 117, 0.18)",
+            overflow: "hidden",
+            fontFamily: "inherit",
+          },
+        }}
+      >
+        <DialogTitle sx={{
+          px: 2.25, py: 1.5,
+          fontSize: 16, lineHeight: 1.35, fontWeight: 700, color: "#173E75",
+          bgcolor: "#F8FAFC", borderBottom: "1px solid #D7E4EE",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <span>Học phần này đã có ở chuyên ngành khác</span>
+          <Tooltip title="Đóng">
+            <IconButton
+              aria-label="Đóng lựa chọn học chung"
+              size="small"
+              onClick={() => setSharingPromptOpen(false)}
+              sx={{
+                ml: 1,
+                color: "#607486",
+                borderRadius: "6px",
+                "&:hover": { color: "#173E75", bgcolor: "#EAF3F8" },
+              }}
+            >
+              <CloseRounded fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </DialogTitle>
+        <DialogContent sx={{ p: 2.25, bgcolor: "#FFFFFF" }}>
+          {!sharingPromptSelecting ? (
+            <Alert
+              severity="info"
+              sx={{
+                alignItems: "center",
+                border: "1px solid #D7EAF3",
+                borderRadius: "8px",
+                bgcolor: "#F4FAFD",
+                color: "#425466",
+                fontSize: 13,
+                lineHeight: 1.55,
+                "& .MuiAlert-icon": { color: "#0788B8", py: 0.25 },
+                "& .MuiAlert-message": { py: 0.25 },
+              }}
+            >
+              Đã tìm thấy học phần <strong>“{subjectDraft.name.trim()}”</strong> ({Number(subjectDraft.credits || 0)} tín chỉ)
+              tại chuyên ngành <strong>{matchingMajorLabels.join(", ")}</strong>. Bạn có muốn cho {matchingMajorLabels.length === 1 ? "hai chuyên ngành" : "các chuyên ngành"} ghép học chung học phần này không?
+            </Alert>
+          ) : (
+            <Stack spacing={1.25}>
+              <Typography variant="body2" sx={{ color: "#425466", fontSize: 13, lineHeight: 1.5 }}>
+                Chọn các chuyên ngành sẽ học chung. Mỗi chuyên ngành vẫn giữ mã học phần riêng.
+              </Typography>
+              <Paper variant="outlined" sx={{ overflow: "hidden", borderColor: "#D7E4EE", borderRadius: "8px" }}>
+                <FormControlLabel
+                  sx={{ m: 0, px: 1.5, py: 0.5, width: "100%", bgcolor: "#F4F7FA" }}
+                  control={(
+                    <Checkbox
+                      checked={sharingCandidateMajors.length > 0
+                        && sharingPromptMajorIds.length === sharingCandidateMajors.length}
+                      indeterminate={sharingPromptMajorIds.length > 0
+                        && sharingPromptMajorIds.length < sharingCandidateMajors.length}
+                      onChange={(event) => setSharingPromptMajorIds(
+                        event.target.checked ? sharingCandidateMajors.map((major) => major.id) : [],
+                      )}
+                    />
+                  )}
+                  label={<Typography sx={{ fontWeight: 700, fontSize: 13.5, color: "#172B3A" }}>Chọn tất cả</Typography>}
+                />
+                <Divider />
+                {sharingCandidateMajors.map((targetMajor, index) => {
+                  const existingSubject = shareableExistingSubjects.find((subject) => subject.majorId === targetMajor.id);
+                  return (
+                    <React.Fragment key={targetMajor.id}>
+                      {index > 0 && <Divider />}
+                      <FormControlLabel
+                        sx={{
+                          m: 0, px: 1.5, py: 0.5, width: "100%",
+                          "&:hover": { bgcolor: "#F8FBFD" },
+                        }}
+                        control={(
+                          <Checkbox
+                            checked={sharingPromptMajorIds.includes(targetMajor.id)}
+                            onChange={(event) => setSharingPromptMajorIds((ids) => (
+                              event.target.checked
+                                ? [...ids, targetMajor.id]
+                                : ids.filter((id) => id !== targetMajor.id)
+                            ))}
+                          />
+                        )}
+                        label={(
+                          <Box>
+                            <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: "#172B3A" }}>
+                              {targetMajor.code || ""} — {targetMajor.name || "Chuyên ngành khác"}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: "#607486" }}>
+                              {existingSubject
+                                ? `Đã có mã học phần: ${existingSubject.codeText || existingSubject.code || existingSubject.codeNumber} · ${existingSubject.credits} tín chỉ`
+                                : "Chưa có học phần này — sẽ nhập mã riêng ở bước tiếp theo"}
+                            </Typography>
+                          </Box>
+                        )}
+                      />
+                    </React.Fragment>
+                  );
+                })}
+              </Paper>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{
+          px: 2.25, py: 1.5, gap: 1,
+          bgcolor: "#F8FAFC", borderTop: "1px solid #D7E4EE",
+          "& .MuiButton-root": {
+            minWidth: 82, height: 36, px: 2,
+            borderRadius: "6px", fontSize: 13, fontWeight: 700, textTransform: "none",
+          },
+          "& .MuiButton-outlined": {
+            color: "#425466", borderColor: "#C8D6E0",
+            "&:hover": { borderColor: "#8EA6B8", bgcolor: "#F0F5F8" },
+          },
+          "& .MuiButton-contained": {
+            bgcolor: "#0788B8", boxShadow: "none",
+            "&:hover": { bgcolor: "#067AA5", boxShadow: "none" },
+          },
+        }}>
+          {!sharingPromptSelecting ? (
+            <>
+              <Button
+                variant="outlined"
+                onClick={() => handleSaveSubjectDraft(sharingPromptKeepOpen, null, { skipSharingPrompt: true })}
+              >
+                Không
+              </Button>
+              <Button variant="contained" onClick={() => setSharingPromptSelecting(true)}>
+                Có
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outlined" onClick={() => setSharingPromptSelecting(false)}>Quay lại</Button>
+              <Button
+                variant="contained"
+                disabled={sharingPromptMajorIds.length === 0}
+                onClick={handleConfirmSuggestedSharing}
+              >
+                Xác nhận học chung
+              </Button>
+            </>
+          )}
+        </DialogActions>
+      </Dialog>
 
       {/* DIALOG: NHẬP MÃ RIÊNG CHO HỌC PHẦN LIÊN NGÀNH */}
       <Dialog open={sharedCodesOpen} onClose={() => setSharedCodesOpen(false)} fullWidth maxWidth="md">

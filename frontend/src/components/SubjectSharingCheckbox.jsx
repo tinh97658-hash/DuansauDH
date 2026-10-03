@@ -6,15 +6,18 @@ import { isCommonMajor } from "../utils/majorScope";
 export default function SubjectSharingCheckbox({ subject, majors = [], disabled = false, onChange }) {
   const [saving, setSaving] = useState(false);
   const candidates = useMemo(() => majors.filter((major) => (
-    major.id !== subject.majorId && !isCommonMajor(major) && major.program === subject.program
+    major.id !== subject.majorId && !isCommonMajor(major) && major.active !== false && major.program === subject.program
   )), [majors, subject.majorId, subject.program]);
-  const selected = Array.isArray(subject.sharedMajorIds) ? subject.sharedMajorIds : [];
+  const candidateIds = useMemo(() => new Set(candidates.map((major) => major.id)), [candidates]);
+  const selected = Array.isArray(subject.sharedMajorIds)
+    ? subject.sharedMajorIds.filter((id) => candidateIds.has(id))
+    : [];
 
   const handleChange = async (event) => {
     const rawValue = typeof event.target.value === "string" ? event.target.value.split(",") : event.target.value;
     const sharedMajorIds = rawValue.includes("__ALL__")
       ? (selected.length === candidates.length ? [] : candidates.map((major) => major.id))
-      : rawValue;
+      : rawValue.filter((id) => candidateIds.has(id));
     setSaving(true);
     try {
       await onChange({

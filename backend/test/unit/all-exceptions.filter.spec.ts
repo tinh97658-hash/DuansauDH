@@ -50,4 +50,34 @@ describe("AllExceptionsFilter conflict payload", () => {
     expect(status).toHaveBeenCalledWith(404);
     expect(json).toHaveBeenCalledWith({ message: "Không tìm thấy đường dẫn yêu cầu" });
   });
+
+  it("returns a useful conflict for a database foreign-key constraint", () => {
+    const status = jest.fn().mockReturnThis();
+    const json = jest.fn();
+    const host = {
+      switchToHttp: () => ({ getResponse: () => ({ status, json }) }),
+    } as unknown as ArgumentsHost;
+
+    new AllExceptionsFilter().catch({ name: "SequelizeForeignKeyConstraintError" }, host);
+
+    expect(status).toHaveBeenCalledWith(409);
+    expect(json).toHaveBeenCalledWith({
+      message: "Không thể xóa hoặc thay đổi dữ liệu vì đang được sử dụng ở chức năng khác.",
+    });
+  });
+
+  it("returns a useful bad request for a database validation error", () => {
+    const status = jest.fn().mockReturnThis();
+    const json = jest.fn();
+    const host = {
+      switchToHttp: () => ({ getResponse: () => ({ status, json }) }),
+    } as unknown as ArgumentsHost;
+
+    new AllExceptionsFilter().catch({ name: "SequelizeValidationError" }, host);
+
+    expect(status).toHaveBeenCalledWith(400);
+    expect(json).toHaveBeenCalledWith({
+      message: "Dữ liệu không hợp lệ, vui lòng kiểm tra lại thông tin nhập.",
+    });
+  });
 });
