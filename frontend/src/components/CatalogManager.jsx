@@ -309,7 +309,7 @@ const CatalogManager = ({
               sx={{
                 height: 40,
                 px: 2,
-                width: { xs: "100%", sm: "auto" },
+                width: { xs: "100%", sm: 190 },
                 flexShrink: 0,
                 bgcolor: "#0788B8",
                 borderRadius: "8px",

@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  AccountBalanceRounded, AddTaskRounded, CategoryRounded, CheckCircleRounded,
-  EventRounded, EventNoteRounded, FactCheckRounded, FlagRounded, FolderOpenRounded,
-  GavelRounded, GradingRounded, GroupAddRounded, GroupsRounded, GroupWorkRounded,
-  InfoRounded, LanguageRounded, ListAltRounded, LocationCityRounded, LockRounded, LogoutRounded,
+  AccountBalanceOutlined, AddTaskOutlined, CategoryOutlined, CheckCircleOutline,
+  EventOutlined, EventNoteOutlined, FactCheckOutlined, FlagOutlined, FolderOpenOutlined,
+  GavelOutlined, GradingOutlined, GroupAddOutlined, GroupsOutlined, GroupWorkOutlined,
+  InfoOutlined, LanguageOutlined, ListAltOutlined, LocationCityOutlined, LockOutlined, LogoutOutlined,
   KeyboardArrowDownRounded, KeyboardArrowUpRounded,
-  ManageAccountsRounded, MenuBookRounded, NoteAddRounded, PaymentsRounded, RuleRounded,
-  SchoolRounded, ScoreboardRounded, SendRounded, SummarizeRounded, SupervisorAccountRounded,
-  MeetingRoomRounded,
-  SystemUpdateRounded, TableChartRounded, TrackChangesRounded, UploadFileRounded,
-  VerifiedRounded, WorkspacePremiumRounded,
-  HistoryEduRounded,
+  ManageAccountsOutlined, MenuBookOutlined, NoteAddOutlined, PaymentsOutlined, RuleOutlined,
+  SchoolOutlined, ScoreboardOutlined, SendOutlined, SummarizeOutlined, SupervisorAccountOutlined,
+  MeetingRoomOutlined,
+  SystemUpdateOutlined, TableChartOutlined, TrackChangesOutlined, UploadFileOutlined,
+  VerifiedOutlined, WorkspacePremiumOutlined,
+  HistoryEduOutlined,
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../config/http";
 import { BRAND } from "../config/branding";
@@ -35,95 +35,95 @@ const tabs = [
 export const ribbons = {
   system: [
     group("THÔNG TIN", [
-      action("Thông tin về đơn vị", "/system/unit-info", InfoRounded, "#168bc2"),
-      action("License", "/system/license", VerifiedRounded, "#4b84b8"),
-      action("Đổi mật khẩu", "/system/change-password", ManageAccountsRounded, "#7b5fac"),
-      action("QL Người dùng", "/system/users", SupervisorAccountRounded, "#168b7c", { roles: ["admin"] }),
-      action("Thoát chương trình", null, LogoutRounded, "#227aa6", { action: "logout" }),
+      action("Thông tin về đơn vị", "/system/unit-info", InfoOutlined, "#168bc2"),
+      action("License", "/system/license", VerifiedOutlined, "#4b84b8"),
+      action("Đổi mật khẩu", "/system/change-password", ManageAccountsOutlined, "#7b5fac"),
+      action("QL Người dùng", "/system/users", SupervisorAccountOutlined, "#168b7c", { roles: ["admin"] }),
+      action("Thoát chương trình", null, LogoutOutlined, "#227aa6", { action: "logout" }),
     ]),
     group("DANH MỤC CHUNG", [
-      action("Dân tộc", "/system/ethnicities", GroupsRounded, "#c0792a"),
-      action("Quốc tịch", "/system/nationalities", FlagRounded, "#3f8cc3"),
-      action("Phường xã", "/system/wards", LocationCityRounded, "#168b7c"),
-      action("Thành phố", "/system/cities", LocationCityRounded, "#a04f86"),
+      action("Dân tộc", "/system/ethnicities", GroupsOutlined, "#c0792a"),
+      action("Quốc tịch", "/system/nationalities", FlagOutlined, "#3f8cc3"),
+      action("Phường xã", "/system/wards", LocationCityOutlined, "#168b7c"),
+      action("Thành phố", "/system/cities", LocationCityOutlined, "#a04f86"),
     ]),
     group("DANH MỤC ĐÀO TẠO", [
-      action("Giảng viên", "/system/lecturers", SchoolRounded, "#3f8cc3", { roles: ["admin"] }),
-      action("Phòng học", "/system/rooms", MeetingRoomRounded, "#168b7c", { roles: ["admin"] }),
-      action("Nhóm hình thức đào tạo", "/system/training-mode-groups", CategoryRounded, "#168bc2"),
-      action("Hình thức đào tạo", "/system/training-modes", FactCheckRounded, "#81952c"),
-      action("Ngành đào tạo", "/system/disciplines", AccountBalanceRounded, "#397c8d"),
-      action("Chuyên ngành", "/system/majors", MenuBookRounded, "#c0792a"),
-      action("Trình độ đào tạo", "/system/training-levels", WorkspacePremiumRounded, "#7b5fac"),
-      action("Trạng thái học", "/system/study-statuses", CheckCircleRounded, "#168b7c"),
-      action("Bổ sung kiến thức", "/system/bridge-knowledge", AddTaskRounded, "#397c8d"),
-      action("Check Update", "/system/check-update", SystemUpdateRounded, "#303942"),
+      action("Giảng viên", "/system/lecturers", SchoolOutlined, "#3f8cc3", { roles: ["admin"] }),
+      action("Phòng học", "/system/rooms", MeetingRoomOutlined, "#168b7c", { roles: ["admin"] }),
+      action("Nhóm hình thức đào tạo", "/system/training-mode-groups", CategoryOutlined, "#168bc2"),
+      action("Hình thức đào tạo", "/system/training-modes", FactCheckOutlined, "#81952c"),
+      action("Ngành đào tạo", "/system/disciplines", AccountBalanceOutlined, "#397c8d"),
+      action("Chuyên ngành", "/system/majors", MenuBookOutlined, "#c0792a"),
+      action("Trình độ đào tạo", "/system/training-levels", WorkspacePremiumOutlined, "#7b5fac"),
+      action("Trạng thái học", "/system/study-statuses", CheckCircleOutline, "#168b7c"),
+      action("Bổ sung kiến thức", "/system/bridge-knowledge", AddTaskOutlined, "#397c8d"),
+      action("Check Update", "/system/check-update", SystemUpdateOutlined, "#303942"),
     ]),
   ],
   plan: [
     group("KẾ HOẠCH KHÓA MỚI", [
-      action("Kế hoạch đào tạo", "/plan/training-plan", EventNoteRounded, "#168bc2"),
-      action("Chỉ tiêu xét tuyển", "/plan/admission-targets", TrackChangesRounded, "#c0792a"),
-      action("Khoản thu đầu năm", "/plan/annual-fees", PaymentsRounded, "#168b7c"),
-      action("Nhập hồ sơ tuyển sinh", "/plan/admission-records", UploadFileRounded, "#7b5fac"),
+      action("Kế hoạch đào tạo", "/plan/training-plan", EventNoteOutlined, "#168bc2"),
+      action("Chỉ tiêu xét tuyển", "/plan/admission-targets", TrackChangesOutlined, "#c0792a"),
+      action("Khoản thu đầu năm", "/plan/annual-fees", PaymentsOutlined, "#168b7c"),
+      action("Nhập hồ sơ tuyển sinh", "/plan/admission-records", UploadFileOutlined, "#7b5fac"),
     ]),
   ],
   masters: [
     group("THỦ TỤC ĐẦU VÀO", [
-      action("Hồ sơ trúng tuyển", "/masters/admitted-records", CheckCircleRounded, "#137b3b"),
-      action("Học bổ sung kiến thức", "/masters/bridge-course", AddTaskRounded, "#168bc2"),
-      action("Điểm thi đầu vào thạc sĩ", "/masters/admission-scores", ScoreboardRounded, "#c0792a"),
-      action("Tạo nhóm học viên", "/masters/create-class-groups", GroupAddRounded, "#168b7c"),
-      action("Phân nhóm học viên", "/masters/assign-class-groups", GroupWorkRounded, "#81952c"),
-      action("Thống kê tiến độ", "/masters/class-course-history", HistoryEduRounded, "#a04f86"),
+      action("Hồ sơ trúng tuyển", "/masters/admitted-records", CheckCircleOutline, "#137b3b"),
+      action("Học bổ sung kiến thức", "/masters/bridge-course", AddTaskOutlined, "#168bc2"),
+      action("Điểm thi đầu vào thạc sĩ", "/masters/admission-scores", ScoreboardOutlined, "#c0792a"),
+      action("Tạo nhóm học viên", "/masters/create-class-groups", GroupAddOutlined, "#168b7c"),
+      action("Phân nhóm học viên", "/masters/assign-class-groups", GroupWorkOutlined, "#81952c"),
+      action("Thống kê tiến độ", "/masters/class-course-history", HistoryEduOutlined, "#a04f86"),
     ]),
     group("QUÁ TRÌNH HỌC TẬP", [
-      action("Tạo lớp học phần", "/masters/course-offerings", NoteAddRounded, "#0788b8"),
-      action("Xếp lịch", "/masters/schedule", EventNoteRounded, "#7b5fac"),
-      action("Ma trận lớp học phần", "/masters/course-matrix", TableChartRounded, "#168b7c"),
-      action("Xét tư cách thi hết môn", "/masters/exam-eligibility", RuleRounded, "#397c8d"),
-      action("Danh sách thi, điểm thi", "/masters/exam-lists", ListAltRounded, "#a04f86"),
+      action("Tạo lớp học phần", "/masters/course-offerings", NoteAddOutlined, "#0788b8"),
+      action("Xếp lịch", "/masters/schedule", EventNoteOutlined, "#7b5fac"),
+      action("Ma trận lớp học phần", "/masters/course-matrix", TableChartOutlined, "#168b7c"),
+      action("Xét tư cách thi hết môn", "/masters/exam-eligibility", RuleOutlined, "#397c8d"),
+      action("Danh sách thi, điểm thi", "/masters/exam-lists", ListAltOutlined, "#a04f86"),
     ]),
     group("THỦ TỤC ĐẦU RA", [
-      action("Tạo đợt thi English", "/masters/english-exam", EventRounded, "#168bc2"),
-      action("Điểm thi English", "/masters/english-scores", GradingRounded, "#c0792a"),
-      action("Đăng ký đạt chuẩn ngoại ngữ", "/masters/english-certification", LanguageRounded, "#168b7c"),
-      action("Bảo vệ tốt nghiệp", "/masters/final-defense", GavelRounded, "#7b5fac"),
-      action("Hồ sơ tốt nghiệp", "/masters/graduation-docs", FolderOpenRounded, "#397c8d"),
+      action("Tạo đợt thi English", "/masters/english-exam", EventOutlined, "#168bc2"),
+      action("Điểm thi English", "/masters/english-scores", GradingOutlined, "#c0792a"),
+      action("Đăng ký đạt chuẩn ngoại ngữ", "/masters/english-certification", LanguageOutlined, "#168b7c"),
+      action("Bảo vệ tốt nghiệp", "/masters/final-defense", GavelOutlined, "#7b5fac"),
+      action("Hồ sơ tốt nghiệp", "/masters/graduation-docs", FolderOpenOutlined, "#397c8d"),
     ]),
   ],
   doctoral: [
     group("ĐÀO TẠO", [
-      action("Điểm đầu vào TS", "/doctoral/admission-scores", ScoreboardRounded, "#c0792a"),
-      action("Tạo nhóm học phần TS", "/doctoral/create-class-groups", GroupAddRounded, "#168b7c"),
-      action("Phân nhóm học phần TS", "/doctoral/assign-class-groups", GroupWorkRounded, "#81952c"),
-      action("Xét tư cách thi hết môn", "/doctoral/exam-eligibility", RuleRounded, "#397c8d"),
-      action("ĐIỂM THI", "/doctoral/exam-scores", GradingRounded, "#a04f86"),
-      action("Danh sách thi, điểm thi", "/doctoral/exam-lists", ListAltRounded, "#168bc2"),
+      action("Điểm đầu vào TS", "/doctoral/admission-scores", ScoreboardOutlined, "#c0792a"),
+      action("Tạo nhóm học phần TS", "/doctoral/create-class-groups", GroupAddOutlined, "#168b7c"),
+      action("Phân nhóm học phần TS", "/doctoral/assign-class-groups", GroupWorkOutlined, "#81952c"),
+      action("Xét tư cách thi hết môn", "/doctoral/exam-eligibility", RuleOutlined, "#397c8d"),
+      action("ĐIỂM THI", "/doctoral/exam-scores", GradingOutlined, "#a04f86"),
+      action("Danh sách thi, điểm thi", "/doctoral/exam-lists", ListAltOutlined, "#168bc2"),
     ]),
     group("TIỂU LUẬN, HỘI THẢO VÀ BẢO VỆ", [
-      action("Tổng quan, chuyên đề", "/doctoral/overview-topics", MenuBookRounded, "#168bc2"),
-      action("Hội thảo cấp trường", "/doctoral/university-workshops", GroupsRounded, "#c0792a"),
-      action("Bảo vệ cấp cơ sở", "/doctoral/faculty-defense", AccountBalanceRounded, "#168b7c"),
-      action("Phản biện kín 2 người", "/doctoral/closed-review", LockRounded, "#7b5fac"),
-      action("Bảo vệ cấp trường", "/doctoral/university-defense", SchoolRounded, "#397c8d"),
-      action("Hồ sơ tốt nghiệp", "/doctoral/graduation-docs", FolderOpenRounded, "#a04f86"),
+      action("Tổng quan, chuyên đề", "/doctoral/overview-topics", MenuBookOutlined, "#168bc2"),
+      action("Hội thảo cấp trường", "/doctoral/university-workshops", GroupsOutlined, "#c0792a"),
+      action("Bảo vệ cấp cơ sở", "/doctoral/faculty-defense", AccountBalanceOutlined, "#168b7c"),
+      action("Phản biện kín 2 người", "/doctoral/closed-review", LockOutlined, "#7b5fac"),
+      action("Bảo vệ cấp trường", "/doctoral/university-defense", SchoolOutlined, "#397c8d"),
+      action("Hồ sơ tốt nghiệp", "/doctoral/graduation-docs", FolderOpenOutlined, "#a04f86"),
     ]),
   ],
   reports: [
     group("BÁO CÁO CHUNG", [
-      action("Danh sách lớp", "/reports/class-lists", GroupsRounded, "#168bc2"),
-      action("Bảng điểm môn học", "/reports/course-scores", TableChartRounded, "#c0792a"),
-      action("Tổng hợp điểm cả lớp", "/reports/class-score-summary", SummarizeRounded, "#168b7c"),
-      action("Báo cáo gửi Bộ", "/reports/ministerial-report", SendRounded, "#7b5fac"),
+      action("Danh sách lớp", "/reports/class-lists", GroupsOutlined, "#168bc2"),
+      action("Bảng điểm môn học", "/reports/course-scores", TableChartOutlined, "#c0792a"),
+      action("Tổng hợp điểm cả lớp", "/reports/class-score-summary", SummarizeOutlined, "#168b7c"),
+      action("Báo cáo gửi Bộ", "/reports/ministerial-report", SendOutlined, "#7b5fac"),
     ]),
     group("BẢNG ĐIỂM TẠM THỜI", [
-      action("Bảng điểm Thạc sĩ", "/reports/temp-score-masters", TableChartRounded, "#81952c"),
-      action("Bảng điểm Tiến sĩ", "/reports/temp-score-doctoral", TableChartRounded, "#a04f86"),
+      action("Bảng điểm Thạc sĩ", "/reports/temp-score-masters", TableChartOutlined, "#81952c"),
+      action("Bảng điểm Tiến sĩ", "/reports/temp-score-doctoral", TableChartOutlined, "#a04f86"),
     ]),
     group("PHỤ LỤC VĂN BẰNG", [
-      action("Phụ lục văn bằng Thạc sĩ", "/reports/diploma-appendix-masters", NoteAddRounded, "#397c8d"),
-      action("Phụ lục văn bằng Tiến sĩ", "/reports/diploma-appendix-doctoral", NoteAddRounded, "#168bc2"),
+      action("Phụ lục văn bằng Thạc sĩ", "/reports/diploma-appendix-masters", NoteAddOutlined, "#397c8d"),
+      action("Phụ lục văn bằng Tiến sĩ", "/reports/diploma-appendix-doctoral", NoteAddOutlined, "#168bc2"),
     ]),
   ],
 };
@@ -185,8 +185,9 @@ const RibbonHeader = () => {
               const Icon = item.icon;
               const isActive = isRibbonRouteActive(path, item.route);
               return <button type="button" className={`ribbon-action${isActive ? " active" : ""}`} key={item.label} onClick={() => runAction(item)} title={item.label}
+                style={{ "--ribbon-icon-color": item.color }}
                 aria-current={isActive ? "page" : undefined}>
-                <Icon className="ribbon-action-icon" style={{ color: item.color }} /><span>{item.label}</span>
+                <Icon className="ribbon-action-icon" /><span>{item.label}</span>
               </button>;
             })}
           </div><div className="ribbon-group-label">{itemGroup.label}</div></section>;

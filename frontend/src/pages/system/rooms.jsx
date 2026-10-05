@@ -140,7 +140,7 @@ const Rooms = () => {
   };
 
   return (
-    <FeatureLayout title="Phòng học" group="Danh mục đào tạo" desc="Quản lý danh mục phòng dùng chung cho xếp lịch." hideHeader={false}>
+    <FeatureLayout title="Phòng học" group="Danh mục đào tạo" desc="Quản lý danh mục phòng dùng chung cho xếp lịch." hideHeader>
       <Stack spacing={1.25}>
         {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
         {feedback && <Alert severity="success" onClose={() => setFeedback("")}>{feedback}</Alert>}
@@ -170,7 +170,7 @@ const Rooms = () => {
                 sx={{
                   height: 40,
                   px: 2,
-                  width: { xs: "100%", sm: "auto" },
+                  width: { xs: "100%", sm: 190 },
                   flexShrink: 0,
                   bgcolor: "#0788B8",
                   borderRadius: "8px",
