@@ -1,3 +1,4 @@
+import { AdmissionRound, AdmissionEvaluation, AdmissionEvaluationHistory } from "./models/plan/admission-evaluation.model.js";
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { SequelizeModule } from "@nestjs/sequelize";
@@ -66,7 +67,7 @@ export const databaseModels = [
   Ethnicity, Nationality, City, District, Ward, TrainingModeGroup, TrainingMode, TrainingLevel,
   Discipline, Major, StudyStatus, BridgeKnowledgeSubject, Lecturer, Room, TrainingProgram,
   // Plan
-  TrainingPlan, AdmissionTarget, AnnualFee, AdmissionRecord,
+  TrainingPlan, AdmissionTarget, AnnualFee, AdmissionRecord, AdmissionRound, AdmissionEvaluation, AdmissionEvaluationHistory,
   Subject, Curriculum, CurriculumBlock, CurriculumElectiveGroup, CurriculumSubject,
   // Training (class & exam)
   ClassGroup, ClassGroupMember, ClassGroupElective, CourseOffering, CourseOfferingClassGroup, CourseOfferingStudent,

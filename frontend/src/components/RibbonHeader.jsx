@@ -71,7 +71,7 @@ export const ribbons = {
   masters: [
     group("THỦ TỤC ĐẦU VÀO", [
       action("Học bổ sung kiến thức", "/masters/bridge-course", AddTaskOutlined, "#168bc2"),
-      action("Điểm thi đầu vào thạc sĩ", "/masters/admission-scores", ScoreboardOutlined, "#c0792a"),
+      action("Điểm xét tuyển thạc sĩ", "/masters/admission-scores", ScoreboardOutlined, "#c0792a"),
       action("Danh sách học viên", "/masters/admitted-records", CheckCircleOutline, "#137b3b"),
       action("Tạo nhóm học viên", "/masters/create-class-groups", GroupAddOutlined, "#168b7c"),
       action("Phân nhóm học viên", "/masters/assign-class-groups", GroupWorkOutlined, "#81952c"),

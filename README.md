@@ -30,7 +30,7 @@ thạc sĩ, đào tạo tiến sĩ, báo cáo). Toàn bộ do migration quản l
 | `training_mode_groups`, `training_modes` | Nhóm & hình thức đào tạo |
 | `training_levels`, `disciplines`, `majors`, `training_programs` | Trình độ đào tạo, **ngành** (cấp 1), **chuyên ngành** (cấp 2, thuộc một ngành), chương trình đào tạo (metadata) |
 | `study_statuses` | Trạng thái học tập |
-| `bridge_knowledge_subjects` | Học phần bổ sung kiến thức |
+| `bridge_knowledge_subjects` | Học phần bổ sung kiến thức | 
 | `lecturers` | Danh mục giảng viên (liên kết `staff` hoặc nhập tay) |
 | `sequelize_meta` | Lịch sử migration đã chạy |
 

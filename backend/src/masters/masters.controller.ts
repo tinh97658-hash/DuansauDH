@@ -8,14 +8,20 @@ import {
 import { MastersService } from "./masters.service.js";
 import { ExamGradebookService } from "./exam-gradebook.service.js";
 import { ExamGradebookQueryDto, ExamSubjectsQueryDto, SaveExamGradebookDto } from "./dto/exam-gradebook.dto.js";
+import { AdmissionEvaluationService } from "../plan/admission-evaluation.service.js";
 
 @Controller("masters")
 @UseGuards(AuthenticatedGuard)
 export class MastersController {
-  constructor(private readonly masters: MastersService, private readonly gradebooks: ExamGradebookService) {}
+  constructor(
+    private readonly masters: MastersService,
+    private readonly gradebooks: ExamGradebookService,
+    private readonly admissionEvaluation: AdmissionEvaluationService,
+  ) {}
 
   @Get("bridge-course") bridgeCourse() { return this.masters.bridgeCourse(); }
-  @Get("admission-scores") admissionScores() { return this.masters.admissionScores(); }
+  @Get("admission-scores") @Roles("admin", "supervisor", "examiner") @UseGuards(RolesGuard)
+  admissionScores(@Query("roundId") roundId?: string) { return roundId ? this.admissionEvaluation.ranking(roundId) : this.admissionEvaluation.listRounds(); }
   @Get("exam-eligibility") examEligibility() { return this.masters.examEligibility(); }
   @Get("exam-lists/options") @Roles("admin", "supervisor", "examiner") @UseGuards(RolesGuard)
   examListOptions() { return this.gradebooks.options(); }

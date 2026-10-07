@@ -31,7 +31,6 @@ export class MastersService {
   }
 
   bridgeCourse() { return this.stub("bridge-course", "Học bổ sung kiến thức"); }
-  admissionScores() { return this.stub("admission-scores", "Điểm thi đầu vào thạc sĩ"); }
   examEligibility() { return this.stub("exam-eligibility", "Xét tư cách thi hết môn"); }
   examLists() { return this.stub("exam-lists", "Danh sách thi, điểm thi"); }
   englishExam() { return this.stub("english-exam", "Tạo đợt thi English"); }

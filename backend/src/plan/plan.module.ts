@@ -1,3 +1,6 @@
+import { AdmissionEvaluationService } from "./admission-evaluation.service.js";
+import { AdmissionEvaluationController } from "./admission-evaluation.controller.js";
+import { AdmissionRound, AdmissionEvaluation, AdmissionEvaluationHistory } from "../database/models/plan/admission-evaluation.model.js";
 import { Module } from "@nestjs/common";
 import { SequelizeModule } from "@nestjs/sequelize";
 import { RolesGuard } from "../common/roles.guard.js";
@@ -31,10 +34,10 @@ import { SubjectRecognitionService } from "./subject-recognition.service.js";
     Curriculum, CurriculumBlock, CurriculumElectiveGroup, CurriculumSubject,
     ClassGroup, ClassGroupMember, ClassGroupElective, CourseOfferingClassGroup, CourseOfferingStudent,
     MajorTransfer, SubjectRecognition, LearnerSubjectResult, BridgeKnowledgeSubject,
-    Major, AdmissionRecord, CourseOffering,
+    Major, AdmissionRecord, CourseOffering, AdmissionRound, AdmissionEvaluation, AdmissionEvaluationHistory,
   ])],
-  controllers: [PlanController],
-  providers: [PlanService, ClassGroupService, CurriculumService, MajorTransferService, SubjectRecognitionService, RolesGuard],
-  exports: [PlanService, ClassGroupService, CurriculumService, SubjectRecognitionService],
+  controllers: [PlanController, AdmissionEvaluationController],
+  providers: [AdmissionEvaluationService, PlanService, ClassGroupService, CurriculumService, MajorTransferService, SubjectRecognitionService, RolesGuard],
+  exports: [AdmissionEvaluationService, PlanService, ClassGroupService, CurriculumService, SubjectRecognitionService],
 })
 export class PlanModule {}

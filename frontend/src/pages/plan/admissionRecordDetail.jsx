@@ -1,3 +1,4 @@
+import AdmissionEvaluationPanel from "../../features/admission/AdmissionEvaluationPanel";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
@@ -7,7 +8,7 @@ import {
   Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, FormControlLabel,
   IconButton, MenuItem, Paper, Select,
-  Stack, TextField, Tooltip, Typography,
+  Stack, TextField, Tooltip, Typography, Tabs, Tab,
 } from "@mui/material";
 import {
   AddPhotoAlternateRounded, ArrowBackRounded, CheckCircleRounded,
@@ -112,6 +113,7 @@ const STUDY_STATUSES = [
   "Nộp hồ sơ đầu vào",
   "Đủ điều kiện dự tuyển",
   "Đã trúng tuyển",
+  "Không trúng tuyển",
   "Đang học",
   "Tạm hoãn",
   "Từ chối",
@@ -276,6 +278,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
+  const [detailTab, setDetailTab] = useState(new URLSearchParams(window.location.search).get("tab") === "admission" ? "admission" : "profile");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [record, setRecord] = useState(null);
@@ -935,6 +938,16 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
         </Paper>
       ) : (
         <Box className="screen-only-form">
+          {record.trainingLevel === "Thạc sĩ" && <>
+            <Tabs value={detailTab} onChange={(_, value) => {
+              setDetailTab(value);
+            }} sx={{ mb: 2, bgcolor: "white", border: "1px solid #DFE4E8", borderRadius: 1 }}>
+              <Tab value="profile" label="Thông tin hồ sơ & học tập" />
+              <Tab value="admission" label="Xét tuyển" />
+            </Tabs>
+            {detailTab === "admission" && <AdmissionEvaluationPanel record={record} />}
+          </>}
+          <Box sx={{ display: detailTab === "profile" || record.trainingLevel !== "Thạc sĩ" ? "block" : "none" }}>
           <Paper variant="outlined" sx={{ ...sectionCardSx, mb: 2 }}>
             <Typography sx={sectionTitleSx}>
               <HistoryRounded sx={{ color: "#0788B8", fontSize: 20 }} />
@@ -1518,7 +1531,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
                   sx={selectSx}
                 >
                   {STUDY_STATUSES.map((s) => (
-                    <MenuItem key={s} value={s}>{s}</MenuItem>
+                    <MenuItem key={s} value={s} disabled={formData.trainingLevel === "Thạc sĩ" && ["Đã trúng tuyển", "Không trúng tuyển"].includes(s) && s !== record.studyStatus}>{s}</MenuItem>
                   ))}
                 </Select>
               </Box>
@@ -1810,6 +1823,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
             >
               {saving ? "Đang lưu..." : "Lưu thay đổi (Ctrl+S)"}
             </Button>
+          </Box>
           </Box>
         </Box>
       )}

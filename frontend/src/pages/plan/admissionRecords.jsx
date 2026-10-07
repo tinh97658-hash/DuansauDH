@@ -66,6 +66,7 @@ const STUDY_STATUSES = [
   "Nộp hồ sơ đầu vào",
   "Đủ điều kiện dự tuyển",
   "Đã trúng tuyển",
+  "Không trúng tuyển",
   "Đang học",
   "Tạm hoãn",
   "Từ chối",
@@ -1269,7 +1270,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                         sx={{ height: 30, fontSize: 12, bgcolor: "#fff" }}
                       >
                         {STUDY_STATUSES.map((s) => (
-                          <MenuItem key={s} value={s} sx={{ fontSize: 12 }}>{s}</MenuItem>
+                          <MenuItem key={s} value={s} disabled={formData.trainingLevel === "Thạc sĩ" && ["Đã trúng tuyển", "Không trúng tuyển"].includes(s) && s !== records.find((record) => record.id === formData.id)?.studyStatus} sx={{ fontSize: 12 }}>{s}</MenuItem>
                         ))}
                       </Select>
                     </Box>

@@ -1,3 +1,5 @@
+import { Optional } from "@nestjs/common";
+import { AdmissionEvaluationService } from "./admission-evaluation.service.js";
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import { col, fn, Op } from "sequelize";
@@ -33,6 +35,7 @@ export class PlanService {
     @InjectModel(CourseOffering) private readonly courseOfferings: typeof CourseOffering,
     private readonly recognitions: SubjectRecognitionService,
     @InjectModel(ClassGroupMember) private readonly classGroupMembers: typeof ClassGroupMember,
+    @Optional() private readonly admissionEvaluation?: AdmissionEvaluationService,
   ) {}
 
   // ===== Các chức năng khác (chưa triển khai) =====
@@ -620,6 +623,7 @@ export class PlanService {
   }
 
   async createAdmissionRecord(dto: CreateAdmissionRecordDto) {
+    await this.admissionEvaluation?.guardRecordUpdate(null, dto);
     let fullName = dto.fullName?.trim();
     if (!fullName) {
       fullName = `${dto.lastName || ""} ${dto.firstName || ""}`.trim();
@@ -643,33 +647,36 @@ export class PlanService {
   }
 
   async updateAdmissionRecord(id: string, dto: UpdateAdmissionRecordDto) {
-    const record = await this.admissionRecordsModel.findByPk(id);
-    if (!record) throw new NotFoundException("Không tìm thấy hồ sơ tuyển sinh");
+    return this.sequelize.transaction(async (transaction) => {
+      const record = await this.admissionRecordsModel.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!record) throw new NotFoundException("Không tìm thấy hồ sơ tuyển sinh");
 
-    let fullName = dto.fullName?.trim();
-    if (!fullName && (dto.lastName !== undefined || dto.firstName !== undefined)) {
-      fullName = `${dto.lastName ?? record.lastName ?? ""} ${dto.firstName ?? record.firstName ?? ""}`.trim();
-    }
-    const payload: Record<string, unknown> = { ...dto };
-    delete payload.majorName;
-    if (dto.majorId !== undefined || dto.trainingLevel !== undefined) {
-      const major = await this.requireAdmissionMajor(dto.majorId ?? record.majorId, dto.trainingLevel ?? record.trainingLevel);
-      payload.majorId = major.id;
-      payload.majorName = major.name;
-    }
-    if (fullName) payload.fullName = fullName;
-
-    await record.update(payload as any);
-    // Học viên vừa vào CTĐT chính thức: tự đối chiếu kết quả tiền thạc sĩ/học trước để đề xuất công nhận.
-    if (payload.status === "approved" && record.status !== "approved" && this.recognitions) {
-      try {
-        await this.recognitions.proposeForRecord(id, {});
-      } catch {
-        // Chưa có CTĐT phù hợp hoặc chưa có kết quả học phần: bỏ qua, không chặn việc lưu hồ sơ.
+      let fullName = dto.fullName?.trim();
+      if (!fullName && (dto.lastName !== undefined || dto.firstName !== undefined)) {
+        fullName = `${dto.lastName ?? record.lastName ?? ""} ${dto.firstName ?? record.firstName ?? ""}`.trim();
       }
-    }
-    return this.admissionRecordsModel.findByPk(id, {
-      include: [{ model: Major, as: "major", attributes: ["id", "name"] }],
+      await this.admissionEvaluation?.guardRecordUpdate(record, dto, transaction);
+      const payload: Record<string, unknown> = { ...dto };
+      delete payload.majorName;
+      if (dto.majorId !== undefined || dto.trainingLevel !== undefined) {
+        const major = await this.requireAdmissionMajor(dto.majorId ?? record.majorId, dto.trainingLevel ?? record.trainingLevel);
+        payload.majorId = major.id;
+        payload.majorName = major.name;
+      }
+      if (fullName) payload.fullName = fullName;
+
+      await record.update(payload as any, { transaction });
+      // Học viên vừa vào CTĐT chính thức: tự đối chiếu kết quả tiền thạc sĩ/học trước để đề xuất công nhận.
+      if (payload.status === "approved" && record.status !== "approved" && this.recognitions) {
+        try {
+          await this.recognitions.proposeForRecord(id, {});
+        } catch {
+          // Chưa có CTĐT phù hợp hoặc chưa có kết quả học phần: bỏ qua, không chặn việc lưu hồ sơ.
+        }
+      }
+      return this.admissionRecordsModel.findByPk(id, {
+        include: [{ model: Major, as: "major", attributes: ["id", "name"] }], transaction,
+      });
     });
   }
 

@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from "@nestjs/common";
+import { AdmissionEvaluationService } from "./admission-evaluation.service.js";
 import { InjectModel } from "@nestjs/sequelize";
 import { Op } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
@@ -29,6 +30,7 @@ export class MajorTransferService {
     @InjectModel(CourseOfferingStudent) private readonly offeringStudents: typeof CourseOfferingStudent,
     private readonly subjectRecognitionService: SubjectRecognitionService,
     private readonly sequelize: Sequelize,
+    @Optional() private readonly admissionEvaluation?: AdmissionEvaluationService,
   ) {}
 
   private readonly include = [
@@ -118,6 +120,11 @@ export class MajorTransferService {
       if (!record) throw new NotFoundException("Không tìm thấy hồ sơ học viên.");
 
       if (dto.decision === "rejected") {
+        await this.admissionEvaluation?.guardRecordUpdate(record, {
+          majorId: transfer.fromMajorId,
+          status: transfer.previousAdmissionStatus || "approved",
+          studyStatus: transfer.previousStudyStatus || "Đang học",
+        }, transaction);
         const oldMajor = await this.majors.findByPk(transfer.fromMajorId, { transaction });
         await record.update({
           majorId: transfer.fromMajorId,
@@ -136,6 +143,7 @@ export class MajorTransferService {
           } as never, { transaction });
         }
       } else {
+        await this.admissionEvaluation?.guardRecordUpdate(record, { majorId: transfer.toMajorId }, transaction);
         if (!dto.toCurriculumId) throw new BadRequestException("Phải chọn chương trình đào tạo mới khi duyệt chuyển chuyên ngành.");
         const curriculum = await this.curriculums.findByPk(dto.toCurriculumId, { transaction });
         const expectedProgram = record.trainingLevel === "Tiến sĩ" ? "doctoral" : "masters";
