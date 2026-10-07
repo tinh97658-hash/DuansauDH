@@ -40,9 +40,17 @@ const normalizeClassGroupMember = (member, group) => {
     majorId: admissionRecord?.majorId || group.majorId || null,
     majorName: admissionRecord?.majorName || admissionRecord?.major?.name || group.major?.name || "",
     academicYear: admissionRecord?.academicYear || group.academicYear || "",
+    tuitionPaid: admissionRecord ? admissionRecord.extraData?.tuitionPayment?.paid === true : null,
     assignedGroup: { id: group.id, code: group.code, name: group.name },
   };
 };
+
+const TuitionStatus = ({ paid }) => (
+  <Chip size="small"
+    label={paid === true ? "Đã nộp" : paid === false ? "Chưa nộp" : "Chưa có dữ liệu"}
+    color={paid === true ? "success" : paid === false ? "warning" : "default"}
+    variant="outlined" />
+);
 
 const AssignClassGroups = () => {
   const [searchParams] = useSearchParams();
@@ -388,19 +396,20 @@ const AssignClassGroups = () => {
                     <TableCell sx={{ fontWeight: 700 }}>Họ đệm</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Tên</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Ngành</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Học phí nhập học</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Nhóm hiện tại</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                         <CircularProgress size={28} />
                       </TableCell>
                     </TableRow>
                   ) : filteredStudents.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 6, color: "text.secondary" }}>
+                      <TableCell colSpan={7} align="center" sx={{ py: 6, color: "text.secondary" }}>
                         {studentSearch.trim()
                           ? "Không tìm thấy học viên chưa được phân nhóm."
                           : "Không còn học viên chưa được phân nhóm."}
@@ -447,6 +456,7 @@ const AssignClassGroups = () => {
                           <TableCell sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
                             {s.majorName || "-"}
                           </TableCell>
+                          <TableCell><TuitionStatus paid={s.tuitionPaid} /></TableCell>
                           <TableCell>
                             <Chip size="small" label="Chưa phân nhóm" color="warning" variant="outlined" />
                           </TableCell>
@@ -565,7 +575,7 @@ const AssignClassGroups = () => {
               border: "1px solid #D8E5EF",
               borderRadius: "10px",
               overflowY: groupMembers.length > 25 ? "auto" : "visible",
-              overflowX: "hidden",
+              overflowX: "auto",
             }}>
               <Table size="small" stickyHeader={groupMembers.length > 25}>
                 <TableHead>
@@ -575,13 +585,14 @@ const AssignClassGroups = () => {
                     <TableCell sx={{ fontWeight: 700 }}>Họ đệm</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Tên</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Ngày sinh</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Học phí nhập học</TableCell>
                     <TableCell align="center" sx={{ width: 70, fontWeight: 700 }}>Bỏ</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {groupMembers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 6, color: "text.secondary" }}>
+                      <TableCell colSpan={7} align="center" sx={{ py: 6, color: "text.secondary" }}>
                         Nhóm này hiện chưa có học viên nào. Chọn học viên từ cột bên trái và bấm "Gán vào nhóm".
                       </TableCell>
                     </TableRow>
@@ -593,6 +604,7 @@ const AssignClassGroups = () => {
                         <TableCell sx={{ fontWeight: 600 }}>{personNameParts(m).familyAndMiddle}</TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>{personNameParts(m).givenName}</TableCell>
                         <TableCell sx={{ fontSize: "0.8rem", color: "text.secondary" }}>{m.dob || "-"}</TableCell>
+                        <TableCell><TuitionStatus paid={m.tuitionPaid} /></TableCell>
                         <TableCell align="center">
                           <Tooltip title="Bỏ khỏi nhóm">
                             <IconButton

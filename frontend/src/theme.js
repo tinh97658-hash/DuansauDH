@@ -5,6 +5,7 @@ export const TABLE_BORDER_COLOR = "#D7E4EE";
 export const TABLE_ROW_BORDER_COLOR = "#E2EBF2";
 export const TABLE_HEADER_BACKGROUND = "#EDF4FA";
 export const TABLE_BORDER_RADIUS = 12;
+export const TABLE_HOVER_BACKGROUND = "#F5FAFE";
 export const CONTROL_BORDER_RADIUS = 8;
 
 /**
@@ -285,7 +286,7 @@ export const theme = createTheme({
             fontWeight: 700,
             fontSize: "12px",
             borderBottom: `1px solid ${TABLE_BORDER_COLOR}`,
-            py: "8px",
+            padding: "9px 16px 9px 8px",
           },
         },
       },
@@ -294,21 +295,22 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           borderColor: TABLE_ROW_BORDER_COLOR,
+          borderRight: `1px solid ${TABLE_ROW_BORDER_COLOR}`,
           padding: "7px 10px",
           fontSize: "12.5px",
           fontFamily: "inherit",
         },
         sizeSmall: {
-          padding: "5px 8px",
-          fontSize: "12px",
+          padding: "7px 8px",
+          fontSize: "12.5px",
         },
       },
     },
     MuiTableRow: {
       styleOverrides: {
         root: {
-          "&.MuiTableRow-hover:hover": {
-            backgroundColor: "#F7F9FA",
+          "&:hover": {
+            backgroundColor: TABLE_HOVER_BACKGROUND,
           },
           "&.Mui-selected": {
             backgroundColor: "#EBF5FB !important",

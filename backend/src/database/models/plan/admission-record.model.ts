@@ -175,7 +175,7 @@ export class AdmissionRecord extends Model {
 
   @Default("pending")
   @Column({ type: DataType.STRING(30), allowNull: false })
-  declare status: string; // pending, approved, admitted, rejected
+  declare status: string; // pending, approved, rejected; trúng tuyển dùng approved
 
   @Default(DataType.NOW)
   @Column({ type: DataType.DATE })

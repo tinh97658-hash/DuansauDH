@@ -4,7 +4,7 @@ import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
-  Avatar, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions,
+  Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, FormControlLabel,
   IconButton, MenuItem, Paper, Radio, RadioGroup, Select,
   Pagination, Stack, TableBody, TableCell, TableContainer, TableRow,
@@ -18,6 +18,7 @@ import {
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
 import ResizableTable from "../../components/ResizableTable";
+import AdmissionTuitionCheckbox from "../../features/admission/AdmissionTuitionCheckbox";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import { getSelectableMajors, normalizeMajorsResponse, selectMajorForLevel } from "../../utils/majors";
@@ -197,32 +198,12 @@ const AdmissionRecords = ({ mode = "applications" }) => {
   const navigate = useNavigate();
   const isAdmittedMasters = mode === "admitted-masters";
   const recordDetailBase = isAdmittedMasters ? "/masters/admitted-records" : "/plan/admission-records";
-  const columns = [
-    { key: "index", label: "STT", width: 50, minWidth: 40, align: "center" },
-    { key: "photo", label: "Ảnh", width: 60, minWidth: 50, align: "center" },
-    { key: "code", label: "Mã HV", width: 140 },
-    ...(isAdmittedMasters ? [
-      { key: "groupName", label: "Nhóm học phần", width: 180 },
-      { key: "groupCode", label: "Mã nhóm", width: 140 },
-    ] : []),
-    { key: "lastName", label: "Họ đệm", width: 160 },
-    { key: "firstName", label: "Tên", width: 90 },
-    { key: "email", label: "Email", width: 240 },
-    { key: "dob", label: "Ngày sinh", width: 120, align: "center" },
-    { key: "gender", label: "Giới tính", width: 90, align: "center" },
-    { key: "idCard", label: "Số CMND/CCCD", width: 150 },
-    { key: "major", label: "Trình độ & Ngành", width: 210 },
-    { key: "phone", label: "Điện thoại", width: 130 },
-    { key: "status", label: "Trạng thái", width: 160 },
-    { key: "actions", label: "Thao tác", width: 130, minWidth: 120, align: "center" },
-  ];
-
   // Global Filter State
   const [year, setYear] = useState(String(currentYear));
   const [levelFilter, setLevelFilter] = useState(isAdmittedMasters ? "Thạc sĩ" : "ALL");
   const [disciplineFilter, setDisciplineFilter] = useState("");
   const [majorFilter, setMajorFilter] = useState("ALL");
-  const [statusFilter, setStatusFilter] = useState(isAdmittedMasters ? "Đã trúng tuyển" : "ALL");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -234,6 +215,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
   const [majors, setMajors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [selectedTuition, setSelectedTuition] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
 
   // Dialog State
@@ -267,6 +249,61 @@ const AdmissionRecords = ({ mode = "applications" }) => {
 
   const fileInputRef = useRef(null);
 
+  const selectableTuitionRows = records.filter((record) => record.trainingLevel === "Thạc sĩ"
+    && ["Đã trúng tuyển", "Đang học"].includes(record.studyStatus)
+    && record.extraData?.tuitionPayment?.paid !== true && record.updatedAt);
+  const selectedTuitionIds = new Set(selectedTuition.map((row) => row.admissionRecordId));
+  const selectedOnPage = selectableTuitionRows.filter((row) => selectedTuitionIds.has(row.id)).length;
+  useEffect(() => { setSelectedTuition([]); }, [year, levelFilter, disciplineFilter, majorFilter, statusFilter, search, isAdmittedMasters]);
+  const selectTuitionPage = (checked) => {
+    const idsOnPage = new Set(selectableTuitionRows.map((row) => row.id));
+    setSelectedTuition((previous) => [
+      ...previous.filter((row) => !idsOnPage.has(row.admissionRecordId)),
+      ...(checked ? selectableTuitionRows.map((row) => ({ admissionRecordId: row.id, updatedAt: row.updatedAt })) : []),
+    ]);
+  };
+  const confirmSelectedTuition = async () => {
+    if (!selectedTuition.length || saving) return;
+    setSaving(true);
+    try {
+      const { data } = await axios.put(`${API_BASE_URL}/plan/admission-records/tuition/confirm-batch`, { rows: selectedTuition }, { withCredentials: true });
+      setSelectedTuition([]);
+      await loadRecords();
+      toast.success(`Đã xác nhận học phí nhập học cho ${data.confirmedCount} học viên và chuyển sang Đang học.`);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Không thể xác nhận học phí hàng loạt.");
+      if (error.response?.status === 409) { setSelectedTuition([]); await loadRecords(); }
+    } finally { setSaving(false); }
+  };
+
+  const columns = [
+    ...(isAdmittedMasters && isAdmin ? [{
+      key: "selectTuition", label: "Chọn học viên", width: 64, minWidth: 64, align: "center",
+      header: <Checkbox size="small" inputProps={{ "aria-label": "Chọn tất cả học viên chưa nộp học phí trên trang này" }}
+        disabled={saving || loading || !selectableTuitionRows.length}
+        checked={selectableTuitionRows.length > 0 && selectedOnPage === selectableTuitionRows.length}
+        indeterminate={selectedOnPage > 0 && selectedOnPage < selectableTuitionRows.length}
+        onChange={(event) => selectTuitionPage(event.target.checked)} />,
+    }] : []),
+    { key: "index", label: "STT", width: 50, minWidth: 40, align: "center" },
+    { key: "code", label: "Mã HV", width: 140 },
+    ...(isAdmittedMasters ? [
+      { key: "groupName", label: "Nhóm học phần", width: 180 },
+      { key: "groupCode", label: "Mã nhóm", width: 140 },
+    ] : []),
+    { key: "lastName", label: "Họ đệm", width: 160 },
+    { key: "firstName", label: "Tên", width: 90 },
+    { key: "email", label: "Email", width: 240 },
+    { key: "dob", label: "Ngày sinh", width: 120, align: "center" },
+    { key: "gender", label: "Giới tính", width: 90, align: "center" },
+    { key: "idCard", label: "Số CMND/CCCD", width: 150 },
+    { key: "major", label: "Trình độ & Ngành", width: 210 },
+    { key: "phone", label: "Điện thoại", width: 130 },
+    ...(isAdmittedMasters ? [{ key: "tuition", label: "Đã nộp học phí nhập học", width: 180, align: "center" }] : []),
+    { key: "status", label: "Trạng thái", width: 160 },
+    { key: "actions", label: "Thao tác", width: 130, minWidth: 120, align: "center" },
+  ];
+
   // Load Majors
   useEffect(() => {
     axios.get(`${API_BASE_URL}/system/majors`, { withCredentials: true })
@@ -297,7 +334,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
       if (levelFilter !== "ALL") params.append("trainingLevel", levelFilter);
       if (majorFilter !== "ALL") params.append("majorId", majorFilter);
       if (statusFilter !== "ALL") params.append("status", statusFilter);
-      if (!isAdmittedMasters) params.append("excludeStatus", "Đã trúng tuyển");
+      params.append("admissionStage", isAdmittedMasters ? "learners" : "applications");
       if (isAdmittedMasters) params.append("includeGroup", "true");
       if (disciplineFilter) params.append("disciplineId", disciplineFilter);
       if (debouncedSearch) params.append("search", debouncedSearch);
@@ -521,7 +558,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
       >
         <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems="flex-end" justifyContent="space-between">
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="flex-end" sx={{ width: { xs: "100%", md: "auto" }, flexGrow: 1 }} flexWrap="wrap">
-            <FilterSelectField label="Năm" value={year} onChange={(e) => setYear(e.target.value)} sx={{ flex: "1 1 108px", minWidth: 108 }}>
+            <FilterSelectField disabled={saving} label="Năm" value={year} onChange={(e) => setYear(e.target.value)} sx={{ flex: "1 1 108px", minWidth: 108 }}>
                 {YEARS.map((y) => (
                   <MenuItem key={y} value={y} sx={{ fontSize: 12 }}>
                     {y}
@@ -529,7 +566,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                 ))}
             </FilterSelectField>
 
-            {!isAdmittedMasters && <FilterSelectField label="Trình độ" sx={{ flex: "1 1 150px", minWidth: 150 }}
+            {!isAdmittedMasters && <FilterSelectField disabled={saving} label="Trình độ" sx={{ flex: "1 1 150px", minWidth: 150 }}
                 value={levelFilter}
                 onChange={(e) => {
                   setLevelFilter(e.target.value);
@@ -543,7 +580,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                 ))}
             </FilterSelectField>}
 
-            <FilterSelectField label="Ngành" sx={{ flex: "1 1 190px", minWidth: 190 }}
+            <FilterSelectField disabled={saving} label="Ngành" sx={{ flex: "1 1 190px", minWidth: 190 }}
                 value={disciplineFilter}
                 onChange={(e) => {
                   setDisciplineFilter(e.target.value);
@@ -558,22 +595,22 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                 ))}
             </FilterSelectField>
 
-            <FilterSelectField label="Chuyên ngành" value={majorFilter} onChange={(e) => setMajorFilter(e.target.value)} sx={{ flex: "1 1 220px", minWidth: 220 }}>
+            <FilterSelectField disabled={saving} label="Chuyên ngành" value={majorFilter} onChange={(e) => setMajorFilter(e.target.value)} sx={{ flex: "1 1 220px", minWidth: 220 }}>
                 <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả chuyên ngành ({visibleFilterMajors.length})</MenuItem>
                 {visibleFilterMajors.map((m) => (
                   <MenuItem key={m.id} value={m.id} sx={{ fontSize: 12 }}>{m.name}</MenuItem>
                 ))}
             </FilterSelectField>
 
-            {!isAdmittedMasters && <FilterSelectField label="Trạng thái" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} sx={{ flex: "1 1 150px", minWidth: 150 }}>
+            <FilterSelectField disabled={saving} label="Trạng thái" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} sx={{ flex: "1 1 150px", minWidth: 150 }}>
                 <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả trạng thái</MenuItem>
-                {STUDY_STATUSES.filter((s) => s !== "Đã trúng tuyển").map((s) => (
+                {STUDY_STATUSES.filter((s) => isAdmittedMasters ? ["Đã trúng tuyển", "Đang học", "Tạm hoãn", "Từ chối"].includes(s) : !["Đã trúng tuyển", "Đang học"].includes(s)).map((s) => (
                   <MenuItem key={s} value={s} sx={{ fontSize: 12 }}>{s}</MenuItem>
                 ))}
-            </FilterSelectField>}
+            </FilterSelectField>
 
             {!isAdmittedMasters && (
-              <FilterSearchField
+              <FilterSearchField disabled={saving}
                 placeholder="Tìm theo họ tên, mã HV, CCCD, điện thoại, email..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -585,7 +622,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
             )}
 
             {isAdmittedMasters && (
-              <FilterSearchField
+              <FilterSearchField disabled={saving}
                 placeholder="Tìm theo họ tên, mã HV, CCCD, điện thoại, email..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -623,6 +660,14 @@ const AdmissionRecords = ({ mode = "applications" }) => {
       </Paper>
 
       {/* 3. MAIN TABLE GRID */}
+      {isAdmittedMasters && isAdmin && <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5 }}>
+        <Stack direction="row" gap={1.5} alignItems="center" flexWrap="wrap">
+          <Typography variant="body2">Đã chọn {selectedTuition.length} học viên</Typography>
+          <Button variant="contained" disabled={saving || loading || !selectedTuition.length || selectedTuition.length > 500} onClick={confirmSelectedTuition}>Xác nhận đã nộp học phí ({selectedTuition.length})</Button>
+          <Button disabled={saving || !selectedTuition.length} onClick={() => setSelectedTuition([])}>Bỏ chọn tất cả</Button>
+          <Typography variant="caption">Có thể chọn qua nhiều trang, tối đa 500 học viên. Đổi bộ lọc sẽ bỏ các lựa chọn.</Typography>
+        </Stack>
+      </Paper>}
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
           <CircularProgress size={32} sx={{ color: "#0788B8" }} />
@@ -669,27 +714,16 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                       },
                     }}
                   >
+                    {isAdmittedMasters && isAdmin && <TableCell align="center">
+                      <Checkbox size="small" checked={selectedTuitionIds.has(r.id)}
+                        disabled={saving || loading || !selectableTuitionRows.some((row) => row.id === r.id)}
+                        inputProps={{ "aria-label": `Chọn xác nhận học phí ${r.code || r.fullName}` }}
+                        onChange={(event) => setSelectedTuition((previous) => event.target.checked
+                          ? [...previous, { admissionRecordId: r.id, updatedAt: r.updatedAt }]
+                          : previous.filter((row) => row.admissionRecordId !== r.id))} />
+                    </TableCell>}
                     <TableCell align="center" sx={{ color: "#607486", fontSize: 11 }}>
                       {(page - 1) * PAGE_SIZE + index + 1}
-                    </TableCell>
-
-                    <TableCell align="center">
-                      <Avatar
-                        src={r.photo || ""}
-                        sx={{
-                          width: 28,
-                          height: 36,
-                          borderRadius: "8px",
-                          fontSize: 10,
-                          bgcolor: "#EEF3F8",
-                          color: "#607486",
-                          margin: "0 auto",
-                          border: "1px solid #E1EAF1",
-                        }}
-                        variant="rounded"
-                      >
-                        {r.firstName ? r.firstName.slice(0, 1) : <PersonRounded sx={{ fontSize: 16 }} />}
-                      </Avatar>
                     </TableCell>
 
                     <TableCell sx={{ fontFamily: "inherit", fontWeight: 700, color: "#173E75" }}>
@@ -786,6 +820,14 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                       {r.phone || "—"}
                     </TableCell>
 
+                    {isAdmittedMasters && <TableCell align="center">
+                      <AdmissionTuitionCheckbox record={r} disabled={!isAdmin || saving || loading} onBusyChange={setSaving} onSaved={(updated) => {
+                        setSelectedTuition((previous) => previous.filter((row) => row.admissionRecordId !== updated.id));
+                        setRecords((previous) => previous.map((item) => item.id === updated.id ? updated : item));
+                        return loadRecords();
+                      }} />
+                    </TableCell>}
+
                     <TableCell>
                       <Chip
                         size="small"
@@ -842,6 +884,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
               Hiển thị {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, pagination.total)} trên {pagination.total} hồ sơ
             </Typography>
             <Pagination
+              disabled={saving}
               page={page}
               count={pagination.totalPages}
               onChange={(_event, nextPage) => setPage(nextPage)}

@@ -42,6 +42,7 @@ const unassigned = {
   majorId: "major-1",
   majorName: "Công nghệ thông tin",
   assignedGroup: null,
+  tuitionPaid: false,
 };
 const assigned = {
   id: "record-assigned",
@@ -71,6 +72,7 @@ describe("AssignClassGroups", () => {
 
     expect(await screen.findByRole("checkbox", { name: "Chọn Học viên chưa có lớp" })).toBeInTheDocument();
     expect(screen.queryByText("Học viên đã có lớp")).not.toBeInTheDocument();
+    expect(screen.getByText("Chưa nộp")).toBeInTheDocument();
 
     // Keep the request pending: this test verifies the submitted payload, not the refresh cycle.
     axios.post.mockReturnValue(new Promise(() => {}));
@@ -99,6 +101,7 @@ describe("AssignClassGroups", () => {
           fullName: "Nguyễn Văn Lịch Sử",
           dob: "1998-01-15",
           gender: "Nam",
+          extraData: { tuitionPayment: { paid: true } },
         },
         student: null,
       }],
@@ -121,8 +124,10 @@ describe("AssignClassGroups", () => {
     expect(await screen.findByText("Sĩ số: 1 / 40 học viên")).toBeInTheDocument();
     expect(screen.getByText("Danh sách học viên trong nhóm (1):")).toBeInTheDocument();
     expect(screen.getByText("Không còn học viên chưa được phân nhóm.")).toBeInTheDocument();
-    expect(screen.getAllByText("Nguyễn Văn Lịch Sử")).toHaveLength(1);
+    expect(screen.getByText("Nguyễn Văn Lịch")).toBeInTheDocument();
+    expect(screen.getByText("Sử")).toBeInTheDocument();
     expect(screen.getAllByText("HV-LEGACY")).toHaveLength(1);
+    expect(screen.getByText("Đã nộp")).toBeInTheDocument();
   });
 
   it("does not allow selecting more students than the target group's remaining capacity", async () => {

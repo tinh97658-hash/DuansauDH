@@ -3,7 +3,7 @@ import { AuthenticatedGuard } from "../common/authenticated.guard.js";
 import { CurrentUser, Roles } from "../common/auth-user.js";
 import { RolesGuard } from "../common/roles.guard.js";
 import { AdmissionEvaluationService } from "./admission-evaluation.service.js";
-import { BulkAdmissionScoresDto, ConfirmAdmissionBatchDto, DecideAdmissionDto, SaveAdmissionEvaluationDto, SaveAdmissionRoundDto } from "./dto/admission.dto.js";
+import { BulkAdmissionScoresDto, ConfirmAdmissionBatchDto, ConfirmAdmissionTuitionBatchDto, DecideAdmissionDto, SaveAdmissionEvaluationDto, SaveAdmissionRoundDto, UpdateAdmissionTuitionDto } from "./dto/admission.dto.js";
 
 @Controller("plan")
 @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -18,6 +18,8 @@ export class AdmissionEvaluationController {
   @Post("admission-rounds/:id/preview") @Roles("admin") preview(@Param("id", ParseUUIDPipe) id: string) { return this.service.preview(id); }
   @Post("admission-rounds/:id/confirm") @Roles("admin") confirm(@Param("id", ParseUUIDPipe) id: string, @Body() dto: ConfirmAdmissionBatchDto, @CurrentUser() actor: any) { return this.service.confirmBatch(id, dto, actor); }
   @Get("admission-records/:id/evaluation") detail(@Param("id", ParseUUIDPipe) id: string) { return this.service.detail(id); }
+  @Put("admission-records/:id/tuition") @Roles("admin") tuition(@Param("id", ParseUUIDPipe) id: string, @Body() dto: UpdateAdmissionTuitionDto, @CurrentUser() actor: any) { return this.service.updateTuition(id, dto, actor); }
+  @Put("admission-records/tuition/confirm-batch") @Roles("admin") tuitionBatch(@Body() dto: ConfirmAdmissionTuitionBatchDto, @CurrentUser() actor: any) { return this.service.confirmTuitionBatch(dto, actor); }
   @Put("admission-records/:id/evaluation") @Roles("admin") save(@Param("id", ParseUUIDPipe) id: string, @Body() dto: SaveAdmissionEvaluationDto, @CurrentUser() actor: any) { return this.service.save(id, dto, actor); }
   @Post("admission-records/:id/evaluation/decision") @Roles("admin") decide(@Param("id", ParseUUIDPipe) id: string, @Body() dto: DecideAdmissionDto, @CurrentUser() actor: any) { return this.service.decide(id, dto, actor); }
 }

@@ -1,4 +1,5 @@
 import AdmissionEvaluationPanel from "../../features/admission/AdmissionEvaluationPanel";
+import AdmissionTuitionCheckbox from "../../features/admission/AdmissionTuitionCheckbox";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
@@ -281,6 +282,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
   const [detailTab, setDetailTab] = useState(new URLSearchParams(window.location.search).get("tab") === "admission" ? "admission" : "profile");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [record, setRecord] = useState(null);
   const [formData, setFormData] = useState(null);
   const [initialData, setInitialData] = useState(null);
@@ -391,6 +393,14 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    let mounted = true;
+    axios.get(`${API_BASE_URL}/auth/session`, { withCredentials: true })
+      .then(({ data }) => { if (mounted) setIsAdmin(data.user?.role === "admin"); })
+      .catch(() => { if (mounted) setIsAdmin(false); });
+    return () => { mounted = false; };
+  }, []);
 
   // Handle Photo Upload
   const handlePhotoUpload = (e) => {
@@ -1548,6 +1558,16 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
                   sx={inputSx}
                 />
               </Box>
+
+              {record.trainingLevel === "Thạc sĩ" && <Box sx={{ gridColumn: "1 / -1", p: 1.5, border: "1px solid #D7E4EE", borderRadius: "8px" }}>
+                <Typography fontWeight={700} mb={0.5}>Xác nhận học phí nhập học</Typography>
+                <AdmissionTuitionCheckbox record={record} showDetails disabled={!isAdmin || saving || isDirty} onBusyChange={setSaving} onSaved={(updated) => {
+                  setRecord(updated);
+                  setFormData((previous) => ({ ...previous, studyStatus: updated.studyStatus }));
+                  setInitialData((previous) => ({ ...previous, studyStatus: updated.studyStatus }));
+                }} />
+                {isDirty && <Typography variant="caption" color="warning.main">Lưu thay đổi hồ sơ trước khi xác nhận học phí.</Typography>}
+              </Box>}
 
               <Box sx={{ gridColumn: { xs: "1fr", sm: "span 2", md: "span 3" }, bgcolor: "#F8FAFC", p: 1.5, borderRadius: "4px", border: "1px solid #E2E8F0" }}>
                 <FormControlLabel

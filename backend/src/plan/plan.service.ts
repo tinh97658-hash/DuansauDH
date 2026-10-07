@@ -519,6 +519,7 @@ export class PlanService {
     pageSizeParam?: string,
     excludeStatus?: string,
     includeGroup = false,
+    admissionStage?: string,
   ) {
     const page = Math.max(1, Number.parseInt(pageParam || "1", 10) || 1);
     const pageSize = Math.min(100, Math.max(1, Number.parseInt(pageSizeParam || "20", 10) || 20));
@@ -528,6 +529,17 @@ export class PlanService {
     if (academicYear) where.academicYear = academicYear;
     if (status && status !== "ALL") where.studyStatus = status;
     else if (excludeStatus) where.studyStatus = { [Op.ne]: excludeStatus };
+    if (admissionStage === "learners") {
+      where[Op.and] = [{ [Op.or]: [
+        { status: "approved" },
+        { studyStatus: { [Op.in]: ["Đã trúng tuyển", "Đang học"] } },
+      ] }];
+    } else if (admissionStage === "applications") {
+      where[Op.and] = [
+        { status: { [Op.ne]: "approved" } },
+        { [Op.or]: [{ studyStatus: { [Op.notIn]: ["Đã trúng tuyển", "Đang học"] } }, { studyStatus: { [Op.is]: null } }] },
+      ];
+    }
 
     const keyword = search?.trim().slice(0, 100);
     if (keyword) {
@@ -561,7 +573,7 @@ export class PlanService {
       }),
       countWith({ trainingLevel: "Thạc sĩ" }),
       countWith({ trainingLevel: "Tiến sĩ" }),
-      countWith({ studyStatus: { [Op.in]: ["Đủ điều kiện dự tuyển", "Đã trúng tuyển"] } }),
+      countWith({ studyStatus: { [Op.in]: ["Đủ điều kiện dự tuyển", "Đã trúng tuyển", "Đang học"] } }),
     ]);
 
     const total = result.count;

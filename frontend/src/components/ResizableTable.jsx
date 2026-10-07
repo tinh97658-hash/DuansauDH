@@ -42,16 +42,13 @@ export default function ResizableTable({ columns, storageKey, children }) {
 
   return <Box sx={{ position: "relative", width: "max-content" }}><Table ref={tableRef} size="small" stickyHeader sx={{
     tableLayout: "fixed", width: columns.reduce((sum, column) => sum + widthOf(column), 0),
-    "& td, & th": { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", borderRight: "1px solid #E2EBF2" },
+    "& td, & th": { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
     "& td .MuiTypography-root": { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   }}>
     <colgroup>{columns.map((column) => <col key={column.key} style={{ width: widthOf(column) }} />)}</colgroup>
-    <TableHead><TableRow sx={{ "& th": {
-      bgcolor: "#EDF4FA", color: "#172B3A", fontWeight: 700, fontSize: 12,
-      py: "9px", pr: 2, borderBottom: "1px solid #D7E4EE",
-    } }}>
+    <TableHead><TableRow>
       {columns.map((column, index) => <TableCell key={column.key} align={column.align || "left"}>
-        {column.label}
+        {column.header ?? column.label}
         <Box
           role="slider" aria-orientation="horizontal" tabIndex={0}
           aria-label={`Độ rộng cột ${column.label}`}

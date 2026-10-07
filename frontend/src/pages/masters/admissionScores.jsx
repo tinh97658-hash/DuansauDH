@@ -97,8 +97,8 @@ export default function AdmissionScores() {
       {data && <>
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Typography fontWeight={700} mb={1}>Điểm ngưỡng từng ngành — {data.round.name}</Typography>
-          <TableContainer><Table size="small"><TableHead><TableRow><TableCell>Mã ngành</TableCell><TableCell>Chuyên ngành</TableCell><TableCell>Điểm ngưỡng (0–20)</TableCell></TableRow></TableHead><TableBody>
-            {majors.map((major) => <TableRow key={major.id}><TableCell>{major.code}</TableCell><TableCell>{major.name}</TableCell><TableCell>
+          <TableContainer><Table size="small"><TableHead><TableRow><TableCell>Ngành</TableCell><TableCell>Chuyên ngành</TableCell><TableCell>Điểm ngưỡng (0–20)</TableCell></TableRow></TableHead><TableBody>
+            {majors.map((major) => <TableRow key={major.id}><TableCell>{major.discipline?.name || "—"}</TableCell><TableCell>{major.name}</TableCell><TableCell>
               {admin ? <TextField size="small" type="number" value={thresholdDrafts[major.id] ?? data.round.majorThresholds?.find((entry) => entry.majorId === major.id)?.cutoff ?? ""}
                 disabled={saving || workflowBusy || loading} inputProps={{ min: 0, max: 20, step: 0.01, "aria-label": `Điểm ngưỡng ${major.name}` }}
                 onChange={(event) => setThresholdDrafts((previous) => { const next = { ...previous }; if (event.target.value === String(data.round.majorThresholds?.find((entry) => entry.majorId === major.id)?.cutoff ?? "")) delete next[major.id]; else next[major.id] = event.target.value; return next; })} />
@@ -123,7 +123,7 @@ export default function AdmissionScores() {
             {[["all", "Tất cả"], ["eligible", "Đạt ngưỡng"], ["below", "Dưới ngưỡng"], ["unscored", "Chưa nhập điểm"], ["pending", "Chưa duyệt"], ["admitted", "Đã trúng tuyển"]].map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
           </TextField>
         </Stack>
-        <BulkAdmissionWorkflow data={data} visibleRows={rows} admin={admin} loading={loading || saving} thresholdsDirty={thresholdsDirty} onRefresh={loadRanking} onDirtyChange={setScoresDirty} onBusyChange={setWorkflowBusy} />
+        <BulkAdmissionWorkflow data={data} visibleRows={rows} paginationKey={`${roundId}:${search}:${filter}:${majorFilter}`} admin={admin} loading={loading || saving} thresholdsDirty={thresholdsDirty} onRefresh={loadRanking} onDirtyChange={setScoresDirty} onBusyChange={setWorkflowBusy} />
       </>}
     </Stack>
     <Dialog open={Boolean(form)} onClose={() => !saving && setForm(null)} maxWidth="sm" fullWidth>

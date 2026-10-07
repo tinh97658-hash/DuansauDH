@@ -81,6 +81,21 @@ describe("PlanService admission major synchronization", () => {
 });
 
 describe("PlanService admission record pagination", () => {
+  it("keeps admitted and studying learners together and excludes them from applications without losing the search filter", async () => {
+    const records = { findAndCountAll: jest.fn().mockResolvedValue({ rows: [], count: 0 }), count: jest.fn().mockResolvedValue(0) };
+    const service = new PlanService({} as never, {} as never, {} as never, {} as never, records as never, {} as never, {} as never, {} as never, {} as never, {} as never);
+    await service.listAdmissionRecords(undefined, "Thạc sĩ", "2026", undefined, undefined, "An", "1", "15", undefined, false, "learners");
+    const learnerWhere = (records.findAndCountAll.mock.calls[0][0] as any).where;
+    expect(learnerWhere[Op.and][0][Op.or]).toEqual([
+      { status: "approved" }, { studyStatus: { [Op.in]: ["Đã trúng tuyển", "Đang học"] } },
+    ]);
+    expect(learnerWhere[Op.or]).toContainEqual({ fullName: { [Op.iLike]: "%An%" } });
+    await service.listAdmissionRecords(undefined, undefined, "2026", undefined, undefined, undefined, "1", "15", undefined, false, "applications");
+    const applicationWhere = (records.findAndCountAll.mock.calls[1][0] as any).where;
+    expect(applicationWhere[Op.and][0].status[Op.ne]).toBe("approved");
+    expect(applicationWhere[Op.and][1][Op.or][0].studyStatus[Op.notIn]).toEqual(["Đã trúng tuyển", "Đang học"]);
+    expect(applicationWhere[Op.and][1][Op.or][1].studyStatus[Op.is]).toBeNull();
+  });
   it("loads only the requested 20-record page and returns filtered totals", async () => {
     const admissionRecords = {
       findAndCountAll: jest.fn().mockResolvedValue({

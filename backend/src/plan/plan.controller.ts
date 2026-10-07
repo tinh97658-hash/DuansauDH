@@ -73,10 +73,11 @@ export class PlanController {
     @Query("pageSize") pageSize?: string,
     @Query("excludeStatus") excludeStatus?: string,
     @Query("includeGroup") includeGroup?: string,
+    @Query("admissionStage") admissionStage?: string,
   ) {
     return this.plan.listAdmissionRecords(
       majorId, trainingLevel, academicYear, status, disciplineId, search, page, pageSize,
-      excludeStatus, includeGroup === "true",
+      excludeStatus, includeGroup === "true", admissionStage,
     );
   }
 

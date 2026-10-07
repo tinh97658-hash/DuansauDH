@@ -1,0 +1,117 @@
+/* Admission-record table appearance for all screen tables, including dialogs.
+   Print layouts keep their own sizing and page-break rules. */
+@media screen {
+  body :is(
+    .MuiTableContainer-root, .table-responsive, .ant-table-container,
+    .sl-create-confirm-table-wrap, .sl-offering-sessions-wrap,
+    .sl-offering-roster-wrap, .sl-matrix-pivot-wrap, .tp-table-wrap,
+    .sl-calendar-wrap
+  ) {
+    border: 1px solid var(--table-border-color) !important;
+    border-radius: var(--table-radius) !important;
+    background: var(--surface-bg);
+    box-shadow: 0 5px 18px rgba(23, 62, 117, 0.06) !important;
+    overflow: auto;
+  }
+
+  body :is(#root, .MuiDialog-root, .scheduling-v20) table {
+    font-family: var(--app-font-family);
+    font-size: 12.5px;
+    color: var(--text-primary);
+    border-spacing: 0;
+  }
+
+  body :is(#root, .MuiDialog-root, .scheduling-v20) table > thead > tr > th {
+    padding: 9px 16px 9px 8px !important;
+    border-bottom: 1px solid var(--table-border-color) !important;
+    border-right: 1px solid var(--table-row-border-color) !important;
+    border-radius: 0 !important;
+    background: var(--table-header-bg) !important;
+    color: var(--text-primary) !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 1.5;
+    letter-spacing: normal;
+    text-transform: none;
+  }
+
+  body :is(#root, .MuiDialog-root, .scheduling-v20) table > tbody > tr > :is(td, th) {
+    padding: 7px 8px !important;
+    border-bottom: 1px solid var(--table-row-border-color) !important;
+    border-right: 1px solid var(--table-row-border-color) !important;
+    font-size: 12.5px !important;
+    line-height: 1.5;
+  }
+
+  /* Preserve the larger loading/empty-state cells and their action buttons. */
+  body :is(#root, .MuiDialog-root, .scheduling-v20) table > tbody > tr:only-child > [colspan] {
+    padding: 32px 16px !important;
+  }
+
+  body :is(#root, .MuiDialog-root, .scheduling-v20) table > tbody > tr:hover:not(.Mui-selected) {
+    background-color: var(--table-hover-bg) !important;
+  }
+
+  body :is(#root, .MuiDialog-root, .scheduling-v20) table > :is(thead, tbody) > tr > :last-child {
+    border-right: 0 !important;
+  }
+
+  body :is(#root, .MuiDialog-root, .scheduling-v20) table > tbody > tr:last-child > :is(td, th) {
+    border-bottom: 0 !important;
+  }
+
+  /* Bootstrap tables without a scroll container still get the same frame. */
+  #root table.table {
+    --bs-table-bg: transparent;
+    --bs-table-striped-bg: transparent;
+    --bs-table-hover-bg: var(--table-hover-bg);
+    margin-bottom: 0;
+    border: 1px solid var(--table-border-color);
+    border-radius: var(--table-radius);
+    border-collapse: separate;
+    overflow: hidden;
+    box-shadow: 0 5px 18px rgba(23, 62, 117, 0.06);
+  }
+
+  #root .table-responsive > table.table {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* Native matrices have sticky cells with their own background rules. */
+  body :is(#root, .scheduling-v20) table:not(.MuiTable-root):not(.table) > tbody > tr > :is(td, th) {
+    height: auto;
+    background-color: var(--surface-bg);
+  }
+
+  body :is(#root, .scheduling-v20) table:not(.MuiTable-root):not(.table) > tbody > tr:hover > :is(td, th) {
+    background-color: var(--table-hover-bg);
+  }
+
+  body :is(#root, .scheduling-v20) :is(
+    .sl-create-confirm-table-wrap, .sl-offering-sessions-wrap,
+    .sl-offering-roster-wrap, .sl-matrix-pivot-wrap, .tp-table-wrap
+  ) :is(input, select, textarea) {
+    border-color: var(--table-border-color) !important;
+    border-radius: var(--control-radius) !important;
+    font-family: var(--app-font-family);
+  }
+
+  /* The weekly timetable is a CSS grid with table semantics. */
+  #root .sl-calendar {
+    border-color: var(--table-row-border-color);
+  }
+
+  #root .sl-calendar :is(.sl-corner, .sl-day, .sl-period) {
+    border-color: var(--table-row-border-color);
+    background: var(--table-header-bg);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  #root .sl-calendar .sl-slot {
+    border-color: var(--table-row-border-color);
+  }
+}

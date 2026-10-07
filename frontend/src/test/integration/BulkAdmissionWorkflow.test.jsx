@@ -21,6 +21,24 @@ it("hiển thị năm sinh, giới tính và liên hệ của hồ sơ", () => {
   mount();
   for (const value of ["1996", "Nam", row.phone, row.email]) expect(screen.getByText(value)).toBeInTheDocument();
 });
+it("phân trang 15 hồ sơ và giữ điểm đang nhập khi chuyển trang", async () => {
+  const rows = Array.from({ length: 16 }, (_, index) => ({ ...row, admissionRecordId: `record-${index + 1}`, code: `HS${String(index + 1).padStart(3, "0")}` }));
+  mount({ data: { ...data, rows }, visibleRows: rows });
+  expect(screen.getAllByRole("spinbutton")).toHaveLength(15);
+  fireEvent.change(screen.getByLabelText("Điểm HS001"), { target: { value: "16.5" } });
+  fireEvent.click(screen.getByRole("button", { name: /page 2/i }));
+  expect(screen.getAllByRole("spinbutton")).toHaveLength(1);
+  expect(screen.getByText("Hiển thị 16–16 trên 16 hồ sơ")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Điểm HS016"), { target: { value: "17" } });
+  fireEvent.click(screen.getByRole("button", { name: /page 1/i }));
+  expect(screen.getByLabelText("Điểm HS001")).toHaveValue(16.5);
+  fireEvent.click(screen.getByRole("button", { name: /Lưu điểm hàng loạt/ }));
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.stringContaining("/scores"), { rows: [
+    { admissionRecordId: "record-1", score: 16.5, version: 0 }, { admissionRecordId: "record-16", score: 17, version: 0 },
+  ] }, expect.anything()));
+  await screen.findByText(/Đã lưu điểm của 2 hồ sơ/);
+  expect(screen.queryByText("Đã nộp học phí nhập học")).not.toBeInTheDocument();
+});
 it("tải file mẫu .xlsx cho đúng danh sách đang hiển thị", async () => {
   const click = jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   const filtered = [row]; mount({ visibleRows: filtered });

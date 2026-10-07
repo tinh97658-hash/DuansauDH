@@ -82,7 +82,7 @@ export class MastersService {
             {
               model: AdmissionRecord,
               as: "admissionRecord",
-              attributes: ["id", "code", "fullName", "dob", "gender", "email", "phone"],
+              attributes: ["id", "code", "fullName", "dob", "gender", "email", "phone", "extraData"],
             },
             {
               model: Student,
@@ -117,7 +117,7 @@ export class MastersService {
             {
               model: AdmissionRecord,
               as: "admissionRecord",
-              attributes: ["id", "code", "fullName", "dob", "gender", "email", "phone"],
+              attributes: ["id", "code", "fullName", "dob", "gender", "email", "phone", "extraData"],
             },
             {
               model: Student,
@@ -268,6 +268,7 @@ export class MastersService {
         majorName: r.major?.name || r.majorName,
         academicYear: r.academicYear,
         status: r.status,
+        tuitionPaid: r.extraData?.tuitionPayment?.paid === true,
         assignedGroup: assignment ? assignment.group : null,
         memberId: assignment ? assignment.memberId : null,
       };

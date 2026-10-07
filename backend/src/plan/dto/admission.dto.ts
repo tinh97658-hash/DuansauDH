@@ -2,6 +2,21 @@ import { Type } from "class-transformer";
 import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Matches, Min, ValidateNested } from "class-validator";
 import { AdmissionInputs } from "../admission-scoring.js";
 
+export class UpdateAdmissionTuitionDto {
+  @IsBoolean() paid!: boolean;
+  @IsDateString() updatedAt!: string;
+}
+
+export class AdmissionTuitionRowDto {
+  @IsUUID() admissionRecordId!: string;
+  @IsDateString() updatedAt!: string;
+}
+export class ConfirmAdmissionTuitionBatchDto {
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(500) @ArrayUnique((row: AdmissionTuitionRowDto) => row.admissionRecordId)
+  @ValidateNested({ each: true }) @Type(() => AdmissionTuitionRowDto)
+  rows!: AdmissionTuitionRowDto[];
+}
+
 export class AdmissionRulesDto {
   @IsNumber() @Min(0) @Max(10) direct!: number;
   @IsNumber() @Min(0) @Max(10) bridge!: number;

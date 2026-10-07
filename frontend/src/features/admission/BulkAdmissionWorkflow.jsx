@@ -1,12 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { Alert, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Pagination, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import { Link } from "react-router-dom";
 import { API_BASE_URL } from "../../config/http";
 import { createScoreTemplate, EXCEL_MIME, parseScoreExcel, readExcelFile } from "./admissionExcel";
 
 const options = { withCredentials: true };
-export default function BulkAdmissionWorkflow({ data, visibleRows, admin, loading = false, thresholdsDirty = false, onRefresh, onDirtyChange, onBusyChange }) {
+const PAGE_SIZE = 15;
+export default function BulkAdmissionWorkflow({ data, visibleRows, paginationKey, admin, loading = false, thresholdsDirty = false, onRefresh, onDirtyChange, onBusyChange }) {
+  const [page, setPage] = useState(1), [previewPage, setPreviewPage] = useState(1);
+  const pageCount = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pageRows = visibleRows.slice(pageStart, pageStart + PAGE_SIZE);
+  useEffect(() => { setPage(1); }, [paginationKey, data.round.id]);
   const [drafts, setDrafts] = useState({});
   const fileInput = useRef(null);
   const [preview, setPreview] = useState(null);
@@ -46,6 +53,7 @@ export default function BulkAdmissionWorkflow({ data, visibleRows, admin, loadin
   const evaluate = () => run(async () => {
     const response = await axios.post(`${API_BASE_URL}/plan/admission-rounds/${data.round.id}/preview`, {}, options);
     setPreview(response.data);
+    setPreviewPage(1);
     setSelected(response.data.rows.map((row) => row.admissionRecordId));
   });
   const confirm = () => run(async () => {
@@ -78,7 +86,7 @@ export default function BulkAdmissionWorkflow({ data, visibleRows, admin, loadin
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Stack spacing={1.5}>
         <Typography fontWeight={700}>Nhập điểm hồ sơ và xét tuyển</Typography>
-        <Typography variant="body2">Tải file Excel mẫu gồm mã hồ sơ, họ tên, năm sinh, giới tính, chuyên ngành, thông tin liên hệ và điểm của danh sách đang hiển thị. Điền cột Tổng điểm, lưu file .xlsx rồi import lại để lưu điểm hàng loạt. Có thể nhập trực tiếp trên bảng.</Typography>
+        <Typography variant="body2">Tải file Excel mẫu gồm mã hồ sơ, họ tên, năm sinh, giới tính, chuyên ngành, thông tin liên hệ và điểm của danh sách theo bộ lọc trên tất cả các trang. Điền cột Tổng điểm, lưu file .xlsx rồi import lại để lưu điểm hàng loạt. Có thể nhập trực tiếp trên bảng.</Typography>
         {admin && <Stack direction="row" gap={1} flexWrap="wrap">
           <Button variant="outlined" disabled={busy || dirty || !visibleRows.length} onClick={downloadTemplate}>Tải file Excel mẫu</Button>
           <Button variant="outlined" disabled={busy || dirty} onClick={() => fileInput.current?.click()}>Import từ file Excel</Button>
@@ -92,7 +100,7 @@ export default function BulkAdmissionWorkflow({ data, visibleRows, admin, loadin
     <TableContainer component={Paper} variant="outlined"><Table size="small"><TableHead><TableRow>
       {["Mã hồ sơ", "Họ tên", "Năm sinh", "Giới tính", "Chuyên ngành", "Liên hệ", "Tổng điểm (0–20)", "Điểm ngưỡng ngành", "Điều kiện theo điểm", "Trạng thái"].map((label) => <TableCell key={label} sx={{ whiteSpace: "nowrap" }}>{label}</TableCell>)}
     </TableRow></TableHead><TableBody>
-      {visibleRows.map((row) => <TableRow key={row.admissionRecordId}>
+      {pageRows.map((row) => <TableRow key={row.admissionRecordId}>
         <TableCell>{row.code || "Chưa có mã"}</TableCell>
         <TableCell><Button component={Link} to={`/plan/admission-records/${row.admissionRecordId}?tab=admission`} onClick={(event) => { if ((dirty || thresholdsDirty) && !window.confirm("Điểm đang sửa chưa lưu. Rời trang và bỏ các thay đổi?")) event.preventDefault(); }}>{row.fullName}</Button></TableCell>
         <TableCell>{row.birthYear ?? "—"}</TableCell>
@@ -105,18 +113,23 @@ export default function BulkAdmissionWorkflow({ data, visibleRows, admin, loadin
         }} /> : row.total ?? "—"}</TableCell>
         <TableCell>{row.cutoff ?? "Chưa nhập"}</TableCell>
         <TableCell><Chip size="small" label={drafts[row.admissionRecordId] !== undefined ? "Chưa lưu điểm" : row.stale ? "Cần xác minh lại" : row.meetsCutoff === true ? "Đủ điều kiện" : row.meetsCutoff === false ? "Chưa đạt ngưỡng" : row.total == null ? "Chưa nhập điểm" : "Chờ xét tuyển"} color={drafts[row.admissionRecordId] === undefined && !row.stale && row.meetsCutoff === true ? "success" : "default"} /></TableCell>
-        <TableCell>{row.decision === "admitted" ? "Đã trúng tuyển" : row.decision === "rejected" ? "Không trúng tuyển" : "Chưa duyệt"}</TableCell>
+        <TableCell>{row.decision === "admitted" ? row.studyStatus || "Đã trúng tuyển" : row.decision === "rejected" ? "Không trúng tuyển" : "Chưa duyệt"}</TableCell>
       </TableRow>)}
       {!visibleRows.length && <TableRow><TableCell colSpan={10} align="center">Chưa có hồ sơ phù hợp với đợt và bộ lọc đang chọn.</TableCell></TableRow>}
     </TableBody></Table></TableContainer>
+    <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="center" justifyContent="space-between">
+      <Typography variant="body2">Hiển thị {visibleRows.length ? pageStart + 1 : 0}–{Math.min(pageStart + PAGE_SIZE, visibleRows.length)} trên {visibleRows.length} hồ sơ</Typography>
+      <Pagination aria-label="Phân trang hồ sơ xét tuyển" count={pageCount} page={currentPage} onChange={(_, value) => setPage(value)} color="primary" size="small" />
+    </Stack>
     <Dialog open={Boolean(preview)} onClose={() => !busy && setPreview(null)} maxWidth="lg" fullWidth><DialogTitle>Duyệt danh sách hồ sơ đạt điểm xét tuyển</DialogTitle><DialogContent>
       {preview && <Stack spacing={2}>
         <Alert severity="info">Đợt {preview.round.name}: có {preview.rows.length} hồ sơ đạt ngưỡng của ngành đăng ký. Trạng thái hồ sơ sẽ được cập nhật sau khi bấm Đồng ý duyệt.</Alert>
         {!preview.rows.length && <Alert severity="warning">Chưa có hồ sơ đủ điều kiện để duyệt. Kiểm tra điểm và các hồ sơ cần xác minh lại.</Alert>}
         {error && <Alert severity="error">{error}</Alert>}
         <Table size="small"><TableHead><TableRow><TableCell><Checkbox inputProps={{ "aria-label": "Chọn tất cả hồ sơ đạt ngưỡng" }} checked={preview.rows.length > 0 && selected.length === preview.rows.length} indeterminate={selected.length > 0 && selected.length < preview.rows.length} disabled={busy || !preview.rows.length} onChange={(event) => setSelected(event.target.checked ? preview.rows.map((row) => row.admissionRecordId) : [])} /></TableCell><TableCell>Mã hồ sơ</TableCell><TableCell>Họ tên</TableCell><TableCell>Năm sinh</TableCell><TableCell>Giới tính</TableCell><TableCell>Chuyên ngành</TableCell><TableCell>Tổng điểm</TableCell><TableCell>Điểm ngưỡng</TableCell></TableRow></TableHead><TableBody>
-          {preview.rows.map((row) => <TableRow key={row.admissionRecordId}><TableCell><Checkbox inputProps={{ "aria-label": `Duyệt ${row.code || row.fullName}` }} disabled={busy} checked={selected.includes(row.admissionRecordId)} onChange={(event) => setSelected((previous) => event.target.checked ? [...previous, row.admissionRecordId] : previous.filter((id) => id !== row.admissionRecordId))} /></TableCell><TableCell>{row.code}</TableCell><TableCell>{row.fullName}</TableCell><TableCell>{row.birthYear ?? "—"}</TableCell><TableCell>{row.gender || "—"}</TableCell><TableCell>{row.majorName}</TableCell><TableCell>{row.total}</TableCell><TableCell>{row.cutoff}</TableCell></TableRow>)}
+          {preview.rows.slice((previewPage - 1) * PAGE_SIZE, previewPage * PAGE_SIZE).map((row) => <TableRow key={row.admissionRecordId}><TableCell><Checkbox inputProps={{ "aria-label": `Duyệt ${row.code || row.fullName}` }} disabled={busy} checked={selected.includes(row.admissionRecordId)} onChange={(event) => setSelected((previous) => event.target.checked ? [...previous, row.admissionRecordId] : previous.filter((id) => id !== row.admissionRecordId))} /></TableCell><TableCell>{row.code}</TableCell><TableCell>{row.fullName}</TableCell><TableCell>{row.birthYear ?? "—"}</TableCell><TableCell>{row.gender || "—"}</TableCell><TableCell>{row.majorName}</TableCell><TableCell>{row.total}</TableCell><TableCell>{row.cutoff}</TableCell></TableRow>)}
         </TableBody></Table>
+        <Pagination aria-label="Phân trang danh sách duyệt" count={Math.max(1, Math.ceil(preview.rows.length / PAGE_SIZE))} page={previewPage} onChange={(_, value) => setPreviewPage(value)} color="primary" size="small" />
         <Typography>Đã chọn {selected.length} hồ sơ.</Typography>
       </Stack>}
     </DialogContent><DialogActions><Button disabled={busy} onClick={() => setPreview(null)}>Hủy</Button><Button variant="contained" disabled={busy || !selected.length} onClick={confirm}>Đồng ý duyệt</Button></DialogActions></Dialog>

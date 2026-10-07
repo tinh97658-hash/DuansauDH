@@ -4,7 +4,7 @@ import { Alert, Box, Button, Chip, CircularProgress, Paper, Stack, Typography } 
 import { API_BASE_URL } from "../../config/http";
 
 const options = { withCredentials: true };
-const decisionLabels = { pending: "Chưa duyệt", admitted: "Đã trúng tuyển", rejected: "Không trúng tuyển", reopen: "Mở lại kết quả", saved: "Lưu điểm xét tuyển" };
+const decisionLabels = { pending: "Chưa duyệt", admitted: "Đã trúng tuyển", rejected: "Không trúng tuyển", reopen: "Mở lại kết quả", saved: "Lưu điểm xét tuyển", tuition_paid: "Xác nhận đã nộp học phí", tuition_unpaid: "Hủy xác nhận học phí" };
 
 export function AdmissionResult({ evaluation }) {
   if (!evaluation) return <Alert severity="info">Hồ sơ chưa có kết quả xét tuyển.</Alert>;
@@ -51,8 +51,10 @@ export default function AdmissionEvaluationPanel({ record }) {
         const snapshot = entry.snapshot || {};
         return <Box key={entry.id} sx={{ py: 1.5, borderBottom: "1px solid #e2e8f0" }}>
           <Typography variant="body2" fontWeight={700}>{decisionLabels[entry.action] || entry.action} · {new Date(entry.createdAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}</Typography>
+          {snapshot.tuitionPayment ? <Typography variant="body2">Học phí nhập học: {snapshot.tuitionPayment.paid ? "Đã nộp" : "Chưa xác nhận"} · Trạng thái: {snapshot.record?.studyStatus || "—"}</Typography> : <>
           <Typography variant="body2">Năm: {snapshot.round?.academicYear || snapshot.record?.academicYear || "—"} · Đợt: {snapshot.round?.name || "—"} · Ngành: {snapshot.record?.majorName || "Chưa lưu tên ngành"}</Typography>
           <Typography variant="body2">Điểm hồ sơ: {snapshot.result?.total ?? "—"} · Điểm ngưỡng ngành: {snapshot.result?.cutoff ?? "—"} · Kết quả: {decisionLabels[snapshot.evaluation?.decision] || "—"}</Typography>
+          </>}
           <Typography variant="caption" display="block">Người thực hiện: {entry.actor || "—"}</Typography>
           {(snapshot.decisionNo || snapshot.decisionDate) && <Typography variant="body2">Quyết định: {snapshot.decisionNo || "—"} · {snapshot.decisionDate || "—"}</Typography>}
           {snapshot.note && <Typography variant="body2">{snapshot.note}</Typography>}
