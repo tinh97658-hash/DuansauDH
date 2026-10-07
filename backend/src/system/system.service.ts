@@ -395,6 +395,8 @@ export class SystemService {
   async removeLecturer(id: string) { return this.removeSimple(this.lecturers, id, "Giảng viên"); }
 
   private async validateLecturerScope(disciplineId?: string | null, majorId?: string | null) {
+    // Đơn vị công tác được lưu ở faculty; phân ngành chỉ kiểm tra khi được khai báo.
+    if (!disciplineId && !majorId) return;
     if (!disciplineId) throw new BadRequestException("Vui lòng chọn ngành của giảng viên.");
     if (!majorId) throw new BadRequestException("Vui lòng chọn chuyên ngành của giảng viên.");
     const discipline = await this.disciplines.findByPk(disciplineId);

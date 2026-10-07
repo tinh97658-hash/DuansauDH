@@ -955,7 +955,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
               <Tab value="profile" label="Thông tin hồ sơ & học tập" />
               <Tab value="admission" label="Xét tuyển" />
             </Tabs>
-            {detailTab === "admission" && <AdmissionEvaluationPanel record={record} />}
+            {detailTab === "admission" && <AdmissionEvaluationPanel record={record} isAdmin={isAdmin} disabled={isDirty || saving} onBusyChange={setSaving} onDecided={fetchData} />}
           </>}
           <Box sx={{ display: detailTab === "profile" || record.trainingLevel !== "Thạc sĩ" ? "block" : "none" }}>
           <Paper variant="outlined" sx={{ ...sectionCardSx, mb: 2 }}>
@@ -1541,9 +1541,10 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
                   sx={selectSx}
                 >
                   {STUDY_STATUSES.map((s) => (
-                    <MenuItem key={s} value={s} disabled={formData.trainingLevel === "Thạc sĩ" && ["Đã trúng tuyển", "Không trúng tuyển"].includes(s) && s !== record.studyStatus}>{s}</MenuItem>
+                    <MenuItem key={s} value={s} disabled={formData.trainingLevel === "Thạc sĩ" && ["Đã trúng tuyển", "Không trúng tuyển", "Đang học"].includes(s) && s !== record.studyStatus}>{s}</MenuItem>
                   ))}
                 </Select>
+                {formData.trainingLevel === "Thạc sĩ" && <Typography variant="caption" color="text.secondary">Phê duyệt tại tab Xét tuyển. Xác nhận học phí nhập học để chuyển sang Đang học.</Typography>}
               </Box>
 
               <Box>

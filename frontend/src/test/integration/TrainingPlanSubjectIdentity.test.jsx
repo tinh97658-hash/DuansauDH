@@ -70,6 +70,25 @@ describe("Training Plan Subject identity persistence", () => {
     jest.clearAllMocks();
   });
 
+  it("đóng và mở lại học phần bằng trạng thái, không có thao tác xóa", async () => {
+    const subject = { ...root, majorId: major.id };
+    configureReads([subject]);
+    axios.put.mockResolvedValueOnce({ data: { ...subject, active: false } })
+      .mockResolvedValueOnce({ data: { ...subject, active: true } });
+    await act(async () => { render(<TrainingPlan />); });
+    const toggle = await screen.findByRole("checkbox", { name: `Mở/Đóng học phần ${subject.name}` });
+    expect(toggle).toBeChecked();
+    expect(screen.queryByRole("button", { name: "Xóa" })).not.toBeInTheDocument();
+    await clickAndWait(toggle);
+    await waitFor(() => expect(toggle).not.toBeChecked());
+    expect(screen.getByText(subject.name)).toBeInTheDocument();
+    expect(axios.put).toHaveBeenLastCalledWith(expect.stringContaining(`/plan/subjects/${subject.id}`), { active: false }, { withCredentials: true });
+    await clickAndWait(toggle);
+    await waitFor(() => expect(toggle).toBeChecked());
+    expect(axios.put).toHaveBeenLastCalledWith(expect.stringContaining(`/plan/subjects/${subject.id}`), { active: true }, { withCredentials: true });
+    expect(axios.delete).not.toHaveBeenCalled();
+  });
+
   it("keeps the old panel hidden and creates a regular subject when sharing is unchecked", async () => {
     configureReads([]);
     const created = {

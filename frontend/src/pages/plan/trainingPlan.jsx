@@ -118,7 +118,6 @@ const TrainingPlan = () => {
   const [editingSubjectId, setEditingSubjectId] = useState(null);
   const [editingSubjectForm, setEditingSubjectForm] = useState(null);
   const [updatingSubjectTypeId, setUpdatingSubjectTypeId] = useState(null);
-  const [deletingSubjectId, setDeletingSubjectId] = useState(null);
   const [sharedCodesOpen, setSharedCodesOpen] = useState(false);
   const [sharedCodes, setSharedCodes] = useState([]);
   const [sharedKeepOpen, setSharedKeepOpen] = useState(false);
@@ -673,20 +672,6 @@ const TrainingPlan = () => {
     );
     setSubjects((prev) => prev.map((item) => (item.id === subject.id ? { ...item, ...updated } : item)));
     setCatalogSubjects((prev) => prev.map((item) => (item.id === subject.id ? { ...item, ...updated } : item)));
-  };
-
-  const handleDeleteSubject = async (subject) => {
-    try {
-      await axios.delete(`${API_BASE_URL}/plan/subjects/${subject.id}`, { withCredentials: true });
-      toast.success(`Đã xóa học phần "${subject.name}"`);
-      setSubjects((prev) => prev.filter((s) => s.id !== subject.id));
-      setCatalogSubjects((prev) => prev.filter((s) => s.id !== subject.id));
-      setDeletingSubjectId(null);
-      loadMajors();
-      if (curriculumId) loadCurriculumDetail(curriculumId);
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Không thể xóa học phần");
-    }
   };
 
   // Keyboard helper for Subject Draft Row (Enter -> Save & Continue, Esc -> Cancel)
@@ -1287,8 +1272,8 @@ const TrainingPlan = () => {
                               width: 250,
                               height: 28,
                               color: "#172B3A",
-                              bgcolor: "#fff",
-                              borderRadius: "14px",
+                              bgcolor: "transparent",
+                              borderRadius: 0,
                               "& .MuiSelect-select": {
                                 py: 0,
                                 pl: 1.25,
@@ -1296,11 +1281,8 @@ const TrainingPlan = () => {
                                 whiteSpace: "nowrap",
                                 textOverflow: "clip",
                               },
-                              "& .MuiOutlinedInput-notchedOutline": {
-                                borderColor: SUBJECT_TYPES.find((t) => t.value === row.subjectType)?.color || "#607486",
-                              },
-                              "&:hover .MuiOutlinedInput-notchedOutline": {
-                                borderColor: SUBJECT_TYPES.find((t) => t.value === row.subjectType)?.color || "#607486",
+                              "& .MuiOutlinedInput-notchedOutline, &:hover .MuiOutlinedInput-notchedOutline, &.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                                border: 0,
                               },
                             }}
                           >
@@ -1356,17 +1338,18 @@ const TrainingPlan = () => {
                         </TableCell>
                         <TableCell align="center">
                           {isAdmin ? (
-                            <Tooltip title="Bật/Tắt kích hoạt">
+                            <Tooltip title="Mở/Đóng học phần (không xóa dữ liệu)">
                               <Switch
                                 size="small"
                                 checked={Boolean(row.active)}
+                                inputProps={{ "aria-label": `Mở/Đóng học phần ${row.name}` }}
                                 onChange={(e) => { e.stopPropagation(); handleQuickToggleSubject(row, "active"); }}
                               />
                             </Tooltip>
                           ) : (
                             <Chip
                               size="small"
-                              label={row.active ? "Bật" : "Ẩn"}
+                              label={row.active ? "Mở" : "Đóng"}
                               sx={{
                                 height: 20,
                                 fontSize: 10,
@@ -1379,27 +1362,6 @@ const TrainingPlan = () => {
 
                         {isAdmin && (
                           <TableCell align="center">
-                            {deletingSubjectId === row.id ? (
-                              <Stack direction="row" spacing={0.5} justifyContent="center">
-                                <Button
-                                  size="small"
-                                  variant="contained"
-                                  color="error"
-                                  onClick={(e) => { e.stopPropagation(); handleDeleteSubject(row); }}
-                                  sx={{ minWidth: 40, px: 1, py: 0.2, fontSize: 11 }}
-                                >
-                                  Xóa
-                                </Button>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  onClick={(e) => { e.stopPropagation(); setDeletingSubjectId(null); }}
-                                  sx={{ minWidth: 40, px: 1, py: 0.2, fontSize: 11 }}
-                                >
-                                  Hủy
-                                </Button>
-                              </Stack>
-                            ) : (
                               <Stack direction="row" spacing={0.5} justifyContent="center">
                                 <Tooltip title="Sửa (Double-click)">
                                   <IconButton
@@ -1410,17 +1372,7 @@ const TrainingPlan = () => {
                                     <EditRounded fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
-                                <Tooltip title="Xóa">
-                                  <IconButton
-                                    size="small"
-                                    color="error"
-                                    onClick={(e) => { e.stopPropagation(); setDeletingSubjectId(row.id); }}
-                                  >
-                                    <DeleteRounded fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
                               </Stack>
-                            )}
                           </TableCell>
                         )}
                       </TableRow>

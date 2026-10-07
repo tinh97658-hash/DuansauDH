@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
-import { Alert, Box, Button, Chip, CircularProgress, Paper, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, TextField, Typography } from "@mui/material";
 import { API_BASE_URL } from "../../config/http";
 
 const options = { withCredentials: true };
@@ -22,11 +22,15 @@ export function AdmissionResult({ evaluation }) {
   </Stack>;
 }
 
-export default function AdmissionEvaluationPanel({ record }) {
+export default function AdmissionEvaluationPanel({ record, isAdmin = false, disabled = false, onDecided, onBusyChange }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [evaluation, setEvaluation] = useState(null);
   const [history, setHistory] = useState([]);
+  const [decision, setDecision] = useState(null);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [success, setSuccess] = useState("");
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
@@ -37,12 +41,45 @@ export default function AdmissionEvaluationPanel({ record }) {
     finally { setLoading(false); }
   }, [record.id]);
   useEffect(() => { load(); }, [load, record]);
+  const canAdmit = evaluation?.decision === "pending" && !evaluation.stale
+    && evaluation.result?.eligibility === "eligible" && evaluation.result?.meetsCutoff === true
+    && record.studyStatus !== "Đang học";
+  const confirmDecision = async () => {
+    if (busy || disabled || !decision || !note.trim()) return;
+    setBusy(true); onBusyChange?.(true); setError(""); setSuccess("");
+    try {
+      await axios.post(`${API_BASE_URL}/plan/admission-records/${record.id}/evaluation/decision`, {
+        decision, version: evaluation.version, note: note.trim(),
+      }, options);
+      setDecision(null);
+      await load();
+      await onDecided?.();
+      setSuccess("Đã cập nhật kết quả xét tuyển và trạng thái hồ sơ.");
+    } catch (err) {
+      setError(err.response?.data?.message || "Không thể phê duyệt xét tuyển.");
+      if (err.response?.status === 409) { setDecision(null); await load(); setError(err.response?.data?.message); }
+    } finally { setBusy(false); onBusyChange?.(false); }
+  };
+  const openDecision = (value) => { setNote(""); setDecision(value); setError(""); setSuccess(""); };
   if (loading) return <Box sx={{ py: 4, textAlign: "center" }}><CircularProgress size={28} /></Box>;
   return <Stack spacing={2}>
+    {success && <Alert severity="success">{success}</Alert>}
     {error && <Alert severity="error" action={<Button onClick={load}>Tải lại</Button>}>{error}</Alert>}
     <Paper variant="outlined" sx={{ p: 2.5 }}>
       <Typography fontWeight={800} color="#173E75" mb={2}>KẾT QUẢ XÉT TUYỂN</Typography>
       <AdmissionResult evaluation={evaluation} />
+      {disabled && !busy && <Alert severity="warning" sx={{ mt: 2 }}>Lưu thay đổi hồ sơ trước khi phê duyệt xét tuyển.</Alert>}
+      {evaluation?.decision === "pending" && !canAdmit && <Alert severity="info" sx={{ mt: 2 }}>
+        {evaluation.stale ? "Hồ sơ đã thay đổi. Kiểm tra và lưu lại điểm xét tuyển trước khi duyệt." : "Chỉ duyệt trúng tuyển khi đã nhập điểm, đủ điều kiện và đạt điểm ngưỡng của ngành."}
+      </Alert>}
+      <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mt: 2 }}>
+        <Button href="/masters/admission-scores" disabled={busy || disabled}>Mở điểm xét tuyển thạc sĩ</Button>
+        {isAdmin && evaluation?.decision === "pending" && <>
+          <Button variant="contained" color="success" disabled={busy || disabled || !canAdmit} onClick={() => openDecision("admitted")}>Duyệt trúng tuyển</Button>
+          <Button variant="outlined" color="error" disabled={busy || disabled} onClick={() => openDecision("rejected")}>Không trúng tuyển</Button>
+        </>}
+        {isAdmin && evaluation && evaluation.decision !== "pending" && <Button variant="outlined" disabled={busy || disabled || record.studyStatus === "Đang học"} onClick={() => openDecision("reopen")}>Mở lại xét tuyển</Button>}
+      </Stack>
     </Paper>
     <Paper variant="outlined" sx={{ p: 2.5 }}>
       <Typography fontWeight={800} color="#173E75" mb={2}>LỊCH SỬ XÉT TUYỂN</Typography>
@@ -61,5 +98,17 @@ export default function AdmissionEvaluationPanel({ record }) {
         </Box>;
       })}
     </Paper>
+    <Dialog open={Boolean(decision)} onClose={() => { if (!busy) setDecision(null); }} fullWidth maxWidth="sm">
+      <DialogTitle>{decisionLabels[decision]}</DialogTitle>
+      <DialogContent>
+        <Typography sx={{ mb: 2 }}>Xác nhận kết quả cho {record.fullName || record.code || "hồ sơ này"}. Thao tác sẽ cập nhật trạng thái hồ sơ và lưu lịch sử xét tuyển.</Typography>
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        <TextField autoFocus fullWidth multiline minRows={2} label="Ghi chú / lý do" value={note} disabled={busy} inputProps={{ maxLength: 2000 }} onChange={(event) => setNote(event.target.value)} />
+      </DialogContent>
+      <DialogActions>
+        <Button disabled={busy} onClick={() => setDecision(null)}>Hủy</Button>
+        <Button variant="contained" disabled={busy || disabled || !note.trim()} onClick={confirmDecision}>{busy ? "Đang xử lý…" : "Xác nhận"}</Button>
+      </DialogActions>
+    </Dialog>
   </Stack>;
 }

@@ -1,10 +1,9 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import { Sequelize } from "sequelize-typescript";
-import type { Transaction } from "sequelize";
-import { AdmissionRecord } from "../database/models/plan/admission-record.model.js";
+import { QueryTypes, type Transaction } from "sequelize";
 import { Subject } from "../database/models/plan/subject.model.js";
-import { Student } from "../database/models/student.model.js";
+import { Major } from "../database/models/common/major.model.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
 import { ClassGroupMember } from "../database/models/training/class-group-member.model.js";
 import { CourseOffering } from "../database/models/training/course-offering.model.js";
@@ -30,10 +29,19 @@ export class ExamGradebookService {
 
   async options() {
     const groups = await this.groups.findAll({
-      where: { program: "masters" }, attributes: ["id", "code", "name", "academicYear"],
+      where: { program: "masters" }, attributes: ["id", "code", "name", "academicYear", "majorId"],
+      include: [{ model: Major, as: "major", attributes: ["id", "name"] }],
       order: [["academicYear", "DESC"], ["name", "ASC"]],
     });
-    return { groups };
+    const courseOfferings = await this.offerings.findAll({
+      attributes: ["id", "name", "subjectId", "status"],
+      include: [
+        { model: Subject, as: "subject", attributes: ["id", "code", "name", "credits"], where: { program: "masters" }, required: true },
+        { model: CourseOfferingClassGroup, as: "groupLinks", attributes: ["classGroupId"], required: true },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+    return { groups, courseOfferings };
   }
 
   private async requireGroup(id: string, transaction?: Transaction) {
@@ -63,45 +71,87 @@ export class ExamGradebookService {
       include: [{ model: Subject, as: "subject", attributes: ["id", "code", "name", "credits", "program"] }], transaction,
     });
     if (!offering || offering.subject?.program !== "masters") throw new NotFoundException("Không tìm thấy học phần Thạc sĩ.");
-    const members = await this.members.findAll({
-      where: { classGroupId: query.classGroupId }, transaction,
-      attributes: ["id", "studentId", "admissionRecordId"],
-      include: [
-        { model: AdmissionRecord, as: "admissionRecord", attributes: ["id", "studentId", "code", "fullName", "lastName", "firstName", "dob", "gender"] },
-        { model: Student, as: "student", attributes: ["id", "regNo", "fullName"] },
-      ],
-    });
-    const roster = new Map<string, { participantId: string; code: string; fullName: string; lastName: string; firstName: string; dob: string; gender: string }>();
-    for (const member of members) {
-      const record = member.admissionRecord;
-      const studentId = member.studentId || record?.studentId;
-      const participantId = studentId ? `student:${studentId}` : record?.id ? `admission:${record.id}` : null;
-      if (!participantId || roster.has(participantId)) continue;
-      roster.set(participantId, {
-        participantId, code: record?.code || member.student?.regNo || "", fullName: record?.fullName || member.student?.fullName || "",
-        lastName: record?.lastName || "", firstName: record?.firstName || "", dob: record?.dob || "", gender: record?.gender || "",
-      });
-    }
-    return { group, offering, roster: [...roster.values()].sort((a, b) => (a.firstName || a.fullName.split(/\s+/).pop() || "").localeCompare(b.firstName || b.fullName.split(/\s+/).pop() || "", "vi") || a.fullName.localeCompare(b.fullName, "vi")) };
+    return { group, offering };
   }
 
   async get(query: ExamGradebookQueryDto) {
-    const [{ group, offering, roster }, book] = await Promise.all([
-      this.scope(query),
-      this.books.findOne({ where: { classGroupId: query.classGroupId, courseOfferingId: query.courseOfferingId } }),
-    ]);
-    const saved = new Map((book?.grades || []).map((grade) => [grade.participantId, grade]));
+    const { group, offering } = await this.scope(query);
+    const pageSize = Math.min(15, Math.max(1, query.pageSize || 15));
+    const requestedPage = Math.max(1, query.page || 1);
+    // Chỉ trả tối đa 15 hồ sơ. COUNT, tìm kiếm, lọc DS thi và khử trùng chạy trong PostgreSQL.
+    const [result] = await this.sequelize.query<any>(`
+      WITH book AS (
+        SELECT revision, grades FROM course_exam_gradebooks
+        WHERE class_group_id = :groupId AND course_offering_id = :offeringId
+      ), identities AS (
+        SELECT cm.id member_id, ar.id admission_id,
+          CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
+            THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text
+            WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END AS "participantId",
+          COALESCE(NULLIF(ar.code, ''), st.reg_no, '') AS code,
+          COALESCE(NULLIF(ar.full_name, ''), st.full_name, '') AS "fullName",
+          COALESCE(ar.last_name, '') AS "lastName", COALESCE(ar.first_name, '') AS "firstName",
+          COALESCE(ar.dob::text, '') AS dob, COALESCE(ar.gender, '') AS gender
+        FROM class_group_members cm
+        LEFT JOIN admission_records ar ON ar.id = cm.admission_record_id
+        LEFT JOIN students st ON st.id = cm.student_id
+        WHERE cm.class_group_id = :groupId
+      ), people AS (
+        SELECT DISTINCT ON ("participantId") "participantId", code, "fullName", "lastName", "firstName", dob, gender
+        FROM identities WHERE "participantId" IS NOT NULL
+        ORDER BY "participantId", admission_id NULLS LAST, member_id
+      ), grade_map AS (
+        SELECT value->>'participantId' participant_id, value grade
+        FROM book, LATERAL jsonb_array_elements(book.grades)
+      ), roster AS (
+        SELECT p.*, COALESCE(g.grade, '{}'::jsonb) grade FROM people p
+        LEFT JOIN grade_map g ON g.participant_id = p."participantId"
+      ), filtered AS (
+        SELECT * FROM roster
+        WHERE (:mode <> 'exam' OR (
+          ("participantId" = ANY(STRING_TO_ARRAY(:includeIds, ',')) OR (grade->>'eligible' = 'true' AND COALESCE(grade->>'examExempt', 'false') <> 'true'))
+          AND NOT ("participantId" = ANY(STRING_TO_ARRAY(:excludeIds, ',')))
+        ))
+          AND (:search = '' OR POSITION(LOWER(:search) IN LOWER(code || ' ' || "fullName")) > 0)
+      ), metadata AS (
+        SELECT (SELECT COUNT(*)::int FROM roster) AS "totalRows",
+          (SELECT COUNT(*)::int FROM filtered) AS total,
+          COALESCE((SELECT revision FROM book), 0) AS revision
+      ), paging AS (
+        SELECT *, LEAST(:page, GREATEST(1, CEIL(total::numeric / :pageSize)::int)) AS page FROM metadata
+      ), selected AS (
+        SELECT * FROM filtered
+        ORDER BY LOWER(COALESCE(NULLIF("firstName", ''), SUBSTRING(TRIM("fullName") FROM '[^ ]+$'))), LOWER("fullName"), "participantId"
+        LIMIT :pageSize OFFSET (SELECT (page - 1) * :pageSize FROM paging)
+      )
+      SELECT paging.*, COALESCE((SELECT jsonb_agg(to_jsonb(selected)) FROM selected), '[]'::jsonb) AS rows FROM paging
+    `, { type: QueryTypes.SELECT, replacements: {
+      groupId: query.classGroupId, offeringId: query.courseOfferingId,
+      page: requestedPage, pageSize, mode: query.mode || "all", search: (query.search || "").trim(),
+      includeIds: query.includeIds || "", excludeIds: query.excludeIds || "",
+    } });
     return {
       group: { id: group.id, name: group.name, code: group.code, academicYear: group.academicYear }, offering,
-      revision: book?.revision || 0,
-      rows: roster.map((person) => ({ ...emptyExamGrade(person.participantId), ...saved.get(person.participantId), ...person })),
+      revision: result.revision, total: result.total, totalRows: result.totalRows, page: result.page, pageSize,
+      rows: result.rows.map(({ grade, ...person }: any) => ({ ...emptyExamGrade(person.participantId), ...grade, ...person })),
     };
   }
 
   async save(dto: SaveExamGradebookDto) {
     await this.sequelize.transaction(async (transaction) => {
-      const { roster } = await this.scope(dto, transaction);
-      const allowed = new Set(roster.map((row) => row.participantId));
+      await this.scope(dto, transaction);
+      // Khi lưu chỉ kiểm tra danh tính các học viên vừa sửa, không tải cả lớp.
+      const participants = await this.sequelize.query<{ participantId: string }>(`
+        SELECT DISTINCT CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
+          THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text
+          WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END AS "participantId"
+        FROM class_group_members cm LEFT JOIN admission_records ar ON ar.id = cm.admission_record_id
+        WHERE cm.class_group_id = :groupId AND
+          (CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
+            THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text
+            WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END) IN (:ids)
+      `, { type: QueryTypes.SELECT, transaction, replacements: { groupId: dto.classGroupId, ids: dto.rows.map(row => row.participantId) } });
+      const allowed = new Set(participants.map(row => row.participantId));
       const ids = new Set<string>();
       for (const row of dto.rows) {
         if (!allowed.has(row.participantId)) throw new BadRequestException("Bảng điểm chứa học viên ngoài lớp đã chọn.");

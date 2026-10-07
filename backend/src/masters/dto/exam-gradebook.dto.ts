@@ -7,6 +7,12 @@ export class ExamSubjectsQueryDto {
 
 export class ExamGradebookQueryDto extends ExamSubjectsQueryDto {
   @IsUUID() courseOfferingId!: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(15) pageSize?: number;
+  @IsOptional() @IsIn(["all", "exam"]) mode?: "all" | "exam";
+  @IsOptional() @IsString() @MaxLength(200) search?: string;
+  @IsOptional() @IsString() @MaxLength(81000) includeIds?: string;
+  @IsOptional() @IsString() @MaxLength(81000) excludeIds?: string;
 }
 
 export class ExamGradeRowDto {

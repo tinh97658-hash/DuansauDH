@@ -18,6 +18,30 @@ const buildService = () => {
 };
 
 describe("SystemService lecturer discipline and major scope", () => {
+  it("creates a lecturer with a teaching unit without requiring discipline or major", async () => {
+    const { service, disciplines, majors, lecturers } = buildService();
+    lecturers.findOne.mockResolvedValue(null);
+    lecturers.create.mockImplementation(async (value) => value);
+
+    await service.createLecturer({
+      code: "53", name: "Nguyễn Đại An", faculty: "Khoa Máy tàu biển",
+    });
+
+    expect(lecturers.create).toHaveBeenCalledWith(expect.objectContaining({ faculty: "Khoa Máy tàu biển" }));
+    expect(disciplines.findByPk).not.toHaveBeenCalled();
+    expect(majors.findByPk).not.toHaveBeenCalled();
+  });
+
+  it("requires a major when a discipline is supplied", async () => {
+    const { service, lecturers } = buildService();
+    lecturers.findOne.mockResolvedValue(null);
+
+    await expect(service.createLecturer({
+      code: "53", name: "Nguyễn Đại An", disciplineId: "discipline-1",
+    })).rejects.toThrow("Vui lòng chọn chuyên ngành của giảng viên");
+    expect(lecturers.create).not.toHaveBeenCalled();
+  });
+
   it("creates a lecturer when the major belongs to the selected discipline", async () => {
     const { service, disciplines, majors, lecturers } = buildService();
     lecturers.findOne.mockResolvedValue(null);

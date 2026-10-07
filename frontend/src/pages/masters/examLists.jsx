@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Pagination, Paper, Stack, TableBody, TableCell, TableContainer, TableRow, TextField, Typography } from "@mui/material";
 import { DownloadRounded, ListAltRounded, SaveRounded } from "@mui/icons-material";
@@ -8,14 +8,21 @@ import FilterSearchField from "../../components/FilterSearchField";
 import ResizableTable from "../../components/ResizableTable";
 import { API_BASE_URL } from "../../config/http";
 import { personNameParts } from "../../utils/personName";
-import { draftOf, gradebookCsv, gradePayload, numericScore, RESULT_LABELS, rowError, SCORE_FIELDS, visibleGradeRows } from "../../features/exams/gradebook";
+import { displayGradeDate, draftOf, gradebookColumns, gradebookCsv, gradebookRowValues, gradePayload, numericScore, RESULT_LABELS, rowError, SCORE_FIELDS, visibleGradeRows } from "../../features/exams/gradebook";
 import "../../features/exams/gradebook.css";
 
 const panelSx = { borderColor: "#D7E4EE", borderRadius: "10px", bgcolor: "#fff", boxShadow: "0 2px 6px rgba(18,59,98,.07)" };
-const inputSx = { "& .MuiOutlinedInput-root": { height: 30, fontSize: 12, borderRadius: "5px", bgcolor: "#fff" }, "& input": { px: 0.75, py: 0.5, textAlign: "center" }, "& fieldset": { borderColor: "#D7E4EE" } };
+const inputSx = {
+  "& .MuiOutlinedInput-root": {
+    height: 30, fontSize: 12, borderRadius: 0, bgcolor: "transparent",
+    "& fieldset, &:hover fieldset, &.Mui-focused fieldset": { border: 0 },
+    "&.Mui-focused": { bgcolor: "#EDF4FA" },
+    "&.Mui-error": { bgcolor: "#FFF1F0" },
+  },
+  "& input": { px: 0.75, py: 0.5, textAlign: "center" },
+};
 const modes = { all: "Cả bảng điểm", exam: "DS thi" };
 const PAGE_SIZE = 15;
-const displayDate = (date) => /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date.split("-").reverse().join("/") : date || "—";
 const errorMessage = (error, fallback) => {
   const message = error.response?.data?.message;
   return Array.isArray(message) ? message.join(" ") : message || fallback;
@@ -23,11 +30,19 @@ const errorMessage = (error, fallback) => {
 
 export default function ExamLists() {
   const [groups, setGroups] = useState([]), [subjects, setSubjects] = useState([]);
+  const [majorId, setMajorId] = useState("");
   const [year, setYear] = useState(""), [groupId, setGroupId] = useState(""), [offeringId, setOfferingId] = useState("");
   const [rows, setRows] = useState([]), [revision, setRevision] = useState(0), [dirty, setDirty] = useState({});
   const [mode, setMode] = useState("all"), [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [role, setRole] = useState(""), [optionsLoading, setOptionsLoading] = useState(true), [subjectsLoading, setSubjectsLoading] = useState(false), [loading, setLoading] = useState(false), [saving, setSaving] = useState(false);
+  const [total, setTotal] = useState(0), [totalRows, setTotalRows] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  const includeIds = Object.values(dirty).filter(row => row.eligible === true && !row.examExempt).map(row => row.participantId).join(",");
+  const excludeIds = Object.values(dirty).filter(row => row.eligible !== true || row.examExempt).map(row => row.participantId).join(",");
+  const examIncludeIds = mode === "exam" ? includeIds : "", examExcludeIds = mode === "exam" ? excludeIds : "";
+  const [role, setRole] = useState(""), [optionsLoading, setOptionsLoading] = useState(true), [loading, setLoading] = useState(false), [saving, setSaving] = useState(false);
   const [error, setError] = useState(""), [success, setSuccess] = useState(""), [pendingChange, setPendingChange] = useState(null);
   const canEdit = role === "admin" || role === "examiner";
   const dirtyCount = Object.keys(dirty).length;
@@ -38,8 +53,12 @@ export default function ExamLists() {
       .then(([options, auth]) => {
         if (!active) return;
         const list = options.data.groups || [];
-        setGroups(list); setRole(auth.data.message || "");
-        const first = list[0]; setYear(first?.academicYear || ""); setGroupId(first?.id || "");
+        const offerings = options.data.courseOfferings || [];
+        setGroups(list); setSubjects(offerings); setRole(auth.data.message || "");
+        const first = list[0];
+        const offering = offerings.find((item) => item.groupLinks?.some((link) => link.classGroupId === first?.id));
+        setMajorId(first?.majorId || ""); setYear(first?.academicYear || "");
+        setGroupId(offering ? first.id : ""); setOfferingId(offering?.id || "");
       })
       .catch((failure) => active && setError(errorMessage(failure, "Không thể tải danh sách lớp. Hãy tải lại trang.")))
       .finally(() => active && setOptionsLoading(false));
@@ -48,27 +67,23 @@ export default function ExamLists() {
 
   useEffect(() => {
     let active = true;
-    setSubjects([]); setOfferingId(""); setRows([]); setDirty({}); setSuccess("");
-    if (!groupId) { setSubjectsLoading(false); return () => { active = false; }; }
-    setSubjectsLoading(true); setError("");
-    axios.get(`${API_BASE_URL}/masters/exam-lists/subjects`, { params: { classGroupId: groupId } })
-      .then(({ data }) => { if (active) { setSubjects(data); setOfferingId(data[0]?.id || ""); } })
-      .catch((failure) => active && setError(errorMessage(failure, "Không thể tải học phần của lớp.")))
-      .finally(() => active && setSubjectsLoading(false));
-    return () => { active = false; };
-  }, [groupId]);
-
-  useEffect(() => {
-    let active = true;
-    setRows([]); setDirty({}); setSuccess("");
+    setRows([]);
     if (!groupId || !offeringId) { setLoading(false); return () => { active = false; }; }
     setLoading(true); setError("");
-    axios.get(`${API_BASE_URL}/masters/exam-lists`, { params: { classGroupId: groupId, courseOfferingId: offeringId } })
-      .then(({ data }) => { if (active) { setRows(data.rows.map(draftOf)); setRevision(data.revision); } })
+    axios.get(`${API_BASE_URL}/masters/exam-lists`, { params: {
+      classGroupId: groupId, courseOfferingId: offeringId, page, pageSize: PAGE_SIZE, mode, search,
+      ...(mode === "exam" ? { includeIds: examIncludeIds, excludeIds: examExcludeIds } : {}),
+    } })
+      .then(({ data }) => { if (active) {
+        setRows(data.rows.map(row => dirtyRef.current[row.participantId] || draftOf(row)));
+        if (!Object.keys(dirtyRef.current).length) setRevision(data.revision);
+        setTotal(data.total); setTotalRows(data.totalRows);
+        if (data.page !== page) setPage(data.page);
+      } })
       .catch((failure) => active && setError(errorMessage(failure, "Không thể tải bảng điểm.")))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [groupId, offeringId]);
+  }, [groupId, offeringId, page, mode, search, examIncludeIds, examExcludeIds]);
 
   useEffect(() => {
     if (!dirtyCount) return undefined;
@@ -77,25 +92,33 @@ export default function ExamLists() {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirtyCount]);
 
-  const years = [...new Set(groups.map((group) => group.academicYear || ""))].sort().reverse();
-  const visibleGroups = groups.filter((group) => (group.academicYear || "") === year);
+  const majors = [...new Map(groups.filter((group) => group.majorId).map((group) => [group.majorId, { id: group.majorId, name: group.major?.name || group.major?.code || group.majorId }])).values()];
+  const majorGroups = groups.filter((group) => !majorId || group.majorId === majorId);
+  const years = [...new Set(majorGroups.map((group) => group.academicYear || ""))].sort().reverse();
+  const classChoices = useMemo(() => subjects.flatMap((offering) => (offering.groupLinks || []).flatMap((link) => {
+    const group = groups.find((item) => item.id === link.classGroupId);
+    return group ? [{ key: `${group.id}:${offering.id}`, group, offering }] : [];
+  })), [subjects, groups]);
+  const visibleClasses = classChoices.filter(({ group }) => (!majorId || group.majorId === majorId) && (group.academicYear || "") === year);
+  const subjectKey = (offering) => offering?.subjectId || offering?.subject?.id || offering?.subject?.code || "";
+  const subjectChoices = [...new Map(visibleClasses.map(({ offering }) => [subjectKey(offering), offering.subject])).entries()];
   const selectedGroup = groups.find((group) => group.id === groupId);
   const selectedOffering = subjects.find((subject) => subject.id === offeringId);
-  const visible = useMemo(() => visibleGradeRows(rows, mode, search), [rows, mode, search]);
-  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
+  const visible = rows;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const currentPage = page;
   const pageStart = (currentPage - 1) * PAGE_SIZE;
-  const pageRows = useMemo(() => visible.slice(pageStart, pageStart + PAGE_SIZE), [visible, pageStart]);
-  const printRows = useMemo(() => visibleGradeRows(rows, mode, ""), [rows, mode]);
-  useEffect(() => { setPage(1); }, [groupId, offeringId, mode, search]);
-  useEffect(() => { setPage((value) => Math.min(value, totalPages)); }, [totalPages]);
+  const pageRows = visible;
+  const printRows = pageRows;
   const requestChange = (change) => { if (dirtyCount) setPendingChange(() => change); else change(); };
+  const selectClass = (entry) => { setDirty({}); dirtyRef.current = {}; setSuccess(""); setPage(1); setGroupId(entry?.group.id || ""); setOfferingId(entry?.offering.id || ""); };
   const edit = (id, patch) => {
     setRows((current) => current.map((row) => row.participantId === id ? { ...row, ...patch } : row));
-    setDirty((current) => ({ ...current, [id]: true })); setSuccess("");
+    const row = dirty[id] || rows.find(item => item.participantId === id);
+    setDirty((current) => ({ ...current, [id]: { ...row, ...patch } })); setSuccess("");
   };
   const save = async () => {
-    const changed = rows.filter((row) => dirty[row.participantId]);
+    const changed = Object.values(dirty);
     for (const row of changed) {
       const invalid = rowError(row);
       if (invalid) { setError(`${row.code || row.fullName}: ${invalid}`); return; }
@@ -104,57 +127,76 @@ export default function ExamLists() {
     try {
       const { data } = await axios.put(`${API_BASE_URL}/masters/exam-lists`, {
         classGroupId: groupId, courseOfferingId: offeringId, revision, rows: changed.map(gradePayload),
+        page, pageSize: PAGE_SIZE, mode, search,
       });
-      setRows(data.rows.map(draftOf)); setRevision(data.revision); setDirty({});
+      setRows(data.rows.map(draftOf)); setRevision(data.revision); setDirty({}); dirtyRef.current = {};
+      setTotal(data.total); setTotalRows(data.totalRows); setPage(data.page);
       setSuccess(`Đã cập nhật bảng điểm cho ${changed.length} học viên.`);
     } catch (failure) { setError(errorMessage(failure, "Không thể lưu bảng điểm. Các điểm vừa nhập vẫn được giữ trên màn hình.")); }
     finally { setSaving(false); }
   };
-  const download = () => {
-    const url = URL.createObjectURL(new Blob([gradebookCsv(visible, mode === "exam")], { type: "text/csv;charset=utf-8;" }));
-    const anchor = document.createElement("a"); anchor.href = url;
-    anchor.download = `bang-diem-${selectedGroup?.code || "lop"}-${selectedOffering?.subject?.code || "hoc-phan"}-${mode}.csv`;
-    anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const download = async () => {
+    setExporting(true); setError("");
+    try {
+      const exported = [];
+      let exportPage = 1, exportTotal = 0, exportRevision;
+      do {
+        const { data } = await axios.get(`${API_BASE_URL}/masters/exam-lists`, { params: {
+          classGroupId: groupId, courseOfferingId: offeringId, page: exportPage, pageSize: PAGE_SIZE, mode, search,
+          ...(mode === "exam" ? { includeIds, excludeIds } : {}),
+        } });
+        if (exportRevision !== undefined && data.revision !== exportRevision) throw new Error("Bảng điểm đã thay đổi trong lúc xuất. Vui lòng xuất lại.");
+        exportRevision = data.revision; exportTotal = data.total;
+        if (data.page !== exportPage) throw new Error("Danh sách đã thay đổi trong lúc xuất. Vui lòng xuất lại.");
+        exported.push(...data.rows.map(row => dirtyRef.current[row.participantId] || draftOf(row)));
+        exportPage++;
+      } while ((exportPage - 1) * PAGE_SIZE < exportTotal);
+      const url = URL.createObjectURL(new Blob([gradebookCsv(visibleGradeRows(exported, mode, search), mode === "exam")], { type: "text/csv;charset=utf-8;" }));
+      const anchor = document.createElement("a"); anchor.href = url;
+      anchor.download = `${mode === "exam" ? "ds-thi" : "ca-bang-diem"}-${selectedGroup?.code || "lop"}-${selectedOffering?.subject?.code || "hoc-phan"}.csv`;
+      anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (failure) { setError(failure.response ? errorMessage(failure, "Không thể xuất danh sách.") : failure.message); }
+    finally { setExporting(false); }
   };
   const blank = mode === "exam";
-  const locked = !canEdit || saving || blank;
-  const columns = [
-    { key: "index", label: "STT", width: 45, minWidth: 40, align: "center" },
-    { key: "code", label: "Mã HV", width: 140 }, { key: "lastName", label: "Họ đệm", width: 150 },
-    { key: "firstName", label: "Tên", width: 85 }, { key: "dob", label: "Ngày sinh", width: 110, align: "center" },
-    { key: "gender", label: "Giới tính", width: 75, align: "center" },
-    { key: "eligible", label: "Tư cách", width: 85, align: "center" }, { key: "exempt", label: "Miễn thi", width: 85, align: "center" },
-    ...SCORE_FIELDS.map(([key, label]) => ({ key, label, width: key === "assignmentScore" ? 130 : 115, minWidth: 90, align: "center" })),
-    { key: "letter", label: "Thang điểm chữ", width: 120, align: "center" },
-    { key: "attempts", label: "Điểm các lần thi hết môn", width: 185 }, { key: "result", label: "Kết quả điểm", width: 155 },
-  ];
-  const busy = optionsLoading || subjectsLoading || loading;
+  const locked = !canEdit || saving || exporting || blank;
+  const columns = gradebookColumns(blank);
+  const busy = optionsLoading || loading;
 
   return <FeatureLayout title="Danh sách thi, điểm thi" group="Quá trình học tập" maxWidth={1880}>
     <Box className="exam-gradebook">
       <Paper variant="outlined" sx={{ ...panelSx, p: 1.5, mb: 1.5 }} className="exam-no-print">
         <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="flex-end">
-          <FilterSelectField label="Năm vào trường" value={year} disabled={optionsLoading || saving} sx={{ flex: "1 1 150px", minWidth: 150 }} onChange={(event) => {
+          <FilterSelectField label="Chuyên ngành" value={majorId} disabled={optionsLoading || saving || exporting} sx={{ flex: "2 1 220px", minWidth: 180 }} onChange={(event) => {
             const next = event.target.value;
-            requestChange(() => { setYear(next); setOfferingId(""); setGroupId(groups.find((group) => (group.academicYear || "") === next)?.id || ""); });
+            requestChange(() => {
+              const scopedGroups = groups.filter((group) => !next || group.majorId === next);
+              const nextYear = scopedGroups.some((group) => (group.academicYear || "") === year) ? year : scopedGroups[0]?.academicYear || "";
+              setMajorId(next); setYear(nextYear);
+              selectClass(classChoices.find(({ group }) => (!next || group.majorId === next) && (group.academicYear || "") === nextYear));
+            });
+          }}><MenuItem value="">Tất cả chuyên ngành</MenuItem>{majors.map((major) => <MenuItem key={major.id} value={major.id}>{major.name}</MenuItem>)}</FilterSelectField>
+          <FilterSelectField label="Năm" value={year} disabled={optionsLoading || saving || exporting} sx={{ flex: "1 1 100px", minWidth: 100 }} onChange={(event) => {
+            const next = event.target.value;
+            requestChange(() => { setYear(next); selectClass(classChoices.find(({ group }) => (!majorId || group.majorId === majorId) && (group.academicYear || "") === next)); });
           }}>{!years.length && <MenuItem value="">Chưa có năm tuyển sinh</MenuItem>}{years.map((value) => <MenuItem key={value} value={value}>{value || "Chưa có năm"}</MenuItem>)}</FilterSelectField>
-          <FilterSelectField label="Chọn lớp" value={groupId} disabled={optionsLoading || saving || !visibleGroups.length} sx={{ flex: "2 1 260px", minWidth: 230 }} onChange={(event) => { const value = event.target.value; requestChange(() => { setOfferingId(""); setGroupId(value); }); }}>
-            {!visibleGroups.length && <MenuItem value="">Chưa có lớp học viên</MenuItem>}{visibleGroups.map((group) => <MenuItem key={group.id} value={group.id}>{group.name} · {group.code}</MenuItem>)}
+          <FilterSelectField label="Lớp học phần" value={groupId && offeringId ? `${groupId}:${offeringId}` : ""} disabled={optionsLoading || saving || exporting || !visibleClasses.length} sx={{ flex: "3 1 280px", minWidth: 230 }} onChange={(event) => { const value = event.target.value; requestChange(() => selectClass(visibleClasses.find((entry) => entry.key === value))); }}>
+            {!visibleClasses.length && <MenuItem value="">Chưa có lớp học phần</MenuItem>}{visibleClasses.map((entry) => <MenuItem key={entry.key} value={entry.key}>{entry.offering.name || entry.offering.subject?.name} · {entry.group.name}</MenuItem>)}
           </FilterSelectField>
-          <FilterSelectField label="Chọn môn" value={offeringId} disabled={subjectsLoading || saving || !subjects.length} sx={{ flex: "3 1 380px", minWidth: 260 }} onChange={(event) => { const value = event.target.value; requestChange(() => setOfferingId(value)); }}>
-            {!subjects.length && <MenuItem value="">{subjectsLoading ? "Đang tải học phần..." : "Chưa tổ chức học phần"}</MenuItem>}{subjects.map((offering) => <MenuItem key={offering.id} value={offering.id}>{offering.subject?.name} · {offering.name || offering.subject?.code}</MenuItem>)}
+          <FilterSelectField label="Môn" value={subjectKey(selectedOffering)} disabled={optionsLoading || saving || exporting || !subjectChoices.length} sx={{ flex: "2 1 220px", minWidth: 180 }} onChange={(event) => { const value = event.target.value; requestChange(() => selectClass(visibleClasses.find((entry) => subjectKey(entry.offering) === value))); }}>
+            {!subjectChoices.length && <MenuItem value="">Chưa có môn học</MenuItem>}{subjectChoices.map(([id, subject]) => <MenuItem key={id} value={id}>{subject?.name}</MenuItem>)}
           </FilterSelectField>
-          <FilterSearchField placeholder="Tìm theo mã HV, họ tên..." value={search} onChange={(event) => setSearch(event.target.value)} sx={{ flex: "2 1 250px", minWidth: 230 }} />
+          <FilterSearchField placeholder="Tìm theo mã HV, họ tên..." value={search} disabled={saving || exporting} onChange={(event) => { setPage(1); setSearch(event.target.value); }} sx={{ flex: "2 1 250px", minWidth: 230 }} />
         </Stack>
       </Paper>
 
       <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} sx={{ mb: 1.5 }} className="exam-no-print">
         <Stack direction="row" flexWrap="wrap" gap={0.75}>
-          <Button variant="contained" startIcon={<SaveRounded />} disabled={!canEdit || !dirtyCount || saving || busy} onClick={save} sx={{ bgcolor: "#0788B8", boxShadow: "none", borderRadius: "7px" }}>{saving ? "Đang lưu..." : "Cập nhật cả bảng"}</Button>
-          {Object.entries(modes).map(([key, label]) => <Button key={key} startIcon={<ListAltRounded />} variant={mode === key ? "contained" : "outlined"} onClick={() => setMode(key)} sx={{ borderRadius: "7px", boxShadow: "none", ...(mode === key ? { bgcolor: "#173E75" } : { bgcolor: "#fff" }) }}>{label}</Button>)}
+          <Button variant="contained" startIcon={<SaveRounded />} disabled={!canEdit || !dirtyCount || saving || exporting || busy} onClick={save} sx={{ bgcolor: "#0788B8", boxShadow: "none", borderRadius: "7px" }}>{saving ? "Đang lưu..." : "Cập nhật cả bảng"}</Button>
+          {Object.entries(modes).map(([key, label]) => <Button key={key} startIcon={<ListAltRounded />} disabled={saving || exporting} variant={mode === key ? "contained" : "outlined"} onClick={() => { setPage(1); setMode(key); }} sx={{ borderRadius: "7px", boxShadow: "none", ...(mode === key ? { bgcolor: "#173E75" } : { bgcolor: "#fff" }) }}>{label}</Button>)}
         </Stack>
         <Stack direction="row" gap={0.75}>
-          <Button variant="outlined" startIcon={<DownloadRounded />} disabled={!visible.length || busy} onClick={download}>Xuất CSV</Button>
+          <Button variant="outlined" startIcon={<DownloadRounded />} disabled={!total || busy || saving || exporting} onClick={download}>{exporting ? "Đang xuất..." : "Xuất CSV"}</Button>
         </Stack>
       </Stack>
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
@@ -164,7 +206,7 @@ export default function ExamLists() {
           <Box><Typography component="h1" sx={{ fontSize: 15, fontWeight: 700, color: "#173E75", m: 0 }}>{modes[mode].toLocaleUpperCase("vi")}</Typography>
             <Typography sx={{ fontSize: 12, color: "#607486", mt: 0.25 }}>{[selectedGroup?.name, selectedOffering?.subject?.name].filter(Boolean).join(" · ") || "Chọn lớp và học phần để xem danh sách thi."}</Typography>
           </Box>
-          <Stack direction="row" gap={0.75} className="exam-no-print"><Chip size="small" label={`${visible.length} / ${rows.length} học viên`} sx={{ bgcolor: "#EDF4FA", color: "#173E75" }} />{dirtyCount > 0 && <Chip size="small" color="warning" variant="outlined" label={`${dirtyCount} học viên chưa lưu`} />}</Stack>
+          <Stack direction="row" gap={0.75} className="exam-no-print"><Chip size="small" label={`${total} / ${totalRows} học viên`} sx={{ bgcolor: "#EDF4FA", color: "#173E75" }} />{dirtyCount > 0 && <Chip size="small" color="warning" variant="outlined" label={`${dirtyCount} học viên chưa lưu`} />}</Stack>
         </Stack>
         {busy ? <Box sx={{ py: 6, textAlign: "center" }}><CircularProgress size={30} aria-label="Đang tải bảng điểm" /></Box> : <TableContainer sx={{ overflowX: "auto" }} className="exam-table-container exam-no-print">
           <ResizableTable columns={columns} storageKey="masters-exam-gradebook-columns">
@@ -173,14 +215,14 @@ export default function ExamLists() {
               return <TableRow key={row.participantId} hover sx={{ "& td": { fontSize: 12.5, py: 0.75, borderColor: "#E2EBF2" }, ...(dirty[row.participantId] ? { bgcolor: "#FFFDF5" } : {}) }}>
                 <TableCell align="center">{pageStart + index + 1}</TableCell><TableCell sx={{ fontWeight: 600 }}>{row.code || "—"}</TableCell>
                 <TableCell title={name.familyAndMiddle}>{name.familyAndMiddle}</TableCell><TableCell>{name.givenName}</TableCell>
-                <TableCell align="center">{displayDate(row.dob)}</TableCell><TableCell align="center">{row.gender || "—"}</TableCell>
+                <TableCell align="center">{displayGradeDate(row.dob)}</TableCell><TableCell align="center">{row.gender || "—"}</TableCell>
                 <TableCell align="center"><Checkbox size="small" disabled={locked} indeterminate={row.eligible == null} checked={row.eligible === true} inputProps={{ "aria-label": `Tư cách thi ${row.code}` }} onChange={(event) => edit(row.participantId, { eligible: event.target.checked })} /></TableCell>
                 <TableCell align="center"><Checkbox size="small" disabled={locked} checked={row.examExempt} inputProps={{ "aria-label": `Miễn thi ${row.code}` }} onChange={(event) => edit(row.participantId, { examExempt: event.target.checked, result: event.target.checked ? "exempt" : "pending" })} /></TableCell>
-                {SCORE_FIELDS.map(([key, label, max]) => <TableCell key={key} align="center" sx={{ bgcolor: "#F7FAFC" }}>
+                {!blank && <>{SCORE_FIELDS.map(([key, label, max]) => <TableCell key={key} align="center" sx={{ bgcolor: "#F7FAFC" }}>
                   <TextField fullWidth size="small" value={blank ? "" : row[key]} disabled={locked} error={!blank && numericScore(row[key]) !== null && (!Number.isFinite(numericScore(row[key])) || numericScore(row[key]) < 0 || numericScore(row[key]) > max)} onChange={(event) => edit(row.participantId, { [key]: event.target.value })} inputProps={{ "aria-label": `${label} ${row.code}`, inputMode: "decimal" }} sx={inputSx} />
                 </TableCell>)}
                 <TableCell><TextField fullWidth size="small" value={blank ? "" : row.letterGrade} disabled={locked} onChange={(event) => edit(row.participantId, { letterGrade: event.target.value.toUpperCase() })} inputProps={{ "aria-label": `Thang điểm chữ ${row.code}`, maxLength: 10 }} sx={inputSx} /></TableCell>
-                <TableCell><TextField fullWidth size="small" value={blank ? "" : row.attemptScores} disabled={locked} placeholder={locked ? "" : "8,5; 9"} onChange={(event) => edit(row.participantId, { attemptScores: event.target.value })} inputProps={{ "aria-label": `Điểm các lần thi ${row.code}` }} sx={inputSx} /></TableCell>
+                <TableCell><TextField fullWidth size="small" value={blank ? "" : row.attemptScores} disabled={locked} placeholder={locked ? "" : "8,5; 9"} onChange={(event) => edit(row.participantId, { attemptScores: event.target.value })} inputProps={{ "aria-label": `Điểm các lần thi ${row.code}` }} sx={inputSx} /></TableCell></>}
                 <TableCell><TextField select fullWidth size="small" SelectProps={{ native: true }} value={blank ? "pending" : row.result} disabled={locked || row.examExempt} onChange={(event) => edit(row.participantId, { result: event.target.value })} inputProps={{ "aria-label": `Kết quả điểm ${row.code}` }} sx={{ ...inputSx, "& select": { py: 0.5, fontSize: 12, color: row.result === "failed" ? "#B52D2D" : row.result === "passed" ? "#137B3B" : "#607486" } }}>
                   {Object.entries(RESULT_LABELS).map(([value, label]) => <option key={value} value={value}>{blank ? "" : label}</option>)}
                 </TextField></TableCell>
@@ -190,10 +232,10 @@ export default function ExamLists() {
         </TableContainer>}
         {!busy && visible.length > 0 && <Box className="exam-no-print" sx={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 1, minHeight: 48, px: 1.5, py: 0.75, borderTop: "1px solid #D7E4EE" }}>
           <Typography variant="caption" sx={{ color: "#607486", fontWeight: 600, position: { xs: "static", md: "absolute" }, left: 16 }}>
-            Hiển thị {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, visible.length)} trên {visible.length} học viên
+            Hiển thị {pageStart + 1}–{pageStart + pageRows.length} trên {total} học viên
           </Typography>
           {totalPages > 1 && <Pagination
-            page={currentPage} count={totalPages} onChange={(_event, value) => setPage(value)}
+            page={currentPage} count={totalPages} disabled={saving || exporting} onChange={(_event, value) => setPage(value)}
             color="primary" size="medium" showFirstButton showLastButton
             sx={{ "& .MuiPaginationItem-root": { minWidth: 38, height: 38, fontSize: 14, fontWeight: 600 } }}
           />}
@@ -202,11 +244,7 @@ export default function ExamLists() {
           <table data-testid="exam-print-table" aria-label="Danh sách in">
             <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead>
             <tbody>{printRows.map((row, index) => {
-              const name = personNameParts(row);
-              const values = [index + 1, row.code || "—", name.familyAndMiddle, name.givenName, displayDate(row.dob), row.gender || "—",
-                row.eligible == null ? "Chưa xét" : row.eligible ? "Đủ tư cách" : "Không đủ tư cách", row.examExempt ? "Có" : "Không",
-                ...SCORE_FIELDS.map(([key]) => blank ? "" : row[key]), blank ? "" : row.letterGrade,
-                blank ? "" : row.attemptScores, blank ? "" : RESULT_LABELS[row.result]];
+              const values = gradebookRowValues(row, pageStart + index, blank);
               return <tr key={row.participantId}>{values.map((value, cellIndex) => <td key={columns[cellIndex].key}>{value}</td>)}</tr>;
             })}</tbody>
           </table>

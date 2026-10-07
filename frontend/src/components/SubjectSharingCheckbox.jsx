@@ -40,7 +40,16 @@ export default function SubjectSharingCheckbox({ subject, majors = [], disabled 
         onDoubleClick={(event) => event.stopPropagation()} displayEmpty
         renderValue={(values) => values.length ? (values.length === candidates.length ? "Tất cả ngành" : `${values.length} ngành`) : "Riêng ngành"}
         inputProps={{ "aria-label": `Phạm vi học chung: ${subject.name || "Học phần mới"}` }}
-        sx={{ minWidth: 112, height: 30, fontSize: 11, bgcolor: "#fff" }}
+        sx={{
+          minWidth: 112,
+          height: 30,
+          fontSize: 11,
+          bgcolor: "transparent",
+          borderRadius: 0,
+          "& .MuiOutlinedInput-notchedOutline, &:hover .MuiOutlinedInput-notchedOutline, &.Mui-focused .MuiOutlinedInput-notchedOutline": {
+            border: 0,
+          },
+        }}
         MenuProps={{ PaperProps: { sx: { maxHeight: 360, minWidth: 300 } } }}>
         <MenuItem value="__ALL__" sx={{ fontWeight: 700 }}>
           <Checkbox size="small" checked={allSelected} indeterminate={selected.length > 0 && !allSelected} />

@@ -33,15 +33,30 @@ export const visibleGradeRows = (rows, mode, query) => {
     return !search || `${row.code} ${row.fullName}`.toLocaleLowerCase("vi").includes(search);
   });
 };
+export const displayGradeDate = (date) => /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date.split("-").reverse().join("/") : date || "—";
+export const gradebookColumns = (blank = false) => [
+  { key: "index", label: "STT", width: 45, minWidth: 40, align: "center" },
+  { key: "code", label: "Mã HV", width: 140 }, { key: "lastName", label: "Họ đệm", width: 150 },
+  { key: "firstName", label: "Tên", width: 85 }, { key: "dob", label: "Ngày sinh", width: 110, align: "center" },
+  { key: "gender", label: "Giới tính", width: 75, align: "center" },
+  { key: "eligible", label: "Tư cách", width: 85, align: "center" }, { key: "exempt", label: "Miễn thi", width: 85, align: "center" },
+  ...(!blank ? [
+    ...SCORE_FIELDS.map(([key, label]) => ({ key, label, width: key === "assignmentScore" ? 130 : 115, minWidth: 90, align: "center" })),
+    { key: "letter", label: "Thang điểm chữ", width: 120, align: "center" },
+    { key: "attempts", label: "Điểm các lần thi hết môn", width: 185 },
+  ] : []),
+  { key: "result", label: "Kết quả điểm", width: 155 },
+];
+export const gradebookRowValues = (row, index, blank = false) => {
+  const name = personNameParts(row);
+  return [index + 1, row.code || "—", name.familyAndMiddle, name.givenName, displayGradeDate(row.dob), row.gender || "—",
+    row.eligible == null ? "Chưa xét" : row.eligible ? "Đủ tư cách" : "Không đủ tư cách", row.examExempt ? "Có" : "Không",
+    ...(!blank ? [...SCORE_FIELDS.map(([key]) => row[key]), row.letterGrade, row.attemptScores] : []),
+    blank ? "" : RESULT_LABELS[row.result]];
+};
 export const gradebookCsv = (rows, blank = false) => {
-  const headers = ["STT", "Mã HV", "Họ đệm", "Tên", "Ngày sinh", "Giới tính", "Tư cách", "Miễn thi", ...SCORE_FIELDS.map(([, label]) => label), "Thang điểm chữ", "Điểm các lần thi hết môn", "Kết quả điểm"];
-  const values = rows.map((row, index) => {
-    const name = personNameParts(row);
-    return [index + 1, row.code, name.familyAndMiddle, name.givenName, row.dob, row.gender,
-      row.eligible == null ? "Chưa xét" : row.eligible ? "Đủ điều kiện" : "Không đủ điều kiện", row.examExempt ? "Có" : "Không",
-      ...SCORE_FIELDS.map(([key]) => blank ? "" : row[key]), blank ? "" : row.letterGrade,
-      blank ? "" : row.attemptScores, blank ? "" : RESULT_LABELS[row.result]];
-  });
+  const headers = gradebookColumns(blank).map((column) => column.label);
+  const values = rows.map((row, index) => gradebookRowValues(row, index, blank));
   const escape = (value) => {
     let text = String(value ?? "");
     if (/^[=+@-]/.test(text)) text = `'${text}`;
