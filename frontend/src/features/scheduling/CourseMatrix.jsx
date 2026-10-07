@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Tooltip } from "@mui/material";
 import {
   CalendarMonthRounded,
   GridViewRounded,
@@ -124,32 +125,53 @@ export default function CourseMatrix({ user }) {
 
   return (
     <section className="sl-workspace sl-matrix-workspace" aria-label="Ma trận lớp học phần theo khóa">
-      {/* KPI Stats Bar */}
-      <div className="sl-matrix-kpi-bar" role="region" aria-label="Chỉ số tổng quan">
-        <div className="sl-matrix-kpi">
-          <span className="sl-matrix-kpi-icon"><LayersRounded aria-hidden="true" /></span>
-          <div><strong>{kpis.total}</strong><span>TỔNG SỐ LỚP HỌC PHẦN</span><small>Trong phạm vi đang lọc</small></div>
-        </div>
-        <div className={`sl-matrix-kpi ${kpis.unscheduled > 0 ? "kpi-warn" : ""}`}>
-          <span className="sl-matrix-kpi-icon"><PendingActionsRounded aria-hidden="true" /></span>
-          <div><strong>{kpis.unscheduled}</strong><span>CHƯA XẾP LỊCH</span><small>{kpis.unscheduled > 0 ? "Cần ưu tiên sắp xếp" : "Đã xử lý đầy đủ"}</small></div>
-        </div>
-        <div className="sl-matrix-kpi kpi-progress">
-          <span className="sl-matrix-kpi-icon"><CalendarMonthRounded aria-hidden="true" /></span>
-          <div><strong>{kpis.scheduled}</strong><span>ĐANG HỌC / ĐÃ XẾP LỊCH</span><small>Đã có buổi học</small></div>
-        </div>
-        <div className="sl-matrix-kpi kpi-cross">
-          <span className="sl-matrix-kpi-icon"><GridViewRounded aria-hidden="true" /></span>
-          <div><strong>{kpis.crossCohort}</strong><span>GHÉP LIÊN KHÓA</span><small>Học chung từ 2 khóa</small></div>
-        </div>
-      </div>
-
-      {/* Filter and View Switcher Toolbar */}
       <div className="sl-matrix-toolbar">
         <div className="sl-matrix-toolbar-head">
-          <div>
-            <h2>Bộ lọc dữ liệu</h2>
-            <span>Đang hiển thị {filtered.length} / {all.length} lớp học phần</span>
+          <div className="sl-matrix-kpi-bar" role="region" aria-label="Chỉ số tổng quan">
+            <Tooltip
+              arrow placement="bottom" disableInteractive enterDelay={0}
+              title={<><strong>Tổng số lớp học phần</strong><span>Trong phạm vi đang lọc</span></>}
+              componentsProps={{ tooltip: { className: "sl-matrix-kpi-tooltip" }, arrow: { className: "sl-matrix-kpi-arrow" } }}
+              PopperProps={{ modifiers: [{ name: "flip", enabled: false }, { name: "preventOverflow", options: { padding: 8, altAxis: true } }] }}
+            >
+              <div className="sl-matrix-kpi kpi-info" tabIndex={0}>
+                <span className="sl-matrix-kpi-icon"><LayersRounded aria-hidden="true" /></span>
+                <div><strong>{kpis.total}</strong><span>Tổng số lớp học phần</span></div>
+              </div>
+            </Tooltip>
+            <Tooltip
+              arrow placement="bottom" disableInteractive enterDelay={0}
+              title={<><strong>Chưa xếp lịch</strong><span>Cần ưu tiên sắp xếp</span></>}
+              componentsProps={{ tooltip: { className: "sl-matrix-kpi-tooltip" }, arrow: { className: "sl-matrix-kpi-arrow" } }}
+              PopperProps={{ modifiers: [{ name: "flip", enabled: false }, { name: "preventOverflow", options: { padding: 8, altAxis: true } }] }}
+            >
+              <div className="sl-matrix-kpi kpi-warn" tabIndex={0}>
+                <span className="sl-matrix-kpi-icon"><PendingActionsRounded aria-hidden="true" /></span>
+                <div><strong>{kpis.unscheduled}</strong><span>Chưa xếp lịch</span></div>
+              </div>
+            </Tooltip>
+            <Tooltip
+              arrow placement="bottom" disableInteractive enterDelay={0}
+              title={<><strong>Đang học / Đã xếp lịch</strong><span>Đã có buổi học</span></>}
+              componentsProps={{ tooltip: { className: "sl-matrix-kpi-tooltip" }, arrow: { className: "sl-matrix-kpi-arrow" } }}
+              PopperProps={{ modifiers: [{ name: "flip", enabled: false }, { name: "preventOverflow", options: { padding: 8, altAxis: true } }] }}
+            >
+              <div className="sl-matrix-kpi kpi-progress" tabIndex={0}>
+                <span className="sl-matrix-kpi-icon"><CalendarMonthRounded aria-hidden="true" /></span>
+                <div><strong>{kpis.scheduled}</strong><span>Đang học / Đã xếp lịch</span></div>
+              </div>
+            </Tooltip>
+            <Tooltip
+              arrow placement="bottom" disableInteractive enterDelay={0}
+              title={<><strong>Ghép liên khóa</strong><span>Học chung từ 2 khóa</span></>}
+              componentsProps={{ tooltip: { className: "sl-matrix-kpi-tooltip" }, arrow: { className: "sl-matrix-kpi-arrow" } }}
+              PopperProps={{ modifiers: [{ name: "flip", enabled: false }, { name: "preventOverflow", options: { padding: 8, altAxis: true } }] }}
+            >
+              <div className="sl-matrix-kpi kpi-cross" tabIndex={0}>
+                <span className="sl-matrix-kpi-icon"><GridViewRounded aria-hidden="true" /></span>
+                <div><strong>{kpis.crossCohort}</strong><span>Ghép liên khóa</span></div>
+              </div>
+            </Tooltip>
           </div>
           <div className="sl-matrix-view-toggle" aria-label="Kiểu hiển thị">
             <button
@@ -249,6 +271,7 @@ export default function CourseMatrix({ user }) {
           <div>
             <h2>{viewMode === "board" ? "Lớp học phần theo khóa" : "Đối chiếu học phần giữa các khóa"}</h2>
           </div>
+          <span className="sl-matrix-display-count">Đang hiển thị {filtered.length} / {all.length} lớp học phần</span>
         </div>
 
         {/* Main Content Area */}

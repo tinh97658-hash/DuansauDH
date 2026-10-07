@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import axios from "axios";
 import CourseMatrixPage from "../../pages/masters/courseMatrix";
@@ -298,4 +298,62 @@ it("uses the existing empty state when every fetched offering is completed", asy
   fireEvent.click(screen.getByRole("button", { name: "Bảng ma trận môn" }));
   expect(screen.queryByRole("table", { name: "Ma trận học phần theo khóa" })).not.toBeInTheDocument();
   expect(screen.getByText("Không tìm thấy lớp học phần phù hợp với bộ lọc hiện tại.")).toBeInTheDocument();
+});
+
+
+it("combines all filters and preserves discipline dependency and the selected view", async () => {
+  const majors = [
+    { id: "m1", name: "CNTT", disciplineId: "d1", discipline: { id: "d1", name: "Công nghệ" } },
+    { id: "m2", name: "QTKD", disciplineId: "d2", discipline: { id: "d2", name: "Kinh tế" } },
+  ];
+  const data = [
+    offering({ id: "a", subjectName: "Triết học", linkedCohorts: ["2026", "2025"], totalCount: 2 }),
+    offering({ id: "b", cohort: "2026", subjectName: "Toán" }),
+    offering({ id: "c", cohort: "2025", subjectName: "Triết học" }),
+  ];
+  data.forEach((item, index) => item.groupLinks.forEach(link => { link.classGroup.majorId = index === 2 ? "m2" : "m1"; }));
+  axios.get.mockImplementation(async (url) => ({ data: url.endsWith("/auth/session")
+    ? { user: { canManageScheduling: true } } : url.includes("/system/majors") ? majors : data }));
+  const { container } = render(<MemoryRouter><CourseMatrixPage /></MemoryRouter>);
+  await screen.findByRole("region", { name: "Khóa 2026" });
+  const expectKpis = (values) => expect(Array.from(container.querySelectorAll(".sl-matrix-kpi strong"), e => Number(e.textContent))).toEqual(values);
+  const change = (label, value) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
+  expectKpis([3, 2, 1, 1]);
+  change("Tình trạng lịch", "scheduled");
+  expectKpis([1, 0, 1, 1]);
+  change("Tình trạng lịch", "unscheduled");
+  expectKpis([2, 2, 0, 0]);
+  change("Tình trạng lịch", "all");
+  change("Chuyên ngành", "m2");
+  expectKpis([1, 1, 0, 0]);
+  change("Ngành", "d1");
+  expect(screen.getByLabelText("Chuyên ngành")).toHaveValue("");
+  expect(within(screen.getByLabelText("Chuyên ngành")).queryByRole("option", { name: "QTKD" })).not.toBeInTheDocument();
+  expectKpis([2, 1, 1, 1]);
+  change("Chuyên ngành", "m1");
+  change("Khóa / năm học", "2026");
+  change("Tìm kiếm", "SUBJECT-A");
+  change("Tình trạng lịch", "scheduled");
+  expectKpis([1, 0, 1, 1]);
+  expect(screen.getByText("Đang hiển thị 1 / 3 lớp học phần")).toBeInTheDocument();
+  await openMatrix();
+  expect(screen.queryByRole("button", { name: "Xóa lọc" })).not.toBeInTheDocument();
+  ["Tìm kiếm", "Ngành", "Chuyên ngành", "Khóa / năm học"].forEach(label => change(label, ""));
+  change("Tình trạng lịch", "all");
+  expectKpis([3, 2, 1, 1]);
+  ["Tìm kiếm", "Ngành", "Chuyên ngành", "Khóa / năm học"].forEach(label => expect(screen.getByLabelText(label)).toHaveValue(""));
+  expect(screen.getByLabelText("Tình trạng lịch")).toHaveValue("all");
+  expect(screen.getByRole("button", { name: "Bảng ma trận môn" })).toHaveAttribute("aria-pressed", "true");
+  const labels = ["Tổng số lớp học phần", "Chưa xếp lịch", "Đang học / Đã xếp lịch", "Ghép liên khóa"];
+  const descriptions = ["Trong phạm vi đang lọc", "Cần ưu tiên sắp xếp", "Đã có buổi học", "Học chung từ 2 khóa"];
+  const cards = container.querySelectorAll(".sl-matrix-kpi");
+  for (let i = 0; i < cards.length; i++) {
+    fireEvent.mouseOver(cards[i]);
+    const tip = await screen.findByRole("tooltip");
+    expect(within(tip).getByText(labels[i])).toBeInTheDocument();
+    expect(within(tip).getByText(descriptions[i])).toBeInTheDocument();
+    expect(container.contains(tip)).toBe(false);
+    fireEvent.mouseLeave(cards[i]);
+    await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
+  }
 });

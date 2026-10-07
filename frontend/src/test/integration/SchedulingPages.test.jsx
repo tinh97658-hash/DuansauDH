@@ -228,9 +228,9 @@ it("renders course matrix across cohorts, displays KPIs and switches between vie
 
   render(<MemoryRouter initialEntries={["/masters/course-matrix"]}><CourseMatrixPage /></MemoryRouter>);
 
-  expect(await screen.findByText("TỔNG SỐ LỚP HỌC PHẦN")).toBeInTheDocument();
+  expect(await screen.findByText("Tổng số lớp học phần")).toBeInTheDocument();
   expect(screen.queryByText("MA TRẬN LỚP HỌC PHẦN THEO KHÓA")).not.toBeInTheDocument();
-  expect(screen.getByText("CHƯA XẾP LỊCH")).toBeInTheDocument();
+  expect(screen.getByText("Chưa xếp lịch", { selector: ".sl-matrix-kpi span" })).toBeInTheDocument();
 
   // Check cohort columns exist
   expect(await screen.findByRole("region", { name: "Khóa 2026" })).toBeInTheDocument();
