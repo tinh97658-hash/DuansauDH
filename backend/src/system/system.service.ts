@@ -17,7 +17,6 @@ import { TrainingModeGroup } from "../database/models/common/training-mode-group
 import { Ward } from "../database/models/common/ward.model.js";
 import { Subject } from "../database/models/plan/subject.model.js";
 import { Staff } from "../database/models/staff.model.js";
-import { COMMON_MAJOR_CODE } from "../common/major-scope.js";
 import { CreateCatalogDto, CreateRoomDto, UpdateCatalogDto, UpdateRoomDto } from "./dto/catalog.dto.js";
 
 // Các model danh mục dùng chung; dùng any để tránh lỗi union ModelStatic với method this của Sequelize.
@@ -238,12 +237,12 @@ export class SystemService {
   async createDiscipline(dto: CreateCatalogDto) {
     if (!dto.code) throw new BadRequestException("Vui lòng nhập mã ngành.");
     await this.ensureCodeUnique(this.disciplines, dto.code);
-    return this.disciplines.create(this.pick(dto, ["code", "name", "description", "sortOrder", "active"]) as any);
+    return this.disciplines.create(this.pick(dto, ["code", "name", "englishName", "description", "sortOrder", "active"]) as any);
   }
   async updateDiscipline(id: string, dto: UpdateCatalogDto) {
     const row = await this.findOr404(this.disciplines, id, "Ngành");
     if (dto.code && dto.code !== row.code) await this.ensureCodeUnique(this.disciplines, dto.code, id);
-    await row.update(this.pick(dto, ["code", "name", "description", "sortOrder", "active"]) as any);
+    await row.update(this.pick(dto, ["code", "name", "englishName", "description", "sortOrder", "active"]) as any);
     return row;
   }
   async removeDiscipline(id: string) {
@@ -257,16 +256,8 @@ export class SystemService {
   }
 
   // ===== Chuyên ngành (cấp 2, thuộc một ngành) =====
-  private async ensureMajorCodeUnique(disciplineId: string, code: string, excludeId?: string) {
-    const where: Record<string, unknown> = { disciplineId, code };
-    if (excludeId) where.id = { [Op.ne]: excludeId };
-    if (await this.majors.findOne({ where })) {
-      throw new ConflictException(`Mã chuyên ngành "${code}" đã tồn tại trong ngành này.`);
-    }
-  }
-
   async listMajors(program?: string, trainingLevelId?: string) {
-    const where: any = { code: { [Op.ne]: COMMON_MAJOR_CODE } };
+    const where: any = { isCommon: false };
     if (program) where.program = program;
     if (trainingLevelId) where.trainingLevelId = trainingLevelId;
     return this.majors.findAll({
@@ -279,16 +270,14 @@ export class SystemService {
     });
   }
   async createMajor(dto: CreateCatalogDto) {
-    if (!dto.code) throw new BadRequestException("Vui lòng nhập mã chuyên ngành.");
     if (!dto.disciplineId) throw new BadRequestException("Vui lòng chọn ngành của chuyên ngành.");
     await this.requireParent(this.disciplines, dto.disciplineId, "Ngành");
-    await this.ensureMajorCodeUnique(dto.disciplineId, dto.code);
     const program = dto.program || "masters";
     const trainingLevelId = await this.resolveMajorTrainingLevel(program, dto.trainingLevelId);
     if (trainingLevelId) await this.requireParent(this.trainingLevels, trainingLevelId, "Trình độ đào tạo");
     return this.majors.create({
       ...this.pick(dto, [
-        "code", "name", "program", "isAdmissionScreening", "durationYears", "maxOvertimeYears", "description", "active"
+        "name", "englishName", "program", "isAdmissionScreening", "durationYears", "maxOvertimeYears", "active"
       ]),
       disciplineId: dto.disciplineId,
       program,
@@ -301,16 +290,12 @@ export class SystemService {
     if (dto.disciplineId && dto.disciplineId !== row.disciplineId) {
       await this.requireParent(this.disciplines, dto.disciplineId, "Ngành");
     }
-    const code = dto.code || row.code;
-    if (disciplineId !== row.disciplineId || code !== row.code) {
-      await this.ensureMajorCodeUnique(disciplineId, code, id);
-    }
     const program = dto.program || row.program || "masters";
     const trainingLevelId = await this.resolveMajorTrainingLevel(program, dto.trainingLevelId);
     if (trainingLevelId) await this.requireParent(this.trainingLevels, trainingLevelId, "Trình độ đào tạo");
     await row.update({
       ...this.pick(dto, [
-        "code", "name", "program", "isAdmissionScreening", "durationYears", "maxOvertimeYears", "description", "active"
+        "name", "englishName", "program", "isAdmissionScreening", "durationYears", "maxOvertimeYears", "active"
       ]),
       disciplineId,
       program,
@@ -378,7 +363,7 @@ export class SystemService {
       include: [
         { model: Staff, as: "staff", attributes: ["id", "name", "email"] },
         { model: Discipline, as: "discipline", attributes: ["id", "code", "name"] },
-        { model: Major, as: "major", attributes: ["id", "code", "name", "disciplineId", "program"] },
+        { model: Major, as: "major", attributes: ["id", "name", "disciplineId", "program"] },
       ],
       order: [["name", "ASC"]],
     });

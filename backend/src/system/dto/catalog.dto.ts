@@ -7,6 +7,7 @@ const trimUpper = ({ value }: { value: unknown }) => (value === undefined || val
 export class CreateCatalogDto {
   @IsString() @IsOptional() @MaxLength(30) @Transform(trimUpper) code?: string;
   @IsString() @MaxLength(200) @Transform(trim) name!: string;
+  @IsOptional() @IsString() @MaxLength(200) @Transform(trim) englishName?: string;
   @IsOptional() @IsInt() @Min(0) sortOrder?: number;
   @IsOptional() @IsBoolean() active?: boolean;
   // Khóa ngoại (tùy chọn)
@@ -40,6 +41,7 @@ export class CreateCatalogDto {
 export class UpdateCatalogDto {
   @IsOptional() @IsString() @MaxLength(30) @Transform(trimUpper) code?: string;
   @IsOptional() @IsString() @MaxLength(200) @Transform(trim) name?: string;
+  @IsOptional() @IsString() @MaxLength(200) @Transform(trim) englishName?: string;
   @IsOptional() @IsInt() @Min(0) sortOrder?: number;
   @IsOptional() @IsBoolean() active?: boolean;
   @IsOptional() @IsUUID() cityId?: string;

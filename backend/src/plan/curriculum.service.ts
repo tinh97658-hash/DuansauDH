@@ -69,7 +69,7 @@ export class CurriculumService {
     const items = await this.curriculums.findAll({
       where,
       include: [
-        { model: Major, as: "major", attributes: ["id", "code", "name"] },
+        { model: Major, as: "major", attributes: ["id", "name"] },
         { model: CurriculumSubject, as: "subjectEntries", attributes: ["id", "isRequired", "credits"] },
       ],
       order: [["applicableFromYear", "DESC"], ["code", "ASC"]],
@@ -444,7 +444,7 @@ export class CurriculumService {
   private async autoCreate(majorId: string, program: string, applicableFromYear: string, transaction: Transaction) {
     const major = await this.requireMajor(majorId, program, transaction);
     const yearLabel = applicableFromYear || "chưa xác định";
-    let code = `CT-${major.code}-${applicableFromYear || "NA"}`;
+    let code = `CT-${applicableFromYear || "NA"}`;
     const duplicate = await this.curriculums.findOne({ where: { code }, transaction });
     if (duplicate) code = `${code}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 

@@ -21,6 +21,9 @@ import { buildGroupNames, getNextGroupIndex, validateNameTemplate } from "./crea
 
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
+const majorShortName = (major) => String(major?.name || "")
+  .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/gi, "d")
+  .split(/\s+/).filter(Boolean).map((word) => word[0]).join("").toUpperCase().slice(0, 8);
 
 const initialForm = (year = String(currentYear)) => ({
   code: "",
@@ -205,8 +208,8 @@ const CreateClassGroups = () => {
     [form.majorId, majors],
   );
   const codePrefix = useMemo(() => (
-    selectedFormMajor?.code && form.academicYear
-      ? `${String(form.academicYear).slice(-2)}${selectedFormMajor.code.toUpperCase()}`
+    selectedFormMajor && form.academicYear
+      ? `NH${String(form.academicYear).slice(-2)}`
       : ""
   ), [form.academicYear, selectedFormMajor]);
   const nameTemplateError = useMemo(
@@ -273,7 +276,7 @@ const CreateClassGroups = () => {
     setForm({
       ...initialForm(selectedYear),
       majorId,
-      nameTemplate: major?.code ? `${major.code.toUpperCase()}${selectedYear}.{n}` : "",
+      nameTemplate: majorShortName(major) ? `${majorShortName(major)}${selectedYear}.{n}` : "",
     });
     setDialogScopeGroups([]);
     setDialogScopeLoading(false);
@@ -306,7 +309,7 @@ const CreateClassGroups = () => {
       ...previous,
       majorId,
       curriculumId: "",
-      nameTemplate: major?.code ? `${major.code.toUpperCase()}${previous.academicYear}.{n}` : "",
+      nameTemplate: majorShortName(major) ? `${majorShortName(major)}${previous.academicYear}.{n}` : "",
     }));
   };
 
@@ -323,7 +326,7 @@ const CreateClassGroups = () => {
       ...previous,
       academicYear,
       curriculumId: "",
-      nameTemplate: major?.code ? `${major.code.toUpperCase()}${academicYear}.{n}` : "",
+      nameTemplate: majorShortName(major) ? `${majorShortName(major)}${academicYear}.{n}` : "",
     }));
   };
 
@@ -358,10 +361,11 @@ const CreateClassGroups = () => {
         toast.success("Cập nhật nhóm học phần thành công.");
       } else {
         const major = majors.find((item) => item.id === form.majorId);
-        if (!major?.code) throw new Error("Chuyên ngành chưa có tên viết tắt.");
+        const shortName = majorShortName(major);
+        if (!shortName) throw new Error("Chuyên ngành chưa có tên.");
         await axios.post(`${API_BASE_URL}/masters/class-groups/batch`, {
           codePrefix,
-          namePrefix: `${major.code.toUpperCase()}${form.academicYear}.`,
+          namePrefix: `${shortName}${form.academicYear}.`,
           nameTemplate: form.nameTemplate.trim(),
           count,
           startIndex,
@@ -440,7 +444,7 @@ const CreateClassGroups = () => {
             >
               <MenuItem value="ALL">Tất cả chuyên ngành</MenuItem>
               {visibleMajors.map((m) => (
-                <MenuItem key={m.id} value={m.id}>{m.name} ({m.code})</MenuItem>
+                <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>
               ))}
           </FilterSelectField>
 
@@ -654,7 +658,7 @@ const CreateClassGroups = () => {
                         >
                           {dialogMajors.map((major) => (
                             <MenuItem key={major.id} value={major.id}>
-                              {major.name} ({major.code})
+                              {major.name}
                             </MenuItem>
                           ))}
                         </Select>
@@ -784,7 +788,7 @@ const CreateClassGroups = () => {
                     <CompactField label="CHUYÊN NGÀNH" htmlFor="create-major">
                       <FormControl fullWidth size="small" sx={compactControlSx}>
                         <Select id="create-major" value={form.majorId} inputProps={{ "aria-label": "Chuyên ngành" }} onChange={(e) => handleCreateMajorChange(e.target.value)}>
-                          {dialogMajors.map((major) => <MenuItem key={major.id} value={major.id}>{major.name} ({major.code})</MenuItem>)}
+                          {dialogMajors.map((major) => <MenuItem key={major.id} value={major.id}>{major.name}</MenuItem>)}
                         </Select>
                       </FormControl>
                     </CompactField>

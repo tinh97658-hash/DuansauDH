@@ -14,10 +14,11 @@ const Disciplines = () => (
     itemName="ngành đào tạo"
     codeLabel="Mã ngành"
     nameLabel="Tên ngành"
+    showIndex={false}
     showSortColumn={false}
     editOnDoubleClick
     fields={[
-      { key: "description", label: "Mô tả", type: "multiline" },
+      { key: "englishName", label: "Tên tiếng Anh", type: "text" },
     ]}
   />
 );

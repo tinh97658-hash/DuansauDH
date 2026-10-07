@@ -32,8 +32,8 @@ export class MajorTransferService {
   ) {}
 
   private readonly include = [
-    { model: Major, as: "fromMajor", attributes: ["id", "code", "name"] },
-    { model: Major, as: "toMajor", attributes: ["id", "code", "name"] },
+    { model: Major, as: "fromMajor", attributes: ["id", "name"] },
+    { model: Major, as: "toMajor", attributes: ["id", "name"] },
     { model: ClassGroup, as: "fromClassGroup", attributes: ["id", "code", "name"] },
     { model: Curriculum, as: "fromCurriculum", attributes: ["id", "code", "name"] },
     { model: Curriculum, as: "toCurriculum", attributes: ["id", "code", "name"] },

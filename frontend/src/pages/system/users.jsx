@@ -3,6 +3,7 @@ import axios from "axios";
 import { Alert, IconButton, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
 import FeatureLayout from "../../components/FeatureLayout";
 import { API_BASE_URL } from "../../config/http";
+import { personNameParts } from "../../utils/personName";
 
 const Users = () => {
   const [users, setUsers] = useState([]);
@@ -45,12 +46,12 @@ const Users = () => {
       {success && <Alert severity="success">{success}</Alert>}
       <Button onClick={loadUsers} disabled={loading || saving} sx={{ alignSelf: "flex-start" }}>Tải lại danh sách</Button>
       {loading ? <CircularProgress aria-label="Đang tải người dùng" /> : !error && <TableContainer><Table aria-label="Phân quyền người dùng">
-        <TableHead><TableRow>{["Họ tên", "Email", "Vai trò", "Quyền tổ chức lớp và xếp lịch"].map((label) => <TableCell key={label}>{label}</TableCell>)}</TableRow></TableHead>
+        <TableHead><TableRow>{["Họ đệm", "Tên", "Email", "Vai trò", "Quyền tổ chức lớp và xếp lịch"].map((label) => <TableCell key={label}>{label}</TableCell>)}</TableRow></TableHead>
         <TableBody>{users.map((user) => <TableRow key={user.id}>
-          <TableCell>{user.name}</TableCell><TableCell>{user.email}</TableCell>
+          <TableCell>{personNameParts(user).familyAndMiddle}</TableCell><TableCell>{personNameParts(user).givenName}</TableCell><TableCell>{user.email}</TableCell>
           <TableCell>{{ admin: "Quản trị viên", supervisor: "Chuyên viên", examiner: "Khảo thí" }[user.role] || user.role}</TableCell>
           <TableCell>{user.canManageScheduling ? "Đang phụ trách" : <Button variant="outlined" disabled={saving} onClick={() => { setSelected(user); setSuccess(""); }}>Phân công phụ trách</Button>}</TableCell>
-        </TableRow>)}{!users.length && <TableRow><TableCell colSpan={4}>Chưa có tài khoản nội bộ.</TableCell></TableRow>}</TableBody>
+        </TableRow>)}{!users.length && <TableRow><TableCell colSpan={5}>Chưa có tài khoản nội bộ.</TableCell></TableRow>}</TableBody>
       </Table></TableContainer>}
     </Stack>
     <Dialog

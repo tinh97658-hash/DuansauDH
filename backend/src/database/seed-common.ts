@@ -16,6 +16,18 @@ const upsertByCode = async (model: any, rows: Row[]) => {
   return { created, updated };
 };
 
+const upsertMajors = async (model: any, rows: Row[]) => {
+  let created = 0, updated = 0;
+  for (const row of rows) {
+    const [record, wasCreated] = await model.findOrCreate({
+      where: { name: row.name, disciplineId: row.disciplineId, program: row.program },
+      defaults: row,
+    });
+    if (!wasCreated) { await record.update(row); updated++; } else { created++; }
+  }
+  return { created, updated };
+};
+
 async function run() {
   const app = await NestFactory.createApplicationContext(AppModule, { logger: false });
   const sequelize = app.get<Sequelize>(getConnectionToken());
@@ -83,14 +95,13 @@ async function run() {
   const disciplineId = async (code: string) =>
     (await sequelize.models.Discipline.findOne({ where: { code } }))?.get("id") as string | undefined;
 
-  // Chuyên ngành thuộc đúng một ngành; mã chuyên ngành chỉ duy nhất trong phạm vi ngành đó.
-  results.majors = await upsertByCode(sequelize.models.Major, [
-    { code: "KTHH", name: "Khai thác hàng hải", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7840101") },
-    { code: "DKTB", name: "Điều khiển tàu biển", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7840101") },
-    { code: "CKTB", name: "Kỹ thuật cơ khí", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7580201") },
-    { code: "DTDD", name: "Kỹ thuật điện - Điện tử", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7520216") },
-    { code: "KTVB", name: "Kinh tế vận tải biển", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7840104") },
-    { code: "XDCT", name: "Xây dựng công trình thủy", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7580213") },
+  results.majors = await upsertMajors(sequelize.models.Major, [
+    { name: "Khai thác hàng hải", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7840101") },
+    { name: "Điều khiển tàu biển", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7840101") },
+    { name: "Kỹ thuật cơ khí", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7580201") },
+    { name: "Kỹ thuật điện - Điện tử", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7520216") },
+    { name: "Kinh tế vận tải biển", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7840104") },
+    { name: "Xây dựng công trình thủy", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7580213") },
   ]);
 
   results.studyStatuses = await upsertByCode(sequelize.models.StudyStatus, [

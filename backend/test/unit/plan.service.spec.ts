@@ -162,7 +162,7 @@ describe("PlanService major-scoped subject catalogs", () => {
     expect(majors.findAll).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ program: "masters" }),
     }));
-    expect(list.map((major) => major.code)).toEqual(["CNTT", "QTKD"]);
+    expect(list.map((major) => major.name)).toEqual(["Công nghệ thông tin", "Quản trị kinh doanh"]);
     expect(list[0].subjectCount).toBe(15);
   });
 });

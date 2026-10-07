@@ -79,7 +79,7 @@ describe("CurriculumService.assignToClassGroup", () => {
     const result = await mocks.service.assignToClassGroup(group as never);
 
     expect(mocks.curriculums.create).toHaveBeenCalledWith(
-      expect.objectContaining({ code: "CT-KTHH-2026", majorId: "major-1", program: "masters", applicableFromYear: "2026" }),
+      expect.objectContaining({ code: "CT-2026", majorId: "major-1", program: "masters", applicableFromYear: "2026" }),
       expect.anything(),
     );
     // Toàn bộ học phần của ngành vào CTĐT, giữ đúng bắt buộc/tự chọn và khối kiến thức.

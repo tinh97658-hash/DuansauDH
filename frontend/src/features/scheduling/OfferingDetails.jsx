@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { api, groupsOf, message, Modal, Notice, offeringTitle, rows, subjectLabel, useLoad } from "./shared";
 import { vietnameseDate, vietnameseDayLabel, isSessionPast } from "../../utils/schedulingCalendar";
+import { personNameParts } from "../../utils/personName";
 
 export default function OfferingDetails({ offering, user, onClose, onSaved, onOpenSession, onSelect }) {
   const detail = useLoad(() => api.get(`/scheduling/course-offerings/${offering.id}`), [offering.id]);
@@ -246,12 +247,14 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
         <>
           <div className="sl-offering-roster-wrap">
             <table className="v20-table sl-offering-roster-table">
-              <thead><tr><th>STT</th><th>HỌC VIÊN</th><th>GHI CHÚ</th></tr></thead>
+              <thead><tr><th>STT</th><th>HỌ ĐỆM</th><th>TÊN</th><th>MÃ HỌC VIÊN</th><th>GHI CHÚ</th></tr></thead>
               <tbody>
                 {(roster.data?.participants || []).map((row, index) => (
                   <tr key={row.id}>
                     <td>{index + 1}</td>
-                    <td className="sl-offering-student-cell"><strong>{row.fullName}</strong><small>{row.code}</small></td>
+                    <td className="sl-offering-student-cell"><strong>{personNameParts(row).familyAndMiddle}</strong></td>
+                    <td><strong>{personNameParts(row).givenName}</strong></td>
+                    <td>{row.code}</td>
                     <td>
                       <input
                         className="sl-offering-note-input"

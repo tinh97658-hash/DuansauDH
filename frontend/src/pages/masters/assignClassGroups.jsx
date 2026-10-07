@@ -19,6 +19,7 @@ import FeatureLayout from "../../components/FeatureLayout";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
+import { personNameParts } from "../../utils/personName";
 
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
@@ -306,7 +307,7 @@ const AssignClassGroups = () => {
             >
               <MenuItem value="ALL">Tất cả chuyên ngành</MenuItem>
               {visibleMajors.map((m) => (
-                <MenuItem key={m.id} value={m.id}>{m.name} ({m.code})</MenuItem>
+                <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>
               ))}
           </FilterSelectField>
 
@@ -384,7 +385,8 @@ const AssignClassGroups = () => {
                       />
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Mã HV / SBD</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Họ và tên</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Họ đệm</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Tên</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Ngành</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Nhóm hiện tại</TableCell>
                   </TableRow>
@@ -392,13 +394,13 @@ const AssignClassGroups = () => {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
                         <CircularProgress size={28} />
                       </TableCell>
                     </TableRow>
                   ) : filteredStudents.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ py: 6, color: "text.secondary" }}>
+                      <TableCell colSpan={6} align="center" sx={{ py: 6, color: "text.secondary" }}>
                         {studentSearch.trim()
                           ? "Không tìm thấy học viên chưa được phân nhóm."
                           : "Không còn học viên chưa được phân nhóm."}
@@ -436,11 +438,12 @@ const AssignClassGroups = () => {
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{s.fullName}</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{personNameParts(s).familyAndMiddle}</Typography>
                             <Typography variant="caption" color="text.secondary">
                               {s.dob || ""} {s.gender ? `• ${s.gender}` : ""}
                             </Typography>
                           </TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>{personNameParts(s).givenName}</TableCell>
                           <TableCell sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
                             {s.majorName || "-"}
                           </TableCell>
@@ -569,7 +572,8 @@ const AssignClassGroups = () => {
                   <TableRow sx={{ "& th": { bgcolor: "#EDF4FA", color: "#111827", borderColor: "#D8E5EF", fontWeight: 700 } }}>
                     <TableCell align="center" sx={{ width: 48, fontWeight: 700 }}>STT</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Mã HV</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Họ và tên</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Họ đệm</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Tên</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Ngày sinh</TableCell>
                     <TableCell align="center" sx={{ width: 70, fontWeight: 700 }}>Bỏ</TableCell>
                   </TableRow>
@@ -577,7 +581,7 @@ const AssignClassGroups = () => {
                 <TableBody>
                   {groupMembers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ py: 6, color: "text.secondary" }}>
+                      <TableCell colSpan={6} align="center" sx={{ py: 6, color: "text.secondary" }}>
                         Nhóm này hiện chưa có học viên nào. Chọn học viên từ cột bên trái và bấm "Gán vào nhóm".
                       </TableCell>
                     </TableRow>
@@ -586,7 +590,8 @@ const AssignClassGroups = () => {
                       <TableRow key={m.id} hover sx={{ "&:hover": { bgcolor: "#F5FAFE!important" }, "& td": { borderColor: "#E2EBF2", color: "#111827" } }}>
                         <TableCell align="center">{idx + 1}</TableCell>
                         <TableCell sx={{ fontFamily: "inherit", fontWeight: 600 }}>{m.code || "-"}</TableCell>
-                        <TableCell sx={{ fontWeight: 600 }}>{m.fullName}</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>{personNameParts(m).familyAndMiddle}</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>{personNameParts(m).givenName}</TableCell>
                         <TableCell sx={{ fontSize: "0.8rem", color: "text.secondary" }}>{m.dob || "-"}</TableCell>
                         <TableCell align="center">
                           <Tooltip title="Bỏ khỏi nhóm">

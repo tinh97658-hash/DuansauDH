@@ -1,0 +1,42 @@
+[Nest] 12416  - 10/06/2026, 9:38:25 PM   ERROR [NestApplication] Error: listen EADDRINUSE: address already in use :::3001 +1ms
+[Nest] 12416  - 10/06/2026, 9:38:25 PM   ERROR [Bootstrap] Startup failed
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+    at listenInCluster (node:net:2005:12)
+    at Server.listen (node:net:2110:7)
+    at ExpressAdapter.listen (D:\SAU-DAI-HOC\DuansauDH-recover\backend\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at D:\SAU-DAI-HOC\DuansauDH-recover\backend\node_modules\@nestjs\core\nest-application.js:191:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (D:\SAU-DAI-HOC\DuansauDH-recover\backend\node_modules\@nestjs\core\nest-application.js:181:16)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async bootstrap (D:\SAU-DAI-HOC\DuansauDH-recover\backend\dist\main.js:35:5)
+node:child_process:1000
+    throw err;
+    ^
+
+<ref *1> Error: spawnSync C:\WINDOWS\system32\cmd.exe EPERM
+    at Object.spawnSync (node:internal/child_process:1119:20)
+    at spawnSync (node:child_process:911:24)
+    at execSync (node:child_process:992:15)
+    at treeKillSync (D:\SAU-DAI-HOC\DuansauDH-recover\backend\node_modules\@nestjs\cli\lib\utils\tree-kill.js:7:38)
+    at D:\SAU-DAI-HOC\DuansauDH-recover\backend\node_modules\@nestjs\cli\actions\start.action.js:92:46
+    at Object.onWatchStatusChange (D:\SAU-DAI-HOC\DuansauDH-recover\backend\node_modules\@nestjs\cli\lib\compiler\watch-compiler.js:82:17)
+    at D:\SAU-DAI-HOC\DuansauDH-recover\backend\node_modules\typescript\lib\typescript.js:134575:30
+    at emitFilesAndReportErrors (D:\SAU-DAI-HOC\DuansauDH-recover\backend\node_modules\typescript\lib\typescript.js:134396:5)
+    at result.afterProgramCreate (D:\SAU-DAI-HOC\DuansauDH-recover\backend\node_modules\typescript\lib\typescript.js:134571:5)
+    at synchronizeProgram (D:\SAU-DAI-HOC\DuansauDH-recover\backend\node_modules\typescript\lib\typescript.js:134894:12) {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'spawnSync C:\\WINDOWS\\system32\\cmd.exe',
+  path: 'C:\\WINDOWS\\system32\\cmd.exe',
+  spawnargs: [ '/d', '/s', '/c', '"taskkill /pid 8520 /T /F"' ],
+  error: [Circular *1],
+  status: null,
+  signal: null,
+  output: null,
+  pid: 0,
+  stdout: undefined,
+  stderr: undefined
+}
+
+Node.js v24.14.1

@@ -61,7 +61,7 @@ export function buildBulkFixtures(options: BulkOptions): FixtureBatch[] {
   const level = add("TrainingLevel", { code: `${prefix}LV`, name: `Thạc sĩ kiểm thử ${prefix}`, durationYears: 2, active: true });
   const discipline = add("Discipline", { code: `${prefix}N`, name: `Ngành kiểm thử ${prefix}`, sortOrder: 0, active: true });
   const majors = Array.from({ length: Math.min(classes, 3) }, (_, i) => add("Major", {
-    code: `${prefix}M${i + 1}`, name: `Chuyên ngành kiểm thử ${prefix} ${i + 1}`, trainingLevelId: level.id,
+    name: `Chuyên ngành kiểm thử ${prefix} ${i + 1}`, trainingLevelId: level.id,
     disciplineId: discipline.id,
     program: "masters", durationYears: 2, maxOvertimeYears: 2, active: true,
   }));
@@ -84,7 +84,7 @@ export function buildBulkFixtures(options: BulkOptions): FixtureBatch[] {
   });
   const catalog = majors.map((major) => Array.from({ length: subjects }, (_, i) => add("Subject", {
     code: `${prefix}S${majors.indexOf(major) + 1}-${i + 1}`, codeText: `${prefix}S${majors.indexOf(major) + 1}-${i + 1}`, codeNumber: i + 1,
-    name: `Học phần kiểm thử ${i + 1} (${major.code})`, majorId: major.id, program: "masters", credits: 3,
+    name: `Học phần kiểm thử ${i + 1} (${major.name})`, majorId: major.id, program: "masters", credits: 3,
   })));
   // CTĐT thuộc ngành + bậc + khóa; lớp kế thừa CTĐT và chỉ chọn học phần tự chọn.
   const curriculums = majors.map((major, i) => add("Curriculum", {

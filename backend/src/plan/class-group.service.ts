@@ -3,7 +3,6 @@ import { InjectModel } from "@nestjs/sequelize";
 import { Op } from "sequelize";
 import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
-import { COMMON_MAJOR_CODE } from "../common/major-scope.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
 import { ClassGroupMember } from "../database/models/training/class-group-member.model.js";
 import { CourseOfferingClassGroup } from "../database/models/training/course-offering-class-group.model.js";
@@ -69,7 +68,7 @@ export class ClassGroupService {
   private async requireMajorForProgram(majorId: string | null | undefined, program: string, transaction?: Transaction) {
     if (!majorId) return null;
     const major = await this.majors.findByPk(majorId, { transaction });
-    if (!major || major.active === false || major.code === COMMON_MAJOR_CODE) {
+    if (!major || major.active === false || major.isCommon) {
       throw new BadRequestException("Chuyên ngành không tồn tại hoặc đã ngừng sử dụng.");
     }
     if (major.program !== program) {

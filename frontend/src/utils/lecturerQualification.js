@@ -20,7 +20,7 @@ export const lecturerRecommendationRank = (lecturer, offering) => {
 export const lecturerBelongsToOfferingMajor = (lecturer, offering) => lecturerRecommendationRank(lecturer, offering) === 2;
 
 export const lecturerTeachingGroup = (lecturer) => {
-  if (lecturer?.major) return `${lecturer.major.code} · ${lecturer.major.name}`;
+  if (lecturer?.major) return lecturer.major.name;
   if (lecturer?.discipline) return `${lecturer.discipline.code} · ${lecturer.discipline.name}`;
   return "Chưa phân ngành / chuyên ngành";
 };

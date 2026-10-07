@@ -38,6 +38,7 @@ import { ClassGroupElective } from "./models/training/class-group-elective.model
 import { ExamSession } from "./models/training/exam-session.model.js";
 import { ExamEligibility } from "./models/training/exam-eligibility.model.js";
 import { ExamResult } from "./models/training/exam-result.model.js";
+import { CourseExamGradebook } from "./models/training/course-exam-gradebook.model.js";
 import { CourseOffering } from "./models/training/course-offering.model.js";
 import { CourseOfferingClassGroup } from "./models/training/course-offering-class-group.model.js";
 import { TeachingSession } from "./models/training/teaching-session.model.js";
@@ -69,7 +70,7 @@ export const databaseModels = [
   Subject, Curriculum, CurriculumBlock, CurriculumElectiveGroup, CurriculumSubject,
   // Training (class & exam)
   ClassGroup, ClassGroupMember, ClassGroupElective, CourseOffering, CourseOfferingClassGroup, CourseOfferingStudent,
-  MajorTransfer, SubjectRecognition, LearnerSubjectResult, TeachingSession, ExamSession, ExamEligibility, ExamResult,
+  MajorTransfer, SubjectRecognition, LearnerSubjectResult, TeachingSession, ExamSession, ExamEligibility, ExamResult, CourseExamGradebook,
   // Masters
   MastersAdmissionScore, EnglishExamSession, EnglishExamScore, EnglishCertification, GraduationDefense, GraduationRecord,
   // Doctoral

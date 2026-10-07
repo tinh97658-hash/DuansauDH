@@ -64,7 +64,7 @@ const capitalizeFirstCharacter = (value = "") => {
 
 const initialCurriculumForm = (year = String(currentYear), major = null) => ({
   applicableFromYear: year,
-  code: major ? `CT-${major.code || "NGANH"}-${year}` : `CT-NGANH-${year}`,
+  code: major ? `CT-${year}-${String(major.id || "").slice(0, 8).toUpperCase()}` : `CT-NGANH-${year}`,
   name: major ? `Chương trình đào tạo ${major.name || ""} - Khóa ${year}` : `Chương trình đào tạo - Khóa ${year}`,
   autoPopulateFromCatalog: true,
   note: "",
@@ -301,7 +301,7 @@ const TrainingPlan = () => {
   const matchingMajorLabels = useMemo(() => shareableExistingSubjects.map((subject) => {
     const subjectMajor = majors.find((major) => major.id === subject.majorId);
     if (!subjectMajor) return "chuyên ngành khác";
-    return [subjectMajor.code, subjectMajor.name].filter(Boolean).join(" — ");
+    return subjectMajor.name;
   }), [majors, shareableExistingSubjects]);
 
   const handleDisciplineChange = (nextDisciplineId) => {
@@ -949,7 +949,7 @@ const TrainingPlan = () => {
               >
                 {filteredMajors.map((m) => (
                   <MenuItem key={m.id} value={m.id} sx={{ fontSize: 13 }}>
-                    {m.code} — {m.name} ({m.subjectCount} học phần)
+                    {m.name} ({m.subjectCount} học phần)
                   </MenuItem>
                 ))}
             </FilterSelectField>
@@ -2133,7 +2133,7 @@ const TrainingPlan = () => {
                         label={(
                           <Box>
                             <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: "#172B3A" }}>
-                              {targetMajor.code || ""} — {targetMajor.name || "Chuyên ngành khác"}
+                              {targetMajor.name || "Chuyên ngành khác"}
                             </Typography>
                             <Typography variant="caption" sx={{ color: "#607486" }}>
                               {existingSubject

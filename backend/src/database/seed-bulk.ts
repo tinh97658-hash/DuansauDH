@@ -26,7 +26,7 @@ async function run() {
       const majorBatch = batches.find(({ model }) => model === "Major");
       if (!majorBatch) throw new Error("Bulk fixture is missing its Major batch.");
       for (const major of majorBatch.rows) {
-        if (await sequelize.models.Major.findOne({ where: { code: major.code }, transaction }))
+        if (await sequelize.models.Major.findOne({ where: { name: major.name, disciplineId: major.disciplineId }, transaction }))
           throw new Error(`Prefix ${options.prefix} already exists. Choose another --prefix.`);
       }
       for (const { model, rows } of batches) {

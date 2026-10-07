@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { CircularProgress } from "@mui/material";
+import { personNameParts } from "../../utils/personName";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -17,10 +18,10 @@ const AdminDashboard = () => {
   return <div className="container-fluid">
     <h1 className="mb-4" style={{ fontWeight: 400 }}>Danh sách học viên và nghiên cứu sinh</h1>
     <div className="table-responsive"><table className="table table-striped table-hover align-middle">
-      <thead><tr><th>Họ và tên</th><th>Mã học viên</th><th>Chương trình</th><th>Hình thức</th><th>Email</th><th>Hướng nghiên cứu</th></tr></thead>
-      <tbody>{students.length ? students.map((student) => <tr key={student._id || student.id} role="button" onClick={() => navigate("/profile", { state: student._id || student.id })}>
-        <td>{student.fullName}</td><td>{student.regNo || "—"}</td><td>{student.degree || "—"}</td><td>{student.studyMode || "—"}</td><td>{student.email}</td><td>{student.researchArea || "—"}</td>
-      </tr>) : <tr><td colSpan="6" className="text-center text-muted py-4">Chưa có dữ liệu học viên.</td></tr>}</tbody>
+      <thead><tr><th>Họ đệm</th><th>Tên</th><th>Mã học viên</th><th>Chương trình</th><th>Hình thức</th><th>Email</th><th>Hướng nghiên cứu</th></tr></thead>
+      <tbody>{students.length ? students.map((student) => { const name = personNameParts(student); return <tr key={student._id || student.id} role="button" onClick={() => navigate("/profile", { state: student._id || student.id })}>
+        <td>{name.familyAndMiddle}</td><td>{name.givenName}</td><td>{student.regNo || "—"}</td><td>{student.degree || "—"}</td><td>{student.studyMode || "—"}</td><td>{student.email}</td><td>{student.researchArea || "—"}</td>
+      </tr>; }) : <tr><td colSpan="7" className="text-center text-muted py-4">Chưa có dữ liệu học viên.</td></tr>}</tbody>
     </table></div>
   </div>;
 };

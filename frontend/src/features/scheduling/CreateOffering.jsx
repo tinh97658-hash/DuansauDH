@@ -4,6 +4,7 @@ import successCircle from "../../assets/create-offering-success.svg";
 import { api, intersectDays, message, normalize, Notice, rows, SearchSelect, suggestOfferingName, unique, useLoad } from "./shared";
 import { isCommonMajor } from "../../utils/majorScope";
 import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
+import { personNameParts } from "../../utils/personName";
 
 const groupLabel = (group) => [group?.code, group?.name].filter(Boolean).join(" · ");
 
@@ -188,13 +189,14 @@ export default function CreateOffering({ user }) {
             {saveError && <Notice error={saveError} />}
             <div className="sl-create-confirm-table-wrap">
               <table>
-                <thead><tr><th>STT</th><th>MÃ HỌC VIÊN</th><th>HỌ VÀ TÊN HỌC VIÊN</th><th>GHI CHÚ</th></tr></thead>
-                <tbody>{roster.map((row, index) => <tr key={row.id}>
+                <thead><tr><th>STT</th><th>MÃ HỌC VIÊN</th><th>HỌ ĐỆM</th><th>TÊN</th><th>GHI CHÚ</th></tr></thead>
+                <tbody>{roster.map((row, index) => { const name = personNameParts(row); return <tr key={row.id}>
                   <td>{String(index + 1).padStart(2, "0")}</td>
                   <td>{row.code}</td>
-                  <td>{row.fullName}</td>
+                  <td>{name.familyAndMiddle}</td>
+                  <td>{name.givenName}</td>
                   <td><input aria-label={`Ghi chú ${row.code}`} value={row.note} maxLength={2000} disabled={saving} placeholder="Nhập ghi chú..." onChange={(event) => { const note = event.target.value; setRoster((current) => current.map((item) => item.id === row.id ? { ...item, note } : item)); }} /></td>
-                </tr>)}</tbody>
+                </tr>; })}</tbody>
               </table>
             </div>
           </section>

@@ -4,7 +4,6 @@ import { getConnectionToken } from "@nestjs/sequelize";
 import { Op, QueryTypes } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { AppModule } from "../../app.module.js";
-import { COMMON_MAJOR_CODE } from "../../common/major-scope.js";
 import { teachingUnitForSubject, teachingUnits } from "../../scheduling/lecturer-qualification.policy.js";
 
 const lecturerNames = [
@@ -41,26 +40,28 @@ async function run() {
     sequelize.options.logging = false;
     const { Major, Lecturer } = sequelize.models as any;
     const majors = await Major.findAll({
-      where: { active: true, code: { [Op.ne]: COMMON_MAJOR_CODE } },
-      order: [["program", "ASC"], ["code", "ASC"]],
+      where: { active: true, isCommon: false },
+      order: [["program", "ASC"], ["name", "ASC"]],
     });
-    const unsupported = majors.filter((major: any) => !teachingUnits[major.code]);
-    if (unsupported.length) throw new Error(`Chưa cấu hình đơn vị cho chuyên ngành: ${unsupported.map((major: any) => major.code).join(", ")}`);
-    const desired = majors.flatMap((major: any, majorIndex: number) => [0, 1, 2, 3, 4, 5].map((index) => ({
-      code: `GV-${major.code}-${String(index + 1).padStart(2, "0")}`,
+    const desired = majors.flatMap((major: any, majorIndex: number) => {
+      const majorKey = String(major.id).replace(/-/g, "").slice(0, 8).toUpperCase();
+      const unit = Object.values(teachingUnits)[majorIndex % Object.values(teachingUnits).length];
+      return [0, 1, 2, 3, 4, 5].map((index) => ({
+      code: `GV-${majorKey}-${String(index + 1).padStart(2, "0")}`,
       name: index < 3 ? lecturerNames[majorIndex * 3 + index] : extraName(majorIndex * 6 + index + 100),
-      email: `gv.${major.code.toLowerCase().replace(/[^a-z0-9]/g, "")}.${index + 1}@vimaru.edu.vn`,
+      email: `gv.${majorKey.toLowerCase()}.${index + 1}@vimaru.edu.vn`,
       phone: `09${String(20000000 + majorIndex * 6 + index).padStart(8, "0")}`,
       academicRank: index % 2 === 0 ? "Phó Giáo sư" : null,
       academicDegree: "Tiến sĩ",
       teachingType: index % 2 === 1 ? "Thỉnh giảng" : "Cơ hữu",
       title: index % 2 === 0 ? "Trưởng bộ môn" : "Giảng viên",
-      faculty: teachingUnits[major.code].faculty,
-      department: teachingUnits[major.code].departments[Math.floor(index / 2)],
+      faculty: unit.faculty,
+      department: unit.departments[Math.floor(index / 2)],
       disciplineId: major.disciplineId,
       majorId: major.id,
       active: true,
-    })));
+      }));
+    });
 
     await sequelize.transaction(async (transaction) => {
       const existingDesired = new Set((await Lecturer.findAll({
@@ -96,13 +97,13 @@ async function run() {
       }
       for (const obsolete of reusable) await obsolete.destroy({ transaction });
       const offerings: any[] = await sequelize.query(
-        `SELECT co.id, s.id subject_id, s.name subject_name, s.subject_type, m.code major_code,
+        `SELECT co.id, s.id subject_id, s.name subject_name, s.subject_type, m.id::text major_key,
                 array_agg(DISTINCT ts.session_date::text || '|' || ts.period) FILTER (WHERE ts.id IS NOT NULL) slots
          FROM course_offerings co
          JOIN subjects s ON s.id = co.subject_id
          JOIN majors m ON m.id = s.major_id
          LEFT JOIN teaching_sessions ts ON ts.course_offering_id = co.id
-         GROUP BY co.id, s.id, s.name, s.subject_type, m.code
+         GROUP BY co.id, s.id, s.name, s.subject_type, m.id
          HAVING count(ts.id) > 0
          ORDER BY min(ts.session_date), co.id`,
         { type: QueryTypes.SELECT, transaction },
@@ -111,7 +112,7 @@ async function run() {
       const occupied = new Map<string, Set<string>>();
       let repairedOfferings = 0;
       for (const offering of offerings) {
-        const unit = teachingUnitForSubject(offering.major_code, { id: offering.subject_id, name: offering.subject_name, subjectType: offering.subject_type });
+        const unit = teachingUnitForSubject(offering.major_key, { id: offering.subject_id, name: offering.subject_name, subjectType: offering.subject_type });
         if (!unit) continue;
         const exact = allLecturers.filter((row: any) => row.faculty === unit.faculty && row.department === unit.department);
         const faculty = allLecturers.filter((row: any) => row.faculty === unit.faculty);

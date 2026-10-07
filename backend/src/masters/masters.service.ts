@@ -3,7 +3,6 @@ import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import { Op, UniqueConstraintError } from "sequelize";
 import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
-import { COMMON_MAJOR_CODE } from "../common/major-scope.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
 import { ClassGroupMember } from "../database/models/training/class-group-member.model.js";
 import { AdmissionRecord } from "../database/models/plan/admission-record.model.js";
@@ -45,7 +44,7 @@ export class MastersService {
   private async requireMastersMajor(majorId?: string | null, transaction?: Transaction) {
     if (!majorId) return null;
     const major = await this.majors.findByPk(majorId, { transaction });
-    if (!major || major.active === false || major.code === COMMON_MAJOR_CODE) {
+    if (!major || major.active === false || major.isCommon) {
       throw new BadRequestException("Chuyên ngành không tồn tại hoặc đã ngừng sử dụng.");
     }
     if (major.program !== "masters") throw new BadRequestException("Nhóm học phần Thạc sĩ không thể sử dụng chuyên ngành Tiến sĩ.");
@@ -75,7 +74,7 @@ export class MastersService {
     const groups = await this.classGroups.findAll({
       where,
       include: [
-        { model: Major, as: "major", attributes: ["id", "code", "name"] },
+        { model: Major, as: "major", attributes: ["id", "name"] },
         { model: Curriculum, as: "curriculum", attributes: ["id", "code", "name", "applicableFromYear", "active"] },
         {
           model: ClassGroupMember,
@@ -110,7 +109,7 @@ export class MastersService {
     const group = await this.classGroups.findOne({
       where: { id, program: "masters" },
       include: [
-        { model: Major, as: "major", attributes: ["id", "code", "name"] },
+        { model: Major, as: "major", attributes: ["id", "name"] },
         { model: Curriculum, as: "curriculum", attributes: ["id", "code", "name", "applicableFromYear", "active"] },
         {
           model: ClassGroupMember,
@@ -223,7 +222,7 @@ export class MastersService {
 
     const records = await this.admissionRecords.findAll({
       where,
-      include: [{ model: Major, as: "major", attributes: ["id", "code", "name"] }],
+      include: [{ model: Major, as: "major", attributes: ["id", "name"] }],
       order: [["lastName", "ASC"], ["firstName", "ASC"], ["fullName", "ASC"]],
     });
 

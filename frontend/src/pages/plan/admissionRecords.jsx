@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -7,7 +7,7 @@ import {
   Avatar, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, FormControlLabel,
   IconButton, MenuItem, Paper, Radio, RadioGroup, Select,
-  Pagination, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Pagination, Stack, TableBody, TableCell, TableContainer, TableRow,
   TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
@@ -17,15 +17,17 @@ import {
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
+import ResizableTable from "../../components/ResizableTable";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import { getSelectableMajors, normalizeMajorsResponse, selectMajorForLevel } from "../../utils/majors";
+import { personNameParts } from "../../utils/personName";
 import {
   disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline,
 } from "../../utils/disciplineScope";
 
 const currentYear = new Date().getFullYear();
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 15;
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
 
 const TRAINING_LEVELS = [
@@ -194,6 +196,25 @@ const AdmissionRecords = ({ mode = "applications" }) => {
   const navigate = useNavigate();
   const isAdmittedMasters = mode === "admitted-masters";
   const recordDetailBase = isAdmittedMasters ? "/masters/admitted-records" : "/plan/admission-records";
+  const columns = [
+    { key: "index", label: "STT", width: 50, minWidth: 40, align: "center" },
+    { key: "photo", label: "Ảnh", width: 60, minWidth: 50, align: "center" },
+    { key: "code", label: "Mã HV", width: 140 },
+    ...(isAdmittedMasters ? [
+      { key: "groupName", label: "Nhóm học phần", width: 180 },
+      { key: "groupCode", label: "Mã nhóm", width: 140 },
+    ] : []),
+    { key: "lastName", label: "Họ đệm", width: 160 },
+    { key: "firstName", label: "Tên", width: 90 },
+    { key: "email", label: "Email", width: 240 },
+    { key: "dob", label: "Ngày sinh", width: 120, align: "center" },
+    { key: "gender", label: "Giới tính", width: 90, align: "center" },
+    { key: "idCard", label: "Số CMND/CCCD", width: 150 },
+    { key: "major", label: "Trình độ & Ngành", width: 210 },
+    { key: "phone", label: "Điện thoại", width: 130 },
+    { key: "status", label: "Trạng thái", width: 160 },
+    { key: "actions", label: "Thao tác", width: 130, minWidth: 120, align: "center" },
+  ];
 
   // Global Filter State
   const [year, setYear] = useState(String(currentYear));
@@ -476,7 +497,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
 
   return (
     <FeatureLayout
-      title={isAdmittedMasters ? "Hồ sơ trúng tuyển" : "Nhập hồ sơ tuyển sinh"}
+      title={isAdmittedMasters ? "Danh sách học viên" : "Nhập hồ sơ tuyển sinh"}
       group={isAdmittedMasters ? "Thủ tục đầu vào" : "Kế hoạch khóa mới"}
       desc={isAdmittedMasters
         ? "Quản lý hồ sơ học viên Thạc sĩ đã trúng tuyển và thực hiện các thủ tục đầu vào."
@@ -539,7 +560,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
             <FilterSelectField label="Chuyên ngành" value={majorFilter} onChange={(e) => setMajorFilter(e.target.value)} sx={{ flex: "1 1 220px", minWidth: 220 }}>
                 <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả chuyên ngành ({visibleFilterMajors.length})</MenuItem>
                 {visibleFilterMajors.map((m) => (
-                  <MenuItem key={m.id} value={m.id} sx={{ fontSize: 12 }}>{m.code} — {m.name}</MenuItem>
+                  <MenuItem key={m.id} value={m.id} sx={{ fontSize: 12 }}>{m.name}</MenuItem>
                 ))}
             </FilterSelectField>
 
@@ -613,33 +634,16 @@ const AdmissionRecords = ({ mode = "applications" }) => {
           sx={{
             borderColor: "#D7E4EE",
             borderRadius: "12px",
-            overflow: "hidden",
+            overflowX: "auto",
             boxShadow: "0 5px 18px rgba(23, 62, 117, 0.06)",
           }}
         >
-          <Table size="small" stickyHeader sx={{ minWidth: isAdmittedMasters ? 1350 : 1100 }}>
-            <TableHead>
-              <TableRow sx={{ "& th": { bgcolor: "#EDF4FA", color: "#172B3A", fontWeight: 700, fontSize: 12, py: "9px", borderBottom: "1px solid #D7E4EE" } }}>
-                <TableCell sx={{ width: 40, textAlign: "center" }}>STT</TableCell>
-                <TableCell sx={{ width: 50, textAlign: "center" }}>Ảnh</TableCell>
-                <TableCell sx={{ width: 100 }}>Mã HV</TableCell>
-                {isAdmittedMasters && <TableCell sx={{ width: 150 }}>Nhóm học phần</TableCell>}
-                {isAdmittedMasters && <TableCell sx={{ width: 110 }}>Mã nhóm</TableCell>}
-                <TableCell sx={{ minWidth: 160 }}>Họ và tên</TableCell>
-                <TableCell sx={{ width: 90, textAlign: "center" }}>Ngày sinh</TableCell>
-                <TableCell sx={{ width: 70, textAlign: "center" }}>Giới tính</TableCell>
-                <TableCell sx={{ width: 110 }}>Số CMND/CCCD</TableCell>
-                <TableCell sx={{ width: 160 }}>Trình độ & Ngành</TableCell>
-                <TableCell sx={{ width: 120 }}>Điện thoại</TableCell>
-                <TableCell sx={{ width: 140 }}>Trạng thái</TableCell>
-                <TableCell sx={{ width: 120, textAlign: "center" }}>Thao tác</TableCell>
-              </TableRow>
-            </TableHead>
+          <ResizableTable key={mode} columns={columns} storageKey={`admission-records-columns:${mode}`}>
 
             <TableBody>
               {records.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={isAdmittedMasters ? 13 : 11} align="center" sx={{ py: 6, color: "#607486", fontSize: 13 }}>
+                  <TableCell colSpan={columns.length} align="center" sx={{ py: 6, color: "#607486", fontSize: 13 }}>
                     Chưa có hồ sơ tuyển sinh nào theo điều kiện lọc.
                     {isAdmin && !isAdmittedMasters && (
                       <Box sx={{ mt: 1.5 }}>
@@ -706,23 +710,31 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                     <TableCell>
                       <Typography
                         variant="body2"
-                        onClick={() => navigate(`${recordDetailBase}/${r.id}`)}
+                        component={Link}
+                        to={`${recordDetailBase}/${r.id}`}
                         sx={{
                           fontWeight: 700,
                           color: "#173E75",
                           fontSize: 12.5,
                           cursor: "pointer",
+                          textDecoration: "none",
                           "&:hover": { color: "#0788B8", textDecoration: "underline" },
                         }}
                       >
-                        {r.fullName}
+                        {personNameParts(r).familyAndMiddle}
                       </Typography>
-                      {r.email && (
-                        <Typography variant="caption" sx={{ color: "#607486", display: "block", fontSize: 11 }}>
-                          {r.email}
-                        </Typography>
-                      )}
                     </TableCell>
+                    <TableCell>
+                      <Typography
+                        variant="body2"
+                        component={Link}
+                        to={`${recordDetailBase}/${r.id}`}
+                        sx={{ fontWeight: 700, color: "#173E75", fontSize: 12.5, textDecoration: "none", "&:hover": { color: "#0788B8", textDecoration: "underline" } }}
+                      >
+                        {personNameParts(r).givenName}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ color: "#607486" }}>{r.email || "—"}</TableCell>
 
                     <TableCell align="center" sx={{ color: "#172B3A" }}>
                       {r.dob || "—"}
@@ -748,6 +760,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                     </TableCell>
 
                     <TableCell>
+                      <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
                       <Chip
                         size="small"
                         label={r.trainingLevel || "Thạc sĩ"}
@@ -759,11 +772,13 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                           color: r.trainingLevel === "Tiến sĩ" ? "#B86216" : "#137B3B",
                           borderRadius: "999px",
                           mr: 0.5,
+                          flexShrink: 0,
                         }}
                       />
-                      <Typography variant="caption" sx={{ fontWeight: 600, color: "#173E75", display: "block" }}>
+                      <Typography variant="caption" title={r.majorName || r.major?.name || ""} sx={{ fontWeight: 600, color: "#173E75", minWidth: 0 }}>
                         {r.majorName || r.major?.name || "—"}
                       </Typography>
+                      </Stack>
                     </TableCell>
 
                     <TableCell sx={{ color: "#172B3A", fontSize: 12 }}>
@@ -797,12 +812,6 @@ const AdmissionRecords = ({ mode = "applications" }) => {
 
                     <TableCell align="center">
                       <Stack direction="row" spacing={0.5} justifyContent="center">
-                        <Tooltip title="Xem chi tiết hồ sơ (Trang A4)">
-                          <IconButton size="small" color="primary" onClick={() => navigate(`${recordDetailBase}/${r.id}`)}>
-                            <VisibilityRounded sx={{ fontSize: 17, color: "#0788B8" }} />
-                          </IconButton>
-                        </Tooltip>
-
                         {isAdmin && (
                           <Tooltip title="Sửa hồ sơ">
                             <IconButton size="small" color="inherit" onClick={() => handleOpenEdit(r)}>
@@ -824,7 +833,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                 ))
               )}
             </TableBody>
-          </Table>
+          </ResizableTable>
         </TableContainer>
         {pagination.totalPages > 1 && (
           <Box sx={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 48, px: 0.5, pb: 0.5 }}>
@@ -1230,7 +1239,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                       <MenuItem value="" disabled>-- Chọn chuyên ngành --</MenuItem>
                       {visibleSelectableMajors.map((m) => (
                         <MenuItem key={m.id} value={m.id} sx={{ fontSize: 12 }}>
-                          {m.code} — {m.name}
+                          {m.name}
                         </MenuItem>
                       ))}
                     </Select>

@@ -1,0 +1,24 @@
+.exam-gradebook { width: 100%; min-width: 0; }
+.exam-print-sheet { display: none; }
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+  body:has(.exam-gradebook) * { visibility: hidden; }
+  .exam-gradebook, .exam-gradebook * { visibility: visible !important; }
+  .exam-gradebook { position: absolute; inset: 0; width: 100%; }
+  .exam-gradebook .exam-no-print { display: none !important; }
+  .exam-gradebook .exam-print-sheet { display: block !important; }
+  .exam-gradebook .exam-print-sheet table { border-collapse: collapse; }
+  .exam-gradebook .exam-print-sheet th { background: #EDF4FA; color: #173E75; }
+  .exam-gradebook .exam-print-sheet th, .exam-gradebook .exam-print-sheet td { border: 1px solid #D7E4EE; text-align: left; }
+  .exam-gradebook .exam-table-container { overflow: visible !important; max-height: none !important; }
+  .exam-gradebook .exam-table-container > div { width: 100% !important; }
+  .exam-gradebook table { width: 100% !important; table-layout: auto !important; }
+  .exam-gradebook col { width: auto !important; }
+  .exam-gradebook th, .exam-gradebook td { padding: 4px 3px !important; font-size: 8px !important; white-space: normal !important; }
+  .exam-gradebook th { position: static !important; }
+  .exam-gradebook tr { break-inside: avoid; }
+  .exam-gradebook [role="slider"] { display: none !important; }
+  .exam-gradebook input, .exam-gradebook select { padding: 0 !important; font-size: 8px !important; color: #000 !important; -webkit-text-fill-color: #000 !important; opacity: 1 !important; }
+  .exam-gradebook fieldset { border: 0 !important; }
+  .exam-gradebook .MuiPaper-root { box-shadow: none !important; border-radius: 0 !important; }
+}

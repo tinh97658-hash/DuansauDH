@@ -209,7 +209,7 @@ export default function CourseMatrix({ user }) {
               <option value="">Tất cả chuyên ngành</option>
               {visibleMajors.map((major) => (
                 <option key={major.id} value={major.id}>
-                  {major.name}{major.code ? ` (${major.code})` : ""}
+                  {major.name}
                 </option>
               ))}
             </select>

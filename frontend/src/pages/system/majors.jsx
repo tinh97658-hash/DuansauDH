@@ -6,11 +6,12 @@ const Majors = () => (
   <CatalogManager
     title="Chuyên ngành đào tạo"
     group="Danh mục đào tạo"
-    desc="Chuyên ngành thuộc một ngành đào tạo, theo bậc Thạc sĩ & Tiến sĩ. Mã chuyên ngành chỉ cần duy nhất trong phạm vi ngành."
+    desc="Chuyên ngành thuộc một ngành đào tạo, theo bậc Thạc sĩ & Tiến sĩ."
     endpoint="/system/majors"
     itemName="chuyên ngành"
-    codeLabel="Mã chuyên ngành"
     nameLabel="Tên chuyên ngành"
+    showCode={false}
+    showIndex={false}
     sortable={false}
     editOnDoubleClick
     parentBeforeName
@@ -24,6 +25,7 @@ const Majors = () => (
         : "-",
     }}
     fields={[
+      { key: "englishName", label: "Tên tiếng Anh", type: "text" },
       {
         key: "program",
         label: "Trình độ / Bậc đào tạo",
@@ -46,7 +48,6 @@ const Majors = () => (
       { key: "isAdmissionScreening", label: "Xét tuyển đầu vào", type: "checkbox", defaultValue: false },
       { key: "durationYears", label: "Thời gian đào tạo (năm)", type: "number", min: 0.5, step: 0.5, defaultValue: 2 },
       { key: "maxOvertimeYears", label: "Thời gian vượt khung (năm)", type: "number", min: 0, step: 0.5, defaultValue: 2 },
-      { key: "description", label: "Mô tả", type: "multiline" },
     ]}
   />
 );

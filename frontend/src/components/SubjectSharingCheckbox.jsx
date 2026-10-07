@@ -50,7 +50,7 @@ export default function SubjectSharingCheckbox({ subject, majors = [], disabled 
         {candidates.map((major) => (
           <MenuItem key={major.id} value={major.id}>
             <Checkbox size="small" checked={selected.includes(major.id)} />
-            <ListItemText primary={`${major.code} — ${major.name}`} />
+            <ListItemText primary={major.name} />
           </MenuItem>
         ))}
       </Select>

@@ -3,7 +3,6 @@ import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import { col, fn, Op } from "sequelize";
 import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
-import { COMMON_MAJOR_CODE } from "../common/major-scope.js";
 import { Major } from "../database/models/common/major.model.js";
 import { Discipline } from "../database/models/common/discipline.model.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
@@ -68,7 +67,7 @@ export class PlanService {
   private async requireAdmissionMajor(majorId: string | null | undefined, trainingLevel?: string | null) {
     if (!majorId) throw new BadRequestException("Vui lòng chọn chuyên ngành đăng ký tuyển sinh");
     const major = await this.majors.findByPk(majorId);
-    if (!major || major.active === false || major.code === COMMON_MAJOR_CODE) {
+    if (!major || major.active === false || major.isCommon) {
       throw new BadRequestException("Chuyên ngành đã chọn không tồn tại hoặc đã ngừng sử dụng");
     }
     const expectedProgram = this.programForTrainingLevel(trainingLevel);
@@ -89,7 +88,7 @@ export class PlanService {
   private async requireMajorForProgram(majorId: string | null | undefined, program: string, transaction?: Transaction) {
     if (!majorId) throw new BadRequestException("Vui lòng chọn chuyên ngành.");
     const major = await this.majors.findByPk(majorId, { transaction });
-    if (!major || major.active === false || major.code === COMMON_MAJOR_CODE) {
+    if (!major || major.active === false || major.isCommon) {
       throw new BadRequestException("Chuyên ngành không tồn tại hoặc đã ngừng sử dụng.");
     }
     if (major.program !== program) throw new BadRequestException("Chuyên ngành không phù hợp với bậc đào tạo.");
@@ -97,11 +96,11 @@ export class PlanService {
   }
 
   async trainingPlan(program?: string) {
-    const majorWhere: Record<string, unknown> = { code: { [Op.ne]: COMMON_MAJOR_CODE }, active: true };
+    const majorWhere: Record<string, unknown> = { isCommon: false, active: true };
     if (program) majorWhere.program = program;
     const majors = await this.majors.findAll({
       where: majorWhere,
-      attributes: ["id", "code", "name", "program", "disciplineId", "active"],
+      attributes: ["id", "name", "program", "disciplineId", "active"],
       include: [{ model: Discipline, attributes: ["id", "code", "name"], required: false }],
       order: [["name", "ASC"]],
     });
@@ -119,7 +118,6 @@ export class PlanService {
     return majors
       .map((m) => ({
         id: m.id,
-        code: m.code,
         name: m.name,
         program: m.program,
         disciplineId: m.disciplineId,
@@ -140,7 +138,7 @@ export class PlanService {
     if (program) where.program = program;
     return this.subjects.findAll({
       where,
-      include: [{ model: Major, as: "major", attributes: ["id", "code", "name"] }],
+      include: [{ model: Major, as: "major", attributes: ["id", "name"] }],
       order: [["sortOrder", "ASC"], ["codeNumber", "ASC"], ["name", "ASC"]],
     });
   }
@@ -154,8 +152,6 @@ export class PlanService {
       await this.requireMajorForProgram(dto.majorId, program, transaction);
       const sharedMajorIds = await this.validateSharedMajorIds(dto.sharedMajorIds || [], dto.majorId, program, transaction);
       dto.allowCrossMajor = sharedMajorIds.length > 0;
-      await this.ensureUnique(this.subjects, "codeNumber", String(dto.codeNumber), undefined, { majorId: dto.majorId, program });
-      await this.ensureUnique(this.subjects, "codeText", dto.codeText, undefined, { majorId: dto.majorId, program });
       await this.validateSubjectIdentityTarget(
         undefined,
         dto.canonicalSubjectId || null,
@@ -188,8 +184,6 @@ export class PlanService {
       );
       if (dto.sharedMajorIds !== undefined || sharedMajorIds.length > 0) dto.allowCrossMajor = sharedMajorIds.length > 0;
       await this.validateSubjectIdentityUpdate(subject, dto, program, transaction);
-      await this.ensureUnique(this.subjects, "codeNumber", String(dto.codeNumber ?? subject.codeNumber), id, { majorId, program });
-      await this.ensureUnique(this.subjects, "codeText", dto.codeText ?? subject.codeText, id, { majorId, program });
       const payload = this.pick(dto, [
         "codeNumber", "codeText", "name", "majorId", "program", "credits",
         "majorAssignment", "subjectType", "isRequired", "sortOrder", "active",
@@ -236,7 +230,7 @@ export class PlanService {
 
       return this.subjects.findByPk(id, {
         include: [
-          { model: Major, as: "major", attributes: ["id", "code", "name"] },
+          { model: Major, as: "major", attributes: ["id", "name"] },
           { model: Subject, as: "canonicalSubject" },
         ],
         transaction,
@@ -260,8 +254,6 @@ export class PlanService {
       for (const majorId of majorIds) await this.requireMajorForProgram(majorId, program, transaction);
       const created: Subject[] = [];
       for (const definition of definitions) {
-        await this.ensureUnique(this.subjects, "codeNumber", String(definition.codeNumber), undefined, { majorId: definition.majorId, program });
-        await this.ensureUnique(this.subjects, "codeText", definition.codeText, undefined, { majorId: definition.majorId, program });
         const sharedMajorIds = majorIds.filter((id) => id !== definition.majorId);
         created.push(await this.subjects.create({
           ...this.pick(source, [
@@ -323,11 +315,7 @@ export class PlanService {
         throw new BadRequestException("Học phần học chung phải cùng tên, cùng số tín chỉ và cùng bậc đào tạo.");
       }
 
-      await this.ensureUnique(this.subjects, "codeNumber", String(source.codeNumber), undefined, { majorId: source.majorId, program });
-      await this.ensureUnique(this.subjects, "codeText", source.codeText, undefined, { majorId: source.majorId, program });
       for (const counterpart of counterparts) {
-        await this.ensureUnique(this.subjects, "codeNumber", String(counterpart.codeNumber), undefined, { majorId: counterpart.majorId, program });
-        await this.ensureUnique(this.subjects, "codeText", counterpart.codeText, undefined, { majorId: counterpart.majorId, program });
       }
       const payload = this.pick(source, [
         "codeNumber", "codeText", "name", "majorId", "program", "credits",
@@ -365,7 +353,7 @@ export class PlanService {
 
       return {
         subject: await this.subjects.findByPk(created.id, {
-          include: [{ model: Major, as: "major", attributes: ["id", "code", "name"] }],
+          include: [{ model: Major, as: "major", attributes: ["id", "name"] }],
           transaction,
         }),
         linkedSubjects: existingSubjects,
@@ -379,7 +367,7 @@ export class PlanService {
     if (uniqueIds.includes(ownMajorId)) throw new BadRequestException("Phạm vi học chung không được chứa chính chuyên ngành của học phần.");
     if (uniqueIds.length === 0) return uniqueIds;
     const majors = await this.majors.findAll({
-      where: { id: { [Op.in]: uniqueIds }, program, active: true, code: { [Op.ne]: COMMON_MAJOR_CODE } },
+      where: { id: { [Op.in]: uniqueIds }, program, active: true, isCommon: false },
       attributes: ["id"], transaction,
     });
     if (majors.length !== uniqueIds.length) {
@@ -478,7 +466,7 @@ export class PlanService {
     return this.classGroups.findAll({
       where,
       include: [
-        { model: Major, as: "major", attributes: ["id", "code", "name"] },
+        { model: Major, as: "major", attributes: ["id", "name"] },
         {
           model: Curriculum,
           as: "curriculum",
@@ -493,7 +481,7 @@ export class PlanService {
     const created = await this.classGroupsService.create(dto as any);
     return this.classGroups.findByPk(created.id, {
       include: [
-        { model: Major, as: "major", attributes: ["id", "code", "name"] },
+        { model: Major, as: "major", attributes: ["id", "name"] },
         { model: Curriculum, as: "curriculum", attributes: ["id", "code", "name", "totalCredits", "applicableFromYear", "active"] },
       ],
     });
@@ -503,7 +491,7 @@ export class PlanService {
     await this.classGroupsService.update(id, dto as any);
     return this.classGroups.findByPk(id, {
       include: [
-        { model: Major, as: "major", attributes: ["id", "code", "name"] },
+        { model: Major, as: "major", attributes: ["id", "name"] },
         { model: Curriculum, as: "curriculum", attributes: ["id", "code", "name", "totalCredits", "applicableFromYear", "active"] },
       ],
     });
@@ -549,7 +537,7 @@ export class PlanService {
     const includeMajor = {
       model: Major,
       as: "major",
-      attributes: ["id", "code", "name", "disciplineId"],
+      attributes: ["id", "name", "disciplineId"],
       ...(disciplineId ? { where: { disciplineId }, required: true } : {}),
     };
 
@@ -625,7 +613,7 @@ export class PlanService {
 
   async getAdmissionRecord(id: string) {
     const record = await this.admissionRecordsModel.findByPk(id, {
-      include: [{ model: Major, as: "major", attributes: ["id", "code", "name"] }],
+      include: [{ model: Major, as: "major", attributes: ["id", "name"] }],
     });
     if (!record) throw new NotFoundException("Không tìm thấy hồ sơ tuyển sinh");
     return record;
@@ -650,7 +638,7 @@ export class PlanService {
 
     const created = await this.admissionRecordsModel.create(payload as any);
     return this.admissionRecordsModel.findByPk(created.id, {
-      include: [{ model: Major, as: "major", attributes: ["id", "code", "name"] }],
+      include: [{ model: Major, as: "major", attributes: ["id", "name"] }],
     });
   }
 
@@ -681,7 +669,7 @@ export class PlanService {
       }
     }
     return this.admissionRecordsModel.findByPk(id, {
-      include: [{ model: Major, as: "major", attributes: ["id", "code", "name"] }],
+      include: [{ model: Major, as: "major", attributes: ["id", "name"] }],
     });
   }
 

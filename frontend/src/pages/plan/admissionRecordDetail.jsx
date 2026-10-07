@@ -1430,7 +1430,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
                   <MenuItem value="" disabled>-- Chọn chuyên ngành --</MenuItem>
                   {visibleSelectableMajors.map((m) => (
                     <MenuItem key={m.id} value={m.id}>
-                      {m.code ? `${m.code} - ${m.name}` : m.name}
+                      {m.name}
                     </MenuItem>
                   ))}
                 </Select>
@@ -1835,7 +1835,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
           </Select>
           <Select fullWidth size="small" displayEmpty value={transferForm.toMajorId} onChange={(e) => setTransferForm((p) => ({ ...p, toMajorId: e.target.value }))}>
             <MenuItem value="">Chọn chuyên ngành mới</MenuItem>
-            {visibleTransferMajors.filter((major) => major.id !== record?.majorId).map((major) => <MenuItem key={major.id} value={major.id}>{major.name} ({major.code})</MenuItem>)}
+            {visibleTransferMajors.filter((major) => major.id !== record?.majorId).map((major) => <MenuItem key={major.id} value={major.id}>{major.name}</MenuItem>)}
           </Select>
           <TextField label="Lý do chuyển" multiline minRows={3} value={transferForm.reason} onChange={(e) => setTransferForm((p) => ({ ...p, reason: e.target.value }))} />
         </Stack></DialogContent>

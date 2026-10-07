@@ -10,6 +10,7 @@ const Lecturers = () => (
     itemName="giảng viên"
     codeLabel="Mã giảng viên"
     nameLabel="Họ và tên"
+    splitPersonName
     sortable={false}
     editOnDoubleClick
     showEditAction={false}
@@ -49,12 +50,12 @@ const Lecturers = () => (
         label: "Chuyên ngành",
         type: "select",
         optionsEndpoint: "/system/majors",
-        optionLabel: (item) => `${item.code} · ${item.name}`,
+        optionLabel: (item) => item.name,
         filterOption: (item, form) => Boolean(form.disciplineId) && item.disciplineId === form.disciplineId,
         required: true,
         allowEmpty: false,
-        display: (row) => row.major ? `${row.major.code} · ${row.major.name}` : "Chưa phân chuyên ngành",
-        searchValue: (row) => row.major ? `${row.major.code} ${row.major.name}` : "",
+        display: (row) => row.major ? row.major.name : "Chưa phân chuyên ngành",
+        searchValue: (row) => row.major?.name || "",
       },
     ]}
   />

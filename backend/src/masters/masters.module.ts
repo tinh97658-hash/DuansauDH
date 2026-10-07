@@ -9,6 +9,11 @@ import { Curriculum } from "../database/models/plan/curriculum.model.js";
 import { PlanModule } from "../plan/plan.module.js";
 import { MastersController } from "./masters.controller.js";
 import { MastersService } from "./masters.service.js";
+import { ExamGradebookService } from "./exam-gradebook.service.js";
+import { CourseExamGradebook } from "../database/models/training/course-exam-gradebook.model.js";
+import { CourseOffering } from "../database/models/training/course-offering.model.js";
+import { CourseOfferingClassGroup } from "../database/models/training/course-offering-class-group.model.js";
+import { Subject } from "../database/models/plan/subject.model.js";
 
 @Module({
   imports: [
@@ -19,11 +24,12 @@ import { MastersService } from "./masters.service.js";
       Student,
       Major,
       Curriculum,
+      CourseExamGradebook, CourseOffering, CourseOfferingClassGroup, Subject,
     ]),
     PlanModule,
   ],
   controllers: [MastersController],
-  providers: [MastersService],
+  providers: [MastersService, ExamGradebookService],
   exports: [MastersService],
 })
 export class MastersModule {}

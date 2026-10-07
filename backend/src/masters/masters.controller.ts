@@ -6,16 +6,25 @@ import {
   AssignMembersDto, AutoAssignDto, BatchCreateMastersClassGroupsDto, CreateMastersClassGroupDto, UpdateMastersClassGroupDto,
 } from "./dto/masters-class-group.dto.js";
 import { MastersService } from "./masters.service.js";
+import { ExamGradebookService } from "./exam-gradebook.service.js";
+import { ExamGradebookQueryDto, ExamSubjectsQueryDto, SaveExamGradebookDto } from "./dto/exam-gradebook.dto.js";
 
 @Controller("masters")
 @UseGuards(AuthenticatedGuard)
 export class MastersController {
-  constructor(private readonly masters: MastersService) {}
+  constructor(private readonly masters: MastersService, private readonly gradebooks: ExamGradebookService) {}
 
   @Get("bridge-course") bridgeCourse() { return this.masters.bridgeCourse(); }
   @Get("admission-scores") admissionScores() { return this.masters.admissionScores(); }
   @Get("exam-eligibility") examEligibility() { return this.masters.examEligibility(); }
-  @Get("exam-lists") examLists() { return this.masters.examLists(); }
+  @Get("exam-lists/options") @Roles("admin", "supervisor", "examiner") @UseGuards(RolesGuard)
+  examListOptions() { return this.gradebooks.options(); }
+  @Get("exam-lists/subjects") @Roles("admin", "supervisor", "examiner") @UseGuards(RolesGuard)
+  examListSubjects(@Query() query: ExamSubjectsQueryDto) { return this.gradebooks.subjects(query.classGroupId); }
+  @Get("exam-lists") @Roles("admin", "supervisor", "examiner") @UseGuards(RolesGuard)
+  examLists(@Query() query: ExamGradebookQueryDto) { return this.gradebooks.get(query); }
+  @Put("exam-lists") @Roles("admin", "examiner") @UseGuards(RolesGuard)
+  saveExamLists(@Body() dto: SaveExamGradebookDto) { return this.gradebooks.save(dto); }
   @Get("english-exam") englishExam() { return this.masters.englishExam(); }
   @Get("english-scores") englishScores() { return this.masters.englishScores(); }
   @Get("english-certification") englishCertification() { return this.masters.englishCertification(); }

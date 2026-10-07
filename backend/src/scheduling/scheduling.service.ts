@@ -109,7 +109,7 @@ export class SchedulingService {
     const groups = await this.classGroups.findAll({
       where: { program, majorId: query.majorId, academicYear: query.academicYear, groupType: "ADMINISTRATIVE" },
       include: [
-        { model: Major, as: "major", attributes: ["id", "code", "name"] },
+        { model: Major, as: "major", attributes: ["id", "name"] },
         { model: Curriculum, as: "curriculum", attributes: ["id", "code"] },
       ],
       order: [["code", "ASC"]],
@@ -353,14 +353,14 @@ export class SchedulingService {
         include: [{
           model: Major,
           as: "major",
-          attributes: ["id", "code", "name", "disciplineId"],
+          attributes: ["id", "name", "disciplineId"],
           include: [{ model: Discipline, as: "discipline", attributes: ["id", "code", "name"] }],
         }],
       },
       {
         model: CourseOfferingClassGroup,
         as: "groupLinks",
-        include: [{ model: ClassGroup, as: "classGroup", include: [{ model: Major, as: "major", attributes: ["id", "code", "name"] }] }],
+        include: [{ model: ClassGroup, as: "classGroup", include: [{ model: Major, as: "major", attributes: ["id", "name"] }] }],
       },
       { model: Staff, as: "completedBy", attributes: ["id", "name", "email"] },
     ];
@@ -671,7 +671,7 @@ export class SchedulingService {
 
     const groups = await this.classGroups.findAll({
       where: groupWhere,
-      include: [{ model: Major, as: "major", attributes: ["id", "code", "name"] }],
+      include: [{ model: Major, as: "major", attributes: ["id", "name"] }],
       order: [["code", "ASC"]],
     });
     const anchorGroupIds = new Set(groups.filter((group) => group.majorId === query.majorId && group.academicYear === query.academicYear).map((group) => group.id));
@@ -1089,7 +1089,7 @@ export class SchedulingService {
           {
             model: CourseOfferingClassGroup,
             as: "groupLinks",
-            include: [{ model: ClassGroup, as: "classGroup", include: [{ model: Major, as: "major", attributes: ["id", "code", "name"] }] }],
+            include: [{ model: ClassGroup, as: "classGroup", include: [{ model: Major, as: "major", attributes: ["id", "name"] }] }],
           },
         ],
       },

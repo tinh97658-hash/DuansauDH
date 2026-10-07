@@ -9,8 +9,9 @@ import { TrainingLevel } from "./training-level.model.js";
 @Table({ tableName: "majors", underscored: true, timestamps: true })
 export class Major extends Model {
   @Default(DataType.UUIDV4) @Column({ type: DataType.UUID, primaryKey: true }) declare id: string;
-  @Column({ type: DataType.STRING(20), allowNull: false }) declare code: string;
   @Column({ type: DataType.STRING(200), allowNull: false }) declare name: string;
+  @Column({ type: DataType.STRING(200), allowNull: true }) declare englishName: string | null;
+  @Default(false) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare isCommon: boolean;
   @ForeignKey(() => Discipline) @Column({ type: DataType.UUID, allowNull: false }) declare disciplineId: string;
   @BelongsTo(() => Discipline) declare discipline: any;
   @ForeignKey(() => TrainingLevel) @Column({ type: DataType.UUID, allowNull: true }) declare trainingLevelId: string | null;

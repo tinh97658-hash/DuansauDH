@@ -31,7 +31,7 @@ function LecturerPicker({ value, lecturers, offering, conflicts, disabled, locke
 
   if (locked) return <div className="sl-fixed-lecturer" aria-label="Giảng viên cố định">
     <strong>{selected?.name || "Giảng viên đã phân công"}</strong>
-    <span>{selected?.major ? `${selected.major.code} · ${selected.major.name}` : "Đã cố định theo buổi học đầu tiên"}</span>
+    <span>{selected?.major ? selected.major.name : "Đã cố định theo buổi học đầu tiên"}</span>
     <small>Giảng viên cố định của lớp · Các buổi sau chỉ thay đổi phòng học</small>
   </div>;
 

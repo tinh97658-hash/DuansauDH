@@ -11,6 +11,7 @@ import {
 import { AddRounded, DeleteRounded, EditRounded } from "@mui/icons-material";
 import { API_BASE_URL } from "../config/http";
 import FeatureLayout from "./FeatureLayout";
+import { personNameParts } from "../utils/personName";
 import FilterSearchField from "./FilterSearchField";
 
 const buildEmptyForm = (parent, fields, sortable) => {
@@ -76,6 +77,7 @@ const CatalogManager = ({
   title, group, desc, endpoint, itemName, nameLabel = "Tên", codeLabel = "Mã",
   sortable = true, parent = null, parentBeforeName = false, fields = [], editOnDoubleClick = false,
   showEditAction = true, showDeleteAction = true, showSortColumn = sortable,
+  showCode = true, showIndex = true, splitPersonName = false,
 }) => {
   const [rows, setRows] = useState([]);
   const [options, setOptions] = useState([]);
@@ -157,15 +159,15 @@ const CatalogManager = ({
     const keyword = search.trim().toLowerCase();
     if (!keyword) return rows;
     const haystacks = (row) => [
-      row.code, row.name,
+      showCode ? row.code : "", row.name,
       ...tableFields.map((f) => f.searchValue ? f.searchValue(row) : row[f.key]),
       parent ? (parent.display ? parent.display(row) : row[parent.field]) : "",
     ];
     return rows.filter((row) => haystacks(row).some((v) => String(v ?? "").toLowerCase().includes(keyword)));
-  }, [rows, search, parent, tableFields]);
+  }, [rows, search, parent, tableFields, showCode]);
 
   const showActions = isAdmin && (showEditAction || showDeleteAction);
-  const colSpan = 3 + (parent ? 1 : 0) + tableFields.length + (showSortColumn ? 1 : 0) + 1 + (showActions ? 1 : 0);
+  const colSpan = (showIndex ? 1 : 0) + (showCode ? 1 : 0) + (splitPersonName ? 2 : 1) + (parent ? 1 : 0) + tableFields.length + (showSortColumn ? 1 : 0) + 1 + (showActions ? 1 : 0);
 
   const openAdd = () => { setEditingId(null); setForm(buildEmptyForm(parent, fields, sortable)); setDialogOpen(true); };
   const openEdit = (row) => {
@@ -191,9 +193,10 @@ const CatalogManager = ({
   }));
 
   const submit = async () => {
-    if (!form.code?.trim()) return toast.error(`Vui lòng nhập ${codeLabel.toLowerCase()}`);
+    if (showCode && !form.code?.trim()) return toast.error(`Vui lòng nhập ${codeLabel.toLowerCase()}`);
     if (!form.name?.trim()) return toast.error(`Vui lòng nhập ${nameLabel.toLowerCase()}`);
-    const body = { code: form.code.trim(), name: form.name.trim(), active: Boolean(form.active) };
+    const body = { name: form.name.trim(), active: Boolean(form.active) };
+    if (showCode) body.code = form.code.trim();
     if (sortable) body.sortOrder = Number(form.sortOrder || 0);
     if (parent) {
       const value = form[parent.field];
@@ -296,7 +299,7 @@ const CatalogManager = ({
       >
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="flex-end">
           <FilterSearchField
-            placeholder={`Tìm theo ${codeLabel.toLowerCase()} hoặc tên...`}
+            placeholder={showCode ? `Tìm theo ${codeLabel.toLowerCase()} hoặc tên...` : "Tìm theo tên..."}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             sx={{ minWidth: { xs: 0, sm: 280 }, width: { xs: "100%", sm: "auto" }, flexGrow: 1 }}
@@ -331,10 +334,10 @@ const CatalogManager = ({
         <Table size="small">
           <TableHead>
             <TableRow sx={{ bgcolor: "#f0f4fa" }}>
-              <TableCell sx={{ width: 60, fontWeight: 700 }}>STT</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>{codeLabel}</TableCell>
+              {showIndex && <TableCell sx={{ width: 60, fontWeight: 700 }}>STT</TableCell>}
+              {showCode && <TableCell sx={{ fontWeight: 700 }}>{codeLabel}</TableCell>}
               {parent && parentBeforeName && <TableCell sx={{ fontWeight: 700 }}>{parent.columnLabel || parent.label}</TableCell>}
-              <TableCell sx={{ fontWeight: 700 }}>{nameLabel}</TableCell>
+              {splitPersonName ? <><TableCell sx={{ fontWeight: 700 }}>Họ đệm</TableCell><TableCell sx={{ fontWeight: 700 }}>Tên</TableCell></> : <TableCell sx={{ fontWeight: 700 }}>{nameLabel}</TableCell>}
               {parent && !parentBeforeName && <TableCell sx={{ fontWeight: 700 }}>{parent.columnLabel || parent.label}</TableCell>}
               {tableFields.map((f) => <TableCell key={f.key} sx={{ fontWeight: 700 }}>{f.label}</TableCell>)}
               {showSortColumn && <TableCell align="center" sx={{ fontWeight: 700, width: 90 }}>Thứ tự</TableCell>}
@@ -351,10 +354,10 @@ const CatalogManager = ({
               <TableRow key={row.id} hover onDoubleClick={isAdmin && editOnDoubleClick ? () => openEdit(row) : undefined}
                 title={isAdmin && editOnDoubleClick ? "Nhấp đúp để sửa" : undefined}
                 sx={isAdmin && editOnDoubleClick ? { cursor: "pointer" } : undefined}>
-                <TableCell>{index + 1}</TableCell>
-                <TableCell><Typography variant="body2" sx={{ fontFamily: "inherit" }}>{row.code}</Typography></TableCell>
+                {showIndex && <TableCell>{index + 1}</TableCell>}
+                {showCode && <TableCell><Typography variant="body2" sx={{ fontFamily: "inherit" }}>{row.code}</Typography></TableCell>}
                 {parent && parentBeforeName && <TableCell>{parent.display ? parent.display(row) : row[parent.field]}</TableCell>}
-                <TableCell>{row.name}</TableCell>
+                {splitPersonName ? <><TableCell>{personNameParts(row).familyAndMiddle}</TableCell><TableCell>{personNameParts(row).givenName}</TableCell></> : <TableCell>{row.name}</TableCell>}
                 {parent && !parentBeforeName && <TableCell>{parent.display ? parent.display(row) : row[parent.field]}</TableCell>}
                 {tableFields.map((f) => <TableCell key={f.key}>{renderFieldValue(row, f)}</TableCell>)}
                 {showSortColumn && <TableCell align="center">{row.sortOrder}</TableCell>}
@@ -406,10 +409,10 @@ const CatalogManager = ({
           <Stack spacing="14px">
             <Box sx={{ p: 1.75, border: "1px solid #d7e1e8", borderRadius: "8px", backgroundColor: "#fbfcfd" }}>
               <Stack spacing="13px">
-                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "160px 1fr" }, gap: 1.5 }}>
-                  <CompactField label={codeLabel.toUpperCase()} htmlFor="catalog-code">
+                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: showCode ? "160px 1fr" : "1fr" }, gap: 1.5 }}>
+                  {showCode && <CompactField label={codeLabel.toUpperCase()} htmlFor="catalog-code">
                     <TextField id="catalog-code" value={form.code} onChange={setField("code")} inputProps={{ "aria-label": codeLabel }} fullWidth size="small" sx={compactControlSx} />
-                  </CompactField>
+                  </CompactField>}
                   <CompactField label={nameLabel.toUpperCase()} htmlFor="catalog-name">
                     <TextField id="catalog-name" value={form.name} onChange={setField("name")} inputProps={{ "aria-label": nameLabel }} fullWidth size="small" sx={compactControlSx} />
                   </CompactField>
@@ -538,7 +541,7 @@ const CatalogManager = ({
         </DialogTitle>
         <DialogContent sx={{ px: 2.5, py: 2 }}>
           <Typography sx={{ fontSize: "13.5px", color: "#1c2936" }}>
-            Bạn có chắc muốn xóa {itemName} <strong>{deleting?.name}</strong> (mã <strong>{deleting?.code}</strong>) không?
+            Bạn có chắc muốn xóa {itemName} <strong>{deleting?.name}</strong>{showCode && <> (mã <strong>{deleting?.code}</strong>)</>} không?
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 2.5, py: 1.5, gap: 1.25, minHeight: 60, borderTop: "1px solid #e1e8ee" }}>

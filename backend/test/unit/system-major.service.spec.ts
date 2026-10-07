@@ -68,21 +68,25 @@ describe("SystemService major catalog synchronization", () => {
     expect(majors.create).not.toHaveBeenCalled();
   });
 
-  it("scopes major code uniqueness to the parent discipline", async () => {
+  it("stores a major without a code and keeps the English name", async () => {
     const { service, trainingLevels, disciplines, majors } = buildService();
     disciplines.findByPk.mockResolvedValue({ id: "discipline-1" });
-    majors.findOne.mockResolvedValue({ id: "existing" });
     trainingLevels.findOne.mockResolvedValue({ id: "masters-level", code: "MASTER" });
+    trainingLevels.findByPk.mockResolvedValue({ id: "masters-level", code: "MASTER" });
+    majors.create.mockImplementation(async (values: unknown) => values);
 
-    await expect(service.createMajor({
-      code: "KTHH",
+    await service.createMajor({
       name: "Khai thác hàng hải",
+      englishName: "Nautical Science",
       disciplineId: "discipline-1",
       program: "masters",
-    })).rejects.toThrow(/đã tồn tại trong ngành này/);
-    expect(majors.findOne).toHaveBeenCalledWith({
-      where: { disciplineId: "discipline-1", code: "KTHH" },
     });
-    expect(majors.create).not.toHaveBeenCalled();
+
+    expect(majors.create).toHaveBeenCalledWith(expect.objectContaining({
+      name: "Khai thác hàng hải",
+      englishName: "Nautical Science",
+      disciplineId: "discipline-1",
+    }));
+    expect(majors.create.mock.calls[0][0]).not.toHaveProperty("code");
   });
 });
