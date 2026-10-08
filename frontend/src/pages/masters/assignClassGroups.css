@@ -1,0 +1,39 @@
+/* Explicit identity-column widths keep long imported codes from sizing the table.
+   The un-sized major/note columns share the remaining space. */
+.assignment-table.MuiTable-root{width:100%;table-layout:fixed}
+.assignment-candidates.MuiTable-root{min-width:700px}
+.assignment-members.MuiTable-root{min-width:560px}
+.assignment-table .MuiTableCell-root{padding:8px 6px;vertical-align:top;white-space:normal;font-size:12px;line-height:1.45}
+.assignment-table .MuiTableCell-paddingCheckbox{padding:4px;vertical-align:middle}
+.assignment-table .MuiTableCell-head{vertical-align:middle}
+.assignment-table .MuiTypography-body2{font-size:inherit;line-height:inherit}
+.assignment-table .assignment-select-col{width:42px}
+.assignment-table .assignment-index-col{width:32px}
+.assignment-table .assignment-action-col{width:40px}
+.assignment-table .assignment-code-col{width:104px}
+.assignment-table .assignment-family-col{width:150px}
+.assignment-table .assignment-name-col{width:76px}
+.assignment-table .assignment-dob-col{width:100px}
+.assignment-table .assignment-gender-col{width:70px}
+.assignment-members .assignment-code-col{width:100px}
+.assignment-members .assignment-family-col{width:145px}
+.assignment-members .assignment-name-col{width:70px}
+.assignment-table .assignment-nowrap{white-space:nowrap}
+.assignment-table .assignment-code{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}
+.assignment-table .assignment-name,.assignment-table .assignment-wrap{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:break-word;white-space:normal}
+.assignment-table .assignment-wrap{-webkit-line-clamp:3}
+.assignment-members .assignment-action{position:sticky;right:0;z-index:1;background:#fff;white-space:nowrap;vertical-align:middle;box-shadow:-1px 0 0 #d8e5ef}
+.assignment-members th.assignment-action{z-index:3;background:#edf4fa}
+.assignment-members tr:hover td.assignment-action{background:#f5fafe}
+.assignment-members .assignment-action .MuiIconButton-root{padding:4px}
+
+.assignment-scroll{container:assignment-table-area / inline-size}
+@container assignment-table-area (max-width:720px){
+  .assignment-candidates.MuiTable-root{min-width:620px}
+  .assignment-candidates .MuiTableCell-root{padding-left:5px;padding-right:5px}
+  .assignment-candidates .assignment-code-col{width:90px}
+  .assignment-candidates .assignment-family-col{width:132px}
+  .assignment-candidates .assignment-name-col{width:64px}
+  .assignment-candidates .assignment-dob-col{width:96px}
+  .assignment-candidates .assignment-gender-col{width:64px}
+}

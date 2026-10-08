@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import axios from "axios";
 import AdmissionScores from "../../pages/masters/admissionScores";
 jest.mock("axios", () => ({ get: jest.fn(), put: jest.fn(), post: jest.fn(), defaults: {} }));
+jest.mock("@mui/icons-material", () => new Proxy({}, { get: () => () => null }));
 jest.mock("../../components/FeatureLayout", () => ({ children }) => <div>{children}</div>);
 const round = { id: "round-1", name: "Đợt 2/2026", academicYear: "2026", majorThresholds: [{ majorId: "major-1", cutoff: 15 }, { majorId: "major-2", cutoff: 17 }] };
 const majors = [{ id: "major-1", name: "Công nghệ thông tin", code: "CNTT", program: "masters", active: true }, { id: "major-2", name: "Quản trị kinh doanh", code: "QTKD", program: "masters", active: true }];

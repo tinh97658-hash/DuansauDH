@@ -1,0 +1,15 @@
+.admission-preview{min-height:100vh;padding:16px;background:#eef1f4;overflow:auto}
+.admission-preview-actions{display:flex;gap:8px;width:210mm;margin:0 auto 16px}
+.admission-preview-actions button{padding:8px 16px;border:1px solid #bbc6d0;border-radius:4px;background:#fff;color:#173e75;cursor:pointer;font:inherit}
+.admission-preview .admission-print-page{width:210mm;margin:0 auto}
+@media print{
+  @page admission-profile{size:A4 portrait;margin:0}
+  .admission-print-page,.a4-print-only-container{page:admission-profile}
+  .admission-preview{min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important;background:#fff!important}
+  .admission-preview,.admission-preview *{visibility:visible!important}
+  .admission-preview-actions{display:none!important}
+  .admission-preview .admission-print-page{width:210mm!important;margin:0!important;padding:0!important}
+  .admission-preview .a4-paper-sheet,.a4-print-only-container .a4-paper-sheet{box-shadow:none!important;border:1.5px solid #173e75!important;margin:0!important;padding:10mm 13mm!important;width:210mm!important;height:297mm!important;max-height:297mm!important;box-sizing:border-box!important;break-inside:avoid!important;break-after:avoid!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  .a4-print-only-container{display:block!important;visibility:visible!important;position:absolute!important;inset:0!important;margin:0!important;padding:0!important}
+  .a4-print-only-container *{visibility:visible!important}
+}

@@ -45,6 +45,7 @@ import AdmissionTargets from "./pages/plan/admissionTargets";
 import AnnualFees from "./pages/plan/annualFees";
 import AdmissionRecords from "./pages/plan/admissionRecords";
 import AdmissionRecordDetail from "./pages/plan/admissionRecordDetail";
+import AdmissionPreview from "./features/admission/AdmissionPreview";
 
 // ===== ĐÀO TẠO THẠC SĨ =====
 import MastersBridgeCourse from "./pages/masters/bridgeCourse";
@@ -55,6 +56,7 @@ import MastersAssignClassGroups from "./pages/masters/assignClassGroups";
 import ClassCourseHistory from "./pages/masters/classCourseHistory";
 import MastersCourseOfferings from "./pages/masters/courseOfferings";
 import MastersSchedule from "./pages/masters/schedule";
+import SchedulePreview from "./features/scheduling/SchedulePreview";
 import MastersCourseMatrix from "./pages/masters/courseMatrix";
 import MastersExamEligibility from "./pages/masters/examEligibility";
 import MastersExamLists from "./pages/masters/examLists";
@@ -137,6 +139,7 @@ function App() {
             <Route path="plan/admission-targets" element={<AdmissionTargets />} />
             <Route path="plan/annual-fees" element={<AnnualFees />} />
             <Route path="plan/admission-records" element={<AdmissionRecords />} />
+            <Route path="plan/admission-records/preview" element={<AdmissionPreview />} />
             <Route path="plan/admission-records/:id" element={<AdmissionRecordDetail />} />
             <Route path="plan/admission-records/detail/:id" element={<AdmissionRecordDetail />} />
 
@@ -150,6 +153,7 @@ function App() {
             <Route path="masters/class-course-history" element={<ClassCourseHistory />} />
             <Route path="masters/course-offerings" element={<MastersCourseOfferings />} />
             <Route path="masters/schedule" element={<MastersSchedule />} />
+            <Route path="masters/schedule/preview" element={<SchedulePreview />} />
             <Route path="masters/course-matrix" element={<MastersCourseMatrix />} />
             <Route path="masters/exam-eligibility" element={<MastersExamEligibility />} />
             <Route path="masters/exam-lists" element={<MastersExamLists />} />

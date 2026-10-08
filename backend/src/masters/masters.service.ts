@@ -54,10 +54,7 @@ export class MastersService {
     const where: Record<PropertyKey, unknown> = {
       trainingLevel: "Thạc sĩ",
       academicYear: group.academicYear,
-      [Op.or]: [
-        { status: "approved" },
-        { studyStatus: { [Op.in]: ["Đủ điều kiện dự tuyển", "Đã trúng tuyển", "Đang học"] } },
-      ],
+      studyStatus: "Đang học",
     };
     if (group.majorId) where.majorId = group.majorId;
     if (ids) where.id = { [Op.in]: ids };
@@ -82,7 +79,7 @@ export class MastersService {
             {
               model: AdmissionRecord,
               as: "admissionRecord",
-              attributes: ["id", "code", "fullName", "dob", "gender", "email", "phone", "extraData"],
+              attributes: ["id", "code", "fullName", "dob", "gender", "email", "phone", "extraData", "note"],
             },
             {
               model: Student,
@@ -117,7 +114,7 @@ export class MastersService {
             {
               model: AdmissionRecord,
               as: "admissionRecord",
-              attributes: ["id", "code", "fullName", "dob", "gender", "email", "phone", "extraData"],
+              attributes: ["id", "code", "fullName", "dob", "gender", "email", "phone", "extraData", "note"],
             },
             {
               model: Student,
@@ -211,10 +208,7 @@ export class MastersService {
   async listEligibleStudents(majorId?: string, academicYear?: string) {
     const where: Record<string, unknown> = {
       trainingLevel: "Thạc sĩ",
-      [Op.or]: [
-        { status: "approved" },
-        { studyStatus: { [Op.in]: ["Đủ điều kiện dự tuyển", "Đã trúng tuyển", "Đang học"] } },
-      ],
+      studyStatus: "Đang học",
     };
     if (majorId) where.majorId = majorId;
     if (academicYear) where.academicYear = academicYear;
@@ -261,18 +255,19 @@ export class MastersService {
         lastName: r.lastName,
         firstName: r.firstName,
         dob: r.dob,
-        gender: r.gender || "Nam",
+        gender: r.gender || "",
         email: r.email,
         phone: r.phone,
         majorId: r.majorId,
         majorName: r.major?.name || r.majorName,
         academicYear: r.academicYear,
         status: r.status,
-        tuitionPaid: r.extraData?.tuitionPayment?.paid === true,
+        studyStatus: r.studyStatus,
+        note: r.note || "",
         assignedGroup: assignment ? assignment.group : null,
         memberId: assignment ? assignment.memberId : null,
       };
-    });
+    }).filter((record) => !record.assignedGroup);
   }
 
   // ===== PHÂN NHÓM HỌC VIÊN =====

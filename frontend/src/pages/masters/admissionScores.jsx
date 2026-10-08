@@ -7,6 +7,10 @@ import { API_BASE_URL } from "../../config/http";
 import { normalizeMajorsResponse } from "../../utils/majors";
 
 const options = { withCredentials: true };
+const toolbarSx = {
+  "& .MuiInputBase-root": { height: 40 },
+  "& > .MuiButton-root": { minHeight: 40, whiteSpace: "nowrap" },
+};
 export default function AdmissionScores() {
   const [scoresDirty, setScoresDirty] = useState(false), [workflowBusy, setWorkflowBusy] = useState(false);
   const [rounds, setRounds] = useState([]), [majors, setMajors] = useState([]);
@@ -81,9 +85,9 @@ export default function AdmissionScores() {
   return <FeatureLayout title="Điểm xét tuyển thạc sĩ" group="Thủ tục đầu vào" hideHeader={false} desc="Chọn đợt xét tuyển toàn viện, nhập điểm ngưỡng từng ngành và điểm hồ sơ để lọc danh sách đạt ngưỡng.">
     <Stack spacing={2}>
       {error && <Alert severity="error">{error}</Alert>}
-      <Paper variant="outlined" sx={{ p: 2 }}><Stack direction={{ xs: "column", md: "row" }} gap={1.5}>
+      <Paper variant="outlined" sx={{ p: 2 }}><Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="center" sx={toolbarSx}>
         <TextField select size="small" label="Đợt xét tuyển toàn viện" value={roundId} disabled={saving || workflowBusy || loading}
-          onChange={(event) => { if (canDiscard()) { setData(null); setThresholdDrafts({}); setMajorFilter("all"); setRoundId(event.target.value); } }} sx={{ flex: 1, minWidth: 220 }}>
+          onChange={(event) => { if (canDiscard()) { setData(null); setThresholdDrafts({}); setMajorFilter("all"); setRoundId(event.target.value); } }} sx={{ width: { xs: "100%", sm: 360 }, maxWidth: "100%" }}>
           <MenuItem value="">Chọn đợt xét tuyển</MenuItem>{rounds.map((round) => <MenuItem key={round.id} value={round.id}>{round.name} · {round.academicYear}</MenuItem>)}
         </TextField>
         <Button onClick={() => { if (canDiscard()) { setThresholdDrafts({}); loadRanking(); } }} disabled={!roundId || loading || workflowBusy || saving}>Tải lại</Button>
@@ -114,12 +118,12 @@ export default function AdmissionScores() {
           <Chip label={`Đạt ngưỡng: ${data.rows.filter((row) => !row.stale && row.meetsCutoff === true).length}`} color="success" variant="outlined" />
           <Chip label={`Đã duyệt: ${data.admittedCount}`} variant="outlined" />
         </Stack>
-        <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
-          <TextField size="small" label="Tìm họ tên / mã hồ sơ" value={search} onChange={(event) => setSearch(event.target.value)} sx={{ flex: 1 }} />
-          <TextField select size="small" label="Lọc ngành" value={majorFilter} onChange={(event) => setMajorFilter(event.target.value)} sx={{ minWidth: 200 }}>
+        <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="center" sx={toolbarSx}>
+          <TextField size="small" label="Tìm họ tên / mã hồ sơ" value={search} onChange={(event) => setSearch(event.target.value)} sx={{ width: { xs: "100%", sm: 320 }, maxWidth: "100%" }} />
+          <TextField select size="small" label="Lọc ngành" value={majorFilter} onChange={(event) => setMajorFilter(event.target.value)} sx={{ width: { xs: "100%", sm: 240 }, maxWidth: "100%" }}>
             <MenuItem value="all">Tất cả ngành</MenuItem>{majors.map((major) => <MenuItem key={major.id} value={major.id}>{major.name}</MenuItem>)}
           </TextField>
-          <TextField select size="small" label="Lọc hồ sơ" value={filter} onChange={(event) => setFilter(event.target.value)} sx={{ minWidth: 220 }}>
+          <TextField select size="small" label="Lọc hồ sơ" value={filter} onChange={(event) => setFilter(event.target.value)} sx={{ width: { xs: "100%", sm: 220 }, maxWidth: "100%" }}>
             {[["all", "Tất cả"], ["eligible", "Đạt ngưỡng"], ["below", "Dưới ngưỡng"], ["unscored", "Chưa nhập điểm"], ["pending", "Chưa duyệt"], ["admitted", "Đã trúng tuyển"]].map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
           </TextField>
         </Stack>

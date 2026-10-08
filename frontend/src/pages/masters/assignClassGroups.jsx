@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useSearchParams } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
@@ -6,7 +6,7 @@ import "react-toastify/dist/ReactToastify.css";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress,
   FormControl,
-  Grid, IconButton, LinearProgress, MenuItem, Paper,
+  IconButton, LinearProgress, MenuItem, Paper,
   Select, Stack, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Tooltip, Typography,
 } from "@mui/material";
@@ -18,8 +18,10 @@ import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
+import ResizableSplit from "../../components/ResizableSplit";
 import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 import { personNameParts } from "../../utils/personName";
+import "./assignClassGroups.css";
 
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
@@ -40,17 +42,10 @@ const normalizeClassGroupMember = (member, group) => {
     majorId: admissionRecord?.majorId || group.majorId || null,
     majorName: admissionRecord?.majorName || admissionRecord?.major?.name || group.major?.name || "",
     academicYear: admissionRecord?.academicYear || group.academicYear || "",
-    tuitionPaid: admissionRecord ? admissionRecord.extraData?.tuitionPayment?.paid === true : null,
+    note: admissionRecord?.note || "",
     assignedGroup: { id: group.id, code: group.code, name: group.name },
   };
 };
-
-const TuitionStatus = ({ paid }) => (
-  <Chip size="small"
-    label={paid === true ? "Đã nộp" : paid === false ? "Chưa nộp" : "Chưa có dữ liệu"}
-    color={paid === true ? "success" : paid === false ? "warning" : "default"}
-    variant="outlined" />
-);
 
 const AssignClassGroups = () => {
   const [searchParams] = useSearchParams();
@@ -71,8 +66,13 @@ const AssignClassGroups = () => {
   const [students, setStudents] = useState([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [groupsLoading, setGroupsLoading] = useState(true);
+  const [groupsError, setGroupsError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
+  const groupsRequest = useRef(0);
+  const studentsRequest = useRef(0);
+  useEffect(() => () => { groupsRequest.current += 1; studentsRequest.current += 1; }, []);
 
   // Load majors
   useEffect(() => {
@@ -91,6 +91,8 @@ const AssignClassGroups = () => {
 
   // Load groups
   const loadGroups = useCallback(async () => {
+    const request = ++groupsRequest.current;
+    setGroupsLoading(true);
     try {
       const params = new URLSearchParams();
       if (selectedYear) params.append("academicYear", selectedYear);
@@ -101,26 +103,27 @@ const AssignClassGroups = () => {
         withCredentials: true,
       });
       const allRows = Array.isArray(data) ? data : data.data || [];
+      if (request !== groupsRequest.current) return;
       const list = selectedDiscipline && selectedMajor === "ALL"
         ? allRows.filter((group) => visibleMajorIds.has(group.majorId || group.major?.id))
         : allRows;
       setGroups(list);
+      setGroupsError("");
 
-      // Auto pick first group if none selected or current not in list
-      if (list.length > 0) {
-        if (!targetGroupId || !list.some((g) => g.id === targetGroupId)) {
-          setTargetGroupId(list[0].id);
-        }
-      } else {
-        setTargetGroupId("");
-      }
+      setTargetGroupId((previous) => list.some((g) => g.id === previous) ? previous : "");
     } catch (err) {
-      console.error(err);
+      if (request === groupsRequest.current) {
+        setGroupsError(err.response?.data?.message || "Không thể tải danh sách lớp mục tiêu.");
+        setGroups([]); setTargetGroupId("");
+      }
+    } finally {
+      if (request === groupsRequest.current) setGroupsLoading(false);
     }
-  }, [selectedYear, selectedDiscipline, selectedMajor, targetGroupId, visibleMajorIds]);
+  }, [selectedYear, selectedDiscipline, selectedMajor, visibleMajorIds]);
 
   // Load students
   const loadStudents = useCallback(async () => {
+    const request = ++studentsRequest.current;
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -131,14 +134,15 @@ const AssignClassGroups = () => {
         withCredentials: true,
       });
       const allRows = Array.isArray(data) ? data : data.data || [];
+      if (request !== studentsRequest.current) return;
       setStudents(selectedDiscipline && selectedMajor === "ALL"
         ? allRows.filter((student) => visibleMajorIds.has(student.majorId || student.major?.id))
         : allRows);
       setError("");
     } catch (err) {
-      setError(err.response?.data?.message || "Không thể tải danh sách học viên.");
+      if (request === studentsRequest.current) setError(err.response?.data?.message || "Không thể tải danh sách học viên.");
     } finally {
-      setLoading(false);
+      if (request === studentsRequest.current) setLoading(false);
     }
   }, [selectedYear, selectedDiscipline, selectedMajor, visibleMajorIds]);
 
@@ -176,7 +180,7 @@ const AssignClassGroups = () => {
     : 0;
 
   const unassignedStudents = useMemo(
-    () => students.filter((student) => !student.assignedGroup),
+    () => students.filter((student) => student.studyStatus === "Đang học" && !student.assignedGroup),
     [students],
   );
 
@@ -198,6 +202,7 @@ const AssignClassGroups = () => {
   }, [unassignedStudents, studentSearch, currentTargetGroup]);
 
   const assignableStudents = filteredStudents;
+  const majorById = useMemo(() => new Map(majors.map((major) => [major.id, major])), [majors]);
 
   useEffect(() => {
     const assignableIds = new Set(assignableStudents.map((student) => student.id));
@@ -211,7 +216,7 @@ const AssignClassGroups = () => {
     if (e.target.checked) {
       setSelectedStudentIds(assignableStudents.slice(0, remainingCapacity).map((s) => s.id));
       if (assignableStudents.length > remainingCapacity) {
-        toast.warning(`Nhóm chỉ còn ${remainingCapacity} chỗ trống.`);
+        toast.warning(`Lớp chỉ còn ${remainingCapacity} chỗ trống.`);
       }
     } else {
       setSelectedStudentIds([]);
@@ -219,6 +224,7 @@ const AssignClassGroups = () => {
   };
 
   const handleToggleSelectStudent = (id) => {
+    if (!currentTargetGroup || loading || groupsLoading || actionLoading) return;
     const student = unassignedStudents.find((item) => item.id === id);
     if (!student) return;
     if (selectedStudentIds.includes(id)) {
@@ -227,8 +233,8 @@ const AssignClassGroups = () => {
     }
     if (selectedStudentIds.length >= remainingCapacity) {
       toast.warning(remainingCapacity > 0
-        ? `Chỉ được chọn tối đa ${remainingCapacity} học viên cho số chỗ còn lại của nhóm.`
-        : "Nhóm đã đủ sĩ số.");
+        ? `Chỉ được chọn tối đa ${remainingCapacity} học viên cho số chỗ còn lại của lớp.`
+        : "Lớp đã đủ sĩ số.");
       return;
     }
     setSelectedStudentIds((previous) => [...previous, id]);
@@ -236,10 +242,11 @@ const AssignClassGroups = () => {
 
   // Assign selected to target group
   const handleAssignSelected = async () => {
-    if (!targetGroupId) return toast.error("Vui lòng chọn nhóm học phần mục tiêu.");
+    if (loading || groupsLoading || groupsError || error) return;
+    if (!targetGroupId) return toast.error("Vui lòng chọn lớp mục tiêu.");
     if (selectedStudentIds.length === 0) return toast.error("Vui lòng chọn ít nhất một học viên.");
     if (selectedStudentIds.length > remainingCapacity) {
-      return toast.error(`Nhóm chỉ còn ${remainingCapacity} chỗ trống.`);
+      return toast.error(`Lớp chỉ còn ${remainingCapacity} chỗ trống.`);
     }
 
     setActionLoading(true);
@@ -267,10 +274,10 @@ const AssignClassGroups = () => {
       await axios.delete(`${API_BASE_URL}/masters/class-groups/${targetGroupId}/members/${memberId}`, {
         withCredentials: true,
       });
-      toast.success(`Đã xóa học viên ${studentName} khỏi nhóm.`);
+      toast.success(`Đã bỏ học viên ${studentName} khỏi lớp.`);
       refreshAll();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Không thể xóa học viên khỏi nhóm.");
+      toast.error(err.response?.data?.message || "Không thể bỏ học viên khỏi lớp.");
     } finally {
       setActionLoading(false);
     }
@@ -280,7 +287,7 @@ const AssignClassGroups = () => {
     <FeatureLayout
       title="Phân nhóm học viên Thạc sĩ"
       group="Thủ tục đầu vào"
-      desc="Phân bổ và sắp xếp học viên Thạc sĩ vào các nhóm học phần theo chuyên ngành."
+      desc="Phân bổ và sắp xếp học viên Thạc sĩ vào lớp theo chuyên ngành."
       maxWidth={1880}
     >
       <ToastContainer position="top-center" newestOnTop limit={3} />
@@ -297,21 +304,21 @@ const AssignClassGroups = () => {
         <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="flex-end">
           <FilterSelectField label="Năm tuyển sinh" sx={{ flex: "1 1 150px", minWidth: 150 }}
               value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
+              onChange={(e) => { setSelectedYear(e.target.value); setTargetGroupId(""); setSelectedStudentIds([]); }}
             >
               {YEARS.map((y) => (
                 <MenuItem key={y} value={y}>{y}</MenuItem>
               ))}
           </FilterSelectField>
 
-          <FilterSelectField label="Ngành" sx={{ flex: "1 1 260px", minWidth: 260 }} value={selectedDiscipline} onChange={(e) => { setSelectedDiscipline(e.target.value); setSelectedMajor("ALL"); }}>
+          <FilterSelectField label="Ngành" sx={{ flex: "1 1 260px", minWidth: 260 }} value={selectedDiscipline} onChange={(e) => { setSelectedDiscipline(e.target.value); setSelectedMajor("ALL"); setTargetGroupId(""); setSelectedStudentIds([]); }}>
               <MenuItem value="">Tất cả ngành</MenuItem>
               {disciplines.map((item) => <MenuItem key={item.id} value={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}
           </FilterSelectField>
 
           <FilterSelectField label="Chuyên ngành" sx={{ flex: "1 1 280px", minWidth: 280 }}
               value={selectedMajor}
-              onChange={(e) => setSelectedMajor(e.target.value)}
+              onChange={(e) => { setSelectedMajor(e.target.value); setTargetGroupId(""); setSelectedStudentIds([]); }}
             >
               <MenuItem value="ALL">Tất cả chuyên ngành</MenuItem>
               {visibleMajors.map((m) => (
@@ -323,11 +330,11 @@ const AssignClassGroups = () => {
       </Paper>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {groupsError && <Alert severity="error" sx={{ mb: 2 }}>{groupsError}</Alert>}
 
       {/* Dual Panel Layout */}
-      <Grid container spacing={1.5} alignItems="stretch">
+      <ResizableSplit left={<>
         {/* Left Panel: Student Candidate List */}
-        <Grid item xs={12} md={6.5}>
           <Paper variant="outlined" sx={{
             p: 1.5,
             minHeight: 650,
@@ -343,10 +350,10 @@ const AssignClassGroups = () => {
               <Typography variant="subtitle2" sx={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 0.75, color: "#111827" }}>
                 <PersonRounded sx={{ color: "#1685B5", fontSize: 19 }} />
                 Danh sách học viên
-                <Chip size="small" label={`${unassignedStudents.length} HV`} sx={{ ml: 0.25, height: 22, bgcolor: "#EAF6FC", color: "#0788B8", fontWeight: 700 }} />
+                <Chip size="small" label={`${filteredStudents.length} HV`} sx={{ ml: 0.25, height: 22, bgcolor: "#EAF6FC", color: "#0788B8", fontWeight: 700 }} />
               </Typography>
 
-              <Chip size="small" label="Chưa phân nhóm" sx={{ height: 22, bgcolor: "#FFF3E2", color: "#C56A00", fontWeight: 700 }} />
+              <Chip size="small" label="Chưa có lớp" sx={{ height: 22, bgcolor: "#FFF3E2", color: "#C56A00", fontWeight: 700 }} />
             </Box>
 
             {/* Left Search Bar */}
@@ -362,7 +369,7 @@ const AssignClassGroups = () => {
             {/* Selection Status & Action Bar */}
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1, px: 0.5 }}>
               <Typography variant="body2" color="text.secondary">
-                Đã chọn: <strong>{selectedStudentIds.length}</strong> / {remainingCapacity} chỗ còn lại
+                {currentTargetGroup ? <>Đã chọn: <strong>{selectedStudentIds.length}</strong> / {remainingCapacity} chỗ còn lại</> : "Chọn lớp mục tiêu để phân lớp"}
                 {` · ${assignableStudents.length} học viên chưa có lớp`}
               </Typography>
 
@@ -371,16 +378,22 @@ const AssignClassGroups = () => {
                 size="small"
                 endIcon={<ArrowForwardRounded />}
                 onClick={handleAssignSelected}
-                disabled={selectedStudentIds.length === 0 || !targetGroupId || actionLoading}
+                disabled={selectedStudentIds.length === 0 || !currentTargetGroup || loading || groupsLoading || !!groupsError || !!error || actionLoading}
                 sx={{ borderRadius: "8px", boxShadow: "none", bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}
               >
-                {actionLoading ? "Đang chuyển..." : "Gán vào nhóm"}
+                {actionLoading ? "Đang chuyển..." : "Gán vào lớp"}
               </Button>
             </Box>
 
             {/* Student Table */}
-            <TableContainer sx={{ flexGrow: 1, maxHeight: 520, border: "1px solid #D8E5EF", borderRadius: "10px", overflow: "auto" }}>
-              <Table size="small" stickyHeader>
+            <TableContainer className="assignment-scroll" sx={{ flexGrow: 1, maxHeight: 520, border: "1px solid #D8E5EF", borderRadius: "10px", overflow: "auto" }}>
+              <Table size="small" stickyHeader aria-label="Học viên chưa phân lớp" className="assignment-table assignment-candidates">
+                <colgroup>
+                  <col className="assignment-select-col" /><col className="assignment-code-col" />
+                  <col className="assignment-family-col" /><col className="assignment-name-col" />
+                  <col className="assignment-dob-col" /><col className="assignment-gender-col" />
+                  <col /><col />
+                </colgroup>
                 <TableHead>
                   <TableRow sx={{ "& th": { bgcolor: "#EDF4FA", color: "#111827", borderColor: "#D8E5EF", fontWeight: 700 } }}>
                     <TableCell padding="checkbox">
@@ -389,36 +402,37 @@ const AssignClassGroups = () => {
                         indeterminate={selectedStudentIds.length > 0 && selectedStudentIds.length < Math.min(assignableStudents.length, remainingCapacity)}
                         checked={Math.min(assignableStudents.length, remainingCapacity) > 0 && selectedStudentIds.length === Math.min(assignableStudents.length, remainingCapacity)}
                         onChange={handleToggleSelectAll}
-                        disabled={assignableStudents.length === 0 || remainingCapacity === 0}
+                        disabled={assignableStudents.length === 0 || remainingCapacity === 0 || loading || groupsLoading || actionLoading}
                       />
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Mã HV / SBD</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Mã HV</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Họ đệm</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Tên</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Ngành</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Học phí nhập học</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Nhóm hiện tại</TableCell>
+                    <TableCell className="assignment-nowrap">Ngày sinh</TableCell>
+                    <TableCell className="assignment-nowrap">Giới tính</TableCell>
+                    <TableCell>Chuyên ngành</TableCell>
+                    <TableCell>Ghi chú</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
                         <CircularProgress size={28} />
                       </TableCell>
                     </TableRow>
                   ) : filteredStudents.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ py: 6, color: "text.secondary" }}>
+                      <TableCell colSpan={8} align="center" sx={{ py: 6, color: "text.secondary" }}>
                         {studentSearch.trim()
-                          ? "Không tìm thấy học viên chưa được phân nhóm."
-                          : "Không còn học viên chưa được phân nhóm."}
+                          ? "Không tìm thấy học viên chưa có lớp."
+                          : "Không còn học viên chưa có lớp."}
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredStudents.map((s) => {
                       const isSelected = selectedStudentIds.includes(s.id);
-                      const selectionLimitReached = !isSelected && selectedStudentIds.length >= remainingCapacity;
+                      const selectionLimitReached = !currentTargetGroup || (!isSelected && selectedStudentIds.length >= remainingCapacity);
                       return (
                         <TableRow
                           key={s.id}
@@ -437,29 +451,23 @@ const AssignClassGroups = () => {
                               size="small"
                               checked={isSelected}
                               onChange={() => handleToggleSelectStudent(s.id)}
-                              disabled={selectionLimitReached}
+                              disabled={selectionLimitReached || loading || groupsLoading || actionLoading}
                               inputProps={{ "aria-label": `Chọn ${s.fullName}` }}
                             />
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" sx={{ fontFamily: "inherit", fontWeight: 600 }}>
+                            <Typography variant="body2" className="assignment-code" title={s.code || ""} sx={{ fontFamily: "inherit", fontWeight: 600 }}>
                               {s.code || "-"}
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{personNameParts(s).familyAndMiddle}</Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {s.dob || ""} {s.gender ? `• ${s.gender}` : ""}
-                            </Typography>
+                            <Typography variant="body2" className="assignment-name" title={personNameParts(s).familyAndMiddle} sx={{ fontWeight: 600 }}>{personNameParts(s).familyAndMiddle}</Typography>
                           </TableCell>
-                          <TableCell sx={{ fontWeight: 600 }}>{personNameParts(s).givenName}</TableCell>
-                          <TableCell sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
-                            {s.majorName || "-"}
-                          </TableCell>
-                          <TableCell><TuitionStatus paid={s.tuitionPaid} /></TableCell>
-                          <TableCell>
-                            <Chip size="small" label="Chưa phân nhóm" color="warning" variant="outlined" />
-                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}><span className="assignment-name" title={personNameParts(s).givenName}>{personNameParts(s).givenName}</span></TableCell>
+                          <TableCell className="assignment-nowrap">{s.dob || "-"}</TableCell>
+                          <TableCell>{s.gender || "-"}</TableCell>
+                          <TableCell><span className="assignment-wrap" title={majorById.get(s.majorId)?.name || s.majorName || ""}>{majorById.get(s.majorId)?.name || s.majorName || "-"}</span></TableCell>
+                          <TableCell><span className="assignment-wrap" title={s.note || ""}>{s.note || ""}</span></TableCell>
                         </TableRow>
                       );
                     })
@@ -468,10 +476,9 @@ const AssignClassGroups = () => {
               </Table>
             </TableContainer>
           </Paper>
-        </Grid>
+        </>} right={<>
 
         {/* Right Panel: Target Class Group & Members */}
-        <Grid item xs={12} md={5.5}>
           <Paper variant="outlined" sx={{
             p: 1.5,
             minHeight: 650,
@@ -486,7 +493,7 @@ const AssignClassGroups = () => {
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 0.75, color: "#111827" }}>
                 <GroupWorkRounded sx={{ color: "#168B7C", fontSize: 19 }} />
-                Nhóm học phần mục tiêu
+                Lớp mục tiêu
               </Typography>
             </Box>
 
@@ -505,11 +512,13 @@ const AssignClassGroups = () => {
                   textTransform: "uppercase",
                 }}
               >
-                Chọn nhóm học phần
+                Chọn lớp mục tiêu
               </Typography>
               <Select
                 id="target-group-select"
                 value={targetGroupId}
+                disabled={groupsLoading || actionLoading}
+                inputProps={{ "aria-label": "Lớp mục tiêu" }}
                 onChange={(e) => setTargetGroupId(e.target.value)}
                 displayEmpty
                 MenuProps={{
@@ -525,8 +534,9 @@ const AssignClassGroups = () => {
                   "& fieldset": { borderColor: "#D8E5EF" },
                 }}
               >
+                <MenuItem value=""><em>Chọn lớp mục tiêu</em></MenuItem>
                 {groups.length === 0 ? (
-                  <MenuItem value="" disabled><em>(Chưa có nhóm học phần nào đang mở)</em></MenuItem>
+                  <MenuItem value="" disabled><em>(Chưa có lớp nào đang mở)</em></MenuItem>
                 ) : (
                   groups.map((g) => (
                     <MenuItem key={g.id} value={g.id}>
@@ -557,13 +567,13 @@ const AssignClassGroups = () => {
               </Box>
             ) : (
               <Alert severity="info" sx={{ mb: 2 }}>
-                Vui lòng chọn hoặc tạo một nhóm học viên ở trang "Tạo nhóm học viên" để bắt đầu phân học viên.
+                Chọn lớp mục tiêu để xem thành viên và phân lớp. Danh sách bên trái vẫn hiển thị học viên chưa có lớp theo bộ lọc.
               </Alert>
             )}
 
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#111827" }}>
-                Danh sách học viên trong nhóm ({groupMembers.length}):
+                Danh sách học viên trong lớp ({groupMembers.length}):
               </Typography>
               <Chip size="small" label={`${groupMembers.length} học viên`} sx={{ height: 22, bgcolor: "#F0F4F8", color: "#52677A", fontWeight: 600 }} />
             </Box>
@@ -577,39 +587,45 @@ const AssignClassGroups = () => {
               overflowY: groupMembers.length > 25 ? "auto" : "visible",
               overflowX: "auto",
             }}>
-              <Table size="small" stickyHeader={groupMembers.length > 25}>
+              <Table size="small" stickyHeader={groupMembers.length > 25} aria-label="Học viên trong lớp" className="assignment-table assignment-members">
+                <colgroup>
+                  <col className="assignment-index-col" /><col className="assignment-code-col" />
+                  <col className="assignment-family-col" /><col className="assignment-name-col" />
+                  <col className="assignment-dob-col" /><col /><col className="assignment-action-col" />
+                </colgroup>
                 <TableHead>
                   <TableRow sx={{ "& th": { bgcolor: "#EDF4FA", color: "#111827", borderColor: "#D8E5EF", fontWeight: 700 } }}>
-                    <TableCell align="center" sx={{ width: 48, fontWeight: 700 }}>STT</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 700 }}>STT</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Mã HV</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Họ đệm</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Tên</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Ngày sinh</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Học phí nhập học</TableCell>
-                    <TableCell align="center" sx={{ width: 70, fontWeight: 700 }}>Bỏ</TableCell>
+                    <TableCell className="assignment-nowrap" sx={{ fontWeight: 700 }}>Ngày sinh</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Ghi chú</TableCell>
+                    <TableCell align="center" className="assignment-action" sx={{ fontWeight: 700 }}>Bỏ</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {groupMembers.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} align="center" sx={{ py: 6, color: "text.secondary" }}>
-                        Nhóm này hiện chưa có học viên nào. Chọn học viên từ cột bên trái và bấm "Gán vào nhóm".
+                        {currentTargetGroup ? 'Lớp này hiện chưa có học viên nào. Chọn học viên từ cột bên trái và bấm "Gán vào lớp".' : "Chưa chọn lớp mục tiêu."}
                       </TableCell>
                     </TableRow>
                   ) : (
                     groupMembers.map((m, idx) => (
                       <TableRow key={m.id} hover sx={{ "&:hover": { bgcolor: "#F5FAFE!important" }, "& td": { borderColor: "#E2EBF2", color: "#111827" } }}>
                         <TableCell align="center">{idx + 1}</TableCell>
-                        <TableCell sx={{ fontFamily: "inherit", fontWeight: 600 }}>{m.code || "-"}</TableCell>
-                        <TableCell sx={{ fontWeight: 600 }}>{personNameParts(m).familyAndMiddle}</TableCell>
-                        <TableCell sx={{ fontWeight: 600 }}>{personNameParts(m).givenName}</TableCell>
-                        <TableCell sx={{ fontSize: "0.8rem", color: "text.secondary" }}>{m.dob || "-"}</TableCell>
-                        <TableCell><TuitionStatus paid={m.tuitionPaid} /></TableCell>
-                        <TableCell align="center">
-                          <Tooltip title="Bỏ khỏi nhóm">
+                        <TableCell sx={{ fontFamily: "inherit", fontWeight: 600 }}><span className="assignment-code" title={m.code || ""}>{m.code || "-"}</span></TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}><span className="assignment-name" title={personNameParts(m).familyAndMiddle}>{personNameParts(m).familyAndMiddle}</span></TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}><span className="assignment-name" title={personNameParts(m).givenName}>{personNameParts(m).givenName}</span></TableCell>
+                        <TableCell className="assignment-nowrap" sx={{ fontSize: "0.8rem", color: "text.secondary" }}>{m.dob || "-"}</TableCell>
+                        <TableCell><span className="assignment-wrap" title={m.note}>{m.note}</span></TableCell>
+                        <TableCell align="center" className="assignment-action">
+                          <Tooltip title="Bỏ khỏi lớp">
                             <IconButton
                               size="small"
                               color="error"
+                              aria-label={`Bỏ ${m.fullName} khỏi lớp`}
                               onClick={() => handleRemoveMember(m.memberId, m.fullName)}
                               disabled={actionLoading}
                             >
@@ -624,8 +640,7 @@ const AssignClassGroups = () => {
               </Table>
             </TableContainer>
           </Paper>
-        </Grid>
-      </Grid>
+        </>} />
     </FeatureLayout>
   );
 };

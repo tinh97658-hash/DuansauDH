@@ -1,26 +1,35 @@
-import { groupsOf } from "../features/scheduling/shared";
-
-// Học phần thuộc một chuyên ngành, và chuyên ngành thuộc một ngành. Gợi ý giảng viên
-// dựa trực tiếp trên các khóa ngoại này, không suy đoán từ mã giảng viên hay tên Khoa/Viện.
-export const teachingMajorForOffering = (offering) => {
-  const subject = offering?.subject || {};
-  if (subject.major || subject.majorId) return subject.major || { id: subject.majorId };
-  return groupsOf(offering)[0]?.major || null;
+// Nguồn Đơn vị hiện tại là Discipline. Picker chỉ sử dụng Unit;
+// không suy đoán từ faculty, mã hoặc chuyên ngành của giảng viên.
+export const lecturerUnitOf = (lecturer) => {
+  const id = lecturer?.disciplineId || lecturer?.discipline?.id;
+  const name = lecturer?.discipline?.name;
+  return id && name ? { id, name, code: lecturer.discipline.code } : null;
 };
 
-export const lecturerRecommendationRank = (lecturer, offering) => {
-  const teachingMajor = teachingMajorForOffering(offering);
-  const teachingMajorId = teachingMajor?.id || offering?.subject?.majorId;
-  const teachingDisciplineId = teachingMajor?.disciplineId || teachingMajor?.discipline?.id;
-  if (teachingMajorId && lecturer?.majorId === teachingMajorId) return 2;
-  if (teachingDisciplineId && lecturer?.disciplineId === teachingDisciplineId) return 1;
-  return 0;
+export const recommendedUnitForOffering = (offering) => {
+  const major = offering?.subject?.major;
+  const id = major?.disciplineId || major?.discipline?.id;
+  return id ? { id, name: major.discipline?.name, code: major.discipline?.code } : null;
 };
 
-export const lecturerBelongsToOfferingMajor = (lecturer, offering) => lecturerRecommendationRank(lecturer, offering) === 2;
+export const lecturerBelongsToRecommendedUnit = (lecturer, offering) => {
+  const unit = lecturerUnitOf(lecturer);
+  return !!unit && unit.id === recommendedUnitForOffering(offering)?.id;
+};
 
-export const lecturerTeachingGroup = (lecturer) => {
-  if (lecturer?.major) return lecturer.major.name;
-  if (lecturer?.discipline) return `${lecturer.discipline.code} · ${lecturer.discipline.name}`;
-  return "Chưa phân ngành / chuyên ngành";
+export const lecturerGroupsForOffering = (lecturers, offering) => {
+  const groups = new Map();
+  lecturers.forEach((lecturer) => {
+    const unit = lecturerUnitOf(lecturer);
+    const key = unit ? `unit:${unit.id}` : "unassigned";
+    if (!groups.has(key)) groups.set(key, { key, name: unit?.name || "Chưa có đơn vị", recommended: false, lecturers: [] });
+    const group = groups.get(key);
+    group.recommended ||= lecturerBelongsToRecommendedUnit(lecturer, offering);
+    group.lecturers.push(lecturer);
+  });
+  return [...groups.values()].map((group) => ({
+    ...group, lecturers: group.lecturers.sort((left, right) => (left.name || "").localeCompare(right.name || "", "vi")),
+  })).sort((left, right) => Number(right.recommended) - Number(left.recommended)
+    || Number(left.key === "unassigned") - Number(right.key === "unassigned")
+    || left.name.localeCompare(right.name, "vi"));
 };

@@ -13,7 +13,7 @@ import {
 } from "@mui/material";
 import {
   AddPhotoAlternateRounded, ArrowBackRounded, CheckCircleRounded,
-  DeleteRounded, FolderSpecialRounded, PersonRounded, PictureAsPdfRounded,
+  DeleteRounded, FolderSpecialRounded, PersonRounded,
   RefreshRounded, SaveRounded, SchoolRounded, WarningAmberRounded, WorkspacePremiumRounded,
   SwapHorizRounded, HistoryRounded,
   AddRounded, DeleteOutlineRounded, EditRounded, FactCheckRounded, MenuBookRounded, RuleRounded,
@@ -24,6 +24,10 @@ import {
   disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline,
 } from "../../utils/disciplineScope";
 import FeatureLayout from "../../components/FeatureLayout";
+import DocumentExportMenu from "../../components/DocumentExportMenu";
+import AdmissionPrintTemplate from "../../features/admission/AdmissionPrintTemplate";
+import { buildAdmissionDocument } from "../../features/admission/admissionDocument";
+import { downloadAdmissionWord, openAdmissionPreview } from "../../features/admission/admissionDocumentExport";
 
 const DOCUMENT_ITEMS = [
   { key: "docDecision", label: "Quyết định cử đi học" },
@@ -478,9 +482,11 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
     }
   };
 
-  // Handle Print / PDF Export
-  const handlePrint = () => {
-    window.print();
+  const documentActions = {
+    disabled: loading || saving || !formData,
+    onWord: () => downloadAdmissionWord(buildAdmissionDocument(formData)),
+    onPdf: () => openAdmissionPreview(buildAdmissionDocument(formData)),
+    onError: (error) => toast.error(error.message || "Không thể xuất hồ sơ. Vui lòng thử lại."),
   };
 
   const submitTransfer = async () => {
@@ -682,65 +688,10 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
     <FeatureLayout
       title={record ? `Hồ sơ: ${record.fullName}` : "Chi tiết hồ sơ tuyển sinh"}
       group="Kế hoạch khóa mới"
-      desc="Chỉnh sửa toàn bộ thông tin hồ sơ tuyển sinh trực tiếp trên một trang và xuất file PDF khổ A4."
+      desc="Chỉnh sửa toàn bộ thông tin hồ sơ tuyển sinh trực tiếp trên một trang và xuất Word hoặc PDF khổ A4."
       maxWidth={1260}
     >
       <ToastContainer position="top-right" newestOnTop autoClose={2500} limit={3} />
-
-      {/* Global Styles for PDF / Print Output */}
-      <style>{`
-        @media print {
-          @page {
-            size: 210mm 297mm;
-            margin: 0;
-          }
-          html, body {
-            background: #ffffff !important;
-            color: #000000 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            width: 210mm !important;
-            height: 297mm !important;
-            overflow: hidden !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          .no-print, header, nav, footer, .MuiAppBar-root, .Toastify, #root > div > header, #root > div > nav, .screen-only-form {
-            display: none !important;
-          }
-          .a4-print-only-container {
-            display: block !important;
-            visibility: visible !important;
-            position: absolute !important;
-            inset: 0 !important;
-            width: 210mm !important;
-            height: 297mm !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-          .a4-print-only-container * {
-            visibility: visible !important;
-          }
-          .a4-paper-sheet {
-            box-shadow: none !important;
-            border: 1.5px solid #173E75 !important;
-            margin: 0 !important;
-            padding: 10mm 13mm !important;
-            width: 210mm !important;
-            height: 297mm !important;
-            max-height: 297mm !important;
-            box-sizing: border-box !important;
-            page-break-inside: avoid !important;
-            page-break-after: avoid !important;
-            page-break-before: avoid !important;
-            break-inside: avoid !important;
-            break-after: avoid !important;
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: space-between !important;
-          }
-        }
-      `}</style>
 
       {/* ========================================================================= */}
       {/* 1. TOP HEADER TOOLBAR (SCREEN ONLY)                                       */}
@@ -886,25 +837,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
             Chuyển chuyên ngành
           </Button>
 
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<PictureAsPdfRounded />}
-            onClick={handlePrint}
-            sx={{
-              height: 34,
-              px: 2,
-              bgcolor: "#DC2626",
-              fontSize: 13,
-              fontWeight: 700,
-              textTransform: "none",
-              borderRadius: "4px",
-              boxShadow: "none",
-              "&:hover": { bgcolor: "#B91C1C" },
-            }}
-          >
-            PDF (Khổ A4)
-          </Button>
+          <DocumentExportMenu {...documentActions} />
 
           <Button
             variant="contained"
@@ -1821,14 +1754,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
             >
               Quay lại danh sách
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<PictureAsPdfRounded />}
-              onClick={handlePrint}
-              sx={{ bgcolor: "#DC2626", textTransform: "none", fontWeight: 700, px: 2.5, "&:hover": { bgcolor: "#B91C1C" } }}
-            >
-              PDF (Khổ A4)
-            </Button>
+            <DocumentExportMenu {...documentActions} />
             <Button
               variant="contained"
               startIcon={<SaveRounded />}
@@ -1990,244 +1916,9 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
       {/* ========================================================================= */}
       {/* 3. HIDDEN PRINT CONTAINER (EXACT 210mm x 297mm A4 TEMPLATE FOR PRINT / PDF)*/}
       {/* ========================================================================= */}
-      {formData && (
-        <Box className="a4-print-only-container" sx={{ display: "none" }}>
-          <Paper
-            className="a4-paper-sheet"
-            sx={{
-              width: "210mm",
-              height: "297mm",
-              maxHeight: "297mm",
-              bgcolor: "#FFFFFF",
-              p: "10mm 13mm",
-              borderRadius: "1px",
-              fontFamily: '"Times New Roman", Times, "Liberation Serif", serif',
-              color: "#000000",
-              lineHeight: 1.35,
-              fontSize: "12.5px",
-              position: "relative",
-              boxSizing: "border-box",
-              border: "1.5px solid #173E75",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-            }}
-          >
-            {/* Header */}
-            <Box sx={{ pb: 0.5 }}>
-              <Box sx={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", textAlign: "center" }}>
-                <Box>
-                  <Typography sx={{ fontFamily: "inherit", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2px", lineHeight: 1.25 }}>
-                    BỘ XÂY DỰNG
-                  </Typography>
-                  <Typography sx={{ fontFamily: "inherit", fontSize: "12px", fontWeight: 700, textTransform: "uppercase", borderBottom: "1.2px solid #000", display: "inline-block", pb: 0.1, lineHeight: 1.25 }}>
-                    TRƯỜNG ĐẠI HỌC HÀNG HẢI VIỆT NAM
-                  </Typography>
-                  <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontWeight: 700, mt: 0.3, color: "#1E293B", lineHeight: 1.2 }}>
-                    VIỆN ĐÀO TẠO SAU ĐẠI HỌC
-                  </Typography>
-                  <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontStyle: "italic", color: "#475569", lineHeight: 1.2 }}>
-                    Số HS: <strong>{formData.code || "VMU-SDH-000"}</strong>
-                  </Typography>
-                </Box>
-
-                <Box>
-                  <Typography sx={{ fontFamily: "inherit", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2px", lineHeight: 1.25 }}>
-                    CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
-                  </Typography>
-                  <Typography sx={{ fontFamily: "inherit", fontSize: "12px", fontWeight: 700, borderBottom: "1.2px solid #000", display: "inline-block", pb: 0.1, lineHeight: 1.25 }}>
-                    Độc lập - Tự do - Hạnh phúc
-                  </Typography>
-                  <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontStyle: "italic", mt: 0.3, color: "#475569", lineHeight: 1.2 }}>
-                    Hải Phòng, ngày {new Date().getDate().toString().padStart(2, "0")} tháng {(new Date().getMonth() + 1).toString().padStart(2, "0")} năm {new Date().getFullYear()}
-                  </Typography>
-                </Box>
-              </Box>
-            </Box>
-
-            {/* Title */}
-            <Box sx={{ textAlign: "center", my: 0.5 }}>
-              <Typography sx={{ fontFamily: "inherit", fontSize: "17px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.4px", lineHeight: 1.2 }}>
-                PHIẾU THÔNG TIN HỒ SƠ TUYỂN SINH
-              </Typography>
-              <Typography sx={{ fontFamily: "inherit", fontSize: "12px", fontStyle: "italic", fontWeight: 600, color: "#334155", lineHeight: 1.2 }}>
-                (Bậc đào tạo: {formData.trainingLevel?.toUpperCase()} - Niên khóa: {formData.academicYear || new Date().getFullYear()})
-              </Typography>
-            </Box>
-
-            {/* Section I: Personal Info & Photo */}
-            <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
-              <Box
-                sx={{
-                  width: 90,
-                  height: 120,
-                  border: "1px solid #173E75",
-                  borderRadius: "2px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  overflow: "hidden",
-                  bgcolor: "#F8FAFC",
-                  textAlign: "center",
-                }}
-              >
-                {formData.photo ? (
-                  <img src={formData.photo} alt="Ảnh 3x4" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  <Box sx={{ p: 0.5 }}>
-                    <PersonRounded sx={{ fontSize: 24, color: "#94A3B8", mb: 0.3 }} />
-                    <Typography sx={{ fontFamily: "inherit", fontSize: "9.5px", fontStyle: "italic", color: "#64748B", lineHeight: 1.15 }}>
-                      Ảnh 3x4<br />(Đóng dấu giáp lai)
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-
-              <Box sx={{ flexGrow: 1 }}>
-                <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", pb: 0.2 }}>
-                  I. THÔNG TIN CÁ NHÂN & LIÊN LẠC
-                </Typography>
-
-                <Box sx={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", rowGap: 0.25, fontSize: "12px", lineHeight: 1.3 }}>
-                  <div><strong>Họ và tên:</strong> <span style={{ textTransform: "uppercase", fontWeight: 700 }}>{formData.fullName}</span></div>
-                  <div><strong>Mã học viên/SBD:</strong> <span>{formData.code || "—"}</span></div>
-                  <div><strong>Ngày sinh:</strong> <span>{formData.dob || "—"}</span></div>
-                  <div><strong>Giới tính:</strong> <span>{formData.gender || "Nam"}</span></div>
-                  <div><strong>Số CMND/CCCD:</strong> <span>{formData.idCard || "—"}</span></div>
-                  <div><strong>Nơi sinh:</strong> <span>{formData.pob || "—"}</span></div>
-                  <div><strong>Điện thoại:</strong> <span>{formData.phone || "—"}</span></div>
-                  <div><strong>Email:</strong> <span>{formData.email || "—"}</span></div>
-                  <div><strong>Dân tộc:</strong> <span>{formData.ethnicity || "Kinh"}</span></div>
-                  <div><strong>Quốc tịch:</strong> <span>{formData.nationality || "Việt Nam"}</span></div>
-                </Box>
-                <div style={{ marginTop: "3px", fontSize: "12px", lineHeight: 1.3 }}>
-                  <strong>Địa chỉ thường trú / Hộ khẩu:</strong> <span>{[formData.ward, formData.city].filter(Boolean).join(", ") || "—"}</span>
-                </div>
-              </Box>
-            </Box>
-
-            {/* Section II: Training Mode & Program */}
-            <Box>
-              <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", pb: 0.2 }}>
-                II. THỂ THỨC & CHƯƠNG TRÌNH ĐÀO TẠO
-              </Typography>
-              <Box sx={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", rowGap: 0.25, fontSize: "12px", lineHeight: 1.3 }}>
-                <div><strong>Chuyên ngành đăng ký:</strong> <span style={{ fontWeight: 700 }}>{formData.majorName || "—"}</span></div>
-                <div><strong>Trình độ đào tạo:</strong> <span>{formData.trainingLevel || "Thạc sĩ"}</span></div>
-                <div><strong>Nhóm hình thức đào tạo:</strong> <span>{formData.trainingModeGroup || "Chính quy"}</span></div>
-                <div><strong>Hình thức đào tạo:</strong> <span>{formData.trainingModeName || "Đào tạo thông thường"}</span></div>
-                <div><strong>Ngôn ngữ giảng dạy:</strong> <span>{formData.language || "Tiếng Việt"}</span></div>
-                <div><strong>Miễn thi môn Ngoại ngữ:</strong> <span>{formData.isExemptForeignLanguage ? "Được miễn thi (Đạt chuẩn chứng chỉ)" : "Không"}</span></div>
-                <div><strong>Hình thức nhận hồ sơ:</strong> <span>{formData.receiptType || "Trực tiếp"}</span></div>
-                <div><strong>Phân loại hồ sơ:</strong> <span>{formData.profileCategory || "Đầy đủ"}</span></div>
-                <div><strong>Trạng thái hồ sơ:</strong> <span>{formData.studyStatus || "Nộp hồ sơ đầu vào"}</span></div>
-                <div><strong>Ngày nộp / tiếp nhận:</strong> <span>{formData.admissionDate || "—"}</span></div>
-              </Box>
-            </Box>
-
-            {/* Section III: Undergraduate Qualifications */}
-            <Box>
-              <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", pb: 0.2 }}>
-                III. VĂN BẰNG ĐẠI HỌC / NĂNG LỰC ĐẦU VÀO
-              </Typography>
-              <Box sx={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", rowGap: 0.25, fontSize: "12px", lineHeight: 1.3 }}>
-                <div><strong>Trường tốt nghiệp ĐH:</strong> <span>{formData.gradSchool || "—"}</span></div>
-                <div><strong>Chuyên ngành tốt nghiệp ĐH:</strong> <span>{formData.gradMajor || "—"}</span></div>
-                <div><strong>Hệ đào tạo ĐH:</strong> <span>{formData.gradDegreeType || "Chính quy"}</span></div>
-                <div><strong>Năm tốt nghiệp:</strong> <span>{formData.gradYear || "—"}</span></div>
-                <div><strong>Điểm TB tích lũy ĐH:</strong> <span>{formData.gpa || "—"}</span></div>
-                <div><strong>Xếp loại tốt nghiệp:</strong> <span>{formData.gradClassification || "—"}</span></div>
-                <div><strong>Số hiệu văn bằng ĐH:</strong> <span>{formData.diplomaNumber || "—"}</span></div>
-                <div><strong>Số vào sổ cấp bằng:</strong> <span>{formData.registryBookNumber || "—"}</span></div>
-                <div><strong>Đơn vị công tác hiện nay:</strong> <span>{formData.workplace || "—"}</span></div>
-                <div><strong>Nghề nghiệp:</strong> <span>{formData.job || "—"}</span></div>
-                <div><strong>Đối tượng ưu tiên:</strong> <span>{formData.priorityObject || "Không"}</span></div>
-                <div><strong>Số môn học BSKT:</strong> <span>{formData.supplementSubjectsCount || 0} môn</span></div>
-              </Box>
-              {formData.note && (
-                <div style={{ marginTop: "3px", fontSize: "12px", lineHeight: 1.3 }}>
-                  <strong>Ghi chú thêm:</strong> <span>{formData.note}</span>
-                </div>
-              )}
-            </Box>
-
-            {/* Section IV: Attached Documents Checklist */}
-            <Box>
-              <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12.5px", mb: 0.3, textTransform: "uppercase", pb: 0.2 }}>
-                IV. DANH MỤC HỒ SƠ & GIẤY TỜ ĐÍNH KÈM
-              </Typography>
-              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", rowGap: 0.35, columnGap: 1, fontSize: "11.5px", lineHeight: 1.2 }}>
-                {DOCUMENT_ITEMS.map((doc) => {
-                  const isChecked = Boolean(formData.documents?.[doc.key]);
-                  return (
-                    <div key={doc.key} style={{ display: "flex", alignItems: "center" }}>
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: 12,
-                          height: 12,
-                          border: "1.2px solid #000000",
-                          borderRadius: 2,
-                          marginRight: 5,
-                          fontSize: 9,
-                          fontWeight: "bold",
-                          lineHeight: 1,
-                          backgroundColor: "#fff",
-                          color: "#000",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {isChecked ? "✓" : ""}
-                      </span>
-                      <span>{doc.label}</span>
-                    </div>
-                  );
-                })}
-              </Box>
-            </Box>
-
-            {/* Section V: Signatures */}
-            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1.1fr 1fr", textAlign: "center", pt: 0.5, pageBreakInside: "avoid", breakInside: "avoid" }}>
-              <Box>
-                <Typography sx={{ fontFamily: "inherit", fontSize: "11px", fontStyle: "italic", color: "#334155", lineHeight: 1.2 }}>
-                  Hải Phòng, ngày ... tháng ... năm 20...
-                </Typography>
-                <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12px", textTransform: "uppercase", mt: 0.2, lineHeight: 1.2 }}>
-                  NGƯỜI KHAI HỒ SƠ
-                </Typography>
-                <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontStyle: "italic", lineHeight: 1.2 }}>(Ký và ghi rõ họ tên)</Typography>
-                <Box sx={{ height: 42 }} />
-                <Typography sx={{ fontFamily: "inherit", fontWeight: 700, textTransform: "uppercase", fontSize: "12px" }}>{formData.fullName}</Typography>
-              </Box>
-
-              <Box>
-                <Typography sx={{ fontFamily: "inherit", fontSize: "11px", fontStyle: "italic", color: "#334155", lineHeight: 1.2 }}>
-                  Ngày ... tháng ... năm 20...
-                </Typography>
-                <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12px", textTransform: "uppercase", mt: 0.2, lineHeight: 1.2 }}>
-                  CÁN BỘ TIẾP NHẬN
-                </Typography>
-                <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontStyle: "italic", lineHeight: 1.2 }}>(Ký và ghi rõ họ tên)</Typography>
-                <Box sx={{ height: 42 }} />
-              </Box>
-
-              <Box>
-                <Typography sx={{ fontFamily: "inherit", fontSize: "11px", fontStyle: "italic", color: "#334155", lineHeight: 1.2 }}>
-                  Ngày ... tháng ... năm 20...
-                </Typography>
-                <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12px", textTransform: "uppercase", mt: 0.2, lineHeight: 1.2 }}>
-                  VIỆN TRƯỞNG
-                </Typography>
-                <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontStyle: "italic", lineHeight: 1.2 }}>(Ký tên, đóng dấu)</Typography>
-                <Box sx={{ height: 42 }} />
-              </Box>
-            </Box>
-          </Paper>
-        </Box>
-      )}
+      {formData && <div className="a4-print-only-container" style={{ display: "none" }}>
+        <AdmissionPrintTemplate document={buildAdmissionDocument(formData)} />
+      </div>}
 
       {/* ========================================================================= */}
       {/* 4. UNSAVED CHANGES CONFIRMATION DIALOG                                    */}

@@ -9,6 +9,7 @@ import OfferingDetails from "../../features/scheduling/OfferingDetails";
 import { addDays, formatDateKey, getBusinessTodayKey, mondayOf, vietnameseDate } from "../../utils/schedulingCalendar";
 
 jest.mock("axios");
+jest.mock("@mui/icons-material", () => new Proxy({}, { get: () => () => null }));
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
 const offering = { id: "offering", subject: { id: "s", code: "HP01", name: "Khai thác cảng" }, status: "active", participantCount: 20,
   groupLinks: [{ classGroupId: "g", classGroup: { id: "g", code: "KTHH-2026", majorId: "m", academicYear: "2026", allowedWeekdays: [1, 2, 3, 4, 5, 6, 0] } }], sessionSummary: { heldCount: 2 } };
@@ -283,7 +284,7 @@ it("loads institute availability and excludes busy and undersized rooms before s
   await waitFor(() => expect(saved).toHaveBeenCalled());
   expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/teaching-sessions"), expect.objectContaining({ courseOfferingId: "offering", sessionDate: "2099-01-05", period: "MORNING", roomId: "r", lecturerId: "l", startTime: "07:00", endTime: "12:00" }), { withCredentials: true });
 });
-it("prioritizes the subject major, then the same discipline, then other disciplines", async () => {
+it("groups by unit IDs, recommending the whole unit regardless of lecturer major", async () => {
   const specializedOffering = {
     ...offering,
     subject: { ...offering.subject, majorId: "major-it", major: { id: "major-it", code: "CNTT", name: "Công nghệ thông tin", disciplineId: "discipline-it" } },
@@ -301,19 +302,59 @@ it("prioritizes the subject major, then the same discipline, then other discipli
   fireEvent.click(screen.getByLabelText("Giảng viên"));
   const lecturerList = screen.getByRole("listbox", { name: "Danh sách giảng viên" });
   const options = within(lecturerList).getAllByRole("option");
-  expect(options[0]).toHaveTextContent("Lê Bình");
-  expect(options[0]).toHaveTextContent("Đúng chuyên ngành");
-  expect(options[1]).toHaveTextContent("Bùi Anh");
-  expect(options[1]).toHaveTextContent("Cùng ngành");
+  expect(options[0]).toHaveTextContent("Bùi Anh");
+  expect(options[1]).toHaveTextContent("Lê Bình");
   expect(options.findIndex((option) => option.textContent.includes("Bùi Anh"))).toBeLessThan(options.findIndex((option) => option.textContent.includes("Vũ Yến")));
-  expect(within(lecturerList).getByText("CNTT · Công nghệ thông tin · Đề xuất")).toBeInTheDocument();
-  expect(within(lecturerList).getByText("KTPM · Kỹ thuật phần mềm · Cùng ngành")).toBeInTheDocument();
+  expect([...lecturerList.querySelectorAll(".sl-lecturer-group > span:first-child")].map((heading) => heading.textContent))
+    .toEqual(["Khoa học máy tính", "Ngôn ngữ Anh", "Quản trị kinh doanh"]);
+  expect(within(lecturerList).getAllByText("Đề xuất")).toHaveLength(1);
+  expect(lecturerList.querySelector(".sl-lecturer-group")).toHaveTextContent("Đề xuất");
+  expect(options.map((option) => option.textContent)).toEqual(["TS. Bùi Anh", "TS. Lê Bình", "TS. Vũ Yến", "TS. Trần An"]);
+  expect(within(lecturerList).queryByText(/Đúng chuyên ngành|Cùng ngành|Ngành khác|Có thể/)).not.toBeInTheDocument();
   expect(options).toHaveLength(4);
   expect(options[1]).toBeEnabled();
 
   fireEvent.change(screen.getByLabelText("Tìm giảng viên"), { target: { value: "tran" } });
   expect(within(lecturerList).getAllByRole("option")).toHaveLength(1);
   expect(within(lecturerList).getByRole("option")).toHaveTextContent("Trần An");
+});
+it("sorts names within groups, keeps busy lecturers disabled, and puts unassigned lecturers last", async () => {
+  const specializedOffering = { ...offering, subject: { ...offering.subject, majorId: "target" } };
+  const candidates = [
+    { id: "target-z", name: "Trần Văn C", disciplineId: "parent", discipline: { name: "Đơn vị đề xuất" }, majorId: "target", active: true },
+    { id: "same-discipline", name: "Lê Văn D", disciplineId: "z", discipline: { name: "ZZZ" }, majorId: "target", active: true },
+    { id: "target-a", code: "GV-TARGET", name: "Nguyễn Văn A", disciplineId: "parent", discipline: { name: "Đơn vị đề xuất" }, majorId: "different", active: true },
+    { id: "other-discipline", name: "Phạm Văn B", disciplineId: "a", discipline: { name: "ATM" }, active: true },
+    { id: "discipline-only", name: "Hoàng Văn E", disciplineId: "common", discipline: { id: "common", code: "NG", name: "Đơn vị chung" }, active: true },
+    { id: "unknown", name: "Đinh Văn F", active: true },
+    { id: "inactive", name: "Giảng viên ngừng hoạt động", active: false },
+  ];
+  specializedOffering.subject.major = { id: "target", disciplineId: "parent" };
+  axios.get.mockImplementation(async (url) => ({ data: url.includes("/lecturers") ? candidates : url.includes("/rooms") ? rooms
+    : url.includes("/teaching-sessions?") ? [{ id: "busy", lecturerId: "target-z", period: "MORNING", status: "planned" }]
+      : url.endsWith("/course-offerings/offering") ? specializedOffering : [] }));
+  render(<SessionEditor offering={specializedOffering} date="2099-01-05" period="MORNING" user={{ canManageScheduling: true }} onClose={jest.fn()} onSaved={jest.fn()} />);
+  await waitFor(() => expect(screen.getByLabelText("Giảng viên")).toBeEnabled());
+  fireEvent.click(screen.getByLabelText("Giảng viên"));
+  const list = screen.getByRole("listbox", { name: "Danh sách giảng viên" });
+  expect([...list.querySelectorAll(".sl-lecturer-group > span:first-child")].map((heading) => heading.textContent))
+    .toEqual(["Đơn vị đề xuất", "ATM", "Đơn vị chung", "ZZZ", "Chưa có đơn vị"]);
+  const options = within(list).getAllByRole("option");
+  expect(options.map((option) => option.textContent)).toEqual(["Nguyễn Văn A", "Trần Văn CĐang bận", "Phạm Văn B", "Hoàng Văn E", "Lê Văn D", "Đinh Văn F"]);
+  const busy = within(list).getByRole("option", { name: /Trần Văn C/ });
+  expect(busy).toBeDisabled();
+  expect(within(busy).getByText("Đang bận")).toHaveClass("sl-lecturer-busy");
+  fireEvent.click(busy);
+  expect(screen.getByLabelText("Giảng viên")).toHaveTextContent("Chọn giảng viên");
+  expect(within(list).queryByText("Giảng viên ngừng hoạt động")).not.toBeInTheDocument();
+  const search = screen.getByPlaceholderText("Tìm giảng viên...");
+  fireEvent.change(search, { target: { value: "nguyen van" } });
+  expect(within(list).getAllByRole("option")).toHaveLength(1);
+  expect(within(list).getByRole("option")).toHaveTextContent("Nguyễn Văn A");
+  fireEvent.change(search, { target: { value: "GV-TARGET" } });
+  expect(within(list).getByRole("option")).toHaveTextContent("Nguyễn Văn A");
+  fireEvent.change(search, { target: { value: "don vi chung" } });
+  expect(within(list).getByRole("option")).toHaveTextContent("Hoàng Văn E");
 });
 it("prefills and locks the lecturer after the first course-offering session", async () => {
   const assigned = { id: "assigned", name: "TS. Lê Bình", faculty: "Khoa Công nghệ thông tin", active: true };
@@ -339,9 +380,15 @@ it("updates the automatic time range and lecturer conflicts when changing period
   fireEvent.click(screen.getByLabelText("Giảng viên"));
   expect(screen.getByRole("option", { name: /Nguyễn Bình/ })).toBeDisabled();
   fireEvent.change(screen.getByLabelText("Buổi"), { target: { value: "AFTERNOON" } });
-  expect(screen.getByText("Khung giờ buổi học: 13:00–17:00")).toBeInTheDocument();
+  expect(screen.getByRole("dialog")).toHaveAccessibleName(/CHIỀU/);
   expect(screen.getByRole("option", { name: /Nguyễn Bình/ })).toBeEnabled();
   expect(screen.getByRole("button", { name: /301.*40 chỗ/ })).toBeEnabled();
+  fireEvent.click(screen.getByRole("option", { name: /Nguyễn Bình/ }));
+  fireEvent.click(screen.getByRole("button", { name: /301.*40 chỗ/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Lưu buổi học" }));
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/teaching-sessions"),
+    expect.objectContaining({ period: "AFTERNOON", startTime: "13:00", endTime: "17:00", lecturerId: "l", roomId: "r" }),
+    { withCredentials: true }));
 });
 it("suppresses occupied date-period slots from complete week data while preserving create and detail flows", async () => {
   const addDate = (date, days) => {

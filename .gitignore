@@ -10,3 +10,13 @@ ServerSide/config.env
 /frontend/node_modules/
 /frontend/build/
 /frontend/coverage/
+
+# Local diagnostics, database backups and generated verification reports
+/.tmp/
+*.log
+*.dump
+*.dmp
+/backend/realistic-test-verification.json
+.env.*
+!.env.example
+!.env.*.example

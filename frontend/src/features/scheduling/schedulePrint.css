@@ -1,0 +1,33 @@
+.sl-print-sheet{width:100%;min-height:190mm;box-sizing:border-box;padding:5mm;border:1px solid #526777;background:#fff;color:#000;font-family:"Times New Roman",Times,serif;font-size:12pt;line-height:1.2;text-transform:none}
+.sl-print-header{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8mm;text-align:center;font-size:12.5pt;line-height:1.2}
+.sl-print-header strong,.sl-print-header b,.sl-print-header span{display:block;margin:0 0 1mm}.sl-print-header strong{font-size:13.5pt;font-weight:700}.sl-print-header b{font-weight:700}
+.sl-print-sheet h1{margin:6mm 0 1.5mm;text-align:center;font-family:inherit;font-size:17pt;line-height:1.2;font-weight:700}.sl-print-range{margin:0 0 3mm;text-align:center;font-size:12.5pt;font-style:italic}
+.sl-print-scope{display:grid;gap:1mm;margin-bottom:3mm;text-align:left;font-size:12pt}
+.sl-print-sheet table{width:100%;border-collapse:collapse;table-layout:auto;font-family:inherit;font-size:10.5pt;line-height:1.2}.sl-print-sheet th,.sl-print-sheet td{padding:3px 4px;border:1px solid #526777;vertical-align:top;word-break:normal;overflow-wrap:normal;hyphens:none;white-space:normal;text-transform:none}.sl-print-sheet th{background:#dcecf6!important;color:#000;font-weight:700;text-align:center;vertical-align:middle}.sl-print-sheet tbody tr:nth-child(even){background:#f7fafc!important}
+.sl-print-sheet .sl-print-nowrap{white-space:nowrap;overflow-wrap:normal;word-break:normal}.sl-print-centered{text-align:center}
+.sl-print-empty{text-align:center;padding:12px!important}.sl-print-sheet footer{display:block!important;margin-top:3mm;text-align:right;font-size:11pt;font-style:italic}
+
+/* The application forces its UI font on headings/tables; scope this override to the document. */
+#root .sl-print-sheet h1,#root .sl-print-sheet table{font-family:"Times New Roman",Times,serif!important;color:#000}
+#root .sl-print-sheet table{font-size:10.5pt;line-height:1.2}
+#root .sl-print-only .sl-print-sheet :is(th,td){padding:3px 4px!important;border:1px solid #526777!important;font-size:10.5pt!important;line-height:1.2;color:#000!important}
+#root .sl-print-sheet th.sl-print-nowrap{white-space:nowrap}
+#root .sl-print-sheet th{background:#dcecf6!important}
+#root .sl-print-sheet td{background:#fff!important}
+#root .sl-print-sheet .sl-print-empty{padding:12px!important}
+.sl-schedule-preview{min-height:100vh;padding:16px;background:#eef1f4;overflow:auto}
+.sl-preview-actions{display:flex;gap:8px;max-width:281mm;margin:0 auto 16px}
+.sl-preview-actions button{padding:8px 16px;border:1px solid #bbc6d0;border-radius:4px;background:#fff;color:#173e75;cursor:pointer;font:inherit}
+.sl-preview-actions button:disabled{opacity:.6;cursor:wait}
+.sl-preview-error{max-width:281mm;margin:0 auto 16px;color:#a12622}
+@media screen{
+  .sl-schedule-preview .sl-print-only{display:block;width:281mm;margin:0 auto}
+}
+@media print{
+  @page{size:A4 landscape;margin:8mm}
+  .sl-schedule-preview{min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important;background:#fff!important}
+  .sl-preview-actions,.sl-preview-error{display:none!important}
+  .sl-schedule-preview .sl-print-only{display:block!important;position:static!important;width:100%!important;margin:0!important;padding:0!important}
+  .sl-print-sheet thead{display:table-header-group}
+  .sl-print-sheet tr{break-inside:avoid}
+}

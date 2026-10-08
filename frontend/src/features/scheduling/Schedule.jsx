@@ -6,7 +6,9 @@ import { addDays, formatDateKey, getBusinessTodayKey, isSessionPast, mondayOf, v
 import SessionEditor from "./SessionEditor";
 import OfferingDetails from "./OfferingDetails";
 import { disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
-import { displayScheduleExportDate, exportSchedule, SCHEDULE_EXPORT_HEADERS, scheduleExportRows } from "./scheduleExport";
+import { buildScheduleDocument, clearScheduleReturnView, createScheduleExcel, createScheduleWord, downloadScheduleFile, exportSchedule, readScheduleReturnView } from "./scheduleExport";
+import SchedulePrintTemplate from "./SchedulePrintTemplate";
+import DocumentExportMenu from "../../components/DocumentExportMenu";
 
 const WEEK_SLOT_LIMIT = 3;
 const DAY_FOCUS_STATUS_LANES = [
@@ -229,19 +231,22 @@ export default function Schedule({ user }) {
   const requested = params.get("offeringId") || "";
   const todayKey = getBusinessTodayKey();
   const currentWeek = formatDateKey(mondayOf(todayKey));
-  const appliedRequest = useRef("");
-  const [majorId, setMajor] = useState("");
-  const [disciplineId, setDiscipline] = useState("");
-  const [year, setYear] = useState("");
-  const [status, setStatus] = useState("active");
-  const [query, setQuery] = useState("");
-  const [week, setWeek] = useState(() => currentWeek);
-  const [selectedId, setSelected] = useState(requested);
+  // The existing permission refresh can remount this view when returning from a PDF tab.
+  const [previewReturn] = useState(readScheduleReturnView);
+  useEffect(() => { if (previewReturn) clearScheduleReturnView(); }, [previewReturn]);
+  const appliedRequest = useRef(previewReturn ? requested : "");
+  const [majorId, setMajor] = useState(previewReturn?.majorId || "");
+  const [disciplineId, setDiscipline] = useState(previewReturn?.disciplineId || "");
+  const [year, setYear] = useState(previewReturn?.year || "");
+  const [status, setStatus] = useState(previewReturn?.status || "active");
+  const [query, setQuery] = useState(previewReturn?.query || "");
+  const [week, setWeek] = useState(() => previewReturn?.week || currentWeek);
+  const [selectedId, setSelected] = useState(previewReturn?.selectedId ?? requested);
   const [editor, setEditor] = useState(null);
   const [details, setDetails] = useState(null);
   const [pendingOpen, setPendingOpen] = useState(false);
-  const [focusedDate, setFocusedDate] = useState("");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [focusedDate, setFocusedDate] = useState(previewReturn?.focusedDate || "");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(previewReturn?.sidebarCollapsed || false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const canEdit = user.canManageScheduling === true;
@@ -315,7 +320,16 @@ export default function Schedule({ user }) {
       setFocusedDate(formatDateKey(addDays(nextWeek, focusedWeekdayIndex)));
     }
   };
-  const runExport = () => exportSchedule();
+  const printSchedule = buildScheduleDocument({ week, end, disciplineId, majorId, year, majors: majors.data || [], sessions: visibleSessions });
+  const downloadWord = async () => {
+    const snapshot = printSchedule;
+    downloadScheduleFile(await createScheduleWord(snapshot), `lich-hoc-${snapshot.week}-${snapshot.end}.docx`);
+  };
+  const downloadExcel = async () => {
+    const snapshot = printSchedule;
+    downloadScheduleFile(await createScheduleExcel(snapshot), `lich-hoc-${snapshot.week}-${snapshot.end}.xlsx`);
+  };
+  const openPdfPreview = () => exportSchedule(printSchedule, { week, disciplineId, majorId, year, status, query, selectedId, focusedDate, sidebarCollapsed });
   const sessionsOn = (date, period) => visibleSessions.filter((session) => session.sessionDate === date && (!period || session.period === period));
   const slotState = (day, period) => {
     const date = formatDateKey(day);
@@ -359,7 +373,7 @@ export default function Schedule({ user }) {
     </article>;
   })}{!listed.length && <Notice>Không có lớp học phần trong phạm vi đã chọn.</Notice>}</section>}</div></div></div></aside>
   <section className="sl-right"><div className="sl-schedule-head"><h1>XẾP LỊCH</h1><div className="sl-week"><button aria-label="Tuần trước" onClick={() => changeWeek(formatDateKey(addDays(week, -7)))}>‹</button><strong>{vietnameseDate(week)} — {vietnameseDate(end)}</strong><button aria-label="Tuần sau" onClick={() => changeWeek(formatDateKey(addDays(week, 7)))}>›</button></div>
-    <div className="sl-actions"><button type="button" className="sl-btn sl-export-trigger" aria-label="Xuất lịch học" disabled={sessions.loading} onClick={runExport}>Export</button><button className="sl-btn sl-today" disabled={week === currentWeek && !focusedDate} onClick={() => changeWeek(currentWeek)}>Tuần này</button>{canEdit && <button className="sl-pending" onClick={() => setPendingOpen(true)}>{pending.loading ? "…" : pending.data?.length ?? "—"} chờ xác nhận</button>}</div>
+    <div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" label="In / Xuất lịch học" disabled={sessions.loading || !!sessions.error || majors.loading || !!majors.error || offerings.loading || !!offerings.error} showFileIcons onWord={downloadWord} onExcel={downloadExcel} onPdf={openPdfPreview} onError={(failure) => setError(message(failure))} /><button className="sl-btn sl-today" disabled={week === currentWeek && !focusedDate} onClick={() => changeWeek(currentWeek)}>Tuần này</button>{canEdit && <button className="sl-pending" onClick={() => setPendingOpen(true)}>{pending.loading ? "…" : pending.data?.length ?? "—"} chờ xác nhận</button>}</div>
   </div>{selecting && <div className="sl-selected-strip"><span className="sl-selected-tag">ĐANG XẾP</span><strong className="sl-selected-offering" title={offeringTitle(selected)}>{offeringTitle(selected)}</strong><span className="sl-selected-meta">{selected.subject?.code ? `${selected.subject.code} · ` : ""}{groupsOf(selected).length} lớp/nhóm · {selected.participantCount ?? 0} HV</span><button type="button" className="sl-btn sl-selected-clear" onClick={() => setSelected("")}>Bỏ chọn</button></div>}
     {sessions.error && <Notice error={sessions.error} />}{error && <Notice error={error} />}
     <div className={`sl-calendar-wrap ${selecting ? "sl-selecting" : ""}`} aria-busy={sessions.loading}>{focusedDay ? <section className="sl-day-focus" aria-label={`Lịch ngày ${vietnameseDate(focusedDate)}`}>
@@ -412,14 +426,7 @@ export default function Schedule({ user }) {
     </div>}</div>
   </section>
   <section className="sl-print-only" aria-hidden="true">
-    <div className="sl-print-sheet">
-      <header className="sl-print-header"><div><strong>BỘ XÂY DỰNG</strong><b>TRƯỜNG ĐẠI HỌC HÀNG HẢI VIỆT NAM</b><span>VIỆN ĐÀO TẠO SAU ĐẠI HỌC</span></div><div><strong>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</strong><b>Độc lập - Tự do - Hạnh phúc</b></div></header>
-      <h1>LỊCH HỌC SAU ĐẠI HỌC</h1>
-      <p className="sl-print-range">Tuần từ {displayScheduleExportDate(week)} đến {displayScheduleExportDate(end)}</p>
-      <div className="sl-print-scope"><span><b>Ngành:</b> {disciplines.find((item) => item.id === disciplineId)?.name || "Tất cả ngành"}</span><span><b>Chuyên ngành:</b> {(majors.data || []).find((item) => item.id === majorId)?.name || "Tất cả chuyên ngành"}</span><span><b>Khóa / Năm học:</b> {year || "Tất cả"}</span></div>
-      <table><thead><tr>{SCHEDULE_EXPORT_HEADERS.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{scheduleExportRows(visibleSessions).map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={`${rowIndex}-${cellIndex}`}>{cell}</td>)}</tr>)}{!visibleSessions.length && <tr><td className="sl-print-empty" colSpan={SCHEDULE_EXPORT_HEADERS.length}>Không có lịch học trong phạm vi đã chọn.</td></tr>}</tbody></table>
-      <footer>Tổng số: {visibleSessions.length} buổi học</footer>
-    </div>
+    <SchedulePrintTemplate schedule={printSchedule} />
   </section>
   {editor && <SessionEditor key={editor.session?.id || `${editor.date}-${editor.period}`} {...editor} user={user} onClose={() => setEditor(null)} onSaved={saved} onViewOffering={(offering) => { setEditor(null); setDetails(offering); }} />}
   {details && <OfferingDetails offering={details} user={user} onClose={() => setDetails(null)} onSaved={saved} onOpenSession={openSession} onSelect={select} />}

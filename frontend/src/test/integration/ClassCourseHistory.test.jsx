@@ -1,6 +1,6 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import axios from "axios";
 import ClassCourseHistory from "../../pages/masters/classCourseHistory";
 
@@ -11,7 +11,8 @@ jest.mock("../../features/scheduling/OfferingDetails", () => function Details({ 
   return <div role="dialog" aria-label="Chi tiết lớp học phần"><span>{offering.name}</span><button onClick={onClose}>Đóng</button></div>;
 });
 
-const major = { id: "major-1", name: "Công nghệ thông tin" };
+const discipline = { id: "discipline-1", name: "Khoa học máy tính" };
+const major = { id: "major-1", name: "Công nghệ thông tin", disciplineId: discipline.id, discipline };
 const baseSubjects = [
   { curriculumSubjectId: "subject-1", code: "NCKH01", name: "Phương pháp nghiên cứu khoa học", credits: 5, status: "in_progress", sessions: [{ lecturer: { name: "TS. Trần Minh Bình" } }] },
   { curriculumSubjectId: "subject-2", code: "HPT02", name: "Hệ phân tán", credits: 2, status: "not_started", sessions: [] },
@@ -28,9 +29,9 @@ const offering = {
   groupLinks: [{ classGroup: { id: "group-2027-1", code: "CNT2027.01", academicYear: "2027" } }],
 };
 
-function mockData({ classes = makeClasses(), catalog = classes, offerings = [offering] } = {}) {
+function mockData({ classes = makeClasses(), catalog = classes, offerings = [offering], majors = [major] } = {}) {
   axios.get.mockImplementation(async (url, options) => {
-    if (url.includes("/system/majors")) return { data: [major] };
+    if (url.includes("/system/majors")) return { data: majors };
     if (url.includes("/plan/classes")) return { data: catalog };
     if (url.includes("/class-curriculum-progress")) return { data: { classes: options.params.academicYear === "2027" ? classes : [] } };
     if (url.includes("/course-offerings")) return { data: offerings };
@@ -38,12 +39,16 @@ function mockData({ classes = makeClasses(), catalog = classes, offerings = [off
   });
 }
 
+function CurrentLocation() {
+  return <output data-testid="location">{useLocation().search}</output>;
+}
 function mount(query = "") {
-  return render(<MemoryRouter initialEntries={[`/masters/class-course-history${query}`]}><ClassCourseHistory /></MemoryRouter>);
+  return render(<MemoryRouter initialEntries={[`/masters/class-course-history${query}`]}><ClassCourseHistory /><CurrentLocation /></MemoryRouter>);
 }
 
 async function chooseScope({ expectTable = true } = {}) {
   await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveValue(major.id));
+  expect(screen.getByLabelText("Ngành")).toHaveValue(discipline.id);
   expect(screen.getByLabelText("Khóa / năm học")).toHaveTextContent("2027");
   if (expectTable) return screen.findByRole("table", { name: "Ma trận tiến độ học phần theo lớp" });
   return null;
@@ -58,6 +63,62 @@ it("selects a valid major and its newest available year on initial load", async 
   expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/class-curriculum-progress"), {
     params: { majorId: major.id, academicYear: "2027" }, withCredentials: true,
   });
+});
+
+it("skips parents without usable classes and uses catalog parent order rather than alphabet order", async () => {
+  const empty = { ...major, id: "empty", disciplineId: "empty-parent", discipline: { id: "empty-parent", name: "A không có lớp" } };
+  const first = { ...major, id: "first", disciplineId: "first-parent", discipline: { id: "first-parent", name: "Z có lớp" } };
+  const later = { ...major, id: "later", disciplineId: "later-parent", discipline: { id: "later-parent", name: "B có lớp" } };
+  const usable = { ...first, id: "first-usable" };
+  mockData({ majors: [empty, first, later, usable], catalog: [
+    { majorId: empty.id, academicYear: "2026", groupType: "NON_ADMINISTRATIVE" },
+    { majorId: first.id, academicYear: "" },
+    { majorId: later.id, academicYear: "2026" },
+    { majorId: usable.id, academicYear: "2027" },
+  ] });
+  mount("?majorId=missing&year=1900");
+  await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveValue(usable.id));
+  expect(screen.getByLabelText("Ngành")).toHaveValue(first.disciplineId);
+  expect(screen.getByLabelText("Khóa / năm học")).toHaveTextContent("2027");
+  expect(screen.queryByRole("option", { name: "Tất cả ngành" })).not.toBeInTheDocument();
+});
+
+it("preserves a valid URL major and years and synchronizes its parent even when the URL parent differs", async () => {
+  mockData({ catalog: [...makeClasses(), ...makeClasses("2028")] });
+  mount(`?disciplineId=wrong-parent&majorId=${major.id}&year=2027,2028&context=keep`);
+  await waitFor(() => expect(screen.getByLabelText("Ngành")).toHaveValue(discipline.id));
+  await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveValue(major.id));
+  expect(screen.getByLabelText("Khóa / năm học")).toHaveTextContent("2027, 2028");
+  await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent(`disciplineId=${discipline.id}`));
+  expect(screen.getByTestId("location")).toHaveTextContent("context=keep");
+  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/class-curriculum-progress"), {
+    params: { majorId: major.id, academicYear: "2028" }, withCredentials: true,
+  }));
+});
+
+it("constrains majors when the parent changes and leaves a parent with no usable data empty", async () => {
+  const other = { ...major, id: "other", disciplineId: "other-parent", discipline: { id: "other-parent", name: "Ngành khác" } };
+  const empty = { ...major, id: "empty", disciplineId: "empty-parent", discipline: { id: "empty-parent", name: "Ngành trống" } };
+  mockData({ majors: [major, other, empty], catalog: [...makeClasses(), { majorId: other.id, academicYear: "2029" }] });
+  mount(); await chooseScope();
+  fireEvent.change(screen.getByLabelText("Ngành"), { target: { value: other.disciplineId } });
+  expect(screen.getByLabelText("Chuyên ngành")).toHaveValue(other.id);
+  expect(screen.getByLabelText("Chuyên ngành").querySelector(`option[value="${major.id}"]`)).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Khóa / năm học")).toHaveTextContent("2029");
+  fireEvent.change(screen.getByLabelText("Ngành"), { target: { value: empty.disciplineId } });
+  await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveValue(""));
+  expect(screen.getByLabelText("Ngành")).toHaveValue(empty.disciplineId);
+  expect(screen.getByText("Chưa có dữ liệu phù hợp để theo dõi tiến độ.")).toBeInTheDocument();
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+});
+
+it("shows an empty state and makes no progress request when no parent-major pair has classes", async () => {
+  mockData({ catalog: [] });
+  mount("?majorId=missing&year=1900");
+  expect(await screen.findByText("Chưa có dữ liệu phù hợp để theo dõi tiến độ.")).toBeInTheDocument();
+  expect(screen.getByLabelText("Ngành")).toHaveValue("");
+  expect(screen.getByLabelText("Chuyên ngành")).toHaveValue("");
+  expect(axios.get.mock.calls.some(([url]) => url.includes("/class-curriculum-progress"))).toBe(false);
 });
 
 it("renders curriculum subjects once with one dynamic status column per class", async () => {
@@ -129,7 +190,7 @@ it("allows selecting multiple academic years and combines their progress", async
 it("prefers the current year and recomputes it when the major changes", async () => {
   const currentYear = String(new Date().getFullYear());
   const newerYear = String(Number(currentYear) + 2);
-  const secondMajor = { id: "major-2", name: "Kỹ thuật hóa học" };
+  const secondMajor = { ...major, id: "major-2", name: "Kỹ thuật hóa học" };
   const secondClasses = [currentYear, newerYear].flatMap((year) => makeClasses(year).map((group) => ({
     ...group, id: group.id.replace("group", "chemical"), code: group.code.replace("CNT", "KTHH"), majorId: secondMajor.id,
   })));
@@ -144,6 +205,7 @@ it("prefers the current year and recomputes it when the major changes", async ()
   mount();
   await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveValue(major.id));
   fireEvent.change(screen.getByLabelText("Chuyên ngành"), { target: { value: secondMajor.id } });
+  expect(screen.getByLabelText("Ngành")).toHaveValue(secondMajor.disciplineId);
   expect(screen.getByLabelText("Khóa / năm học")).toHaveTextContent(currentYear);
   await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/class-curriculum-progress"), {
     params: { majorId: secondMajor.id, academicYear: currentYear }, withCredentials: true,

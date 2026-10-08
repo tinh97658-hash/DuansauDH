@@ -16,7 +16,15 @@ const Lecturers = () => (
     showEditAction={false}
     showDeleteAction={false}
     fields={[
-      { key: "faculty", label: "Đơn vị", required: true },
+      {
+        key: "disciplineId", label: "Đơn vị", type: "select",
+        optionsEndpoint: "/system/disciplines", requiredOnCreate: true, alphabeticalGroups: true,
+        filterOption: (unit, form) => unit.active !== false || unit.id === form.disciplineId,
+        display: (row) => row.discipline?.name || (row.faculty ? `${row.faculty} (chưa liên kết)` : "Chưa có đơn vị"),
+        searchValue: (row) => row.discipline?.name || row.faculty,
+        helper: (form, row) => !form.disciplineId && row?.faculty
+          ? `Đơn vị cũ: ${row.faculty}. Chọn từ danh mục để liên kết; để trống giữ dữ liệu cũ.` : "",
+      },
       { key: "phone", label: "Số điện thoại", type: "tel" },
       {
         key: "academicRank",

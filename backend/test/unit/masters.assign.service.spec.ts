@@ -1,5 +1,6 @@
 import { jest } from "@jest/globals";
 import { MastersService } from "../../src/masters/masters.service.js";
+import { Op } from "sequelize";
 
 /**
  * Unit tests for MastersService student-assignment operations:
@@ -39,6 +40,20 @@ const openGroup = {
 };
 
 describe("MastersService.assignMembers", () => {
+  it.each(["Bảo lưu", "Tạm dừng", "Thôi học", "Đã trúng tuyển", "Đủ điều kiện dự tuyển", null])(
+    "rejects direct assignment of %s even if approved and tuition is paid", async (studyStatus) => {
+      const { service, classGroups, admissionRecords, classGroupMembers } = buildService();
+      classGroups.findOne.mockResolvedValue(openGroup);
+      admissionRecords.findAll.mockImplementation(async ({ where }: any) => {
+        expect(where.studyStatus).toBe("Đang học");
+        expect(where[Op.or]).toBeUndefined();
+        const record = { id: "a1", studyStatus, status: "approved", extraData: { tuitionPayment: { paid: true } } };
+        return record.studyStatus === where.studyStatus ? [record] : [];
+      });
+      await expect(service.assignMembers("g1", { admissionRecordIds: ["a1"] })).rejects.toThrow("không đủ điều kiện");
+      expect(classGroupMembers.bulkCreate).not.toHaveBeenCalled();
+    },
+  );
   it("assigns eligible students to an open group inside a transaction", async () => {
     const { service, classGroups, classGroupMembers, admissionRecords } = buildService();
     classGroups.findOne.mockResolvedValue(openGroup);
@@ -55,6 +70,10 @@ describe("MastersService.assignMembers", () => {
       expect.anything(),
     );
     expect(result.count).toBe(1);
+    expect(admissionRecords.findAll).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ studyStatus: "Đang học", trainingLevel: "Thạc sĩ", academicYear: "2026" }),
+      lock: "UPDATE",
+    }));
   });
 
   it("rejects a student who already belongs to another class", async () => {
@@ -132,6 +151,7 @@ describe("MastersService.autoAssign", () => {
       ["g3", "a5"],
     ]);
     expect(result.distributed.map((item: { count: number }) => item.count)).toEqual([2, 2, 1]);
+    expect(admissionRecords.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ studyStatus: "Đang học" }) }));
   });
 
   it("fills groups to capacity in order for fill-first", async () => {
@@ -227,6 +247,42 @@ describe("MastersService.autoAssign", () => {
       classGroupIds: ["g1", "g2"],
       admissionRecordIds: ["a1", "a2"],
     })).rejects.toThrow("Các nhóm phải cùng chuyên ngành");
+  });
+});
+
+describe("MastersService assignment lists", () => {
+  it("returns only studying unassigned candidates and AdmissionRecord.note", async () => {
+    const { service, admissionRecords, classGroupMembers } = buildService();
+    const records = [
+      { id: "free", studyStatus: "Đang học", note: "Ghi chú hồ sơ", gender: null },
+      { id: "assigned", studyStatus: "Đang học" },
+      { id: "same-student", studentId: "s1", studyStatus: "Đang học" },
+      { id: "paused", studyStatus: "Bảo lưu", status: "approved" },
+      { id: "admitted", studyStatus: "Đã trúng tuyển", status: "approved" },
+    ];
+    admissionRecords.findAll.mockImplementation(async ({ where }: any) => {
+      expect(where).toEqual({ trainingLevel: "Thạc sĩ", studyStatus: "Đang học", academicYear: "2026" });
+      return records.filter((record) => record.studyStatus === where.studyStatus);
+    });
+    const classGroup = { id: "other-year", code: "OLD", name: "Lớp cũ" };
+    classGroupMembers.findAll.mockResolvedValue([
+      { id: "member1", admissionRecordId: "assigned", classGroup },
+      { id: "member2", studentId: "s1", classGroup },
+    ]);
+    expect(await service.listEligibleStudents(undefined, "2026")).toEqual([
+      expect.objectContaining({ id: "free", studyStatus: "Đang học", note: "Ghi chú hồ sơ", gender: "", assignedGroup: null }),
+    ]);
+  });
+
+  it("includes AdmissionRecord.note in both class list and detail", async () => {
+    const { service, classGroups } = buildService();
+    classGroups.findAll.mockResolvedValue([]);
+    classGroups.findOne.mockResolvedValue({ get: () => ({ id: "g1", members: [] }) });
+    await service.listClassGroups(); await service.getClassGroup("g1");
+    for (const call of [classGroups.findAll.mock.calls[0][0], classGroups.findOne.mock.calls[0][0]]) {
+      const members = (call as any).include.find((item: any) => item.as === "members");
+      expect(members.include.find((item: any) => item.as === "admissionRecord").attributes).toContain("note");
+    }
   });
 });
 

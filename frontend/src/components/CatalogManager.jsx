@@ -6,13 +6,14 @@ import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
   DialogTitle, FormControl, FormControlLabel, IconButton, MenuItem, Paper, Select, Stack,
   Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField,
-  Tooltip, Typography,
+  Tooltip, Typography, ListSubheader,
 } from "@mui/material";
 import { AddRounded, DeleteRounded, EditRounded } from "@mui/icons-material";
 import { API_BASE_URL } from "../config/http";
 import FeatureLayout from "./FeatureLayout";
 import { personNameParts } from "../utils/personName";
 import FilterSearchField from "./FilterSearchField";
+import { alphabeticalOptionGroups } from "../utils/optionGroups";
 
 const buildEmptyForm = (parent, fields, sortable) => {
   const form = { code: "", name: "", active: true };
@@ -71,6 +72,12 @@ const CompactField = ({ label, htmlFor, helper, error = false, children, sx }) =
       </Typography>
     )}
   </Box>
+);
+
+// MUI 5.8 Select injects role="option" into every child. Keep group headings
+// presentational and skip them in MenuList keyboard focus.
+const AlphabeticalHeader = ({ children }) => (
+  <ListSubheader role="presentation" sx={{ color: "#173b5d", fontWeight: 700, lineHeight: "32px", bgcolor: "#f5f8fb" }}>{children}</ListSubheader>
 );
 
 const CatalogManager = ({
@@ -216,7 +223,7 @@ const CatalogManager = ({
         body[f.key] = num;
       } else {
         const value = String(raw ?? "").trim();
-        if (f.required && !value) return toast.error(`Vui lòng ${f.type === "select" ? "chọn" : "nhập"} ${f.label}`);
+        if ((f.required || (f.requiredOnCreate && !editingId)) && !value) return toast.error(`Vui lòng ${f.type === "select" ? "chọn" : "nhập"} ${f.label}`);
         if (f.type === "email" && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return toast.error(`${f.label} không hợp lệ`);
         body[f.key] = value || null;
       }
@@ -467,11 +474,16 @@ const CatalogManager = ({
                       </CompactField>
                     );
                   }
-                  if (f.type === "select" && (fieldOptions[f.key] || Array.isArray(f.options))) {
-                    const selectOptions = (fieldOptions[f.key] || f.options)
+                  if (f.type === "select" && (f.optionsEndpoint || Array.isArray(f.options))) {
+                    const selectOptions = (fieldOptions[f.key] || f.options || [])
                       .filter((option) => !f.filterOption || f.filterOption(option?.raw ?? option, form));
+                    const groupedOptions = f.alphabeticalGroups ? alphabeticalOptionGroups([
+                      ...selectOptions.map((option) => typeof option === "object" ? option : { value: option, label: option }),
+                      ...(f.allowEmpty !== false ? [{ value: "", label: "(Không có)" }] : []),
+                    ]) : null;
                     return (
-                      <CompactField key={f.key} label={f.label.toUpperCase()} htmlFor={`catalog-${f.key}`}>
+                      <CompactField key={f.key} label={f.label.toUpperCase()} htmlFor={`catalog-${f.key}`}
+                        helper={typeof f.helper === "function" ? f.helper(form, rows.find((row) => row.id === editingId)) : f.helper}>
                         <FormControl key={f.key} fullWidth size="small" sx={compactControlSx}>
                           <Select
                             id={`catalog-${f.key}`}
@@ -479,12 +491,16 @@ const CatalogManager = ({
                             onChange={setField(f.key)}
                             inputProps={{ "aria-label": f.label }}
                           >
-                            {f.allowEmpty !== false && <MenuItem value=""><em>(Không có)</em></MenuItem>}
-                            {selectOptions.map((opt) => {
+                            {groupedOptions ? groupedOptions.flatMap((group) => [
+                              <AlphabeticalHeader key={`heading:${group.label}`} disabled>{group.label}</AlphabeticalHeader>,
+                              ...group.items.map((option) => <MenuItem key={`option:${option.value}`} value={option.value} sx={{ pl: 3.5, fontWeight: 400 }}>{option.label}</MenuItem>),
+                            ]) : [
+                            f.allowEmpty !== false && <MenuItem key="empty" value=""><em>(Không có)</em></MenuItem>,
+                            ...selectOptions.map((opt) => {
                               const val = typeof opt === "object" ? opt.value : opt;
                               const lbl = typeof opt === "object" ? opt.label : opt;
                               return <MenuItem key={val} value={val}>{lbl}</MenuItem>;
-                            })}
+                            })]}
                           </Select>
                         </FormControl>
                       </CompactField>

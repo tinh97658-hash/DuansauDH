@@ -385,7 +385,11 @@ export class SystemService {
     if (dto.email && dto.email !== row.email) await this.ensureEmailUnique(dto.email, id);
     if (dto.staffId !== undefined && dto.staffId !== null) await this.requireParent(this.staff, dto.staffId, "Tài khoản nhân sự");
     if (dto.disciplineId !== undefined || dto.majorId !== undefined) {
-      await this.validateLecturerScope(dto.disciplineId ?? row.disciplineId, dto.majorId ?? row.majorId);
+      const disciplineId = dto.disciplineId === undefined ? row.disciplineId : dto.disciplineId;
+      const majorId = dto.majorId === undefined ? row.majorId : dto.majorId;
+      if (disciplineId !== row.disciplineId || majorId !== row.majorId) {
+        await this.validateLecturerScope(disciplineId, majorId);
+      }
     }
     await row.update(this.pick(dto, [
       "staffId", "code", "name", "phone", "email", "academicRank", "academicDegree", "teachingType", "title", "faculty", "department", "disciplineId", "majorId", "active"
@@ -395,20 +399,20 @@ export class SystemService {
   async removeLecturer(id: string) { return this.removeSimple(this.lecturers, id, "Giảng viên"); }
 
   private async validateLecturerScope(disciplineId?: string | null, majorId?: string | null) {
-    // Đơn vị công tác được lưu ở faculty; phân ngành chỉ kiểm tra khi được khai báo.
+    // Đơn vị dùng relation Discipline có sẵn; major là phân loại cũ, không bắt buộc.
     if (!disciplineId && !majorId) return;
-    if (!disciplineId) throw new BadRequestException("Vui lòng chọn ngành của giảng viên.");
-    if (!majorId) throw new BadRequestException("Vui lòng chọn chuyên ngành của giảng viên.");
+    if (!disciplineId) throw new BadRequestException("Vui lòng chọn đơn vị của giảng viên có chuyên ngành đã khai báo.");
     const discipline = await this.disciplines.findByPk(disciplineId);
     if (!discipline || discipline.active === false) {
-      throw new BadRequestException("Ngành của giảng viên không tồn tại hoặc đã ngừng sử dụng.");
+      throw new BadRequestException("Đơn vị của giảng viên không tồn tại hoặc đã ngừng sử dụng.");
     }
+    if (!majorId) return;
     const major = await this.majors.findByPk(majorId);
     if (!major || major.active === false) {
       throw new BadRequestException("Chuyên ngành của giảng viên không tồn tại hoặc đã ngừng sử dụng.");
     }
     if (major.disciplineId !== disciplineId) {
-      throw new BadRequestException("Chuyên ngành không thuộc ngành đã chọn.");
+      throw new BadRequestException("Chuyên ngành đã khai báo không thuộc đơn vị đã chọn. Cần rà soát phân loại cũ trước khi đổi đơn vị.");
     }
   }
 

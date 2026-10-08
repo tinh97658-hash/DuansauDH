@@ -1,0 +1,9 @@
+.document-export{display:inline-block;position:relative;flex-shrink:0}
+.document-export-trigger{display:inline-flex;align-items:center;gap:8px;min-height:32px;padding:6px 12px;border:1px solid #0788b8;border-radius:4px;background:#0788b8;color:#fff;font:inherit;font-size:12px;font-weight:700;white-space:nowrap;cursor:pointer}
+.document-export-trigger:disabled{opacity:.6;cursor:default}
+.document-export-trigger:focus-visible,.document-export-options button:focus-visible{outline:2px solid #173e75;outline-offset:2px}
+.document-export-options{position:fixed;min-width:150px;padding:4px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;box-shadow:0 4px 14px #172b3a26;z-index:1500}
+.document-export-options button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:0;border-radius:3px;background:#fff;color:#173e75;font:inherit;font-size:13px;text-align:left;white-space:nowrap;cursor:pointer}
+.document-export-icon{width:20px;height:20px;flex:none;fill:currentColor}.document-export-icon-word{color:#185abd}.document-export-icon-excel{color:#107c41}.document-export-icon-pdf{color:#c62828}
+.document-export-options button:hover,.document-export-options button:focus{background:#edf4fa}
+@media print{.document-export,.document-export-options{display:none!important}}

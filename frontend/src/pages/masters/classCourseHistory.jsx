@@ -7,7 +7,7 @@ import FeatureLayout from "../../components/FeatureLayout";
 import OfferingDetails from "../../features/scheduling/OfferingDetails";
 import { API_BASE_URL } from "../../config/http";
 import "./classCourseHistory.css";
-import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
+import { disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline } from "../../utils/disciplineScope";
 
 const asList = (value) => (Array.isArray(value) ? value : value?.data || []);
 const normalize = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/gi, "d").toLowerCase();
@@ -80,7 +80,8 @@ export default function ClassCourseHistory() {
   const [majors, setMajors] = useState([]);
   const [groups, setGroups] = useState([]);
   const [majorId, setMajorId] = useState(searchParams.get("majorId") || "");
-  const [disciplineId, setDisciplineId] = useState("");
+  const [disciplineId, setDisciplineId] = useState(searchParams.get("disciplineId") || "");
+  const scopeInitialized = useRef(false);
   const [academicYears, setAcademicYears] = useState((searchParams.get("year") || "").split(",").filter(Boolean));
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
@@ -107,24 +108,42 @@ export default function ClassCourseHistory() {
   }, []);
 
   const disciplines = useMemo(() => disciplinesFromMajors(majors), [majors]);
-  const visibleMajors = useMemo(() => majorsForDiscipline(majors, disciplineId).filter((major) => groups.some((group) => group.majorId === major.id && group.academicYear)), [disciplineId, groups, majors]);
+  const eligibleMajors = useMemo(() => majors.filter((major) => majorDisciplineId(major)
+    && groups.some((group) => group.majorId === major.id && group.academicYear)), [groups, majors]);
+  const visibleMajors = useMemo(() => disciplineId ? majorsForDiscipline(eligibleMajors, disciplineId) : [], [disciplineId, eligibleMajors]);
+  const defaultMajor = useMemo(() => {
+    // Keep the catalog's parent order even when a parent's first major has no classes.
+    const parentIds = [...new Set(majors.map(majorDisciplineId).filter(Boolean))];
+    for (const id of parentIds) {
+      const candidate = eligibleMajors.find((major) => majorDisciplineId(major) === id);
+      if (candidate) return candidate;
+    }
+    return null;
+  }, [eligibleMajors, majors]);
   const years = useMemo(() => yearsForMajor(groups, majorId), [groups, majorId]);
   useEffect(() => {
     if (loadingCatalog) return;
-    const nextMajorId = visibleMajors.some((major) => major.id === majorId) ? majorId : visibleMajors[0]?.id || "";
+    const selectedMajor = eligibleMajors.find((major) => major.id === majorId);
+    const validParent = disciplines.some((item) => item.id === disciplineId);
+    const nextMajor = selectedMajor || visibleMajors[0]
+      || ((!scopeInitialized.current || !validParent) ? defaultMajor : null);
+    const nextMajorId = nextMajor?.id || "";
+    const nextDisciplineId = nextMajor ? majorDisciplineId(nextMajor) : (validParent ? disciplineId : "");
     const availableYears = yearsForMajor(groups, nextMajorId);
     const retainedYears = nextMajorId === majorId ? academicYears.filter((year) => availableYears.includes(year)) : [];
     const preferredYear = preferredYearForMajor(groups, nextMajorId);
     const nextAcademicYears = retainedYears.length ? retainedYears : (preferredYear ? [preferredYear] : []);
-    if (nextMajorId === majorId && nextAcademicYears.join(",") === academicYears.join(",")) return;
+    scopeInitialized.current = true;
+    if (nextDisciplineId === disciplineId && nextMajorId === majorId && nextAcademicYears.join(",") === academicYears.join(",")) return;
+    setDisciplineId(nextDisciplineId);
     setMajorId(nextMajorId);
     setAcademicYears(nextAcademicYears);
     setSelectedOffering(null);
-    setError("");
-  }, [academicYears, groups, loadingCatalog, majorId, visibleMajors]);
+  }, [academicYears, defaultMajor, disciplineId, disciplines, eligibleMajors, groups, loadingCatalog, majorId, visibleMajors]);
 
   useEffect(() => {
-    if (!majorId || !academicYears.length || academicYears.some((year) => !years.includes(year))) {
+    if (loadingCatalog || !majorId || !visibleMajors.some((major) => major.id === majorId)
+      || !academicYears.length || academicYears.some((year) => !years.includes(year))) {
       setReport(null);
       setOfferings([]);
       setSelectedOffering(null);
@@ -154,14 +173,16 @@ export default function ClassCourseHistory() {
     }).catch(() => active && setError("Không thể tải dữ liệu theo dõi tiến độ."))
       .finally(() => active && setLoadingReport(false));
     return () => { active = false; };
-  }, [academicYears, majorId, years]);
+  }, [academicYears, loadingCatalog, majorId, visibleMajors, years]);
 
   useEffect(() => {
-    const next = new URLSearchParams();
-    if (majorId) next.set("majorId", majorId);
-    if (academicYears.length) next.set("year", academicYears.join(","));
+    if (loadingCatalog || (majorId && !visibleMajors.some((major) => major.id === majorId))) return;
+    const next = new URLSearchParams(searchParams);
+    if (disciplineId) next.set("disciplineId", disciplineId); else next.delete("disciplineId");
+    if (majorId) next.set("majorId", majorId); else next.delete("majorId");
+    if (academicYears.length) next.set("year", academicYears.join(",")); else next.delete("year");
     if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
-  }, [academicYears, majorId, searchParams, setSearchParams]);
+  }, [academicYears, disciplineId, loadingCatalog, majorId, searchParams, setSearchParams, visibleMajors]);
 
   const classes = useMemo(() => report?.classes || [], [report]);
   const subjectRows = useMemo(() => {
@@ -193,12 +214,19 @@ export default function ClassCourseHistory() {
   return <FeatureLayout title="Theo dõi tiến độ">
     <div className="tp-page">
       <section className="tp-filters" aria-label="Bộ lọc tiến độ">
-        <SelectFilter label="Ngành" value={disciplineId} onChange={(value) => { setDisciplineId(value); setMajorId(""); setAcademicYears([]); setSelectedOffering(null); setError(""); }} disabled={loadingCatalog}>
-          <option value="">Tất cả ngành</option>
+        <SelectFilter label="Ngành" value={disciplineId} onChange={(value) => {
+          const candidates = majorsForDiscipline(eligibleMajors, value);
+          const nextMajorId = candidates.find((item) => item.id === majorId)?.id || candidates[0]?.id || "";
+          const preferred = preferredYearForMajor(groups, nextMajorId);
+          setDisciplineId(value); setMajorId(nextMajorId);
+          if (nextMajorId !== majorId) setAcademicYears(preferred ? [preferred] : []);
+          setSelectedOffering(null); setError("");
+        }} disabled={loadingCatalog}>
+          <option value="" disabled>Chọn ngành</option>
           {disciplines.map((item) => <option value={item.id} key={item.id}>{disciplineOptionLabel(item)}</option>)}
         </SelectFilter>
-        <SelectFilter label="Chuyên ngành" value={majorId} onChange={(value) => { const preferred = preferredYearForMajor(groups, value); setMajorId(value); setAcademicYears(preferred ? [preferred] : []); setSelectedOffering(null); setError(""); }} disabled={loadingCatalog}>
-          <option value="">Chọn chuyên ngành</option>
+        <SelectFilter label="Chuyên ngành" value={majorId} onChange={(value) => { const preferred = preferredYearForMajor(groups, value); setDisciplineId(majorDisciplineId(eligibleMajors.find((item) => item.id === value))); setMajorId(value); setAcademicYears(preferred ? [preferred] : []); setSelectedOffering(null); setError(""); }} disabled={loadingCatalog || !visibleMajors.length}>
+          <option value="" disabled>Chọn chuyên ngành</option>
           {visibleMajors.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
         </SelectFilter>
         <YearMultiSelect years={years} value={academicYears} onChange={(value) => { setAcademicYears(value); setSelectedOffering(null); setError(""); }} disabled={!majorId || !years.length} />
@@ -211,7 +239,7 @@ export default function ClassCourseHistory() {
 
       {error && <Alert severity="error">{error}</Alert>}
       {(loadingCatalog || loadingReport) && <Box className="tp-loading"><CircularProgress size={30} /></Box>}
-      {!loadingCatalog && !majorId && <Alert severity="info">Vui lòng chọn chuyên ngành và khóa / năm học để xem tiến độ.</Alert>}
+      {!loadingCatalog && !majorId && <Alert severity="info">Chưa có dữ liệu phù hợp để theo dõi tiến độ.</Alert>}
       {!loadingCatalog && majorId && !academicYears.length && <Alert severity="info">Vui lòng chọn ít nhất một khóa / năm học để xem tiến độ.</Alert>}
       {!loadingCatalog && !loadingReport && !error && report && <section className="tp-content" aria-label="Tổng quan tiến độ">
         <header className="tp-matrix-heading">
