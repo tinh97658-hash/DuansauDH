@@ -46,6 +46,11 @@ export class SystemController {
   @Delete("wards/:id") @Roles("admin") @UseGuards(RolesGuard) removeWard(@Param("id") id: string) { return this.system.removeWard(id); }
 
   // ===== Giảng viên =====
+  @Get("units") units() { return this.system.listUnits(); }
+  @Post("units") @Roles("admin") @UseGuards(RolesGuard) createUnit(@Body() dto: CreateCatalogDto) { return this.system.createUnit(dto); }
+  @Put("units/:id") @Roles("admin") @UseGuards(RolesGuard) updateUnit(@Param("id") id: string, @Body() dto: UpdateCatalogDto) { return this.system.updateUnit(id, dto); }
+  @Delete("units/:id") @Roles("admin") @UseGuards(RolesGuard) removeUnit(@Param("id") id: string) { return this.system.removeUnit(id); }
+
   @Get("lecturers") lecturers() { return this.system.listLecturers(); }
   @Post("lecturers") @Roles("admin") @UseGuards(RolesGuard) createLecturer(@Body() dto: CreateCatalogDto) { return this.system.createLecturer(dto); }
   @Put("lecturers/:id") @Roles("admin") @UseGuards(RolesGuard) updateLecturer(@Param("id") id: string, @Body() dto: UpdateCatalogDto) { return this.system.updateLecturer(id, dto); }

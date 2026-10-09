@@ -6,6 +6,15 @@ import CourseOfferings from "../../pages/masters/courseOfferings";
 import CourseMatrixPage from "../../pages/masters/courseMatrix";
 
 jest.mock("axios");
+jest.mock("@mui/icons-material", () => ({
+  CalendarMonthRounded: require("@mui/icons-material/CalendarMonthRounded").default,
+  GridViewRounded: require("@mui/icons-material/GridViewRounded").default,
+  LayersRounded: require("@mui/icons-material/LayersRounded").default,
+  PendingActionsRounded: require("@mui/icons-material/PendingActionsRounded").default,
+  SearchRounded: require("@mui/icons-material/SearchRounded").default,
+  TableChartRounded: require("@mui/icons-material/TableChartRounded").default,
+  ViewColumnRounded: require("@mui/icons-material/ViewColumnRounded").default,
+}));
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
 const major = { id: "major", name: "Khai thác hàng hải", code: "KTHH", active: true };
 const group = { id: "group", code: "KTHH-2026", name: "Nhóm 1", majorId: "major", academicYear: "2026", allowedWeekdays: [1, 3, 5], memberCount: 2 };

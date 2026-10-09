@@ -56,6 +56,45 @@ async function chooseScope({ expectTable = true } = {}) {
 
 beforeEach(() => { jest.clearAllMocks(); mockData(); });
 
+it("shows a yellow grade reminder only for a completed class with missing grades, and reveals its text on hover", async () => {
+  const classes = makeClasses();
+  classes[0] = { ...classes[0], subjects: [
+    { ...baseSubjects[0], status: "completed", needsGradeEntry: true },
+    { ...baseSubjects[1], status: "scheduled", needsGradeEntry: true },
+  ] };
+  classes[1] = { ...classes[1], subjects: [
+    { ...baseSubjects[0], status: "completed", needsGradeEntry: false },
+    { ...baseSubjects[1], status: "in_progress", needsGradeEntry: true },
+  ] };
+  mockData({ classes });
+  mount();
+  const table = await chooseScope();
+  const warnings = within(table).getAllByRole("img", { name: "Hãy nhập điểm môn học" });
+  expect(warnings).toHaveLength(1);
+  const cell = warnings[0].closest("td");
+  expect(cell).toHaveTextContent("Hoàn thành");
+  expect(cell.cellIndex).toBe(3);
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  fireEvent.mouseOver(warnings[0]);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Hãy nhập điểm môn học");
+  fireEvent.click(within(cell).getByRole("button", { name: "Xem chi tiết: Hoàn thành" }));
+  expect(screen.getByRole("dialog", { name: "Chi tiết lớp học phần" })).toBeInTheDocument();
+});
+
+it("removes the reminder on the next visit after the class grades have been saved", async () => {
+  const classes = makeClasses();
+  classes[1] = { ...classes[1], subjects: [{ ...baseSubjects[0], status: "completed", needsGradeEntry: true }] };
+  mockData({ classes });
+  const view = mount();
+  await chooseScope();
+  expect(screen.getByRole("img", { name: "Hãy nhập điểm môn học" })).toBeInTheDocument();
+  view.unmount();
+  mockData({ classes: classes.map((group) => ({ ...group, subjects: group.subjects.map((subject) => ({ ...subject, needsGradeEntry: false })) })) });
+  mount();
+  await chooseScope();
+  expect(screen.queryByRole("img", { name: "Hãy nhập điểm môn học" })).not.toBeInTheDocument();
+});
+
 it("selects a valid major and its newest available year on initial load", async () => {
   mount();
   expect(await chooseScope()).toBeInTheDocument();

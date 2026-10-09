@@ -20,6 +20,7 @@ import { Major } from "./models/common/major.model.js";
 import { StudyStatus } from "./models/common/study-status.model.js";
 import { BridgeKnowledgeSubject } from "./models/common/bridge-knowledge-subject.model.js";
 import { Lecturer } from "./models/common/lecturer.model.js";
+import { Unit } from "./models/common/unit.model.js";
 import { Room } from "./models/common/room.model.js";
 import { TrainingProgram } from "./models/common/training-program.model.js";
 // Bảng riêng: Kế hoạch khóa mới
@@ -65,7 +66,7 @@ export const databaseModels = [
   Student, Staff, StaffStudent, Submission,
   // Common
   Ethnicity, Nationality, City, District, Ward, TrainingModeGroup, TrainingMode, TrainingLevel,
-  Discipline, Major, StudyStatus, BridgeKnowledgeSubject, Lecturer, Room, TrainingProgram,
+  Discipline, Major, StudyStatus, BridgeKnowledgeSubject, Lecturer, Unit, Room, TrainingProgram,
   // Plan
   TrainingPlan, AdmissionTarget, AnnualFee, AdmissionRecord, AdmissionRound, AdmissionEvaluation, AdmissionEvaluationHistory,
   Subject, Curriculum, CurriculumBlock, CurriculumElectiveGroup, CurriculumSubject,

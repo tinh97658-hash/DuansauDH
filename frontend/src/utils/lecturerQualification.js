@@ -1,9 +1,8 @@
-// Nguồn Đơn vị hiện tại là Discipline. Picker chỉ sử dụng Unit;
-// không suy đoán từ faculty, mã hoặc chuyên ngành của giảng viên.
+// Đơn vị công tác độc lập với phân loại ngành/chuyên ngành.
 export const lecturerUnitOf = (lecturer) => {
-  const id = lecturer?.disciplineId || lecturer?.discipline?.id;
-  const name = lecturer?.discipline?.name;
-  return id && name ? { id, name, code: lecturer.discipline.code } : null;
+  const id = lecturer?.unitId || lecturer?.unit?.id;
+  const name = lecturer?.unit?.name;
+  return id && name ? { id, name, code: lecturer.unit.code } : null;
 };
 
 export const recommendedUnitForOffering = (offering) => {
@@ -13,8 +12,8 @@ export const recommendedUnitForOffering = (offering) => {
 };
 
 export const lecturerBelongsToRecommendedUnit = (lecturer, offering) => {
-  const unit = lecturerUnitOf(lecturer);
-  return !!unit && unit.id === recommendedUnitForOffering(offering)?.id;
+  const disciplineId = lecturer?.disciplineId || lecturer?.discipline?.id;
+  return !!disciplineId && disciplineId === recommendedUnitForOffering(offering)?.id;
 };
 
 export const lecturerGroupsForOffering = (lecturers, offering) => {

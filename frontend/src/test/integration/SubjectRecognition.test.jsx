@@ -25,6 +25,7 @@ jest.mock("axios", () => ({
 jest.mock("react-router-dom", () => ({
   useParams: () => ({ id: "record-1" }),
   useNavigate: () => jest.fn(),
+  useSearchParams: () => [new URLSearchParams(), jest.fn()],
 }));
 jest.mock("../../components/FeatureLayout", () => function FeatureLayoutMock({ children }) { return children; });
 jest.mock("react-toastify", () => ({
@@ -129,7 +130,7 @@ describe("AdmissionRecordDetail shared subject recognition", () => {
 
     render(<AdminAdmissionRecordDetail />);
 
-    expect(await screen.findByText(/Đang học/)).toBeTruthy();
+    expect(await screen.findByText("Đang học", { selector: ".MuiChip-label" })).toBeTruthy();
     expect(screen.getByText(/Học trước/)).toBeTruthy();
   });
 

@@ -17,23 +17,20 @@ import FeatureLayout from "../../components/FeatureLayout";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import { disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline } from "../../utils/disciplineScope";
-import { buildGroupNames, getNextGroupIndex, validateNameTemplate } from "./createClassGroups.logic";
+import { formatGroupName, getAvailableGroupIndexes, validateNameTemplate } from "./createClassGroups.logic";
 
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
-const majorShortName = (major) => String(major?.name || "")
-  .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/gi, "d")
-  .split(/\s+/).filter(Boolean).map((word) => word[0]).join("").toUpperCase().slice(0, 8);
+const majorShortName = (major) => String(major?.code || "").trim().toUpperCase();
 
 const initialForm = (year = String(currentYear)) => ({
   code: "",
-  name: "",
   count: 1,
   majorId: "",
   curriculumId: "",
   academicYear: year,
+  intakeRound: 1,
   maxStudents: 40,
-  nameTemplate: "",
   status: "open",
   note: "",
 });
@@ -207,32 +204,35 @@ const CreateClassGroups = () => {
     () => majors.find((item) => item.id === form.majorId),
     [form.majorId, majors],
   );
-  const codePrefix = useMemo(() => (
-    selectedFormMajor && form.academicYear
-      ? `NH${String(form.academicYear).slice(-2)}`
-      : ""
-  ), [form.academicYear, selectedFormMajor]);
+  const nameTemplate = selectedFormMajor?.code && form.academicYear
+    ? `${majorShortName(selectedFormMajor)} ${form.academicYear}.${form.intakeRound}.{n}` : "";
   const nameTemplateError = useMemo(
-    () => validateNameTemplate(form.nameTemplate),
-    [form.nameTemplate],
+    () => nameTemplate ? validateNameTemplate(nameTemplate) : "Chuyên ngành chưa có mã. Hãy cập nhật mã chuyên ngành trước.",
+    [nameTemplate],
   );
-  const startIndex = useMemo(
-    () => getNextGroupIndex(dialogScopeGroups, form.nameTemplate, codePrefix),
-    [codePrefix, dialogScopeGroups, form.nameTemplate],
+  const nameIndexes = useMemo(
+    () => getAvailableGroupIndexes(dialogScopeGroups.map((group) => ({ name: group.code })), nameTemplate, form.count),
+    [dialogScopeGroups, nameTemplate, form.count],
   );
   const automaticNames = useMemo(
-    () => (nameTemplateError ? [] : buildGroupNames(form.nameTemplate, startIndex, form.count)),
-    [form.count, form.nameTemplate, nameTemplateError, startIndex],
+    () => (nameTemplateError ? [] : nameIndexes.map((index) => formatGroupName(nameTemplate, index, 1))),
+    [nameTemplate, nameTemplateError, nameIndexes],
   );
   useEffect(() => {
     if (!dialogOpen || editingId || !form.majorId || !form.academicYear) return undefined;
     let active = true;
     setDialogScopeLoading(true);
     setDialogScopeError("");
-    axios.get(`${API_BASE_URL}/masters/class-groups?${new URLSearchParams({ majorId: form.majorId, academicYear: form.academicYear })}`, {
+    // Codes are unique across the masters program, including other majors and years.
+    axios.get(`${API_BASE_URL}/masters/class-groups`, {
       withCredentials: true,
     }).then(({ data }) => {
-      if (active) setDialogScopeGroups(Array.isArray(data) ? data : data.data || []);
+      if (active) {
+        const rows = Array.isArray(data) ? data : data.data || [];
+        setDialogScopeGroups(rows.filter((group) => (
+          group.majorId === form.majorId && String(group.academicYear) === String(form.academicYear)
+        )));
+      }
     }).catch(() => {
       if (active) {
         setDialogScopeGroups([]);
@@ -276,7 +276,6 @@ const CreateClassGroups = () => {
     setForm({
       ...initialForm(selectedYear),
       majorId,
-      nameTemplate: majorShortName(major) ? `${majorShortName(major)}${selectedYear}.{n}` : "",
     });
     setDialogScopeGroups([]);
     setDialogScopeLoading(false);
@@ -290,13 +289,12 @@ const CreateClassGroups = () => {
     setEditingId(group.id);
     setForm({
       code: group.code,
-      name: group.name,
       count: 1,
       majorId: group.majorId || "",
       curriculumId: group.curriculumId || "",
       academicYear: group.academicYear || selectedYear,
+      intakeRound: group.intakeRound || 1,
       maxStudents: group.maxStudents || 40,
-      nameTemplate: "",
       status: group.status || "open",
       note: group.note || "",
     });
@@ -304,12 +302,10 @@ const CreateClassGroups = () => {
   };
 
   const handleCreateMajorChange = (majorId) => {
-    const major = majors.find((item) => item.id === majorId);
     setForm((previous) => ({
       ...previous,
       majorId,
       curriculumId: "",
-      nameTemplate: majorShortName(major) ? `${majorShortName(major)}${previous.academicYear}.{n}` : "",
     }));
   };
 
@@ -317,37 +313,35 @@ const CreateClassGroups = () => {
     setDialogDisciplineId(disciplineId);
     const currentMajor = majors.find((item) => item.id === form.majorId);
     if (!disciplineId || majorDisciplineId(currentMajor) === disciplineId) return;
-    setForm((previous) => ({ ...previous, majorId: "", curriculumId: "", nameTemplate: "" }));
+    setForm((previous) => ({ ...previous, majorId: "", curriculumId: "" }));
   };
 
   const handleCreateYearChange = (academicYear) => {
-    const major = majors.find((item) => item.id === form.majorId);
     setForm((previous) => ({
       ...previous,
       academicYear,
       curriculumId: "",
-      nameTemplate: majorShortName(major) ? `${majorShortName(major)}${academicYear}.{n}` : "",
     }));
   };
 
   const handleSave = async () => {
     if (editingId && !form.code?.trim()) return toast.error("Vui lòng nhập mã nhóm học phần.");
-    if (editingId && !form.name?.trim()) return toast.error("Vui lòng nhập tên nhóm học phần.");
     if (!editingId && !form.majorId) return toast.error("Vui lòng chọn chuyên ngành.");
     if (!form.curriculumId) return toast.error("Vui lòng chọn chương trình đào tạo cho lớp.");
     const count = Number(form.count || 0);
     if (!editingId && (count < 1 || count > 10)) return toast.error("Số lượng nhóm cần tạo từ 1 đến 10.");
     if (!editingId && nameTemplateError) return toast.error(nameTemplateError);
-    if (!editingId && automaticNames.some((name) => !name || name.length > 200)) return toast.error("Quy tắc tên nhóm sinh ra tên không hợp lệ.");
-    if (!editingId && new Set(automaticNames).size !== automaticNames.length) return toast.error("Quy tắc tên nhóm sinh ra các tên bị trùng nhau.");
-    if (!editingId && dialogScopeGroups.some((group) => automaticNames.includes(group.name))) return toast.error("Tên nhóm đã tồn tại trong chuyên ngành và khóa này.");
+    if (!editingId && automaticNames.some((code) => !code || code.length > 100)) return toast.error("Quy tắc mã nhóm sinh ra mã không hợp lệ.");
+    if (!editingId && new Set(automaticNames).size !== automaticNames.length) return toast.error("Quy tắc mã nhóm sinh ra các mã bị trùng nhau.");
+    if (!editingId && (!Number.isInteger(Number(form.intakeRound)) || Number(form.intakeRound) < 1 || Number(form.intakeRound) > 99)) return toast.error("Đợt phải là số nguyên từ 1 đến 99.");
+    if (!editingId && dialogScopeGroups.some((group) => automaticNames.includes(group.code))) return toast.error("Mã nhóm đã tồn tại trong chuyên ngành và khóa này.");
     if (!editingId && dialogScopeError) return toast.error(dialogScopeError);
     if (!editingId && dialogScopeLoading) return toast.error("Đang kiểm tra các nhóm đã tồn tại.");
     setSaving(true);
     try {
       const payload = {
         code: form.code.trim().toUpperCase(),
-        name: form.name.trim(),
+        name: form.code.trim().toUpperCase(),
         majorId: form.majorId || null,
         curriculumId: form.curriculumId,
         academicYear: form.academicYear,
@@ -362,13 +356,11 @@ const CreateClassGroups = () => {
       } else {
         const major = majors.find((item) => item.id === form.majorId);
         const shortName = majorShortName(major);
-        if (!shortName) throw new Error("Chuyên ngành chưa có tên.");
+        if (!shortName) throw new Error("Chuyên ngành chưa có mã.");
         await axios.post(`${API_BASE_URL}/masters/class-groups/batch`, {
-          codePrefix,
-          namePrefix: `${shortName}${form.academicYear}.`,
-          nameTemplate: form.nameTemplate.trim(),
           count,
-          startIndex,
+          nameIndexes,
+          intakeRound: Number(form.intakeRound),
           majorId: form.majorId,
           curriculumId: form.curriculumId,
           academicYear: form.academicYear,
@@ -458,7 +450,7 @@ const CreateClassGroups = () => {
           </FilterSelectField>
 
           <FilterSearchField
-            placeholder="Tìm theo mã nhóm, tên nhóm, ngành học..."
+            placeholder="Tìm theo mã nhóm, ngành học..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             sx={{ flex: "2 1 360px", minWidth: 280 }}
@@ -495,7 +487,6 @@ const CreateClassGroups = () => {
             <TableRow sx={{ bgcolor: "#EDF4FA", "& th": { color: "#111111", py: 1.25, borderColor: "#D7E4EE" } }}>
               <TableCell align="center" sx={{ width: 64, fontWeight: 700 }}>STT</TableCell>
               <TableCell sx={{ fontWeight: 700, width: 140 }}>Mã nhóm</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Tên nhóm học phần</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Ngành học</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Chương trình đào tạo</TableCell>
               <TableCell align="center" sx={{ fontWeight: 700, width: 90 }}>Năm học</TableCell>
@@ -507,13 +498,13 @@ const CreateClassGroups = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} align="center" sx={{ py: 5 }}>
+                <TableCell colSpan={8} align="center" sx={{ py: 5 }}>
                   <CircularProgress size={30} />
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} align="center" sx={{ py: 5, color: "text.secondary" }}>
+                <TableCell colSpan={8} align="center" sx={{ py: 5, color: "text.secondary" }}>
                   Chưa có nhóm học phần nào phù hợp. Bấm "Thêm nhóm mới" để bắt đầu.
                 </TableCell>
               </TableRow>
@@ -541,10 +532,6 @@ const CreateClassGroups = () => {
                       <Typography variant="body2" sx={{ fontFamily: "inherit", fontWeight: 700, color: "#0788B8" }}>
                         {row.code}
                       </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: "#111111" }}>{row.name}</Typography>
-                      {row.note && <Typography variant="caption" sx={{ color: "#111111" }}>{row.note}</Typography>}
                     </TableCell>
                     <TableCell>{row.major?.name || "-"}</TableCell>
                     <TableCell>{row.curriculum ? `${row.curriculum.code} — ${row.curriculum.name}` : "Chưa chọn"}</TableCell>
@@ -701,7 +688,7 @@ const CreateClassGroups = () => {
                     </FormControl>
                   </CompactField>
 
-                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1.1fr) minmax(0, 1.9fr) minmax(0, 1.2fr)" }, gap: 1.5, alignItems: "start" }}>
+                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "2fr 1fr" }, gap: 1.5, alignItems: "start" }}>
                     <CompactField label="MÃ NHÓM" htmlFor="edit-code">
                       <TextField
                         id="edit-code"
@@ -711,19 +698,6 @@ const CreateClassGroups = () => {
                         size="small"
                         required
                         inputProps={{ "aria-label": "Mã nhóm" }}
-                        sx={compactControlSx}
-                      />
-                    </CompactField>
-
-                    <CompactField label="TÊN NHÓM HỌC VIÊN" htmlFor="edit-name">
-                      <TextField
-                        id="edit-name"
-                        value={form.name}
-                        onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                        fullWidth
-                        size="small"
-                        required
-                        inputProps={{ "aria-label": "Tên nhóm học viên" }}
                         sx={compactControlSx}
                       />
                     </CompactField>
@@ -814,22 +788,25 @@ const CreateClassGroups = () => {
                     </FormControl>
                   </CompactField>
 
-                  <Box sx={{ display: "grid", gridTemplateColumns: "minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.6fr)", gap: 1.5, alignItems: "start" }}>
+                  <Box sx={{ display: "grid", gridTemplateColumns: "minmax(0, .8fr) minmax(0, 1fr) minmax(0, .6fr) minmax(0, 1.6fr)", gap: 1.5, alignItems: "start" }}>
                     <CompactField label="SỐ NHÓM CẦN TẠO" htmlFor="create-group-count">
                       <TextField id="create-group-count" type="number" value={form.count} onChange={(e) => setForm((p) => ({ ...p, count: e.target.value }))} fullWidth size="small" inputProps={{ min: 1, max: 10, "aria-label": "Số nhóm cần tạo" }} sx={compactControlSx} />
                     </CompactField>
                     <CompactField label="SĨ SỐ TỐI ĐA / NHÓM" htmlFor="create-group-capacity">
                       <TextField id="create-group-capacity" type="number" value={form.maxStudents} onChange={(e) => setForm((p) => ({ ...p, maxStudents: e.target.value }))} fullWidth size="small" inputProps={{ min: 1, max: 200, "aria-label": "Sĩ số tối đa / nhóm" }} sx={compactControlSx} />
                     </CompactField>
-                    <CompactField label="QUY TẮC TÊN NHÓM" htmlFor="create-name-template" helper={nameTemplateError || "{n}: số thứ tự tự tăng"} error={Boolean(nameTemplateError)}>
+                    <CompactField label="ĐỢT" htmlFor="create-intake-round">
+                      <TextField id="create-intake-round" type="number" value={form.intakeRound} onChange={(e) => setForm((p) => ({ ...p, intakeRound: e.target.value }))} fullWidth size="small" inputProps={{ min: 1, max: 99, "aria-label": "Đợt" }} sx={compactControlSx} />
+                    </CompactField>
+                    <CompactField label="QUY TẮC MÃ NHÓM" htmlFor="create-name-template" helper={nameTemplateError || "{n}: số nhóm nhỏ nhất chưa sử dụng trong đợt"} error={Boolean(nameTemplateError)}>
                       <TextField
                         id="create-name-template"
-                        value={form.nameTemplate}
-                        onChange={(e) => setForm((p) => ({ ...p, nameTemplate: e.target.value }))}
+                        value={nameTemplate}
+                        InputProps={{ readOnly: true }}
                         fullWidth
                         size="small"
                         error={Boolean(nameTemplateError)}
-                        inputProps={{ "aria-label": "Quy tắc tên nhóm" }}
+                        inputProps={{ "aria-label": "Quy tắc mã nhóm" }}
                         sx={compactControlSx}
                       />
                     </CompactField>
@@ -999,7 +976,7 @@ const CreateClassGroups = () => {
           <Button
             variant="contained"
             onClick={handleSave}
-            disabled={saving || (editingId ? (!form.code?.trim() || !form.name?.trim() || !form.curriculumId) : (
+            disabled={saving || (editingId ? (!form.code?.trim() || !form.curriculumId) : (
               !form.majorId
               || !form.curriculumId
               || Number(form.count) < 1

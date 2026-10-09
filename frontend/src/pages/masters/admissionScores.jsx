@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { AddRounded, EditRounded, RefreshRounded } from "@mui/icons-material";
 import BulkAdmissionWorkflow from "../../features/admission/BulkAdmissionWorkflow";
 import FeatureLayout from "../../components/FeatureLayout";
+import FilterSelectField from "../../components/FilterSelectField";
 import { API_BASE_URL } from "../../config/http";
 import { normalizeMajorsResponse } from "../../utils/majors";
 
@@ -85,17 +87,21 @@ export default function AdmissionScores() {
   return <FeatureLayout title="Điểm xét tuyển thạc sĩ" group="Thủ tục đầu vào" hideHeader={false} desc="Chọn đợt xét tuyển toàn viện, nhập điểm ngưỡng từng ngành và điểm hồ sơ để lọc danh sách đạt ngưỡng.">
     <Stack spacing={2}>
       {error && <Alert severity="error">{error}</Alert>}
-      <Paper variant="outlined" sx={{ p: 2 }}><Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="center" sx={toolbarSx}>
-        <TextField select size="small" label="Đợt xét tuyển toàn viện" value={roundId} disabled={saving || workflowBusy || loading}
-          onChange={(event) => { if (canDiscard()) { setData(null); setThresholdDrafts({}); setMajorFilter("all"); setRoundId(event.target.value); } }} sx={{ width: { xs: "100%", sm: 360 }, maxWidth: "100%" }}>
-          <MenuItem value="">Chọn đợt xét tuyển</MenuItem>{rounds.map((round) => <MenuItem key={round.id} value={round.id}>{round.name} · {round.academicYear}</MenuItem>)}
-        </TextField>
-        <Button onClick={() => { if (canDiscard()) { setThresholdDrafts({}); loadRanking(); } }} disabled={!roundId || loading || workflowBusy || saving}>Tải lại</Button>
-        {admin && <>
-          <Button variant="outlined" disabled={!data || loading || workflowBusy || saving} onClick={() => { if (canDiscard()) openForm(data.round); }}>Sửa đợt</Button>
-          <Button variant="contained" disabled={workflowBusy || saving} onClick={() => { if (canDiscard()) openForm(null); }}>Tạo đợt xét tuyển</Button>
-        </>}
-      </Stack></Paper>
+      <Paper variant="outlined" sx={{ p: "12px", borderRadius: "10px", borderColor: "#C6D5E1", bgcolor: "#FFF", boxShadow: "0 2px 6px rgba(18,59,98,.07)" }}>
+        <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="flex-end">
+          <FilterSelectField label="Đợt xét tuyển toàn viện" value={roundId} disabled={saving || workflowBusy || loading}
+            onChange={(event) => { if (canDiscard()) { setData(null); setThresholdDrafts({}); setMajorFilter("all"); setRoundId(event.target.value); } }} sx={{ width: { xs: "100%", sm: 360 }, maxWidth: "100%" }}>
+            <MenuItem value="">Chọn đợt xét tuyển</MenuItem>{rounds.map((round) => <MenuItem key={round.id} value={round.id}>{round.name} · {round.academicYear}</MenuItem>)}
+          </FilterSelectField>
+          <Stack direction="row" gap={1} flexWrap="wrap" sx={{ "& .MuiButton-root": { height: 38, whiteSpace: "nowrap" } }}>
+            <Button size="small" variant="outlined" startIcon={<RefreshRounded />} onClick={() => { if (canDiscard()) { setThresholdDrafts({}); loadRanking(); } }} disabled={!roundId || loading || workflowBusy || saving}>Tải lại</Button>
+            {admin && <>
+              <Button size="small" variant="outlined" startIcon={<EditRounded />} disabled={!data || loading || workflowBusy || saving} onClick={() => { if (canDiscard()) openForm(data.round); }}>Sửa đợt</Button>
+              <Button size="small" variant="contained" startIcon={<AddRounded />} disabled={workflowBusy || saving} onClick={() => { if (canDiscard()) openForm(null); }}>Tạo đợt xét tuyển</Button>
+            </>}
+          </Stack>
+        </Stack>
+      </Paper>
       {loading && <Box sx={{ textAlign: "center", p: 2 }}><CircularProgress size={28} /></Box>}
       {!rounds.length && !loading && <Alert severity="info">Tạo đợt xét tuyển chung cho toàn viện, sau đó nhập điểm ngưỡng của từng ngành trong đợt.</Alert>}
       {data && <>

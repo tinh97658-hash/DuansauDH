@@ -1,4 +1,5 @@
 .exam-gradebook { width: 100%; min-width: 0; }
+.exam-gradebook .exam-table-container { --control-radius: 0px; }
 .exam-print-sheet { display: none; }
 @media print {
   @page { size: A4 landscape; margin: 8mm; }

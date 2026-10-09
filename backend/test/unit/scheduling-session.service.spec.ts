@@ -6,7 +6,7 @@ import { SchedulingService } from "../../src/scheduling/scheduling.service.js";
 
 const transaction = { LOCK: { UPDATE: "UPDATE" } };
 
-const subject = { id: "subject-1", program: "masters", active: true };
+const subject = { id: "subject-1", program: "masters", active: true, credits: 2 };
 const room = (id = "room-1", capacity: number | null = 50) => ({ id, code: id.toUpperCase(), name: `Phòng ${id}`, capacity, isActive: true });
 const lecturer = (id = "lecturer-1") => ({ id, code: id.toUpperCase(), name: `Giảng viên ${id}`, active: true });
 const group = (id = "group-1", majorId = "major-1") => ({ id, code: id, majorId, program: "masters" });
@@ -43,7 +43,7 @@ const buildService = () => {
   const sequelize = { query: jest.fn().mockResolvedValue([]), transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)) };
   const rooms = { findAll: jest.fn() };
   const lecturers = { findAll: jest.fn() };
-  const teachingSessions = { findAll: jest.fn(), findByPk: jest.fn(), findOne: jest.fn(), create: jest.fn() };
+  const teachingSessions = { findAll: jest.fn(), findByPk: jest.fn(), findOne: jest.fn(), create: jest.fn(), count: jest.fn().mockResolvedValue(0), destroy: jest.fn().mockResolvedValue(1) };
   const individualStudents = { findAll: jest.fn().mockResolvedValue([]), bulkCreate: jest.fn().mockResolvedValue([]) };
   const admissionRecords = { findAll: jest.fn().mockResolvedValue([]) };
   const subjectRecognitions = { findAll: jest.fn().mockResolvedValue([]) };
@@ -112,6 +112,32 @@ const expectConflictCode = async (promise: Promise<unknown>, code: string) => {
 };
 
 describe("SchedulingService TeachingSession", () => {
+  it.each([[2, 4], [2, 5], [3, 6], [3, 7]])("allows scheduling at %i credits and %i held sessions without completing the class", async (credits, heldCount) => {
+    const mocks = buildService();
+    arrangeValid(mocks);
+    const currentOffering = { ...offering(), update: jest.fn() };
+    mocks.courseOfferings.findByPk.mockResolvedValue(currentOffering);
+    mocks.subjects.findByPk.mockResolvedValue({ ...subject, credits });
+    mocks.teachingSessions.count.mockResolvedValue(heldCount);
+
+    await expect(mocks.service.createTeachingSession(createDto())).resolves.toBeDefined();
+    expect(mocks.teachingSessions.create).toHaveBeenCalledWith(expect.objectContaining({ status: "planned" }), { transaction });
+    expect(currentOffering.status).toBe("active");
+    expect(currentOffering.update).not.toHaveBeenCalled();
+  });
+
+  it.each([[2, 3], [3, 5]])("allows another planned session below the held limit for %i credits", async (credits, heldCount) => {
+    const mocks = buildService();
+    arrangeValid(mocks);
+    mocks.subjects.findByPk.mockResolvedValue({ ...subject, credits });
+    mocks.teachingSessions.count.mockImplementation(async (query: any) => {
+      expect(query.where).toEqual({ courseOfferingId: "offering-1", status: "held" });
+      return heldCount;
+    });
+    await expect(mocks.service.createTeachingSession(createDto())).resolves.toBeDefined();
+    expect(mocks.teachingSessions.create).toHaveBeenCalledWith(expect.objectContaining({ status: "planned" }), { transaction });
+  });
+
   it("reuses the lecturer already assigned to the course offering", async () => {
     const mocks = buildService();
     arrangeValid(mocks, { lecturers: [lecturer(), lecturer("lecturer-2")] });
@@ -663,6 +689,57 @@ describe("SchedulingService TeachingSession", () => {
     await expectConflictCode(mocks.service.completeCourseOffering("offering-1", "staff-1"), "NO_HELD_SESSIONS");
   });
 
+  it("deletes only confirmed planned sessions and completes within the same transaction", async () => {
+    const mocks = buildService();
+    const persistedOffering = { ...offering(), subject, groupLinks: [], update: jest.fn().mockResolvedValue(undefined) };
+    mocks.courseOfferings.findByPk.mockResolvedValue(persistedOffering);
+    mocks.subjects.findByPk.mockResolvedValue(subject);
+    mocks.teachingSessions.findAll.mockResolvedValue([
+      session({ id: "held", status: "held" }),
+      session({ id: "not-held", status: "not_held" }),
+      session({ id: "future", status: "planned" }),
+      session({ id: "pending", status: "planned", sessionDate: "2000-09-12" }),
+    ]);
+
+    await mocks.service.completeCourseOffering("offering-1", "staff-1", {
+      cancelPlannedSessions: true, expectedPlannedSessionIds: ["future", "pending"],
+    });
+    expect(mocks.teachingSessions.destroy).toHaveBeenCalledWith({
+      where: { courseOfferingId: "offering-1", id: { [Op.in]: ["future", "pending"] }, status: "planned" }, transaction,
+    });
+    expect(persistedOffering.update).toHaveBeenCalledWith(expect.objectContaining({ status: "completed" }), { transaction });
+    expect(mocks.teachingSessions.destroy.mock.invocationCallOrder[0]).toBeLessThan(persistedOffering.update.mock.invocationCallOrder[0]);
+  });
+
+  it("preserves sessions when the planned list has changed since the confirmation prompt", async () => {
+    const mocks = buildService();
+    const persistedOffering = { ...offering(), update: jest.fn() };
+    mocks.courseOfferings.findByPk.mockResolvedValue(persistedOffering);
+    mocks.subjects.findByPk.mockResolvedValue(subject);
+    mocks.teachingSessions.findAll.mockResolvedValue([
+      session({ id: "held", status: "held" }),
+      session({ id: "newly-planned", status: "planned" }),
+    ]);
+    await expectConflictCode(mocks.service.completeCourseOffering("offering-1", "staff-1", {
+      cancelPlannedSessions: true, expectedPlannedSessionIds: ["previously-planned"],
+    }), "UNRESOLVED_SESSIONS");
+    expect(mocks.teachingSessions.destroy).not.toHaveBeenCalled();
+    expect(persistedOffering.update).not.toHaveBeenCalled();
+  });
+
+  it("preserves planned sessions if completion fails the held-session requirement", async () => {
+    const mocks = buildService();
+    const persistedOffering = { ...offering(), update: jest.fn() };
+    mocks.courseOfferings.findByPk.mockResolvedValue(persistedOffering);
+    mocks.subjects.findByPk.mockResolvedValue(subject);
+    mocks.teachingSessions.findAll.mockResolvedValue([session({ id: "planned", status: "planned" })]);
+    await expectConflictCode(mocks.service.completeCourseOffering("offering-1", "staff-1", {
+      cancelPlannedSessions: true, expectedPlannedSessionIds: ["planned"],
+    }), "NO_HELD_SESSIONS");
+    expect(mocks.teachingSessions.destroy).not.toHaveBeenCalled();
+    expect(persistedOffering.update).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["future", "2999-09-12"],
     ["pending", "2000-09-12"],
@@ -675,6 +752,7 @@ describe("SchedulingService TeachingSession", () => {
       session({ id: "planned-session", status: "planned", sessionDate }),
     ]);
     await expectConflictCode(mocks.service.completeCourseOffering("offering-1", "staff-1"), "UNRESOLVED_SESSIONS");
+    expect(mocks.teachingSessions.destroy).not.toHaveBeenCalled();
   });
 });
 describe("Vietnam clock and period consistency", () => {

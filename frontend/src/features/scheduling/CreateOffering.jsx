@@ -6,7 +6,7 @@ import { isCommonMajor } from "../../utils/majorScope";
 import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 import { personNameParts } from "../../utils/personName";
 
-const groupLabel = (group) => [group?.code, group?.name].filter(Boolean).join(" · ");
+const groupLabel = (group) => [...new Set([group?.code, group?.name].filter(Boolean))].join(" · ");
 
 export default function CreateOffering({ user }) {
   const navigate = useNavigate();

@@ -8,7 +8,7 @@ import {
   KeyboardArrowDownRounded, KeyboardArrowUpRounded,
   ManageAccountsOutlined, MenuBookOutlined, NoteAddOutlined, PaymentsOutlined, RuleOutlined,
   SchoolOutlined, ScoreboardOutlined, SendOutlined, SummarizeOutlined, SupervisorAccountOutlined,
-  MeetingRoomOutlined,
+  MeetingRoomOutlined, BusinessOutlined,
   SystemUpdateOutlined, TableChartOutlined, TrackChangesOutlined, UploadFileOutlined,
   VerifiedOutlined, WorkspacePremiumOutlined,
   HistoryEduOutlined,
@@ -49,6 +49,7 @@ export const ribbons = {
     ]),
     group("DANH MỤC ĐÀO TẠO", [
       action("Giảng viên", "/system/lecturers", SchoolOutlined, "#3f8cc3", { roles: ["admin"] }),
+      action("Đơn vị", "/system/units", BusinessOutlined, "#168b7c", { roles: ["admin"] }),
       action("Phòng học", "/system/rooms", MeetingRoomOutlined, "#168b7c", { roles: ["admin"] }),
       action("Nhóm hình thức đào tạo", "/system/training-mode-groups", CategoryOutlined, "#168bc2"),
       action("Hình thức đào tạo", "/system/training-modes", FactCheckOutlined, "#81952c"),
@@ -114,7 +115,7 @@ export const ribbons = {
     group("BÁO CÁO CHUNG", [
       action("Danh sách lớp", "/reports/class-lists", GroupsOutlined, "#168bc2"),
       action("Bảng điểm môn học", "/reports/course-scores", TableChartOutlined, "#c0792a"),
-      action("Tổng hợp điểm cả lớp", "/reports/class-score-summary", SummarizeOutlined, "#168b7c"),
+      action("Tổng hợp điểm của lớp", "/reports/class-score-summary", SummarizeOutlined, "#168b7c"),
       action("Báo cáo gửi Bộ", "/reports/ministerial-report", SendOutlined, "#7b5fac"),
     ]),
     group("BẢNG ĐIỂM TẠM THỜI", [

@@ -8,6 +8,7 @@ import { ClassGroupMember } from "../database/models/training/class-group-member
 import { CourseOfferingClassGroup } from "../database/models/training/course-offering-class-group.model.js";
 import { Major } from "../database/models/common/major.model.js";
 import { CurriculumService } from "./curriculum.service.js";
+import { classGroupCode, parseClassGroupCode } from "./class-group-code.js";
 
 export interface CreateClassGroupInput {
   code: string;
@@ -19,6 +20,8 @@ export interface CreateClassGroupInput {
   maxStudents?: number;
   status?: string;
   note?: string | null;
+  intakeRound?: number;
+  groupNumber?: number;
 }
 
 export interface UpdateClassGroupInput {
@@ -67,7 +70,7 @@ export class ClassGroupService {
 
   private async requireMajorForProgram(majorId: string | null | undefined, program: string, transaction?: Transaction) {
     if (!majorId) return null;
-    const major = await this.majors.findByPk(majorId, { transaction });
+    const major = await this.majors.findByPk(majorId, { transaction, ...(transaction ? { lock: transaction.LOCK.UPDATE } : {}) });
     if (!major || major.active === false || major.isCommon) {
       throw new BadRequestException("Chuyên ngành không tồn tại hoặc đã ngừng sử dụng.");
     }
@@ -105,7 +108,12 @@ export class ClassGroupService {
   async create(input: CreateClassGroupInput, transaction?: Transaction) {
     if (!transaction) return this.sequelize.transaction((tx) => this.create(input, tx));
     const program = input.program || "masters";
-    await this.requireMajorForProgram(input.majorId, program, transaction);
+    const major = await this.requireMajorForProgram(input.majorId, program, transaction);
+    if (program === "masters" && input.groupNumber !== undefined) {
+      if (!major) throw new BadRequestException("Vui lòng chọn chuyên ngành.");
+      const code = classGroupCode(major.code, input.academicYear || String(new Date().getFullYear()), input.intakeRound ?? 1, input.groupNumber);
+      input = { ...input, code, name: code };
+    }
     await this.ensureCodeUnique(input.code, program, undefined, transaction);
     const group = await this.classGroups.create({
       program,
@@ -116,6 +124,8 @@ export class ClassGroupService {
       maxStudents: input.maxStudents ?? 40,
       status: input.status || "open",
       note: input.note ?? null,
+      intakeRound: input.intakeRound ?? 1,
+      groupNumber: input.groupNumber ?? null,
     } as any, { transaction });
     await this.curriculums.assignToClassGroup(group, transaction, input.curriculumId || undefined);
     return group;
@@ -129,7 +139,16 @@ export class ClassGroupService {
     const program = input.program || group.program;
     // Lớp bắt buộc thuộc một chuyên ngành (để suy ra CTĐT), nên không cho xoá trắng.
     const majorId = input.majorId ? input.majorId : group.majorId;
-    await this.requireMajorForProgram(majorId, program, transaction);
+    const major = await this.requireMajorForProgram(majorId, program, transaction);
+    if (program === "masters" && group.groupNumber) {
+      const parsed = parseClassGroupCode(input.code || group.code);
+      if (!parsed) throw new BadRequestException("Mã nhóm phải có dạng CNTT 2026.1.1.");
+      const academicYear = input.academicYear ?? parsed.academicYear;
+      const code = classGroupCode(major!.code, academicYear, parsed.intakeRound, parsed.groupNumber);
+      input = { ...input, code, name: code, academicYear };
+      await group.update({ intakeRound: parsed.intakeRound, groupNumber: parsed.groupNumber }, { transaction });
+    }
+    if (program === "masters" && input.code !== undefined) input = { ...input, name: input.code };
 
     if (input.code !== undefined && input.code !== group.code) {
       await this.ensureCodeUnique(input.code, program, id, transaction);

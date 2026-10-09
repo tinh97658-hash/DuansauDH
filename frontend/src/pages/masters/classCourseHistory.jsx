@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useSearchParams } from "react-router-dom";
-import { Alert, Box, CircularProgress } from "@mui/material";
+import { Alert, Box, CircularProgress, Tooltip } from "@mui/material";
 import { SearchRounded } from "@mui/icons-material";
+import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 import FeatureLayout from "../../components/FeatureLayout";
 import OfferingDetails from "../../features/scheduling/OfferingDetails";
 import { API_BASE_URL } from "../../config/http";
@@ -61,10 +62,16 @@ function YearMultiSelect({ years, value, onChange, disabled }) {
   </div>;
 }
 
-function StatusBadge({ status, offering, onOpen }) {
+function StatusBadge({ status, offering, onOpen, needsGradeEntry }) {
   const info = statusInfo[status] || statusInfo.not_started;
-  if (!offering) return <span className={`tp-status tp-${info.tone}`}>{info.label}</span>;
-  return <button type="button" className={`tp-status tp-status-button tp-${info.tone}`} onClick={() => onOpen(offering)} aria-label={`Xem chi tiết: ${info.label}`}>{info.label}</button>;
+  const warn = status === "completed" && needsGradeEntry === true;
+  return <span className={`tp-status-cell${warn ? " tp-has-grade-warning" : ""}`}>
+    {offering ? <button type="button" className={`tp-status tp-status-button tp-${info.tone}`} onClick={() => onOpen(offering)} aria-label={`Xem chi tiết: ${info.label}`}>{info.label}</button>
+      : <span className={`tp-status tp-${info.tone}`}>{info.label}</span>}
+    {warn && <Tooltip title="Hãy nhập điểm môn học" describeChild arrow placement="top" enterDelay={0} enterNextDelay={0}>
+      <span className="tp-grade-warning" role="img" aria-label="Hãy nhập điểm môn học" tabIndex={0}><WarningAmberRounded aria-hidden="true" /></span>
+    </Tooltip>}
+  </span>;
 }
 
 const offeringGroups = (offering) => (offering?.groupLinks || []).map((link) => link.classGroup).filter(Boolean);
@@ -265,7 +272,7 @@ export default function ClassCourseHistory() {
                 const subject = row.byClass[classGroup.id];
                 if (!subject) return <td className="tp-centered tp-not-applicable" key={classGroup.id} aria-label={`Không áp dụng cho ${classGroup.code}`}>—</td>;
                 const offering = offeringFor(classGroup, subject);
-                return <td className="tp-centered" key={classGroup.id}><StatusBadge status={subject.status} offering={offering} onOpen={setSelectedOffering} /></td>;
+                return <td className="tp-centered" key={classGroup.id}><StatusBadge status={subject.status} offering={offering} onOpen={setSelectedOffering} needsGradeEntry={subject.needsGradeEntry} /></td>;
               })}
             </tr>)}</tbody>
           </table></div></div>

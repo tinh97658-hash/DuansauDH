@@ -1,5 +1,9 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
-import { InjectModel } from "@nestjs/sequelize";
+import { InjectConnection, InjectModel } from "@nestjs/sequelize";
+import { Sequelize } from "sequelize-typescript";
+import type { Transaction } from "sequelize";
+import { ClassGroup } from "../database/models/training/class-group.model.js";
+import { classGroupCode } from "../plan/class-group-code.js";
 import { col, fn, Op, where } from "sequelize";
 import { BridgeKnowledgeSubject } from "../database/models/common/bridge-knowledge-subject.model.js";
 import { City } from "../database/models/common/city.model.js";
@@ -7,6 +11,7 @@ import { Discipline } from "../database/models/common/discipline.model.js";
 import { District } from "../database/models/common/district.model.js";
 import { Ethnicity } from "../database/models/common/ethnicity.model.js";
 import { Lecturer } from "../database/models/common/lecturer.model.js";
+import { Unit } from "../database/models/common/unit.model.js";
 import { Major } from "../database/models/common/major.model.js";
 import { Room } from "../database/models/common/room.model.js";
 import { Nationality } from "../database/models/common/nationality.model.js";
@@ -43,6 +48,9 @@ export class SystemService {
     @InjectModel(Staff) private readonly staff: typeof Staff,
     @InjectModel(Room) private readonly rooms: typeof Room,
     @InjectModel(Subject) private readonly subjects: typeof Subject,
+    @InjectModel(ClassGroup) private readonly classGroups: typeof ClassGroup = ClassGroup,
+    @InjectConnection() private readonly sequelize: Sequelize = null as any,
+    @InjectModel(Unit) private readonly units: typeof Unit = Unit,
   ) {}
 
   // ===== Các chức năng chưa triển khai =====
@@ -273,6 +281,8 @@ export class SystemService {
     if (!dto.disciplineId) throw new BadRequestException("Vui lòng chọn ngành của chuyên ngành.");
     await this.requireParent(this.disciplines, dto.disciplineId, "Ngành");
     const program = dto.program || "masters";
+    const code = this.majorCode(dto.code);
+    await this.ensureMajorCodeUnique(code, program);
     const trainingLevelId = await this.resolveMajorTrainingLevel(program, dto.trainingLevelId);
     if (trainingLevelId) await this.requireParent(this.trainingLevels, trainingLevelId, "Trình độ đào tạo");
     return this.majors.create({
@@ -280,17 +290,42 @@ export class SystemService {
         "name", "englishName", "program", "isAdmissionScreening", "durationYears", "maxOvertimeYears", "active"
       ]),
       disciplineId: dto.disciplineId,
+      code,
       program,
       trainingLevelId,
     } as any);
   }
-  async updateMajor(id: string, dto: UpdateCatalogDto) {
-    const row = await this.findOr404(this.majors, id, "Chuyên ngành");
+  private majorCode(value: unknown) {
+    const code = String(value || "").trim().toUpperCase();
+    if (!/^[A-Z0-9_-]{1,30}$/.test(code)) throw new BadRequestException("Vui lòng nhập mã chuyên ngành gồm chữ không dấu, số, gạch ngang hoặc gạch dưới (tối đa 30 ký tự).");
+    return code;
+  }
+  private async ensureMajorCodeUnique(code: string, program: string, excludeId?: string, transaction?: Transaction) {
+    const where: any = { code, program };
+    if (excludeId) where.id = { [Op.ne]: excludeId };
+    if (await this.majors.findOne({ where, transaction })) throw new ConflictException(`Mã chuyên ngành "${code}" đã tồn tại trong bậc đào tạo này.`);
+  }
+  async updateMajor(id: string, dto: UpdateCatalogDto, transaction?: Transaction) {
+    if (!transaction && this.sequelize) return this.sequelize.transaction((tx) => this.updateMajor(id, dto, tx));
+    const row = await this.majors.findByPk(id, { transaction, ...(transaction ? { lock: transaction.LOCK.UPDATE } : {}) });
+    if (!row) throw new NotFoundException("Chuyên ngành không tồn tại.");
     const disciplineId = dto.disciplineId || row.disciplineId;
     if (dto.disciplineId && dto.disciplineId !== row.disciplineId) {
       await this.requireParent(this.disciplines, dto.disciplineId, "Ngành");
     }
     const program = dto.program || row.program || "masters";
+    const code = dto.code === undefined ? row.code : this.majorCode(dto.code);
+    if (code && (code !== row.code || program !== row.program)) {
+      await this.ensureMajorCodeUnique(code, program, id, transaction);
+      const groups = await this.classGroups.findAll({ where: { majorId: id }, transaction, ...(transaction ? { lock: transaction.LOCK.UPDATE } : {}) });
+      for (const group of groups) {
+        if (!group.groupNumber || !group.academicYear) continue;
+        const groupCode = classGroupCode(code, group.academicYear, group.intakeRound, group.groupNumber);
+        const collision = await this.classGroups.findOne({ where: { code: groupCode, program: group.program, id: { [Op.ne]: group.id } }, transaction });
+        if (collision) throw new ConflictException(`Mã nhóm "${groupCode}" đã tồn tại.`);
+        await group.update({ code: groupCode, name: groupCode }, { transaction });
+      }
+    }
     const trainingLevelId = await this.resolveMajorTrainingLevel(program, dto.trainingLevelId);
     if (trainingLevelId) await this.requireParent(this.trainingLevels, trainingLevelId, "Trình độ đào tạo");
     await row.update({
@@ -298,9 +333,10 @@ export class SystemService {
         "name", "englishName", "program", "isAdmissionScreening", "durationYears", "maxOvertimeYears", "active"
       ]),
       disciplineId,
+      ...(code ? { code } : {}),
       program,
       trainingLevelId,
-    } as any);
+    } as any, { transaction });
     return row;
   }
   async removeMajor(id: string) { return this.removeSimple(this.majors, id, "Chuyên ngành"); }
@@ -357,11 +393,45 @@ export class SystemService {
     return subject.id;
   }
 
+  // ===== Đơn vị công tác =====
+  async listUnits() { return this.listAll(this.units); }
+
+  async createUnit(dto: CreateCatalogDto) {
+    if (!dto.code) throw new BadRequestException("Vui lòng nhập mã đơn vị.");
+    if (!dto.name?.trim()) throw new BadRequestException("Vui lòng nhập tên đơn vị.");
+    await this.ensureCodeUnique(this.units, dto.code);
+    return this.units.create(this.pick(dto, ["code", "name", "englishName", "description", "sortOrder", "active"]) as any);
+  }
+
+  async updateUnit(id: string, dto: UpdateCatalogDto) {
+    const row = await this.findOr404(this.units, id, "Đơn vị");
+    if (dto.code !== undefined && !dto.code?.trim()) throw new BadRequestException("Vui lòng nhập mã đơn vị.");
+    if (dto.name !== undefined && !dto.name?.trim()) throw new BadRequestException("Vui lòng nhập tên đơn vị.");
+    if (dto.code && dto.code !== row.code) await this.ensureCodeUnique(this.units, dto.code, id);
+    await row.update(this.pick(dto, ["code", "name", "englishName", "description", "sortOrder", "active"]) as any);
+    return row;
+  }
+
+  async removeUnit(id: string) {
+    const row = await this.findOr404(this.units, id, "Đơn vị");
+    const count = await this.lecturers.count({ where: { unitId: id } });
+    if (count) throw new ConflictException(`Đơn vị "${row.name}" đang có ${count} giảng viên. Chuyển giảng viên sang đơn vị khác trước khi xóa.`);
+    await row.destroy();
+    return { message: "Xóa đơn vị thành công" };
+  }
+
+  private async validateLecturerUnit(unitId?: string | null) {
+    if (!unitId) return;
+    const unit = await this.units.findByPk(unitId);
+    if (!unit || !unit.active) throw new BadRequestException("Đơn vị không tồn tại hoặc đã ngừng sử dụng.");
+  }
+
   // ===== Giảng viên =====
   async listLecturers() {
     return this.lecturers.findAll({
       include: [
         { model: Staff, as: "staff", attributes: ["id", "name", "email"] },
+        { model: Unit, as: "unit", attributes: ["id", "code", "name", "active"] },
         { model: Discipline, as: "discipline", attributes: ["id", "code", "name"] },
         { model: Major, as: "major", attributes: ["id", "name", "disciplineId", "program"] },
       ],
@@ -375,12 +445,14 @@ export class SystemService {
     if (dto.email) await this.ensureEmailUnique(dto.email);
     if (dto.staffId !== undefined && dto.staffId !== null) await this.requireParent(this.staff, dto.staffId, "Tài khoản nhân sự");
     await this.validateLecturerScope(dto.disciplineId, dto.majorId);
+    await this.validateLecturerUnit(dto.unitId);
     return this.lecturers.create(this.pick(dto, [
-      "staffId", "code", "name", "phone", "email", "academicRank", "academicDegree", "teachingType", "title", "faculty", "department", "disciplineId", "majorId", "active"
+      "staffId", "code", "name", "phone", "email", "academicRank", "academicDegree", "teachingType", "title", "faculty", "department", "unitId", "disciplineId", "majorId", "active"
     ]) as any);
   }
   async updateLecturer(id: string, dto: UpdateCatalogDto) {
     const row = await this.findOr404(this.lecturers, id, "Giảng viên");
+    if (dto.unitId !== undefined && dto.unitId !== row.unitId) await this.validateLecturerUnit(dto.unitId);
     if (dto.code && dto.code !== row.code) await this.ensureCodeUnique(this.lecturers, dto.code, id);
     if (dto.email && dto.email !== row.email) await this.ensureEmailUnique(dto.email, id);
     if (dto.staffId !== undefined && dto.staffId !== null) await this.requireParent(this.staff, dto.staffId, "Tài khoản nhân sự");
@@ -392,14 +464,14 @@ export class SystemService {
       }
     }
     await row.update(this.pick(dto, [
-      "staffId", "code", "name", "phone", "email", "academicRank", "academicDegree", "teachingType", "title", "faculty", "department", "disciplineId", "majorId", "active"
+      "staffId", "code", "name", "phone", "email", "academicRank", "academicDegree", "teachingType", "title", "faculty", "department", "unitId", "disciplineId", "majorId", "active"
     ]) as any);
     return row;
   }
   async removeLecturer(id: string) { return this.removeSimple(this.lecturers, id, "Giảng viên"); }
 
   private async validateLecturerScope(disciplineId?: string | null, majorId?: string | null) {
-    // Đơn vị dùng relation Discipline có sẵn; major là phân loại cũ, không bắt buộc.
+    // Giữ nguyên kiểm tra phân loại ngành/chuyên ngành cũ, độc lập với đơn vị công tác.
     if (!disciplineId && !majorId) return;
     if (!disciplineId) throw new BadRequestException("Vui lòng chọn đơn vị của giảng viên có chuyên ngành đã khai báo.");
     const discipline = await this.disciplines.findByPk(disciplineId);

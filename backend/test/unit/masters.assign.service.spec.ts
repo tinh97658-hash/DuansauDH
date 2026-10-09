@@ -40,20 +40,37 @@ const openGroup = {
 };
 
 describe("MastersService.assignMembers", () => {
-  it.each(["Bảo lưu", "Tạm dừng", "Thôi học", "Đã trúng tuyển", "Đủ điều kiện dự tuyển", null])(
-    "rejects direct assignment of %s even if approved and tuition is paid", async (studyStatus) => {
+  it.each(["Nộp hồ sơ đầu vào", "Không trúng tuyển", "Đủ điều kiện dự tuyển", null])(
+    "rejects unapproved %s records even if tuition is paid", async (studyStatus) => {
       const { service, classGroups, admissionRecords, classGroupMembers } = buildService();
       classGroups.findOne.mockResolvedValue(openGroup);
       admissionRecords.findAll.mockImplementation(async ({ where }: any) => {
-        expect(where.studyStatus).toBe("Đang học");
-        expect(where[Op.or]).toBeUndefined();
-        const record = { id: "a1", studyStatus, status: "approved", extraData: { tuitionPayment: { paid: true } } };
-        return record.studyStatus === where.studyStatus ? [record] : [];
+        expect(where[Op.or]).toEqual([{ status: "approved" }, { studyStatus: { [Op.in]: ["Đã trúng tuyển", "Đang học"] } }]);
+        const record = { id: "a1", studyStatus, status: "pending", extraData: { tuitionPayment: { paid: true } } };
+        return record.status === where[Op.or][0].status || where[Op.or][1].studyStatus[Op.in].includes(record.studyStatus) ? [record] : [];
       });
       await expect(service.assignMembers("g1", { admissionRecordIds: ["a1"] })).rejects.toThrow("không đủ điều kiện");
       expect(classGroupMembers.bulkCreate).not.toHaveBeenCalled();
     },
   );
+  it.each([
+    { status: "pending", studyStatus: "Đã trúng tuyển" },
+    { status: "approved", studyStatus: "Nộp hồ sơ đầu vào" },
+    { status: "approved", studyStatus: "Tạm hoãn" },
+  ])("assigns unpaid learners matching the learner list: %j", async (record) => {
+    const { service, classGroups, admissionRecords, classGroupMembers } = buildService();
+    classGroups.findOne.mockResolvedValue(openGroup);
+    admissionRecords.findAll.mockImplementation(async ({ where }: any) => {
+      expect(where.studyStatus).toBeUndefined();
+      return record.status === where[Op.or][0].status || where[Op.or][1].studyStatus[Op.in].includes(record.studyStatus)
+        ? [{ ...record, id: "a1", extraData: { tuitionPayment: { paid: false } } }] : [];
+    });
+    classGroupMembers.findAll.mockResolvedValue([]);
+    classGroupMembers.count.mockResolvedValue(0);
+    classGroupMembers.bulkCreate.mockResolvedValue([{}]);
+    await expect(service.assignMembers("g1", { admissionRecordIds: ["a1"] })).resolves.toMatchObject({ count: 1 });
+    expect(classGroupMembers.bulkCreate).toHaveBeenCalled();
+  });
   it("assigns eligible students to an open group inside a transaction", async () => {
     const { service, classGroups, classGroupMembers, admissionRecords } = buildService();
     classGroups.findOne.mockResolvedValue(openGroup);
@@ -71,7 +88,7 @@ describe("MastersService.assignMembers", () => {
     );
     expect(result.count).toBe(1);
     expect(admissionRecords.findAll).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ studyStatus: "Đang học", trainingLevel: "Thạc sĩ", academicYear: "2026" }),
+      where: expect.objectContaining({ [Op.or]: [{ status: "approved" }, { studyStatus: { [Op.in]: ["Đã trúng tuyển", "Đang học"] } }], trainingLevel: "Thạc sĩ", academicYear: "2026" }),
       lock: "UPDATE",
     }));
   });
@@ -151,7 +168,7 @@ describe("MastersService.autoAssign", () => {
       ["g3", "a5"],
     ]);
     expect(result.distributed.map((item: { count: number }) => item.count)).toEqual([2, 2, 1]);
-    expect(admissionRecords.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ studyStatus: "Đang học" }) }));
+    expect(admissionRecords.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ [Op.or]: [{ status: "approved" }, { studyStatus: { [Op.in]: ["Đã trúng tuyển", "Đang học"] } }] }) }));
   });
 
   it("fills groups to capacity in order for fill-first", async () => {
@@ -251,18 +268,21 @@ describe("MastersService.autoAssign", () => {
 });
 
 describe("MastersService assignment lists", () => {
-  it("returns only studying unassigned candidates and AdmissionRecord.note", async () => {
+  it("returns unassigned learners regardless of tuition using the learner-list scope", async () => {
     const { service, admissionRecords, classGroupMembers } = buildService();
     const records = [
       { id: "free", studyStatus: "Đang học", note: "Ghi chú hồ sơ", gender: null },
+      { id: "paid", studyStatus: "Đang học", extraData: { tuitionPayment: { paid: true } } },
+      { id: "unpaid", studyStatus: "Đang học", extraData: { tuitionPayment: { paid: false } } },
       { id: "assigned", studyStatus: "Đang học" },
       { id: "same-student", studentId: "s1", studyStatus: "Đang học" },
       { id: "paused", studyStatus: "Bảo lưu", status: "approved" },
       { id: "admitted", studyStatus: "Đã trúng tuyển", status: "approved" },
+      { id: "pending", studyStatus: "Nộp hồ sơ đầu vào", status: "pending" },
     ];
     admissionRecords.findAll.mockImplementation(async ({ where }: any) => {
-      expect(where).toEqual({ trainingLevel: "Thạc sĩ", studyStatus: "Đang học", academicYear: "2026" });
-      return records.filter((record) => record.studyStatus === where.studyStatus);
+      expect(where).toEqual({ trainingLevel: "Thạc sĩ", [Op.or]: [{ status: "approved" }, { studyStatus: { [Op.in]: ["Đã trúng tuyển", "Đang học"] } }], academicYear: "2026" });
+      return records.filter((record) => record.status === where[Op.or][0].status || where[Op.or][1].studyStatus[Op.in].includes(record.studyStatus));
     });
     const classGroup = { id: "other-year", code: "OLD", name: "Lớp cũ" };
     classGroupMembers.findAll.mockResolvedValue([
@@ -270,32 +290,77 @@ describe("MastersService assignment lists", () => {
       { id: "member2", studentId: "s1", classGroup },
     ]);
     expect(await service.listEligibleStudents(undefined, "2026")).toEqual([
-      expect.objectContaining({ id: "free", studyStatus: "Đang học", note: "Ghi chú hồ sơ", gender: "", assignedGroup: null }),
+      expect.objectContaining({ id: "free", studyStatus: "Đang học", tuitionPaid: false, note: "Ghi chú hồ sơ", gender: "", assignedGroup: null }),
+      expect.objectContaining({ id: "paid", tuitionPaid: true, assignedGroup: null }),
+      expect.objectContaining({ id: "unpaid", tuitionPaid: false, assignedGroup: null }),
+      expect.objectContaining({ id: "paused", tuitionPaid: false, assignedGroup: null }),
+      expect.objectContaining({ id: "admitted", tuitionPaid: false, assignedGroup: null }),
     ]);
   });
 
-  it("includes AdmissionRecord.note in both class list and detail", async () => {
+  it("includes admission tuition data in both class list and detail", async () => {
     const { service, classGroups } = buildService();
     classGroups.findAll.mockResolvedValue([]);
     classGroups.findOne.mockResolvedValue({ get: () => ({ id: "g1", members: [] }) });
     await service.listClassGroups(); await service.getClassGroup("g1");
     for (const call of [classGroups.findAll.mock.calls[0][0], classGroups.findOne.mock.calls[0][0]]) {
       const members = (call as any).include.find((item: any) => item.as === "members");
-      expect(members.include.find((item: any) => item.as === "admissionRecord").attributes).toContain("note");
+      expect(members.include.find((item: any) => item.as === "admissionRecord").attributes).toEqual(expect.arrayContaining(["extraData", "note"]));
     }
   });
 });
 
 describe("MastersService.batchCreateClassGroups", () => {
+  it("fills name gaps while generating independent consecutive codes", async () => {
+    const { service, classGroups, majors, classGroupsService } = buildService();
+    majors.findByPk.mockResolvedValue({ id: "major-1", active: true, program: "masters", code: "QLCVATHH" });
+    classGroups.findAll.mockResolvedValue([]);
+    classGroupsService.create.mockImplementation(async (row: unknown) => row);
+    await service.batchCreateClassGroups({
+      codePrefix: "NH26", namePrefix: "QLCVATHH 2026.", nameTemplate: "QLCVATHH 2026.{n}",
+      count: 2, startIndex: 1, nameIndexes: [1, 4], codeStartIndex: 4,
+      majorId: "major-1", curriculumId: "curriculum-1", academicYear: "2026", maxStudents: 40,
+    });
+    expect(classGroupsService.create).toHaveBeenNthCalledWith(1,
+      expect.objectContaining({ name: "QLCVATHH 2026.1.1", code: "QLCVATHH 2026.1.1" }), expect.anything());
+    expect(classGroupsService.create).toHaveBeenNthCalledWith(2,
+      expect.objectContaining({ name: "QLCVATHH 2026.1.4", code: "QLCVATHH 2026.1.4" }), expect.anything());
+  });
+
+  it("creates the first named group with independently numbered codes", async () => {
+    const { service, classGroups, majors, classGroupsService } = buildService();
+    majors.findByPk.mockResolvedValue({ id: "major-1", active: true, program: "masters", code: "QLCVATHH" });
+    classGroups.findAll.mockResolvedValue([]);
+    classGroupsService.create.mockImplementation(async (row: unknown) => row);
+
+    await service.batchCreateClassGroups({
+      codePrefix: "NH26",
+      namePrefix: "QLCVATHH2026.",
+      nameTemplate: "QLCVATHH2026.{n}",
+      count: 2,
+      startIndex: 1,
+      codeStartIndex: 2,
+      majorId: "major-1",
+      curriculumId: "curriculum-1",
+      academicYear: "2026",
+      maxStudents: 40,
+    });
+
+    expect(classGroupsService.create).toHaveBeenNthCalledWith(1,
+      expect.objectContaining({ code: "QLCVATHH 2026.1.1", name: "QLCVATHH 2026.1.1" }), expect.anything());
+    expect(classGroupsService.create).toHaveBeenNthCalledWith(2,
+      expect.objectContaining({ code: "QLCVATHH 2026.1.2", name: "QLCVATHH 2026.1.2" }), expect.anything());
+  });
+
   it("creates empty groups without assigning students", async () => {
     const { service, classGroups, classGroupMembers, majors, classGroupsService } = buildService();
     const g1 = { ...openGroup, id: "g1", code: "26CNTT01", name: "CNTT2026.01" };
     const g2 = { ...openGroup, id: "g2", code: "26CNTT02", name: "CNTT2026.02" };
-    majors.findByPk.mockResolvedValue({ id: "major-1", active: true, program: "masters" });
+    majors.findByPk.mockResolvedValue({ id: "major-1", active: true, program: "masters", code: "QLCVATHH" });
     classGroups.findAll
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([g1, g2]);
+      .mockResolvedValueOnce([]);
     classGroupsService.create.mockResolvedValueOnce(g1).mockResolvedValueOnce(g2);
     const result = await service.batchCreateClassGroups({
       codePrefix: "26CNTT",

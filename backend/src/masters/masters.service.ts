@@ -10,6 +10,8 @@ import { Student } from "../database/models/student.model.js";
 import { Major } from "../database/models/common/major.model.js";
 import { Curriculum } from "../database/models/plan/curriculum.model.js";
 import { ClassGroupService } from "../plan/class-group.service.js";
+import { admissionLearnerWhere } from "../plan/admission-learner-policy.js";
+import { classGroupCode, parseClassGroupCode } from "../plan/class-group-code.js";
 import {
   AssignMembersDto, AutoAssignDto, BatchCreateMastersClassGroupsDto, CreateMastersClassGroupDto, UpdateMastersClassGroupDto,
 } from "./dto/masters-class-group.dto.js";
@@ -42,7 +44,7 @@ export class MastersService {
   // ===== NHÓM HỌC PHẦN (CLASS GROUPS) =====
   private async requireMastersMajor(majorId?: string | null, transaction?: Transaction) {
     if (!majorId) return null;
-    const major = await this.majors.findByPk(majorId, { transaction });
+    const major = await this.majors.findByPk(majorId, { transaction, ...(transaction ? { lock: transaction.LOCK.UPDATE } : {}) });
     if (!major || major.active === false || major.isCommon) {
       throw new BadRequestException("Chuyên ngành không tồn tại hoặc đã ngừng sử dụng.");
     }
@@ -54,7 +56,7 @@ export class MastersService {
     const where: Record<PropertyKey, unknown> = {
       trainingLevel: "Thạc sĩ",
       academicYear: group.academicYear,
-      studyStatus: "Đang học",
+      ...admissionLearnerWhere(),
     };
     if (group.majorId) where.majorId = group.majorId;
     if (ids) where.id = { [Op.in]: ids };
@@ -134,7 +136,11 @@ export class MastersService {
   }
 
   async createClassGroup(dto: CreateMastersClassGroupDto) {
-    const group = await this.classGroupsService.create({ ...dto, program: "masters" });
+    const parsed = parseClassGroupCode(dto.code);
+    if (!parsed) throw new BadRequestException("Mã nhóm phải có dạng CNTT 2026.1.1.");
+    const major = await this.requireMastersMajor(dto.majorId);
+    const code = classGroupCode(major!.code, dto.academicYear || parsed.academicYear, parsed.intakeRound, parsed.groupNumber);
+    const group = await this.classGroupsService.create({ ...dto, code, name: code, academicYear: dto.academicYear || parsed.academicYear, intakeRound: parsed.intakeRound, groupNumber: parsed.groupNumber, program: "masters" });
     return this.getClassGroup(group.id);
   }
 
@@ -150,20 +156,29 @@ export class MastersService {
   // ===== HỌC VIÊN ĐỦ ĐIỀU KIỆN PHÂN NHÓM =====
   async batchCreateClassGroups(dto: BatchCreateMastersClassGroupsDto) {
     return this.sequelize.transaction(async (transaction) => {
-      await this.requireMastersMajor(dto.majorId, transaction);
-      const nameSeparator = /[.\-_]$/.test(dto.namePrefix) ? "" : " ";
+      const major = await this.requireMastersMajor(dto.majorId, transaction);
+      if (!major?.code) throw new BadRequestException("Chuyên ngành chưa có mã. Vui lòng cập nhật mã chuyên ngành trước.");
+      const intakeRound = dto.intakeRound ?? 1;
       const templateTokens = dto.nameTemplate?.match(/\{n\}/g) || [];
+      if (dto.nameIndexes && dto.nameIndexes.length !== dto.count) {
+        throw new BadRequestException("Số thứ tự tên nhóm phải khớp với số nhóm cần tạo.");
+      }
       if (dto.nameTemplate && templateTokens.length !== 1) {
         throw new BadRequestException('Quy tắc tên nhóm phải chứa đúng một ký hiệu "{n}".');
       }
+      const scope = await this.classGroups.findAll({ where: { program: "masters", majorId: dto.majorId, academicYear: dto.academicYear, intakeRound }, attributes: ["groupNumber"], transaction });
+      const used = new Set(scope.map((group) => group.groupNumber));
+      const indexes: number[] = [];
+      for (let number = 1; indexes.length < dto.count; number += 1) if (!used.has(number)) indexes.push(number);
       const rows = Array.from({ length: dto.count }, (_, offset) => {
-        const number = String(dto.startIndex + offset).padStart(2, "0");
+        const groupNumber = dto.nameIndexes?.[offset] ?? indexes[offset];
+        const code = classGroupCode(major.code, dto.academicYear, intakeRound, groupNumber);
         return {
           program: "masters",
-          code: `${dto.codePrefix}${number}`,
-          name: dto.nameTemplate
-            ? dto.nameTemplate.replace("{n}", number)
-            : `${dto.namePrefix}${nameSeparator}${number}`,
+          code,
+          name: code,
+          intakeRound,
+          groupNumber,
           majorId: dto.majorId || null,
           curriculumId: dto.curriculumId,
           academicYear: dto.academicYear,
@@ -206,9 +221,9 @@ export class MastersService {
   }
 
   async listEligibleStudents(majorId?: string, academicYear?: string) {
-    const where: Record<string, unknown> = {
+    const where: Record<PropertyKey, unknown> = {
       trainingLevel: "Thạc sĩ",
-      studyStatus: "Đang học",
+      ...admissionLearnerWhere(),
     };
     if (majorId) where.majorId = majorId;
     if (academicYear) where.academicYear = academicYear;
@@ -263,6 +278,7 @@ export class MastersService {
         academicYear: r.academicYear,
         status: r.status,
         studyStatus: r.studyStatus,
+        tuitionPaid: r.extraData?.tuitionPayment?.paid === true,
         note: r.note || "",
         assignedGroup: assignment ? assignment.group : null,
         memberId: assignment ? assignment.memberId : null,

@@ -30,6 +30,7 @@ import {
   ClassCurriculumProgressQueryDto,
   CreateCourseOfferingDto,
   CreateTeachingSessionDto,
+  CompleteCourseOfferingDto,
   ListCourseOfferingsQueryDto,
   ListTeachingSessionsQueryDto,
   PreviewCourseOfferingParticipantsDto,
@@ -149,6 +150,37 @@ export class SchedulingService {
       order: [["sessionDate", "ASC"], ["startTime", "ASC"], ["id", "ASC"]],
     });
 
+    const completedOfferingIds = offerings.filter((offering) => offering.status === "completed").map((offering) => offering.id);
+    // Check the whole class, including learners outside the gradebook's current page.
+    // A component score alone does not complete grading; zero totals and exemptions do.
+    const gradeEntryCounts = completedOfferingIds.length === 0 ? [] : await this.sequelize.query<{
+      classGroupId: string; courseOfferingId: string; missingGradeCount: number;
+    }>(`
+      WITH people AS (
+        SELECT DISTINCT cm.class_group_id,
+          CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
+            THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text
+            WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END AS participant_id
+        FROM class_group_members cm LEFT JOIN admission_records ar ON ar.id = cm.admission_record_id
+        WHERE cm.class_group_id IN (:groupIds)
+      ), completed_grades AS (
+        SELECT DISTINCT book.class_group_id, book.course_offering_id, grade->>'participantId' AS participant_id
+        FROM course_exam_gradebooks book CROSS JOIN LATERAL jsonb_array_elements(book.grades) grade
+        WHERE book.class_group_id IN (:groupIds) AND book.course_offering_id IN (:completedOfferingIds)
+          AND (jsonb_typeof(grade->'courseScore') = 'number'
+            OR grade->>'result' = 'exempt' OR grade->>'examExempt' = 'true')
+      )
+      SELECT link.class_group_id AS "classGroupId", link.course_offering_id AS "courseOfferingId",
+        COUNT(DISTINCT person.participant_id) FILTER (WHERE saved.participant_id IS NULL)::int AS "missingGradeCount"
+      FROM course_offering_class_groups link
+      LEFT JOIN people person ON person.class_group_id = link.class_group_id
+      LEFT JOIN completed_grades saved ON saved.class_group_id = link.class_group_id
+        AND saved.course_offering_id = link.course_offering_id AND saved.participant_id = person.participant_id
+      WHERE link.class_group_id IN (:groupIds) AND link.course_offering_id IN (:completedOfferingIds)
+      GROUP BY link.class_group_id, link.course_offering_id
+    `, { type: QueryTypes.SELECT, replacements: { groupIds, completedOfferingIds } });
+    const missingGradeCounts = new Map(gradeEntryCounts.map((row) => [`${row.classGroupId}:${row.courseOfferingId}`, Number(row.missingGradeCount)]));
+
     const offeringById = new Map(offerings.map((offering) => [offering.id, offering]));
     const offeringIdsByGroup = new Map<string, string[]>();
     links.forEach((link) => {
@@ -187,6 +219,8 @@ export class SchedulingService {
           code: entry.subject?.code || "",
           name: entry.subject?.name || "",
           status,
+          needsGradeEntry: completed && matchingOfferings.some((offering) => offering.status === "completed"
+            && (missingGradeCounts.get(`${group.id}:${offering.id}`) || 0) > 0),
           heldSessionCount,
           sessionCount: matchingSessions.length,
           sessions: matchingSessions.map((session) => ({
@@ -1519,8 +1553,9 @@ export class SchedulingService {
     });
   }
 
-  async completeCourseOffering(id: string, staffId: string) {
+  async completeCourseOffering(id: string, staffId: string, dto: CompleteCourseOfferingDto = {}) {
     return this.sequelize.transaction(async (transaction) => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21025)", { transaction });
       const offering = await this.courseOfferings.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!offering) throw new NotFoundException("Không tìm thấy lớp học phần.");
       await this.requireEnabledOfferingSubject(offering, transaction);
@@ -1532,10 +1567,14 @@ export class SchedulingService {
         lock: transaction.LOCK.UPDATE,
       });
       const unresolved = sessions.filter((session) => session.status === "planned");
-      if (unresolved.length > 0) {
+      const expectedIds = new Set(dto.expectedPlannedSessionIds || []);
+      const confirmedDeletion = dto.cancelPlannedSessions === true
+        && expectedIds.size === unresolved.length
+        && unresolved.every((session) => expectedIds.has(session.id));
+      if (unresolved.length > 0 && !confirmedDeletion) {
         throw new ConflictException({
           code: "UNRESOLVED_SESSIONS",
-          message: `Còn ${unresolved.length} buổi đã xếp hoặc chờ xác nhận; chưa thể hoàn thành giảng dạy.`,
+          message: `Còn ${unresolved.length} buổi đã xếp chưa xác nhận diễn ra. Vui lòng kiểm tra và xác nhận xóa các buổi này trước khi đóng lớp.`,
           details: {
             unresolvedCount: unresolved.length,
             teachingSessionId: unresolved[0].id,
@@ -1549,6 +1588,12 @@ export class SchedulingService {
           code: "NO_HELD_SESSIONS",
           message: "Cần ít nhất một buổi đã xác nhận diễn ra trước khi hoàn thành giảng dạy.",
           details: { heldCount: 0 },
+        });
+      }
+      if (unresolved.length > 0) {
+        await this.teachingSessions.destroy({
+          where: { courseOfferingId: id, id: { [Op.in]: unresolved.map((session) => session.id) }, status: "planned" },
+          transaction,
         });
       }
       await offering.update({

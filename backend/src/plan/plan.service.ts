@@ -1,4 +1,5 @@
 import { Optional } from "@nestjs/common";
+import { admissionLearnerWhere } from "./admission-learner-policy.js";
 import { AdmissionEvaluationService } from "./admission-evaluation.service.js";
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
@@ -530,10 +531,7 @@ export class PlanService {
     if (status && status !== "ALL") where.studyStatus = status;
     else if (excludeStatus) where.studyStatus = { [Op.ne]: excludeStatus };
     if (admissionStage === "learners") {
-      where[Op.and] = [{ [Op.or]: [
-        { status: "approved" },
-        { studyStatus: { [Op.in]: ["Đã trúng tuyển", "Đang học"] } },
-      ] }];
+      where[Op.and] = [admissionLearnerWhere()];
     } else if (admissionStage === "applications") {
       where[Op.and] = [
         { status: { [Op.ne]: "approved" } },

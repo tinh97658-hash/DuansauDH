@@ -45,7 +45,7 @@ const unassigned = {
   majorId: "major-1",
   majorName: "Công nghệ thông tin",
   assignedGroup: null,
-  studyStatus: "Đang học",
+  studyStatus: "Đã trúng tuyển",
   tuitionPaid: false,
 };
 const assigned = {
@@ -76,7 +76,9 @@ describe("AssignClassGroups", () => {
 
     expect(await screen.findByRole("checkbox", { name: "Chọn Học viên chưa có lớp" })).toBeInTheDocument();
     expect(screen.queryByText("Học viên đã có lớp")).not.toBeInTheDocument();
-    expect(screen.queryByText("Học phí nhập học")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Học phí nhập học")).toHaveLength(2);
+    expect(screen.getByText("Chưa nộp")).toBeInTheDocument();
+    expect(screen.getByText("Chưa phân nhóm")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Gán vào lớp/ })).toBeDisabled();
     fireEvent.mouseDown(screen.getByRole("button", { name: "Lớp mục tiêu" }));
     fireEvent.click(await screen.findByRole("option", { name: /L01/ }));
@@ -135,8 +137,8 @@ describe("AssignClassGroups", () => {
     expect(screen.getByText("Nguyễn Văn Lịch")).toBeInTheDocument();
     expect(screen.getByText("Sử")).toBeInTheDocument();
     expect(screen.getAllByText("HV-LEGACY")).toHaveLength(1);
-    expect(screen.getByText("Ghi chú hồ sơ cũ")).toBeInTheDocument();
-    expect(screen.queryByText("Đã nộp")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ghi chú hồ sơ cũ")).not.toBeInTheDocument();
+    expect(screen.getByText("Đã nộp")).toBeInTheDocument();
   });
 
   it("does not allow selecting more students than the target group's remaining capacity", async () => {
@@ -169,10 +171,11 @@ describe("AssignClassGroups", () => {
       { id: "major-2", name: "Chuyên ngành Hai", disciplineId: "d2", discipline: { id: "d2", name: "Ngành Hai" } },
     ];
     const candidates = [
-      { ...unassigned, fullName: "Nguyễn Văn An", dob: "1999-01-02", gender: "Nam", note: "Ghi chú tuyển sinh" },
+      { ...unassigned, fullName: "Nguyễn Văn An", dob: "1999-01-02", gender: "Nam", note: "Ghi chú tuyển sinh", tuitionPaid: true },
       { ...unassigned, id: "other-major", code: "HV-OTHER", majorId: "major-2", fullName: "Trần Thị Bình" },
       { ...unassigned, id: "paused", code: "HV-PAUSED", studyStatus: "Bảo lưu" },
       { ...unassigned, id: "admitted", code: "HV-ADMITTED", studyStatus: "Đã trúng tuyển" },
+      { ...unassigned, id: "approved", code: "HV-APPROVED", status: "approved", studyStatus: "Nộp hồ sơ đầu vào" },
     ];
     axios.get.mockImplementation(async (url) => ({ data: url.includes("/system/majors") ? majors
       : url.includes("/eligible-students") ? candidates.filter((candidate) => !url.includes("majorId=") || url.includes(`majorId=${candidate.majorId}`))
@@ -183,24 +186,27 @@ describe("AssignClassGroups", () => {
     expect(screen.getByRole("button", { name: "Lớp mục tiêu" })).toHaveTextContent("Chọn lớp mục tiêu");
     const headers = () => within(table).getAllByRole("columnheader").map((cell) => cell.textContent);
     // The revised table always shows Major and never Discipline, including ALL/ALL.
-    expect(headers()).toEqual(["", "Mã HV", "Họ đệm", "Tên", "Ngày sinh", "Giới tính", "Chuyên ngành", "Ghi chú"]);
+    expect(headers()).toEqual(["", "Mã HV", "Họ đệm", "Tên", "Ngày sinh", "Giới tính", "Chuyên ngành", "Học phí nhập học", "Nhóm hiện tại"]);
     expect(within(table).getByText("Nguyễn Văn").closest("td")).toHaveTextContent(/^Nguyễn Văn$/);
     expect(within(table).getByText("1999-01-02")).toBeInTheDocument();
     expect(within(table).getByText("Nam")).toBeInTheDocument();
-    expect(within(table).getByText("Ghi chú tuyển sinh")).toBeInTheDocument();
+    expect(within(table).queryByText("Ghi chú tuyển sinh")).not.toBeInTheDocument();
+    expect(within(table).getByText("Đã nộp")).toBeInTheDocument();
+    expect(within(table).getAllByText("Chưa nộp")).toHaveLength(3);
     expect(screen.queryByText("HV-PAUSED")).not.toBeInTheDocument();
-    expect(screen.queryByText("HV-ADMITTED")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Học phí nhập học|Nhóm hiện tại|Mã HV \/ SBD/)).not.toBeInTheDocument();
+    expect(screen.getByText("HV-ADMITTED")).toBeInTheDocument();
+    expect(screen.getByText("HV-APPROVED")).toBeInTheDocument();
+    expect(screen.queryByText("Mã HV / SBD")).not.toBeInTheDocument();
     fireEvent.mouseDown(screen.getByRole("button", { name: "Ngành", exact: true }));
     fireEvent.click(await screen.findByRole("option", { name: "Ngành Một" }));
     await waitFor(() => expect(screen.queryByText("HV-OTHER")).not.toBeInTheDocument());
-    expect(headers()).toEqual(["", "Mã HV", "Họ đệm", "Tên", "Ngày sinh", "Giới tính", "Chuyên ngành", "Ghi chú"]);
+    expect(headers()).toEqual(["", "Mã HV", "Họ đệm", "Tên", "Ngày sinh", "Giới tính", "Chuyên ngành", "Học phí nhập học", "Nhóm hiện tại"]);
     fireEvent.mouseDown(screen.getByRole("button", { name: "Chuyên ngành", exact: true }));
     fireEvent.click(await screen.findByRole("option", { name: "Chuyên ngành Một" }));
-    expect(headers()).toEqual(["", "Mã HV", "Họ đệm", "Tên", "Ngày sinh", "Giới tính", "Chuyên ngành", "Ghi chú"]);
+    expect(headers()).toEqual(["", "Mã HV", "Họ đệm", "Tên", "Ngày sinh", "Giới tính", "Chuyên ngành", "Học phí nhập học", "Nhóm hiện tại"]);
   });
 
-  it("narrows candidates only after choosing a target and reads member notes from the admission record", async () => {
+  it("narrows candidates only after choosing a target and reads tuition status from the admission record", async () => {
     const target = { ...group, members: [{ id: "member", note: "Sai nguồn ghi chú", admissionRecord: {
       id: "member-record", code: "MEMBER", fullName: "Lê Văn Cường", dob: "1998-02-03", note: "Ghi chú hồ sơ thành viên",
     } }] };
@@ -214,11 +220,12 @@ describe("AssignClassGroups", () => {
     fireEvent.click(await screen.findByRole("option", { name: /L01/ }));
     await screen.findByText("MEMBER");
     expect(screen.queryByText("HV-OTHER")).not.toBeInTheDocument();
-    expect(screen.getByText("Ghi chú hồ sơ thành viên")).toBeInTheDocument();
+    expect(screen.queryByText("Ghi chú hồ sơ thành viên")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table", { name: "Học viên trong lớp" })).getByText("Chưa nộp")).toBeInTheDocument();
     expect(screen.queryByText("Sai nguồn ghi chú")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Bỏ Lê Văn Cường khỏi lớp" })).toBeInTheDocument();
     expect(within(screen.getByRole("table", { name: "Học viên trong lớp" })).getAllByRole("columnheader").map((cell) => cell.textContent))
-      .toEqual(["STT", "Mã HV", "Họ đệm", "Tên", "Ngày sinh", "Ghi chú", "Bỏ"]);
+      .toEqual(["STT", "Mã HV", "Họ đệm", "Tên", "Ngày sinh", "Học phí nhập học", "Bỏ"]);
   });
 
   it("bounds long student codes and keeps the remove action sticky on the rendered member table", async () => {

@@ -7,6 +7,7 @@ import { Discipline } from "../database/models/common/discipline.model.js";
 import { District } from "../database/models/common/district.model.js";
 import { Ethnicity } from "../database/models/common/ethnicity.model.js";
 import { Lecturer } from "../database/models/common/lecturer.model.js";
+import { Unit } from "../database/models/common/unit.model.js";
 import { Major } from "../database/models/common/major.model.js";
 import { Room } from "../database/models/common/room.model.js";
 import { Nationality } from "../database/models/common/nationality.model.js";
@@ -19,13 +20,14 @@ import { Subject } from "../database/models/plan/subject.model.js";
 import { Staff } from "../database/models/staff.model.js";
 import { SystemController } from "./system.controller.js";
 import { SystemService } from "./system.service.js";
+import { ClassGroup } from "../database/models/training/class-group.model.js";
 
 @Module({
   imports: [SequelizeModule.forFeature([
     Ethnicity, Nationality, City, District, Ward,
     TrainingModeGroup, TrainingMode, TrainingLevel, Discipline, Major, StudyStatus, BridgeKnowledgeSubject, Lecturer, Room,
-    Subject,
-    Staff,
+    Subject, ClassGroup,
+    Staff, Unit,
   ])],
   controllers: [SystemController],
   providers: [SystemService, RolesGuard],

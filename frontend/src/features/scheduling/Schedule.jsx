@@ -1,9 +1,12 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
+import { Tooltip } from "@mui/material";
+import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 import { api, groupsOf, intersectDays, labelOf, message, Modal, normalize, Notice, offeringTitle, rows, SearchSelect, subjectLabel, unique, useLoad } from "./shared";
 import { addDays, formatDateKey, getBusinessTodayKey, isSessionPast, mondayOf, vietnameseDate, vietnameseDayMonth, vietnameseWeekdayShort, weekDaysFrom } from "../../utils/schedulingCalendar";
 import SessionEditor from "./SessionEditor";
+import { shouldSuggestClosing } from "./sessionWarning";
 import OfferingDetails from "./OfferingDetails";
 import { disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 import { buildScheduleDocument, clearScheduleReturnView, createScheduleExcel, createScheduleWord, downloadScheduleFile, exportSchedule, readScheduleReturnView } from "./scheduleExport";
@@ -288,7 +291,9 @@ export default function Schedule({ user }) {
   const refresh = () => { offerings.reload(); sessions.reload(); pending.reload(); };
   const saved = () => { setEditor(null); setDetails(null); setError(""); refresh(); };
   const openSession = (session) => { setDetails(null); setPendingOpen(false); setEditor({ session, offering: all.find((row) => row.id === session.courseOfferingId) || session.courseOffering }); };
-  const select = (offering) => { setSelected(offering.id); setDetails(null); };
+  const select = (offering) => {
+    setSelected(offering.id); setDetails(null);
+  };
   const changeScope = (callback) => { callback(); setSelected(""); };
   const confirmation = async (session, result) => {
     setSaving(true); setError("");
@@ -367,8 +372,14 @@ export default function Schedule({ user }) {
     {majors.error && <Notice error={majors.error} />}
   </div><div className="sl-worklist"><div className="sl-search-wrap"><span>⌕</span><input className="sl-search" aria-label="Tìm môn / lớp" placeholder="Tìm lớp học phần..." value={query} onChange={(event) => setQuery(event.target.value)} /></div><div className="sl-card-scroll">{offerings.loading ? <Notice>Đang tải lớp học phần...</Notice> : offerings.error ? <Notice error={offerings.error} /> : <section className="sl-section"><h2><span>LỚP HỌC PHẦN</span><b>{listed.length}</b></h2>{listed.map((offering) => {
     const summary = offering.sessionSummary || {};
+    const suggestClosing = shouldSuggestClosing(offering);
+    const closingMessage = `Đã học được ${summary.heldCount || 0} buổi, bạn có muốn đóng lớp không?`;
     return <article key={offering.id} id={`offering-${offering.id}`} className={`sl-card ${selectedId === offering.id ? "sl-selected" : ""}`}>
-      <button className="sl-btn sl-btn-link sl-card-detail" onClick={() => setDetails(offering)}><strong>{offeringTitle(offering)}</strong><span>{subjectLabel(offering)}</span><small>{groupsOf(offering).length} lớp/nhóm · {offering.participantCount ?? 0} HV</small></button>
+      <div className="sl-card-heading"><button className="sl-btn sl-btn-link sl-card-detail" onClick={() => setDetails(offering)}><strong>{offeringTitle(offering)}</strong><span>{subjectLabel(offering)}</span><small>{groupsOf(offering).length} lớp/nhóm · {offering.participantCount ?? 0} HV</small></button>
+        {suggestClosing && <Tooltip title={closingMessage} arrow placement="top" enterDelay={0} enterNextDelay={0}>
+          <button type="button" className="sl-close-suggestion" aria-label={closingMessage} onClick={() => setDetails(offering)}><WarningAmberRounded aria-hidden="true" /></button>
+        </Tooltip>}
+      </div>
       <div className="sl-card-foot"><div className="sl-card-copy"><strong>Đã diễn ra {summary.heldCount || 0} buổi</strong><span className={!summary.futurePlannedCount ? "sl-no-week" : ""}>{summary.futurePlannedCount ? `Có ${summary.futurePlannedCount} lịch sắp tới` : "Chưa có lịch tuần này"}</span></div>{canEdit && offering.status === "active" && <button className="sl-btn sl-btn-primary sl-btn-sm" onClick={() => select(offering)}>Xếp lịch</button>}</div>
     </article>;
   })}{!listed.length && <Notice>Không có lớp học phần trong phạm vi đã chọn.</Notice>}</section>}</div></div></div></aside>

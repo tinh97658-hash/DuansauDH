@@ -2,6 +2,7 @@ import { BelongsTo, Column, DataType, Default, ForeignKey, Model, Table } from "
 import { Staff } from "../staff.model.js";
 import { Discipline } from "./discipline.model.js";
 import { Major } from "./major.model.js";
+import { Unit } from "./unit.model.js";
 
 @Table({ tableName: "lecturers", underscored: true, timestamps: true })
 export class Lecturer extends Model {
@@ -18,6 +19,8 @@ export class Lecturer extends Model {
   @Column(DataType.STRING(50)) declare title: string | null;
   @Column(DataType.STRING(150)) declare faculty: string | null;
   @Column(DataType.STRING(150)) declare department: string | null;
+  @ForeignKey(() => Unit) @Column({ type: DataType.UUID, allowNull: true }) declare unitId: string | null;
+  @BelongsTo(() => Unit) declare unit: Unit | null;
   @ForeignKey(() => Discipline) @Column({ type: DataType.UUID, allowNull: true }) declare disciplineId: string | null;
   @BelongsTo(() => Discipline) declare discipline: Discipline | null;
   @ForeignKey(() => Major) @Column({ type: DataType.UUID, allowNull: true }) declare majorId: string | null;

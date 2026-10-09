@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Box, Table, TableCell, TableHead, TableRow } from "@mui/material";
 
-export default function ResizableTable({ columns, storageKey, children }) {
+export default function ResizableTable({ columns, storageKey, children, freezeThrough }) {
   const [widths, setWidths] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) || "{}");
@@ -16,6 +16,21 @@ export default function ResizableTable({ columns, storageKey, children }) {
   const setWidth = (column, width) => setWidths((previous) => ({
     ...previous, [column.key]: Math.max(column.minWidth || 60, Math.min(1000, width)),
   }));
+  const frozenIndex = columns.findIndex((column) => column.key === freezeThrough);
+  const frozenStyles = {};
+  let frozenLeft = 0;
+  for (let index = 0; index <= frozenIndex; index += 1) {
+    const cell = `:nth-of-type(${index + 1}):not([colspan])`;
+    frozenStyles[`& > thead > tr > th${cell}`] = {
+      position: "sticky", left: frozenLeft, zIndex: 4, bgcolor: "var(--table-header-bg, #EDF4FA)",
+    };
+    frozenStyles[`& > tbody > tr > td${cell}`] = {
+      position: "sticky", left: frozenLeft, zIndex: 2, bgcolor: "var(--surface-bg, #fff)",
+    };
+    frozenStyles[`& > tbody > tr:hover > td${cell}`] = { bgcolor: "var(--table-hover-bg, #F5FAFE)" };
+    frozenStyles[`& > tbody > tr.Mui-selected > td${cell}`] = { bgcolor: "#EDF4FA" };
+    frozenLeft += widthOf(columns[index]);
+  }
   const stopDrag = () => { drag.current = null; setPreview(null); };
   const autoFit = (column, index) => {
     const measure = document.createElement("span");
@@ -42,8 +57,12 @@ export default function ResizableTable({ columns, storageKey, children }) {
 
   return <Box sx={{ position: "relative", width: "max-content" }}><Table ref={tableRef} size="small" stickyHeader sx={{
     tableLayout: "fixed", width: columns.reduce((sum, column) => sum + widthOf(column), 0),
+    // Collapsed borders leave seams when cells stick at different scroll offsets.
+    ...(frozenIndex >= 0 ? { borderCollapse: "separate", borderSpacing: 0 } : {}),
     "& td, & th": { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
     "& td .MuiTypography-root": { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+    ...frozenStyles,
+    "@media print": { "& th, & td": { position: "static", left: "auto", boxShadow: "none" } },
   }}>
     <colgroup>{columns.map((column) => <col key={column.key} style={{ width: widthOf(column) }} />)}</colgroup>
     <TableHead><TableRow>

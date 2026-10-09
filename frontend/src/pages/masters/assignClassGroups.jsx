@@ -42,10 +42,17 @@ const normalizeClassGroupMember = (member, group) => {
     majorId: admissionRecord?.majorId || group.majorId || null,
     majorName: admissionRecord?.majorName || admissionRecord?.major?.name || group.major?.name || "",
     academicYear: admissionRecord?.academicYear || group.academicYear || "",
-    note: admissionRecord?.note || "",
+    tuitionPaid: admissionRecord ? admissionRecord.extraData?.tuitionPayment?.paid === true : null,
     assignedGroup: { id: group.id, code: group.code, name: group.name },
   };
 };
+
+const TuitionStatus = ({ paid }) => (
+  <Chip size="small" className="assignment-status"
+    label={paid === true ? "Đã nộp" : paid === false ? "Chưa nộp" : "Chưa có dữ liệu"}
+    color={paid === true ? "success" : paid === false ? "warning" : "default"}
+    variant="outlined" />
+);
 
 const AssignClassGroups = () => {
   const [searchParams] = useSearchParams();
@@ -180,7 +187,9 @@ const AssignClassGroups = () => {
     : 0;
 
   const unassignedStudents = useMemo(
-    () => students.filter((student) => student.studyStatus === "Đang học" && !student.assignedGroup),
+    () => students.filter((student) => !student.assignedGroup && (
+      student.status === "approved" || ["Đã trúng tuyển", "Đang học"].includes(student.studyStatus)
+    )),
     [students],
   );
 
@@ -392,7 +401,7 @@ const AssignClassGroups = () => {
                   <col className="assignment-select-col" /><col className="assignment-code-col" />
                   <col className="assignment-family-col" /><col className="assignment-name-col" />
                   <col className="assignment-dob-col" /><col className="assignment-gender-col" />
-                  <col /><col />
+                  <col /><col className="assignment-tuition-col" /><col className="assignment-group-col" />
                 </colgroup>
                 <TableHead>
                   <TableRow sx={{ "& th": { bgcolor: "#EDF4FA", color: "#111827", borderColor: "#D8E5EF", fontWeight: 700 } }}>
@@ -411,19 +420,20 @@ const AssignClassGroups = () => {
                     <TableCell className="assignment-nowrap">Ngày sinh</TableCell>
                     <TableCell className="assignment-nowrap">Giới tính</TableCell>
                     <TableCell>Chuyên ngành</TableCell>
-                    <TableCell>Ghi chú</TableCell>
+                    <TableCell>Học phí nhập học</TableCell>
+                    <TableCell>Nhóm hiện tại</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                         <CircularProgress size={28} />
                       </TableCell>
                     </TableRow>
                   ) : filteredStudents.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center" sx={{ py: 6, color: "text.secondary" }}>
+                      <TableCell colSpan={9} align="center" sx={{ py: 6, color: "text.secondary" }}>
                         {studentSearch.trim()
                           ? "Không tìm thấy học viên chưa có lớp."
                           : "Không còn học viên chưa có lớp."}
@@ -467,7 +477,8 @@ const AssignClassGroups = () => {
                           <TableCell className="assignment-nowrap">{s.dob || "-"}</TableCell>
                           <TableCell>{s.gender || "-"}</TableCell>
                           <TableCell><span className="assignment-wrap" title={majorById.get(s.majorId)?.name || s.majorName || ""}>{majorById.get(s.majorId)?.name || s.majorName || "-"}</span></TableCell>
-                          <TableCell><span className="assignment-wrap" title={s.note || ""}>{s.note || ""}</span></TableCell>
+                          <TableCell><TuitionStatus paid={s.tuitionPaid} /></TableCell>
+                          <TableCell><Chip size="small" className="assignment-status" label="Chưa phân nhóm" color="warning" variant="outlined" /></TableCell>
                         </TableRow>
                       );
                     })
@@ -540,7 +551,7 @@ const AssignClassGroups = () => {
                 ) : (
                   groups.map((g) => (
                     <MenuItem key={g.id} value={g.id}>
-                      {g.code} — {g.name} ({g.memberCount || 0}/{g.maxStudents || 40} HV)
+                      {g.code} ({g.memberCount || 0}/{g.maxStudents || 40} HV)
                     </MenuItem>
                   ))
                 )}
@@ -552,7 +563,7 @@ const AssignClassGroups = () => {
               <Box sx={{ mb: 2, p: 1.25, bgcolor: "#EAF7FB", borderRadius: "9px", border: "1px solid #D4EAF2" }}>
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.8 }}>
                   <Typography variant="body2" sx={{ fontWeight: 700, color: "#087F8C" }}>
-                    {currentTargetGroup.name} ({currentTargetGroup.code})
+                    {currentTargetGroup.code}
                   </Typography>
                   <Typography variant="caption" sx={{ fontWeight: 700 }}>
                     Sĩ số: {groupMembers.length} / {currentTargetGroup.maxStudents || 40} học viên
@@ -591,7 +602,7 @@ const AssignClassGroups = () => {
                 <colgroup>
                   <col className="assignment-index-col" /><col className="assignment-code-col" />
                   <col className="assignment-family-col" /><col className="assignment-name-col" />
-                  <col className="assignment-dob-col" /><col /><col className="assignment-action-col" />
+                  <col className="assignment-dob-col" /><col className="assignment-tuition-col" /><col className="assignment-action-col" />
                 </colgroup>
                 <TableHead>
                   <TableRow sx={{ "& th": { bgcolor: "#EDF4FA", color: "#111827", borderColor: "#D8E5EF", fontWeight: 700 } }}>
@@ -600,7 +611,7 @@ const AssignClassGroups = () => {
                     <TableCell sx={{ fontWeight: 700 }}>Họ đệm</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Tên</TableCell>
                     <TableCell className="assignment-nowrap" sx={{ fontWeight: 700 }}>Ngày sinh</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Ghi chú</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Học phí nhập học</TableCell>
                     <TableCell align="center" className="assignment-action" sx={{ fontWeight: 700 }}>Bỏ</TableCell>
                   </TableRow>
                 </TableHead>
@@ -619,7 +630,7 @@ const AssignClassGroups = () => {
                         <TableCell sx={{ fontWeight: 600 }}><span className="assignment-name" title={personNameParts(m).familyAndMiddle}>{personNameParts(m).familyAndMiddle}</span></TableCell>
                         <TableCell sx={{ fontWeight: 600 }}><span className="assignment-name" title={personNameParts(m).givenName}>{personNameParts(m).givenName}</span></TableCell>
                         <TableCell className="assignment-nowrap" sx={{ fontSize: "0.8rem", color: "text.secondary" }}>{m.dob || "-"}</TableCell>
-                        <TableCell><span className="assignment-wrap" title={m.note}>{m.note}</span></TableCell>
+                        <TableCell><TuitionStatus paid={m.tuitionPaid} /></TableCell>
                         <TableCell align="center" className="assignment-action">
                           <Tooltip title="Bỏ khỏi lớp">
                             <IconButton

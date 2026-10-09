@@ -7,6 +7,7 @@ import {
   AssignSchedulingManagerDto,
   ClassCurriculumProgressQueryDto,
   ConfirmTeachingSessionDto,
+  CompleteCourseOfferingDto,
   CourseOfferingCandidatesQueryDto,
   CreateCourseOfferingDto,
   CreateTeachingSessionDto,
@@ -145,8 +146,9 @@ export class SchedulingController {
   completeCourseOffering(
     @Param("id", ParseUUIDPipe) id: string,
     @CurrentUser() user: any,
+    @Body() dto: CompleteCourseOfferingDto,
   ) {
-    return this.scheduling.completeCourseOffering(id, user.id);
+    return this.scheduling.completeCourseOffering(id, user.id, dto);
   }
 
   @Put("assignee")

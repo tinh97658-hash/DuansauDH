@@ -1,9 +1,14 @@
 import { Transform, Type } from "class-transformer";
-import { ArrayMinSize, ArrayUnique, IsArray, IsDateString, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateNested, IsInt, Min, Max } from "class-validator";
+import { ArrayMinSize, ArrayUnique, IsArray, IsBoolean, IsDateString, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateNested, IsInt, Min, Max } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim());
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/;
+
+export class CompleteCourseOfferingDto {
+  @IsOptional() @IsBoolean() cancelPlannedSessions?: boolean;
+  @IsOptional() @IsArray() @ArrayUnique() @IsUUID("all", { each: true }) expectedPlannedSessionIds?: string[];
+}
 
 export class CourseOfferingCandidatesQueryDto {
   @IsOptional() @IsIn(["masters", "doctoral"]) program = "masters";

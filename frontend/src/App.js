@@ -29,6 +29,7 @@ import Nationalities from "./pages/system/nationalities";
 import Wards from "./pages/system/wards";
 import Cities from "./pages/system/cities";
 import Lecturers from "./pages/system/lecturers";
+import Units from "./pages/system/units";
 import Rooms from "./pages/system/rooms";
 import Disciplines from "./pages/system/disciplines";
 import TrainingModeGroups from "./pages/system/trainingModeGroups";
@@ -124,6 +125,7 @@ function App() {
             <Route path="system/wards" element={<Wards />} />
             <Route path="system/cities" element={<Cities />} />
             <Route path="system/lecturers" element={<Lecturers />} />
+            <Route path="system/units" element={<Units />} />
             <Route path="system/rooms" element={<Rooms />} />
             <Route path="system/training-mode-groups" element={<TrainingModeGroups />} />
             <Route path="system/training-modes" element={<TrainingModes />} />

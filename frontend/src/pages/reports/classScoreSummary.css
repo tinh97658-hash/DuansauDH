@@ -1,0 +1,25 @@
+.css-report { display:flex; flex-direction:column; flex:1; min-width:0; min-height:0; gap:12px; color:var(--text-primary); font-family:var(--app-font-family); }
+.css-report .css-filters,.css-report .css-content { border-color:var(--table-border-color); border-radius:10px; background:var(--surface-bg); box-shadow:0 2px 6px rgba(18,59,98,.07); }
+.css-filters { display:grid; flex:none; grid-template-columns:minmax(120px,.6fr) minmax(170px,1fr) minmax(170px,1fr) minmax(220px,1.4fr) minmax(210px,1.2fr) auto; align-items:end; gap:12px; padding:12px; }
+.css-filters .css-export { height:38px; white-space:nowrap; }
+.css-content { display:flex; flex-direction:column; overflow:hidden; }
+.css-heading { display:flex; flex:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 16px; padding:12px; margin-bottom:12px; border-bottom:1px solid var(--table-border-color); }
+.css-title { margin:0; color:var(--secondary); font-size:15px; font-weight:700; line-height:1.5; }
+.css-heading p { margin:2px 0 0; color:var(--text-secondary); font-size:12px; line-height:1.5; }
+.css-content > .MuiAlert-root { margin:0 12px 12px; }
+.css-report .css-table-scroll { width:calc(100% - 24px) !important; margin:0 12px 12px; max-height:none; overflow-x:auto; overflow-y:hidden; }
+/* The shared table theme supplies header colors, borders, spacing and hover states. */
+.css-table-scroll .css-failed { color:var(--danger); font-weight:600; }
+.css-table-scroll .css-exempt { color:var(--success); font-weight:600; }
+.css-student-link { display:block; color:inherit; text-decoration:none; }
+.css-student-link:hover,.css-student-link:focus-visible { color:var(--primary); text-decoration:underline; }
+.css-empty { display:flex; flex:1; align-items:center; justify-content:center; gap:10px; min-height:180px; padding:32px 16px; color:var(--text-secondary); font-size:12.5px; }
+@media (max-width:1200px) {
+  .css-filters { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media (max-width:760px) {
+  .css-filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:420px) {
+  .css-filters { grid-template-columns:minmax(0,1fr); }
+}

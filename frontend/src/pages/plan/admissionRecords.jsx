@@ -17,9 +17,6 @@ import {
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
-import DocumentExportMenu from "../../components/DocumentExportMenu";
-import { buildAdmissionDocument } from "../../features/admission/admissionDocument";
-import { downloadAdmissionWord, openAdmissionPreview } from "../../features/admission/admissionDocumentExport";
 import ResizableTable from "../../components/ResizableTable";
 import AdmissionTuitionCheckbox from "../../features/admission/AdmissionTuitionCheckbox";
 import FilterSearchField from "../../components/FilterSearchField";
@@ -289,7 +286,6 @@ const AdmissionRecords = ({ mode = "applications" }) => {
     { key: "index", label: "STT", width: 50, minWidth: 40, align: "center" },
     { key: "code", label: "Mã HV", width: 140 },
     ...(isAdmittedMasters ? [
-      { key: "groupName", label: "Nhóm học phần", width: 180 },
       { key: "groupCode", label: "Mã nhóm", width: 140 },
     ] : []),
     { key: "lastName", label: "Họ đệm", width: 160 },
@@ -298,11 +294,12 @@ const AdmissionRecords = ({ mode = "applications" }) => {
     { key: "dob", label: "Ngày sinh", width: 120, align: "center" },
     { key: "gender", label: "Giới tính", width: 90, align: "center" },
     { key: "idCard", label: "Số CMND/CCCD", width: 150 },
-    { key: "major", label: "Trình độ & Ngành", width: 210 },
+    { key: "trainingLevel", label: "Trình độ", width: 100, align: "center" },
+    { key: "major", label: "Ngành", width: 210 },
     { key: "phone", label: "Điện thoại", width: 130 },
     ...(isAdmittedMasters ? [{ key: "tuition", label: "Đã nộp học phí nhập học", width: 180, align: "center" }] : []),
     { key: "status", label: "Trạng thái", width: 160 },
-    { key: "actions", label: "Thao tác", width: 220, minWidth: 210, align: "center" },
+    { key: "actions", label: "Thao tác", width: isAdmittedMasters ? 90 : 110, minWidth: 80, align: "center" },
   ];
 
   // Load Majors
@@ -682,7 +679,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
             boxShadow: "0 5px 18px rgba(23, 62, 117, 0.06)",
           }}
         >
-          <ResizableTable key={mode} columns={columns} storageKey={`admission-records-columns:${mode}`}>
+          <ResizableTable key={mode} columns={columns} storageKey={`admission-records-columns:${mode}`} freezeThrough={isAdmittedMasters ? "firstName" : undefined}>
 
             <TableBody>
               {records.length === 0 ? (
@@ -727,12 +724,6 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                     <TableCell sx={{ fontFamily: "inherit", fontWeight: 700, color: "#173E75" }}>
                       {r.code || "—"}
                     </TableCell>
-
-                    {isAdmittedMasters && (
-                      <TableCell sx={{ color: r.assignedGroup ? "#173E75" : "#8A9AAA", fontWeight: 600 }}>
-                        {r.assignedGroup?.name || "Chưa phân nhóm"}
-                      </TableCell>
-                    )}
 
                     {isAdmittedMasters && (
                       <TableCell sx={{ color: r.assignedGroup ? "#172B3A" : "#8A9AAA", fontWeight: 700 }}>
@@ -792,8 +783,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                       {r.idCard || "—"}
                     </TableCell>
 
-                    <TableCell>
-                      <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
+                    <TableCell align="center">
                       <Chip
                         size="small"
                         label={r.trainingLevel || "Thạc sĩ"}
@@ -804,14 +794,13 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                           bgcolor: r.trainingLevel === "Tiến sĩ" ? "#FEF7E0" : "#E6F4EA",
                           color: r.trainingLevel === "Tiến sĩ" ? "#B86216" : "#137B3B",
                           borderRadius: "999px",
-                          mr: 0.5,
-                          flexShrink: 0,
                         }}
                       />
+                    </TableCell>
+                    <TableCell>
                       <Typography variant="caption" title={r.majorName || r.major?.name || ""} sx={{ fontWeight: 600, color: "#173E75", minWidth: 0 }}>
                         {r.majorName || r.major?.name || "—"}
                       </Typography>
-                      </Stack>
                     </TableCell>
 
                     <TableCell sx={{ color: "#172B3A", fontSize: 12 }}>
@@ -853,10 +842,6 @@ const AdmissionRecords = ({ mode = "applications" }) => {
 
                     <TableCell align="center">
                       <Stack direction="row" spacing={0.5} justifyContent="center">
-                        <DocumentExportMenu label={`In / Xuất hồ sơ ${r.code || r.fullName}`} disabled={loading || saving}
-                          onWord={() => downloadAdmissionWord(buildAdmissionDocument(r, { year, variant: "list" }))}
-                          onPdf={() => openAdmissionPreview(buildAdmissionDocument(r, { year, variant: "list" }))}
-                          onError={(error) => toast.error(error.message || "Không thể xuất hồ sơ. Vui lòng thử lại.")} />
                         {isAdmin && (
                           <Tooltip title="Sửa hồ sơ">
                             <IconButton size="small" color="inherit" onClick={() => handleOpenEdit(r)}>
@@ -865,7 +850,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                           </Tooltip>
                         )}
 
-                        {isAdmin && (
+                        {isAdmin && !isAdmittedMasters && (
                           <Tooltip title="Xóa hồ sơ">
                             <IconButton size="small" color="error" onClick={() => setDeletingRecord(r)}>
                               <DeleteRounded sx={{ fontSize: 17, color: "#B52D2D" }} />

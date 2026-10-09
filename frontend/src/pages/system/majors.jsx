@@ -10,7 +10,8 @@ const Majors = () => (
     endpoint="/system/majors"
     itemName="chuyên ngành"
     nameLabel="Tên chuyên ngành"
-    showCode={false}
+    showCode
+    codeLabel="Mã chuyên ngành"
     showIndex={false}
     sortable={false}
     editOnDoubleClick

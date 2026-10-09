@@ -16,21 +16,33 @@ export const validateNameTemplate = (template) => {
   return "";
 };
 
-export const formatGroupName = (template, index) => (
-  String(template || "").trim().replace("{n}", String(index).padStart(2, "0"))
+export const formatGroupName = (template, index, digits = 2) => (
+  String(template || "").trim().replace("{n}", String(index).padStart(digits, "0"))
 );
 
-export const getNextGroupIndex = (groups, template, codePrefix) => {
+export const getNextGroupIndex = (groups, template, codePrefix, codeGroups = groups) => {
+  if (!codePrefix) return getAvailableGroupIndexes(groups, template, 1)[0];
   const normalizedTemplate = String(template || "").trim();
   const escapedParts = normalizedTemplate.split("{n}").map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const namePattern = escapedParts.length === 2 ? new RegExp(`^${escapedParts[0]}(\\d+)${escapedParts[1]}$`) : null;
   const codePattern = codePrefix ? new RegExp(`^${String(codePrefix).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\d+)$`) : null;
-  const indexes = (groups || []).flatMap((group) => {
-    const nameMatch = namePattern?.exec(String(group.name || ""));
-    const codeMatch = codePattern?.exec(String(group.code || ""));
-    return [nameMatch?.[1], codeMatch?.[1]].map(Number).filter(Number.isInteger);
-  });
+  const indexes = [
+    ...(groups || []).map((group) => namePattern?.exec(String(group.name || ""))?.[1]),
+    ...(codeGroups || []).map((group) => codePattern?.exec(String(group.code || ""))?.[1]),
+  ].map(Number).filter(Number.isInteger);
   return Math.max(0, ...indexes) + 1;
+};
+
+export const getAvailableGroupIndexes = (groups, template, count) => {
+  const parts = String(template || "").trim().split("{n}")
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pattern = parts.length === 2 ? new RegExp(`^${parts[0]}(\\d+)${parts[1]}$`) : null;
+  const used = new Set((groups || []).map((group) => Number(pattern?.exec(String(group.name || ""))?.[1])));
+  const indexes = [];
+  for (let index = 1; indexes.length < Math.min(10, asCount(count)); index += 1) {
+    if (!used.has(index)) indexes.push(index);
+  }
+  return indexes;
 };
 
 export const buildGroupNames = (template, startIndex, count) => (

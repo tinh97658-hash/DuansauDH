@@ -1,7 +1,8 @@
 import AdmissionEvaluationPanel from "../../features/admission/AdmissionEvaluationPanel";
 import AdmissionTuitionCheckbox from "../../features/admission/AdmissionTuitionCheckbox";
+import LearnerScorecard from "../../features/learners/LearnerScorecard";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -283,11 +284,18 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
-  const [detailTab, setDetailTab] = useState(new URLSearchParams(window.location.search).get("tab") === "admission" ? "admission" : "profile");
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [record, setRecord] = useState(null);
+  const requestedTab = searchParams.get("tab");
+  const detailTab = requestedTab === "grades" || (requestedTab === "admission" && record?.trainingLevel === "Thạc sĩ") ? requestedTab : "profile";
+  const changeDetailScope = (key, value) => {
+    const params = new URLSearchParams(searchParams);
+    params.set(key, value);
+    setSearchParams(params, { replace: true });
+  };
   const [formData, setFormData] = useState(null);
   const [initialData, setInitialData] = useState(null);
   const [majors, setMajors] = useState([]);
@@ -881,16 +889,14 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
         </Paper>
       ) : (
         <Box className="screen-only-form">
-          {record.trainingLevel === "Thạc sĩ" && <>
-            <Tabs value={detailTab} onChange={(_, value) => {
-              setDetailTab(value);
-            }} sx={{ mb: 2, bgcolor: "white", border: "1px solid #DFE4E8", borderRadius: 1 }}>
+            <Tabs value={detailTab} onChange={(_, value) => changeDetailScope("tab", value)} sx={{ mb: 2, bgcolor: "white", border: "1px solid #DFE4E8", borderRadius: 1 }}>
               <Tab value="profile" label="Thông tin hồ sơ & học tập" />
-              <Tab value="admission" label="Xét tuyển" />
+              {record.trainingLevel === "Thạc sĩ" && <Tab value="admission" label="Xét tuyển" />}
+              <Tab value="grades" label="Bảng điểm" />
             </Tabs>
             {detailTab === "admission" && <AdmissionEvaluationPanel record={record} isAdmin={isAdmin} disabled={isDirty || saving} onBusyChange={setSaving} onDecided={fetchData} />}
-          </>}
-          <Box sx={{ display: detailTab === "profile" || record.trainingLevel !== "Thạc sĩ" ? "block" : "none" }}>
+            {detailTab === "grades" && <LearnerScorecard admissionRecordId={id} classGroupId={searchParams.get("classGroupId")} onClassChange={value => changeDetailScope("classGroupId", value)} />}
+          <Box sx={{ display: detailTab === "profile" ? "block" : "none" }}>
           <Paper variant="outlined" sx={{ ...sectionCardSx, mb: 2 }}>
             <Typography sx={sectionTitleSx}>
               <HistoryRounded sx={{ color: "#0788B8", fontSize: 20 }} />

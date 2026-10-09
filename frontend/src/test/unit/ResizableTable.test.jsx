@@ -6,7 +6,7 @@ const columns = [
   { key: "name", label: "Họ đệm", width: 160 },
   { key: "email", label: "Email", width: 240 },
 ];
-const table = () => <ResizableTable columns={columns} storageKey="test-column-widths">
+const table = (freezeThrough) => <ResizableTable columns={columns} storageKey="test-column-widths" freezeThrough={freezeThrough}>
   <TableBody><TableRow><TableCell>Nguyễn Văn</TableCell><TableCell>a@example.com</TableCell></TableRow></TableBody>
 </ResizableTable>;
 const pointer = (element, type, x) => {
@@ -56,4 +56,19 @@ it("keeps the previous width when a drag is cancelled", () => {
   pointer(handle, "pointerMove", 280);
   pointer(handle, "pointerCancel", 280);
   expect(handle).toHaveAttribute("aria-valuenow", "240");
+});
+
+it("keeps frozen headers and cells aligned when preceding columns are resized", () => {
+  render(table("email"));
+  const nameHeader = screen.getByRole("columnheader", { name: /Họ đệm/ });
+  const emailHeader = screen.getByRole("columnheader", { name: /Email/ });
+  const nameCell = screen.getByRole("cell", { name: "Nguyễn Văn" });
+  const emailCell = screen.getByRole("cell", { name: "a@example.com" });
+  expect(nameHeader).toHaveStyle({ position: "sticky", left: "0px" });
+  expect(nameCell).toHaveStyle({ position: "sticky", left: "0px" });
+  expect(emailHeader).toHaveStyle({ position: "sticky", left: "160px" });
+  expect(emailCell).toHaveStyle({ position: "sticky", left: "160px" });
+  fireEvent.keyDown(screen.getByRole("slider", { name: "Độ rộng cột Họ đệm" }), { key: "ArrowRight" });
+  expect(emailHeader).toHaveStyle({ left: "170px" });
+  expect(emailCell).toHaveStyle({ left: "170px" });
 });

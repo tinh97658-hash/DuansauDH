@@ -136,25 +136,17 @@ it("reports corrupt/missing snapshot data instead of fetching a different record
   expect(axios.get).not.toHaveBeenCalled();
 });
 
-it.each(["applications", "admitted-masters"])("%s list downloads Word directly and opens PDF for the same row without changing filters", async (mode) => {
+it.each(["applications", "admitted-masters"])("%s list keeps the relevant row actions without document export", async (mode) => {
   render(<MemoryRouter><AdmissionRecords mode={mode} /></MemoryRouter>);
-  const trigger = await screen.findByRole("button", { name: "In / Xuất hồ sơ HV001" });
-  await waitFor(() => expect(trigger).toBeEnabled());
-  const queries = axios.get.mock.calls.filter(([url]) => url.includes("/admission-records?"));
-  fireEvent.click(trigger);
+  await screen.findAllByText(record.email);
+  expect(screen.queryByRole("button", { name: /In \/ Xuất/ })).not.toBeInTheDocument();
+  expect(screen.getAllByRole("button", { name: "Sửa hồ sơ" })).toHaveLength(2);
+  if (mode === "admitted-masters") {
+    expect(screen.queryByRole("button", { name: "Xóa hồ sơ" })).not.toBeInTheDocument();
+  } else {
+    expect(screen.getAllByRole("button", { name: "Xóa hồ sơ" })).toHaveLength(2);
+  }
   expect(window.open).not.toHaveBeenCalled();
-  for (const format of ["word", "pdf"]) expect(document.querySelector(`.document-export-icon-${format}`)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Word" }));
-  await waitFor(() => expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledTimes(1), { timeout: 10000 });
-  expect(window.open).not.toHaveBeenCalled(); expect(window.print).not.toHaveBeenCalled();
-  expect(HTMLAnchorElement.prototype.click.mock.instances[0].download).toBe("ho-so-HV001.docx");
-  const xml = await docxXml(URL.createObjectURL.mock.calls[0][0]);
-  expect(xml.documentElement.textContent).toContain(record.fullName.toUpperCase());
-  expect(xml.documentElement.textContent).not.toContain("Hồ sơ khác");
-  await waitFor(() => expect(trigger).toBeEnabled());
-  fireEvent.click(trigger); fireEvent.click(screen.getByRole("menuitem", { name: "Xuất PDF" }));
-  expect(readAdmissionPreview(previewId())).toMatchObject({ fullName: record.fullName, displayCode: record.code });
-  expect(axios.get.mock.calls.filter(([url]) => url.includes("/admission-records?"))).toEqual(queries);
   expect(axios.put).not.toHaveBeenCalled(); expect(axios.post).not.toHaveBeenCalled();
 });
 

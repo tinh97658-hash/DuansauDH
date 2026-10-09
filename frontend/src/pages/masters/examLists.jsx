@@ -16,8 +16,8 @@ const inputSx = {
   "& .MuiOutlinedInput-root": {
     height: 30, fontSize: 12, borderRadius: 0, bgcolor: "transparent",
     "& fieldset, &:hover fieldset, &.Mui-focused fieldset": { border: 0 },
-    "&.Mui-focused": { bgcolor: "#EDF4FA" },
-    "&.Mui-error": { bgcolor: "#FFF1F0" },
+    "&.Mui-focused": { bgcolor: "transparent", boxShadow: "none" },
+    "&.Mui-error": { bgcolor: "transparent", color: "#B52D2D" },
   },
   "& input": { px: 0.75, py: 0.5, textAlign: "center" },
 };
@@ -209,7 +209,7 @@ export default function ExamLists() {
           <Stack direction="row" gap={0.75} className="exam-no-print"><Chip size="small" label={`${total} / ${totalRows} học viên`} sx={{ bgcolor: "#EDF4FA", color: "#173E75" }} />{dirtyCount > 0 && <Chip size="small" color="warning" variant="outlined" label={`${dirtyCount} học viên chưa lưu`} />}</Stack>
         </Stack>
         {busy ? <Box sx={{ py: 6, textAlign: "center" }}><CircularProgress size={30} aria-label="Đang tải bảng điểm" /></Box> : <TableContainer sx={{ overflowX: "auto" }} className="exam-table-container exam-no-print">
-          <ResizableTable columns={columns} storageKey="masters-exam-gradebook-columns">
+          <ResizableTable columns={columns} storageKey="masters-exam-gradebook-columns" freezeThrough="firstName">
             <TableBody>{!visible.length ? <TableRow><TableCell colSpan={columns.length} align="center" sx={{ py: 6, color: "#607486" }}>{!groupId ? "Chưa có lớp học viên." : !offeringId ? "Lớp chưa có học phần được tổ chức. Hãy tạo lớp học phần để nhập điểm." : "Không có học viên phù hợp với danh sách đang chọn."}</TableCell></TableRow> : pageRows.map((row, index) => {
               const name = personNameParts(row);
               return <TableRow key={row.participantId} hover sx={{ "& td": { fontSize: 12.5, py: 0.75, borderColor: "#E2EBF2" }, ...(dirty[row.participantId] ? { bgcolor: "#FFFDF5" } : {}) }}>
@@ -222,7 +222,7 @@ export default function ExamLists() {
                   <TextField fullWidth size="small" value={blank ? "" : row[key]} disabled={locked} error={!blank && numericScore(row[key]) !== null && (!Number.isFinite(numericScore(row[key])) || numericScore(row[key]) < 0 || numericScore(row[key]) > max)} onChange={(event) => edit(row.participantId, { [key]: event.target.value })} inputProps={{ "aria-label": `${label} ${row.code}`, inputMode: "decimal" }} sx={inputSx} />
                 </TableCell>)}
                 <TableCell><TextField fullWidth size="small" value={blank ? "" : row.letterGrade} disabled={locked} onChange={(event) => edit(row.participantId, { letterGrade: event.target.value.toUpperCase() })} inputProps={{ "aria-label": `Thang điểm chữ ${row.code}`, maxLength: 10 }} sx={inputSx} /></TableCell>
-                <TableCell><TextField fullWidth size="small" value={blank ? "" : row.attemptScores} disabled={locked} placeholder={locked ? "" : "8,5; 9"} onChange={(event) => edit(row.participantId, { attemptScores: event.target.value })} inputProps={{ "aria-label": `Điểm các lần thi ${row.code}` }} sx={inputSx} /></TableCell></>}
+                <TableCell><TextField fullWidth size="small" value={blank ? "" : row.attemptScores} disabled={locked} onChange={(event) => edit(row.participantId, { attemptScores: event.target.value })} inputProps={{ "aria-label": `Điểm các lần thi ${row.code}` }} sx={inputSx} /></TableCell></>}
                 <TableCell><TextField select fullWidth size="small" SelectProps={{ native: true }} value={blank ? "pending" : row.result} disabled={locked || row.examExempt} onChange={(event) => edit(row.participantId, { result: event.target.value })} inputProps={{ "aria-label": `Kết quả điểm ${row.code}` }} sx={{ ...inputSx, "& select": { py: 0.5, fontSize: 12, color: row.result === "failed" ? "#B52D2D" : row.result === "passed" ? "#137B3B" : "#607486" } }}>
                   {Object.entries(RESULT_LABELS).map(([value, label]) => <option key={value} value={value}>{blank ? "" : label}</option>)}
                 </TextField></TableCell>

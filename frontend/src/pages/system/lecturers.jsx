@@ -17,13 +17,12 @@ const Lecturers = () => (
     showDeleteAction={false}
     fields={[
       {
-        key: "disciplineId", label: "Đơn vị", type: "select",
-        optionsEndpoint: "/system/disciplines", requiredOnCreate: true, alphabeticalGroups: true,
-        filterOption: (unit, form) => unit.active !== false || unit.id === form.disciplineId,
-        display: (row) => row.discipline?.name || (row.faculty ? `${row.faculty} (chưa liên kết)` : "Chưa có đơn vị"),
-        searchValue: (row) => row.discipline?.name || row.faculty,
-        helper: (form, row) => !form.disciplineId && row?.faculty
-          ? `Đơn vị cũ: ${row.faculty}. Chọn từ danh mục để liên kết; để trống giữ dữ liệu cũ.` : "",
+        key: "unitId", label: "Đơn vị", type: "select",
+        optionsEndpoint: "/system/units", requiredOnCreate: true, alphabeticalGroups: true,
+        filterOption: (unit, form) => unit.active !== false || unit.id === form.unitId,
+        display: (row, options) => options?.find((unit) => unit.value === row.unitId)?.label || (row.unitId ? "—" : "Chưa chọn đơn vị"),
+        searchValue: (row, options) => options?.find((unit) => unit.value === row.unitId)?.label || "",
+        helper: "Tên đơn vị được lấy từ danh mục Đơn vị.",
       },
       { key: "phone", label: "Số điện thoại", type: "tel" },
       {

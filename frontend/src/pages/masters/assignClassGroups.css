@@ -1,8 +1,8 @@
 /* Explicit identity-column widths keep long imported codes from sizing the table.
-   The un-sized major/note columns share the remaining space. */
+   The un-sized major column takes the remaining space. */
 .assignment-table.MuiTable-root{width:100%;table-layout:fixed}
-.assignment-candidates.MuiTable-root{min-width:700px}
-.assignment-members.MuiTable-root{min-width:560px}
+.assignment-candidates.MuiTable-root{min-width:910px}
+.assignment-members.MuiTable-root{min-width:610px}
 .assignment-table .MuiTableCell-root{padding:8px 6px;vertical-align:top;white-space:normal;font-size:12px;line-height:1.45}
 .assignment-table .MuiTableCell-paddingCheckbox{padding:4px;vertical-align:middle}
 .assignment-table .MuiTableCell-head{vertical-align:middle}
@@ -15,6 +15,10 @@
 .assignment-table .assignment-name-col{width:76px}
 .assignment-table .assignment-dob-col{width:100px}
 .assignment-table .assignment-gender-col{width:70px}
+.assignment-table .assignment-tuition-col{width:120px}
+.assignment-table .assignment-group-col{width:124px}
+.assignment-table .assignment-status{height:22px;font-size:11px;max-width:100%}
+.assignment-table .assignment-status .MuiChip-label{padding:0 6px;overflow:visible;text-overflow:clip}
 .assignment-members .assignment-code-col{width:100px}
 .assignment-members .assignment-family-col{width:145px}
 .assignment-members .assignment-name-col{width:70px}
@@ -29,7 +33,7 @@
 
 .assignment-scroll{container:assignment-table-area / inline-size}
 @container assignment-table-area (max-width:720px){
-  .assignment-candidates.MuiTable-root{min-width:620px}
+  .assignment-candidates.MuiTable-root{min-width:850px}
   .assignment-candidates .MuiTableCell-root{padding-left:5px;padding-right:5px}
   .assignment-candidates .assignment-code-col{width:90px}
   .assignment-candidates .assignment-family-col{width:132px}

@@ -4,12 +4,13 @@ import { TrainingLevel } from "./training-level.model.js";
 
 /**
  * Chuyên ngành đào tạo (cấp 2) — thuộc đúng một ngành (`discipline_id`).
- * `code` chỉ duy nhất trong phạm vi một ngành (unique `discipline_id + code`).
+ * `code` duy nhất trong phạm vi bậc đào tạo (unique `program + code`).
  */
 @Table({ tableName: "majors", underscored: true, timestamps: true })
 export class Major extends Model {
   @Default(DataType.UUIDV4) @Column({ type: DataType.UUID, primaryKey: true }) declare id: string;
   @Column({ type: DataType.STRING(200), allowNull: false }) declare name: string;
+  @Column({ type: DataType.STRING(30), allowNull: false }) declare code: string;
   @Column({ type: DataType.STRING(200), allowNull: true }) declare englishName: string | null;
   @Default(false) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare isCommon: boolean;
   @ForeignKey(() => Discipline) @Column({ type: DataType.UUID, allowNull: false }) declare disciplineId: string;

@@ -7,7 +7,9 @@ import { Curriculum } from "../plan/curriculum.model.js";
 export class ClassGroup extends Model {
   @Default(DataType.UUIDV4) @Column({ type: DataType.UUID, primaryKey: true }) declare id: string;
   @Column({ type: DataType.ENUM("masters", "doctoral"), allowNull: false }) declare program: string;
-  @Column({ type: DataType.STRING(30), allowNull: false }) declare code: string;
+  @Column({ type: DataType.STRING(100), allowNull: false }) declare code: string;
+  @Default(1) @Column({ type: DataType.INTEGER, allowNull: false }) declare intakeRound: number;
+  @Column({ type: DataType.INTEGER, allowNull: true }) declare groupNumber: number | null;
   @Column({ type: DataType.STRING(200), allowNull: false }) declare name: string;
   @ForeignKey(() => Major) @Column({ type: DataType.UUID, allowNull: true }) declare majorId: string | null;
   @BelongsTo(() => Major) declare major: any;

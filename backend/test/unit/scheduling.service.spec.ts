@@ -865,6 +865,52 @@ describe("SchedulingService.createCourseOffering", () => {
 });
 
 describe("SchedulingService persisted reads", () => {
+  it.each([23, 1, 0])("reports missing grades per completed offering and class (%i missing learners)", async (missingGradeCount) => {
+    const mocks = buildService();
+    const first = group("group-1");
+    const second = group("group-2");
+    mocks.majors.findOne.mockResolvedValue({ id: "major-1" });
+    mocks.classGroups.findAll.mockResolvedValue([first, second]);
+    mocks.packages.findAll.mockResolvedValue([first, second].map((value) => ({
+      ...officialPackage(value.id), credits: 3, sortOrder: 1,
+    })));
+    mocks.offeringGroups.findAll.mockResolvedValue([first, second].map((value) => ({ classGroupId: value.id, courseOfferingId: "completed" })));
+    mocks.courseOfferings.findAll.mockResolvedValue([{ id: "completed", status: "completed", subject }]);
+    mocks.sequelize.query.mockResolvedValue([
+      { classGroupId: first.id, courseOfferingId: "completed", missingGradeCount },
+      { classGroupId: second.id, courseOfferingId: "completed", missingGradeCount: 0 },
+    ]);
+    const data = await mocks.service.getClassCurriculumProgress({ majorId: "major-1", academicYear: "2026" });
+    expect(data.classes[0].subjects[0]).toMatchObject({ status: "completed", needsGradeEntry: missingGradeCount > 0 });
+    expect(data.classes[1].subjects[0]).toMatchObject({ status: "completed", needsGradeEntry: false });
+    expect(mocks.sequelize.query).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+      replacements: { groupIds: [first.id, second.id], completedOfferingIds: ["completed"] },
+    }));
+  });
+
+  it("keeps the warning when another completed offering of the same canonical subject still lacks grades", async () => {
+    const mocks = buildService();
+    const selectedGroup = group("group-1");
+    mocks.majors.findOne.mockResolvedValue({ id: "major-1" });
+    mocks.classGroups.findAll.mockResolvedValue([selectedGroup]);
+    mocks.packages.findAll.mockResolvedValue([officialPackage(selectedGroup.id)]);
+    mocks.offeringGroups.findAll.mockResolvedValue(["completed", "alias", "active"].map((courseOfferingId) => ({ classGroupId: selectedGroup.id, courseOfferingId })));
+    mocks.courseOfferings.findAll.mockResolvedValue([
+      { id: "completed", status: "completed", subject },
+      { id: "alias", status: "completed", subject: { ...subject, id: "alias-subject", canonicalSubjectId: subject.id } },
+      { id: "active", status: "active", subject },
+    ]);
+    mocks.sequelize.query.mockResolvedValue([
+      { classGroupId: selectedGroup.id, courseOfferingId: "completed", missingGradeCount: 0 },
+      { classGroupId: selectedGroup.id, courseOfferingId: "alias", missingGradeCount: 1 },
+    ]);
+    const data = await mocks.service.getClassCurriculumProgress({ majorId: "major-1", academicYear: "2026" });
+    expect(data.classes[0].subjects[0]).toMatchObject({ status: "completed", needsGradeEntry: true });
+    expect(mocks.sequelize.query).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+      replacements: { groupIds: [selectedGroup.id], completedOfferingIds: ["completed", "alias"] },
+    }));
+  });
+
   it("returns the class progress summary and every teaching session", async () => {
     const { service, majors, packages, classGroupElectives, classGroups, offeringGroups, courseOfferings, teachingSessions } = buildService();
     const selectedGroup = { ...group("group-1", "CNT2027.01"), curriculum: { id: curriculumIdFor("group-1"), code: "CNTT-2027", name: "CTĐT CNTT 2027", totalCredits: 60 } };
@@ -904,6 +950,7 @@ describe("SchedulingService persisted reads", () => {
       where: { program: "masters", majorId: "major-1", academicYear: "2027", groupType: "ADMINISTRATIVE" },
     }));
     expect(courseOfferings.findAll.mock.calls[0][0].include.find((include: any) => include.as === "subject").where).toEqual({ program: "masters" });
+    expect(result.classes[0].subjects.every((row: any) => row.needsGradeEntry === false)).toBe(true);
   });
 
   it("scopes the list through Subject.program so another program cannot leak into Masters", async () => {

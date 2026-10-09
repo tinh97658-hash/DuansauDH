@@ -192,6 +192,11 @@
 .sl-schedule-view .sl-section h2 b{min-width:31px;height:27px;display:grid;place-items:center;border-radius:4px;background:#f3f7f9;color:#607486;font-size:12.5px;font-weight:600}
 .sl-schedule-view .sl-card{height:auto;min-height:98px;display:grid;grid-template-rows:auto auto;align-content:space-between;margin-bottom:7px;padding:8px 10px;border:1px solid #d7e1e9;border-left:1px solid #d7e1e9;border-radius:4px;background:#fff;cursor:default;overflow:hidden}
 .sl-schedule-view .sl-card.sl-selected{border-color:#72aed0;border-left:3px solid #1689b4;background:#eaf4fa}
+.sl-card-heading{display:flex;align-items:center;gap:12px;min-width:0}
+.sl-schedule-view .sl-close-suggestion{flex:none;display:grid;place-items:center;width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:#d99a0b;line-height:1;cursor:pointer;transition:background-color .15s,color .15s}
+.sl-schedule-view .sl-close-suggestion svg{width:23px;height:23px}
+.sl-schedule-view .sl-close-suggestion:hover{background:#fff7df;color:#bd8000}
+.sl-schedule-view .sl-close-suggestion:focus-visible{outline:2px solid #d99a0b;outline-offset:2px;background:#fff7df}
 .sl-card-detail{width:100%;min-width:0;display:grid;align-content:start;justify-items:start;overflow:hidden;padding:0!important;color:#172b3a!important;line-height:1.35;text-align:left!important}
 .sl-card-detail strong,.sl-card-detail span,.sl-card-detail small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sl-card-detail strong{color:#173e75;font-size:13px;line-height:1.3;text-transform:uppercase}
@@ -354,6 +359,15 @@
 .sl-session-editor-dialog .v20-field{gap:6px;margin-bottom:16px;color:#5f748c;font-size:13px;font-weight:600;line-height:1.35}
 .sl-session-editor-dialog .v20-field select,.sl-session-editor-dialog .v20-field textarea{border:1px solid #bfcedb;border-radius:8px;color:#172b3a;font-weight:400}
 .sl-session-editor-dialog .v20-field select{height:42px;padding:0 12px}
+.sl-session-editor-dialog .sl-unit-field .sl-combo{margin-top:0}
+.sl-session-editor-dialog .sl-unit-field .sl-combo input{height:42px;padding:0 38px 0 12px;border:1px solid #bfcedb;border-radius:8px;color:#172b3a;font:inherit;font-weight:400}
+.sl-session-editor-dialog .sl-unit-field .sl-combo>button{height:40px;width:36px;border-radius:0 8px 8px 0}
+.sl-session-editor-dialog .sl-unit-field .sl-combo-list{top:47px;max-height:260px;border-radius:8px}
+.sl-session-editor-dialog .sl-unit-field .sl-combo-list button{font:inherit;font-weight:400;color:#172b3a}
+.sl-session-editor-dialog .sl-lecturer-trigger{position:relative;padding-right:38px}
+.sl-session-editor-dialog .sl-unit-field .sl-combo>button,
+.sl-session-editor-dialog .sl-lecturer-trigger b{position:absolute;top:1px;right:1px;width:36px;height:40px;color:transparent;font-size:0;background-color:transparent;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M2 2l4 4 4-4' fill='none' stroke='%23526a82' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:center;background-size:12px 8px}
+.sl-session-editor-dialog .sl-lecturer-trigger b{pointer-events:none}
 .sl-session-editor-dialog .v20-field textarea{height:110px;min-height:110px;padding:11px 12px;resize:none}
 .sl-session-editor-dialog .v20-field textarea::placeholder{color:#9aa8b4}
 .sl-teaching-unit-hint{color:#17704a;font-size:11px;font-weight:500;line-height:1.35}
@@ -414,16 +428,23 @@
 .sl-sessions-table td{padding:8px 10px;font-size:13px;border-bottom:1px solid #eef2f6;vertical-align:middle}
 .sl-sessions-table .sl-session-centered{text-align:center}
 .sl-sessions-table tr:hover td{background:#f8fafc}
+.sl-session-details-button{display:inline-flex;align-items:center;justify-content:center;gap:5px;height:30px;padding:0 10px;border:1px solid #d2e4f0;border-radius:7px;background:#edf5fc;color:#246b9b;font:inherit;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;transition:background .15s ease,border-color .15s ease}
+.sl-session-details-button .MuiSvgIcon-root{width:16px;height:16px}
+.sl-session-details-button:hover{border-color:#9fc5df;background:#dcecf8;color:#155d8d}
+.sl-session-details-button:focus-visible{outline:2px solid #0b7f9c;outline-offset:2px}
 .sl-offering-groups-title{margin:22px 0 8px;color:#5f748c;font-size:12px;font-weight:600;letter-spacing:.025em}
 .sl-offering-groups{display:flex;flex-wrap:wrap;gap:10px}
 .sl-offering-groups>div{min-width:220px;max-width:320px;min-height:0;flex:1 1 240px;padding:10px 14px;border:1px solid #d9e4ec;border-radius:9px;background:#fff}
 .sl-offering-groups strong,.sl-offering-groups span{display:block}
 .sl-offering-groups strong{color:#123b63;font-size:14px;font-weight:600;line-height:1.35}.sl-offering-groups span{margin-top:4px;color:#5f748c;font-size:12px;line-height:1.35}
-.sl-offering-roster-wrap{max-height:270px;overflow-y:auto;border:1px solid #d5dfe6;border-radius:4px;background:#fff}
-.sl-offering-roster-table{table-layout:fixed}
-.sl-offering-roster-table th:first-child{width:11%}
-.sl-offering-roster-table th:nth-child(2){width:38%}
-.sl-offering-roster-table th:nth-child(3){width:51%}
+.sl-offering-roster-wrap{max-height:270px;overflow:auto;border:1px solid #d5dfe6;border-radius:4px;background:#fff}
+.sl-offering-roster-table{width:100%;min-width:760px;table-layout:fixed}
+.sl-offering-roster-table .sl-roster-number{width:56px}
+.sl-offering-roster-table .sl-roster-family{width:26%}
+.sl-offering-roster-table .sl-roster-given{width:16%}
+.sl-offering-roster-table .sl-roster-code{width:20%}
+.sl-offering-roster-table th,.sl-offering-roster-table td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sl-offering-roster-table th:first-child,.sl-offering-roster-table td:first-child{text-align:center}
 .sl-offering-roster-table td{height:60px;vertical-align:middle}
 .sl-offering-student-cell strong,.sl-offering-student-cell small{display:block}
 .sl-offering-student-cell strong{color:#172b3a;font-size:14px;line-height:1.35;font-weight:500}

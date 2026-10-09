@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -80,11 +80,14 @@ const AlphabeticalHeader = ({ children }) => (
   <ListSubheader role="presentation" sx={{ color: "#173b5d", fontWeight: 700, lineHeight: "32px", bgcolor: "#f5f8fb" }}>{children}</ListSubheader>
 );
 
+const EMPTY_FIELDS = [];
+
 const CatalogManager = ({
   title, group, desc, endpoint, itemName, nameLabel = "Tên", codeLabel = "Mã",
-  sortable = true, parent = null, parentBeforeName = false, fields = [], editOnDoubleClick = false,
+  sortable = true, parent = null, parentBeforeName = false, fields = EMPTY_FIELDS, editOnDoubleClick = false,
   showEditAction = true, showDeleteAction = true, showSortColumn = sortable,
   showCode = true, showIndex = true, splitPersonName = false,
+  inlineEdit = false,
 }) => {
   const [rows, setRows] = useState([]);
   const [options, setOptions] = useState([]);
@@ -98,6 +101,60 @@ const CatalogManager = ({
   const [form, setForm] = useState(buildEmptyForm(parent, fields, sortable));
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
+  const [inlineCell, setInlineCell] = useState(null);
+  const inlineRef = useRef(null);
+  const [inlineSaving, setInlineSaving] = useState(false);
+
+  const startInlineEdit = (row, key) => {
+    if (!isAdmin || inlineRef.current || saving) return;
+    const cell = { id: row.id, key, value: row[key] || "", original: row[key] || "", error: "" };
+    inlineRef.current = cell;
+    setInlineCell(cell);
+  };
+  const cancelInlineEdit = () => {
+    if (inlineRef.current?.pending) return;
+    inlineRef.current = null;
+    setInlineCell(null);
+  };
+  const saveInlineEdit = async () => {
+    const cell = inlineRef.current;
+    if (!cell || cell.pending) return;
+    const value = cell.value.trim();
+    if (!value) {
+      const next = { ...cell, error: `Vui lòng nhập ${cell.key === "code" ? codeLabel.toLowerCase() : nameLabel.toLowerCase()}.` };
+      inlineRef.current = next; setInlineCell(next); return;
+    }
+    if (value === cell.original) { cancelInlineEdit(); return; }
+    inlineRef.current = { ...cell, pending: true };
+    setInlineSaving(true);
+    try {
+      const { data } = await axios.put(`${API_BASE_URL}${endpoint}/${cell.id}`, { [cell.key]: value }, { withCredentials: true });
+      setRows((previous) => previous.map((row) => row.id === cell.id ? { ...row, [cell.key]: data?.[cell.key] ?? value } : row));
+      inlineRef.current = null; setInlineCell(null);
+    } catch (failure) {
+      const next = { ...cell, error: failure.response?.data?.message || `Không thể lưu ${itemName}.` };
+      inlineRef.current = next; setInlineCell(next);
+    } finally { setInlineSaving(false); }
+  };
+  const renderEditableCell = (row, key, label, content) => {
+    if (!inlineEdit || !isAdmin) return content;
+    if (inlineCell?.id === row.id && inlineCell.key === key) return <TextField
+      autoFocus fullWidth size="small" value={inlineCell.value} disabled={inlineSaving}
+      inputProps={{ "aria-label": label }} error={!!inlineCell.error} helperText={inlineCell.error || ""}
+      onChange={(event) => { const next = { ...inlineRef.current, value: event.target.value, error: "" }; inlineRef.current = next; setInlineCell(next); }}
+      onBlur={saveInlineEdit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") { event.preventDefault(); saveInlineEdit(); }
+        if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancelInlineEdit(); }
+      }}
+    />;
+    return <Box component="button" type="button" aria-label={`Sửa ${label.toLowerCase()} ${row.code || row.name}`}
+      onDoubleClick={() => startInlineEdit(row, key)} disabled={inlineSaving}
+      title="Nhấp đúp để sửa"
+      sx={{ display: "block", width: "100%", border: 0, p: 0, background: "transparent", color: "inherit", font: "inherit", textAlign: "left", cursor: "text" }}>
+      {content}
+    </Box>;
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -167,17 +224,18 @@ const CatalogManager = ({
     if (!keyword) return rows;
     const haystacks = (row) => [
       showCode ? row.code : "", row.name,
-      ...tableFields.map((f) => f.searchValue ? f.searchValue(row) : row[f.key]),
+      ...tableFields.map((f) => f.searchValue ? f.searchValue(row, fieldOptions[f.key]) : row[f.key]),
       parent ? (parent.display ? parent.display(row) : row[parent.field]) : "",
     ];
     return rows.filter((row) => haystacks(row).some((v) => String(v ?? "").toLowerCase().includes(keyword)));
-  }, [rows, search, parent, tableFields, showCode]);
+  }, [rows, search, parent, tableFields, showCode, fieldOptions]);
 
   const showActions = isAdmin && (showEditAction || showDeleteAction);
   const colSpan = (showIndex ? 1 : 0) + (showCode ? 1 : 0) + (splitPersonName ? 2 : 1) + (parent ? 1 : 0) + tableFields.length + (showSortColumn ? 1 : 0) + 1 + (showActions ? 1 : 0);
 
   const openAdd = () => { setEditingId(null); setForm(buildEmptyForm(parent, fields, sortable)); setDialogOpen(true); };
   const openEdit = (row) => {
+    if (inlineEdit) { startInlineEdit(row, "name"); return; }
     const next = { code: row.code, name: row.name, active: row.active };
     if (sortable) next.sortOrder = row.sortOrder ?? 0;
     if (parent) next[parent.field] = row[parent.field] || "";
@@ -270,7 +328,7 @@ const CatalogManager = ({
   };
 
   const renderFieldValue = (row, f) => {
-    if (f.display) return f.display(row);
+    if (f.display) return f.display(row, fieldOptions[f.key]);
     if (f.type === "checkbox" || f.type === "boolean") {
       return row[f.key] ? (
         <Chip size="small" label="Có" color="primary" variant="outlined" />
@@ -358,13 +416,13 @@ const CatalogManager = ({
             ) : filtered.length === 0 ? (
               <TableRow><TableCell colSpan={colSpan} align="center" sx={{ py: 4, color: "text.secondary" }}>Chưa có dữ liệu.</TableCell></TableRow>
             ) : filtered.map((row, index) => (
-              <TableRow key={row.id} hover onDoubleClick={isAdmin && editOnDoubleClick ? () => openEdit(row) : undefined}
+              <TableRow key={row.id} hover onDoubleClick={isAdmin && editOnDoubleClick && !inlineEdit ? () => openEdit(row) : undefined}
                 title={isAdmin && editOnDoubleClick ? "Nhấp đúp để sửa" : undefined}
                 sx={isAdmin && editOnDoubleClick ? { cursor: "pointer" } : undefined}>
                 {showIndex && <TableCell>{index + 1}</TableCell>}
-                {showCode && <TableCell><Typography variant="body2" sx={{ fontFamily: "inherit" }}>{row.code}</Typography></TableCell>}
+                {showCode && <TableCell>{renderEditableCell(row, "code", codeLabel, <Typography variant="body2" sx={{ fontFamily: "inherit" }}>{row.code}</Typography>)}</TableCell>}
                 {parent && parentBeforeName && <TableCell>{parent.display ? parent.display(row) : row[parent.field]}</TableCell>}
-                {splitPersonName ? <><TableCell>{personNameParts(row).familyAndMiddle}</TableCell><TableCell>{personNameParts(row).givenName}</TableCell></> : <TableCell>{row.name}</TableCell>}
+                {splitPersonName ? <><TableCell>{personNameParts(row).familyAndMiddle}</TableCell><TableCell>{personNameParts(row).givenName}</TableCell></> : <TableCell>{renderEditableCell(row, "name", nameLabel, row.name)}</TableCell>}
                 {parent && !parentBeforeName && <TableCell>{parent.display ? parent.display(row) : row[parent.field]}</TableCell>}
                 {tableFields.map((f) => <TableCell key={f.key}>{renderFieldValue(row, f)}</TableCell>)}
                 {showSortColumn && <TableCell align="center">{row.sortOrder}</TableCell>}
@@ -379,7 +437,7 @@ const CatalogManager = ({
                 </TableCell>
                 {showActions && (
                   <TableCell align="right" onDoubleClick={(event) => event.stopPropagation()}>
-                    {showEditAction && <Tooltip title="Sửa"><IconButton size="small" color="primary" onClick={() => openEdit(row)}><EditRounded fontSize="small" /></IconButton></Tooltip>}
+                    {showEditAction && <Tooltip title={inlineEdit ? "Nhấp đúp để sửa" : "Sửa"}><IconButton aria-label="Sửa" size="small" color="primary" onClick={inlineEdit ? undefined : () => openEdit(row)} onDoubleClick={inlineEdit ? () => openEdit(row) : undefined}><EditRounded fontSize="small" /></IconButton></Tooltip>}
                     {showDeleteAction && <Tooltip title="Xóa"><IconButton size="small" color="error" onClick={() => setDeleting(row)}><DeleteRounded fontSize="small" /></IconButton></Tooltip>}
                   </TableCell>
                 )}

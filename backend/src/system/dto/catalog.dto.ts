@@ -20,6 +20,7 @@ export class CreateCatalogDto {
   @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsIn(["masters", "doctoral"]) program?: string;
   @IsOptional() @IsUUID() staffId?: string;
+  @IsOptional() @IsUUID() unitId?: string | null;
   // Trường bổ sung theo từng danh mục
   @IsOptional() @IsBoolean() isAdmissionScreening?: boolean;
   @IsOptional() @IsNumber({ maxDecimalPlaces: 1 }) @Min(0) durationYears?: number;
@@ -53,6 +54,7 @@ export class UpdateCatalogDto {
   @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsIn(["masters", "doctoral"]) program?: string;
   @IsOptional() @IsUUID() staffId?: string;
+  @IsOptional() @IsUUID() unitId?: string | null;
   @IsOptional() @IsBoolean() isAdmissionScreening?: boolean;
   @IsOptional() @IsNumber({ maxDecimalPlaces: 1 }) @Min(0) durationYears?: number;
   @IsOptional() @IsNumber({ maxDecimalPlaces: 1 }) @Min(0) maxOvertimeYears?: number;
