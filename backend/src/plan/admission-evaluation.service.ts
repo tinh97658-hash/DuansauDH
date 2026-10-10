@@ -7,6 +7,7 @@ import { isDeepStrictEqual } from "node:util";
 import { AdmissionRecord } from "../database/models/plan/admission-record.model.js";
 import { AdmissionEvaluation, AdmissionEvaluationHistory, AdmissionRound } from "../database/models/plan/admission-evaluation.model.js";
 import { Major } from "../database/models/common/major.model.js";
+import { MajorTransfer } from "../database/models/training/major-transfer.model.js";
 import { ADMISSION_CORE_FIELDS, ADMISSION_SOURCE, admissionBirthYear, admissionRecordSnapshot, DEFAULT_ADMISSION_RULES, normalizedAdmissionValue, rankAdmissions, scoreAdmission } from "./admission-scoring.js";
 import { BulkAdmissionScoresDto, ConfirmAdmissionBatchDto, ConfirmAdmissionTuitionBatchDto, DecideAdmissionDto, SaveAdmissionEvaluationDto, SaveAdmissionRoundDto, UpdateAdmissionTuitionDto } from "./dto/admission.dto.js";
 
@@ -19,6 +20,7 @@ export class AdmissionEvaluationService {
     @InjectModel(AdmissionEvaluationHistory) private readonly history: typeof AdmissionEvaluationHistory,
     @InjectModel(Major) private readonly majors: typeof Major,
     @InjectConnection() private readonly sequelize: Sequelize,
+    @InjectModel(MajorTransfer) private readonly majorTransfers: typeof MajorTransfer,
   ) {}
 
   async listRounds() {
@@ -250,5 +252,55 @@ export class AdmissionEvaluationService {
       || (dto.studyStatus !== undefined && dto.studyStatus !== record.studyStatus && !(evaluation.decision === "admitted" && dto.studyStatus === "Đang học"))) {
       throw new ConflictException("Thông tin xét tuyển đã được duyệt. Mở lại kết quả trước khi thay đổi.");
     }
+  }
+
+  // This closes a completed business transition, not a manual edit or a reopen.
+  // Read the persisted approval in the caller's transaction; never accept a bypass flag from a DTO.
+  async archiveForApprovedMajorTransfer(transferId: string, actor: any, transaction: Transaction) {
+    if (!transaction) throw new BadRequestException("Chuyển chuyên ngành phải được xử lý trong một transaction.");
+    const transfer = await this.majorTransfers.findByPk(transferId, { transaction, lock: transaction.LOCK.UPDATE });
+    if (!transfer || transfer.status !== "approved" || !transfer.toCurriculumId || !transfer.decidedAt
+      || transfer.fromMajorId === transfer.toMajorId) {
+      throw new ConflictException("Chỉ kết thúc chu kỳ xét tuyển khi chuyển chuyên ngành đã được duyệt.");
+    }
+    const record = await this.records.findByPk(transfer.admissionRecordId, { transaction, lock: transaction.LOCK.UPDATE });
+    if (!record || record.majorId !== transfer.toMajorId || record.status !== "pending"
+      || record.studyStatus !== "Nộp hồ sơ đầu vào") {
+      throw new ConflictException("Hồ sơ không khớp quyết định chuyển chuyên ngành. Tải lại trước khi xử lý.");
+    }
+    const evaluation = await this.evaluations.findOne({ where: { admissionRecordId: record.id }, transaction, lock: transaction.LOCK.UPDATE });
+    if (!evaluation) return;
+    if (evaluation.recordSnapshot?.majorId !== transfer.fromMajorId) {
+      throw new ConflictException("Chu kỳ xét tuyển không thuộc chuyên ngành trước khi chuyển. Cần đối soát dữ liệu.");
+    }
+    const entries = await this.history.findAll({ where: { admissionRecordId: record.id }, order: [["createdAt", "DESC"], ["id", "DESC"]], transaction });
+    const saved = entries.find((entry) => entry.snapshot?.evaluation?.id === evaluation.id
+      && entry.snapshot?.evaluation?.version === evaluation.version
+      && entry.snapshot?.evaluation?.decision === evaluation.decision
+      && entry.snapshot?.record?.majorId === transfer.fromMajorId
+      && entry.snapshot?.round && entry.snapshot?.result);
+    // A decided result must keep its original threshold and decision, not be recalculated
+    // against today's round. Missing historical evidence requires reconciliation.
+    if (!saved && evaluation.decision !== "pending") {
+      throw new ConflictException("Thiếu snapshot quyết định xét tuyển cũ. Cần đối soát lịch sử trước khi chuyển chuyên ngành.");
+    }
+    let snapshot = saved?.snapshot;
+    if (!snapshot) {
+      const round = await this.rounds.findByPk(evaluation.roundId, { transaction });
+      if (!round) throw new NotFoundException("Không tìm thấy đợt xét tuyển cũ.");
+      const majors = await this.majors.findAll({ where: { id: transfer.fromMajorId }, transaction });
+      snapshot = { record: { ...evaluation.recordSnapshot, majorName: majors[0]?.name || null },
+        round: round.toJSON(), result: scoreAdmission(evaluation.recordSnapshot, evaluation.inputs, round) };
+    }
+    await this.history.create({ admissionRecordId: record.id, action: "major_transfer",
+      actor: String(actor?.name || actor?.email || actor?.id || "unknown"),
+      snapshot: { ...snapshot, evaluation: evaluation.toJSON(), actorId: actor?.id || null,
+        sourceHistoryId: saved?.id || null,
+        majorTransfer: { id: transfer.id, fromMajorId: transfer.fromMajorId, toMajorId: transfer.toMajorId, toCurriculumId: transfer.toCurriculumId },
+        note: transfer.decisionNote || "Kết thúc chu kỳ xét tuyển sau khi duyệt chuyển chuyên ngành." },
+    } as any, { transaction });
+    // History has no FK to this current slot. A new cycle gets its own evaluation ID
+    // and version; the old admitted evaluation and all snapshots remain in history.
+    await evaluation.destroy({ transaction });
   }
 }

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { AdmissionEvaluationService } from "./admission-evaluation.service.js";
 import { InjectModel } from "@nestjs/sequelize";
 import { Op } from "sequelize";
@@ -30,7 +30,7 @@ export class MajorTransferService {
     @InjectModel(CourseOfferingStudent) private readonly offeringStudents: typeof CourseOfferingStudent,
     private readonly subjectRecognitionService: SubjectRecognitionService,
     private readonly sequelize: Sequelize,
-    @Optional() private readonly admissionEvaluation?: AdmissionEvaluationService,
+    private readonly admissionEvaluation: AdmissionEvaluationService,
   ) {}
 
   private readonly include = [
@@ -111,7 +111,7 @@ export class MajorTransferService {
     });
   }
 
-  async decide(id: string, dto: DecideMajorTransferDto) {
+  async decide(id: string, dto: DecideMajorTransferDto, actor?: any) {
     return this.sequelize.transaction(async (transaction) => {
       const transfer = await this.transfers.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!transfer) throw new NotFoundException("Không tìm thấy yêu cầu chuyển chuyên ngành.");
@@ -120,7 +120,7 @@ export class MajorTransferService {
       if (!record) throw new NotFoundException("Không tìm thấy hồ sơ học viên.");
 
       if (dto.decision === "rejected") {
-        await this.admissionEvaluation?.guardRecordUpdate(record, {
+        await this.admissionEvaluation.guardRecordUpdate(record, {
           majorId: transfer.fromMajorId,
           status: transfer.previousAdmissionStatus || "approved",
           studyStatus: transfer.previousStudyStatus || "Đang học",
@@ -143,14 +143,29 @@ export class MajorTransferService {
           } as never, { transaction });
         }
       } else {
-        await this.admissionEvaluation?.guardRecordUpdate(record, { majorId: transfer.toMajorId }, transaction);
+        if (record.majorId !== transfer.fromMajorId || transfer.fromMajorId === transfer.toMajorId) {
+          throw new ConflictException("Chuyên ngành hiện tại không khớp yêu cầu chuyển. Tải lại trước khi duyệt.");
+        }
         if (!dto.toCurriculumId) throw new BadRequestException("Phải chọn chương trình đào tạo mới khi duyệt chuyển chuyên ngành.");
         const curriculum = await this.curriculums.findByPk(dto.toCurriculumId, { transaction });
         const expectedProgram = record.trainingLevel === "Tiến sĩ" ? "doctoral" : "masters";
+        const targetMajor = await this.majors.findByPk(transfer.toMajorId, { transaction });
+        if (!targetMajor || targetMajor.active === false || targetMajor.program !== expectedProgram) {
+          throw new BadRequestException("Chuyên ngành mới không còn tồn tại, đã ngừng sử dụng hoặc không cùng bậc đào tạo.");
+        }
         if (!curriculum || curriculum.majorId !== transfer.toMajorId || curriculum.program !== expectedProgram
-          || curriculum.applicableFromYear !== (record.academicYear || "")) {
+          || curriculum.active === false || curriculum.applicableFromYear !== (record.academicYear || "")) {
           throw new BadRequestException("Chương trình đào tạo mới không phù hợp với chuyên ngành, bậc hoặc khóa của học viên.");
         }
+        // Recognition validates the curriculum against the current major. Change it
+        // inside this transaction first, while retaining the old memberships for
+        // capturing completed learning results. Any later failure rolls it back.
+        await record.update({
+          majorId: targetMajor.id,
+          majorName: targetMajor.name,
+          status: "pending",
+          studyStatus: "Nộp hồ sơ đầu vào",
+        } as never, { transaction });
         // Cùng một cơ chế công nhận dùng chung: đối chiếu kết quả học phần cá nhân với CTĐT mới.
         await this.subjectRecognitionService.proposeForRecord(transfer.admissionRecordId, {
           curriculumId: curriculum.id,
@@ -176,20 +191,13 @@ export class MajorTransferService {
             );
           }
         }
-        const targetMajor = await this.majors.findByPk(transfer.toMajorId, { transaction });
-        if (!targetMajor || targetMajor.active === false) {
-          throw new BadRequestException("Chuyên ngành mới không còn tồn tại hoặc đã ngừng sử dụng.");
-        }
         await this.memberships.destroy({ where: membershipWhere as never, transaction });
-        await record.update({
-          majorId: targetMajor.id,
-          majorName: targetMajor.name,
-          status: "pending",
-          studyStatus: "Nộp hồ sơ đầu vào",
-        } as never, { transaction });
         await transfer.update({ toCurriculumId: curriculum.id } as never, { transaction });
       }
       await transfer.update({ status: dto.decision, decisionNote: dto.note || null, decidedAt: new Date() } as never, { transaction });
+      if (dto.decision === "approved") {
+        await this.admissionEvaluation.archiveForApprovedMajorTransfer(transfer.id, actor, transaction);
+      }
       return this.transfers.findByPk(id, { include: this.include as never, transaction });
     });
   }

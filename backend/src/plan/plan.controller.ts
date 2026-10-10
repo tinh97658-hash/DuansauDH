@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from "@nestjs/common";
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
-import { Roles } from "../common/auth-user.js";
+import { CurrentUser, Roles } from "../common/auth-user.js";
 import { RolesGuard } from "../common/roles.guard.js";
 import {
   CreateAdmissionRecordDto, CreateClassDto, CreateCurriculumDto, CreateLearningResultDto, CreateSharedSubjectsDto, CreateSubjectDto,
@@ -118,8 +118,8 @@ export class PlanController {
 
   @Put("major-transfers/:id/decision")
   @Roles("admin") @UseGuards(RolesGuard)
-  decideMajorTransfer(@Param("id") id: string, @Body() dto: DecideMajorTransferDto) {
-    return this.majorTransfers.decide(id, dto);
+  decideMajorTransfer(@Param("id") id: string, @Body() dto: DecideMajorTransferDto, @CurrentUser() actor: any) {
+    return this.majorTransfers.decide(id, dto, actor);
   }
 
   @Put("subject-recognitions/:id")

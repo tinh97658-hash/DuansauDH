@@ -16,7 +16,7 @@ function setup() {
   const evaluations = { findOne: jest.fn().mockResolvedValue(evaluation), findAll: jest.fn().mockResolvedValue([evaluation]), count: jest.fn().mockResolvedValue(0) };
   const history = { create: jest.fn().mockResolvedValue({}), findAll: jest.fn().mockResolvedValue([]) };
   const db = { transaction: jest.fn(async (callback) => callback(tx)) };
-  const service = new AdmissionEvaluationService(records as never, rounds as never, evaluations as never, history as never, majors as never, db as never);
+  const service = new AdmissionEvaluationService(records as never, rounds as never, evaluations as never, history as never, majors as never, db as never, {} as never);
   const decision = { decision: "admitted" as const, decisionNo: "QD-2", decisionDate: "2026-10-06", note: "Hội đồng duyệt", version: 1 };
   return { service, record, records, rounds, majors, round, evaluation, evaluations, history, tx, decision, db };
 }

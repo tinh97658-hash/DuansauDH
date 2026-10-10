@@ -502,7 +502,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
     setSaving(true);
     try {
       await axios.post(`${API_BASE_URL}/plan/admission-records/${id}/major-transfers`, transferForm, { withCredentials: true });
-      toast.success("Đã lập yêu cầu chuyển chuyên ngành và đưa hồ sơ về trạng thái chờ xét.");
+      toast.success("Đã gửi yêu cầu chuyển chuyên ngành, chờ xử lý.");
       setTransferOpen(false);
       setTransferForm({ toMajorId: "", reason: "" });
       await fetchData();
@@ -1784,7 +1784,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
       <Dialog open={transferOpen} onClose={() => !saving && setTransferOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Chuyển chuyên ngành</DialogTitle>
         <DialogContent><Stack spacing={2} sx={{ mt: 1 }}>
-          <Typography variant="body2">Mã học viên và toàn bộ lịch sử học tập được giữ nguyên. Hồ sơ sẽ trở về trạng thái nộp hồ sơ, chờ hội đồng xét.</Typography>
+          <Typography variant="body2">Mã học viên và toàn bộ lịch sử học tập được giữ nguyên. Sau khi yêu cầu được duyệt, hồ sơ sẽ trở về trạng thái nộp hồ sơ, chờ hội đồng xét.</Typography>
           <Select
             fullWidth
             size="small"

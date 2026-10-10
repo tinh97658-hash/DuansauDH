@@ -69,6 +69,18 @@ it("hồ sơ chưa xét tuyển có thông báo rõ ràng", async () => {
   expect(await screen.findByText("Hồ sơ chưa có kết quả xét tuyển.")).toBeInTheDocument();
   expect(screen.getByText("Chưa có lịch sử xét tuyển.")).toBeInTheDocument();
 });
+it("sau chuyển ngành hiển thị lịch sử A đã trúng tuyển và cho mở điểm xét tuyển mới, không yêu cầu mở lại A", async () => {
+  axios.get.mockResolvedValue({ data: { evaluation: null, history: [...history, {
+    ...history[0], id: "transfer-history", action: "major_transfer", snapshot: { ...history[0].snapshot, majorTransfer: { fromMajorId: "major-1", toMajorId: "major-2" } },
+  }] } });
+  render(<AdmissionEvaluationPanel record={{ ...record, status: "pending", studyStatus: "Nộp hồ sơ đầu vào" }} isAdmin />);
+  expect(await screen.findByText("Hồ sơ chưa có kết quả xét tuyển.")).toBeInTheDocument();
+  expect(screen.getAllByText(/Ngành: Công nghệ thông tin/)).toHaveLength(2);
+  expect(screen.getAllByText(/Kết quả: Đã trúng tuyển/)).toHaveLength(2);
+  expect(screen.getByText(/Lưu xét tuyển trước chuyển ngành/)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Mở điểm xét tuyển thạc sĩ" })).toHaveAttribute("href", "/masters/admission-scores");
+  expect(screen.queryByRole("button", { name: "Mở lại xét tuyển" })).not.toBeInTheDocument();
+});
 it("có thể tải lại khi đọc dữ liệu thất bại", async () => {
   axios.get.mockRejectedValueOnce(new Error("network"));
   render(<AdmissionEvaluationPanel record={record} />);

@@ -4,7 +4,7 @@ import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, Dial
 import { API_BASE_URL } from "../../config/http";
 
 const options = { withCredentials: true };
-const decisionLabels = { pending: "Chưa duyệt", admitted: "Đã trúng tuyển", rejected: "Không trúng tuyển", reopen: "Mở lại kết quả", saved: "Lưu điểm xét tuyển", tuition_paid: "Xác nhận đã nộp học phí", tuition_unpaid: "Hủy xác nhận học phí" };
+const decisionLabels = { pending: "Chưa duyệt", admitted: "Đã trúng tuyển", rejected: "Không trúng tuyển", reopen: "Mở lại kết quả", saved: "Lưu điểm xét tuyển", major_transfer: "Lưu xét tuyển trước chuyển ngành", tuition_paid: "Xác nhận đã nộp học phí", tuition_unpaid: "Hủy xác nhận học phí" };
 
 export function AdmissionResult({ evaluation }) {
   if (!evaluation) return <Alert severity="info">Hồ sơ chưa có kết quả xét tuyển.</Alert>;

@@ -13,12 +13,13 @@ const buildService = () => {
   const offeringStudents = { findAll: jest.fn().mockResolvedValue([]), bulkCreate: jest.fn() };
   const recognitions = { proposeForRecord: jest.fn().mockResolvedValue({ autoApproved: 0 }), decide: jest.fn().mockResolvedValue({ id: "rec-1", status: "approved" }) };
   const sequelize = { transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)) };
+  const admissionEvaluation = { guardRecordUpdate: jest.fn(), archiveForApprovedMajorTransfer: jest.fn() };
   const service = new MajorTransferService(
     transfers as never, records as never, majors as never,
     curriculums as never, memberships as never,
-    offeringGroups as never, offeringStudents as never, recognitions as never, sequelize as never,
+    offeringGroups as never, offeringStudents as never, recognitions as never, sequelize as never, admissionEvaluation as never,
   );
-  return { service, transfers, records, majors, curriculums, memberships, offeringGroups, offeringStudents, recognitions };
+  return { service, transfers, records, majors, curriculums, memberships, offeringGroups, offeringStudents, recognitions, admissionEvaluation };
 };
 
 describe("MajorTransferService", () => {
@@ -68,7 +69,7 @@ describe("MajorTransferService", () => {
     mocks.transfers.findByPk.mockResolvedValueOnce(transfer).mockResolvedValueOnce(transfer);
     mocks.records.findByPk.mockResolvedValue(record);
     mocks.curriculums.findByPk.mockResolvedValue({ id: "curriculum-new", majorId: "major-new", program: "masters", applicableFromYear: "2026" });
-    mocks.majors.findByPk.mockResolvedValue({ id: "major-new", name: "Ngành mới", active: true });
+    mocks.majors.findByPk.mockResolvedValue({ id: "major-new", name: "Ngành mới", active: true, program: "masters" });
 
     await mocks.service.decide(transfer.id, { decision: "approved", toCurriculumId: "curriculum-new" });
 
