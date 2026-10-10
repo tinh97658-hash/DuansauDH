@@ -5,7 +5,7 @@ import { ReactComponent as ExcelFileIcon } from "../assets/icons/filetype-xlsx.s
 import { ReactComponent as PdfFileIcon } from "../assets/icons/filetype-pdf.svg";
 import "./documentExportMenu.css";
 
-export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, showFileIcons = true, disabled = false, className = "", label = "In / Xuất" }) {
+export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, showFileIcons = true, disabled = false, className = "", label = "In / Xuất", excelLabel = "Xuất Excel", pdfLabel = "Xuất PDF" }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const root = useRef(null);
@@ -14,9 +14,9 @@ export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, sh
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const menuId = useId();
   const items = [
-    { name: "Xuất Word", action: onWord, Icon: WordFileIcon, format: "word" },
-    ...(onExcel ? [{ name: "Xuất Excel", action: onExcel, Icon: ExcelFileIcon, format: "excel" }] : []),
-    { name: "Xuất PDF", action: onPdf, Icon: PdfFileIcon, format: "pdf" },
+    ...(onWord ? [{ name: "Xuất Word", action: onWord, Icon: WordFileIcon, format: "word" }] : []),
+    ...(onExcel ? [{ name: excelLabel, action: onExcel, Icon: ExcelFileIcon, format: "excel" }] : []),
+    ...(onPdf ? [{ name: pdfLabel, action: onPdf, Icon: PdfFileIcon, format: "pdf" }] : []),
   ];
 
   useLayoutEffect(() => {

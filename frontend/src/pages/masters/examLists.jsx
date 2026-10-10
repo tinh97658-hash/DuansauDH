@@ -6,9 +6,12 @@ import FeatureLayout from "../../components/FeatureLayout";
 import FilterSelectField from "../../components/FilterSelectField";
 import FilterSearchField from "../../components/FilterSearchField";
 import ResizableTable from "../../components/ResizableTable";
+import DocumentExportMenu from "../../components/DocumentExportMenu";
+import { downloadDocumentFile } from "../../utils/documentFiles";
+import { buildGradebookDocument, createGradebookExcel, fetchAllGradebookRows, gradebookFilename, openGradebookPreview } from "../../features/exams/gradebookExport";
 import { API_BASE_URL } from "../../config/http";
 import { personNameParts } from "../../utils/personName";
-import { displayGradeDate, draftOf, gradebookColumns, gradebookCsv, gradebookRowValues, gradePayload, numericScore, RESULT_LABELS, rowError, SCORE_FIELDS, visibleGradeRows } from "../../features/exams/gradebook";
+import { displayGradeDate, draftOf, gradebookColumns, gradebookCsv, gradebookRowValues, gradePayload, numericScore, RESULT_LABELS, rowError, SCORE_FIELDS } from "../../features/exams/gradebook";
 import "../../features/exams/gradebook.css";
 
 const panelSx = { borderColor: "#D7E4EE", borderRadius: "10px", bgcolor: "#fff", boxShadow: "0 2px 6px rgba(18,59,98,.07)" };
@@ -109,7 +112,7 @@ export default function ExamLists() {
   const currentPage = page;
   const pageStart = (currentPage - 1) * PAGE_SIZE;
   const pageRows = visible;
-  const printRows = pageRows;
+  const examPrintRows = mode === "exam" ? pageRows : [];
   const requestChange = (change) => { if (dirtyCount) setPendingChange(() => change); else change(); };
   const selectClass = (entry) => { setDirty({}); dirtyRef.current = {}; setSuccess(""); setPage(1); setGroupId(entry?.group.id || ""); setOfferingId(entry?.offering.id || ""); };
   const edit = (id, patch) => {
@@ -138,24 +141,35 @@ export default function ExamLists() {
   const download = async () => {
     setExporting(true); setError("");
     try {
-      const exported = [];
-      let exportPage = 1, exportTotal = 0, exportRevision;
-      do {
-        const { data } = await axios.get(`${API_BASE_URL}/masters/exam-lists`, { params: {
-          classGroupId: groupId, courseOfferingId: offeringId, page: exportPage, pageSize: PAGE_SIZE, mode, search,
-          ...(mode === "exam" ? { includeIds, excludeIds } : {}),
-        } });
-        if (exportRevision !== undefined && data.revision !== exportRevision) throw new Error("Bảng điểm đã thay đổi trong lúc xuất. Vui lòng xuất lại.");
-        exportRevision = data.revision; exportTotal = data.total;
-        if (data.page !== exportPage) throw new Error("Danh sách đã thay đổi trong lúc xuất. Vui lòng xuất lại.");
-        exported.push(...data.rows.map(row => dirtyRef.current[row.participantId] || draftOf(row)));
-        exportPage++;
-      } while ((exportPage - 1) * PAGE_SIZE < exportTotal);
-      const url = URL.createObjectURL(new Blob([gradebookCsv(visibleGradeRows(exported, mode, search), mode === "exam")], { type: "text/csv;charset=utf-8;" }));
+      const exported = await fetchAllGradebookRows(params => axios.get(`${API_BASE_URL}/masters/exam-lists`, { params }), {
+        classGroupId: groupId, courseOfferingId: offeringId, mode, search,
+        ...(mode === "exam" ? { includeIds, excludeIds } : {}),
+      }, () => dirtyRef.current);
+      const url = URL.createObjectURL(new Blob([gradebookCsv(exported, mode === "exam")], { type: "text/csv;charset=utf-8;" }));
       const anchor = document.createElement("a"); anchor.href = url;
       anchor.download = `${mode === "exam" ? "ds-thi" : "ca-bang-diem"}-${selectedGroup?.code || "lop"}-${selectedOffering?.subject?.code || "hoc-phan"}.csv`;
       anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (failure) { setError(failure.response ? errorMessage(failure, "Không thể xuất danh sách.") : failure.message); }
+    finally { setExporting(false); }
+  };
+  const exportGradebook = async (format) => {
+    if (!groupId || !offeringId || !total || optionsLoading || loading || saving || exporting) return;
+    setExporting(true); setError("");
+    let previewTab;
+    try {
+      if (format === "pdf") {
+        // Reserve the tab during the click, before network requests lose user activation.
+        previewTab = window.open("about:blank", "_blank");
+        if (!previewTab) throw new Error("Trình duyệt đã chặn tab xem trước. Vui lòng cho phép mở tab mới và chọn PDF / In lại.");
+        previewTab.opener = null;
+      }
+      const exported = await fetchAllGradebookRows(params => axios.get(`${API_BASE_URL}/masters/exam-lists`, { params }), {
+        classGroupId: groupId, courseOfferingId: offeringId, mode: "all", search,
+      }, () => dirtyRef.current);
+      const document = buildGradebookDocument(selectedGroup, selectedOffering, exported);
+      if (format === "excel") downloadDocumentFile(await createGradebookExcel(document), gradebookFilename(selectedGroup, selectedOffering));
+      else openGradebookPreview(document, previewTab);
+    } catch (failure) { previewTab?.close(); setError(failure.response ? errorMessage(failure, "Không thể xuất bảng điểm.") : failure.message); }
     finally { setExporting(false); }
   };
   const blank = mode === "exam";
@@ -196,7 +210,9 @@ export default function ExamLists() {
           {Object.entries(modes).map(([key, label]) => <Button key={key} startIcon={<ListAltRounded />} disabled={saving || exporting} variant={mode === key ? "contained" : "outlined"} onClick={() => { setPage(1); setMode(key); }} sx={{ borderRadius: "7px", boxShadow: "none", ...(mode === key ? { bgcolor: "#173E75" } : { bgcolor: "#fff" }) }}>{label}</Button>)}
         </Stack>
         <Stack direction="row" gap={0.75}>
-          <Button variant="outlined" startIcon={<DownloadRounded />} disabled={!total || busy || saving || exporting} onClick={download}>{exporting ? "Đang xuất..." : "Xuất CSV"}</Button>
+          {mode === "all" ? <DocumentExportMenu disabled={!groupId || !offeringId || !total || busy || saving || exporting}
+            excelLabel="Excel (.xlsx)" pdfLabel="PDF / In" onExcel={() => exportGradebook("excel")} onPdf={() => exportGradebook("pdf")} />
+            : <Button variant="outlined" startIcon={<DownloadRounded />} disabled={!total || busy || saving || exporting} onClick={download}>{exporting ? "Đang xuất..." : "Xuất CSV"}</Button>}
         </Stack>
       </Stack>
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
@@ -240,18 +256,18 @@ export default function ExamLists() {
             sx={{ "& .MuiPaginationItem-root": { minWidth: 38, height: 38, fontSize: 14, fontWeight: 600 } }}
           />}
         </Box>}
-        <Box className="exam-print-sheet" sx={{ display: "none" }}>
+        {blank && <Box className="exam-print-sheet" sx={{ display: "none" }}>
           <table data-testid="exam-print-table" aria-label="Danh sách in">
             <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead>
-            <tbody>{printRows.map((row, index) => {
+            <tbody>{examPrintRows.map((row, index) => {
               const values = gradebookRowValues(row, pageStart + index, blank);
               return <tr key={row.participantId}>{values.map((value, cellIndex) => <td key={columns[cellIndex].key}>{value}</td>)}</tr>;
             })}</tbody>
           </table>
-        </Box>
+        </Box>}
       </Paper>
       <Typography sx={{ mt: 1, color: "#607486", fontSize: 11.5 }} className="exam-no-print">Tư cách thi: dấu gạch là chưa xét. Điểm học phần, thang 4 và điểm chữ được nhập trực tiếp. Nháy đúp mép tiêu đề để tự căn độ rộng cột.</Typography>
-      {dirtyCount > 0 && <Alert severity="warning" sx={{ mt: 1 }} className="exam-no-print">Bạn có điểm chưa lưu. Danh sách in và CSV sử dụng các điểm vừa nhập.</Alert>}
+      {dirtyCount > 0 && <Alert severity="warning" sx={{ mt: 1 }} className="exam-no-print">Bạn có điểm chưa lưu. {mode === "all" ? "Excel và PDF sử dụng các điểm vừa nhập." : "Danh sách in và CSV sử dụng các điểm vừa nhập."}</Alert>}
       <Dialog open={Boolean(pendingChange)} onClose={() => setPendingChange(null)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, color: "#173E75", fontSize: 16 }}>Có điểm chưa lưu</DialogTitle>
         <DialogContent>Bạn đã chỉnh sửa {dirtyCount} học viên. Chuyển lựa chọn sẽ bỏ các thay đổi này.</DialogContent>

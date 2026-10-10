@@ -58,6 +58,7 @@ import ClassCourseHistory from "./pages/masters/classCourseHistory";
 import MastersCourseOfferings from "./pages/masters/courseOfferings";
 import MastersSchedule from "./pages/masters/schedule";
 import SchedulePreview from "./features/scheduling/SchedulePreview";
+import GradebookPreview from "./features/exams/GradebookPreview";
 import MastersCourseMatrix from "./pages/masters/courseMatrix";
 import MastersExamEligibility from "./pages/masters/examEligibility";
 import MastersExamLists from "./pages/masters/examLists";
@@ -156,6 +157,7 @@ function App() {
             <Route path="masters/course-offerings" element={<MastersCourseOfferings />} />
             <Route path="masters/schedule" element={<MastersSchedule />} />
             <Route path="masters/schedule/preview" element={<SchedulePreview />} />
+            <Route path="masters/exam-lists/preview" element={<GradebookPreview />} />
             <Route path="masters/course-matrix" element={<MastersCourseMatrix />} />
             <Route path="masters/exam-eligibility" element={<MastersExamEligibility />} />
             <Route path="masters/exam-lists" element={<MastersExamLists />} />

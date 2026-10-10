@@ -1,0 +1,35 @@
+.gradebook-preview { padding: 16px; background: #eef1f4; overflow: auto; }
+.gradebook-preview nav { margin-bottom: 12px; }
+.gradebook-document { box-sizing: border-box; width: 281mm; margin: 0 auto; padding: 6mm; background: white; color: black; font: 11pt "Times New Roman", serif; }
+.gradebook-document header { width: 110mm; max-width: 100%; text-align: center; line-height: 1.5; }
+.gradebook-document header strong { display: block; font-size: 12pt; }
+.gradebook-document h1 { text-align: center; font-size: 16pt; margin: 6mm 0 4mm; }
+.gradebook-document p { margin: 2mm 0; overflow-wrap: anywhere; }
+.gradebook-document table { width: calc(100% - 1px); table-layout: fixed; border-collapse: collapse; border: 1px solid black; font-size: 9pt; }
+.gradebook-document th, .gradebook-document td { border: 1px solid black; padding: 3px 2px; text-align: center; vertical-align: middle; white-space: normal; overflow-wrap: normal; word-break: normal; }
+.gradebook-document th { background: #f2f2f2; color: black; font-weight: bold; }
+.gradebook-document td.name { text-align: left; }
+.gradebook-document td.nowrap { white-space: nowrap; overflow-wrap: normal; }
+.gradebook-document thead { display: table-header-group; }
+.gradebook-document tr { break-inside: avoid; }
+.gradebook-document footer { break-inside: avoid; margin-top: 4mm; }
+.gradebook-document .signing-date { text-align: right; font-style: italic; }
+.gradebook-document .signature-roles { display: flex; justify-content: space-around; text-align: center; padding-top: 3mm; min-height: 24mm; }
+/* Keep document typography and table borders independent of the global UI theme. */
+#root .gradebook-document, #root .gradebook-document * { font-family: "Times New Roman", serif !important; color: black !important; }
+#root .gradebook-document h1 { font-size: 16pt; font-weight: bold; }
+#root .gradebook-document table { font-size: 9pt; }
+#root .gradebook-document table :is(th, td) { border: 1px solid black !important; padding: 3px 2px !important; font-size: 9pt !important; line-height: 1.2; }
+#root .gradebook-document th { background: #f2f2f2 !important; }
+#root .gradebook-document td { background: white !important; }
+@media print {
+  @page gradebook-report { size: A4 landscape; margin: 8mm; }
+  body:has(.gradebook-preview) { margin: 0 !important; background: white; }
+  body:has(.gradebook-preview) > #root { width: 100%; }
+  .gradebook-preview { padding: 0; background: white; overflow: visible; }
+  .gradebook-preview nav { display: none; }
+  #root .gradebook-preview, #root .gradebook-preview * { visibility: visible !important; }
+  .gradebook-document { page: gradebook-report; width: 100%; padding: 0; margin: 0; }
+  .gradebook-document footer { display: block !important; }
+  .gradebook-document th { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}

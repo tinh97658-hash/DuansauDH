@@ -1,12 +1,12 @@
 // Transfer a frozen document to its own tab; session storage also supports reload.
-export function openDocumentPreview({ prefix, path, snapshot, fallbackToCurrentTab = true }) {
+export function openDocumentPreview({ prefix, path, snapshot, fallbackToCurrentTab = true, reservedTab }) {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const key = `${prefix}${id}`;
   const value = JSON.stringify({ ...snapshot, version: 1 });
   try { window.sessionStorage.setItem(key, value); }
   catch { throw new Error("Không thể lưu bản xem trước. Vui lòng cho phép trình duyệt lưu dữ liệu phiên và thử lại."); }
   const url = `${path}?${new URLSearchParams({ preview: id })}`;
-  const tab = window.open("about:blank", "_blank");
+  const tab = reservedTab || window.open("about:blank", "_blank");
   if (tab) {
     try {
       tab.sessionStorage.setItem(key, value);
