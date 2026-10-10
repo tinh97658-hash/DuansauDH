@@ -13,6 +13,7 @@ ServerSide/config.env
 
 # Local diagnostics, database backups and generated verification reports
 /.tmp/
+/.docker-recovery/
 *.log
 *.dump
 *.dmp
