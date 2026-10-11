@@ -2,6 +2,8 @@ import ExcelJS from "exceljs";
 import { buildGradebookDocument, createGradebookExcel, fetchAllGradebookRows, gradebookFilename, GRADEBOOK_HEADER_ROW } from "../../features/exams/gradebookExport";
 import { draftOf, gradebookColumns } from "../../features/exams/gradebook";
 import { autoFitColumnByContent, gradebookDocumentColumns } from "../../features/exams/gradebookLayout";
+import { buildExamListDocument, createExamListExcel, EXAM_LIST_HEADER_ROW } from "../../features/exams/examListExport";
+import { createScheduleExcel } from "../../features/scheduling/scheduleExport";
 
 const group = { code: "CNTT/2026", name: "Công nghệ thông tin 2026" };
 const offering = { subject: { code: "HP:01", name: "Phương pháp nghiên cứu khoa học" } };
@@ -10,8 +12,8 @@ const roster = count => Array.from({ length: count }, (_, index) => ({
   eligible: index === 0 ? null : true, examExempt: index === 1, testScore: 0, assignmentScore: null, examScore: 8,
   courseScore: 8, grade4: 3, letterGrade: "B", attemptScores: [0, 8], result: index === 1 ? "exempt" : "passed",
 }));
-const load = async document => {
-  const blob = await createGradebookExcel(document);
+const load = async (document, create = createGradebookExcel) => {
+  const blob = await create(document);
   const buffer = await new Promise((resolve, reject) => {
     const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsArrayBuffer(blob);
   });
@@ -100,4 +102,52 @@ it("sizes content within limits, wraps headers and keeps long codes on one line"
 it("uses the business timezone and sanitizes filename components", () => {
   expect(buildGradebookDocument(group, offering, [], new Date("2026-10-09T18:00:00Z")).signingDate).toBe("Hải Phòng, ngày 10 tháng 10 năm 2026");
   expect(gradebookFilename(group, offering)).toBe("Bang-diem-mon-hoc-CNTT-2026-HP-01.xlsx");
+  expect(gradebookFilename(group, offering, "DS-thi")).toBe("DS-thi-CNTT-2026-HP-01.xlsx");
+});
+
+it("prints the existing nine-column exam data with the schedule Excel format", async () => {
+  const rows = roster(40).map(draftOf);
+  rows[0].code = "=HV-2026-001";
+  rows[0].courseScore = "8,5";
+  const before = JSON.stringify(rows);
+  const document = buildExamListDocument(group, offering, rows);
+  const sheet = (await load(document, createExamListExcel)).worksheets[0];
+  const schedule = (await load({ week: "2026-10-05", end: "2026-10-11", rows: [] }, createScheduleExcel)).worksheets[0];
+  expect(sheet.name).toBe("Danh sách thi");
+  expect(sheet.getCell("A1").value).toBe(document.university);
+  expect(sheet.getCell("A2").value).toBe(document.institute);
+  expect(sheet.getRow(1).values).toContain("DANH SÁCH THI");
+  expect(sheet.getRow(2).values).toContain(`Lớp: ${group.name}`);
+  expect(sheet.getCell("A3").value).toBe(`Học phần: ${offering.subject.name}`);
+  expect(sheet.getRow(EXAM_LIST_HEADER_ROW).values.slice(1)).toEqual(gradebookColumns(true).map(column => column.label));
+  expect(sheet.columnCount).toBe(9);
+  expect(sheet.rowCount).toBe(EXAM_LIST_HEADER_ROW + rows.length);
+  expect(sheet.getCell("B5").value).toBe(rows[0].code);
+  expect(sheet.getCell("B5").type).toBe(ExcelJS.ValueType.String);
+  expect(sheet.getCell("E5").value).toBe("02/01/1990");
+  expect(sheet.getCell("G5").value).toBe("Chưa xét");
+  expect(sheet.getCell("H6").value).toBe("Có");
+  expect(sheet.getCell("I5").value).toBe("");
+  expect(sheet.getCell("B44").value).toBe("HV40");
+  expect(sheet.getCell("B5").alignment.wrapText).not.toBe(true);
+  expect(sheet.getCell("B5").alignment.shrinkToFit).toBe(true);
+  expect(gradebookDocumentColumns(document, true)[8].key).toBe("result");
+  for (let column = 1; column <= 9; column++) {
+    const header = sheet.getCell(EXAM_LIST_HEADER_ROW, column);
+    const scheduleHeader = schedule.getCell(4, column);
+    expect(header.font).toMatchObject({ name: scheduleHeader.font.name, size: scheduleHeader.font.size, bold: scheduleHeader.font.bold });
+    expect(header.fill).toEqual(scheduleHeader.fill);
+    expect(header.border).toEqual(scheduleHeader.border);
+    expect(header.alignment).toMatchObject({ horizontal: "center", vertical: "middle", wrapText: true });
+    expect(sheet.getCell(5, column).border).toEqual(scheduleHeader.border);
+    expect(sheet.getCell(5, column).font).toMatchObject({ name: "Times New Roman", size: 11 });
+    expect(sheet.getCell(5, column).isMerged).toBe(false);
+  }
+  expect(sheet.pageSetup).toMatchObject({ paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+    printTitlesRow: "4:4", printArea: "A1:I44", margins: schedule.pageSetup.margins });
+  expect(sheet.views[0]).toMatchObject({ state: "frozen", ySplit: 4, showGridLines: true });
+  expect(sheet.autoFilter).toBe("A4:I44");
+  expect(sheet.getCell("J4").value).toBeNull();
+  expect(JSON.stringify(sheet.model)).not.toContain("8,5");
+  expect(JSON.stringify(rows)).toBe(before);
 });

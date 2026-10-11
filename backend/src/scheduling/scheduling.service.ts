@@ -119,6 +119,11 @@ export class SchedulingService {
       return { scope: { program, major, academicYear: query.academicYear }, summary: { classCount: 0 }, classes: [] };
     }
 
+    // Progress covers the full major catalog, including subjects outside a class's curriculum.
+    const catalogSubjects = await this.subjects.findAll({
+      where: { program, majorId: query.majorId },
+      order: [["sortOrder", "ASC"], ["codeNumber", "ASC"], ["name", "ASC"]],
+    });
     const groupIds = groups.map((group) => group.id);
     const progressMembers = await this.classGroupMembers.findAll({
       where: { classGroupId: { [Op.in]: groupIds } },
@@ -197,13 +202,14 @@ export class SchedulingService {
     const logicalSubjectId = (subject: Subject | any) => subject?.canonicalSubjectId || subject?.id;
 
     const classes = groups.map((group) => {
-      const expectedRows = curriculumRows
+      const curriculumEntries = new Map(curriculumRows
         .filter((row) => row.curriculumId === group.curriculumId)
-        .sort((left: any, right: any) => left.sortOrder - right.sortOrder);
+        .map((row) => [row.subjectId, row]));
       const groupOfferings = (offeringIdsByGroup.get(group.id) || []).map((id) => offeringById.get(id)).filter(Boolean) as CourseOffering[];
 
-      const subjects = expectedRows.map((entry: any) => {
-        const subjectId = logicalSubjectId(entry.subject);
+      const subjects = catalogSubjects.map((subject) => {
+        const entry = curriculumEntries.get(subject.id);
+        const subjectId = logicalSubjectId(subject);
         const matchingOfferings = groupOfferings.filter((offering) => logicalSubjectId(offering.subject) === subjectId);
         const matchingSessions = matchingOfferings.flatMap((offering) => sessionsByOffering.get(offering.id) || [])
           .sort((a, b) => a.sessionDate.localeCompare(b.sessionDate) || a.startTime.localeCompare(b.startTime));
@@ -212,12 +218,12 @@ export class SchedulingService {
         const completed = matchingOfferings.some((offering) => offering.status === "completed");
         const status = completed ? "completed" : heldSessionCount > 0 ? "in_progress" : plannedSessionCount > 0 ? "scheduled" : "not_started";
         return {
-          curriculumSubjectId: entry.id,
-          subjectId: entry.subject?.id || null,
+          curriculumSubjectId: entry?.id || null,
+          subjectId: subject.id,
           logicalSubjectId: subjectId,
-          credits: entry.credits,
-          code: entry.subject?.code || "",
-          name: entry.subject?.name || "",
+          credits: entry?.credits ?? subject.credits,
+          code: subject.code || "",
+          name: subject.name || "",
           status,
           needsGradeEntry: completed && matchingOfferings.some((offering) => offering.status === "completed"
             && (missingGradeCounts.get(`${group.id}:${offering.id}`) || 0) > 0),

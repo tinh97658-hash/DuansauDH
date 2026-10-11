@@ -163,7 +163,7 @@ export class MastersService {
       if (dto.nameIndexes && dto.nameIndexes.length !== dto.count) {
         throw new BadRequestException("Số thứ tự tên nhóm phải khớp với số nhóm cần tạo.");
       }
-      if (dto.nameTemplate && templateTokens.length !== 1) {
+      if (dto.nameTemplate !== undefined && templateTokens.length !== 1) {
         throw new BadRequestException('Quy tắc tên nhóm phải chứa đúng một ký hiệu "{n}".');
       }
       const scope = await this.classGroups.findAll({ where: { program: "masters", majorId: dto.majorId, academicYear: dto.academicYear, intakeRound }, attributes: ["groupNumber"], transaction });
@@ -172,13 +172,15 @@ export class MastersService {
       for (let number = 1; indexes.length < dto.count; number += 1) if (!used.has(number)) indexes.push(number);
       const rows = Array.from({ length: dto.count }, (_, offset) => {
         const groupNumber = dto.nameIndexes?.[offset] ?? indexes[offset];
-        const code = classGroupCode(major.code, dto.academicYear, intakeRound, groupNumber);
+        const defaultCode = classGroupCode(major.code, dto.academicYear, intakeRound, groupNumber);
+        const code = dto.nameTemplate === undefined
+          ? defaultCode : dto.nameTemplate.trim().replace("{n}", String(groupNumber));
         return {
           program: "masters",
           code,
           name: code,
           intakeRound,
-          groupNumber,
+          groupNumber: code === defaultCode ? groupNumber : null,
           majorId: dto.majorId || null,
           curriculumId: dto.curriculumId,
           academicYear: dto.academicYear,
@@ -187,8 +189,8 @@ export class MastersService {
           note: dto.note || null,
         };
       });
-      if (rows.some((row) => !row.name.trim() || row.name.length > 200)) {
-        throw new BadRequestException("Quy tắc tên nhóm sinh ra tên không hợp lệ.");
+      if (rows.some((row) => !row.code.trim() || row.code.length > 100)) {
+        throw new BadRequestException("Quy tắc mã nhóm sinh ra mã không hợp lệ.");
       }
       if (new Set(rows.map((row) => row.name)).size !== rows.length) {
         throw new BadRequestException("Quy tắc tên nhóm sinh ra các tên bị trùng nhau.");

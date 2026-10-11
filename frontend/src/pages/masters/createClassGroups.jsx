@@ -25,6 +25,7 @@ const majorShortName = (major) => String(major?.code || "").trim().toUpperCase()
 
 const initialForm = (year = String(currentYear)) => ({
   code: "",
+  nameTemplate: null,
   count: 1,
   majorId: "",
   curriculumId: "",
@@ -204,11 +205,14 @@ const CreateClassGroups = () => {
     () => majors.find((item) => item.id === form.majorId),
     [form.majorId, majors],
   );
-  const nameTemplate = selectedFormMajor?.code && form.academicYear
+  const defaultNameTemplate = selectedFormMajor?.code && form.academicYear
     ? `${majorShortName(selectedFormMajor)} ${form.academicYear}.${form.intakeRound}.{n}` : "";
+  const nameTemplate = form.nameTemplate ?? defaultNameTemplate;
   const nameTemplateError = useMemo(
-    () => nameTemplate ? validateNameTemplate(nameTemplate) : "Chuyên ngành chưa có mã. Hãy cập nhật mã chuyên ngành trước.",
-    [nameTemplate],
+    () => !selectedFormMajor?.code
+      ? "Chuyên ngành chưa có mã. Hãy cập nhật mã chuyên ngành trước."
+      : validateNameTemplate(nameTemplate),
+    [nameTemplate, selectedFormMajor?.code],
   );
   const nameIndexes = useMemo(
     () => getAvailableGroupIndexes(dialogScopeGroups.map((group) => ({ name: group.code })), nameTemplate, form.count),
@@ -359,6 +363,7 @@ const CreateClassGroups = () => {
         if (!shortName) throw new Error("Chuyên ngành chưa có mã.");
         await axios.post(`${API_BASE_URL}/masters/class-groups/batch`, {
           count,
+          nameTemplate,
           nameIndexes,
           intakeRound: Number(form.intakeRound),
           majorId: form.majorId,
@@ -802,7 +807,7 @@ const CreateClassGroups = () => {
                       <TextField
                         id="create-name-template"
                         value={nameTemplate}
-                        InputProps={{ readOnly: true }}
+                        onChange={(e) => setForm((previous) => ({ ...previous, nameTemplate: e.target.value }))}
                         fullWidth
                         size="small"
                         error={Boolean(nameTemplateError)}

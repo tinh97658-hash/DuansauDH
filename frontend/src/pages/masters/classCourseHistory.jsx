@@ -78,6 +78,9 @@ const offeringGroups = (offering) => (offering?.groupLinks || []).map((link) => 
 const sameSubject = (subject, offering) => {
   const offered = offering?.subject;
   if (!offered) return false;
+  const logicalId = subject.logicalSubjectId || subject.subjectId;
+  const offeredLogicalId = offered.canonicalSubjectId || offered.id || offering.subjectId;
+  if (logicalId && offeredLogicalId) return logicalId === offeredLogicalId;
   return Boolean(subject.code && offered.code && normalize(subject.code) === normalize(offered.code))
     || Boolean(subject.name && offered.name && normalize(subject.name) === normalize(offered.name));
 };
@@ -195,7 +198,7 @@ export default function ClassCourseHistory() {
   const subjectRows = useMemo(() => {
     const rows = new Map();
     classes.forEach((classGroup) => (classGroup.subjects || []).forEach((subject) => {
-      const key = subject.logicalSubjectId || subject.subjectId || subject.curriculumSubjectId;
+      const key = subject.subjectId || subject.logicalSubjectId || subject.curriculumSubjectId;
       if (!rows.has(key)) rows.set(key, { ...subject, rowKey: key, byClass: {} });
       rows.get(key).byClass[classGroup.id] = subject;
     }));
@@ -203,7 +206,7 @@ export default function ClassCourseHistory() {
   }, [classes]);
 
   const visibleSubjects = useMemo(() => subjectRows.filter((row) => {
-    const classSubjects = Object.values(row.byClass);
+    const classSubjects = Object.values(row.byClass).filter((subject) => subject.curriculumSubjectId);
     if (status !== "all" && !classSubjects.some((subject) => subject.status === status)) return false;
     const lecturers = classSubjects.flatMap((subject) => subject.sessions || []).map((session) => session.lecturer?.name || "").join(" ");
     return !search.trim() || normalize(`${row.code || ""} ${row.name} ${lecturers}`).includes(normalize(search));
@@ -270,13 +273,13 @@ export default function ClassCourseHistory() {
               <td className="tp-sticky tp-sticky-credits tp-centered">{row.credits ?? "—"}</td>
               {classes.map((classGroup) => {
                 const subject = row.byClass[classGroup.id];
-                if (!subject) return <td className="tp-centered tp-not-applicable" key={classGroup.id} aria-label={`Không áp dụng cho ${classGroup.code}`}>—</td>;
+                if (!subject?.curriculumSubjectId) return <td className="tp-centered tp-not-applicable" key={classGroup.id} aria-label={`Không áp dụng cho ${classGroup.code}`}>-</td>;
                 const offering = offeringFor(classGroup, subject);
                 return <td className="tp-centered" key={classGroup.id}><StatusBadge status={subject.status} offering={offering} onOpen={setSelectedOffering} needsGradeEntry={subject.needsGradeEntry} /></td>;
               })}
             </tr>)}</tbody>
           </table></div></div>
-          {!visibleSubjects.length && <div className="tp-empty">{subjectRows.length ? "Không có học phần phù hợp với bộ lọc." : "Chưa có dữ liệu học phần áp dụng cho các lớp. Vui lòng kiểm tra chương trình đào tạo."}</div>}
+          {!visibleSubjects.length && <div className="tp-empty">{subjectRows.length ? "Không có học phần phù hợp với bộ lọc." : "Chưa có học phần trong danh mục của chuyên ngành đã chọn."}</div>}
         </>}
       </section>}
     </div>

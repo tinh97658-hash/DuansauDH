@@ -298,7 +298,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
     { key: "major", label: "Ngành", width: 210 },
     { key: "phone", label: "Điện thoại", width: 130 },
     ...(isAdmittedMasters ? [{ key: "tuition", label: "Đã nộp học phí nhập học", width: 180, align: "center" }] : []),
-    { key: "status", label: "Trạng thái", width: 160 },
+    { key: "status", label: "Trạng thái", width: 160, align: "center" },
     { key: "actions", label: "Thao tác", width: isAdmittedMasters ? 90 : 110, minWidth: 80, align: "center" },
   ];
 
@@ -815,7 +815,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                       }} />
                     </TableCell>}
 
-                    <TableCell>
+                    <TableCell align="center">
                       <Chip
                         size="small"
                         label={r.studyStatus || "Nộp hồ sơ"}

@@ -311,7 +311,7 @@ describe("MastersService assignment lists", () => {
 });
 
 describe("MastersService.batchCreateClassGroups", () => {
-  it("fills name gaps while generating independent consecutive codes", async () => {
+  it("uses the edited template and fills gaps in its codes", async () => {
     const { service, classGroups, majors, classGroupsService } = buildService();
     majors.findByPk.mockResolvedValue({ id: "major-1", active: true, program: "masters", code: "QLCVATHH" });
     classGroups.findAll.mockResolvedValue([]);
@@ -322,12 +322,12 @@ describe("MastersService.batchCreateClassGroups", () => {
       majorId: "major-1", curriculumId: "curriculum-1", academicYear: "2026", maxStudents: 40,
     });
     expect(classGroupsService.create).toHaveBeenNthCalledWith(1,
-      expect.objectContaining({ name: "QLCVATHH 2026.1.1", code: "QLCVATHH 2026.1.1" }), expect.anything());
+      expect.objectContaining({ name: "QLCVATHH 2026.1", code: "QLCVATHH 2026.1", groupNumber: null }), expect.anything());
     expect(classGroupsService.create).toHaveBeenNthCalledWith(2,
-      expect.objectContaining({ name: "QLCVATHH 2026.1.4", code: "QLCVATHH 2026.1.4" }), expect.anything());
+      expect.objectContaining({ name: "QLCVATHH 2026.4", code: "QLCVATHH 2026.4", groupNumber: null }), expect.anything());
   });
 
-  it("creates the first named group with independently numbered codes", async () => {
+  it("uses the edited template for both code and name", async () => {
     const { service, classGroups, majors, classGroupsService } = buildService();
     majors.findByPk.mockResolvedValue({ id: "major-1", active: true, program: "masters", code: "QLCVATHH" });
     classGroups.findAll.mockResolvedValue([]);
@@ -347,9 +347,39 @@ describe("MastersService.batchCreateClassGroups", () => {
     });
 
     expect(classGroupsService.create).toHaveBeenNthCalledWith(1,
-      expect.objectContaining({ code: "QLCVATHH 2026.1.1", name: "QLCVATHH 2026.1.1" }), expect.anything());
+      expect.objectContaining({ code: "QLCVATHH2026.1", name: "QLCVATHH2026.1", groupNumber: null }), expect.anything());
     expect(classGroupsService.create).toHaveBeenNthCalledWith(2,
-      expect.objectContaining({ code: "QLCVATHH 2026.1.2", name: "QLCVATHH 2026.1.2" }), expect.anything());
+      expect.objectContaining({ code: "QLCVATHH2026.2", name: "QLCVATHH2026.2", groupNumber: null }), expect.anything());
+  });
+
+  it("keeps automatic codes when the template is omitted or unchanged", async () => {
+    const { service, classGroups, majors, classGroupsService } = buildService();
+    majors.findByPk.mockResolvedValue({ id: "major-1", active: true, program: "masters", code: "CNTT" });
+    classGroups.findAll.mockResolvedValue([]);
+    classGroupsService.create.mockImplementation(async (row: unknown) => row);
+    for (const nameTemplate of [undefined, "CNTT 2026.2.{n}"]) {
+      await service.batchCreateClassGroups({
+        count: 1, majorId: "major-1", curriculumId: "curriculum-1",
+        academicYear: "2026", intakeRound: 2, maxStudents: 40, nameTemplate,
+      });
+    }
+    expect(classGroupsService.create).toHaveBeenCalledTimes(2);
+    for (const [row] of classGroupsService.create.mock.calls) {
+      expect(row).toEqual(expect.objectContaining({ code: "CNTT 2026.2.1", name: "CNTT 2026.2.1", groupNumber: 1 }));
+    }
+  });
+
+  it("rejects invalid or oversized custom codes before saving", async () => {
+    const { service, majors, classGroups, classGroupsService } = buildService();
+    majors.findByPk.mockResolvedValue({ id: "major-1", active: true, program: "masters", code: "CNTT" });
+    classGroups.findAll.mockResolvedValue([]);
+    for (const nameTemplate of ["", "LOP", "{n}-{n}", `${"X".repeat(100)}{n}`]) {
+      await expect(service.batchCreateClassGroups({
+        count: 1, majorId: "major-1", curriculumId: "curriculum-1",
+        academicYear: "2026", maxStudents: 40, nameTemplate,
+      })).rejects.toThrow();
+    }
+    expect(classGroupsService.create).not.toHaveBeenCalled();
   });
 
   it("creates empty groups without assigning students", async () => {

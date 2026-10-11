@@ -21,7 +21,7 @@ export interface CreateClassGroupInput {
   status?: string;
   note?: string | null;
   intakeRound?: number;
-  groupNumber?: number;
+  groupNumber?: number | null;
 }
 
 export interface UpdateClassGroupInput {
@@ -109,7 +109,7 @@ export class ClassGroupService {
     if (!transaction) return this.sequelize.transaction((tx) => this.create(input, tx));
     const program = input.program || "masters";
     const major = await this.requireMajorForProgram(input.majorId, program, transaction);
-    if (program === "masters" && input.groupNumber !== undefined) {
+    if (program === "masters" && input.groupNumber != null) {
       if (!major) throw new BadRequestException("Vui lòng chọn chuyên ngành.");
       const code = classGroupCode(major.code, input.academicYear || String(new Date().getFullYear()), input.intakeRound ?? 1, input.groupNumber);
       input = { ...input, code, name: code };

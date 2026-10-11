@@ -10,8 +10,8 @@ export const compactClassCodes = (classes = [], max = 2) => {
 
 /** Gợi ý mã CTĐT chưa trùng: một khóa có thể có nhiều CTĐT nên mã phải khác nhau. */
 export const suggestCurriculumCode = (majorCode, year, existing = []) => {
-  const base = `CT-${majorCode || "NGANH"}-${year}`;
-  const taken = new Set((existing || []).map((item) => String(item?.code || "").toUpperCase()));
+  const base = `CT-${String(majorCode || "").trim().toUpperCase() || "NGANH"}-${year}`;
+  const taken = new Set((existing || []).map((item) => String(item?.code || "").trim().toUpperCase()));
   if (!taken.has(base.toUpperCase())) return base;
   let index = 2;
   while (taken.has(`${base}-${index}`.toUpperCase())) index += 1;

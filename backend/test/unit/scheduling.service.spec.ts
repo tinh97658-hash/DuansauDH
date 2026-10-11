@@ -865,12 +865,51 @@ describe("SchedulingService.createCourseOffering", () => {
 });
 
 describe("SchedulingService persisted reads", () => {
+  it.each([true, false])("returns the complete scoped catalog even for a class with curriculum=%s", async (hasCurriculum) => {
+    const mocks = buildService();
+    const selectedGroup = { ...group("group-1"), curriculumId: hasCurriculum ? curriculumIdFor("group-1") : null };
+    const added = { ...subject, id: "catalog-added", code: "HP02", name: "Học phần mới ngoài CTĐT", credits: 4 };
+    const localAlias = { ...subject, id: "local-alias", code: "LOCAL03", canonicalSubjectId: "shared-root" };
+    const unused = { ...subject, id: "catalog-unused", code: "HP04", name: "Học phần chưa tổ chức", active: false };
+    const catalog = [subject, added, localAlias, unused];
+    const root = { ...localAlias, id: "shared-root", canonicalSubjectId: null, majorId: "other-major", code: "ROOT03" };
+    mocks.majors.findOne.mockResolvedValue({ id: "major-1" });
+    mocks.classGroups.findAll.mockResolvedValue([selectedGroup]);
+    mocks.subjects.findAll.mockImplementation(async (options: any) => [
+      ...catalog, { ...subject, id: "other-major", majorId: "other-major" }, { ...subject, id: "doctoral", program: "doctoral" },
+    ].filter((value) => value.majorId === options.where.majorId && value.program === options.where.program));
+    mocks.packages.findAll.mockResolvedValue([officialPackage(selectedGroup.id)]);
+    mocks.offeringGroups.findAll.mockResolvedValue([
+      { classGroupId: selectedGroup.id, courseOfferingId: "scheduled" },
+      { classGroupId: selectedGroup.id, courseOfferingId: "completed" },
+    ]);
+    mocks.courseOfferings.findAll.mockResolvedValue([
+      { id: "scheduled", status: "active", subject: added },
+      { id: "completed", status: "completed", subject: root },
+    ]);
+    mocks.teachingSessions.findAll.mockResolvedValue([{
+      id: "planned", courseOfferingId: "scheduled", sessionDate: "2026-10-12", startTime: "08:00:00", period: "MORNING", status: "planned",
+    }]);
+    mocks.sequelize.query.mockResolvedValue([{ classGroupId: selectedGroup.id, courseOfferingId: "completed", missingGradeCount: 1 }]);
+
+    const result = await mocks.service.getClassCurriculumProgress({ majorId: "major-1", academicYear: "2026" });
+
+    expect(result.classes[0].subjects.map((row) => row.subjectId)).toEqual(catalog.map((value) => value.id));
+    expect(result.classes[0].subjects[0].curriculumSubjectId).toBe(hasCurriculum ? `entry-${selectedGroup.id}` : null);
+    expect(result.classes[0].subjects[1]).toMatchObject({ curriculumSubjectId: null, code: added.code, credits: 4, status: "scheduled", sessionCount: 1 });
+    expect(result.classes[0].subjects[2]).toMatchObject({ subjectId: localAlias.id, logicalSubjectId: root.id, code: localAlias.code, status: "completed", needsGradeEntry: true });
+    expect(result.classes[0].subjects[3]).toMatchObject({ curriculumSubjectId: null, status: "not_started", sessionCount: 0, needsGradeEntry: false });
+    expect(result.classes[0].summary).toEqual({ totalSubjectCount: 4, inProgressSubjectCount: 0, scheduledSubjectCount: 1, completedSubjectCount: 1, notStartedSubjectCount: 2 });
+    expect(mocks.subjects.findAll).toHaveBeenCalledWith({ where: { program: "masters", majorId: "major-1" }, order: [["sortOrder", "ASC"], ["codeNumber", "ASC"], ["name", "ASC"]] });
+  });
+
   it.each([23, 1, 0])("reports missing grades per completed offering and class (%i missing learners)", async (missingGradeCount) => {
     const mocks = buildService();
     const first = group("group-1");
     const second = group("group-2");
     mocks.majors.findOne.mockResolvedValue({ id: "major-1" });
     mocks.classGroups.findAll.mockResolvedValue([first, second]);
+    mocks.subjects.findAll.mockResolvedValue([subject]);
     mocks.packages.findAll.mockResolvedValue([first, second].map((value) => ({
       ...officialPackage(value.id), credits: 3, sortOrder: 1,
     })));
@@ -893,6 +932,7 @@ describe("SchedulingService persisted reads", () => {
     const selectedGroup = group("group-1");
     mocks.majors.findOne.mockResolvedValue({ id: "major-1" });
     mocks.classGroups.findAll.mockResolvedValue([selectedGroup]);
+    mocks.subjects.findAll.mockResolvedValue([subject]);
     mocks.packages.findAll.mockResolvedValue([officialPackage(selectedGroup.id)]);
     mocks.offeringGroups.findAll.mockResolvedValue(["completed", "alias", "active"].map((courseOfferingId) => ({ classGroupId: selectedGroup.id, courseOfferingId })));
     mocks.courseOfferings.findAll.mockResolvedValue([
@@ -912,7 +952,7 @@ describe("SchedulingService persisted reads", () => {
   });
 
   it("returns the class progress summary and every teaching session", async () => {
-    const { service, majors, packages, classGroupElectives, classGroups, offeringGroups, courseOfferings, teachingSessions } = buildService();
+    const { service, majors, subjects, packages, classGroupElectives, classGroups, offeringGroups, courseOfferings, teachingSessions } = buildService();
     const selectedGroup = { ...group("group-1", "CNT2027.01"), curriculum: { id: curriculumIdFor("group-1"), code: "CNTT-2027", name: "CTĐT CNTT 2027", totalCredits: 60 } };
     const secondSubject = { ...subject, id: "subject-2", code: "HP02", name: "Học phần chưa học" };
     const offering = { id: "offering-1", name: "Lớp học phần CNTT", status: "active", subject };
@@ -924,6 +964,7 @@ describe("SchedulingService persisted reads", () => {
     };
     majors.findOne.mockResolvedValue({ id: "major-1", code: "CNTT", name: "Công nghệ thông tin" });
     classGroups.findAll.mockResolvedValue([selectedGroup]);
+    subjects.findAll.mockResolvedValue([subject, secondSubject]);
     packages.findAll.mockResolvedValue([
       { id: "entry-1", curriculumId: selectedGroup.curriculumId, subjectId: subject.id, subject, isRequired: true, credits: 3, sortOrder: 1, block: { id: "block", code: "CS", name: "Cơ sở", sortOrder: 1 } },
       { id: "entry-2", curriculumId: selectedGroup.curriculumId, subjectId: secondSubject.id, subject: secondSubject, isRequired: true, credits: 2, sortOrder: 2, block: { id: "block", code: "CS", name: "Cơ sở", sortOrder: 1 } },

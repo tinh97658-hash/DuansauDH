@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Box, Table, TableCell, TableHead, TableRow } from "@mui/material";
 
-export default function ResizableTable({ columns, storageKey, children, freezeThrough }) {
+export default function ResizableTable({ columns, storageKey, children, freezeThrough, className, "aria-label": ariaLabel, sx = {} }) {
   const [widths, setWidths] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) || "{}");
@@ -55,18 +55,19 @@ export default function ResizableTable({ columns, storageKey, children, freezeTh
     try { localStorage.setItem(storageKey, JSON.stringify(widths)); } catch { /* Storage may be disabled. */ }
   }, [storageKey, widths]);
 
-  return <Box sx={{ position: "relative", width: "max-content" }}><Table ref={tableRef} size="small" stickyHeader sx={{
+  return <Box sx={{ position: "relative", width: "max-content" }}><Table ref={tableRef} size="small" stickyHeader className={className} aria-label={ariaLabel} sx={{
     tableLayout: "fixed", width: columns.reduce((sum, column) => sum + widthOf(column), 0),
     // Collapsed borders leave seams when cells stick at different scroll offsets.
     ...(frozenIndex >= 0 ? { borderCollapse: "separate", borderSpacing: 0 } : {}),
     "& td, & th": { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
     "& td .MuiTypography-root": { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
     ...frozenStyles,
+    ...sx,
     "@media print": { "& th, & td": { position: "static", left: "auto", boxShadow: "none" } },
   }}>
-    <colgroup>{columns.map((column) => <col key={column.key} style={{ width: widthOf(column) }} />)}</colgroup>
+    <colgroup>{columns.map((column) => <col key={column.key} className={column.className} style={{ width: widthOf(column) }} />)}</colgroup>
     <TableHead><TableRow>
-      {columns.map((column, index) => <TableCell key={column.key} align={column.align || "left"}>
+      {columns.map((column, index) => <TableCell key={column.key} align={column.align || "left"} padding={column.padding || "normal"}>
         {column.header ?? column.label}
         <Box
           role="slider" aria-orientation="horizontal" tabIndex={0}

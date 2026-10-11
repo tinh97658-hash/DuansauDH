@@ -60,6 +60,7 @@ const assigned = {
 describe("AssignClassGroups", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.clear();
     axios.get.mockImplementation((url) => {
       if (url.includes("/system/majors")) return Promise.resolve({ data: [] });
       if (url.includes("/eligible-students")) return Promise.resolve({ data: [unassigned, assigned] });
@@ -187,7 +188,13 @@ describe("AssignClassGroups", () => {
     const headers = () => within(table).getAllByRole("columnheader").map((cell) => cell.textContent);
     // The revised table always shows Major and never Discipline, including ALL/ALL.
     expect(headers()).toEqual(["", "Mã HV", "Họ đệm", "Tên", "Ngày sinh", "Giới tính", "Chuyên ngành", "Học phí nhập học", "Nhóm hiện tại"]);
-    expect(within(table).getByText("Nguyễn Văn").closest("td")).toHaveTextContent(/^Nguyễn Văn$/);
+    const codeWidth = within(table).getByRole("slider", { name: "Độ rộng cột Mã HV" });
+    const initialWidth = Number(codeWidth.getAttribute("aria-valuenow"));
+    fireEvent.keyDown(codeWidth, { key: "ArrowRight" });
+    expect(codeWidth).toHaveAttribute("aria-valuenow", String(initialWidth + 10));
+    expect(table.querySelector("col.assignment-code-col")).toHaveStyle({ width: `${initialWidth + 10}px` });
+    expect(JSON.parse(localStorage.getItem("masters-assignment-candidate-column-widths"))).toMatchObject({ code: initialWidth + 10 });
+    expect((await within(table).findByText("Nguyễn Văn")).closest("td")).toHaveTextContent(/^Nguyễn Văn$/);
     expect(within(table).getByText("1999-01-02")).toBeInTheDocument();
     expect(within(table).getByText("Nam")).toBeInTheDocument();
     expect(within(table).queryByText("Ghi chú tuyển sinh")).not.toBeInTheDocument();

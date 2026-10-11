@@ -126,6 +126,36 @@ test("changing intake round starts numbering within the selected round", async (
   ));
 });
 
+test("allows overriding the generated template and submits the previewed codes", async () => {
+  await openCreateDialog();
+  const templateInput = screen.getByLabelText("Quy tắc mã nhóm");
+  expect(templateInput).toHaveValue(`CNTT ${year}.1.{n}`);
+  fireEvent.change(templateInput, { target: { value: "LOP-CNTT-{n}" } });
+  fireEvent.change(screen.getByLabelText("Số nhóm cần tạo"), { target: { value: "2" } });
+  fireEvent.change(screen.getByLabelText("Đợt"), { target: { value: "2" } });
+  expect(templateInput).toHaveValue("LOP-CNTT-{n}");
+  expect(screen.getByText("LOP-CNTT-1")).toBeInTheDocument();
+  expect(screen.getByText("LOP-CNTT-2")).toBeInTheDocument();
+  const createButton = screen.getByRole("button", { name: "Tạo 2 nhóm" });
+  await waitFor(() => expect(createButton).toBeEnabled());
+  fireEvent.click(createButton);
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
+    expect.stringContaining("/masters/class-groups/batch"),
+    expect.objectContaining({ nameTemplate: "LOP-CNTT-{n}", nameIndexes: [1, 2], intakeRound: 2 }),
+    { withCredentials: true },
+  ));
+});
+
+test("requires the numbering token in a manually edited template", async () => {
+  await openCreateDialog();
+  fireEvent.change(screen.getByLabelText("Quy tắc mã nhóm"), { target: { value: "LOP-CNTT" } });
+  expect(screen.getByText(/phải chứa đúng một ký hiệu/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Tạo 1 nhóm" })).toBeDisabled();
+  fireEvent.change(screen.getByLabelText("Quy tắc mã nhóm"), { target: { value: "" } });
+  expect(screen.getByLabelText("Quy tắc mã nhóm")).toHaveValue("");
+  expect(screen.getByRole("button", { name: "Tạo 1 nhóm" })).toBeDisabled();
+});
+
 test("previews and creates missing 01 then 04 when 02 and 03 already exist", async () => {
   const defaultGet = axios.get.getMockImplementation();
   axios.get.mockImplementation(async (url) => {

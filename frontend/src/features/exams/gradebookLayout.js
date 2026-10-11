@@ -21,8 +21,8 @@ export function autoFitColumnByContent(values, { minWidth, maxWidth, header = ""
   return Math.min(maxWidth, Math.max(minWidth, Math.ceil(contentWidth + padding)));
 }
 
-export function gradebookDocumentColumns(document) {
-  const catalog = gradebookColumns();
+export function gradebookDocumentColumns(document, blank = false) {
+  const catalog = gradebookColumns(blank);
   return document.headers.map((label, index) => {
     const key = catalog[index]?.key;
     const policy = policies[key] || { min: 11, max: 18 };

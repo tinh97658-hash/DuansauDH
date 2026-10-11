@@ -36,10 +36,10 @@ export function buildGradebookDocument(group, offering, rows, now = new Date()) 
   };
 }
 
-export function gradebookFilename(group, offering) {
+export function gradebookFilename(group, offering, prefix = "Bang-diem-mon-hoc") {
   const safe = value => Array.from(String(value || ""), character => character.charCodeAt(0) < 32 ? "-" : character)
     .join("").replace(/[<>:"/\\|?*]/g, "-").replace(/[. ]+$/g, "").slice(0, 80) || "chua-co-ma";
-  return `Bang-diem-mon-hoc-${safe(group?.code)}-${safe(offering?.subject?.code)}.xlsx`;
+  return `${prefix}-${safe(group?.code)}-${safe(offering?.subject?.code)}.xlsx`;
 }
 
 export async function createGradebookExcel(document) {

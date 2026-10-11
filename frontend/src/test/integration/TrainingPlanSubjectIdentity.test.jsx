@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import axios from "axios";
 import TrainingPlan from "../../pages/plan/trainingPlan";
 import { toast } from "react-toastify";
@@ -64,6 +64,52 @@ const configureReads = (
     return Promise.reject(new Error(`Unexpected GET ${url}`));
   });
 };
+
+describe("Training Plan new curriculum codes", () => {
+  const year = String(new Date().getFullYear());
+  const openDialog = async (globalCodes) => {
+    configureReads([], [{ ...major, code: "" }]);
+    const defaultGet = axios.get.getMockImplementation();
+    axios.get.mockImplementation((url) => {
+      if (url.endsWith("/plan/curriculums")) return Promise.resolve({ data: globalCodes.map((code) => ({ code, majorId: "other-major" })) });
+      if (url.includes("/plan/curriculums?")) return Promise.resolve({ data: [] });
+      return defaultGet(url);
+    });
+    await act(async () => { render(<TrainingPlan />); });
+    await clickAndWait(await screen.findByRole("tab", { name: /Chương trình đào tạo theo khóa/ }));
+    await clickAndWait(screen.getByRole("button", { name: "Lập CTĐT mới" }));
+    return screen.findByRole("dialog");
+  };
+
+  beforeEach(() => { jest.clearAllMocks(); });
+
+  it("suggests a fresh global code on every opening and saves manual edits", async () => {
+    const dialog = await openDialog([`CT-NGANH-${year}`, `CT-NGANH-${year}-2`]);
+    expect(within(dialog).getByLabelText("Mã CTĐT")).toHaveValue(`CT-NGANH-${year}-3`);
+    fireEvent.change(within(dialog).getByLabelText("Mã CTĐT"), { target: { value: "ct-moi-tu-nhap" } });
+    axios.post.mockResolvedValue({ data: { id: "new-curriculum" } });
+    await clickAndWait(within(dialog).getByRole("button", { name: "Lập chương trình đào tạo" }));
+    expect(axios.post).toHaveBeenCalledWith(
+      expect.stringContaining("/plan/curriculums"),
+      expect.objectContaining({ code: "CT-MOI-TU-NHAP", majorId: major.id }),
+      { withCredentials: true },
+    );
+    const previousGet = axios.get.getMockImplementation();
+    axios.get.mockImplementation((url) => url.endsWith("/plan/curriculums")
+      ? Promise.resolve({ data: ["", "-2", "-3"].map((suffix) => ({ code: `CT-NGANH-${year}${suffix}` })) })
+      : previousGet(url));
+    await clickAndWait(await screen.findByRole("button", { name: "Lập CTĐT mới" }));
+    expect(screen.getByLabelText("Mã CTĐT")).toHaveValue(`CT-NGANH-${year}-4`);
+  });
+
+  it("rejects a manually entered code already used by another major", async () => {
+    const dialog = await openDialog([`CT-NGANH-${year}`]);
+    fireEvent.change(within(dialog).getByLabelText("Mã CTĐT"), { target: { value: `CT-NGANH-${year}` } });
+    await clickAndWait(within(dialog).getByRole("button", { name: "Lập chương trình đào tạo" }));
+    expect(axios.post).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("đã tồn tại"));
+  });
+});
 
 describe("Training Plan Subject identity persistence", () => {
   beforeEach(() => {

@@ -19,7 +19,7 @@ import FeatureLayout from "../../components/FeatureLayout";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import SubjectSharingCheckbox from "../../components/SubjectSharingCheckbox";
-import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
+import { disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline } from "../../utils/disciplineScope";
 import {
   compactClassCodes, countGroupClasses, groupCurriculumsByYear,
   normalizeSubjectName, suggestCurriculumCode,
@@ -131,6 +131,9 @@ const TrainingPlan = () => {
   // Curriculum Creation Dialog State
   const [isCreateCurriculumOpen, setIsCreateCurriculumOpen] = useState(false);
   const [createCurriculumForm, setCreateCurriculumForm] = useState(initialCurriculumForm(String(currentYear)));
+  const [curriculumCodeOptions, setCurriculumCodeOptions] = useState([]);
+  const [curriculumCodeLoading, setCurriculumCodeLoading] = useState(false);
+  const [curriculumCodeEdited, setCurriculumCodeEdited] = useState(false);
 
   // Curriculum State
   const [matrixSaving, setMatrixSaving] = useState(false);
@@ -148,11 +151,7 @@ const TrainingPlan = () => {
       setMajors(list);
       if (list.length > 0) {
         const selected = list.find((m) => m.id === majorId) || list[0];
-        setDisciplineId((previous) => (
-          previous && list.some((major) => (major.disciplineId || major.discipline?.id) === previous)
-            ? previous
-            : ""
-        ));
+        setDisciplineId(majorDisciplineId(selected));
         setMajorId(selected.id);
       } else {
         setDisciplineId("");
@@ -307,6 +306,11 @@ const TrainingPlan = () => {
     setDisciplineId(nextDisciplineId);
     const nextMajors = majorsForDiscipline(majors, nextDisciplineId);
     if (!nextMajors.some((major) => major.id === majorId)) setMajorId(nextMajors[0]?.id || "");
+  };
+
+  const handleMajorChange = (nextMajorId) => {
+    setMajorId(nextMajorId);
+    setDisciplineId(majorDisciplineId(majors.find((major) => major.id === nextMajorId)));
   };
 
   // Nhóm CTĐT theo khóa áp dụng để phân biệt rõ chương trình của từng khóa.
@@ -698,18 +702,29 @@ const TrainingPlan = () => {
   // ==========================================
   // CURRICULUM ACTIONS
   // ==========================================
-  const handleOpenCreateCurriculum = () => {
-    const defaultYear = year || String(currentYear);
-    const mCode = selectedMajor?.code || "NGANH";
-    const mName = selectedMajor?.name || "";
-    setCreateCurriculumForm({
-      applicableFromYear: defaultYear,
-      code: suggestCurriculumCode(mCode, defaultYear, curriculums),
-      name: `Chương trình đào tạo ${mName} - Khóa ${defaultYear}`,
-      autoPopulateFromCatalog: true,
-      note: "",
-    });
-    setIsCreateCurriculumOpen(true);
+  const handleOpenCreateCurriculum = async () => {
+    if (curriculumCodeLoading) return;
+    setCurriculumCodeLoading(true);
+    try {
+      // Curriculum codes are unique across all majors and training levels.
+      const { data } = await axios.get(`${API_BASE_URL}/plan/curriculums`, { withCredentials: true });
+      const allCurriculums = Array.isArray(data) ? data : data.data || [];
+      const defaultYear = year || String(currentYear);
+      setCurriculumCodeOptions(allCurriculums);
+      setCurriculumCodeEdited(false);
+      setCreateCurriculumForm({
+        applicableFromYear: defaultYear,
+        code: suggestCurriculumCode(selectedMajor?.code, defaultYear, allCurriculums),
+        name: `Chương trình đào tạo ${selectedMajor?.name || ""} - Khóa ${defaultYear}`,
+        autoPopulateFromCatalog: true,
+        note: "",
+      });
+      setIsCreateCurriculumOpen(true);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Không thể kiểm tra mã CTĐT đã tồn tại. Vui lòng thử lại.");
+    } finally {
+      setCurriculumCodeLoading(false);
+    }
   };
 
   const handleCreateCurriculum = async () => {
@@ -718,7 +733,7 @@ const TrainingPlan = () => {
     if (!createCurriculumForm.applicableFromYear?.trim()) return toast.error("Vui lòng nhập khóa áp dụng");
 
     const newCode = createCurriculumForm.code.trim().toUpperCase();
-    if (curriculums.some((c) => String(c.code || "").toUpperCase() === newCode)) {
+    if (curriculumCodeOptions.some((c) => String(c.code || "").trim().toUpperCase() === newCode)) {
       return toast.error(`Mã CTĐT "${newCode}" đã tồn tại. Mỗi CTĐT cần một mã riêng.`);
     }
 
@@ -930,7 +945,7 @@ const TrainingPlan = () => {
 
             <FilterSelectField label="Chuyên ngành" sx={{ flex: "2 1 320px", minWidth: 320, width: { xs: "100%", sm: "auto" } }}
                 value={majorId}
-                onChange={(e) => setMajorId(e.target.value)}
+                onChange={(e) => handleMajorChange(e.target.value)}
               >
                 {filteredMajors.map((m) => (
                   <MenuItem key={m.id} value={m.id} sx={{ fontSize: 13 }}>
@@ -1557,6 +1572,7 @@ const TrainingPlan = () => {
                     variant="contained"
                     startIcon={<AddRounded />}
                     onClick={handleOpenCreateCurriculum}
+                    disabled={curriculumCodeLoading}
                     sx={{
                       height: 28,
                       fontSize: 12,
@@ -1736,6 +1752,7 @@ const TrainingPlan = () => {
                       variant="contained"
                       startIcon={<AddRounded />}
                       onClick={handleOpenCreateCurriculum}
+                      disabled={curriculumCodeLoading}
                       sx={{
                         height: 32,
                         fontSize: 12,
@@ -2409,7 +2426,7 @@ const TrainingPlan = () => {
                     setCreateCurriculumForm((p) => ({
                       ...p,
                       applicableFromYear: y,
-                      code: suggestCurriculumCode(mCode, y, curriculums),
+                      code: curriculumCodeEdited ? p.code : suggestCurriculumCode(mCode, y, curriculumCodeOptions),
                       name: `Chương trình đào tạo ${mName} - Khóa ${y}`,
                     }));
                   }}
@@ -2431,7 +2448,11 @@ const TrainingPlan = () => {
                   fullWidth
                   size="small"
                   value={createCurriculumForm.code}
-                  onChange={(e) => setCreateCurriculumForm((p) => ({ ...p, code: e.target.value.toUpperCase() }))}
+                  onChange={(e) => {
+                    setCurriculumCodeEdited(true);
+                    setCreateCurriculumForm((p) => ({ ...p, code: e.target.value.toUpperCase() }));
+                  }}
+                  inputProps={{ "aria-label": "Mã CTĐT" }}
                   placeholder="VD: CT-KTPM-2025"
                   sx={cellInputSx}
                 />

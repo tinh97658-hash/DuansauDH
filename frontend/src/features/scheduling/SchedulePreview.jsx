@@ -10,6 +10,7 @@ export default function SchedulePreview() {
   return <main className="sl-schedule-preview">
     <nav className="sl-preview-actions" aria-label="Xuất lịch học">
       <button type="button" onClick={() => window.print()}>In / Lưu PDF</button>
+      <p>Để lưu PDF, chọn “Lưu dưới dạng PDF”, khổ A4 ngang và tắt “Đầu trang và chân trang”.</p>
     </nav>
     <section className="sl-print-only" aria-label="Mẫu lịch học"><SchedulePrintTemplate schedule={schedule} /></section>
   </main>;

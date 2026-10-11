@@ -44,23 +44,16 @@ it("downloads the active tab's columns, current draft values, and searched stude
   URL.revokeObjectURL = jest.fn();
   const downloads = [];
   const click = jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function () { downloads.push(this.download); });
-  const readBlob = (blob) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsText(blob);
-  });
-  const exportCsv = async () => {
+  const exportExamExcel = async () => {
     const count = URL.createObjectURL.mock.calls.length;
-    const button = await screen.findByRole("button", { name: "Xuất CSV" });
+    const button = await screen.findByRole("button", { name: "Xuất Excel" });
     await waitFor(() => expect(button).toBeEnabled());
     fireEvent.click(button);
     await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(count + 1));
-    const blob = URL.createObjectURL.mock.calls[URL.createObjectURL.mock.calls.length - 1][0];
-    const csv = await readBlob(blob);
-    const header = screen.getAllByRole("columnheader").map((cell) => `"${cell.textContent}"`).join(",");
-    expect(csv.replace(/^\uFEFF/, "").split("\r\n")[0]).toBe(header);
-    return csv;
+    const blob = URL.createObjectURL.mock.calls[count][0];
+    const buffer = await new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsArrayBuffer(blob); });
+    const book = new ExcelJS.Workbook(); await book.xlsx.load(buffer);
+    return book.worksheets[0];
   };
   try {
     render(<ExamLists />);
@@ -81,17 +74,21 @@ it("downloads the active tab's columns, current draft values, and searched stude
     expect(sheet.getCell("B11").value).toBe("HV002");
     expect(downloads[0]).toBe("Bang-diem-mon-hoc-N01-HP01.xlsx");
     fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
-    const exam = await exportCsv();
-    expect(exam).not.toContain("Điểm học phần");
-    expect(exam).not.toContain('"8,5"');
-    expect(exam).not.toContain('"HV002"');
-    expect(exam).toContain('"HV001"');
-    expect(exam).toContain('"HV003"');
-    expect(downloads[1]).toMatch(/^ds-thi-/);
+    const examSheet = await exportExamExcel();
+    expect(examSheet.getRow(4).values.slice(1)).toEqual(screen.getAllByRole("columnheader").map(cell => cell.textContent));
+    expect(examSheet.rowCount).toBe(6);
+    expect(examSheet.getCell("B5").value).toBe("HV001");
+    expect(examSheet.getCell("B6").value).toBe("HV003");
+    expect(examSheet.getCell("I5").value).toBe("");
+    expect(examSheet.getCell("A4").fill.fgColor.argb).toBe("FFDCE6F1");
+    expect(examSheet.pageSetup).toMatchObject({ paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1 });
+    expect(downloads[1]).toBe("DS-thi-N01-HP01.xlsx");
+    expect(screen.queryByRole("button", { name: "Xuất CSV" })).not.toBeInTheDocument();
     fireEvent.change(screen.getByPlaceholderText("Tìm theo mã HV, họ tên..."), { target: { value: "HV003" } });
-    const searched = await exportCsv();
-    expect(searched).toContain('"HV003"');
-    expect(searched).not.toContain('"HV001"');
+    const searchedSheet = await exportExamExcel();
+    expect(searchedSheet.rowCount).toBe(5);
+    expect(searchedSheet.getCell("A5").value).toBe(1);
+    expect(searchedSheet.getCell("B5").value).toBe("HV003");
     expect(axios.put).not.toHaveBeenCalled();
   } finally {
     // Đợi các URL tải file được giải phóng trước khi khôi phục API trình duyệt.
@@ -210,7 +207,8 @@ it("prints the loaded page with the current search and mode without fetching the
   expect(printed[1]).toHaveTextContent("HV001");
   expect(screen.queryByRole("button", { name: "In danh sách" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Tải lại" })).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Xuất CSV" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Xuất CSV" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Xuất Excel" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Cả bảng điểm" }));
   await waitFor(() => expect(screen.queryByTestId("exam-print-table")).not.toBeInTheDocument());
 });

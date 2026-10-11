@@ -97,5 +97,9 @@ describe("training plan curriculum grouping", () => {
 
   test("falls back to a generic major token when the major code is missing", () => {
     expect(suggestCurriculumCode("", "2026", [])).toBe("CT-NGANH-2026");
+    expect(suggestCurriculumCode("", "2026", [
+      { code: " ct-nganh-2026 ", majorId: "other-major", program: "doctoral" },
+      { code: "CT-NGANH-2026-2", majorId: "another-major" },
+    ])).toBe("CT-NGANH-2026-3");
   });
 });

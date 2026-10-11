@@ -19,6 +19,7 @@ import FeatureLayout from "../../components/FeatureLayout";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import ResizableSplit from "../../components/ResizableSplit";
+import ResizableTable from "../../components/ResizableTable";
 import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 import { personNameParts } from "../../utils/personName";
 import "./assignClassGroups.css";
@@ -292,6 +293,25 @@ const AssignClassGroups = () => {
     }
   };
 
+  const candidateColumns = [
+    { key: "select", label: "Chọn học viên", width: 42, minWidth: 42, padding: "checkbox", className: "assignment-select-col", header: <Checkbox
+      size="small"
+      indeterminate={selectedStudentIds.length > 0 && selectedStudentIds.length < Math.min(assignableStudents.length, remainingCapacity)}
+      checked={Math.min(assignableStudents.length, remainingCapacity) > 0 && selectedStudentIds.length === Math.min(assignableStudents.length, remainingCapacity)}
+      onChange={handleToggleSelectAll}
+      disabled={assignableStudents.length === 0 || remainingCapacity === 0 || loading || groupsLoading || actionLoading}
+      inputProps={{ "aria-label": "Chọn tất cả học viên" }}
+    /> },
+    { key: "code", label: "Mã HV", width: 104, className: "assignment-code-col" },
+    { key: "family", label: "Họ đệm", width: 150, className: "assignment-family-col" },
+    { key: "name", label: "Tên", width: 76, className: "assignment-name-col" },
+    { key: "dob", label: "Ngày sinh", width: 100, className: "assignment-dob-col" },
+    { key: "gender", label: "Giới tính", width: 70, className: "assignment-gender-col" },
+    { key: "major", label: "Chuyên ngành", width: 160 },
+    { key: "tuition", label: "Học phí nhập học", width: 120, className: "assignment-tuition-col" },
+    { key: "group", label: "Nhóm hiện tại", width: 124, className: "assignment-group-col" },
+  ];
+
   return (
     <FeatureLayout
       title="Phân nhóm học viên Thạc sĩ"
@@ -396,34 +416,14 @@ const AssignClassGroups = () => {
 
             {/* Student Table */}
             <TableContainer className="assignment-scroll" sx={{ flexGrow: 1, maxHeight: 520, border: "1px solid #D8E5EF", borderRadius: "10px", overflow: "auto" }}>
-              <Table size="small" stickyHeader aria-label="Học viên chưa phân lớp" className="assignment-table assignment-candidates">
-                <colgroup>
-                  <col className="assignment-select-col" /><col className="assignment-code-col" />
-                  <col className="assignment-family-col" /><col className="assignment-name-col" />
-                  <col className="assignment-dob-col" /><col className="assignment-gender-col" />
-                  <col /><col className="assignment-tuition-col" /><col className="assignment-group-col" />
-                </colgroup>
-                <TableHead>
-                  <TableRow sx={{ "& th": { bgcolor: "#EDF4FA", color: "#111827", borderColor: "#D8E5EF", fontWeight: 700 } }}>
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        size="small"
-                        indeterminate={selectedStudentIds.length > 0 && selectedStudentIds.length < Math.min(assignableStudents.length, remainingCapacity)}
-                        checked={Math.min(assignableStudents.length, remainingCapacity) > 0 && selectedStudentIds.length === Math.min(assignableStudents.length, remainingCapacity)}
-                        onChange={handleToggleSelectAll}
-                        disabled={assignableStudents.length === 0 || remainingCapacity === 0 || loading || groupsLoading || actionLoading}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Mã HV</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Họ đệm</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Tên</TableCell>
-                    <TableCell className="assignment-nowrap">Ngày sinh</TableCell>
-                    <TableCell className="assignment-nowrap">Giới tính</TableCell>
-                    <TableCell>Chuyên ngành</TableCell>
-                    <TableCell>Học phí nhập học</TableCell>
-                    <TableCell>Nhóm hiện tại</TableCell>
-                  </TableRow>
-                </TableHead>
+              <ResizableTable columns={candidateColumns} storageKey="masters-assignment-candidate-column-widths"
+                aria-label="Học viên chưa phân lớp" className="assignment-table assignment-candidates assignment-resizable"
+                sx={{
+                  "& td, & th": { whiteSpace: "normal", overflow: "hidden", textOverflow: "ellipsis" },
+                  "& td .MuiTypography-root": { whiteSpace: "normal", overflow: "hidden", textOverflow: "ellipsis" },
+                  "& td .assignment-code": { whiteSpace: "nowrap" },
+                  "& th": { bgcolor: "#EDF4FA", color: "#111827", borderColor: "#D8E5EF", fontWeight: 700 },
+                }}>
                 <TableBody>
                   {loading ? (
                     <TableRow>
@@ -484,7 +484,7 @@ const AssignClassGroups = () => {
                     })
                   )}
                 </TableBody>
-              </Table>
+              </ResizableTable>
             </TableContainer>
           </Paper>
         </>} right={<>

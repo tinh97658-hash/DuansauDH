@@ -160,7 +160,7 @@ it("shows an empty state and makes no progress request when no parent-major pair
   expect(axios.get.mock.calls.some(([url]) => url.includes("/class-curriculum-progress"))).toBe(false);
 });
 
-it("renders curriculum subjects once with one dynamic status column per class", async () => {
+it("renders catalog subjects once with one dynamic status column per class", async () => {
   mount();
   const table = await chooseScope();
   expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
@@ -176,6 +176,49 @@ it("renders curriculum subjects once with one dynamic status column per class", 
   expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/class-curriculum-progress"), {
     params: { majorId: major.id, academicYear: "2027" }, withCredentials: true,
   });
+});
+
+it("shows every catalog subject but only shows progress in classes whose curriculum contains it", async () => {
+  const added = { curriculumSubjectId: "entry-new", subjectId: "new-local", logicalSubjectId: "new-root", code: "NEW01", name: "Học phần mới trong danh mục", credits: 4, status: "scheduled", sessions: [] };
+  const another = { ...added, curriculumSubjectId: null, subjectId: "another-local", code: "NEW02", name: "Học phần khác trong danh mục", status: "completed", needsGradeEntry: true };
+  const classes = makeClasses();
+  classes[0] = { ...classes[0], subjects: [...classes[0].subjects, added, another] };
+  classes[1] = { ...classes[1], curriculumId: "curriculum-2", curriculum: { code: "K68" }, subjects: [...classes[1].subjects, ...[added, another].map((subject) => ({ ...subject, curriculumSubjectId: null, status: "not_started" }))] };
+  const sharedOffering = { ...offering, id: "new-offering", name: "Lớp học phần mới", subject: { id: "new-root", code: "ROOT01", name: "Tên môn gốc dùng chung" } };
+  mockData({ classes, offerings: [offering, sharedOffering] });
+  mount();
+  const table = await chooseScope();
+  expect(within(table).getAllByRole("row")).toHaveLength(5);
+  expect(within(table).getAllByText(added.name)).toHaveLength(1);
+  expect(within(table).getAllByText(another.name)).toHaveLength(1);
+  const row = within(table).getByRole("row", { name: /NEW01/ });
+  expect(within(row).getByText("4")).toBeInTheDocument();
+  expect(within(row).getByLabelText("Không áp dụng cho CNT2027.02")).toHaveTextContent(/^\-$/);
+  expect(within(row).queryByText("Chưa tổ chức")).not.toBeInTheDocument();
+  const outsideRow = within(table).getByRole("row", { name: /NEW02/ });
+  expect(within(outsideRow).getByLabelText("Không áp dụng cho CNT2027.01")).toHaveTextContent(/^\-$/);
+  expect(within(outsideRow).getByLabelText("Không áp dụng cho CNT2027.02")).toHaveTextContent(/^\-$/);
+  expect(within(outsideRow).queryByRole("button")).not.toBeInTheDocument();
+  expect(within(outsideRow).queryByRole("img", { name: "Hãy nhập điểm môn học" })).not.toBeInTheDocument();
+  fireEvent.click(within(row).getByRole("button", { name: "Xem chi tiết: Đã xếp lịch" }));
+  expect(screen.getByRole("dialog", { name: "Chi tiết lớp học phần" })).toHaveTextContent(sharedOffering.name);
+  fireEvent.click(screen.getByRole("button", { name: "Đóng" }));
+  fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: "hoc phan moi" } });
+  expect(within(table).getAllByRole("row")).toHaveLength(2);
+  fireEvent.change(screen.getByLabelText("Trạng thái"), { target: { value: "not_started" } });
+  expect(screen.queryByText(added.name)).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Trạng thái"), { target: { value: "completed" } });
+  expect(screen.queryByText(added.name)).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: "hoc phan khac" } });
+  expect(screen.queryByText(another.name)).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Trạng thái"), { target: { value: "all" } });
+  expect(screen.getByText(another.name)).toBeInTheDocument();
+});
+
+it("uses a catalog empty state for classes without curriculum subjects", async () => {
+  mockData({ classes: makeClasses().map((group) => ({ ...group, curriculum: null, subjects: [] })) });
+  mount(); await chooseScope();
+  expect(screen.getByText("Chưa có học phần trong danh mục của chuyên ngành đã chọn.")).toBeInTheDocument();
 });
 
 it("opens existing OfferingDetails from an organized status and leaves Chưa tổ chức non-interactive", async () => {
