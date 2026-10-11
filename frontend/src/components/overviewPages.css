@@ -1,0 +1,104 @@
+/* Scoped to the three overview pages; the real application shell is unchanged. */
+.overview-page{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;background:#f3f9fc;font-family:"Segoe UI",sans-serif;color:#103651}
+.overview-page>main{flex:1;min-width:0}
+.overview-home-page{min-height:calc(100vh + 100px);min-height:calc(100dvh + 100px)}
+.overview-home-main{display:flex;min-height:max(620px,46vw)}
+.overview-hero{position:relative;isolation:isolate;flex:1;overflow:hidden;background:linear-gradient(120deg,#fff 0%,#e8faff 53%,#1daeca 100%)}
+.overview-hero-left{position:absolute;inset:0;background:linear-gradient(120deg,#fff,#e3f8fb 70%);clip-path:polygon(0 0,59% 0,43% 100%,0 100%)}
+.overview-hero-art{position:absolute;inset:0 0 0 42%;clip-path:polygon(22% 0,100% 0,100% 100%,0 100%);background:linear-gradient(90deg,#1186d1,#0c93dc 25%,#17abde 50%,#29c1e2 75%,#4dcddd)}
+.overview-hero-art img{position:absolute;left:9%;bottom:12%;height:90%;width:90%;object-fit:contain;object-position:center bottom;mask-image:linear-gradient(to bottom,transparent 6%,#000 22%,#000)}
+.overview-diagonals{position:absolute;inset:0;pointer-events:none}
+.overview-diagonals i{position:absolute;inset:0;background:linear-gradient(150deg,#70d5e1aa,#0878b7aa);clip-path:polygon(54% 0,57% 0,41% 100%,38% 100%)}
+.overview-diagonals i:nth-child(2){clip-path:polygon(57% 0,60% 0,44% 100%,41% 100%);background:linear-gradient(150deg,#22b8cfbb,#007cafbb)}
+.overview-diagonals i:nth-child(3){clip-path:polygon(60% 0,63% 0,47% 100%,44% 100%);background:linear-gradient(150deg,#5dd4dc88,#1490b955)}
+.overview-hero-copy{position:absolute;z-index:3;left:5%;top:51%;transform:translateY(-50%);width:55%;max-width:850px}
+.overview-eyebrow{margin:0 0 26px;color:#187e9d;font-size:clamp(13px,1.125vw,19px);letter-spacing:.13em;font-weight:800}
+#root .overview-hero-copy h1{margin:0;color:#082f4a;font-family:"Segoe UI",sans-serif;font-size:clamp(30px,3.5vw,56px);font-weight:900;line-height:1.12;letter-spacing:-.04em}
+.overview-hero-copy h1 span{display:block;white-space:nowrap}
+.overview-hero-copy h1 span+span{margin-top:6px}
+.overview-university{margin:28px 0 28px;color:#183e50;font-size:clamp(17px,1.85vw,30px);font-weight:500;line-height:1.4}
+.overview-accent{display:block;width:112px;height:4px;border-radius:4px;background:linear-gradient(90deg,#098cb2,#50d5e1)}
+.overview-waves{position:absolute;bottom:-1px;left:0;width:54%;height:30%;pointer-events:none}
+.overview-footer{flex:none;padding:14px 16px;background:#fff;border-top:1px solid #e4eff3}
+.overview-footer nav{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
+.overview-footer a{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;border-radius:9px;color:#607d90;text-decoration:none;font-size:14px;font-weight:600}
+.overview-footer a svg{width:18px;height:18px}
+.overview-footer a:hover{background:#f1f9fc;color:#123c57}
+.overview-footer a.active{background:#eaf7fb;color:#103651;font-weight:700}
+.overview-footer a.active::after{content:"";position:absolute;bottom:0;left:20px;right:20px;height:3px;background:#12b3cf;border-radius:3px}
+.overview-footer a:focus-visible{outline:2px solid #10a9c9;outline-offset:3px}
+.overview-info{width:100%;margin:0;padding:24px 28px 22px;box-sizing:border-box}
+#root .overview-info h1{margin:0;color:#123954;font-size:clamp(25px,2.05vw,36px);font-weight:800;line-height:1.25;letter-spacing:-.02em}
+.overview-info-subtitle{margin:10px 0 0;color:#658091;font-size:14px;line-height:1.6}
+.overview-steps{position:relative;list-style:none;margin:26px 0 0;padding:0;display:grid;gap:14px}
+.overview-steps li{position:relative;display:flex;align-items:center;gap:20px;padding:22px 26px;background:#fff;border:1px solid #dfebf1;border-radius:16px}
+.overview-step-number{flex:none;display:grid;place-items:center;width:52px;height:52px;border-radius:14px;background:#e7f6fb;color:#087fa4;font-size:20px;font-weight:800}
+.overview-steps h2{margin:0 0 6px;font-size:18px;font-weight:700;color:#183f58;line-height:1.4}
+.overview-steps p{margin:0;font-size:14px;line-height:1.65;color:#688091}
+.overview-procedure .overview-steps{margin-left:22px}
+.overview-procedure .overview-steps::before{content:"";position:absolute;left:-22px;top:14px;bottom:14px;width:2px;background:#b8dfe8}
+.overview-procedure .overview-steps li::before{content:"";position:absolute;left:-28px;width:14px;height:14px;border-radius:50%;background:#16b4ce;box-shadow:0 0 0 4px #f3f9fc}
+.overview-procedure .overview-step-number{background:#123b58;color:#fff}
+.overview-info-note{margin:20px 0 0;padding:12px 16px;border-radius:10px;background:#edf8fc;color:#6a8495;font-size:13px;line-height:1.7}
+.overview-progress .overview-steps{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:28px}
+.overview-progress .overview-steps li{min-height:300px;box-sizing:border-box;flex-direction:column;align-items:flex-start;gap:24px;padding:28px 24px;border-radius:18px;overflow:hidden;isolation:isolate}
+.overview-progress .overview-steps li::before{content:"";position:absolute;z-index:-1;width:100px;height:100px;right:-22px;top:-24px;border-radius:50%;background:#f1f9fc}
+.overview-progress .overview-steps h2{margin-bottom:12px}
+.overview-card-accent{display:block;width:58px;height:3px;margin-top:26px;background:#68afba}
+/* Keep readable cards and the footer visible when the real ribbon leaves limited height. */
+@media(min-width:761px){.overview-information-page{height:100vh;height:100dvh;min-height:0}.overview-information-page>main{min-height:0;overflow-y:auto}}
+@media(min-width:761px) and (max-height:1000px){.overview-info{padding:20px 24px}.overview-procedure .overview-steps{margin-top:20px;gap:12px}.overview-procedure .overview-steps li{padding:14px 24px}.overview-procedure .overview-step-number{width:48px;height:48px}.overview-info-note{margin-top:16px}}
+@media(max-width:1000px){.overview-progress .overview-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){
+.overview-home-main{min-height:max(820px,100dvh)}
+.overview-hero-art{inset:40% 0 0;clip-path:polygon(10% 0,100% 0,100% 100%,0 100%)}
+.overview-hero-art img{left:0;bottom:0;height:100%;width:100%;mask-image:none}
+.overview-hero-left{clip-path:none;background:linear-gradient(120deg,#fff,#e9faff)}
+.overview-diagonals{top:36%;height:25%}
+.overview-diagonals i{clip-path:polygon(6% 0,12% 0,6% 100%,0 100%)}
+.overview-diagonals i:nth-child(2){clip-path:polygon(12% 0,18% 0,12% 100%,6% 100%)}
+.overview-diagonals i:nth-child(3){clip-path:polygon(18% 0,24% 0,18% 100%,12% 100%)}
+.overview-hero-copy{top:6%;left:6%;width:88%;max-width:none;transform:none}
+#root .overview-hero-copy h1{font-size:clamp(25px,5.6vw,40px)}
+.overview-university{font-size:clamp(17px,3.3vw,22px);margin:20px 0}
+.overview-eyebrow{font-size:12px;margin-bottom:18px}
+.overview-waves{width:100%;bottom:57%;height:15%}
+.overview-footer{padding:14px 8px}.overview-footer nav{gap:4px}.overview-footer a{padding:12px 10px;font-size:12px;gap:5px}.overview-footer a svg{width:16px;height:16px}
+.overview-info{padding:24px 20px}.overview-steps li{padding:18px 16px;gap:16px}.overview-steps h2{font-size:16px}.overview-step-number{width:44px;height:44px;font-size:18px}
+.overview-progress .overview-steps li{min-height:260px;padding:24px 20px}
+}
+@media(max-width:520px){.overview-progress .overview-steps{grid-template-columns:1fr}.overview-progress .overview-steps li{min-height:220px}}
+.overview-hero,.overview-hero *,.overview-info,.overview-info *,.overview-footer,.overview-footer *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+
+/* Home-only reference proportions. Other pages and shell/footer retain their styles. */
+@media(min-width:761px){
+.overview-home-page{min-height:100vh;min-height:100dvh}
+.overview-home-page .overview-home-main{flex:none;height:max(620px,46vw);min-height:0}
+.overview-home-page .overview-hero-copy{left:5%;top:54%;width:44%;max-width:740px}
+.overview-home-page .overview-eyebrow{font-size:clamp(16px,1.08vw,18px);margin-bottom:22px}
+#root .overview-home-page .overview-hero-copy h1{font-size:clamp(30px,2.92vw,48px);line-height:1.1}
+.overview-home-page .overview-university{font-size:clamp(19px,1.75vw,29px);margin:24px 0}
+.overview-home-page .overview-hero-art{inset:0 0 0 40%;clip-path:polygon(24% 0,100% 0,100% 100%,0 100%)}
+.overview-home-page .overview-hero-art img{left:15%;bottom:0;width:82%;height:82%;object-position:center bottom}
+.overview-home-page .overview-diagonals i{clip-path:polygon(54.5% 0,57.17% 0,40.67% 100%,38% 100%)}
+.overview-home-page .overview-diagonals i:nth-child(2){clip-path:polygon(57.17% 0,59.83% 0,43.33% 100%,40.67% 100%)}
+.overview-home-page .overview-diagonals i:nth-child(3){clip-path:polygon(59.83% 0,62.5% 0,46% 100%,43.33% 100%)}
+.overview-home-page .overview-waves{height:21%;width:54%}
+}
+
+/* Keep the pale left waves separate from the illustration foreground. */
+.overview-home-page .overview-waves{width:50%;clip-path:polygon(0 0,96% 0,76% 100%,0 100%)}
+
+/* Reference artwork supplies the existing diagonal bands, left waves and VMU scene.
+   Typography remains real HTML; this background applies only to the home hero. */
+@media(min-width:761px){
+.overview-home-page .overview-home-main{height:auto;aspect-ratio:1672 / 752;min-height:0}
+.overview-home-page .overview-hero-left,.overview-home-page .overview-diagonals,.overview-home-page .overview-waves{display:none}
+.overview-home-page .overview-hero-art{inset:0;clip-path:none;background:transparent}
+.overview-home-page .overview-hero-art img{left:0;bottom:0;width:100%;height:100%;object-fit:fill;mask-image:none}
+.overview-home-page .overview-hero-copy{left:5%;top:49%;width:45%;max-width:none}
+.overview-home-page .overview-eyebrow{font-size:clamp(16px,1.3vw,25px);margin-bottom:26px}
+#root .overview-home-page .overview-hero-copy h1{font-size:clamp(32px,3.85vw,74px);line-height:1.1}
+.overview-home-page .overview-university{font-size:clamp(22px,2.16vw,41px);margin:26px 0 28px}
+.overview-home-page .overview-accent{width:clamp(110px,7.65vw,147px);height:5px}
+}

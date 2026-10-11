@@ -1,26 +1,8 @@
 import React from "react";
 import ProgressReview from "../components/infoPages/progress";
-import Footer from "../components/footer";
 import ResponsiveAppBar from "../components/navbarNew";
+import { OverviewFooter } from "../components/overviewPages";
 
-// Function for showing information pages on post graduate programme
-
-function ProgressReviewPage() {
-  return (
-    <div>
-      <div style={{ marginBottom: "100px" }}>
-        <ResponsiveAppBar />
-      </div>
-
-      <div>
-        <ProgressReview />
-      </div>
-
-      <div style={{ marginTop: "10px" }}>
-        <Footer />
-      </div>
-    </div>
-  );
+export default function ProgressReviewPage() {
+  return <div className="overview-page overview-information-page"><ResponsiveAppBar /><main><ProgressReview /></main><OverviewFooter /></div>;
 }
-
-export default ProgressReviewPage;
