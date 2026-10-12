@@ -7,6 +7,7 @@ import FilterSelectField from "../../components/FilterSelectField";
 import FilterSearchField from "../../components/FilterSearchField";
 import ResizableTable from "../../components/ResizableTable";
 import DocumentExportMenu from "../../components/DocumentExportMenu";
+import ConfirmDialog from "../../components/ConfirmDialog";
 import { downloadDocumentFile } from "../../utils/documentFiles";
 import { buildGradebookDocument, createGradebookExcel, fetchAllGradebookRows, gradebookFilename, openGradebookPreview } from "../../features/exams/gradebookExport";
 import { buildExamListDocument, createExamListExcel } from "../../features/exams/examListExport";
@@ -261,11 +262,21 @@ export default function ExamLists() {
       </Paper>
       <Typography sx={{ mt: 1, color: "#607486", fontSize: 11.5 }} className="exam-no-print">Tư cách thi: dấu gạch là chưa xét. Điểm học phần, thang 4 và điểm chữ được nhập trực tiếp. Nháy đúp mép tiêu đề để tự căn độ rộng cột.</Typography>
       {dirtyCount > 0 && <Alert severity="warning" sx={{ mt: 1 }} className="exam-no-print">Bạn có điểm chưa lưu. {mode === "all" ? "Excel và PDF sử dụng các điểm vừa nhập." : "Excel sử dụng danh sách theo tư cách thi vừa chỉnh sửa."}</Alert>}
-      <Dialog open={Boolean(pendingChange)} onClose={() => setPendingChange(null)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: "#173E75", fontSize: 16 }}>Có điểm chưa lưu</DialogTitle>
-        <DialogContent>Bạn đã chỉnh sửa {dirtyCount} học viên. Chuyển lựa chọn sẽ bỏ các thay đổi này.</DialogContent>
-        <DialogActions><Button onClick={() => setPendingChange(null)}>Ở lại</Button><Button color="warning" onClick={() => { const change = pendingChange; setPendingChange(null); setDirty({}); change(); }}>Bỏ thay đổi và tiếp tục</Button></DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={Boolean(pendingChange)}
+        onClose={() => setPendingChange(null)}
+        title="Có điểm chưa lưu"
+        content={`Bạn đã chỉnh sửa ${dirtyCount} học viên. Chuyển lựa chọn sẽ bỏ các thay đổi này.`}
+        cancelText="Ở lại"
+        confirmText="Bỏ thay đổi và tiếp tục"
+        severity="warning"
+        onConfirm={() => {
+          const change = pendingChange;
+          setPendingChange(null);
+          setDirty({});
+          change();
+        }}
+      />
     </Box>
   </FeatureLayout>;
 }

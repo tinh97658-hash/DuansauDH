@@ -327,7 +327,7 @@ const AssignClassGroups = () => {
         mb: 1.5,
         bgcolor: "#FFF",
         borderColor: "#C6D5E1",
-        borderRadius: "10px",
+        borderRadius: "6px",
         boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
       }}>
         <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="flex-end">
@@ -594,7 +594,7 @@ const AssignClassGroups = () => {
               flexGrow: 1,
               maxHeight: groupMembers.length > 25 ? 460 : "none",
               border: "1px solid #D8E5EF",
-              borderRadius: "10px",
+              borderRadius: "6px",
               overflowY: groupMembers.length > 25 ? "auto" : "visible",
               overflowX: "auto",
             }}>

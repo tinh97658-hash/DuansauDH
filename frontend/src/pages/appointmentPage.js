@@ -1,33 +1,13 @@
-import React from 'react';
-import Appointment from '../components/infoPages/appointment';
-import Footer from '../components/footer';
-import ResponsiveAppBar from '../components/navbarNew';
+import React from "react";
+import FeatureLayout from "../components/FeatureLayout";
+import Appointment from "../components/infoPages/appointment";
 
-
-// Function for showing information pages on post graduate programme
-
-function AppointmentPage(){
-
-    return(
-
-
-        <div>
-                <div style={{marginBottom: '100px'}}>
-                    <ResponsiveAppBar/>
-                </div>
-
-                <div>
-                    <Appointment/>
-                </div>
-
-                <div style={{marginTop: '10px'}}>
-                    <Footer/>
-                </div>
-                
-
-            </div>
-
-    )
+function AppointmentPage() {
+  return (
+    <FeatureLayout title="Lịch hẹn hướng dẫn & đánh giá" hideHeader={false}>
+      <Appointment />
+    </FeatureLayout>
+  );
 }
 
 export default AppointmentPage;

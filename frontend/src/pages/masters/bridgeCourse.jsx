@@ -3,14 +3,17 @@ import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
-  Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControl, IconButton, MenuItem, Paper, Select, Stack, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip, Typography,
+  Alert, Box, Button, Chip, CircularProgress,
+  FormControl, IconButton, MenuItem, Paper, Select, Stack, TableBody,
+  TableCell, TableContainer, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import { AddRounded, DeleteRounded, EditRounded, RefreshRounded } from "@mui/icons-material";
 import FeatureLayout from "../../components/FeatureLayout";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
+import AppDialog from "../../components/AppDialog";
+import ConfirmDialog from "../../components/ConfirmDialog";
+import ResizableTable from "../../components/ResizableTable";
 import { API_BASE_URL } from "../../config/http";
 import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 import { personNameParts } from "../../utils/personName";
@@ -27,7 +30,6 @@ const RESULTS = {
 };
 const blank = (year) => ({ admissionRecordId: "", subjectId: "", academicYear: year, status: "assigned", score: "", decisionNo: "", completedAt: "", note: "" });
 
-
 const compactFieldLabelSx = {
   display: "block",
   mb: "5px",
@@ -41,14 +43,14 @@ const compactFieldLabelSx = {
 const compactControlSx = {
   "& .MuiOutlinedInput-root": {
     height: 40,
-    borderRadius: "6px",
+    borderRadius: "4px",
     backgroundColor: "#fff",
     color: "#1c2936",
     fontSize: "13px",
     fontWeight: 500,
     "& fieldset": { borderColor: "#c5d1db" },
     "&:hover fieldset": { borderColor: "#8fa6b9" },
-    "&.Mui-focused fieldset": { borderColor: "#087eae", borderWidth: "1.5px" },
+    "&.Mui-focused fieldset": { borderColor: "var(--primary, #0788B8)", borderWidth: "1.5px" },
   },
   "& .MuiOutlinedInput-input": {
     height: "auto",
@@ -105,6 +107,20 @@ export default function BridgeCourse() {
   const disciplines = useMemo(() => disciplinesFromMajors(majors), [majors]);
   const visibleMajors = useMemo(() => majorsForDiscipline(majors, disciplineId), [majors, disciplineId]);
 
+  const columns = useMemo(() => [
+    { key: "code", label: "Mã HV", width: 120, minWidth: 90 },
+    { key: "familyMiddle", label: "Họ đệm", width: 140, minWidth: 100 },
+    { key: "givenName", label: "Tên", width: 110, minWidth: 80 },
+    { key: "major", label: "Chuyên ngành", width: 200, minWidth: 140 },
+    { key: "subject", label: "Học phần bổ sung", width: 240, minWidth: 160 },
+    { key: "credits", label: "TC", width: 60, minWidth: 50, align: "center" },
+    { key: "year", label: "Thời gian", width: 100, minWidth: 80 },
+    { key: "status", label: "Trạng thái", width: 130, minWidth: 100 },
+    { key: "score", label: "Điểm", width: 70, minWidth: 60, align: "center" },
+    { key: "result", label: "Kết quả", width: 140, minWidth: 100 },
+    ...(admin ? [{ key: "actions", label: "Thao tác", width: 110, minWidth: 90, align: "right" }] : []),
+  ], [admin]);
+
   const visible = useMemo(() => {
     const key = search.trim().toLocaleLowerCase("vi");
     const allowedMajorIds = new Set(visibleMajors.map((item) => item.id));
@@ -154,187 +170,192 @@ export default function BridgeCourse() {
   return <FeatureLayout title="Học bổ sung kiến thức" group="Thủ tục đầu vào" desc="Đăng ký, theo dõi tiến độ và kết quả học phần bổ sung kiến thức của học viên Thạc sĩ.">
     <ToastContainer position="top-center" newestOnTop limit={3} />
     <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ mb: 2 }}>
-      {[["Tổng đăng ký", summary.total, "#087da5"], ["Đã phân công", summary.assigned, "#667085"], ["Đang học", summary.studying, "#168bc2"], ["Đạt / miễn", summary.passed, "#168b63"], ["Không đạt", summary.failed, "#c0392b"]].map(([label, value, color]) => <Paper key={label} variant="outlined" sx={{ px: 2, py: 1.25, flex: 1 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography variant="h5" fontWeight={700} sx={{ color }}>{value || 0}</Typography></Paper>)}
+      {[["Tổng đăng ký", summary.total, "#087da5"], ["Đã phân công", summary.assigned, "#667085"], ["Đang học", summary.studying, "#168bc2"], ["Đạt / miễn", summary.passed, "#168b63"], ["Không đạt", summary.failed, "#c0392b"]].map(([label, value, color]) => <Paper key={label} variant="outlined" sx={{ px: 2, py: 1.25, flex: 1, borderRadius: "6px" }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography variant="h5" fontWeight={700} sx={{ color }}>{value || 0}</Typography></Paper>)}
     </Stack>
-    <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderColor: "#C6D5E1", borderRadius: "10px", boxShadow: "0 2px 6px rgba(18,59,98,.07)" }}><Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="flex-end">
+    <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderColor: "#C6D5E1", borderRadius: "6px", boxShadow: "none" }}><Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="flex-end">
       <FilterSelectField label="Năm học" value={year} onChange={(e) => setYear(e.target.value)} sx={{ flex: "1 1 140px", minWidth: 140 }}>{YEARS.map((v) => <MenuItem key={v} value={v}>{v}</MenuItem>)}</FilterSelectField>
       <FilterSelectField label="Ngành" value={disciplineId} onChange={(e) => { setDisciplineId(e.target.value); setMajor("ALL"); }} sx={{ flex: "1 1 210px", minWidth: 210 }}><MenuItem value="">Tất cả ngành</MenuItem>{disciplines.map((item) => <MenuItem key={item.id} value={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}</FilterSelectField>
       <FilterSelectField label="Chuyên ngành" value={major} onChange={(e) => setMajor(e.target.value)} sx={{ flex: "1 1 210px", minWidth: 210 }}><MenuItem value="ALL">Tất cả chuyên ngành</MenuItem>{visibleMajors.map((m) => <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>)}</FilterSelectField>
       <FilterSelectField label="Trạng thái" value={status} onChange={(e) => setStatus(e.target.value)} sx={{ flex: "1 1 155px", minWidth: 155 }}><MenuItem value="ALL">Tất cả</MenuItem>{Object.entries(STATES).map(([k, v]) => <MenuItem key={k} value={k}>{v[0]}</MenuItem>)}</FilterSelectField>
       <FilterSearchField placeholder="Tìm học viên, học phần..." value={search} onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: 220, flex: 1 }} />
-      <Tooltip title="Tải lại"><IconButton onClick={load}><RefreshRounded /></IconButton></Tooltip>{admin && <Button variant="contained" startIcon={<AddRounded />} onClick={create}>Đăng ký học phần</Button>}
+      <Tooltip title="Tải lại"><IconButton onClick={load}><RefreshRounded /></IconButton></Tooltip>{admin && <Button variant="contained" startIcon={<AddRounded />} onClick={create} sx={{ height: 40, px: 2, bgcolor: "#0788B8", borderRadius: "4px", boxShadow: "none", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}>Đăng ký học phần</Button>}
     </Stack></Paper>
     {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-    <TableContainer component={Paper} variant="outlined"><Table size="small"><TableHead><TableRow sx={{ bgcolor: "#f5f8fa" }}><TableCell>Mã HV</TableCell><TableCell>Họ đệm</TableCell><TableCell>Tên</TableCell><TableCell>Chuyên ngành</TableCell><TableCell>Học phần bổ sung</TableCell><TableCell align="center">TC</TableCell><TableCell>Thời gian</TableCell><TableCell>Trạng thái</TableCell><TableCell align="center">Điểm</TableCell><TableCell>Kết quả</TableCell>{admin && <TableCell align="right">Thao tác</TableCell>}</TableRow></TableHead><TableBody>
-      {loading ? <TableRow><TableCell colSpan={11} align="center" sx={{ py: 6 }}><CircularProgress size={30} /></TableCell></TableRow> : !visible.length ? <TableRow><TableCell colSpan={11} align="center" sx={{ py: 6 }}>Chưa có đăng ký phù hợp bộ lọc.</TableCell></TableRow> : visible.map((r) => <TableRow key={r.id} hover><TableCell>{r.admissionRecord?.code || "—"}</TableCell><TableCell><strong>{personNameParts(r.admissionRecord).familyAndMiddle}</strong></TableCell><TableCell><strong>{personNameParts(r.admissionRecord).givenName}</strong></TableCell><TableCell>{r.admissionRecord?.major?.name || r.admissionRecord?.majorName || "—"}</TableCell><TableCell><strong>{r.subject?.code}</strong> - {r.subject?.name}</TableCell><TableCell align="center">{r.subject?.credits || 0}</TableCell><TableCell>{r.academicYear}</TableCell><TableCell><Chip size="small" label={(STATES[r.status] || STATES.assigned)[0]} color={(STATES[r.status] || STATES.assigned)[1]} /></TableCell><TableCell align="center">{r.score ?? "—"}</TableCell><TableCell><Chip size="small" variant="outlined" label={(RESULTS[r.result] || RESULTS.pending)[0]} color={(RESULTS[r.result] || RESULTS.pending)[1]} /></TableCell>{admin && <TableCell align="right"><IconButton size="small" onClick={() => edit(r)}><EditRounded fontSize="small" /></IconButton><IconButton size="small" color="error" onClick={() => setDeleting(r)}><DeleteRounded fontSize="small" /></IconButton></TableCell>}</TableRow>)}
-    </TableBody></Table></TableContainer>
-    <Dialog
+    <TableContainer component={Paper} variant="outlined" sx={{ borderColor: "#D7E4EE", borderRadius: "6px", overflow: "auto", boxShadow: "0 2px 8px rgba(23, 62, 117, 0.04)" }}>
+      <ResizableTable
+        columns={columns}
+        storageKey="bridge-course-table-widths"
+        aria-label="Danh sách học bổ sung kiến thức"
+      >
+        <TableBody>
+          {loading ? (
+            <TableRow><TableCell colSpan={columns.length} align="center" sx={{ py: 6 }}><CircularProgress size={30} /></TableCell></TableRow>
+          ) : !visible.length ? (
+            <TableRow><TableCell colSpan={columns.length} align="center" sx={{ py: 6 }}>Chưa có đăng ký phù hợp bộ lọc.</TableCell></TableRow>
+          ) : (
+            visible.map((r) => (
+              <TableRow key={r.id} hover sx={{ "&:hover": { bgcolor: "#F5FAFE!important" }, "& td": { borderColor: "#E2EBF2" } }}>
+                <TableCell>{r.admissionRecord?.code || "—"}</TableCell>
+                <TableCell><strong>{personNameParts(r.admissionRecord).familyAndMiddle}</strong></TableCell>
+                <TableCell><strong>{personNameParts(r.admissionRecord).givenName}</strong></TableCell>
+                <TableCell>{r.admissionRecord?.major?.name || r.admissionRecord?.majorName || "—"}</TableCell>
+                <TableCell><strong>{r.subject?.code}</strong> - {r.subject?.name}</TableCell>
+                <TableCell align="center">{r.subject?.credits || 0}</TableCell>
+                <TableCell>{r.academicYear}</TableCell>
+                <TableCell><Chip size="small" label={(STATES[r.status] || STATES.assigned)[0]} color={(STATES[r.status] || STATES.assigned)[1]} sx={{ borderRadius: "4px" }} /></TableCell>
+                <TableCell align="center">{r.score ?? "—"}</TableCell>
+                <TableCell><Chip size="small" variant="outlined" label={(RESULTS[r.result] || RESULTS.pending)[0]} color={(RESULTS[r.result] || RESULTS.pending)[1]} sx={{ borderRadius: "4px" }} /></TableCell>
+                {admin && (
+                  <TableCell align="right">
+                    <IconButton size="small" color="primary" onClick={() => edit(r)}><EditRounded fontSize="small" /></IconButton>
+                    <IconButton size="small" color="error" onClick={() => setDeleting(r)}><DeleteRounded fontSize="small" /></IconButton>
+                  </TableCell>
+                )}
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </ResizableTable>
+    </TableContainer>
+    <AppDialog
       open={open}
       onClose={() => !saving && setOpen(false)}
       fullWidth
       maxWidth="sm"
+      title={editing ? "CẬP NHẬT HỌC BỔ SUNG KIẾN THỨC" : "ĐĂNG KÝ HỌC BỔ SUNG KIẾN THỨC"}
       PaperProps={{
         sx: {
           width: 580,
           maxWidth: "calc(100vw - 32px)",
-          border: "1px solid #cfdbe4",
-          borderRadius: "8px",
-          boxShadow: "0 8px 24px rgba(23, 61, 112, 0.14)",
-          fontFamily: '"Inter", "Segoe UI", sans-serif',
-          "& .MuiTypography-root, & .MuiButton-root, & .MuiInputBase-root, & .MuiChip-root": {
-            fontFamily: '"Inter", "Segoe UI", sans-serif!important',
-          },
         },
       }}
+      actions={
+        <>
+          <Button onClick={() => setOpen(false)} color="inherit" sx={{ minHeight: 36, px: 2, py: 0.75, border: "1px solid #c5d1db", borderRadius: "4px", color: "#435b72", fontSize: "12.5px", fontWeight: 600 }}>Hủy</Button>
+          <Button variant="contained" disabled={saving} onClick={save} sx={{ minHeight: 36, px: 2, py: 0.75, borderRadius: "4px", bgcolor: "#0788B8", boxShadow: "none", fontSize: "12.5px", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}>
+            {saving ? <CircularProgress size={20} sx={{ color: "#fff" }} /> : "Lưu"}
+          </Button>
+        </>
+      }
     >
-      <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2.5, py: 1.75, color: "#173d70", fontSize: "17px", fontWeight: 700, lineHeight: "23px", borderBottom: "1px solid #e1e8ee", textTransform: "uppercase" }}>
-        <span>{editing ? "CẬP NHẬT HỌC BỔ SUNG KIẾN THỨC" : "ĐĂNG KÝ HỌC BỔ SUNG KIẾN THỨC"}</span>
-        <IconButton aria-label="Đóng" size="small" onClick={() => !saving && setOpen(false)} sx={{ width: 30, height: 30, color: "#526a7d", fontSize: 20 }}>×</IconButton>
-      </DialogTitle>
-      <DialogContent sx={{ px: 2.5, py: 2 }}>
-        <Stack spacing="14px">
-          <Box sx={{ p: 1.75, border: "1px solid #d7e1e8", borderRadius: "8px", backgroundColor: "#fbfcfd" }}>
-            <Stack spacing="13px">
-              {!editing && (
-                <CompactField
-                  label="HỌC VIÊN THẠC SĨ"
-                  htmlFor="bridge-student"
-                  helper={!candidates.length ? "Không có học viên đủ điều kiện theo bộ lọc." : undefined}
-                >
-                  <FormControl fullWidth size="small" sx={compactControlSx}>
-                    <Select
-                      id="bridge-student"
-                      value={form.admissionRecordId}
-                      inputProps={{ "aria-label": "Học viên Thạc sĩ" }}
-                      onChange={(e) => setForm({ ...form, admissionRecordId: e.target.value })}
-                    >
-                      {candidates.map((c) => (
-                        <MenuItem key={c.id} value={c.id}>
-                          {c.code || "Chưa có mã"} - {c.fullName} ({c.major?.name || c.majorName || "Chưa xếp ngành"})
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </CompactField>
-              )}
-
-              <CompactField label="HỌC PHẦN BỔ SUNG" htmlFor="bridge-subject">
+      <Stack spacing="14px">
+        <Box sx={{ p: 1.75, border: "1px solid #d7e1e8", borderRadius: "6px", backgroundColor: "#fbfcfd" }}>
+          <Stack spacing="13px">
+            {!editing && (
+              <CompactField
+                label="HỌC VIÊN THẠC SĨ"
+                htmlFor="bridge-student"
+                helper={!candidates.length ? "Không có học viên đủ điều kiện theo bộ lọc." : undefined}
+              >
                 <FormControl fullWidth size="small" sx={compactControlSx}>
                   <Select
-                    id="bridge-subject"
-                    value={form.subjectId}
-                    inputProps={{ "aria-label": "Học phần bổ sung" }}
-                    onChange={(e) => setForm({ ...form, subjectId: e.target.value })}
+                    id="bridge-student"
+                    value={form.admissionRecordId}
+                    inputProps={{ "aria-label": "Học viên Thạc sĩ" }}
+                    onChange={(e) => setForm({ ...form, admissionRecordId: e.target.value })}
                   >
-                    {subjects.map((s) => (
-                      <MenuItem key={s.id} value={s.id}>
-                        {s.code} - {s.name} ({s.credits} TC)
+                    {candidates.map((c) => (
+                      <MenuItem key={c.id} value={c.id}>
+                        {c.code || "Chưa có mã"} - {c.fullName} ({c.major?.name || c.majorName || "Chưa xếp ngành"})
                       </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
               </CompactField>
+            )}
 
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "160px 1fr" }, gap: 1.5 }}>
-                <CompactField label="NĂM HỌC" htmlFor="bridge-year">
-                  <TextField id="bridge-year" value={form.academicYear} onChange={(e) => setForm({ ...form, academicYear: e.target.value })} fullWidth size="small" inputProps={{ "aria-label": "Năm học" }} sx={compactControlSx} />
-                </CompactField>
-                <CompactField label="TRẠNG THÁI" htmlFor="bridge-status">
-                  <FormControl fullWidth size="small" sx={compactControlSx}>
-                    <Select
-                      id="bridge-status"
-                      value={form.status}
-                      inputProps={{ "aria-label": "Trạng thái" }}
-                      onChange={(e) => setForm({ ...form, status: e.target.value, score: e.target.value === "exempt" ? "" : form.score })}
-                    >
-                      {Object.entries(STATES).map(([k, v]) => (
-                        <MenuItem key={k} value={k}>{v[0]}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </CompactField>
-              </Box>
-
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "160px 1fr" }, gap: 1.5 }}>
-                <CompactField label="ĐIỂM (0–10)" htmlFor="bridge-score">
-                  <TextField
-                    id="bridge-score"
-                    type="number"
-                    value={form.score}
-                    disabled={form.status === "exempt"}
-                    inputProps={{ min: 0, max: 10, step: 0.01, "aria-label": "Điểm" }}
-                    onChange={(e) => setForm({ ...form, score: e.target.value })}
-                    fullWidth
-                    size="small"
-                    sx={compactControlSx}
-                  />
-                </CompactField>
-                <CompactField label="NGÀY HOÀN THÀNH" htmlFor="bridge-completed-at">
-                  <TextField
-                    id="bridge-completed-at"
-                    type="date"
-                    value={form.completedAt}
-                    InputLabelProps={{ shrink: true }}
-                    onChange={(e) => setForm({ ...form, completedAt: e.target.value })}
-                    fullWidth
-                    size="small"
-                    inputProps={{ "aria-label": "Ngày hoàn thành" }}
-                    sx={compactControlSx}
-                  />
-                </CompactField>
-              </Box>
-            </Stack>
-          </Box>
-
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
-            <CompactField label="SỐ QUYẾT ĐỊNH / BIÊN BẢN" htmlFor="bridge-decision">
-              <TextField id="bridge-decision" placeholder="Nhập số quyết định..." value={form.decisionNo} onChange={(e) => setForm({ ...form, decisionNo: e.target.value })} fullWidth size="small" inputProps={{ "aria-label": "Số quyết định" }} sx={compactControlSx} />
+            <CompactField label="HỌC PHẦN BỔ SUNG" htmlFor="bridge-subject">
+              <FormControl fullWidth size="small" sx={compactControlSx}>
+                <Select
+                  id="bridge-subject"
+                  value={form.subjectId}
+                  inputProps={{ "aria-label": "Học phần bổ sung" }}
+                  onChange={(e) => setForm({ ...form, subjectId: e.target.value })}
+                >
+                  {subjects.map((s) => (
+                    <MenuItem key={s.id} value={s.id}>
+                      {s.code} - {s.name} ({s.credits} TC)
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </CompactField>
-            <CompactField label="GHI CHÚ" htmlFor="bridge-note">
-              <TextField id="bridge-note" placeholder="Nhập ghi chú..." value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} fullWidth size="small" inputProps={{ "aria-label": "Ghi chú" }} sx={compactControlSx} />
-            </CompactField>
-          </Box>
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 2.5, py: 1.5, gap: 1.25, minHeight: 60, borderTop: "1px solid #e1e8ee" }}>
-        <Button onClick={() => setOpen(false)} color="inherit" sx={{ minHeight: 36, px: 2, py: 0.75, border: "1px solid #c5d1db", borderRadius: "6px", color: "#435b72", fontSize: "12.5px", fontWeight: 600 }}>Hủy</Button>
-        <Button variant="contained" disabled={saving} onClick={save} sx={{ minHeight: 36, px: 2, py: 0.75, borderRadius: "6px", backgroundColor: "#087eae", boxShadow: "none", fontSize: "12.5px", fontWeight: 700, "&:hover": { backgroundColor: "#066e99", boxShadow: "none" } }}>
-          {saving ? <CircularProgress size={20} sx={{ color: "#fff" }} /> : "Lưu"}
-        </Button>
-      </DialogActions>
-    </Dialog>
 
-    <Dialog
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "160px 1fr" }, gap: 1.5 }}>
+              <CompactField label="NĂM HỌC" htmlFor="bridge-year">
+                <TextField id="bridge-year" value={form.academicYear} onChange={(e) => setForm({ ...form, academicYear: e.target.value })} fullWidth size="small" inputProps={{ "aria-label": "Năm học" }} sx={compactControlSx} />
+              </CompactField>
+              <CompactField label="TRẠNG THÁI" htmlFor="bridge-status">
+                <FormControl fullWidth size="small" sx={compactControlSx}>
+                  <Select
+                    id="bridge-status"
+                    value={form.status}
+                    inputProps={{ "aria-label": "Trạng thái" }}
+                    onChange={(e) => setForm({ ...form, status: e.target.value, score: e.target.value === "exempt" ? "" : form.score })}
+                  >
+                    {Object.entries(STATES).map(([k, v]) => (
+                      <MenuItem key={k} value={k}>{v[0]}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </CompactField>
+            </Box>
+
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "160px 1fr" }, gap: 1.5 }}>
+              <CompactField label="ĐIỂM (0–10)" htmlFor="bridge-score">
+                <TextField
+                  id="bridge-score"
+                  type="number"
+                  value={form.score}
+                  disabled={form.status === "exempt"}
+                  inputProps={{ min: 0, max: 10, step: 0.01, "aria-label": "Điểm" }}
+                  onChange={(e) => setForm({ ...form, score: e.target.value })}
+                  fullWidth
+                  size="small"
+                  sx={compactControlSx}
+                />
+              </CompactField>
+              <CompactField label="NGÀY HOÀN THÀNH" htmlFor="bridge-completed-at">
+                <TextField
+                  id="bridge-completed-at"
+                  type="date"
+                  value={form.completedAt}
+                  InputLabelProps={{ shrink: true }}
+                  onChange={(e) => setForm({ ...form, completedAt: e.target.value })}
+                  fullWidth
+                  size="small"
+                  inputProps={{ "aria-label": "Ngày hoàn thành" }}
+                  sx={compactControlSx}
+                />
+              </CompactField>
+            </Box>
+          </Stack>
+        </Box>
+
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
+          <CompactField label="SỐ QUYẾT ĐỊNH / BIÊN BẢN" htmlFor="bridge-decision">
+            <TextField id="bridge-decision" placeholder="Nhập số quyết định..." value={form.decisionNo} onChange={(e) => setForm({ ...form, decisionNo: e.target.value })} fullWidth size="small" inputProps={{ "aria-label": "Số quyết định" }} sx={compactControlSx} />
+          </CompactField>
+          <CompactField label="GHI CHÚ" htmlFor="bridge-note">
+            <TextField id="bridge-note" placeholder="Nhập ghi chú..." value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} fullWidth size="small" inputProps={{ "aria-label": "Ghi chú" }} sx={compactControlSx} />
+          </CompactField>
+        </Box>
+      </Stack>
+    </AppDialog>
+
+    <ConfirmDialog
       open={Boolean(deleting)}
       onClose={() => setDeleting(null)}
-      maxWidth="xs"
-      fullWidth
-      PaperProps={{
-        sx: {
-          border: "1px solid #cfdbe4",
-          borderRadius: "8px",
-          boxShadow: "0 8px 24px rgba(23, 61, 112, 0.14)",
-          fontFamily: '"Inter", "Segoe UI", sans-serif',
-          "& .MuiTypography-root, & .MuiButton-root": {
-            fontFamily: '"Inter", "Segoe UI", sans-serif!important',
-          },
-        },
-      }}
+      onConfirm={remove}
+      title="XÁC NHẬN XÓA ĐĂNG KÝ"
+      severity="error"
+      confirmText={saving ? "Đang xóa..." : "Xóa"}
+      confirmDisabled={saving}
     >
-      <DialogTitle sx={{ px: 2.5, py: 1.75, color: "#173d70", fontSize: "16px", fontWeight: 700, borderBottom: "1px solid #e1e8ee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span>Xác nhận xóa đăng ký</span>
-        <IconButton aria-label="Đóng" size="small" onClick={() => setDeleting(null)} sx={{ width: 30, height: 30, color: "#526a7d", fontSize: 20 }}>×</IconButton>
-      </DialogTitle>
-      <DialogContent sx={{ px: 2.5, py: 2 }}>
-        <Typography sx={{ fontSize: "13.5px", color: "#1c2936" }}>
-          Bạn có chắc muốn xóa học phần <strong>{deleting?.subject?.name}</strong> của <strong>{deleting?.admissionRecord?.fullName}</strong> không?
-        </Typography>
-      </DialogContent>
-      <DialogActions sx={{ px: 2.5, py: 1.5, gap: 1.25, minHeight: 60, borderTop: "1px solid #e1e8ee" }}>
-        <Button onClick={() => setDeleting(null)} color="inherit" sx={{ minHeight: 36, px: 2, py: 0.75, border: "1px solid #c5d1db", borderRadius: "6px", color: "#435b72", fontSize: "12.5px", fontWeight: 600 }}>Hủy</Button>
-        <Button color="error" variant="contained" onClick={remove} sx={{ minHeight: 36, px: 2, py: 0.75, borderRadius: "6px", boxShadow: "none", fontSize: "12.5px", fontWeight: 700 }}>Xóa</Button>
-      </DialogActions>
-    </Dialog>
+      <Typography sx={{ fontSize: "13.5px", color: "#1c2936" }}>
+        Bạn có chắc muốn xóa học phần <strong>{deleting?.subject?.name}</strong> của <strong>{deleting?.admissionRecord?.fullName}</strong> không?
+      </Typography>
+    </ConfirmDialog>
   
   </FeatureLayout>;
 }

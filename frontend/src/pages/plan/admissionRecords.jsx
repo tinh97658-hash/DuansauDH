@@ -21,6 +21,7 @@ import ResizableTable from "../../components/ResizableTable";
 import AdmissionTuitionCheckbox from "../../features/admission/AdmissionTuitionCheckbox";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
+import ConfirmDialog from "../../components/ConfirmDialog";
 import { getSelectableMajors, normalizeMajorsResponse, selectMajorForLevel } from "../../utils/majors";
 import { personNameParts } from "../../utils/personName";
 import {
@@ -903,18 +904,20 @@ const AdmissionRecords = ({ mode = "applications" }) => {
         fullWidth
         PaperProps={{
           sx: {
-            borderRadius: "4px",
-            border: "1px solid #DFE4E8",
+            borderRadius: "6px",
+            overflow: "hidden",
+            border: "1px solid #B8C7D6",
             width: "calc(100vw - 32px)",
             maxWidth: "1800px",
+            boxShadow: "0 12px 36px rgba(15, 39, 75, 0.22)",
           },
         }}
       >
         <DialogTitle
           sx={{
-            bgcolor: "#F0F4F8",
-            borderBottom: "1px solid #DFE4E8",
-            py: 1.2,
+            background: "linear-gradient(180deg, #1A4680 0%, #153A6B 100%)",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.15)",
+            py: 1.25,
             px: 2.5,
             display: "flex",
             alignItems: "center",
@@ -922,12 +925,12 @@ const AdmissionRecords = ({ mode = "applications" }) => {
           }}
         >
           <Stack direction="row" spacing={1} alignItems="center">
-            <PersonRounded sx={{ color: "#173E75", fontSize: 20 }} />
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#173E75", fontSize: 14 }}>
+            <PersonRounded sx={{ color: "#FFFFFF", fontSize: 20 }} />
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#FFFFFF", fontSize: 14, letterSpacing: "0.3px" }}>
               {formData.id ? "SỬA HỒ SƠ HỌC VIÊN" : "HỒ SƠ HỌC VIÊN - QUẢN LÝ HỌC VIÊN [MPS - VMU]"}
             </Typography>
           </Stack>
-          <IconButton size="small" onClick={() => setIsFormOpen(false)}>
+          <IconButton size="small" onClick={() => setIsFormOpen(false)} sx={{ color: "rgba(255, 255, 255, 0.75)", "&:hover": { color: "#FFF", bgcolor: "rgba(255, 255, 255, 0.15)" } }}>
             <CloseRounded fontSize="small" />
           </IconButton>
         </DialogTitle>
@@ -1524,18 +1527,20 @@ const AdmissionRecords = ({ mode = "applications" }) => {
       </Dialog>
 
       {/* Delete Confirmation */}
-      <Dialog open={Boolean(deletingRecord)} onClose={() => setDeletingRecord(null)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: "#B52D2D" }}>Xác nhận xóa hồ sơ</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">
+      <ConfirmDialog
+        open={Boolean(deletingRecord)}
+        onClose={() => setDeletingRecord(null)}
+        onConfirm={handleDeleteRecord}
+        title="Xác nhận xóa hồ sơ"
+        content={(
+          <span>
             Bạn có chắc chắn muốn xóa hồ sơ thí sinh <strong>{deletingRecord?.fullName}</strong> (Mã: <strong>{deletingRecord?.code}</strong>) không?
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setDeletingRecord(null)} color="inherit">Hủy</Button>
-          <Button variant="contained" color="error" onClick={handleDeleteRecord}>Xóa vĩnh viễn</Button>
-        </DialogActions>
-      </Dialog>
+          </span>
+        )}
+        confirmLabel="Xóa vĩnh viễn"
+        cancelLabel="Hủy"
+        confirmColor="error"
+      />
     </FeatureLayout>
   );
 };

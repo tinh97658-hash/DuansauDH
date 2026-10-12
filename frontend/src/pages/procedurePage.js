@@ -1,33 +1,13 @@
-import React from 'react';
-import AppProcedure from '../components/infoPages/procedure';
-import Footer from '../components/footer';
-import ResponsiveAppBar from '../components/navbarNew';
+import React from "react";
+import FeatureLayout from "../components/FeatureLayout";
+import AppProcedure from "../components/infoPages/procedure";
 
-
-// Function for showing information pages on post graduate programme
-
-function ProcedurePage(){
-
-    return(
-
-
-        <div>
-                <div style={{marginBottom: '100px'}}>
-                    <ResponsiveAppBar/>
-                </div>
-
-                <div>
-                    <AppProcedure/>
-                </div>
-
-                <div style={{marginTop: '10px'}}>
-                    <Footer/>
-                </div>
-                
-
-            </div>
-
-    )
+function ProcedurePage() {
+  return (
+    <FeatureLayout title="Quy trình đào tạo sau đại học" hideHeader={false}>
+      <AppProcedure />
+    </FeatureLayout>
+  );
 }
 
 export default ProcedurePage;

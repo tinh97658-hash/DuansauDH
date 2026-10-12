@@ -6,7 +6,7 @@ export const TABLE_ROW_BORDER_COLOR = "#E2EBF2";
 export const TABLE_HEADER_BACKGROUND = "#EDF4FA";
 export const TABLE_BORDER_RADIUS = 12;
 export const TABLE_HOVER_BACKGROUND = "#F5FAFE";
-export const CONTROL_BORDER_RADIUS = 8;
+export const CONTROL_BORDER_RADIUS = 4;
 
 /**
  * Institutional Theme for University Postgraduate Operations System
@@ -165,13 +165,13 @@ export const theme = createTheme({
         },
         outlined: {
           borderColor: "#DFE4E8",
-          borderRadius: 4,
+          borderRadius: 6,
           boxShadow: "none",
         },
         elevation1: {
           boxShadow: "none",
           border: "1px solid #DFE4E8",
-          borderRadius: 4,
+          borderRadius: 6,
         },
       },
     },
@@ -179,7 +179,7 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           border: "1px solid #DFE4E8",
-          borderRadius: 4,
+          borderRadius: 6,
           boxShadow: "none",
         },
       },
@@ -334,7 +334,7 @@ export const theme = createTheme({
     MuiDialog: {
       styleOverrides: {
         paper: {
-          borderRadius: 4,
+          borderRadius: 6,
           border: "1px solid #DFE4E8",
           boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
         },

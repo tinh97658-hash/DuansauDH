@@ -1,6 +1,6 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
-import { Card, CardContent, CircularProgress, Grid } from "@mui/material";
+import { Alert, Box, Card, CardContent, CircularProgress, Grid, Paper, Typography } from "@mui/material";
 import profilePicture from "../images/profile-picture.jpg";
 
 const labels = [
@@ -17,6 +17,7 @@ const displayValue = (value) => {
 const ProfileCard = ({ endpoint }) => {
   const [info, setInfo] = useState(null);
   const [error, setError] = useState("");
+
   useEffect(() => {
     let mounted = true;
     axios.get(endpoint, { withCredentials: true })
@@ -25,21 +26,45 @@ const ProfileCard = ({ endpoint }) => {
     return () => { mounted = false; };
   }, [endpoint]);
 
-  if (error) return <div className="alert alert-danger">{error}</div>;
-  if (!info) return <div className="text-center p-5"><CircularProgress aria-label="Đang tải hồ sơ" /></div>;
-  return <Card sx={{ width: "100%", maxWidth: 900, borderRadius: 3 }}>
-    <CardContent sx={{ p: { xs: 3, md: 5 } }}>
-      <div className="text-center mb-4">
-        <img src={info.photo || profilePicture} width="140" height="140" className="rounded-circle" alt="Ảnh đại diện" style={{ objectFit: "cover" }} />
-        <h2 className="mt-3 mb-1">{info.fullName || info.name || "Hồ sơ người dùng"}</h2>
-        <p className="text-muted">{info.role ? `Vai trò: ${info.role}` : "Học viên sau đại học"}</p>
-      </div>
-      <Grid container spacing={2}>
-        {labels.filter(([key]) => info[key] !== undefined).map(([key, label]) => <Grid item xs={12} md={6} key={key}>
-          <div className="border rounded p-3 h-100"><strong>{label}</strong><div className="text-muted mt-1">{displayValue(info[key])}</div></div>
-        </Grid>)}
-      </Grid>
-    </CardContent>
-  </Card>;
+  if (error) return <Alert severity="error" sx={{ my: 2, borderRadius: "4px" }}>{error}</Alert>;
+  if (!info) return <Box sx={{ display: "flex", justifyContent: "center", p: 5 }}><CircularProgress aria-label="Đang tải hồ sơ" /></Box>;
+
+  return (
+    <Box sx={{ width: "100%", maxWidth: 900, mx: "auto" }}>
+      <Card variant="outlined" sx={{ borderRadius: "6px", borderColor: "#DFE4E8" }}>
+        <CardContent sx={{ p: { xs: 3, md: 5 } }}>
+          <Box sx={{ textAlign: "center", mb: 4 }}>
+            <Box
+              component="img"
+              src={info.photo || profilePicture}
+              alt="Ảnh đại diện"
+              sx={{ width: 140, height: 140, borderRadius: "50%", objectFit: "cover", border: "2px solid #DFE4E8" }}
+            />
+            <Typography variant="h5" sx={{ fontWeight: 700, color: "#173E75", mt: 2, mb: 0.5 }}>
+              {info.fullName || info.name || "Hồ sơ người dùng"}
+            </Typography>
+            <Typography variant="body2" sx={{ color: "#607486" }}>
+              {info.role ? `Vai trò: ${info.role}` : "Học viên sau đại học"}
+            </Typography>
+          </Box>
+          <Grid container spacing={2}>
+            {labels.filter(([key]) => info[key] !== undefined).map(([key, label]) => (
+              <Grid item xs={12} md={6} key={key}>
+                <Paper variant="outlined" sx={{ p: 2, height: "100%", borderRadius: "4px", borderColor: "#DFE4E8" }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", display: "block" }}>
+                    {label}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: "#243B53", mt: 0.5 }}>
+                    {displayValue(info[key])}
+                  </Typography>
+                </Paper>
+              </Grid>
+            ))}
+          </Grid>
+        </CardContent>
+      </Card>
+    </Box>
+  );
 };
+
 export default ProfileCard;

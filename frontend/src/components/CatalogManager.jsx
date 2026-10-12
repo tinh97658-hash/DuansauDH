@@ -11,12 +11,14 @@ import {
 import { AddRounded, DeleteRounded, EditRounded } from "@mui/icons-material";
 import { API_BASE_URL } from "../config/http";
 import FeatureLayout from "./FeatureLayout";
+import AppDialog from "./AppDialog";
+import ConfirmDialog from "./ConfirmDialog";
 import { personNameParts } from "../utils/personName";
 import FilterSearchField from "./FilterSearchField";
 import { alphabeticalOptionGroups } from "../utils/optionGroups";
 
-const buildEmptyForm = (parent, fields, sortable) => {
-  const form = { code: "", name: "", active: true };
+const buildEmptyForm = (parent, fields, sortable, activeField = "active") => {
+  const form = { code: "", name: "", [activeField]: true };
   if (sortable) form.sortOrder = 0;
   if (parent) form[parent.field] = "";
   for (const f of fields) {
@@ -41,14 +43,14 @@ const compactFieldLabelSx = {
 const compactControlSx = {
   "& .MuiOutlinedInput-root": {
     height: 40,
-    borderRadius: "6px",
+    borderRadius: "4px",
     backgroundColor: "#fff",
     color: "#1c2936",
     fontSize: "13px",
     fontWeight: 500,
     "& fieldset": { borderColor: "#c5d1db" },
     "&:hover fieldset": { borderColor: "#8fa6b9" },
-    "&.Mui-focused fieldset": { borderColor: "#087eae", borderWidth: "1.5px" },
+    "&.Mui-focused fieldset": { borderColor: "var(--primary, #0788B8)", borderWidth: "1.5px" },
   },
   "& .MuiOutlinedInput-input": {
     height: "auto",
@@ -88,7 +90,16 @@ const CatalogManager = ({
   showEditAction = true, showDeleteAction = true, showSortColumn = sortable,
   showCode = true, showIndex = true, splitPersonName = false,
   inlineEdit = false,
+  activeField = "active",
+  baseEndpoint = null,
+  authEndpoint = "/auth/isStaff",
+  authCheck = null,
+  validate = null,
+  activeSwitchAriaLabel = null,
+  activeStatusLabel = null,
+  addButtonLabel = null,
 }) => {
+  const apiBase = baseEndpoint || endpoint.split("?")[0];
   const [rows, setRows] = useState([]);
   const [options, setOptions] = useState([]);
   const [fieldOptions, setFieldOptions] = useState({});
@@ -98,7 +109,7 @@ const CatalogManager = ({
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState(buildEmptyForm(parent, fields, sortable));
+  const [form, setForm] = useState(buildEmptyForm(parent, fields, sortable, activeField));
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [inlineCell, setInlineCell] = useState(null);
@@ -128,7 +139,7 @@ const CatalogManager = ({
     inlineRef.current = { ...cell, pending: true };
     setInlineSaving(true);
     try {
-      const { data } = await axios.put(`${API_BASE_URL}${endpoint}/${cell.id}`, { [cell.key]: value }, { withCredentials: true });
+      const { data } = await axios.put(`${API_BASE_URL}${apiBase}/${cell.id}`, { [cell.key]: value }, { withCredentials: true });
       setRows((previous) => previous.map((row) => row.id === cell.id ? { ...row, [cell.key]: data?.[cell.key] ?? value } : row));
       inlineRef.current = null; setInlineCell(null);
     } catch (failure) {
@@ -175,11 +186,18 @@ const CatalogManager = ({
 
   useEffect(() => {
     let mounted = true;
-    axios.get(`${API_BASE_URL}/auth/isStaff`, { withCredentials: true })
-      .then(({ data }) => mounted && setIsAdmin(data.message === "admin"))
+    axios.get(`${API_BASE_URL}${authEndpoint}`, { withCredentials: true })
+      .then(({ data }) => {
+        if (!mounted) return;
+        if (typeof authCheck === "function") {
+          setIsAdmin(Boolean(authCheck(data)));
+        } else {
+          setIsAdmin(data.message === "admin" || data.user?.role === "admin");
+        }
+      })
       .catch(() => mounted && setIsAdmin(false));
     return () => { mounted = false; };
-  }, []);
+  }, [authEndpoint, authCheck]);
 
   useEffect(() => {
     if (!parent) { setOptions([]); return; }
@@ -233,10 +251,10 @@ const CatalogManager = ({
   const showActions = isAdmin && (showEditAction || showDeleteAction);
   const colSpan = (showIndex ? 1 : 0) + (showCode ? 1 : 0) + (splitPersonName ? 2 : 1) + (parent ? 1 : 0) + tableFields.length + (showSortColumn ? 1 : 0) + 1 + (showActions ? 1 : 0);
 
-  const openAdd = () => { setEditingId(null); setForm(buildEmptyForm(parent, fields, sortable)); setDialogOpen(true); };
+  const openAdd = () => { setEditingId(null); setForm(buildEmptyForm(parent, fields, sortable, activeField)); setDialogOpen(true); };
   const openEdit = (row) => {
     if (inlineEdit) { startInlineEdit(row, "name"); return; }
-    const next = { code: row.code, name: row.name, active: row.active };
+    const next = { code: row.code, name: row.name, [activeField]: Boolean(row[activeField]) };
     if (sortable) next.sortOrder = row.sortOrder ?? 0;
     if (parent) next[parent.field] = row[parent.field] || "";
     for (const f of fields) {
@@ -258,9 +276,13 @@ const CatalogManager = ({
   }));
 
   const submit = async () => {
+    if (typeof validate === "function") {
+      const valErr = validate(form);
+      if (valErr) return toast.error(valErr);
+    }
     if (showCode && !form.code?.trim()) return toast.error(`Vui lòng nhập ${codeLabel.toLowerCase()}`);
     if (!form.name?.trim()) return toast.error(`Vui lòng nhập ${nameLabel.toLowerCase()}`);
-    const body = { name: form.name.trim(), active: Boolean(form.active) };
+    const body = { name: form.name.trim(), [activeField]: Boolean(form[activeField]) };
     if (showCode) body.code = form.code.trim();
     if (sortable) body.sortOrder = Number(form.sortOrder || 0);
     if (parent) {
@@ -279,7 +301,7 @@ const CatalogManager = ({
       } else if (f.type === "number") {
         const num = raw === "" || raw === null || raw === undefined ? (f.allowNull ? null : (f.defaultValue ?? 0)) : Number(raw);
         body[f.key] = num;
-      } else {
+      } else if (f.type !== "custom") {
         const value = String(raw ?? "").trim();
         if ((f.required || (f.requiredOnCreate && !editingId)) && !value) return toast.error(`Vui lòng ${f.type === "select" ? "chọn" : "nhập"} ${f.label}`);
         if (f.type === "email" && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return toast.error(`${f.label} không hợp lệ`);
@@ -289,10 +311,10 @@ const CatalogManager = ({
     setSaving(true);
     try {
       if (editingId) {
-        await axios.put(`${API_BASE_URL}${endpoint}/${editingId}`, body, { withCredentials: true });
+        await axios.put(`${API_BASE_URL}${apiBase}/${editingId}`, body, { withCredentials: true });
         toast.success(`Cập nhật ${itemName} thành công`);
       } else {
-        await axios.post(`${API_BASE_URL}${endpoint}`, body, { withCredentials: true });
+        await axios.post(`${API_BASE_URL}${apiBase}`, body, { withCredentials: true });
         toast.success(`Thêm ${itemName} thành công`);
       }
       closeDialog();
@@ -305,9 +327,10 @@ const CatalogManager = ({
   };
 
   const toggleActive = async (row) => {
+    const nextVal = !row[activeField];
     try {
-      await axios.put(`${API_BASE_URL}${endpoint}/${row.id}`, { active: !row.active }, { withCredentials: true });
-      setRows((prev) => prev.map((item) => (item.id === row.id ? { ...item, active: !row.active } : item)));
+      await axios.put(`${API_BASE_URL}${apiBase}/${row.id}`, { [activeField]: nextVal }, { withCredentials: true });
+      setRows((prev) => prev.map((item) => (item.id === row.id ? { ...item, [activeField]: nextVal } : item)));
     } catch (requestError) {
       toast.error(requestError.response?.data?.message || "Không thể cập nhật trạng thái");
     }
@@ -316,7 +339,7 @@ const CatalogManager = ({
   const confirmDelete = async () => {
     setSaving(true);
     try {
-      await axios.delete(`${API_BASE_URL}${endpoint}/${deleting.id}`, { withCredentials: true });
+      await axios.delete(`${API_BASE_URL}${apiBase}/${deleting.id}`, { withCredentials: true });
       toast.success(`Xóa ${itemName} thành công`);
       setDeleting(null);
       load();
@@ -328,6 +351,7 @@ const CatalogManager = ({
   };
 
   const renderFieldValue = (row, f) => {
+    if (f.render) return f.render(row, fieldOptions[f.key]);
     if (f.display) return f.display(row, fieldOptions[f.key]);
     if (f.type === "checkbox" || f.type === "boolean") {
       return row[f.key] ? (
@@ -380,14 +404,14 @@ const CatalogManager = ({
                 width: { xs: "100%", sm: 190 },
                 flexShrink: 0,
                 bgcolor: "#0788B8",
-                borderRadius: "8px",
+                borderRadius: "4px",
                 boxShadow: "none",
                 textTransform: "none",
                 fontWeight: 700,
                 "&:hover": { bgcolor: "#056A8F", boxShadow: "none" },
               }}
             >
-              Thêm mới
+              {addButtonLabel || "Thêm mới"}
             </Button>
           )}
         </Stack>
@@ -404,7 +428,7 @@ const CatalogManager = ({
               {parent && parentBeforeName && <TableCell sx={{ fontWeight: 700 }}>{parent.columnLabel || parent.label}</TableCell>}
               {splitPersonName ? <><TableCell sx={{ fontWeight: 700 }}>Họ đệm</TableCell><TableCell sx={{ fontWeight: 700 }}>Tên</TableCell></> : <TableCell sx={{ fontWeight: 700 }}>{nameLabel}</TableCell>}
               {parent && !parentBeforeName && <TableCell sx={{ fontWeight: 700 }}>{parent.columnLabel || parent.label}</TableCell>}
-              {tableFields.map((f) => <TableCell key={f.key} sx={{ fontWeight: 700 }}>{f.label}</TableCell>)}
+              {tableFields.map((f) => <TableCell key={f.key} align={f.align || "left"} sx={{ fontWeight: 700 }}>{f.label}</TableCell>)}
               {showSortColumn && <TableCell align="center" sx={{ fontWeight: 700, width: 90 }}>Thứ tự</TableCell>}
               <TableCell align="center" sx={{ fontWeight: 700, width: 110 }}>Trạng thái</TableCell>
               {showActions && <TableCell align="right" sx={{ fontWeight: 700, width: 110 }}>Thao tác</TableCell>}
@@ -424,16 +448,33 @@ const CatalogManager = ({
                 {parent && parentBeforeName && <TableCell>{parent.display ? parent.display(row) : row[parent.field]}</TableCell>}
                 {splitPersonName ? <><TableCell>{personNameParts(row).familyAndMiddle}</TableCell><TableCell>{personNameParts(row).givenName}</TableCell></> : <TableCell>{renderEditableCell(row, "name", nameLabel, row.name)}</TableCell>}
                 {parent && !parentBeforeName && <TableCell>{parent.display ? parent.display(row) : row[parent.field]}</TableCell>}
-                {tableFields.map((f) => <TableCell key={f.key}>{renderFieldValue(row, f)}</TableCell>)}
+                {tableFields.map((f) => <TableCell key={f.key} align={f.align || "left"}>{renderFieldValue(row, f)}</TableCell>)}
                 {showSortColumn && <TableCell align="center">{row.sortOrder}</TableCell>}
                 <TableCell align="center" onDoubleClick={(event) => event.stopPropagation()}>
-                  {isAdmin ? (
-                    <Tooltip title={row.active ? "Đang hoạt động" : "Đã ẩn"}>
-                      <Switch size="small" checked={Boolean(row.active)} onChange={() => toggleActive(row)} />
-                    </Tooltip>
-                  ) : (
-                    <Chip size="small" label={row.active ? "Hoạt động" : "Ẩn"} color={row.active ? "success" : "default"} variant="outlined" />
+                  {activeStatusLabel && (
+                    <Chip
+                      size="small"
+                      label={activeStatusLabel(Boolean(row[activeField]), row)}
+                      color={row[activeField] ? "success" : "default"}
+                      sx={{ mr: isAdmin ? 1 : 0 }}
+                    />
                   )}
+                  {isAdmin ? (
+                    <Tooltip title={row[activeField] ? "Đang hoạt động" : "Đã ẩn"}>
+                      <Switch
+                        size="small"
+                        checked={Boolean(row[activeField])}
+                        onChange={() => toggleActive(row)}
+                        inputProps={{
+                          "aria-label": typeof activeSwitchAriaLabel === "function"
+                            ? activeSwitchAriaLabel(Boolean(row[activeField]), row)
+                            : `${row[activeField] ? "Vô hiệu hóa" : "Kích hoạt"} ${itemName} ${row.code || row.name}`,
+                        }}
+                      />
+                    </Tooltip>
+                  ) : !activeStatusLabel ? (
+                    <Chip size="small" label={row[activeField] ? "Hoạt động" : "Ẩn"} color={row[activeField] ? "success" : "default"} variant="outlined" />
+                  ) : null}
                 </TableCell>
                 {showActions && (
                   <TableCell align="right" onDoubleClick={(event) => event.stopPropagation()}>
@@ -447,184 +488,139 @@ const CatalogManager = ({
         </Table>
       </TableContainer>
 
-      <Dialog
+      <AppDialog
         open={dialogOpen}
         onClose={closeDialog}
         maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            width: 580,
-            maxWidth: "calc(100vw - 32px)",
-            border: "1px solid #cfdbe4",
-            borderRadius: "8px",
-            boxShadow: "0 8px 24px rgba(23, 61, 112, 0.14)",
-            fontFamily: '"Inter", "Segoe UI", sans-serif',
-            "& .MuiTypography-root, & .MuiButton-root, & .MuiInputBase-root, & .MuiChip-root": {
-              fontFamily: '"Inter", "Segoe UI", sans-serif!important',
-            },
-          },
-        }}
+        title={editingId ? `SỬA ${itemName.toUpperCase()}` : `THÊM ${itemName.toUpperCase()} MỚI`}
+        confirmText={saving ? "Đang lưu..." : "Lưu"}
+        onConfirm={submit}
+        saving={saving}
       >
-        <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2.5, py: 1.75, color: "#173d70", fontSize: "17px", fontWeight: 700, lineHeight: "23px", borderBottom: "1px solid #e1e8ee", textTransform: "uppercase" }}>
-          <span>{editingId ? `Sửa ${itemName}` : `Thêm ${itemName} mới`}</span>
-          <IconButton aria-label="Đóng" size="small" onClick={closeDialog} sx={{ width: 30, height: 30, color: "#526a7d", fontSize: 20 }}>×</IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ px: 2.5, py: 2 }}>
-          <Stack spacing="14px">
-            <Box sx={{ p: 1.75, border: "1px solid #d7e1e8", borderRadius: "8px", backgroundColor: "#fbfcfd" }}>
-              <Stack spacing="13px">
-                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: showCode ? "160px 1fr" : "1fr" }, gap: 1.5 }}>
-                  {showCode && <CompactField label={codeLabel.toUpperCase()} htmlFor="catalog-code">
-                    <TextField id="catalog-code" value={form.code} onChange={setField("code")} inputProps={{ "aria-label": codeLabel }} fullWidth size="small" sx={compactControlSx} />
-                  </CompactField>}
-                  <CompactField label={nameLabel.toUpperCase()} htmlFor="catalog-name">
-                    <TextField id="catalog-name" value={form.name} onChange={setField("name")} inputProps={{ "aria-label": nameLabel }} fullWidth size="small" sx={compactControlSx} />
-                  </CompactField>
-                </Box>
-                {parent && (
-                  <CompactField label={parent.label.toUpperCase()} htmlFor="catalog-parent">
-                    <FormControl fullWidth size="small" sx={compactControlSx}>
-                      <Select id="catalog-parent" value={form[parent.field]} inputProps={{ "aria-label": parent.label }} onChange={setParentField}>
-                        {parent.optional && <MenuItem value="">(Không)</MenuItem>}
-                        {options.map((opt) => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
-                      </Select>
-                    </FormControl>
-                  </CompactField>
-                )}
-                {fields.map((f) => {
-                  if (f.type === "checkbox" || f.type === "boolean") {
-                    return (
-                      <FormControlLabel
-                        key={f.key}
-                        control={
-                          <Checkbox
-                            checked={Boolean(form[f.key])}
-                            onChange={(event) => setForm((prev) => ({ ...prev, [f.key]: event.target.checked }))}
-                            color="primary"
-                            size="small"
-                          />
-                        }
-                        label={<Typography sx={{ fontSize: "13px", fontWeight: 600, color: "#223548" }}>{f.label}</Typography>}
-                      />
-                    );
-                  }
-                  if (f.type === "number") {
-                    return (
-                      <CompactField key={f.key} label={f.label.toUpperCase()} htmlFor={`catalog-${f.key}`}>
-                        <TextField key={f.key} id={`catalog-${f.key}`} type="number" value={form[f.key]} onChange={setField(f.key)} fullWidth size="small"
-                          inputProps={{ min: f.min ?? 0, step: f.step ?? 1, "aria-label": f.label }} sx={compactControlSx} />
-                      </CompactField>
-                    );
-                  }
-                  if (f.type === "multiline") {
-                    return (
-                      <CompactField key={f.key} label={f.label.toUpperCase()} htmlFor={`catalog-${f.key}`}>
-                        <TextField key={f.key} id={`catalog-${f.key}`} value={form[f.key]} onChange={setField(f.key)} fullWidth size="small" multiline minRows={3} inputProps={{ "aria-label": f.label }}
-                          sx={{
-                            ...compactControlSx,
-                            "& .MuiOutlinedInput-root": {
-                              ...compactControlSx["& .MuiOutlinedInput-root"],
-                              height: "auto",
-                              minHeight: 80,
-                            },
-                          }} />
-                      </CompactField>
-                    );
-                  }
-                  if (f.type === "select" && (f.optionsEndpoint || Array.isArray(f.options))) {
-                    const selectOptions = (fieldOptions[f.key] || f.options || [])
-                      .filter((option) => !f.filterOption || f.filterOption(option?.raw ?? option, form));
-                    const groupedOptions = f.alphabeticalGroups ? alphabeticalOptionGroups([
-                      ...selectOptions.map((option) => typeof option === "object" ? option : { value: option, label: option }),
-                      ...(f.allowEmpty !== false ? [{ value: "", label: "(Không có)" }] : []),
-                    ]) : null;
-                    return (
-                      <CompactField key={f.key} label={f.label.toUpperCase()} htmlFor={`catalog-${f.key}`}
-                        helper={typeof f.helper === "function" ? f.helper(form, rows.find((row) => row.id === editingId)) : f.helper}>
-                        <FormControl key={f.key} fullWidth size="small" sx={compactControlSx}>
-                          <Select
-                            id={`catalog-${f.key}`}
-                            value={form[f.key] ?? ""}
-                            onChange={setField(f.key)}
-                            inputProps={{ "aria-label": f.label }}
-                          >
-                            {groupedOptions ? groupedOptions.flatMap((group) => [
-                              <AlphabeticalHeader key={`heading:${group.label}`} disabled>{group.label}</AlphabeticalHeader>,
-                              ...group.items.map((option) => <MenuItem key={`option:${option.value}`} value={option.value} sx={{ pl: 3.5, fontWeight: 400 }}>{option.label}</MenuItem>),
-                            ]) : [
-                            f.allowEmpty !== false && <MenuItem key="empty" value=""><em>(Không có)</em></MenuItem>,
-                            ...selectOptions.map((opt) => {
-                              const val = typeof opt === "object" ? opt.value : opt;
-                              const lbl = typeof opt === "object" ? opt.label : opt;
-                              return <MenuItem key={val} value={val}>{lbl}</MenuItem>;
-                            })]}
-                          </Select>
-                        </FormControl>
-                      </CompactField>
-                    );
-                  }
+        <Stack spacing="14px">
+          <Box sx={{ p: 1.75, border: "1px solid #d7e1e8", borderRadius: "6px", backgroundColor: "#fbfcfd" }}>
+            <Stack spacing="13px">
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: showCode ? "160px 1fr" : "1fr" }, gap: 1.5 }}>
+                {showCode && <CompactField label={codeLabel.toUpperCase()} htmlFor="catalog-code">
+                  <TextField id="catalog-code" value={form.code} onChange={setField("code")} inputProps={{ "aria-label": codeLabel }} fullWidth size="small" sx={compactControlSx} />
+                </CompactField>}
+                <CompactField label={nameLabel.toUpperCase()} htmlFor="catalog-name">
+                  <TextField id="catalog-name" value={form.name} onChange={setField("name")} inputProps={{ "aria-label": nameLabel }} fullWidth size="small" sx={compactControlSx} />
+                </CompactField>
+              </Box>
+              {parent && (
+                <CompactField label={parent.label.toUpperCase()} htmlFor="catalog-parent">
+                  <FormControl fullWidth size="small" sx={compactControlSx}>
+                    <Select id="catalog-parent" value={form[parent.field]} inputProps={{ "aria-label": parent.label }} onChange={setParentField}>
+                      {parent.optional && <MenuItem value="">(Không)</MenuItem>}
+                      {options.map((opt) => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                </CompactField>
+              )}
+              {fields.filter((f) => f.showInForm !== false).map((f) => {
+                if (f.type === "checkbox" || f.type === "boolean") {
+                  return (
+                    <FormControlLabel
+                      key={f.key}
+                      control={
+                        <Checkbox
+                          checked={Boolean(form[f.key])}
+                          onChange={(event) => setForm((prev) => ({ ...prev, [f.key]: event.target.checked }))}
+                          color="primary"
+                          size="small"
+                        />
+                      }
+                      label={<Typography sx={{ fontSize: "13px", fontWeight: 600, color: "#223548" }}>{f.label}</Typography>}
+                    />
+                  );
+                }
+                if (f.type === "number") {
                   return (
                     <CompactField key={f.key} label={f.label.toUpperCase()} htmlFor={`catalog-${f.key}`}>
-                      <TextField key={f.key} id={`catalog-${f.key}`} type={f.type === "email" ? "email" : f.type === "tel" ? "tel" : "text"} value={form[f.key]} onChange={setField(f.key)} fullWidth size="small" inputProps={{ "aria-label": f.label }} sx={compactControlSx} />
+                      <TextField key={f.key} id={`catalog-${f.key}`} type="number" value={form[f.key]} onChange={setField(f.key)} fullWidth size="small"
+                        inputProps={{ min: f.min ?? 0, step: f.step ?? 1, "aria-label": f.label }} sx={compactControlSx} />
                     </CompactField>
                   );
-                })}
-                {sortable && (
-                  <CompactField label="THỨ TỰ HIỂN THỊ" htmlFor="catalog-sort">
-                    <TextField id="catalog-sort" type="number" value={form.sortOrder} onChange={setField("sortOrder")} fullWidth size="small" inputProps={{ min: 0, "aria-label": "Thứ tự hiển thị" }} sx={compactControlSx} />
+                }
+                if (f.type === "multiline") {
+                  return (
+                    <CompactField key={f.key} label={f.label.toUpperCase()} htmlFor={`catalog-${f.key}`}>
+                      <TextField key={f.key} id={`catalog-${f.key}`} value={form[f.key]} onChange={setField(f.key)} fullWidth size="small" multiline minRows={3} inputProps={{ "aria-label": f.label }}
+                        sx={{
+                          ...compactControlSx,
+                          "& .MuiOutlinedInput-root": {
+                            ...compactControlSx["& .MuiOutlinedInput-root"],
+                            height: "auto",
+                            minHeight: 80,
+                          },
+                        }} />
+                    </CompactField>
+                  );
+                }
+                if (f.type === "select" && (f.optionsEndpoint || Array.isArray(f.options))) {
+                  const selectOptions = (fieldOptions[f.key] || f.options || [])
+                    .filter((option) => !f.filterOption || f.filterOption(option?.raw ?? option, form));
+                  const groupedOptions = f.alphabeticalGroups ? alphabeticalOptionGroups([
+                    ...selectOptions.map((option) => typeof option === "object" ? option : { value: option, label: option }),
+                    ...(f.allowEmpty !== false ? [{ value: "", label: "(Không có)" }] : []),
+                  ]) : null;
+                  return (
+                    <CompactField key={f.key} label={f.label.toUpperCase()} htmlFor={`catalog-${f.key}`}
+                      helper={typeof f.helper === "function" ? f.helper(form, rows.find((row) => row.id === editingId)) : f.helper}>
+                      <FormControl key={f.key} fullWidth size="small" sx={compactControlSx}>
+                        <Select
+                          id={`catalog-${f.key}`}
+                          value={form[f.key] ?? ""}
+                          onChange={setField(f.key)}
+                          inputProps={{ "aria-label": f.label }}
+                        >
+                          {groupedOptions ? groupedOptions.flatMap((group) => [
+                            <AlphabeticalHeader key={`heading:${group.label}`} disabled>{group.label}</AlphabeticalHeader>,
+                            ...group.items.map((option) => <MenuItem key={`option:${option.value}`} value={option.value} sx={{ pl: 3.5, fontWeight: 400 }}>{option.label}</MenuItem>),
+                          ]) : [
+                          f.allowEmpty !== false && <MenuItem key="empty" value=""><em>(Không có)</em></MenuItem>,
+                          ...selectOptions.map((opt) => {
+                            const val = typeof opt === "object" ? opt.value : opt;
+                            const lbl = typeof opt === "object" ? opt.label : opt;
+                            return <MenuItem key={val} value={val}>{lbl}</MenuItem>;
+                          })]}
+                        </Select>
+                      </FormControl>
+                    </CompactField>
+                  );
+                }
+                return (
+                  <CompactField key={f.key} label={f.label.toUpperCase()} htmlFor={`catalog-${f.key}`}>
+                    <TextField key={f.key} id={`catalog-${f.key}`} type={f.type === "email" ? "email" : f.type === "tel" ? "tel" : "text"} value={form[f.key]} onChange={setField(f.key)} fullWidth size="small" inputProps={{ "aria-label": f.label }} sx={compactControlSx} />
                   </CompactField>
-                )}
-              </Stack>
-            </Box>
+                );
+              })}
+              {sortable && (
+                <CompactField label="THỨ TỰ HIỂN THỊ" htmlFor="catalog-sort">
+                  <TextField id="catalog-sort" type="number" value={form.sortOrder} onChange={setField("sortOrder")} fullWidth size="small" inputProps={{ min: 0, "aria-label": "Thứ tự hiển thị" }} sx={compactControlSx} />
+                </CompactField>
+              )}
+            </Stack>
+          </Box>
 
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 0.5 }}>
-              <Typography sx={{ color: "#435b72", fontSize: "12px", fontWeight: 700, textTransform: "uppercase" }}>Trạng thái hoạt động</Typography>
-              <Switch checked={Boolean(form.active)} onChange={(event) => setForm((prev) => ({ ...prev, active: event.target.checked }))} />
-            </Box>
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 2.5, py: 1.5, gap: 1.25, minHeight: 60, borderTop: "1px solid #e1e8ee" }}>
-          <Button onClick={closeDialog} color="inherit" sx={{ minHeight: 36, px: 2, py: 0.75, border: "1px solid #c5d1db", borderRadius: "6px", color: "#435b72", fontSize: "12.5px", fontWeight: 600 }}>Hủy</Button>
-          <Button variant="contained" onClick={submit} disabled={saving} sx={{ minHeight: 36, px: 2, py: 0.75, borderRadius: "6px", backgroundColor: "#087eae", boxShadow: "none", fontSize: "12.5px", fontWeight: 700, "&:hover": { backgroundColor: "#066e99", boxShadow: "none" } }}>
-            {saving ? "Đang lưu..." : "Lưu"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 0.5 }}>
+            <Typography sx={{ color: "#435b72", fontSize: "12px", fontWeight: 700, textTransform: "uppercase" }}>Trạng thái hoạt động</Typography>
+            <Switch checked={Boolean(form[activeField])} onChange={(event) => setForm((prev) => ({ ...prev, [activeField]: event.target.checked }))} />
+          </Box>
+        </Stack>
+      </AppDialog>
 
-      <Dialog
+      <ConfirmDialog
         open={Boolean(deleting)}
         onClose={() => setDeleting(null)}
-        maxWidth="xs"
-        fullWidth
-        PaperProps={{
-          sx: {
-            border: "1px solid #cfdbe4",
-            borderRadius: "8px",
-            boxShadow: "0 8px 24px rgba(23, 61, 112, 0.14)",
-            fontFamily: '"Inter", "Segoe UI", sans-serif',
-            "& .MuiTypography-root, & .MuiButton-root": {
-              fontFamily: '"Inter", "Segoe UI", sans-serif!important',
-            },
-          },
-        }}
-      >
-        <DialogTitle sx={{ px: 2.5, py: 1.75, color: "#173d70", fontSize: "16px", fontWeight: 700, borderBottom: "1px solid #e1e8ee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span>Xác nhận xóa</span>
-          <IconButton aria-label="Đóng" size="small" onClick={() => setDeleting(null)} sx={{ width: 30, height: 30, color: "#526a7d", fontSize: 20 }}>×</IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ px: 2.5, py: 2 }}>
-          <Typography sx={{ fontSize: "13.5px", color: "#1c2936" }}>
-            Bạn có chắc muốn xóa {itemName} <strong>{deleting?.name}</strong>{showCode && <> (mã <strong>{deleting?.code}</strong>)</>} không?
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 2.5, py: 1.5, gap: 1.25, minHeight: 60, borderTop: "1px solid #e1e8ee" }}>
-          <Button onClick={() => setDeleting(null)} color="inherit" sx={{ minHeight: 36, px: 2, py: 0.75, border: "1px solid #c5d1db", borderRadius: "6px", color: "#435b72", fontSize: "12.5px", fontWeight: 600 }}>Hủy</Button>
-          <Button variant="contained" color="error" onClick={confirmDelete} disabled={saving} sx={{ minHeight: 36, px: 2, py: 0.75, borderRadius: "6px", boxShadow: "none", fontSize: "12.5px", fontWeight: 700 }}>
-            {saving ? "Đang xóa..." : "Xóa"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onConfirm={confirmDelete}
+        title="XÁC NHẬN XÓA"
+        confirmText="Xóa"
+        severity="error"
+        loading={saving}
+        content={`Bạn có chắc muốn xóa ${itemName} ${deleting?.name || ""}${showCode && deleting?.code ? ` (mã ${deleting?.code})` : ""} không?`}
+      />
     
   </FeatureLayout>
   );

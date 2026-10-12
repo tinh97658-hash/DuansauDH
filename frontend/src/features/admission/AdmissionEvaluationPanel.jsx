@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, CircularProgress, Paper, Stack, TextField, Typography } from "@mui/material";
+import AppDialog from "../../components/AppDialog";
 import { API_BASE_URL } from "../../config/http";
 
 const options = { withCredentials: true };
@@ -98,17 +99,52 @@ export default function AdmissionEvaluationPanel({ record, isAdmin = false, disa
         </Box>;
       })}
     </Paper>
-    <Dialog open={Boolean(decision)} onClose={() => { if (!busy) setDecision(null); }} fullWidth maxWidth="sm">
-      <DialogTitle>{decisionLabels[decision]}</DialogTitle>
-      <DialogContent>
-        <Typography sx={{ mb: 2 }}>Xác nhận kết quả cho {record.fullName || record.code || "hồ sơ này"}. Thao tác sẽ cập nhật trạng thái hồ sơ và lưu lịch sử xét tuyển.</Typography>
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-        <TextField autoFocus fullWidth multiline minRows={2} label="Ghi chú / lý do" value={note} disabled={busy} inputProps={{ maxLength: 2000 }} onChange={(event) => setNote(event.target.value)} />
-      </DialogContent>
-      <DialogActions>
-        <Button disabled={busy} onClick={() => setDecision(null)}>Hủy</Button>
-        <Button variant="contained" disabled={busy || disabled || !note.trim()} onClick={confirmDecision}>{busy ? "Đang xử lý…" : "Xác nhận"}</Button>
-      </DialogActions>
-    </Dialog>
+    <AppDialog
+      open={Boolean(decision)}
+      onClose={() => { if (!busy) setDecision(null); }}
+      maxWidth="xs"
+      PaperProps={{ sx: { width: 500, maxWidth: "calc(100vw - 32px)" } }}
+      title={decisionLabels[decision]}
+      confirmText={busy ? "Đang xử lý…" : "Xác nhận"}
+      cancelText="Hủy"
+      onConfirm={confirmDecision}
+      confirmDisabled={busy || disabled || !note.trim()}
+      confirmLoading={busy}
+      confirmColor={decision === "rejected" ? "error" : "primary"}
+    >
+      <Stack spacing={2} sx={{ pt: 0.5 }}>
+        <Typography sx={{ fontSize: "13.5px", color: "#244360", lineHeight: 1.5 }}>
+          Xác nhận kết quả cho <strong>{record.fullName || record.code || "hồ sơ này"}</strong>. Thao tác sẽ cập nhật trạng thái hồ sơ và lưu lịch sử xét tuyển.
+        </Typography>
+        {error && <Alert severity="error" sx={{ borderRadius: "4px" }}>{error}</Alert>}
+        <Box sx={{ p: 1.5, border: "1px solid #D6E0EA", borderRadius: "4px", bgcolor: "#F8FAFC" }}>
+          <Typography component="label" htmlFor="decision-note" sx={{ display: "block", mb: "5px", color: "#435b72", fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>
+            GHI CHÚ / LÝ DO
+          </Typography>
+          <TextField
+            id="decision-note"
+            autoFocus
+            fullWidth
+            multiline
+            minRows={2}
+            placeholder="Nhập ghi chú hoặc lý do..."
+            value={note}
+            disabled={busy}
+            inputProps={{ maxLength: 2000, "aria-label": "Ghi chú / lý do" }}
+            onChange={(event) => setNote(event.target.value)}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "4px",
+                bgcolor: "#fff",
+                fontSize: "13px",
+                "& fieldset": { borderColor: "#c5d1db" },
+                "&:hover fieldset": { borderColor: "#8fa6b9" },
+                "&.Mui-focused fieldset": { borderColor: "var(--primary, #0788B8)", borderWidth: "1.5px" },
+              },
+            }}
+          />
+        </Box>
+      </Stack>
+    </AppDialog>
   </Stack>;
 }

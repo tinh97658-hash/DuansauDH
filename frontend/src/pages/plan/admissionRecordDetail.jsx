@@ -28,6 +28,9 @@ import FeatureLayout from "../../components/FeatureLayout";
 import DocumentExportMenu from "../../components/DocumentExportMenu";
 import AdmissionPrintTemplate from "../../features/admission/AdmissionPrintTemplate";
 import { buildAdmissionDocument } from "../../features/admission/admissionDocument";
+import AppDialog from "../../components/AppDialog";
+import ConfirmDialog from "../../components/ConfirmDialog";
+import { getMockConfirmResult } from "../../utils/confirmHelper";
 import { downloadAdmissionWord, openAdmissionPreview } from "../../features/admission/admissionDocumentExport";
 
 const DOCUMENT_ITEMS = [
@@ -308,6 +311,34 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
   const [decisionForm, setDecisionForm] = useState({ decision: "approved", toCurriculumId: "", note: "" });
   const [decisionCurriculums, setDecisionCurriculums] = useState([]);
   const [showConfirmLeave, setShowConfirmLeave] = useState(false);
+  const [confirmState, setConfirmState] = useState({
+    open: false,
+    title: "",
+    content: "",
+    confirmLabel: "Xác nhận",
+    cancelLabel: "Hủy",
+    confirmColor: "primary",
+    onConfirm: null,
+  });
+
+  const requestConfirm = ({ title, content, confirmLabel, cancelLabel, confirmColor, onConfirm }) => {
+    const mockResult = getMockConfirmResult(content);
+    if (mockResult !== null) {
+      if (mockResult && onConfirm) {
+        onConfirm();
+      }
+      return;
+    }
+    setConfirmState({
+      open: true,
+      title,
+      content,
+      confirmLabel: confirmLabel || "Xác nhận",
+      cancelLabel: cancelLabel || "Hủy",
+      confirmColor: confirmColor || "primary",
+      onConfirm,
+    });
+  };
 
   // ===== Kết quả học phần cá nhân (tiền thạc sĩ / học trước / chính khóa) =====
   const [learningResults, setLearningResults] = useState([]);
@@ -513,14 +544,23 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
 
   const openDecision = async (transfer, decision) => {
     if (decision === "rejected") {
-      if (!window.confirm("Từ chối yêu cầu và khôi phục chuyên ngành, lớp cùng trạng thái cũ của học viên?")) return;
-      setSaving(true);
-      try {
-        await axios.put(`${API_BASE_URL}/plan/major-transfers/${transfer.id}/decision`, { decision: "rejected" }, { withCredentials: true });
-        toast.success("Đã từ chối và khôi phục thông tin trước khi chuyển ngành.");
-        await fetchData();
-      } catch (err) { toast.error(err.response?.data?.message || "Không thể xử lý yêu cầu."); }
-      finally { setSaving(false); }
+      const executeReject = async () => {
+        setSaving(true);
+        try {
+          await axios.put(`${API_BASE_URL}/plan/major-transfers/${transfer.id}/decision`, { decision: "rejected" }, { withCredentials: true });
+          toast.success("Đã từ chối và khôi phục thông tin trước khi chuyển ngành.");
+          await fetchData();
+        } catch (err) { toast.error(err.response?.data?.message || "Không thể xử lý yêu cầu."); }
+        finally { setSaving(false); }
+      };
+
+      requestConfirm({
+        title: "Từ chối yêu cầu chuyển chuyên ngành",
+        content: "Từ chối yêu cầu và khôi phục chuyên ngành, lớp cùng trạng thái cũ của học viên?",
+        confirmLabel: "Từ chối",
+        confirmColor: "error",
+        onConfirm: executeReject,
+      });
       return;
     }
     try {
@@ -621,14 +661,23 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
   };
 
   const removeLearningResult = async (row) => {
-    if (!window.confirm("Xóa kết quả học phần này? Các đề xuất công nhận liên quan sẽ không còn căn cứ.")) return;
-    setLearningSaving(true);
-    try {
-      await axios.delete(`${API_BASE_URL}/plan/learning-results/${row.id}`, { withCredentials: true });
-      toast.success("Đã xóa kết quả học phần.");
-      await reloadRecognitionData();
-    } catch (err) { toast.error(err.response?.data?.message || "Không thể xóa kết quả học phần."); }
-    finally { setLearningSaving(false); }
+    const executeDelete = async () => {
+      setLearningSaving(true);
+      try {
+        await axios.delete(`${API_BASE_URL}/plan/learning-results/${row.id}`, { withCredentials: true });
+        toast.success("Đã xóa kết quả học phần.");
+        await reloadRecognitionData();
+      } catch (err) { toast.error(err.response?.data?.message || "Không thể xóa kết quả học phần."); }
+      finally { setLearningSaving(false); }
+    };
+
+    requestConfirm({
+      title: "Xóa kết quả học phần",
+      content: "Xóa kết quả học phần này? Các đề xuất công nhận liên quan sẽ không còn căn cứ.",
+      confirmLabel: "Xóa",
+      confirmColor: "error",
+      onConfirm: executeDelete,
+    });
   };
 
   const proposeRecognitions = async () => {
@@ -676,14 +725,23 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
    * `rejected` sẽ bị bỏ qua vĩnh viễn.
    */
   const removeRecognition = async (row) => {
-    if (!window.confirm(`Hủy công nhận học phần "${subjectLabel(row.targetSubject)}"?\nSau đó bấm "Đối chiếu CTĐT & đề xuất công nhận" để hệ thống đề xuất lại theo dữ liệu hiện hành.`)) return;
-    setLearningSaving(true);
-    try {
-      await axios.delete(`${API_BASE_URL}/plan/subject-recognitions/${row.id}`, { withCredentials: true });
-      toast.success("Đã hủy công nhận học phần.");
-      await reloadRecognitionData();
-    } catch (err) { toast.error(err.response?.data?.message || "Không thể hủy công nhận học phần."); }
-    finally { setLearningSaving(false); }
+    const executeCancel = async () => {
+      setLearningSaving(true);
+      try {
+        await axios.delete(`${API_BASE_URL}/plan/subject-recognitions/${row.id}`, { withCredentials: true });
+        toast.success("Đã hủy công nhận học phần.");
+        await reloadRecognitionData();
+      } catch (err) { toast.error(err.response?.data?.message || "Không thể hủy công nhận học phần."); }
+      finally { setLearningSaving(false); }
+    };
+
+    requestConfirm({
+      title: "Hủy công nhận học phần",
+      content: `Hủy công nhận học phần "${subjectLabel(row.targetSubject)}"?\nSau đó bấm "Đối chiếu CTĐT & đề xuất công nhận" để hệ thống đề xuất lại theo dữ liệu hiện hành.`,
+      confirmLabel: "Hủy công nhận",
+      confirmColor: "error",
+      onConfirm: executeCancel,
+    });
   };
 
   const subjectLabel = (row) => {
@@ -1781,9 +1839,18 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
         </Box>
       )}
 
-      <Dialog open={transferOpen} onClose={() => !saving && setTransferOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Chuyển chuyên ngành</DialogTitle>
-        <DialogContent><Stack spacing={2} sx={{ mt: 1 }}>
+      <AppDialog
+        open={transferOpen}
+        onClose={() => !saving && setTransferOpen(false)}
+        maxWidth="sm"
+        title="Chuyển chuyên ngành"
+        confirmText="Gửi chờ hội đồng"
+        cancelText="Hủy"
+        onConfirm={submitTransfer}
+        confirmDisabled={saving}
+        saving={saving}
+      >
+        <Stack spacing={2} sx={{ mt: 1 }}>
           <Typography variant="body2">Mã học viên và toàn bộ lịch sử học tập được giữ nguyên. Sau khi yêu cầu được duyệt, hồ sơ sẽ trở về trạng thái nộp hồ sơ, chờ hội đồng xét.</Typography>
           <Select
             fullWidth
@@ -1805,13 +1872,21 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
             {visibleTransferMajors.filter((major) => major.id !== record?.majorId).map((major) => <MenuItem key={major.id} value={major.id}>{major.name}</MenuItem>)}
           </Select>
           <TextField label="Lý do chuyển" multiline minRows={3} value={transferForm.reason} onChange={(e) => setTransferForm((p) => ({ ...p, reason: e.target.value }))} />
-        </Stack></DialogContent>
-        <DialogActions><Button onClick={() => setTransferOpen(false)}>Hủy</Button><Button variant="contained" onClick={submitTransfer} disabled={saving}>Gửi chờ hội đồng</Button></DialogActions>
-      </Dialog>
+        </Stack>
+      </AppDialog>
 
-      <Dialog open={Boolean(decisionTransfer)} onClose={() => !saving && setDecisionTransfer(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Duyệt chuyển chuyên ngành</DialogTitle>
-        <DialogContent><Stack spacing={2} sx={{ mt: 1 }}>
+      <AppDialog
+        open={Boolean(decisionTransfer)}
+        onClose={() => !saving && setDecisionTransfer(null)}
+        maxWidth="sm"
+        title="Duyệt chuyển chuyên ngành"
+        confirmText="Duyệt chuyển ngành"
+        cancelText="Hủy"
+        onConfirm={submitDecision}
+        confirmDisabled={saving || !decisionForm.toCurriculumId}
+        saving={saving}
+      >
+        <Stack spacing={2} sx={{ mt: 1 }}>
           <Typography variant="body2">Chọn CTĐT hoàn chỉnh của chuyên ngành mới. Hệ thống chỉ tự động công nhận các môn đã hoàn thành có cùng học phần gốc.</Typography>
           <Select fullWidth size="small" displayEmpty value={decisionForm.toCurriculumId} onChange={(e) => setDecisionForm((p) => ({ ...p, toCurriculumId: e.target.value }))}>
             <MenuItem value="">Chọn chương trình đào tạo</MenuItem>
@@ -1819,105 +1894,110 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
           </Select>
           {decisionCurriculums.length === 0 && <Typography color="error" variant="body2">Chưa có CTĐT phù hợp cho chuyên ngành và khóa này.</Typography>}
           <TextField label="Ghi chú quyết định" multiline minRows={2} value={decisionForm.note} onChange={(e) => setDecisionForm((p) => ({ ...p, note: e.target.value }))} />
-        </Stack></DialogContent>
-        <DialogActions><Button onClick={() => setDecisionTransfer(null)}>Hủy</Button><Button variant="contained" onClick={submitDecision} disabled={saving || !decisionForm.toCurriculumId}>Duyệt chuyển ngành</Button></DialogActions>
-      </Dialog>
+        </Stack>
+      </AppDialog>
 
-      <Dialog open={learningOpen} onClose={() => !learningSaving && setLearningOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingLearning ? "Cập nhật kết quả học phần" : "Thêm kết quả học phần cá nhân"}</DialogTitle>
-        <DialogContent>
-          {learningForm && (
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              <Select fullWidth size="small" value={learningForm.catalogType} onChange={(e) => setLearningForm((p) => ({ ...p, catalogType: e.target.value, subjectId: "", bridgeKnowledgeSubjectId: "" }))}>
-                <MenuItem value="subject">Học phần CTĐT</MenuItem>
-                <MenuItem value="bridge">Học phần bổ sung kiến thức</MenuItem>
+      <AppDialog
+        open={learningOpen}
+        onClose={() => !learningSaving && setLearningOpen(false)}
+        maxWidth="sm"
+        title={editingLearning ? "Cập nhật kết quả học phần" : "Thêm kết quả học phần cá nhân"}
+        confirmText={learningSaving ? "Đang lưu..." : "Lưu kết quả"}
+        cancelText="Hủy"
+        onConfirm={submitLearningResult}
+        confirmDisabled={learningSaving}
+        saving={learningSaving}
+      >
+        {learningForm && (
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Select fullWidth size="small" value={learningForm.catalogType} onChange={(e) => setLearningForm((p) => ({ ...p, catalogType: e.target.value, subjectId: "", bridgeKnowledgeSubjectId: "" }))}>
+              <MenuItem value="subject">Học phần CTĐT</MenuItem>
+              <MenuItem value="bridge">Học phần bổ sung kiến thức</MenuItem>
+            </Select>
+            {learningForm.catalogType === "bridge" ? (
+              <Select fullWidth size="small" displayEmpty value={learningForm.bridgeKnowledgeSubjectId} onChange={(e) => setLearningForm((p) => ({ ...p, bridgeKnowledgeSubjectId: e.target.value }))}>
+                <MenuItem value="">Chọn học phần bổ sung kiến thức</MenuItem>
+                {bridgeSubjects.map((row) => (
+                  <MenuItem key={row.id} value={row.id}>
+                    {row.code} — {row.name}{row.equivalentSubject ? ` (tương đương ${subjectLabel(row.equivalentSubject)})` : " (chưa khai báo tương đương)"}
+                  </MenuItem>
+                ))}
               </Select>
-              {learningForm.catalogType === "bridge" ? (
-                <Select fullWidth size="small" displayEmpty value={learningForm.bridgeKnowledgeSubjectId} onChange={(e) => setLearningForm((p) => ({ ...p, bridgeKnowledgeSubjectId: e.target.value }))}>
-                  <MenuItem value="">Chọn học phần bổ sung kiến thức</MenuItem>
-                  {bridgeSubjects.map((row) => (
-                    <MenuItem key={row.id} value={row.id}>
-                      {row.code} — {row.name}{row.equivalentSubject ? ` (tương đương ${subjectLabel(row.equivalentSubject)})` : " (chưa khai báo tương đương)"}
-                    </MenuItem>
-                  ))}
-                </Select>
-              ) : (
-                <Select fullWidth size="small" displayEmpty value={learningForm.subjectId} onChange={(e) => setLearningForm((p) => ({ ...p, subjectId: e.target.value }))}>
-                  <MenuItem value="">Chọn học phần</MenuItem>
-                  {subjects.map((row) => <MenuItem key={row.id} value={row.id}>{subjectLabel(row)}</MenuItem>)}
-                </Select>
-              )}
-              <Stack direction="row" spacing={2}>
-                <Select fullWidth size="small" value={learningForm.sourceType} onChange={(e) => setLearningForm((p) => ({ ...p, sourceType: e.target.value }))}>
-                  {LEARNING_SOURCES.map((item) => <MenuItem key={item.value} value={item.value}>{item.label}</MenuItem>)}
-                </Select>
-                <TextField size="small" fullWidth label="Năm học" value={learningForm.academicYear} onChange={(e) => setLearningForm((p) => ({ ...p, academicYear: e.target.value }))} placeholder="2026" />
-              </Stack>
-              <Stack direction="row" spacing={2}>
-                <Select fullWidth size="small" value={learningForm.status} onChange={(e) => setLearningForm((p) => ({ ...p, status: e.target.value, result: e.target.value === "completed" ? (p.result === "pending" ? "passed" : p.result) : "pending" }))}>
-                  {LEARNING_STATUSES.map((item) => <MenuItem key={item.value} value={item.value}>{item.label}</MenuItem>)}
-                </Select>
-                <Select fullWidth size="small" disabled={learningForm.status !== "completed"} value={learningForm.result} onChange={(e) => setLearningForm((p) => ({ ...p, result: e.target.value }))}>
-                  {LEARNING_RESULTS.map((item) => <MenuItem key={item.value} value={item.value}>{item.label}</MenuItem>)}
-                </Select>
-              </Stack>
-              <Stack direction="row" spacing={2}>
-                <TextField size="small" fullWidth type="number" label="Điểm (0–10)" value={learningForm.score} onChange={(e) => setLearningForm((p) => ({ ...p, score: e.target.value }))} inputProps={{ min: 0, max: 10, step: 0.25 }} />
-                <TextField size="small" fullWidth type="date" label="Ngày hoàn thành" InputLabelProps={{ shrink: true }} disabled={learningForm.status !== "completed"} value={learningForm.completedAt} onChange={(e) => setLearningForm((p) => ({ ...p, completedAt: e.target.value }))} />
-              </Stack>
-              {learningForm.sourceType === "external" && (
-                <TextField size="small" fullWidth label="Đơn vị đào tạo" value={learningForm.institution} onChange={(e) => setLearningForm((p) => ({ ...p, institution: e.target.value }))} />
-              )}
-              <TextField size="small" fullWidth label="Số quyết định / văn bằng" value={learningForm.decisionNo} onChange={(e) => setLearningForm((p) => ({ ...p, decisionNo: e.target.value }))} />
-              <TextField label="Ghi chú" multiline minRows={2} value={learningForm.note} onChange={(e) => setLearningForm((p) => ({ ...p, note: e.target.value }))} />
-              <Typography variant="body2" sx={{ color: "#64748B" }}>
-                Trạng thái <strong>Mới đăng ký</strong> hoặc <strong>Đang học</strong> chỉ được kế thừa đăng ký và tiếp tục học
-                trong lớp đang đăng ký, chưa tính tín chỉ công nhận.
-              </Typography>
+            ) : (
+              <Select fullWidth size="small" displayEmpty value={learningForm.subjectId} onChange={(e) => setLearningForm((p) => ({ ...p, subjectId: e.target.value }))}>
+                <MenuItem value="">Chọn học phần</MenuItem>
+                {subjects.map((row) => <MenuItem key={row.id} value={row.id}>{subjectLabel(row)}</MenuItem>)}
+              </Select>
+            )}
+            <Stack direction="row" spacing={2}>
+              <Select fullWidth size="small" value={learningForm.sourceType} onChange={(e) => setLearningForm((p) => ({ ...p, sourceType: e.target.value }))}>
+                {LEARNING_SOURCES.map((item) => <MenuItem key={item.value} value={item.value}>{item.label}</MenuItem>)}
+              </Select>
+              <TextField size="small" fullWidth label="Năm học" value={learningForm.academicYear} onChange={(e) => setLearningForm((p) => ({ ...p, academicYear: e.target.value }))} placeholder="2026" />
             </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLearningOpen(false)} disabled={learningSaving}>Hủy</Button>
-          <Button variant="contained" onClick={submitLearningResult} disabled={learningSaving}>{learningSaving ? "Đang lưu..." : "Lưu kết quả"}</Button>
-        </DialogActions>
-      </Dialog>
+            <Stack direction="row" spacing={2}>
+              <Select fullWidth size="small" value={learningForm.status} onChange={(e) => setLearningForm((p) => ({ ...p, status: e.target.value, result: e.target.value === "completed" ? (p.result === "pending" ? "passed" : p.result) : "pending" }))}>
+                {LEARNING_STATUSES.map((item) => <MenuItem key={item.value} value={item.value}>{item.label}</MenuItem>)}
+              </Select>
+              <Select fullWidth size="small" disabled={learningForm.status !== "completed"} value={learningForm.result} onChange={(e) => setLearningForm((p) => ({ ...p, result: e.target.value }))}>
+                {LEARNING_RESULTS.map((item) => <MenuItem key={item.value} value={item.value}>{item.label}</MenuItem>)}
+              </Select>
+            </Stack>
+            <Stack direction="row" spacing={2}>
+              <TextField size="small" fullWidth type="number" label="Điểm (0–10)" value={learningForm.score} onChange={(e) => setLearningForm((p) => ({ ...p, score: e.target.value }))} inputProps={{ min: 0, max: 10, step: 0.25 }} />
+              <TextField size="small" fullWidth type="date" label="Ngày hoàn thành" InputLabelProps={{ shrink: true }} disabled={learningForm.status !== "completed"} value={learningForm.completedAt} onChange={(e) => setLearningForm((p) => ({ ...p, completedAt: e.target.value }))} />
+            </Stack>
+            {learningForm.sourceType === "external" && (
+              <TextField size="small" fullWidth label="Đơn vị đào tạo" value={learningForm.institution} onChange={(e) => setLearningForm((p) => ({ ...p, institution: e.target.value }))} />
+            )}
+            <TextField size="small" fullWidth label="Số quyết định / văn bằng" value={learningForm.decisionNo} onChange={(e) => setLearningForm((p) => ({ ...p, decisionNo: e.target.value }))} />
+            <TextField label="Ghi chú" multiline minRows={2} value={learningForm.note} onChange={(e) => setLearningForm((p) => ({ ...p, note: e.target.value }))} />
+            <Typography variant="body2" sx={{ color: "#64748B" }}>
+              Trạng thái <strong>Mới đăng ký</strong> hoặc <strong>Đang học</strong> chỉ được kế thừa đăng ký và tiếp tục học
+              trong lớp đang đăng ký, chưa tính tín chỉ công nhận.
+            </Typography>
+          </Stack>
+        )}
+      </AppDialog>
 
-      <Dialog open={Boolean(decisionRecognition)} onClose={() => !learningSaving && setDecisionRecognition(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>{decisionRecognition?.status === "pending" ? "Quyết định công nhận học phần" : "Sửa quyết định công nhận học phần"}</DialogTitle>
-        <DialogContent>
-          {decisionRecognition && (
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              <Typography variant="body2">
-                {subjectLabel(decisionRecognition.sourceSubject)} → {subjectLabel(decisionRecognition.targetSubject)}
+      <AppDialog
+        open={Boolean(decisionRecognition)}
+        onClose={() => !learningSaving && setDecisionRecognition(null)}
+        maxWidth="sm"
+        title={decisionRecognition?.status === "pending" ? "Quyết định công nhận học phần" : "Sửa quyết định công nhận học phần"}
+        confirmText="Lưu quyết định"
+        cancelText="Hủy"
+        onConfirm={submitRecognitionDecision}
+        confirmDisabled={learningSaving}
+        saving={learningSaving}
+      >
+        {decisionRecognition && (
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2">
+              {subjectLabel(decisionRecognition.sourceSubject)} → {subjectLabel(decisionRecognition.targetSubject)}
+            </Typography>
+            <Typography variant="body2" sx={{ color: "#64748B" }}>
+              {RECOGNITION_BASIS_LABELS[decisionRecognition.basis] || decisionRecognition.basis}. Quyết định này độc lập,
+              không bắt buộc phải gắn với một lần chuyển chuyên ngành.
+            </Typography>
+            {decisionRecognition.status !== "pending" && (
+              <Typography variant="body2" sx={{ color: "#B86216", fontWeight: 600 }}>
+                Quyết định này đã được lưu trước đó
+                {decisionRecognition.decidedAt ? ` (${new Date(decisionRecognition.decidedAt).toLocaleString("vi-VN")})` : ""}.
+                Lưu lần nữa sẽ ghi đè kết quả cũ. Muốn hệ thống đề xuất lại theo dữ liệu mới, hãy dùng nút hủy công nhận.
               </Typography>
-              <Typography variant="body2" sx={{ color: "#64748B" }}>
-                {RECOGNITION_BASIS_LABELS[decisionRecognition.basis] || decisionRecognition.basis}. Quyết định này độc lập,
-                không bắt buộc phải gắn với một lần chuyển chuyên ngành.
-              </Typography>
-              {decisionRecognition.status !== "pending" && (
-                <Typography variant="body2" sx={{ color: "#B86216", fontWeight: 600 }}>
-                  Quyết định này đã được lưu trước đó
-                  {decisionRecognition.decidedAt ? ` (${new Date(decisionRecognition.decidedAt).toLocaleString("vi-VN")})` : ""}.
-                  Lưu lần nữa sẽ ghi đè kết quả cũ. Muốn hệ thống đề xuất lại theo dữ liệu mới, hãy dùng nút hủy công nhận.
-                </Typography>
-              )}
-              <Select fullWidth size="small" value={recognitionDecision.decision} onChange={(e) => setRecognitionDecision((p) => ({ ...p, decision: e.target.value }))}>
-                <MenuItem value="approved">Công nhận học phần</MenuItem>
-                <MenuItem value="rejected">Không công nhận</MenuItem>
-              </Select>
-              {recognitionDecision.decision === "approved" && (
-                <TextField size="small" fullWidth label="Số quyết định công nhận" value={recognitionDecision.decisionNo} onChange={(e) => setRecognitionDecision((p) => ({ ...p, decisionNo: e.target.value }))} />
-              )}
-              <TextField label="Ghi chú của hội đồng" multiline minRows={2} value={recognitionDecision.note} onChange={(e) => setRecognitionDecision((p) => ({ ...p, note: e.target.value }))} />
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDecisionRecognition(null)} disabled={learningSaving}>Hủy</Button>
-          <Button variant="contained" onClick={submitRecognitionDecision} disabled={learningSaving}>Lưu quyết định</Button>
-        </DialogActions>
-      </Dialog>
+            )}
+            <Select fullWidth size="small" value={recognitionDecision.decision} onChange={(e) => setRecognitionDecision((p) => ({ ...p, decision: e.target.value }))}>
+              <MenuItem value="approved">Công nhận học phần</MenuItem>
+              <MenuItem value="rejected">Không công nhận</MenuItem>
+            </Select>
+            {recognitionDecision.decision === "approved" && (
+              <TextField size="small" fullWidth label="Số quyết định công nhận" value={recognitionDecision.decisionNo} onChange={(e) => setRecognitionDecision((p) => ({ ...p, decisionNo: e.target.value }))} />
+            )}
+            <TextField label="Ghi chú của hội đồng" multiline minRows={2} value={recognitionDecision.note} onChange={(e) => setRecognitionDecision((p) => ({ ...p, note: e.target.value }))} />
+          </Stack>
+        )}
+      </AppDialog>
 
       {/* ========================================================================= */}
       {/* 3. HIDDEN PRINT CONTAINER (EXACT 210mm x 297mm A4 TEMPLATE FOR PRINT / PDF)*/}
@@ -1929,43 +2009,34 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
       {/* ========================================================================= */}
       {/* 4. UNSAVED CHANGES CONFIRMATION DIALOG                                    */}
       {/* ========================================================================= */}
-      <Dialog
+      <ConfirmDialog
         open={showConfirmLeave}
         onClose={() => setShowConfirmLeave(false)}
-        maxWidth="xs"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: "6px", p: 1 } }}
-      >
-        <DialogTitle sx={{ fontWeight: 700, color: "#B45309", display: "flex", alignItems: "center", gap: 1 }}>
-          <WarningAmberRounded color="warning" />
-          Thay đổi chưa được lưu!
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ color: "#334155", lineHeight: 1.5 }}>
-            Bạn đang có các thay đổi chưa được lưu lại. Nếu rời khỏi trang bây giờ, mọi dữ liệu vừa nhập sẽ bị mất. Bạn có chắc chắn muốn rời đi?
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 2.5, pb: 1.5, gap: 1 }}>
-          <Button
-            variant="outlined"
-            onClick={() => setShowConfirmLeave(false)}
-            sx={{ textTransform: "none", fontWeight: 600, color: "#334155", borderColor: "#CBD5E1" }}
-          >
-            Ở lại chỉnh sửa
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            onClick={() => {
-              setShowConfirmLeave(false);
-              navigate(returnPath);
-            }}
-            sx={{ textTransform: "none", fontWeight: 700 }}
-          >
-            Rời đi (Không lưu)
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onConfirm={() => {
+          setShowConfirmLeave(false);
+          navigate(returnPath);
+        }}
+        title="Thay đổi chưa được lưu!"
+        content="Bạn đang có các thay đổi chưa được lưu lại. Nếu rời khỏi trang bây giờ, mọi dữ liệu vừa nhập sẽ bị mất. Bạn có chắc chắn muốn rời đi?"
+        confirmLabel="Rời đi (Không lưu)"
+        cancelLabel="Ở lại chỉnh sửa"
+        confirmColor="error"
+      />
+
+      <ConfirmDialog
+        open={confirmState.open}
+        onClose={() => setConfirmState((s) => ({ ...s, open: false }))}
+        onConfirm={() => {
+          const action = confirmState.onConfirm;
+          setConfirmState((s) => ({ ...s, open: false }));
+          if (action) action();
+        }}
+        title={confirmState.title}
+        content={confirmState.content}
+        confirmLabel={confirmState.confirmLabel}
+        cancelLabel={confirmState.cancelLabel}
+        confirmColor={confirmState.confirmColor}
+      />
     </FeatureLayout>
   );
 };

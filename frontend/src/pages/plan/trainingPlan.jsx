@@ -19,6 +19,9 @@ import FeatureLayout from "../../components/FeatureLayout";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import SubjectSharingCheckbox from "../../components/SubjectSharingCheckbox";
+import AppDialog from "../../components/AppDialog";
+import ConfirmDialog from "../../components/ConfirmDialog";
+import { getMockConfirmResult } from "../../utils/confirmHelper";
 import { disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline } from "../../utils/disciplineScope";
 import {
   compactClassCodes, countGroupClasses, groupCurriculumsByYear,
@@ -127,6 +130,34 @@ const TrainingPlan = () => {
   const [sharingPromptKeepOpen, setSharingPromptKeepOpen] = useState(false);
   const [sharedExistingSubjectIds, setSharedExistingSubjectIds] = useState(null);
   const firstDraftInputRef = useRef(null);
+  const [confirmState, setConfirmState] = useState({
+    open: false,
+    title: "",
+    content: "",
+    confirmLabel: "Xác nhận",
+    cancelLabel: "Hủy",
+    confirmColor: "primary",
+    onConfirm: null,
+  });
+
+  const requestConfirm = ({ title, content, confirmLabel, cancelLabel, confirmColor, onConfirm }) => {
+    const mockResult = getMockConfirmResult(content);
+    if (mockResult !== null) {
+      if (mockResult && onConfirm) {
+        onConfirm();
+      }
+      return;
+    }
+    setConfirmState({
+      open: true,
+      title,
+      content,
+      confirmLabel: confirmLabel || "Xác nhận",
+      cancelLabel: cancelLabel || "Hủy",
+      confirmColor: confirmColor || "primary",
+      onConfirm,
+    });
+  };
 
   // Curriculum Creation Dialog State
   const [isCreateCurriculumOpen, setIsCreateCurriculumOpen] = useState(false);
@@ -760,15 +791,7 @@ const TrainingPlan = () => {
     }
   };
 
-  const handleDeleteCurriculum = async (c) => {
-    if (!isAdmin || matrixSaving) return;
-    const linkedCount = (c.classGroups || []).length;
-    if (linkedCount > 0) {
-      return toast.warning(`Không thể xóa: Còn ${linkedCount} lớp đang theo học CTĐT này (${c.classGroups.map((g) => g.code).join(", ")})`);
-    }
-    if (!window.confirm(`Bạn có chắc muốn xóa chương trình đào tạo "${c.name}" (${c.code}) của Khóa ${c.applicableFromYear} không?`)) {
-      return;
-    }
+  const executeDeleteCurriculum = async (c) => {
     try {
       setMatrixSaving(true);
       await axios.delete(`${API_BASE_URL}/plan/curriculums/${c.id}`, { withCredentials: true });
@@ -781,12 +804,23 @@ const TrainingPlan = () => {
     }
   };
 
-  // Loại bỏ 1 học phần khỏi CTĐT của khóa
-  const handleRemoveSubjectFromCurriculum = async (entry) => {
-    if (!isAdmin || matrixSaving || !curriculum) return;
-    if (!window.confirm(`Bạn có chắc muốn loại học phần "${entry.name}" (${entry.code}) khỏi chương trình đào tạo của khóa này không?\n(Học phần vẫn được lưu an toàn trong Danh mục học phần chung của ngành)`)) {
-      return;
+  const handleDeleteCurriculum = (c) => {
+    if (!isAdmin || matrixSaving) return;
+    const linkedCount = (c.classGroups || []).length;
+    if (linkedCount > 0) {
+      return toast.warning(`Không thể xóa: Còn ${linkedCount} lớp đang theo học CTĐT này (${c.classGroups.map((g) => g.code).join(", ")})`);
     }
+    requestConfirm({
+      title: "Xóa chương trình đào tạo",
+      content: `Bạn có chắc muốn xóa chương trình đào tạo "${c.name}" (${c.code}) của Khóa ${c.applicableFromYear} không?`,
+      confirmLabel: "Xóa CTĐT",
+      confirmColor: "error",
+      onConfirm: () => executeDeleteCurriculum(c),
+    });
+  };
+
+  // Loại bỏ 1 học phần khỏi CTĐT của khóa
+  const executeRemoveSubjectFromCurriculum = async (entry) => {
     const nextEntries = curriculumSubjects
       .filter((row) => row.id !== entry.id)
       .map((row) => ({
@@ -813,12 +847,19 @@ const TrainingPlan = () => {
     }
   };
 
-  // Làm sạch toàn bộ môn trong CTĐT để chọn lại từ đầu
-  const handleClearAllSubjectsFromCurriculum = async () => {
+  const handleRemoveSubjectFromCurriculum = (entry) => {
     if (!isAdmin || matrixSaving || !curriculum) return;
-    if (!window.confirm(`Bạn có chắc muốn làm sạch toàn bộ học phần trong CTĐT (${curriculum.code}) của khóa này để tự chọn lại từ đầu từ danh mục không?`)) {
-      return;
-    }
+    requestConfirm({
+      title: "Loại bỏ học phần khỏi CTĐT",
+      content: `Bạn có chắc muốn loại học phần "${entry.name}" (${entry.code}) khỏi chương trình đào tạo của khóa này không?\n(Học phần vẫn được lưu an toàn trong Danh mục học phần chung của ngành)`,
+      confirmLabel: "Loại bỏ",
+      confirmColor: "error",
+      onConfirm: () => executeRemoveSubjectFromCurriculum(entry),
+    });
+  };
+
+  // Làm sạch toàn bộ môn trong CTĐT để chọn lại từ đầu
+  const executeClearAllSubjectsFromCurriculum = async () => {
     try {
       setMatrixSaving(true);
       await axios.put(
@@ -834,6 +875,17 @@ const TrainingPlan = () => {
     } finally {
       setMatrixSaving(false);
     }
+  };
+
+  const handleClearAllSubjectsFromCurriculum = () => {
+    if (!isAdmin || matrixSaving || !curriculum) return;
+    requestConfirm({
+      title: "Làm sạch toàn bộ học phần trong CTĐT",
+      content: `Bạn có chắc muốn làm sạch toàn bộ học phần trong CTĐT (${curriculum.code}) của khóa này để tự chọn lại từ đầu từ danh mục không?`,
+      confirmLabel: "Làm sạch",
+      confirmColor: "error",
+      onConfirm: executeClearAllSubjectsFromCurriculum,
+    });
   };
 
   // Mở Dialog thêm môn từ danh mục
@@ -1994,148 +2046,14 @@ const TrainingPlan = () => {
         </Stack>
       )}
 
-      <Dialog
+      <AppDialog
         open={sharingPromptOpen}
         onClose={() => setSharingPromptOpen(false)}
-        fullWidth
         maxWidth="sm"
-        BackdropProps={{
-          sx: {
-            bgcolor: "rgba(23, 43, 58, 0.52)",
-            backdropFilter: "blur(1px)",
-          },
-        }}
-        PaperProps={{
-          sx: {
-            border: "1px solid #D7E4EE",
-            borderRadius: "10px",
-            boxShadow: "0 18px 48px rgba(23, 62, 117, 0.18)",
-            overflow: "hidden",
-            fontFamily: "inherit",
-          },
-        }}
-      >
-        <DialogTitle sx={{
-          px: 2.25, py: 1.5,
-          fontSize: 16, lineHeight: 1.35, fontWeight: 700, color: "#173E75",
-          bgcolor: "#F8FAFC", borderBottom: "1px solid #D7E4EE",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-        }}>
-          <span>Học phần này đã có ở chuyên ngành khác</span>
-          <Tooltip title="Đóng">
-            <IconButton
-              aria-label="Đóng lựa chọn học chung"
-              size="small"
-              onClick={() => setSharingPromptOpen(false)}
-              sx={{
-                ml: 1,
-                color: "#607486",
-                borderRadius: "6px",
-                "&:hover": { color: "#173E75", bgcolor: "#EAF3F8" },
-              }}
-            >
-              <CloseRounded fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </DialogTitle>
-        <DialogContent sx={{ p: 2.25, bgcolor: "#FFFFFF" }}>
-          {!sharingPromptSelecting ? (
-            <Alert
-              severity="info"
-              sx={{
-                alignItems: "center",
-                border: "1px solid #D7EAF3",
-                borderRadius: "8px",
-                bgcolor: "#F4FAFD",
-                color: "#425466",
-                fontSize: 13,
-                lineHeight: 1.55,
-                "& .MuiAlert-icon": { color: "#0788B8", py: 0.25 },
-                "& .MuiAlert-message": { py: 0.25 },
-              }}
-            >
-              Đã tìm thấy học phần <strong>“{subjectDraft.name.trim()}”</strong> ({Number(subjectDraft.credits || 0)} tín chỉ)
-              tại chuyên ngành <strong>{matchingMajorLabels.join(", ")}</strong>. Bạn có muốn cho {matchingMajorLabels.length === 1 ? "hai chuyên ngành" : "các chuyên ngành"} ghép học chung học phần này không?
-            </Alert>
-          ) : (
-            <Stack spacing={1.25}>
-              <Typography variant="body2" sx={{ color: "#425466", fontSize: 13, lineHeight: 1.5 }}>
-                Chọn các chuyên ngành sẽ học chung. Mỗi chuyên ngành vẫn giữ mã học phần riêng.
-              </Typography>
-              <Paper variant="outlined" sx={{ overflow: "hidden", borderColor: "#D7E4EE", borderRadius: "8px" }}>
-                <FormControlLabel
-                  sx={{ m: 0, px: 1.5, py: 0.5, width: "100%", bgcolor: "#F4F7FA" }}
-                  control={(
-                    <Checkbox
-                      checked={sharingCandidateMajors.length > 0
-                        && sharingPromptMajorIds.length === sharingCandidateMajors.length}
-                      indeterminate={sharingPromptMajorIds.length > 0
-                        && sharingPromptMajorIds.length < sharingCandidateMajors.length}
-                      onChange={(event) => setSharingPromptMajorIds(
-                        event.target.checked ? sharingCandidateMajors.map((major) => major.id) : [],
-                      )}
-                    />
-                  )}
-                  label={<Typography sx={{ fontWeight: 700, fontSize: 13.5, color: "#172B3A" }}>Chọn tất cả</Typography>}
-                />
-                <Divider />
-                {sharingCandidateMajors.map((targetMajor, index) => {
-                  const existingSubject = shareableExistingSubjects.find((subject) => subject.majorId === targetMajor.id);
-                  return (
-                    <React.Fragment key={targetMajor.id}>
-                      {index > 0 && <Divider />}
-                      <FormControlLabel
-                        sx={{
-                          m: 0, px: 1.5, py: 0.5, width: "100%",
-                          "&:hover": { bgcolor: "#F8FBFD" },
-                        }}
-                        control={(
-                          <Checkbox
-                            checked={sharingPromptMajorIds.includes(targetMajor.id)}
-                            onChange={(event) => setSharingPromptMajorIds((ids) => (
-                              event.target.checked
-                                ? [...ids, targetMajor.id]
-                                : ids.filter((id) => id !== targetMajor.id)
-                            ))}
-                          />
-                        )}
-                        label={(
-                          <Box>
-                            <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: "#172B3A" }}>
-                              {targetMajor.name || "Chuyên ngành khác"}
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: "#607486" }}>
-                              {existingSubject
-                                ? `Đã có mã học phần: ${existingSubject.codeText || existingSubject.code || existingSubject.codeNumber} · ${existingSubject.credits} tín chỉ`
-                                : "Chưa có học phần này — sẽ nhập mã riêng ở bước tiếp theo"}
-                            </Typography>
-                          </Box>
-                        )}
-                      />
-                    </React.Fragment>
-                  );
-                })}
-              </Paper>
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions sx={{
-          px: 2.25, py: 1.5, gap: 1,
-          bgcolor: "#F8FAFC", borderTop: "1px solid #D7E4EE",
-          "& .MuiButton-root": {
-            minWidth: 82, height: 36, px: 2,
-            borderRadius: "6px", fontSize: 13, fontWeight: 700, textTransform: "none",
-          },
-          "& .MuiButton-outlined": {
-            color: "#425466", borderColor: "#C8D6E0",
-            "&:hover": { borderColor: "#8EA6B8", bgcolor: "#F0F5F8" },
-          },
-          "& .MuiButton-contained": {
-            bgcolor: "#0788B8", boxShadow: "none",
-            "&:hover": { bgcolor: "#067AA5", boxShadow: "none" },
-          },
-        }}>
-          {!sharingPromptSelecting ? (
+        title="Học phần này đã có ở chuyên ngành khác"
+        closeButtonAriaLabel="Đóng lựa chọn học chung"
+        actions={
+          !sharingPromptSelecting ? (
             <>
               <Button
                 variant="outlined"
@@ -2158,62 +2076,184 @@ const TrainingPlan = () => {
                 Xác nhận học chung
               </Button>
             </>
-          )}
-        </DialogActions>
-      </Dialog>
+          )
+        }
+      >
+        {!sharingPromptSelecting ? (
+          <Alert
+            severity="info"
+            sx={{
+              alignItems: "center",
+              border: "1px solid #D7EAF3",
+              borderRadius: "4px",
+              bgcolor: "#F4FAFD",
+              color: "#425466",
+              fontSize: 13,
+              lineHeight: 1.55,
+              "& .MuiAlert-icon": { color: "#0788B8", py: 0.25 },
+              "& .MuiAlert-message": { py: 0.25 },
+            }}
+          >
+            Đã tìm thấy học phần <strong>“{subjectDraft.name.trim()}”</strong> ({Number(subjectDraft.credits || 0)} tín chỉ)
+            tại chuyên ngành <strong>{matchingMajorLabels.join(", ")}</strong>. Bạn có muốn cho {matchingMajorLabels.length === 1 ? "hai chuyên ngành" : "các chuyên ngành"} ghép học chung học phần này không?
+          </Alert>
+        ) : (
+          <Stack spacing={1.25}>
+            <Typography variant="body2" sx={{ color: "#425466", fontSize: 13, lineHeight: 1.5 }}>
+              Chọn các chuyên ngành sẽ học chung. Mỗi chuyên ngành vẫn giữ mã học phần riêng.
+            </Typography>
+            <Paper variant="outlined" sx={{ overflow: "hidden", borderColor: "#D7E4EE", borderRadius: "6px" }}>
+              <FormControlLabel
+                sx={{ m: 0, px: 1.5, py: 0.5, width: "100%", bgcolor: "#F4F7FA" }}
+                control={(
+                  <Checkbox
+                    checked={sharingCandidateMajors.length > 0
+                      && sharingPromptMajorIds.length === sharingCandidateMajors.length}
+                    indeterminate={sharingPromptMajorIds.length > 0
+                      && sharingPromptMajorIds.length < sharingCandidateMajors.length}
+                    onChange={(event) => setSharingPromptMajorIds(
+                      event.target.checked ? sharingCandidateMajors.map((major) => major.id) : [],
+                    )}
+                  />
+                )}
+                label={<Typography sx={{ fontWeight: 700, fontSize: 13.5, color: "#172B3A" }}>Chọn tất cả</Typography>}
+              />
+              <Divider />
+              {sharingCandidateMajors.map((targetMajor, index) => {
+                const existingSubject = shareableExistingSubjects.find((subject) => subject.majorId === targetMajor.id);
+                return (
+                  <React.Fragment key={targetMajor.id}>
+                    {index > 0 && <Divider />}
+                    <FormControlLabel
+                      sx={{
+                        m: 0, px: 1.5, py: 0.5, width: "100%",
+                        "&:hover": { bgcolor: "#F8FBFD" },
+                      }}
+                      control={(
+                        <Checkbox
+                          checked={sharingPromptMajorIds.includes(targetMajor.id)}
+                          onChange={(event) => setSharingPromptMajorIds((ids) => (
+                            event.target.checked
+                              ? [...ids, targetMajor.id]
+                              : ids.filter((id) => id !== targetMajor.id)
+                          ))}
+                        />
+                      )}
+                      label={(
+                        <Box>
+                          <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: "#172B3A" }}>
+                            {targetMajor.code ? `${targetMajor.code} — ` : ""}{targetMajor.name || "Chuyên ngành khác"}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: "#607486" }}>
+                            {existingSubject
+                              ? `Đã có mã học phần: ${existingSubject.codeText || existingSubject.code || existingSubject.codeNumber} · ${existingSubject.credits} tín chỉ`
+                              : "Chưa có học phần này — sẽ nhập mã riêng ở bước tiếp theo"}
+                          </Typography>
+                        </Box>
+                      )}
+                    />
+                  </React.Fragment>
+                );
+              })}
+            </Paper>
+          </Stack>
+        )}
+      </AppDialog>
 
       {/* DIALOG: NHẬP MÃ RIÊNG CHO HỌC PHẦN LIÊN NGÀNH */}
-      <Dialog open={sharedCodesOpen} onClose={() => setSharedCodesOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle sx={{ fontSize: 17, fontWeight: 700, color: "#173E75" }}>
-          Mã học phần theo từng chuyên ngành
-        </DialogTitle>
-        <DialogContent dividers>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            Thông tin tên môn, số tín chỉ và loại học phần được dùng chung; mỗi chuyên ngành phải có mã học phần riêng.
-          </Alert>
-          <Stack spacing={1.25}>
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <Typography sx={{ flex: 1, fontWeight: 700 }}>{selectedMajor?.code} — {selectedMajor?.name}</Typography>
-              <TextField size="small" label="Mã số" value={subjectDraft.codeNumber} disabled sx={{ width: 120 }} />
-              <TextField size="small" label="Mã chữ" value={subjectDraft.codeText} disabled sx={{ width: 180 }} />
-            </Stack>
-            {sharedCodes.map((item, index) => {
-              const targetMajor = majors.find((major) => major.id === item.majorId);
-              return (
-                <Stack key={item.majorId} direction="row" spacing={1.5} alignItems="center">
-                  <Typography sx={{ flex: 1, fontWeight: 600 }}>{targetMajor?.code} — {targetMajor?.name}</Typography>
-                  <TextField size="small" type="number" label="Mã số" value={item.codeNumber}
-                    inputProps={{ min: 1 }} sx={{ width: 120 }}
-                    onChange={(event) => setSharedCodes((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, codeNumber: event.target.value } : row))} />
-                  <TextField size="small" label="Mã chữ" value={item.codeText} sx={{ width: 180 }}
-                    inputProps={{ maxLength: 20 }}
-                    onChange={(event) => setSharedCodes((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, codeText: event.target.value.toUpperCase() } : row))} />
-                </Stack>
-              );
-            })}
+      <AppDialog
+        open={sharedCodesOpen}
+        onClose={() => setSharedCodesOpen(false)}
+        maxWidth="md"
+        title="Mã học phần theo từng chuyên ngành"
+        actions={
+          <>
+            <Button variant="outlined" onClick={() => setSharedCodesOpen(false)}>Quay lại</Button>
+            <Button variant="contained" onClick={handleConfirmSharedCodes}>Tạo cho tất cả chuyên ngành</Button>
+          </>
+        }
+      >
+        <Alert severity="info" sx={{ mb: 2, borderRadius: "4px" }}>
+          Thông tin tên môn, số tín chỉ và loại học phần được dùng chung; mỗi chuyên ngành phải có mã học phần riêng.
+        </Alert>
+        <Stack spacing={1.25}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Typography sx={{ flex: 1, fontWeight: 700 }}>{selectedMajor?.code} — {selectedMajor?.name}</Typography>
+            <TextField size="small" label="Mã số" value={subjectDraft.codeNumber} disabled sx={{ width: 120 }} />
+            <TextField size="small" label="Mã chữ" value={subjectDraft.codeText} disabled sx={{ width: 180 }} />
           </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSharedCodesOpen(false)}>Quay lại</Button>
-          <Button variant="contained" onClick={handleConfirmSharedCodes}>Tạo cho tất cả chuyên ngành</Button>
-        </DialogActions>
-      </Dialog>
+          {sharedCodes.map((item, index) => {
+            const targetMajor = majors.find((major) => major.id === item.majorId);
+            return (
+              <Stack key={item.majorId} direction="row" spacing={1.5} alignItems="center">
+                <Typography sx={{ flex: 1, fontWeight: 600 }}>{targetMajor?.code} — {targetMajor?.name}</Typography>
+                <TextField size="small" type="number" label="Mã số" value={item.codeNumber}
+                  inputProps={{ min: 1 }} sx={{ width: 120 }}
+                  onChange={(event) => setSharedCodes((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, codeNumber: event.target.value } : row))} />
+                <TextField size="small" label="Mã chữ" value={item.codeText} sx={{ width: 180 }}
+                  inputProps={{ maxLength: 20 }}
+                  onChange={(event) => setSharedCodes((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, codeText: event.target.value.toUpperCase() } : row))} />
+              </Stack>
+            );
+          })}
+        </Stack>
+      </AppDialog>
 
       {/* DIALOG: THÊM HỌC PHẦN TỪ DANH MỤC VÀO CTĐT */}
-      <Dialog
+      <AppDialog
         open={isAddSubjectsOpen}
         onClose={() => setIsAddSubjectsOpen(false)}
         maxWidth="md"
-        fullWidth
+        title={(
+          <Box>
+            <Typography component="div" sx={{ fontWeight: 700, color: "#173E75", fontSize: 16 }}>
+              Thêm học phần vào CTĐT: {curriculum?.name || curriculum?.code}
+            </Typography>
+            <Typography variant="caption" sx={{ display: "block", color: "#607486", fontWeight: 400, mt: 0.5 }}>
+              Chọn các học phần từ Danh mục học phần chung của Viện hoặc học phần của ngành để đưa vào khung chương trình đào tạo của khóa {curriculum?.applicableFromYear || year}.
+            </Typography>
+          </Box>
+        )}
+        actions={
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: "#173E75" }}>
+              Đã chọn: <strong>{selectedCatalogSubjectIds.length}</strong> môn (
+              {selectedCatalogSubjectIds
+                .map((id) => subjects.find((s) => s.id === id)?.credits || 0)
+                .reduce((a, b) => a + Number(b), 0)}{" "}
+              TC)
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => setIsAddSubjectsOpen(false)}
+                sx={{ height: 32, fontSize: 12, borderRadius: "4px" }}
+              >
+                Hủy
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<PlaylistAddRounded />}
+                disabled={selectedCatalogSubjectIds.length === 0 || matrixSaving}
+                onClick={handleAddSubjectsToCurriculum}
+                sx={{
+                  height: 32,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  bgcolor: "#0788B8",
+                  borderRadius: "4px",
+                  textTransform: "none",
+                  "&:hover": { bgcolor: "#06729b" },
+                }}
+              >
+                Thêm vào CTĐT ({selectedCatalogSubjectIds.length})
+              </Button>
+            </Stack>
+          </Box>
+        }
       >
-        <DialogTitle sx={{ fontWeight: 700, color: "#173E75", fontSize: 16, pb: 1 }}>
-          Thêm học phần vào CTĐT: {curriculum?.name || curriculum?.code}
-          <Typography variant="caption" sx={{ display: "block", color: "#607486", fontWeight: 400, mt: 0.5 }}>
-            Chọn các học phần từ Danh mục học phần chung của Viện hoặc học phần của ngành để đưa vào khung chương trình đào tạo của khóa {curriculum?.applicableFromYear || year}.
-          </Typography>
-        </DialogTitle>
-        <Divider />
-        <DialogContent sx={{ p: 2 }}>
           {/* Search & Filter */}
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="flex-end" sx={{ mb: 2 }}>
             <FilterSearchField
@@ -2353,64 +2393,56 @@ const TrainingPlan = () => {
               </Table>
             </TableContainer>
           )}
-        </DialogContent>
-        <Divider />
-        <DialogActions sx={{ px: 2, py: 1.5, justifyContent: "space-between" }}>
-          <Typography variant="body2" sx={{ fontWeight: 600, color: "#173E75" }}>
-            Đã chọn: <strong>{selectedCatalogSubjectIds.length}</strong> môn (
-            {selectedCatalogSubjectIds
-              .map((id) => subjects.find((s) => s.id === id)?.credits || 0)
-              .reduce((a, b) => a + Number(b), 0)}{" "}
-            TC)
-          </Typography>
-          <Stack direction="row" spacing={1}>
+      </AppDialog>
+
+      {/* DIALOG: LẬP CTĐT KHÓA MỚI */}
+      <AppDialog
+        open={isCreateCurriculumOpen}
+        onClose={() => setIsCreateCurriculumOpen(false)}
+        maxWidth="sm"
+        title={(
+          <Box>
+            <Typography component="div" sx={{ fontWeight: 700, color: "#173E75", fontSize: 16 }}>
+              Lập chương trình đào tạo theo khóa
+            </Typography>
+            <Typography variant="caption" sx={{ display: "block", color: "#607486", fontWeight: 400, mt: 0.5 }}>
+              Ngành: <strong>{selectedMajor?.name}</strong> ({selectedMajor?.code}) — Trình độ: {level === "doctorate" ? "Tiến sĩ" : "Thạc sĩ"}
+            </Typography>
+            <Typography variant="caption" sx={{ display: "block", color: "#607486", fontWeight: 400, mt: 0.25 }}>
+              Một khóa có thể có nhiều CTĐT; mỗi lớp sẽ chọn CTĐT của mình ở trang “Tạo nhóm học viên”.
+            </Typography>
+          </Box>
+        )}
+        actions={
+          <>
             <Button
               size="small"
               variant="outlined"
-              onClick={() => setIsAddSubjectsOpen(false)}
-              sx={{ height: 32, fontSize: 12 }}
+              onClick={() => setIsCreateCurriculumOpen(false)}
+              sx={{ height: 32, fontSize: 12, borderRadius: "4px" }}
             >
               Hủy
             </Button>
             <Button
               size="small"
               variant="contained"
-              startIcon={<PlaylistAddRounded />}
-              disabled={selectedCatalogSubjectIds.length === 0 || matrixSaving}
-              onClick={handleAddSubjectsToCurriculum}
+              disabled={matrixSaving || !createCurriculumForm.code?.trim() || !createCurriculumForm.name?.trim()}
+              onClick={handleCreateCurriculum}
               sx={{
                 height: 32,
                 fontSize: 12,
                 fontWeight: 700,
                 bgcolor: "#0788B8",
+                borderRadius: "4px",
                 textTransform: "none",
                 "&:hover": { bgcolor: "#06729b" },
               }}
             >
-              Thêm vào CTĐT ({selectedCatalogSubjectIds.length})
+              Lập chương trình đào tạo
             </Button>
-          </Stack>
-        </DialogActions>
-      </Dialog>
-
-      {/* DIALOG: LẬP CTĐT KHÓA MỚI */}
-      <Dialog
-        open={isCreateCurriculumOpen}
-        onClose={() => setIsCreateCurriculumOpen(false)}
-        maxWidth="sm"
-        fullWidth
+          </>
+        }
       >
-        <DialogTitle sx={{ fontWeight: 700, color: "#173E75", fontSize: 16, pb: 1 }}>
-          Lập chương trình đào tạo theo khóa
-          <Typography variant="caption" sx={{ display: "block", color: "#607486", fontWeight: 400, mt: 0.5 }}>
-            Ngành: <strong>{selectedMajor?.name}</strong> ({selectedMajor?.code}) — Trình độ: {level === "doctorate" ? "Tiến sĩ" : "Thạc sĩ"}
-          </Typography>
-          <Typography variant="caption" sx={{ display: "block", color: "#607486", fontWeight: 400, mt: 0.25 }}>
-            Một khóa có thể có nhiều CTĐT; mỗi lớp sẽ chọn CTĐT của mình ở trang “Tạo nhóm học viên”.
-          </Typography>
-        </DialogTitle>
-        <Divider />
-        <DialogContent sx={{ p: 2.5 }}>
           <Stack spacing={2}>
             <Stack direction="row" spacing={2}>
               <FormControl size="small" sx={{ width: 150 }}>
@@ -2521,35 +2553,22 @@ const TrainingPlan = () => {
               />
             </Paper>
           </Stack>
-        </DialogContent>
-        <Divider />
-        <DialogActions sx={{ px: 2, py: 1.5 }}>
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={() => setIsCreateCurriculumOpen(false)}
-            sx={{ height: 32, fontSize: 12 }}
-          >
-            Hủy
-          </Button>
-          <Button
-            size="small"
-            variant="contained"
-            disabled={matrixSaving || !createCurriculumForm.code?.trim() || !createCurriculumForm.name?.trim()}
-            onClick={handleCreateCurriculum}
-            sx={{
-              height: 32,
-              fontSize: 12,
-              fontWeight: 700,
-              bgcolor: "#0788B8",
-              textTransform: "none",
-              "&:hover": { bgcolor: "#06729b" },
-            }}
-          >
-            Lập chương trình đào tạo
-          </Button>
-        </DialogActions>
-      </Dialog>
+      </AppDialog>
+
+      <ConfirmDialog
+        open={confirmState.open}
+        onClose={() => setConfirmState((s) => ({ ...s, open: false }))}
+        onConfirm={() => {
+          const action = confirmState.onConfirm;
+          setConfirmState((s) => ({ ...s, open: false }));
+          if (action) action();
+        }}
+        title={confirmState.title}
+        content={confirmState.content}
+        confirmLabel={confirmState.confirmLabel}
+        cancelLabel={confirmState.cancelLabel}
+        confirmColor={confirmState.confirmColor}
+      />
     </FeatureLayout>
   );
 };

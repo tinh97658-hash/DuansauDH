@@ -1,10 +1,14 @@
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
-import { AddRounded, EditRounded, RefreshRounded } from "@mui/icons-material";
+import { Alert, Box, Button, Chip, CircularProgress, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { AddRounded, EditRounded, InfoOutlined, RefreshRounded } from "@mui/icons-material";
 import BulkAdmissionWorkflow from "../../features/admission/BulkAdmissionWorkflow";
 import FeatureLayout from "../../components/FeatureLayout";
+import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
+import AppDialog from "../../components/AppDialog";
+import ConfirmDialog from "../../components/ConfirmDialog";
+import { getMockConfirmResult } from "../../utils/confirmHelper";
 import { API_BASE_URL } from "../../config/http";
 import { normalizeMajorsResponse } from "../../utils/majors";
 
@@ -12,6 +16,33 @@ const options = { withCredentials: true };
 const toolbarSx = {
   "& .MuiInputBase-root": { height: 40 },
   "& > .MuiButton-root": { minHeight: 40, whiteSpace: "nowrap" },
+};
+const compactFieldLabelSx = {
+  display: "block",
+  mb: "5px",
+  color: "#435b72",
+  fontSize: "11px",
+  fontWeight: 700,
+  lineHeight: "15px",
+  textTransform: "uppercase",
+};
+const compactControlSx = {
+  "& .MuiOutlinedInput-root": {
+    height: 40,
+    borderRadius: "4px",
+    backgroundColor: "#fff",
+    color: "#1c2936",
+    fontSize: "13px",
+    fontWeight: 500,
+    "& fieldset": { borderColor: "#c5d1db" },
+    "&:hover fieldset": { borderColor: "#8fa6b9" },
+    "&.Mui-focused fieldset": { borderColor: "var(--primary, #0788B8)", borderWidth: "1.5px" },
+  },
+  "& .MuiOutlinedInput-input": {
+    height: "auto",
+    padding: "9px 12px",
+    lineHeight: "20px",
+  },
 };
 export default function AdmissionScores() {
   const [scoresDirty, setScoresDirty] = useState(false), [workflowBusy, setWorkflowBusy] = useState(false);
@@ -21,6 +52,7 @@ export default function AdmissionScores() {
   const [saving, setSaving] = useState(false), [form, setForm] = useState(null);
   const [search, setSearch] = useState(""), [filter, setFilter] = useState("all"), [majorFilter, setMajorFilter] = useState("all");
   const [thresholdDrafts, setThresholdDrafts] = useState({});
+  const [discardAction, setDiscardAction] = useState(null);
   const thresholdsDirty = Object.keys(thresholdDrafts).length > 0;
   const loadRounds = useCallback(async () => {
     const [config, catalog, session] = await Promise.all([
@@ -47,7 +79,18 @@ export default function AdmissionScores() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [thresholdsDirty]);
-  const canDiscard = () => (!scoresDirty && !thresholdsDirty) || window.confirm("Điểm hồ sơ hoặc điểm ngưỡng ngành đang sửa chưa lưu. Bỏ các thay đổi để tiếp tục?");
+  const runWithDiscardCheck = (action) => {
+    if (!scoresDirty && !thresholdsDirty) {
+      action();
+      return;
+    }
+    const mock = getMockConfirmResult("Điểm hồ sơ hoặc điểm ngưỡng ngành đang sửa chưa lưu. Bỏ các thay đổi để tiếp tục?");
+    if (mock !== null) {
+      if (mock) action();
+      return;
+    }
+    setDiscardAction(() => action);
+  };
   const openForm = (round) => {
     setError(""); setForm(round ? { id: round.id, name: round.name, academicYear: round.academicYear, majorThresholds: round.majorThresholds || [],
       rules: round.rules, regulationNo: round.regulationNo || "", decisionNo: round.decisionNo || undefined, decisionDate: round.decisionDate || undefined }
@@ -87,64 +130,127 @@ export default function AdmissionScores() {
   return <FeatureLayout title="Điểm xét tuyển thạc sĩ" group="Thủ tục đầu vào" hideHeader={false} desc="Chọn đợt xét tuyển toàn viện, nhập điểm ngưỡng từng ngành và điểm hồ sơ để lọc danh sách đạt ngưỡng.">
     <Stack spacing={2}>
       {error && <Alert severity="error">{error}</Alert>}
-      <Paper variant="outlined" sx={{ p: "12px", borderRadius: "10px", borderColor: "#C6D5E1", bgcolor: "#FFF", boxShadow: "0 2px 6px rgba(18,59,98,.07)" }}>
+      <Paper variant="outlined" sx={{ p: "12px", borderRadius: "6px", borderColor: "#C6D5E1", bgcolor: "#FFF", boxShadow: "none" }}>
         <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="flex-end">
           <FilterSelectField label="Đợt xét tuyển toàn viện" value={roundId} disabled={saving || workflowBusy || loading}
-            onChange={(event) => { if (canDiscard()) { setData(null); setThresholdDrafts({}); setMajorFilter("all"); setRoundId(event.target.value); } }} sx={{ width: { xs: "100%", sm: 360 }, maxWidth: "100%" }}>
+            onChange={(event) => { const val = event.target.value; runWithDiscardCheck(() => { setData(null); setThresholdDrafts({}); setMajorFilter("all"); setRoundId(val); }); }} sx={{ width: { xs: "100%", sm: 360 }, maxWidth: "100%" }}>
             <MenuItem value="">Chọn đợt xét tuyển</MenuItem>{rounds.map((round) => <MenuItem key={round.id} value={round.id}>{round.name} · {round.academicYear}</MenuItem>)}
           </FilterSelectField>
-          <Stack direction="row" gap={1} flexWrap="wrap" sx={{ "& .MuiButton-root": { height: 38, whiteSpace: "nowrap" } }}>
-            <Button size="small" variant="outlined" startIcon={<RefreshRounded />} onClick={() => { if (canDiscard()) { setThresholdDrafts({}); loadRanking(); } }} disabled={!roundId || loading || workflowBusy || saving}>Tải lại</Button>
+          <Stack direction="row" gap={1} flexWrap="wrap" sx={{ "& .MuiButton-root": { height: 38, whiteSpace: "nowrap", borderRadius: "4px" } }}>
+            <Button size="small" variant="outlined" startIcon={<RefreshRounded />} onClick={() => runWithDiscardCheck(() => { setThresholdDrafts({}); loadRanking(); })} disabled={!roundId || loading || workflowBusy || saving}>Tải lại</Button>
             {admin && <>
-              <Button size="small" variant="outlined" startIcon={<EditRounded />} disabled={!data || loading || workflowBusy || saving} onClick={() => { if (canDiscard()) openForm(data.round); }}>Sửa đợt</Button>
-              <Button size="small" variant="contained" startIcon={<AddRounded />} disabled={workflowBusy || saving} onClick={() => { if (canDiscard()) openForm(null); }}>Tạo đợt xét tuyển</Button>
+              <Button size="small" variant="outlined" startIcon={<EditRounded />} disabled={!data || loading || workflowBusy || saving} onClick={() => runWithDiscardCheck(() => openForm(data.round))}>Sửa đợt</Button>
+              <Button size="small" variant="contained" startIcon={<AddRounded />} disabled={workflowBusy || saving} onClick={() => runWithDiscardCheck(() => openForm(null))} sx={{ bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F" } }}>Tạo đợt xét tuyển</Button>
             </>}
           </Stack>
         </Stack>
       </Paper>
       {loading && <Box sx={{ textAlign: "center", p: 2 }}><CircularProgress size={28} /></Box>}
-      {!rounds.length && !loading && <Alert severity="info">Tạo đợt xét tuyển chung cho toàn viện, sau đó nhập điểm ngưỡng của từng ngành trong đợt.</Alert>}
+      {!rounds.length && !loading && <Alert severity="info" sx={{ borderRadius: "4px" }}>Tạo đợt xét tuyển chung cho toàn viện, sau đó nhập điểm ngưỡng của từng ngành trong đợt.</Alert>}
       {data && <>
-        <Paper variant="outlined" sx={{ p: 2 }}>
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: "6px", borderColor: "#D7E4EE" }}>
           <Typography fontWeight={700} mb={1}>Điểm ngưỡng từng ngành — {data.round.name}</Typography>
-          <TableContainer><Table size="small"><TableHead><TableRow><TableCell>Ngành</TableCell><TableCell>Chuyên ngành</TableCell><TableCell>Điểm ngưỡng (0–20)</TableCell></TableRow></TableHead><TableBody>
-            {majors.map((major) => <TableRow key={major.id}><TableCell>{major.discipline?.name || "—"}</TableCell><TableCell>{major.name}</TableCell><TableCell>
+          <TableContainer sx={{ border: "1px solid #D7E4EE", borderRadius: "6px" }}><Table size="small"><TableHead><TableRow sx={{ bgcolor: "#EDF4FA", "& th": { fontWeight: 700, color: "#111" } }}><TableCell>Ngành</TableCell><TableCell>Chuyên ngành</TableCell><TableCell>Điểm ngưỡng (0–20)</TableCell></TableRow></TableHead><TableBody>
+            {majors.map((major) => <TableRow key={major.id} hover sx={{ "&:hover": { bgcolor: "#F5FAFE!important" }, "& td": { borderColor: "#E2EBF2" } }}><TableCell>{major.discipline?.name || "—"}</TableCell><TableCell>{major.name}</TableCell><TableCell>
               {admin ? <TextField size="small" type="number" value={thresholdDrafts[major.id] ?? data.round.majorThresholds?.find((entry) => entry.majorId === major.id)?.cutoff ?? ""}
                 disabled={saving || workflowBusy || loading} inputProps={{ min: 0, max: 20, step: 0.01, "aria-label": `Điểm ngưỡng ${major.name}` }}
+                sx={{ width: 90, "& .MuiOutlinedInput-root": { borderRadius: "4px" } }}
                 onChange={(event) => setThresholdDrafts((previous) => { const next = { ...previous }; if (event.target.value === String(data.round.majorThresholds?.find((entry) => entry.majorId === major.id)?.cutoff ?? "")) delete next[major.id]; else next[major.id] = event.target.value; return next; })} />
                 : data.round.majorThresholds?.find((entry) => entry.majorId === major.id)?.cutoff ?? "Chưa nhập"}
             </TableCell></TableRow>)}
           </TableBody></Table></TableContainer>
-          {admin && <Button sx={{ mt: 1 }} variant="contained" disabled={!thresholdsDirty || saving || workflowBusy || loading || scoresDirty} onClick={saveMajorThresholds}>Lưu điểm ngưỡng các ngành</Button>}
-          {thresholdsDirty && <Alert severity="warning" sx={{ mt: 1 }}>Điểm ngưỡng đang sửa chưa lưu.{scoresDirty ? " Lưu điểm hồ sơ trước, sau đó lưu điểm ngưỡng các ngành." : " Lưu điểm ngưỡng trước khi xét tuyển."}</Alert>}
+          {admin && <Button sx={{ mt: 1.5, borderRadius: "4px", bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F" } }} variant="contained" disabled={!thresholdsDirty || saving || workflowBusy || loading || scoresDirty} onClick={saveMajorThresholds}>Lưu điểm ngưỡng các ngành</Button>}
+          {thresholdsDirty && <Alert severity="warning" sx={{ mt: 1, borderRadius: "4px" }}>Điểm ngưỡng đang sửa chưa lưu.{scoresDirty ? " Lưu điểm hồ sơ trước, sau đó lưu điểm ngưỡng các ngành." : " Lưu điểm ngưỡng trước khi xét tuyển."}</Alert>}
         </Paper>
         <Stack direction="row" gap={1} flexWrap="wrap">
-          <Chip label={`Ngành đã nhập ngưỡng: ${(data.round.majorThresholds || []).filter((entry) => entry.cutoff != null).length}`} color="primary" />
-          <Chip label={`Hồ sơ: ${data.rows.length}`} variant="outlined" />
-          <Chip label={`Đạt ngưỡng: ${data.rows.filter((row) => !row.stale && row.meetsCutoff === true).length}`} color="success" variant="outlined" />
-          <Chip label={`Đã duyệt: ${data.admittedCount}`} variant="outlined" />
+          <Chip label={`Ngành đã nhập ngưỡng: ${(data.round.majorThresholds || []).filter((entry) => entry.cutoff != null).length}`} color="primary" sx={{ borderRadius: "4px" }} />
+          <Chip label={`Hồ sơ: ${data.rows.length}`} variant="outlined" sx={{ borderRadius: "4px" }} />
+          <Chip label={`Đạt ngưỡng: ${data.rows.filter((row) => !row.stale && row.meetsCutoff === true).length}`} color="success" variant="outlined" sx={{ borderRadius: "4px" }} />
+          <Chip label={`Đã duyệt: ${data.admittedCount}`} variant="outlined" sx={{ borderRadius: "4px" }} />
         </Stack>
-        <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="center" sx={toolbarSx}>
-          <TextField size="small" label="Tìm họ tên / mã hồ sơ" value={search} onChange={(event) => setSearch(event.target.value)} sx={{ width: { xs: "100%", sm: 320 }, maxWidth: "100%" }} />
-          <TextField select size="small" label="Lọc ngành" value={majorFilter} onChange={(event) => setMajorFilter(event.target.value)} sx={{ width: { xs: "100%", sm: 240 }, maxWidth: "100%" }}>
+        <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="flex-end">
+          <FilterSearchField label="Tìm kiếm" placeholder="Tìm họ tên / mã hồ sơ..." value={search} onChange={(event) => setSearch(event.target.value)} sx={{ width: { xs: "100%", sm: 320 }, maxWidth: "100%" }} />
+          <FilterSelectField label="Lọc ngành" value={majorFilter} onChange={(event) => setMajorFilter(event.target.value)} sx={{ width: { xs: "100%", sm: 240 }, maxWidth: "100%" }}>
             <MenuItem value="all">Tất cả ngành</MenuItem>{majors.map((major) => <MenuItem key={major.id} value={major.id}>{major.name}</MenuItem>)}
-          </TextField>
-          <TextField select size="small" label="Lọc hồ sơ" value={filter} onChange={(event) => setFilter(event.target.value)} sx={{ width: { xs: "100%", sm: 220 }, maxWidth: "100%" }}>
+          </FilterSelectField>
+          <FilterSelectField label="Lọc hồ sơ" value={filter} onChange={(event) => setFilter(event.target.value)} sx={{ width: { xs: "100%", sm: 220 }, maxWidth: "100%" }}>
             {[["all", "Tất cả"], ["eligible", "Đạt ngưỡng"], ["below", "Dưới ngưỡng"], ["unscored", "Chưa nhập điểm"], ["pending", "Chưa duyệt"], ["admitted", "Đã trúng tuyển"]].map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
-          </TextField>
+          </FilterSelectField>
         </Stack>
         <BulkAdmissionWorkflow data={data} visibleRows={rows} paginationKey={`${roundId}:${search}:${filter}:${majorFilter}`} admin={admin} loading={loading || saving} thresholdsDirty={thresholdsDirty} onRefresh={loadRanking} onDirtyChange={setScoresDirty} onBusyChange={setWorkflowBusy} />
       </>}
     </Stack>
-    <Dialog open={Boolean(form)} onClose={() => !saving && setForm(null)} maxWidth="sm" fullWidth>
-      <DialogTitle>{form?.id ? "Sửa đợt xét tuyển toàn viện" : "Tạo đợt xét tuyển toàn viện"}</DialogTitle>
-      <DialogContent>{form && <Stack spacing={2} mt={1}>
-        {error && <Alert severity="error">{error}</Alert>}
-        <TextField size="small" label="Tên đợt xét tuyển" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-        <TextField size="small" label="Năm tuyển sinh" value={form.academicYear} onChange={(event) => setForm({ ...form, academicYear: event.target.value })} />
-        <Typography variant="body2">Đợt áp dụng cho tất cả ngành thạc sĩ trong năm. Nhập điểm ngưỡng từng ngành ở bảng sau khi tạo đợt.</Typography>
-      </Stack>}</DialogContent>
-      <DialogActions><Button onClick={() => setForm(null)} disabled={saving}>Hủy</Button><Button variant="contained" onClick={saveRound} disabled={saving || !form?.name.trim() || !form?.academicYear}>Lưu đợt xét tuyển</Button></DialogActions>
-    </Dialog>
+    <AppDialog
+      open={Boolean(form)}
+      onClose={() => !saving && setForm(null)}
+      maxWidth="xs"
+      PaperProps={{ sx: { width: 480, maxWidth: "calc(100vw - 32px)" } }}
+      title={form?.id ? "SỬA ĐỢT XÉT TUYỂN TOÀN VIỆN" : "TẠO ĐỢT XÉT TUYỂN TOÀN VIỆN"}
+      confirmText={form?.id ? "Lưu thay đổi" : "Lưu đợt xét tuyển"}
+      cancelText="Hủy"
+      onConfirm={saveRound}
+      confirmDisabled={saving || !form?.name?.trim() || !form?.academicYear}
+      saving={saving}
+    >
+      {form && (
+        <Stack spacing={2} sx={{ pt: 0.5 }}>
+          {error && <Alert severity="error" sx={{ borderRadius: "4px" }}>{error}</Alert>}
+          <Box sx={{ p: 2, border: "1px solid #D6E0EA", borderRadius: "4px", bgcolor: "#F8FAFC" }}>
+            <Stack spacing={2}>
+              <Box>
+                <Typography component="label" htmlFor="round-name" sx={compactFieldLabelSx}>
+                  TÊN ĐỢT XÉT TUYỂN
+                </Typography>
+                <TextField
+                  id="round-name"
+                  size="small"
+                  fullWidth
+                  placeholder="Nhập tên đợt (VD: Đợt 1 / 2026)..."
+                  value={form.name}
+                  onChange={(event) => setForm({ ...form, name: event.target.value })}
+                  inputProps={{ "aria-label": "Tên đợt xét tuyển" }}
+                  sx={compactControlSx}
+                />
+              </Box>
+              <Box>
+                <Typography component="label" htmlFor="round-year" sx={compactFieldLabelSx}>
+                  NĂM TUYỂN SINH
+                </Typography>
+                <TextField
+                  id="round-year"
+                  size="small"
+                  fullWidth
+                  placeholder="VD: 2026"
+                  value={form.academicYear}
+                  onChange={(event) => setForm({ ...form, academicYear: event.target.value })}
+                  inputProps={{ "aria-label": "Năm tuyển sinh" }}
+                  sx={compactControlSx}
+                />
+              </Box>
+            </Stack>
+          </Box>
+          <Box sx={{ p: 1.25, bgcolor: "#EFF6FB", border: "1px solid #CDE0F0", borderRadius: "4px", display: "flex", gap: 1.25, alignItems: "flex-start" }}>
+            <InfoOutlined sx={{ fontSize: 18, color: "#0788B8", mt: "1px", flexShrink: 0 }} />
+            <Typography sx={{ fontSize: "12px", color: "#244360", lineHeight: "17px" }}>
+              Đợt áp dụng cho tất cả ngành thạc sĩ trong năm. Nhập điểm ngưỡng từng ngành ở bảng sau khi tạo đợt.
+            </Typography>
+          </Box>
+        </Stack>
+      )}
+    </AppDialog>
+
+    <ConfirmDialog
+      open={Boolean(discardAction)}
+      onClose={() => setDiscardAction(null)}
+      onConfirm={() => {
+        const fn = discardAction;
+        setDiscardAction(null);
+        fn?.();
+      }}
+      title="XÁC NHẬN BỎ THAY ĐỔI"
+      content="Điểm hồ sơ hoặc điểm ngưỡng ngành đang sửa chưa lưu. Bỏ các thay đổi để tiếp tục?"
+      severity="warning"
+      confirmText="Bỏ thay đổi"
+    />
   </FeatureLayout>;
 }

@@ -4,10 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
-  Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
-  DialogTitle, FormControl, IconButton, LinearProgress,
-  MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, TextField, Tooltip, Typography,
+  Alert, Box, Button, Chip, CircularProgress, FormControl, IconButton, LinearProgress,
+  MenuItem, Paper, Select, Stack, TableBody, TableCell, TableContainer,
+  TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
   AddRounded, DeleteRounded, EditRounded, GroupWorkRounded,
@@ -16,8 +15,22 @@ import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
+import AppDialog from "../../components/AppDialog";
+import ConfirmDialog from "../../components/ConfirmDialog";
+import ResizableTable from "../../components/ResizableTable";
 import { disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline } from "../../utils/disciplineScope";
 import { formatGroupName, getAvailableGroupIndexes, validateNameTemplate } from "./createClassGroups.logic";
+
+const CLASS_GROUP_COLUMNS = [
+  { key: "index", label: "STT", width: 64, minWidth: 50, align: "center" },
+  { key: "code", label: "Mã nhóm", width: 150, minWidth: 100 },
+  { key: "major", label: "Ngành học", width: 220, minWidth: 150 },
+  { key: "curriculum", label: "Chương trình đào tạo", width: 260, minWidth: 180 },
+  { key: "year", label: "Năm học", width: 100, minWidth: 80, align: "center" },
+  { key: "students", label: "Sĩ số", width: 160, minWidth: 120 },
+  { key: "status", label: "Trạng thái", width: 120, minWidth: 100, align: "center" },
+  { key: "actions", label: "Thao tác", width: 160, minWidth: 140, align: "center" },
+];
 
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
@@ -49,14 +62,14 @@ const compactFieldLabelSx = {
 const compactControlSx = {
   "& .MuiOutlinedInput-root": {
     height: 40,
-    borderRadius: "6px",
+    borderRadius: "4px",
     backgroundColor: "#fff",
     color: "#1c2936",
     fontSize: "13px",
     fontWeight: 500,
     "& fieldset": { borderColor: "#c5d1db" },
     "&:hover fieldset": { borderColor: "#8fa6b9" },
-    "&.Mui-focused fieldset": { borderColor: "#087eae", borderWidth: "1.5px" },
+    "&.Mui-focused fieldset": { borderColor: "var(--primary, #0788B8)", borderWidth: "1.5px" },
   },
   "& .MuiOutlinedInput-input": {
     height: "auto",
@@ -81,9 +94,9 @@ const compactSectionLabelSx = {
 const compactChipSx = {
   height: 30,
   borderColor: "#bfd0dd",
-  borderRadius: "6px",
+  borderRadius: "4px",
   backgroundColor: "#f7fbfd",
-  color: "#173d70",
+  color: "var(--secondary, #173E75)",
   fontSize: "12px",
   fontWeight: 600,
   "& .MuiChip-label": { px: 1.25 },
@@ -93,7 +106,7 @@ const compactAlertSx = {
   minHeight: 32,
   px: 1.25,
   py: 0.25,
-  borderRadius: "6px",
+  borderRadius: "4px",
   fontSize: "11.5px",
   lineHeight: "17px",
   "& .MuiAlert-icon": { mr: 0.75, py: "5px", fontSize: 18 },
@@ -466,7 +479,7 @@ const CreateClassGroups = () => {
               variant="contained"
               startIcon={<AddRounded />}
               onClick={openAdd}
-              sx={{ height: 40, px: 2, bgcolor: "#0788B8", borderRadius: "8px", boxShadow: "none", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}
+              sx={{ height: 40, px: 2, bgcolor: "#0788B8", borderRadius: "4px", boxShadow: "none", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}
             >
               Thêm nhóm mới
             </Button>
@@ -482,24 +495,16 @@ const CreateClassGroups = () => {
         variant="outlined"
         sx={{
           borderColor: "#D7E4EE",
-          borderRadius: "12px",
-          overflow: "hidden",
-          boxShadow: "0 5px 18px rgba(23, 62, 117, 0.06)",
+          borderRadius: "6px",
+          overflow: "auto",
+          boxShadow: "0 2px 8px rgba(23, 62, 117, 0.04)",
         }}
       >
-        <Table size="small">
-          <TableHead>
-            <TableRow sx={{ bgcolor: "#EDF4FA", "& th": { color: "#111111", py: 1.25, borderColor: "#D7E4EE" } }}>
-              <TableCell align="center" sx={{ width: 64, fontWeight: 700 }}>STT</TableCell>
-              <TableCell sx={{ fontWeight: 700, width: 140 }}>Mã nhóm</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Ngành học</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Chương trình đào tạo</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 700, width: 90 }}>Năm học</TableCell>
-              <TableCell sx={{ fontWeight: 700, width: 150 }}>Sĩ số</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 700, width: 110 }}>Trạng thái</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 700, width: 170 }}>Thao tác</TableCell>
-            </TableRow>
-          </TableHead>
+        <ResizableTable
+          columns={CLASS_GROUP_COLUMNS}
+          storageKey="create-class-groups-table-widths"
+          aria-label="Danh sách nhóm học phần"
+        >
           <TableBody>
             {loading ? (
               <TableRow>
@@ -599,35 +604,45 @@ const CreateClassGroups = () => {
               })
             )}
           </TableBody>
-        </Table>
+        </ResizableTable>
       </TableContainer>
 
       {/* Add / Edit Dialog */}
-      <Dialog
+      <AppDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         maxWidth="md"
         fullWidth
+        title={editingId ? "CHỈNH SỬA NHÓM HỌC VIÊN" : "THÊM NHÓM HỌC VIÊN MỚI"}
         PaperProps={{
           sx: {
             width: 640,
             maxWidth: "calc(100vw - 32px)",
-            border: "1px solid #cfdbe4",
-            borderRadius: "8px",
-            boxShadow: "0 8px 24px rgba(23, 61, 112, 0.14)",
-            fontFamily: '"Inter", "Segoe UI", sans-serif',
-            "& .MuiTypography-root, & .MuiButton-root, & .MuiInputBase-root, & .MuiChip-root": {
-              fontFamily: '"Inter", "Segoe UI", sans-serif!important',
-            },
           },
         }}
+        actions={
+          <>
+            <Button onClick={() => setDialogOpen(false)} color="inherit" sx={{ minHeight: 36, px: 2, py: 0.75, border: "1px solid #c5d1db", borderRadius: "4px", color: "#435b72", fontSize: "12.5px", fontWeight: 600 }}>Hủy</Button>
+            <Button
+              variant="contained"
+              onClick={handleSave}
+              disabled={saving || (editingId ? (!form.code?.trim() || !form.curriculumId) : (
+                !form.majorId
+                || !form.curriculumId
+                || Number(form.count) < 1
+                || Number(form.count) > 10
+                || Boolean(nameTemplateError)
+                || Boolean(dialogScopeError)
+                || dialogScopeLoading
+              ))}
+              sx={{ minHeight: 36, px: 2, py: 0.75, borderRadius: "4px", bgcolor: "#0788B8", boxShadow: "none", fontSize: "12.5px", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}
+            >
+              {saving ? "Đang lưu..." : editingId ? "Lưu nhóm" : `Tạo ${form.count || 0} nhóm`}
+            </Button>
+          </>
+        }
       >
-        <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2.5, py: 1.75, color: "#173d70", fontSize: "17px", fontWeight: 700, lineHeight: "23px", borderBottom: "1px solid #e1e8ee" }}>
-          <span>{editingId ? "CHỈNH SỬA NHÓM HỌC VIÊN" : "THÊM NHÓM HỌC VIÊN MỚI"}</span>
-          <IconButton aria-label="Đóng" size="small" onClick={() => setDialogOpen(false)} sx={{ width: 30, height: 30, color: "#526a7d", fontSize: 20 }}>×</IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ px: 2.5, py: 2 }}>
-          {editingId ? (
+        {editingId ? (
             <Stack spacing="14px">
               <Box sx={{ p: 1.75, border: "1px solid #d7e1e8", borderRadius: "8px", backgroundColor: "#fbfcfd" }}>
                 <Stack spacing="13px">
@@ -975,67 +990,27 @@ const CreateClassGroups = () => {
               </Box>
             </Stack>
           )}
-        </DialogContent>
-        <DialogActions sx={{ px: 2.5, py: 1.5, gap: 1.25, minHeight: 60, borderTop: "1px solid #e1e8ee" }}>
-          <Button onClick={() => setDialogOpen(false)} color="inherit" sx={{ minHeight: 36, px: 2, py: 0.75, border: "1px solid #c5d1db", borderRadius: "6px", color: "#435b72", fontSize: "12.5px", fontWeight: 600 }}>Hủy</Button>
-          <Button
-            variant="contained"
-            onClick={handleSave}
-            disabled={saving || (editingId ? (!form.code?.trim() || !form.curriculumId) : (
-              !form.majorId
-              || !form.curriculumId
-              || Number(form.count) < 1
-              || Number(form.count) > 10
-              || Boolean(nameTemplateError)
-              || Boolean(dialogScopeError)
-              || dialogScopeLoading
-            ))}
-            sx={{ minHeight: 36, px: 2, py: 0.75, borderRadius: "6px", backgroundColor: "#087eae", boxShadow: "none", fontSize: "12.5px", fontWeight: 700, "&:hover": { backgroundColor: "#066e99", boxShadow: "none" } }}
-          >
-            {saving ? "Đang lưu..." : editingId ? "Lưu nhóm" : `Tạo ${form.count || 0} nhóm`}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      </AppDialog>
 
       {/* Delete Dialog */}
-      <Dialog
+      <ConfirmDialog
         open={Boolean(deletingGroup)}
         onClose={() => setDeletingGroup(null)}
-        maxWidth="xs"
-        fullWidth
-        PaperProps={{
-          sx: {
-            border: "1px solid #cfdbe4",
-            borderRadius: "8px",
-            boxShadow: "0 8px 24px rgba(23, 61, 112, 0.14)",
-            fontFamily: '"Inter", "Segoe UI", sans-serif',
-            "& .MuiTypography-root, & .MuiButton-root": {
-              fontFamily: '"Inter", "Segoe UI", sans-serif!important',
-            },
-          },
-        }}
+        onConfirm={handleDelete}
+        title="XÁC NHẬN XÓA"
+        severity="error"
+        confirmText={saving ? "Đang xóa..." : "Xóa"}
+        confirmDisabled={saving}
       >
-        <DialogTitle sx={{ px: 2.5, py: 1.75, color: "#173d70", fontSize: "16px", fontWeight: 700, borderBottom: "1px solid #e1e8ee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span>Xác nhận xóa</span>
-          <IconButton aria-label="Đóng" size="small" onClick={() => setDeletingGroup(null)} sx={{ width: 30, height: 30, color: "#526a7d", fontSize: 20 }}>×</IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ px: 2.5, py: 2 }}>
-          <Typography sx={{ fontSize: "13.5px", color: "#1c2936" }}>
-            Bạn có chắc muốn xóa nhóm <strong>{deletingGroup?.name}</strong> (Mã: <strong>{deletingGroup?.code}</strong>) không?
-          </Typography>
-          {deletingGroup?.memberCount > 0 && (
-            <Alert severity="warning" sx={{ mt: 1.5, borderRadius: "6px" }}>
-              Nhóm này đang có <strong>{deletingGroup?.memberCount}</strong> học viên. Các học viên sẽ được đưa về trạng thái chưa phân nhóm.
-            </Alert>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 2.5, py: 1.5, gap: 1.25, minHeight: 60, borderTop: "1px solid #e1e8ee" }}>
-          <Button onClick={() => setDeletingGroup(null)} color="inherit" sx={{ minHeight: 36, px: 2, py: 0.75, border: "1px solid #c5d1db", borderRadius: "6px", color: "#435b72", fontSize: "12.5px", fontWeight: 600 }}>Hủy</Button>
-          <Button variant="contained" color="error" onClick={handleDelete} disabled={saving} sx={{ minHeight: 36, px: 2, py: 0.75, borderRadius: "6px", boxShadow: "none", fontSize: "12.5px", fontWeight: 700 }}>
-            {saving ? "Đang xóa..." : "Xóa"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        <Typography sx={{ fontSize: "13.5px", color: "#1c2936" }}>
+          Bạn có chắc muốn xóa nhóm <strong>{deletingGroup?.name}</strong> (Mã: <strong>{deletingGroup?.code}</strong>) không?
+        </Typography>
+        {deletingGroup?.memberCount > 0 && (
+          <Alert severity="warning" sx={{ mt: 1.5, borderRadius: "4px" }}>
+            Nhóm này đang có <strong>{deletingGroup?.memberCount}</strong> học viên. Các học viên sẽ được đưa về trạng thái chưa phân nhóm.
+          </Alert>
+        )}
+      </ConfirmDialog>
     
 
   </FeatureLayout>
