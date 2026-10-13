@@ -63,10 +63,11 @@ export class ClassScoreSummaryService {
     });
     if (!group) throw new NotFoundException("Không tìm thấy lớp học viên.");
     const subjects = group.curriculumId ? await this.sequelize.query<any>(`
-      SELECT s.id, s.code, s.name, cs.credits, cs.is_required AS "isRequired", b.name AS "blockName"
+      SELECT s.id, COALESCE(NULLIF(s.code_text, ''), s.code) AS code, s.name, s.credits, s.is_required AS "isRequired", COALESCE(catalog_block.name, b.name) AS "blockName"
       FROM curriculum_subjects cs
       JOIN subjects s ON s.id = cs.subject_id
       JOIN curriculum_blocks b ON b.id = cs.block_id
+      LEFT JOIN curriculum_blocks catalog_block ON catalog_block.curriculum_id = cs.curriculum_id AND catalog_block.code = s.subject_type
       WHERE cs.curriculum_id = :curriculumId
       ORDER BY b.sort_order, cs.sort_order, s.sort_order, s.code, s.id
     `, { type: QueryTypes.SELECT, replacements: { curriculumId: group.curriculumId } }) : [];
@@ -115,55 +116,28 @@ export class ClassScoreSummaryService {
 
     const rows: any[] = roster.rows.map((row: any) => ({ ...row, scores: {} }));
     if (subjects.length && rows.length) {
-      // Preserve the summary's latest saved total. The scorecard also shows component-only entries when no total exists.
+      // The latest saved exam row is authoritative, even when its result is pending or its score is empty.
       // Match aliases by their canonical subject, never by a coincidentally equal name.
       const scores = await this.sequelize.query<any>(`
         WITH candidates AS (
-          SELECT g.value->>'participantId' AS participant_id, co.subject_id,
+          SELECT CASE WHEN identity.student_id IS NOT NULL THEN 'student:' || identity.student_id::text ELSE g.value->>'participantId' END AS participant_id, co.subject_id,
             NULLIF(g.value->>'courseScore', '')::numeric AS score,
-            CASE WHEN g.value->>'examExempt' = 'true' THEN 'exempt'
-              ELSE COALESCE(g.value->>'result', 'pending') END AS result,
-            book.updated_at AS recorded_at, book.id, 1 AS priority,
+            COALESCE(g.value->>'result', 'pending') AS result,
+            book.updated_at AS recorded_at, book.id,
             g.value || jsonb_build_object('source', 'gradebook') AS details
           FROM course_exam_gradebooks book
           JOIN course_offerings co ON co.id = book.course_offering_id
           CROSS JOIN LATERAL jsonb_array_elements(book.grades) g(value)
-          WHERE book.class_group_id = :groupId AND g.value->>'participantId' IN (:participantIds)
-            AND EXISTS (SELECT 1 FROM course_offering_class_groups link
-              WHERE link.course_offering_id = co.id AND link.class_group_id = :groupId)
-          UNION ALL
-          SELECT CASE WHEN ar.student_id IS NOT NULL THEN 'student:' || ar.student_id::text
-              ELSE 'admission:' || ar.id::text END,
-            r.subject_id, r.score, r.result, r.updated_at, r.id, 0,
-            jsonb_build_object('courseScore', r.score, 'source', 'individual')
-          FROM learner_subject_results r JOIN admission_records ar ON ar.id = r.admission_record_id
-          WHERE r.status = 'completed' AND r.subject_id IS NOT NULL
-            AND (CASE WHEN ar.student_id IS NOT NULL THEN 'student:' || ar.student_id::text
-              ELSE 'admission:' || ar.id::text END) IN (:participantIds)
-          UNION ALL
-          SELECT CASE WHEN ar.student_id IS NOT NULL THEN 'student:' || ar.student_id::text
-              ELSE 'admission:' || ar.id::text END,
-            recognition.target_subject_id, r.score, r.result, recognition.updated_at, recognition.id, 0,
-            jsonb_build_object('courseScore', r.score, 'source', 'recognition')
-          FROM subject_recognitions recognition
-          JOIN learner_subject_results r ON r.id = recognition.learning_result_id
-          JOIN admission_records ar ON ar.id = recognition.admission_record_id
-          WHERE recognition.status = 'approved' AND r.status = 'completed' AND r.result IN ('passed', 'exempt')
-            AND (CASE WHEN ar.student_id IS NOT NULL THEN 'student:' || ar.student_id::text
-              ELSE 'admission:' || ar.id::text END) IN (:participantIds)
+          LEFT JOIN admission_records identity ON g.value->>'participantId' = 'admission:' || identity.id::text
+          WHERE g.value->>'participantId' IN (:participantIds)
+            OR ('student:' || identity.student_id::text) IN (:participantIds)
         ), ranked AS (
           SELECT c.participant_id AS "participantId", target.id AS "subjectId", c.score, c.result, c.details,
             ROW_NUMBER() OVER (PARTITION BY c.participant_id, target.id
-              ORDER BY (c.score IS NOT NULL OR c.result = 'exempt') DESC, c.recorded_at DESC, c.priority DESC, c.id DESC) AS rank
+              ORDER BY c.recorded_at DESC, c.id DESC) AS rank
           FROM candidates c JOIN subjects source ON source.id = c.subject_id
           JOIN subjects target ON COALESCE(target.canonical_subject_id, target.id) = COALESCE(source.canonical_subject_id, source.id)
-          WHERE target.id IN (:subjectIds) AND (c.score IS NOT NULL OR c.result = 'exempt'
-            OR (:includeDetails AND (
-              NULLIF(c.details->>'testScore', '') IS NOT NULL OR NULLIF(c.details->>'assignmentScore', '') IS NOT NULL
-              OR NULLIF(c.details->>'examScore', '') IS NOT NULL OR NULLIF(c.details->>'grade4', '') IS NOT NULL
-              OR NULLIF(c.details->>'letterGrade', '') IS NOT NULL
-              OR CASE WHEN jsonb_typeof(c.details->'attemptScores') = 'array' THEN jsonb_array_length(c.details->'attemptScores') ELSE 0 END > 0
-            )))
+          WHERE target.id IN (:subjectIds)
         )
         SELECT "participantId", "subjectId", score, result, details FROM ranked WHERE rank = 1
       `, { type: QueryTypes.SELECT, replacements: {
@@ -176,7 +150,10 @@ export class ClassScoreSummaryService {
           ...(scope.includeDetails ? { details: entry.details } : {}) };
       }
     }
-    return { group, curriculum: group.curriculum, subjects, rows, total: roster.total, page: roster.page, pageSize,
-      scorePolicy: "Điểm học phần đã lưu gần nhất; gồm kết quả cá nhân đã hoàn thành. Ô trống: chưa có điểm; MT: miễn thi." };
+    const storedCurriculum = typeof group.curriculum?.toJSON === "function" ? group.curriculum.toJSON() : group.curriculum;
+    const curriculum = storedCurriculum ? { ...storedCurriculum, totalCredits: subjects.reduce((total: number, subject: any) => total + Number(subject.credits || 0), 0) } : null;
+    const plainGroup = typeof group.toJSON === "function" ? group.toJSON() : group;
+    return { group: { ...plainGroup, curriculum }, curriculum, subjects, rows, total: roster.total, page: roster.page, pageSize,
+      scorePolicy: "Điểm và kết quả lấy nguyên trạng từ danh sách thi, điểm thi đã lưu gần nhất. Ô trống: chưa có điểm; MT: miễn thi." };
   }
 }

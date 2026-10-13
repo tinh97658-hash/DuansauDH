@@ -70,7 +70,7 @@ export class CurriculumService {
       where,
       include: [
         { model: Major, as: "major", attributes: ["id", "name"] },
-        { model: CurriculumSubject, as: "subjectEntries", attributes: ["id", "isRequired", "credits"] },
+        { model: CurriculumSubject, as: "subjectEntries", attributes: ["id", "isRequired", "credits"], include: [SUBJECT_INCLUDE] },
       ],
       order: [["applicableFromYear", "DESC"], ["code", "ASC"]],
     });
@@ -93,6 +93,7 @@ export class CurriculumService {
       const plain = typeof item.get === "function" ? item.get({ plain: true }) : item;
       return {
         ...plain,
+        totalCredits: (plain.subjectEntries || []).reduce((total: number, entry: any) => total + (Number(entry.subject?.credits ?? entry.credits) || 0), 0),
         classGroups: classesByCurriculum.get(item.id) || [],
       };
     });
@@ -176,7 +177,7 @@ export class CurriculumService {
           code: plain.subject?.codeText || plain.subject?.code || "",
           codeNumber: plain.subject?.codeNumber ?? 0,
           name: plain.subject?.name || "",
-          credits: Number(plain.credits) || 0,
+          credits: Number(plain.subject?.credits ?? plain.credits) || 0,
           isRequired,
           active: plain.subject?.active !== false,
           blockId: plain.blockId,
@@ -200,7 +201,7 @@ export class CurriculumService {
 
       return {
         classGroup: { id: classGroup.id, code: classGroup.code, name: classGroup.name, academicYear: classGroup.academicYear },
-        curriculum: { id: curriculum.id, code: curriculum.code, name: curriculum.name, totalCredits: curriculum.totalCredits },
+        curriculum: { id: curriculum.id, code: curriculum.code, name: curriculum.name, totalCredits: requiredCredits + selectedElectiveCredits },
         blocks: blocks.map((block) => ({
           id: block.id,
           code: block.code,
@@ -580,13 +581,13 @@ export class CurriculumService {
     const fallbackBlock = blocks.values().next().value as CurriculumBlock;
     const payload = entries.map((entry, index) => {
       const subject = subjectById.get(entry.subjectId)!;
-      const blockCode = String(entry.blockCode || "").trim().toUpperCase();
+      const blockCode = String(subject.subjectType || entry.blockCode || "").trim().toUpperCase();
       const block = (blockCode ? blocks.get(blockCode) : undefined) || fallbackBlock;
       if (!block) throw new BadRequestException("Chương trình đào tạo chưa có khối kiến thức phù hợp.");
       const groupCode = String(entry.electiveGroupCode || "").trim().toUpperCase();
       const group = groupCode ? groups.get(groupCode) : undefined;
       if (groupCode && !group) throw new BadRequestException(`Nhóm tự chọn "${groupCode}" không tồn tại trong chương trình đào tạo.`);
-      const isRequired = entry.isRequired ?? subject.isRequired !== false;
+      const isRequired = subject.isRequired ?? entry.isRequired ?? true;
       if (isRequired && group) throw new BadRequestException("Học phần bắt buộc không được xếp vào nhóm tự chọn.");
       return {
         curriculumId,
@@ -594,7 +595,7 @@ export class CurriculumService {
         electiveGroupId: isRequired ? null : group?.id ?? null,
         subjectId: entry.subjectId,
         isRequired,
-        credits: entry.credits ?? (Number(subject.credits) || 0),
+        credits: Number(subject.credits) || 0,
         sortOrder: entry.sortOrder ?? index + 1,
       };
     });
@@ -624,8 +625,8 @@ export class CurriculumService {
   }
 
   private async recomputeTotalCredits(curriculumId: string, transaction: Transaction) {
-    const rows = await this.entries.findAll({ where: { curriculumId }, transaction });
-    const totalCredits = rows.reduce((total, row) => total + (Number(row.credits) || 0), 0);
+    const rows = await this.entries.findAll({ where: { curriculumId }, include: [SUBJECT_INCLUDE], transaction });
+    const totalCredits = rows.reduce((total, row) => total + (Number(row.subject?.credits ?? row.credits) || 0), 0);
     await this.curriculums.update({ totalCredits } as never, { where: { id: curriculumId }, transaction });
   }
 
@@ -638,10 +639,12 @@ export class CurriculumService {
         subjectId: entry.subjectId,
         code: subject.codeText || subject.code || "",
         name: subject.name || "",
-        credits: Number(entry.credits) || 0,
-        isRequired: Boolean(entry.isRequired),
+        credits: Number(subject.credits ?? entry.credits) || 0,
+        isRequired: Boolean(subject.isRequired ?? entry.isRequired),
+        active: subject.active !== false,
+        majorAssignment: Boolean(subject.majorAssignment),
         blockId: entry.blockId,
-        blockCode: (value.blocks || []).find((block: any) => block.id === entry.blockId)?.code || "",
+        blockCode: subject.subjectType || (value.blocks || []).find((block: any) => block.id === entry.blockId)?.code || "",
         electiveGroupId: entry.electiveGroupId ?? null,
         electiveGroupCode: (value.electiveGroups || []).find((group: any) => group.id === entry.electiveGroupId)?.code || "",
         sortOrder: entry.sortOrder,
@@ -649,6 +652,7 @@ export class CurriculumService {
     });
     const requiredCredits = entries.filter((entry: any) => entry.isRequired).reduce((total: number, entry: any) => total + entry.credits, 0);
     const selectedElectiveCredits = (value.electiveGroups || []).reduce((total: number, group: any) => total + (Number(group.minCredits) || 0), 0);
+    const totalCredits = entries.reduce((total: number, entry: any) => total + entry.credits, 0);
     return {
       id: value.id,
       code: value.code,
@@ -659,12 +663,12 @@ export class CurriculumService {
       applicableFromYear: value.applicableFromYear,
       active: value.active,
       note: value.note,
-      totalCredits: value.totalCredits,
+      totalCredits,
       blocks: value.blocks || [],
       electiveGroups: value.electiveGroups || [],
       classGroups: value.classGroups || [],
       subjects: entries,
-      totals: { requiredCredits, selectedElectiveCredits, totalCredits: value.totalCredits },
+      totals: { requiredCredits, selectedElectiveCredits, totalCredits },
     };
   }
 

@@ -58,8 +58,8 @@ it.each([4, 40])("writes an actual single-sheet workbook with %i students and bo
   expect(sheet.rowCount).toBe(GRADEBOOK_HEADER_ROW + count);
   expect(sheet.getCell(`B${9 + count}`).value).toBe(`HV${count}`);
   expect(sheet.getCell("E10").value).toBe("02/01/1990");
-  expect(sheet.getCell("I10").value).toBe("0"); expect(sheet.getCell("L10").value).toBe("8,5");
-  expect(sheet.getCell("O10").value).toBe("0; 8");
+  expect(sheet.getCell("I10").value).toBe("0.0"); expect(sheet.getCell("L10").value).toBe("8.5");
+  expect(sheet.getCell("O10").value).toBe("8.0");
   for (let column = 1; column <= 16; column++) {
     const header = sheet.getCell(9, column);
     expect(header.font).toMatchObject({ name: "Times New Roman", bold: true, color: { argb: "FF000000" } });
@@ -105,10 +105,11 @@ it("uses the business timezone and sanitizes filename components", () => {
   expect(gradebookFilename(group, offering, "DS-thi")).toBe("DS-thi-CNTT-2026-HP-01.xlsx");
 });
 
-it("prints the existing nine-column exam data with the schedule Excel format", async () => {
+it("prints ten exam columns including notes with the schedule Excel format", async () => {
   const rows = roster(40).map(draftOf);
   rows[0].code = "=HV-2026-001";
   rows[0].courseScore = "8,5";
+  rows[0].notes = "Miễn thi theo quyết định";
   const before = JSON.stringify(rows);
   const document = buildExamListDocument(group, offering, rows);
   const sheet = (await load(document, createExamListExcel)).worksheets[0];
@@ -120,14 +121,14 @@ it("prints the existing nine-column exam data with the schedule Excel format", a
   expect(sheet.getRow(2).values).toContain(`Lớp: ${group.name}`);
   expect(sheet.getCell("A3").value).toBe(`Học phần: ${offering.subject.name}`);
   expect(sheet.getRow(EXAM_LIST_HEADER_ROW).values.slice(1)).toEqual(gradebookColumns(true).map(column => column.label));
-  expect(sheet.columnCount).toBe(9);
+  expect(sheet.columnCount).toBe(10);
   expect(sheet.rowCount).toBe(EXAM_LIST_HEADER_ROW + rows.length);
   expect(sheet.getCell("B5").value).toBe(rows[0].code);
   expect(sheet.getCell("B5").type).toBe(ExcelJS.ValueType.String);
   expect(sheet.getCell("E5").value).toBe("02/01/1990");
   expect(sheet.getCell("G5").value).toBe("Chưa xét");
   expect(sheet.getCell("H6").value).toBe("Có");
-  expect(sheet.getCell("I5").value).toBe("");
+  expect(sheet.getCell("I5").value).toBe("Đạt");
   expect(sheet.getCell("B44").value).toBe("HV40");
   expect(sheet.getCell("B5").alignment.wrapText).not.toBe(true);
   expect(sheet.getCell("B5").alignment.shrinkToFit).toBe(true);
@@ -144,10 +145,12 @@ it("prints the existing nine-column exam data with the schedule Excel format", a
     expect(sheet.getCell(5, column).isMerged).toBe(false);
   }
   expect(sheet.pageSetup).toMatchObject({ paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0,
-    printTitlesRow: "4:4", printArea: "A1:I44", margins: schedule.pageSetup.margins });
+    printTitlesRow: "4:4", printArea: "A1:J44", margins: schedule.pageSetup.margins });
   expect(sheet.views[0]).toMatchObject({ state: "frozen", ySplit: 4, showGridLines: true });
-  expect(sheet.autoFilter).toBe("A4:I44");
-  expect(sheet.getCell("J4").value).toBeNull();
+  expect(sheet.autoFilter).toBe("A4:J44");
+  expect(sheet.getCell("J4").value).toBe("Ghi chú");
+  expect(sheet.getCell("J5").value).toBe(rows[0].notes);
+  expect(sheet.getCell("K4").value).toBeNull();
   expect(JSON.stringify(sheet.model)).not.toContain("8,5");
   expect(JSON.stringify(rows)).toBe(before);
 });

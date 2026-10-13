@@ -201,6 +201,21 @@ export class PlanService {
       }
       await subject.update(payload, { transaction });
 
+      if (dto.credits !== undefined) {
+        await this.curriculumEntries.update(
+          { credits: dto.credits }, { where: { subjectId: id }, transaction },
+        );
+        await this.sequelize.query(
+          `UPDATE curriculums AS c
+           SET total_credits = (
+             SELECT COALESCE(SUM(s.credits), 0) FROM curriculum_subjects cs
+             JOIN subjects s ON s.id = cs.subject_id WHERE cs.curriculum_id = c.id
+           ), updated_at = NOW()
+           WHERE EXISTS (SELECT 1 FROM curriculum_subjects cs WHERE cs.curriculum_id = c.id AND cs.subject_id = :subjectId)`,
+          { replacements: { subjectId: id }, transaction },
+        );
+      }
+
       // Curriculum entries store a snapshot of the required/elective flag.
       // Keep that snapshot aligned with the catalog, which is the UI's source
       // of truth for this property.

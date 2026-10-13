@@ -132,6 +132,9 @@ export class PlanController {
   @Get("admission-records/:id/learning-results")
   learningResults(@Param("id") id: string) { return this.recognitions.listLearningResults(id); }
 
+  @Get("admission-records/:id/studied-subjects")
+  studiedSubjects(@Param("id") id: string) { return this.recognitions.listStudiedSubjects(id); }
+
   @Post("admission-records/:id/learning-results")
   @Roles("admin") @UseGuards(RolesGuard)
   createLearningResult(@Param("id") id: string, @Body() dto: CreateLearningResultDto) {

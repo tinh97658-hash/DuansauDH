@@ -1,14 +1,15 @@
 import AdmissionEvaluationPanel from "../../features/admission/AdmissionEvaluationPanel";
 import AdmissionTuitionCheckbox from "../../features/admission/AdmissionTuitionCheckbox";
 import LearnerScorecard from "../../features/learners/LearnerScorecard";
+import { RESULT_LABELS } from "../../features/exams/gradebook";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
-  Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions,
-  DialogContent, DialogTitle, Divider, FormControlLabel,
+  Box, Button, Checkbox, Chip, CircularProgress,
+  Divider, FormControlLabel,
   IconButton, MenuItem, Paper, Select,
   Stack, TextField, Tooltip, Typography, Tabs, Tab,
 } from "@mui/material";
@@ -31,6 +32,7 @@ import { buildAdmissionDocument } from "../../features/admission/admissionDocume
 import AppDialog from "../../components/AppDialog";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { getMockConfirmResult } from "../../utils/confirmHelper";
+import { useSubjectCatalogRevision } from "../../utils/subjectCatalog";
 import { downloadAdmissionWord, openAdmissionPreview } from "../../features/admission/admissionDocumentExport";
 
 const DOCUMENT_ITEMS = [
@@ -283,6 +285,7 @@ const mapRecordToFormState = (data, majorList = []) => {
 };
 
 const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
+  const catalogRevision = useSubjectCatalogRevision();
   const { id } = useParams();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
@@ -342,7 +345,13 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
 
   // ===== Kết quả học phần cá nhân (tiền thạc sĩ / học trước / chính khóa) =====
   const [learningResults, setLearningResults] = useState([]);
+  const [studiedSubjects, setStudiedSubjects] = useState([]);
   const [recognitions, setRecognitions] = useState([]);
+  const displayedRecognitions = recognitions.filter((row) => {
+    const learning = row.learningResult || learningResults.find((result) => result.id === row.learningResultId);
+    return Boolean(learning?.bridgeKnowledgeSubjectId || learning?.bridgeKnowledgeSubject)
+      || ["pre_masters", "early_enrollment"].includes(learning?.sourceType || row.sourceType);
+  });
   const [recognizedCredits, setRecognizedCredits] = useState(0);
   const [subjects, setSubjects] = useState([]);
   const [bridgeSubjects, setBridgeSubjects] = useState([]);
@@ -389,7 +398,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [resRec, resMajors, resTransfers, resResults, resRecognitions, resCredits, resBridge] = await Promise.all([
+      const [resRec, resMajors, resTransfers, resResults, resRecognitions, resCredits, resBridge, resStudied] = await Promise.all([
         axios.get(`${API_BASE_URL}/plan/admission-records/${id}`, { withCredentials: true }),
         axios.get(`${API_BASE_URL}/system/majors`, { withCredentials: true }),
         axios.get(`${API_BASE_URL}/plan/admission-records/${id}/major-transfers`, { withCredentials: true }),
@@ -397,6 +406,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
         axios.get(`${API_BASE_URL}/plan/admission-records/${id}/subject-recognitions`, { withCredentials: true }),
         axios.get(`${API_BASE_URL}/plan/admission-records/${id}/recognized-credits`, { withCredentials: true }),
         axios.get(`${API_BASE_URL}/system/bridge-knowledge`, { withCredentials: true }),
+        axios.get(`${API_BASE_URL}/plan/admission-records/${id}/studied-subjects`, { withCredentials: true }),
       ]);
 
       const data = resRec.data;
@@ -405,6 +415,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
       setMajors(majorList);
       setTransferHistory(Array.isArray(resTransfers.data) ? resTransfers.data : []);
       setLearningResults(Array.isArray(resResults.data) ? resResults.data : []);
+      setStudiedSubjects(Array.isArray(resStudied.data) ? resStudied.data : []);
       setRecognitions(Array.isArray(resRecognitions.data) ? resRecognitions.data : []);
       setRecognizedCredits(Number(resCredits.data?.credits ?? resCredits.data ?? 0) || 0);
       setBridgeSubjects(Array.isArray(resBridge.data) ? resBridge.data : []);
@@ -610,16 +621,23 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
     setLearningOpen(true);
   };
 
-  const reloadRecognitionData = async () => {
-    const [resResults, resRecognitions, resCredits] = await Promise.all([
+  const reloadRecognitionData = useCallback(async () => {
+    const [resResults, resRecognitions, resCredits, resStudied] = await Promise.all([
       axios.get(`${API_BASE_URL}/plan/admission-records/${id}/learning-results`, { withCredentials: true }),
       axios.get(`${API_BASE_URL}/plan/admission-records/${id}/subject-recognitions`, { withCredentials: true }),
       axios.get(`${API_BASE_URL}/plan/admission-records/${id}/recognized-credits`, { withCredentials: true }),
+      axios.get(`${API_BASE_URL}/plan/admission-records/${id}/studied-subjects`, { withCredentials: true }),
     ]);
     setLearningResults(Array.isArray(resResults.data) ? resResults.data : []);
+    setStudiedSubjects(Array.isArray(resStudied.data) ? resStudied.data : []);
     setRecognitions(Array.isArray(resRecognitions.data) ? resRecognitions.data : []);
     setRecognizedCredits(Number(resCredits.data?.credits ?? resCredits.data ?? 0) || 0);
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (!catalogRevision) return;
+    reloadRecognitionData().catch(() => toast.error("Không thể làm mới học phần và tín chỉ đã học."));
+  }, [catalogRevision, reloadRecognitionData]);
 
   const submitLearningResult = async () => {
     if (!learningForm) return;
@@ -1005,7 +1023,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
             <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1} sx={{ mb: 1 }}>
               <Typography sx={{ ...sectionTitleSx, mb: 0 }}>
                 <MenuBookRounded sx={{ color: "#0788B8", fontSize: 20 }} />
-                Kết quả học phần cá nhân & công nhận ({learningResults.length})
+                Học phần đã học trong chương trình đào tạo ({studiedSubjects.length})
               </Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap">
                 <Chip size="small" color="success" variant="outlined" label={`Đã công nhận: ${recognizedCredits} tín chỉ`} />
@@ -1018,28 +1036,28 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
               </Stack>
             </Stack>
             <Typography sx={{ fontSize: 12, color: "#64748B", mb: 1.5 }}>
-              Ghi nhận mọi lần học (tiền thạc sĩ, học trước, chính khóa, học bổ sung kiến thức). Chỉ học phần
-              <strong> đã hoàn thành và đạt</strong> mới được công nhận; mới đăng ký hoặc đang học chỉ được kế thừa đăng ký, chưa tính tín chỉ.
-              Học bổ sung kiến thức chỉ được công nhận khi danh mục đã khai báo tương đương với một học phần CTĐT.
+              Hiển thị các học phần đã có kết quả Đạt hoặc Không đạt thuộc chương trình đào tạo hiện tại,
+              gồm kết quả chính khóa và kết quả học trước, tiền thạc sĩ, bổ sung kiến thức được đối chiếu vào chương trình.
+              Quyết định công nhận bên dưới chỉ gồm học trước, tiền thạc sĩ và học bổ sung kiến thức.
             </Typography>
 
-            {learningResults.length === 0 ? (
-              <Typography sx={{ fontSize: 13, color: "#64748B" }}>Học viên chưa có kết quả học phần cá nhân nào.</Typography>
+            {studiedSubjects.length === 0 ? (
+              <Typography sx={{ fontSize: 13, color: "#64748B" }}>Học viên chưa có học phần đã học có kết quả trong chương trình đào tạo.</Typography>
             ) : (
               <Box sx={{ overflowX: "auto" }}>
-                <Box sx={{ display: "grid", gridTemplateColumns: "minmax(0,2.4fr) 1.1fr 1fr 0.8fr 0.8fr auto", gap: 1, minWidth: 860 }}>
-                  {["Học phần", "Nguồn học", "Trạng thái", "Điểm", "Kết quả", ""].map((header) => (
+                <Box data-testid="studied-subjects" sx={{ display: "grid", gridTemplateColumns: "minmax(0,2.4fr) 1.1fr 1fr 0.8fr auto", gap: 1, minWidth: 760 }}>
+                  {["Học phần", "Nguồn học", "Trạng thái", "Kết quả", ""].map((header) => (
                     <Typography key={header} sx={{ fontSize: 11.5, fontWeight: 800, color: "#475569", textTransform: "uppercase", pb: 0.5, borderBottom: "1px solid #E2E8F0" }}>
                       {header}
                     </Typography>
                   ))}
-                  {learningResults.map((row) => {
+                  {studiedSubjects.map((row) => {
                     const source = LEARNING_SOURCES.find((item) => item.value === row.sourceType);
                     const status = LEARNING_STATUSES.find((item) => item.value === row.status);
-                    const result = LEARNING_RESULTS.find((item) => item.value === row.result);
+                    const originalResult = learningResults.find((result) => result.id === row.id);
                     const eligible = row.status === "completed" && (row.result === "passed" || row.result === "exempt");
                     return (
-                      <React.Fragment key={row.id}>
+                      <React.Fragment key={row.subject?.id || row.id}>
                         <Typography sx={{ fontSize: 12.5, py: 0.5 }}>
                           {row.subject ? subjectLabel(row.subject) : row.bridgeKnowledgeSubject ? `[BSKT] ${subjectLabel(row.bridgeKnowledgeSubject)}` : "—"}
                           {row.academicYear ? <span style={{ color: "#64748B" }}> · {row.academicYear}</span> : null}
@@ -1053,11 +1071,10 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
                             variant={eligible ? "filled" : "outlined"}
                           />
                         </Typography>
-                        <Typography sx={{ fontSize: 12.5, py: 0.5 }}>{row.score ?? "—"}</Typography>
-                        <Typography sx={{ fontSize: 12.5, py: 0.5 }}>{result?.label || row.result}</Typography>
+                        <Typography sx={{ fontSize: 12.5, py: 0.5 }}>{RESULT_LABELS[row.result] || RESULT_LABELS.pending}</Typography>
                         <Stack direction="row" spacing={0.5} sx={{ py: 0.5 }}>
-                          <Tooltip title="Sửa kết quả"><span><IconButton size="small" onClick={() => openLearningDialog(row)}><EditRounded fontSize="small" /></IconButton></span></Tooltip>
-                          <Tooltip title="Xóa kết quả"><span><IconButton size="small" color="error" onClick={() => removeLearningResult(row)}><DeleteOutlineRounded fontSize="small" /></IconButton></span></Tooltip>
+                          {originalResult && <><Tooltip title="Sửa kết quả"><span><IconButton size="small" onClick={() => openLearningDialog(originalResult)}><EditRounded fontSize="small" /></IconButton></span></Tooltip>
+                          <Tooltip title="Xóa kết quả"><span><IconButton size="small" color="error" onClick={() => removeLearningResult(originalResult)}><DeleteOutlineRounded fontSize="small" /></IconButton></span></Tooltip></>}
                         </Stack>
                       </React.Fragment>
                     );
@@ -1070,15 +1087,16 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
 
             <Typography sx={{ fontSize: 13, fontWeight: 800, mb: 1 }}>
               <RuleRounded sx={{ fontSize: 17, mr: 0.5, verticalAlign: "text-bottom", color: "#0788B8" }} />
-              Quyết định công nhận học phần ({recognitions.length})
+              Quyết định công nhận học phần ({displayedRecognitions.length})
             </Typography>
-            {recognitions.length === 0 ? (
+            {displayedRecognitions.length === 0 ? (
               <Typography sx={{ fontSize: 13, color: "#64748B" }}>
                 Chưa có đề xuất công nhận. Nhấn “Đối chiếu CTĐT & đề xuất công nhận” để hệ thống tự so khớp.
               </Typography>
-            ) : recognitions.map((row) => (
+            ) : displayedRecognitions.map((row) => (
               <Stack
                 key={row.id}
+                data-testid={`recognition-${row.id}`}
                 direction={{ xs: "column", md: "row" }}
                 justifyContent="space-between"
                 alignItems={{ xs: "flex-start", md: "center" }}
@@ -1096,6 +1114,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
                     {row.decisionNo ? ` · QĐ: ${row.decisionNo}` : ""}
                   </Typography>
                   {row.note && <Typography sx={{ fontSize: 12, mt: 0.25 }}>{row.note}</Typography>}
+                  {row.learningResult && <Typography sx={{ fontSize: 12, mt: 0.25 }}>Kết quả: {RESULT_LABELS[row.learningResult.result] || RESULT_LABELS.pending}</Typography>}
                 </Box>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Chip
@@ -1936,10 +1955,10 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
               <TextField size="small" fullWidth label="Năm học" value={learningForm.academicYear} onChange={(e) => setLearningForm((p) => ({ ...p, academicYear: e.target.value }))} placeholder="2026" />
             </Stack>
             <Stack direction="row" spacing={2}>
-              <Select fullWidth size="small" value={learningForm.status} onChange={(e) => setLearningForm((p) => ({ ...p, status: e.target.value, result: e.target.value === "completed" ? (p.result === "pending" ? "passed" : p.result) : "pending" }))}>
+              <Select fullWidth size="small" value={learningForm.status} onChange={(e) => setLearningForm((p) => ({ ...p, status: e.target.value }))}>
                 {LEARNING_STATUSES.map((item) => <MenuItem key={item.value} value={item.value}>{item.label}</MenuItem>)}
               </Select>
-              <Select fullWidth size="small" disabled={learningForm.status !== "completed"} value={learningForm.result} onChange={(e) => setLearningForm((p) => ({ ...p, result: e.target.value }))}>
+              <Select fullWidth size="small" disabled value={learningForm.result}>
                 {LEARNING_RESULTS.map((item) => <MenuItem key={item.value} value={item.value}>{item.label}</MenuItem>)}
               </Select>
             </Stack>

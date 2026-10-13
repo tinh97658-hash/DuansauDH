@@ -134,6 +134,40 @@ describe("CurriculumService.assignToClassGroup", () => {
 });
 
 describe("CurriculumService.classSubjects", () => {
+  it("cannot restore stale catalog credits through a curriculum save and preserves the existing entry ID", async () => {
+    const mocks = buildService();
+    const entry = { id: "entry-1", subjectId: "subject-1", credits: 3, isRequired: true, update: jest.fn().mockResolvedValue(undefined) };
+    mocks.curriculums.findByPk.mockResolvedValue({ id: "cur-1", majorId: "major-1", program: "masters", subjectEntries: [] });
+    mocks.blocks.findAll.mockResolvedValue(blockRows);
+    mocks.entries.findAll.mockResolvedValue([entry]);
+    mocks.subjects.findAll.mockResolvedValue([{ id: "subject-1", majorId: "major-1", program: "masters", credits: 5, isRequired: true, subjectType: "CN", active: true }]);
+    await mocks.service.setSubjects("cur-1", { subjects: [{ subjectId: "subject-1", credits: 3, blockCode: "CS" }] });
+    expect(entry.update).toHaveBeenCalledWith(expect.objectContaining({ credits: 5, blockId: "block-cn" }), expect.anything());
+    expect(mocks.entries.create).not.toHaveBeenCalled();
+    expect(mocks.entries.destroy).not.toHaveBeenCalled();
+  });
+
+  it("reads current catalog metadata and totals despite legacy curriculum snapshots", async () => {
+    const mocks = buildService();
+    mocks.classGroups.findByPk.mockResolvedValue(classGroup({ curriculumId: "cur-1" }));
+    const curriculum = {
+      id: "cur-1", majorId: "major-1", program: "masters", applicableFromYear: "2026",
+      totalCredits: 99, blocks: [], electiveGroups: [],
+      subjectEntries: [{ id: "entry-1", subjectId: "subject-1", credits: 3, isRequired: true,
+        subject: { name: "Tên học phần đã sửa", codeText: "NEW01", credits: 5, isRequired: false, subjectType: "CS" } }],
+    };
+    mocks.curriculums.findByPk.mockResolvedValue(curriculum);
+    mocks.entries.findAll.mockResolvedValue(curriculum.subjectEntries);
+    const detail = await mocks.service.detail("cur-1");
+    const classSubjects = await mocks.service.classSubjects("class-1");
+    for (const result of [detail, classSubjects]) {
+      expect(result.subjects[0]).toMatchObject({ name: "Tên học phần đã sửa", code: "NEW01", credits: 5, isRequired: false, blockCode: "CS" });
+      expect(result.totals.totalCredits).toBe(5);
+    }
+    expect(detail.totalCredits).toBe(5);
+    expect(classSubjects.curriculum?.totalCredits).toBe(5);
+  });
+
   it("is read-only: returns no curriculum and creates nothing when the class has none", async () => {
     const mocks = buildService();
     mocks.classGroups.findByPk.mockResolvedValue(classGroup({ curriculumId: null }));

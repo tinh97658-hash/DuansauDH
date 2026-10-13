@@ -18,6 +18,9 @@
   --primary-dark: #056A8F;
   --primary-light: #EBF5FB;
   --secondary: #173E75;
+  --dialog-title-bg: #b4cae6;
+  --dialog-title-text: #000000;
+  --dialog-content-inset: 3mm;
   --success: #137B3B;
   --success-light: #E6F4EA;
   --warning: #B86216;

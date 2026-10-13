@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Pagination, Paper, Stack, TableBody, TableCell, TableContainer, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, MenuItem, Pagination, Paper, Stack, TableBody, TableCell, TableContainer, TableRow, TextField, Tooltip, Typography } from "@mui/material";
 import { DownloadRounded, ListAltRounded, SaveRounded } from "@mui/icons-material";
+import SettingsRounded from "@mui/icons-material/SettingsRounded";
+import GradeSettingsDialog from "../../features/exams/GradeSettingsDialog";
 import FeatureLayout from "../../components/FeatureLayout";
 import FilterSelectField from "../../components/FilterSelectField";
 import FilterSearchField from "../../components/FilterSearchField";
@@ -13,8 +15,9 @@ import { buildGradebookDocument, createGradebookExcel, fetchAllGradebookRows, gr
 import { buildExamListDocument, createExamListExcel } from "../../features/exams/examListExport";
 import { API_BASE_URL } from "../../config/http";
 import { personNameParts } from "../../utils/personName";
-import { displayGradeDate, draftOf, gradebookColumns, gradebookRowValues, gradePayload, numericScore, RESULT_LABELS, rowError, SCORE_FIELDS } from "../../features/exams/gradebook";
+import { displayGradeDate, draftOf, formatScore, gradebookColumns, gradebookRowValues, gradePayload, numericScore, RESULT_LABELS, rowError, SCORE_FIELDS, updateGradeDraft, visibleGradeRows } from "../../features/exams/gradebook";
 import "../../features/exams/gradebook.css";
+import { useSubjectCatalogRevision } from "../../utils/subjectCatalog";
 
 const panelSx = { borderColor: "#D7E4EE", borderRadius: "10px", bgcolor: "#fff", boxShadow: "0 2px 6px rgba(18,59,98,.07)" };
 const inputSx = {
@@ -34,6 +37,15 @@ const errorMessage = (error, fallback) => {
 };
 
 export default function ExamLists() {
+  const catalogRevision = useSubjectCatalogRevision();
+  const [policyRevision, setPolicyRevision] = useState(0);
+  useEffect(() => {
+    const refresh = () => setPolicyRevision(value => value + 1);
+    const storage = event => { if (event.key === "grading-policy-revision") refresh(); };
+    window.addEventListener("grading-policy-changed", refresh);
+    window.addEventListener("storage", storage);
+    return () => { window.removeEventListener("grading-policy-changed", refresh); window.removeEventListener("storage", storage); };
+  }, []);
   const [groups, setGroups] = useState([]), [subjects, setSubjects] = useState([]);
   const [majorId, setMajorId] = useState("");
   const [year, setYear] = useState(""), [groupId, setGroupId] = useState(""), [offeringId, setOfferingId] = useState("");
@@ -42,10 +54,11 @@ export default function ExamLists() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0), [totalRows, setTotalRows] = useState(0);
   const [exporting, setExporting] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
-  const includeIds = Object.values(dirty).filter(row => row.eligible === true && !row.examExempt).map(row => row.participantId).join(",");
-  const excludeIds = Object.values(dirty).filter(row => row.eligible !== true || row.examExempt).map(row => row.participantId).join(",");
+  const includeIds = Object.values(dirty).filter(row => row.result === "passed").map(row => row.participantId).join(",");
+  const excludeIds = Object.values(dirty).filter(row => row.result !== "passed").map(row => row.participantId).join(",");
   const examIncludeIds = mode === "exam" ? includeIds : "", examExcludeIds = mode === "exam" ? excludeIds : "";
   const [role, setRole] = useState(""), [optionsLoading, setOptionsLoading] = useState(true), [loading, setLoading] = useState(false), [saving, setSaving] = useState(false);
   const [error, setError] = useState(""), [success, setSuccess] = useState(""), [pendingChange, setPendingChange] = useState(null);
@@ -88,7 +101,7 @@ export default function ExamLists() {
       .catch((failure) => active && setError(errorMessage(failure, "Không thể tải bảng điểm.")))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [groupId, offeringId, page, mode, search, examIncludeIds, examExcludeIds]);
+  }, [groupId, offeringId, page, mode, search, examIncludeIds, examExcludeIds, policyRevision]);
 
   useEffect(() => {
     if (!dirtyCount) return undefined;
@@ -96,6 +109,15 @@ export default function ExamLists() {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirtyCount]);
+
+  useEffect(() => {
+    if (!catalogRevision) return undefined;
+    let active = true;
+    axios.get(`${API_BASE_URL}/masters/exam-lists/options`)
+      .then(({ data }) => { if (active) { setGroups(data.groups || []); setSubjects(data.courseOfferings || []); } })
+      .catch((failure) => active && setError(errorMessage(failure, "Không thể làm mới thông tin học phần.")));
+    return () => { active = false; };
+  }, [catalogRevision]);
 
   const majors = [...new Map(groups.filter((group) => group.majorId).map((group) => [group.majorId, { id: group.majorId, name: group.major?.name || group.major?.code || group.majorId }])).values()];
   const majorGroups = groups.filter((group) => !majorId || group.majorId === majorId);
@@ -109,7 +131,7 @@ export default function ExamLists() {
   const subjectChoices = [...new Map(visibleClasses.map(({ offering }) => [subjectKey(offering), offering.subject])).entries()];
   const selectedGroup = groups.find((group) => group.id === groupId);
   const selectedOffering = subjects.find((subject) => subject.id === offeringId);
-  const visible = rows;
+  const visible = visibleGradeRows(rows, mode, "");
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = page;
   const pageStart = (currentPage - 1) * PAGE_SIZE;
@@ -118,9 +140,10 @@ export default function ExamLists() {
   const requestChange = (change) => { if (dirtyCount) setPendingChange(() => change); else change(); };
   const selectClass = (entry) => { setDirty({}); dirtyRef.current = {}; setSuccess(""); setPage(1); setGroupId(entry?.group.id || ""); setOfferingId(entry?.offering.id || ""); };
   const edit = (id, patch) => {
-    setRows((current) => current.map((row) => row.participantId === id ? { ...row, ...patch } : row));
+    const apply = row => ["testScore", "assignmentScore", "examScore", "examExempt"].some(key => key in patch) ? updateGradeDraft({ ...row, ...patch }) : { ...row, ...patch };
+    setRows((current) => current.map((row) => row.participantId === id ? apply(row) : row));
     const row = dirty[id] || rows.find(item => item.participantId === id);
-    setDirty((current) => ({ ...current, [id]: { ...row, ...patch } })); setSuccess("");
+    setDirty((current) => ({ ...current, [id]: apply(row) })); setSuccess("");
   };
   const save = async () => {
     const changed = Object.values(dirty);
@@ -216,7 +239,13 @@ export default function ExamLists() {
           <Box><Typography component="h1" sx={{ fontSize: 15, fontWeight: 700, color: "#173E75", m: 0 }}>{modes[mode].toLocaleUpperCase("vi")}</Typography>
             <Typography sx={{ fontSize: 12, color: "#607486", mt: 0.25 }}>{[selectedGroup?.name, selectedOffering?.subject?.name].filter(Boolean).join(" · ") || "Chọn lớp và học phần để xem danh sách thi."}</Typography>
           </Box>
-          <Stack direction="row" gap={0.75} className="exam-no-print"><Chip size="small" label={`${total} / ${totalRows} học viên`} sx={{ bgcolor: "#EDF4FA", color: "#173E75" }} />{dirtyCount > 0 && <Chip size="small" color="warning" variant="outlined" label={`${dirtyCount} học viên chưa lưu`} />}</Stack>
+          <Stack direction="row" gap={0.75} alignItems="center" className="exam-no-print">
+            <Tooltip title="Cài đặt điểm số">
+              <span><IconButton aria-label="Cài đặt điểm số" disabled={optionsLoading} onClick={() => setSettingsOpen(true)} size="small"
+                sx={{ color: "#173E75", width: 34, height: 34, "&:hover": { bgcolor: "#EDF4FA" } }}><SettingsRounded fontSize="small" /></IconButton></span>
+            </Tooltip>
+            <Chip size="small" label={`${total} / ${totalRows} học viên`} sx={{ bgcolor: "#EDF4FA", color: "#173E75" }} />{dirtyCount > 0 && <Chip size="small" color="warning" variant="outlined" label={`${dirtyCount} học viên chưa lưu`} />}
+          </Stack>
         </Stack>
         {busy ? <Box sx={{ py: 6, textAlign: "center" }}><CircularProgress size={30} aria-label="Đang tải bảng điểm" /></Box> : <TableContainer sx={{ overflowX: "auto" }} className="exam-table-container exam-no-print">
           <ResizableTable columns={columns} storageKey="masters-exam-gradebook-columns" freezeThrough="firstName">
@@ -226,16 +255,17 @@ export default function ExamLists() {
                 <TableCell align="center">{pageStart + index + 1}</TableCell><TableCell sx={{ fontWeight: 600 }}>{row.code || "—"}</TableCell>
                 <TableCell title={name.familyAndMiddle}>{name.familyAndMiddle}</TableCell><TableCell>{name.givenName}</TableCell>
                 <TableCell align="center">{displayGradeDate(row.dob)}</TableCell><TableCell align="center">{row.gender || "—"}</TableCell>
-                <TableCell align="center"><Checkbox size="small" disabled={locked} indeterminate={row.eligible == null} checked={row.eligible === true} inputProps={{ "aria-label": `Tư cách thi ${row.code}` }} onChange={(event) => edit(row.participantId, { eligible: event.target.checked })} /></TableCell>
+                <TableCell align="center"><Checkbox size="small" disabled={locked} checked={row.eligible === true} inputProps={{ "aria-label": `Tư cách thi ${row.code}` }} onChange={(event) => edit(row.participantId, { eligible: event.target.checked })} /></TableCell>
                 <TableCell align="center"><Checkbox size="small" disabled={locked} checked={row.examExempt} inputProps={{ "aria-label": `Miễn thi ${row.code}` }} onChange={(event) => edit(row.participantId, { examExempt: event.target.checked, result: event.target.checked ? "exempt" : "pending" })} /></TableCell>
                 {!blank && <>{SCORE_FIELDS.map(([key, label, max]) => <TableCell key={key} align="center" sx={{ bgcolor: "#F7FAFC" }}>
-                  <TextField fullWidth size="small" value={blank ? "" : row[key]} disabled={locked} error={!blank && numericScore(row[key]) !== null && (!Number.isFinite(numericScore(row[key])) || numericScore(row[key]) < 0 || numericScore(row[key]) > max)} onChange={(event) => edit(row.participantId, { [key]: event.target.value })} inputProps={{ "aria-label": `${label} ${row.code}`, inputMode: "decimal" }} sx={inputSx} />
+                  <TextField fullWidth size="small" value={blank ? "" : row[key]} disabled={locked} InputProps={{ readOnly: ["courseScore", "grade4"].includes(key) }} error={!blank && numericScore(row[key]) !== null && (!Number.isFinite(numericScore(row[key])) || numericScore(row[key]) < 0 || numericScore(row[key]) > max)} onChange={["courseScore", "grade4"].includes(key) ? undefined : (event) => { const value = event.target.value; const score = numericScore(value); if (value === "" || (/^\d*(?:[.,]\d*)?$/.test(value) && Number.isFinite(score) && score >= 0 && score <= max)) edit(row.participantId, { [key]: value }); }} onBlur={(event) => { const value = formatScore(event.target.value, max); if (value !== row[key]) edit(row.participantId, { [key]: value }); }} inputProps={{ "aria-label": `${label} ${row.code}`, inputMode: "decimal" }} sx={inputSx} />
                 </TableCell>)}
-                <TableCell><TextField fullWidth size="small" value={blank ? "" : row.letterGrade} disabled={locked} onChange={(event) => edit(row.participantId, { letterGrade: event.target.value.toUpperCase() })} inputProps={{ "aria-label": `Thang điểm chữ ${row.code}`, maxLength: 10 }} sx={inputSx} /></TableCell>
-                <TableCell><TextField fullWidth size="small" value={blank ? "" : row.attemptScores} disabled={locked} onChange={(event) => edit(row.participantId, { attemptScores: event.target.value })} inputProps={{ "aria-label": `Điểm các lần thi ${row.code}` }} sx={inputSx} /></TableCell></>}
-                <TableCell><TextField select fullWidth size="small" SelectProps={{ native: true }} value={blank ? "pending" : row.result} disabled={locked || row.examExempt} onChange={(event) => edit(row.participantId, { result: event.target.value })} inputProps={{ "aria-label": `Kết quả điểm ${row.code}` }} sx={{ ...inputSx, "& select": { py: 0.5, fontSize: 12, color: row.result === "failed" ? "#B52D2D" : row.result === "passed" ? "#137B3B" : "#607486" } }}>
-                  {Object.entries(RESULT_LABELS).map(([value, label]) => <option key={value} value={value}>{blank ? "" : label}</option>)}
+                <TableCell><TextField fullWidth size="small" value={blank ? "" : row.letterGrade} disabled={locked} InputProps={{ readOnly: true }} inputProps={{ "aria-label": `Thang điểm chữ ${row.code}`, maxLength: 10 }} sx={inputSx} /></TableCell>
+                <TableCell><TextField fullWidth size="small" value={blank ? "" : row.attemptScores} disabled={locked} InputProps={{ readOnly: true }} inputProps={{ "aria-label": `Điểm các lần thi ${row.code}` }} sx={inputSx} /></TableCell></>}
+                <TableCell><TextField select fullWidth size="small" SelectProps={{ native: true }} value={row.result} disabled inputProps={{ "aria-label": `Kết quả điểm ${row.code}` }} sx={{ ...inputSx, "& select": { py: 0.5, fontSize: 12, color: row.result === "failed" ? "#B52D2D" : row.result === "passed" ? "#137B3B" : "#607486" } }}>
+                  {Object.entries(RESULT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </TextField></TableCell>
+                {blank && <TableCell><TextField fullWidth size="small" value={row.notes} disabled={!canEdit || saving || exporting} onChange={(event) => edit(row.participantId, { notes: event.target.value })} inputProps={{ "aria-label": `Ghi chú ${row.code}`, maxLength: 1000 }} sx={{ ...inputSx, "& input": { px: 0.75, py: 0.5, textAlign: "left" } }} /></TableCell>}
               </TableRow>;
             })}</TableBody>
           </ResizableTable>
@@ -260,8 +290,9 @@ export default function ExamLists() {
           </table>
         </Box>}
       </Paper>
-      <Typography sx={{ mt: 1, color: "#607486", fontSize: 11.5 }} className="exam-no-print">Tư cách thi: dấu gạch là chưa xét. Điểm học phần, thang 4 và điểm chữ được nhập trực tiếp. Nháy đúp mép tiêu đề để tự căn độ rộng cột.</Typography>
+      <Typography sx={{ mt: 1, color: "#607486", fontSize: 11.5 }} className="exam-no-print">Điểm học phần được tính theo tỷ trọng, điều kiện đạt và bảng quy đổi của từng môn, làm tròn 1 chữ số thập phân. Điểm đã lưu giữ nguyên phiên bản cấu hình cũ, kể cả khi sửa lại điểm. Thành phần có tỷ trọng 0% không bắt buộc nhập. DS thi hiển thị học viên có kết quả Đạt. Nháy đúp mép tiêu đề để tự căn độ rộng cột.</Typography>
       {dirtyCount > 0 && <Alert severity="warning" sx={{ mt: 1 }} className="exam-no-print">Bạn có điểm chưa lưu. {mode === "all" ? "Excel và PDF sử dụng các điểm vừa nhập." : "Excel sử dụng danh sách theo tư cách thi vừa chỉnh sửa."}</Alert>}
+      {settingsOpen && <GradeSettingsDialog canEdit={canEdit} initialMajorId={majorId} initialYear={year} groups={groups} onClose={() => setSettingsOpen(false)} />}
       <ConfirmDialog
         open={Boolean(pendingChange)}
         onClose={() => setPendingChange(null)}

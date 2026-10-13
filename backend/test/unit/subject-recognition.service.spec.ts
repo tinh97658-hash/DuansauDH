@@ -17,7 +17,8 @@ const buildService = () => {
   const memberships = { findAll: jest.fn().mockResolvedValue([]) };
   const sequelize = {
     transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)),
-    query: jest.fn().mockResolvedValue([]),
+    query: jest.fn().mockImplementation(async (sql: string) => sql.includes("SELECT learning.id")
+      ? [{ id: "lr-1", result: "passed", score: 8.5 }] : []),
   };
   const service = new SubjectRecognitionService(
     results as never, recognitions as never, bridgeSubjects as never, records as never,
@@ -38,9 +39,59 @@ const buildRecord = (overrides: Record<string, unknown> = {}) => ({
 
 const buildCurriculum = () => ({ id: "curriculum-1", majorId: "major-1", program: "masters", applicableFromYear: "2026", totalCredits: 60 });
 
+describe("Studied curriculum subjects", () => {
+  it("returns no studied subjects without a curriculum and never generates learning results", async () => {
+    const mocks = buildService();
+    mocks.records.findByPk.mockResolvedValue(buildRecord());
+    mocks.curriculums.findOne.mockResolvedValue(null);
+    expect(await mocks.service.listStudiedSubjects("record-1")).toEqual([]);
+    expect(mocks.sequelize.query).not.toHaveBeenCalled();
+    expect(mocks.results.bulkCreate).not.toHaveBeenCalled();
+  });
+
+  it("reads stored outcomes within the current curriculum without requiring class membership", async () => {
+    const mocks = buildService();
+    mocks.records.findByPk.mockResolvedValue(buildRecord());
+    mocks.curriculums.findOne.mockResolvedValue(buildCurriculum());
+    const outcomes = [{ id: "grade-1", subject: { id: "subject-1", name: "Triết học" }, result: "failed", status: "completed", sourceType: "regular" }];
+    mocks.sequelize.query.mockResolvedValue(outcomes);
+    expect(await mocks.service.listStudiedSubjects("record-1")).toEqual(outcomes);
+    expect(mocks.sequelize.query).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ replacements: {
+      recordId: "record-1", curriculumId: "curriculum-1", participantIds: ["admission:record-1", "student:student-1"],
+    } }));
+    expect(mocks.memberships.findAll).not.toHaveBeenCalled();
+    expect(mocks.results.bulkCreate).not.toHaveBeenCalled();
+  });
+});
+
 describe("SubjectRecognitionService personal learning results", () => {
+  it("reads the exam failure even when a personal result says passed", async () => {
+    const mocks = buildService();
+    mocks.records.findByPk.mockResolvedValue(buildRecord());
+    mocks.results.findAll.mockResolvedValue([{ id: "lr-1", status: "completed", result: "passed", score: 10 }]);
+    mocks.sequelize.query.mockResolvedValue([{ id: "lr-1", result: "failed", score: 8.5 }]);
+    expect(await mocks.service.listLearningResults("record-1"))
+      .toEqual([expect.objectContaining({ result: "failed", score: 8.5 })]);
+  });
+
+  it("does not count old approved credits after the exam outcome becomes failed", async () => {
+    const mocks = buildService();
+    mocks.recognitions.findAll.mockResolvedValue([{ learningResultId: "lr-1", targetSubjectId: "target-1", status: "approved" }]);
+    mocks.sequelize.query.mockResolvedValue([{ id: "lr-1", result: "failed", score: 8.5 }]);
+    expect(await mocks.service.recognizedCredits("record-1")).toBe(0);
+  });
+
+  it("rejects approval when the exam failed despite a manually recorded pass", async () => {
+    const mocks = buildService();
+    mocks.recognitions.findByPk.mockResolvedValue({ id: "rec-1", learningResultId: "lr-1", admissionRecordId: "record-1" });
+    mocks.results.findByPk.mockResolvedValue({ id: "lr-1", status: "completed", result: "passed" });
+    mocks.sequelize.query.mockResolvedValue([{ id: "lr-1", result: "failed", score: 8.5 }]);
+    await expect(mocks.service.decide("rec-1", { decision: "approved" })).rejects.toBeInstanceOf(ConflictException);
+  });
+
   it("carries over a registered subject without recognizing credits", async () => {
     const mocks = buildService();
+    mocks.sequelize.query.mockResolvedValue([]);
     mocks.records.findByPk.mockResolvedValue(buildRecord());
     mocks.curriculums.findOne.mockResolvedValue(buildCurriculum());
     mocks.results.findAll.mockResolvedValue([
@@ -137,6 +188,8 @@ describe("SubjectRecognitionService personal learning results", () => {
 
   it("never recognizes a failed result", async () => {
     const mocks = buildService();
+    mocks.sequelize.query.mockImplementation(async (sql: string) => sql.includes("SELECT learning.id")
+      ? [{ id: "lr-1", result: "failed", score: 8.5 }] : []);
     mocks.records.findByPk.mockResolvedValue(buildRecord());
     mocks.curriculums.findOne.mockResolvedValue(buildCurriculum());
     mocks.curriculumSubjects.findAll.mockResolvedValue([
@@ -184,6 +237,7 @@ describe("SubjectRecognitionService validation", () => {
 
   it("refuses to approve a recognition whose result is not completed", async () => {
     const mocks = buildService();
+    mocks.sequelize.query.mockResolvedValue([]);
     mocks.recognitions.findByPk.mockResolvedValue({
       id: "rec-1", learningResultId: "lr-1", targetSubjectId: "target-1", admissionRecordId: "record-1",
       status: "pending", update: jest.fn(),

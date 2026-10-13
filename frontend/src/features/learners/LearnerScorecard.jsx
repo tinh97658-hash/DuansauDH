@@ -6,6 +6,7 @@ import ResizableTable from "../../components/ResizableTable";
 import { API_BASE_URL } from "../../config/http";
 import { RESULT_LABELS, SCORE_FIELDS } from "../exams/gradebook";
 import "./learnerScorecard.css";
+import { useSubjectCatalogRevision } from "../../utils/subjectCatalog";
 
 const columns = [
   { key: "index", label: "STT", width: 50, minWidth: 40, align: "center" },
@@ -20,6 +21,7 @@ const columns = [
 ];
 
 export default function LearnerScorecard({ admissionRecordId, classGroupId, onClassChange }) {
+  const catalogRevision = useSubjectCatalogRevision();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -36,7 +38,7 @@ export default function LearnerScorecard({ admissionRecordId, classGroupId, onCl
       .catch(error => { if (active) setError(error.response?.data?.message || error.message || "Không tải được bảng điểm học viên."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [admissionRecordId, classGroupId, reload]);
+  }, [admissionRecordId, classGroupId, reload, catalogRevision]);
 
   const subjects = report?.subjects || [];
   const gradedCount = subjects.filter(subject => subject.grade?.score != null || subject.grade?.result === "exempt").length;
@@ -62,7 +64,7 @@ export default function LearnerScorecard({ admissionRecordId, classGroupId, onCl
             <TableBody>{subjects.map((subject, index) => {
               const grade = subject.grade;
               const details = grade?.details || {};
-              const result = grade?.result === "exempt" && details.source !== "gradebook" ? "Miễn học" : RESULT_LABELS[grade?.result] || "Chưa có điểm";
+              const result = RESULT_LABELS[grade?.result] || RESULT_LABELS.pending;
               return <TableRow key={subject.id} hover className={grade?.result === "failed" ? "lsc-failed" : grade?.result === "exempt" ? "lsc-exempt" : ""}>
                 <TableCell align="center">{index + 1}</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>{subject.code || "—"}</TableCell>

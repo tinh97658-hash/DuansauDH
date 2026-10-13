@@ -14,11 +14,13 @@ import { displayGradeDate } from "../../features/exams/gradebook";
 import { downloadDocumentFile } from "../../utils/documentFiles";
 import { createClassScoreWorkbook, scoreSummaryColumns, scoreSummaryValue } from "./classScoreSummaryExcel";
 import "./classScoreSummary.css";
+import { useSubjectCatalogRevision } from "../../utils/subjectCatalog";
 
 const endpoint = `${API_BASE_URL}/reports/class-score-summary`;
 const errorMessage = (error, fallback) => error.response?.data?.message || error.message || fallback;
 
 export default function ClassScoreSummary() {
+  const catalogRevision = useSubjectCatalogRevision();
   const [groups, setGroups] = useState([]);
   const [year, setYear] = useState("");
   const [disciplineId, setDisciplineId] = useState("");
@@ -74,7 +76,7 @@ export default function ClassScoreSummary() {
     }).catch(error => { if (active) setError(errorMessage(error, "Không tải được bảng điểm.")); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [classGroupId, loadingOptions, reload, debouncedSearch]);
+  }, [classGroupId, loadingOptions, reload, debouncedSearch, catalogRevision]);
 
   const years = useMemo(() => [...new Set(groups.map(group => group.academicYear || ""))]
     .sort((a, b) => b.localeCompare(a, "vi", { numeric: true })), [groups]);

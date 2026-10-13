@@ -79,16 +79,15 @@ const AppDialog = ({
             justifyContent: "space-between",
             px: 2.5,
             py: 1.5,
-            color: "#FFFFFF",
+            color: "var(--dialog-title-text, #000000)",
             fontSize: "15px",
             fontWeight: 700,
             lineHeight: "22px",
             letterSpacing: "0.4px",
             textTransform: "uppercase",
-            background: "linear-gradient(180deg, #1A4680 0%, #153A6B 100%)",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.15)",
-            "& .MuiTypography-root": { color: "#FFFFFF" },
-            "& .MuiTypography-caption": { color: "rgba(255, 255, 255, 0.8)!important" },
+            background: "var(--dialog-title-bg, #b4cae6)",
+            borderBottom: "1px solid #B8C7D6",
+            "& .MuiTypography-root": { color: "inherit" },
             ...titleSx,
           }}
         >
@@ -104,12 +103,12 @@ const AppDialog = ({
               sx={{
                 width: 28,
                 height: 28,
-                color: "rgba(255, 255, 255, 0.75)",
+                color: "inherit",
                 fontSize: 20,
                 ml: 1,
                 flexShrink: 0,
                 borderRadius: "4px",
-                "&:hover": { bgcolor: "rgba(255, 255, 255, 0.15)", color: "#FFFFFF" },
+                "&:hover": { bgcolor: "rgba(0, 0, 0, 0.06)", color: "inherit" },
               }}
             >
               ×
@@ -118,7 +117,11 @@ const AppDialog = ({
         </DialogTitle>
       )}
 
-      <DialogContent sx={{ px: 2.5, py: 2.25, bgcolor: "#FFFFFF", ...contentSx }}>
+      <DialogContent sx={{
+        p: "var(--dialog-content-inset, 3mm)", bgcolor: "#FFFFFF", ...contentSx,
+        // MUI otherwise removes the top padding immediately after a dialog title.
+        ".MuiDialogTitle-root + &": { paddingTop: "var(--dialog-content-inset, 3mm)" },
+      }}>
         {children}
       </DialogContent>
 

@@ -345,17 +345,19 @@ export const theme = createTheme({
         root: {
           fontSize: "15px",
           fontWeight: 700,
-          color: "#173E75",
+          color: "var(--dialog-title-text, #000000)",
           borderBottom: "1px solid #DFE4E8",
           padding: "12px 18px",
-          backgroundColor: "#FAFBFC",
+          background: "var(--dialog-title-bg, #b4cae6)",
+          "& .MuiTypography-root, & .MuiIconButton-root": { color: "inherit" },
         },
       },
     },
     MuiDialogContent: {
       styleOverrides: {
         root: {
-          padding: "16px 18px",
+          padding: "var(--dialog-content-inset, 3mm)",
+          ".MuiDialogTitle-root + &": { paddingTop: "var(--dialog-content-inset, 3mm)" },
         },
       },
     },

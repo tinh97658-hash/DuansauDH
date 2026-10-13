@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { QueryTypes, type Transaction } from "sequelize";
@@ -10,10 +10,13 @@ import { CourseOffering } from "../database/models/training/course-offering.mode
 import { CourseOfferingClassGroup } from "../database/models/training/course-offering-class-group.model.js";
 import { CourseExamGrade, CourseExamGradebook } from "../database/models/training/course-exam-gradebook.model.js";
 import { ExamGradebookQueryDto, SaveExamGradebookDto } from "./dto/exam-gradebook.dto.js";
+import { calculateExamGrade, roundExamScore } from "./exam-grade-calculation.js";
+import { GradingPolicyService } from "./grading-policy.service.js";
+import { COMPONENT_KEYS, LEGACY_GRADING_POLICY } from "./grading-policy.js";
 
 export const emptyExamGrade = (participantId: string): CourseExamGrade => ({
   participantId, eligible: null, examExempt: false, testScore: null, assignmentScore: null,
-  examScore: null, courseScore: null, grade4: null, letterGrade: "", attemptScores: [], result: "pending",
+  examScore: null, courseScore: null, grade4: null, letterGrade: "", attemptScores: [], result: "pending", notes: "",
 });
 
 @Injectable()
@@ -25,6 +28,7 @@ export class ExamGradebookService {
     @InjectModel(CourseOfferingClassGroup) private readonly links: typeof CourseOfferingClassGroup,
     @InjectModel(CourseExamGradebook) private readonly books: typeof CourseExamGradebook,
     @InjectConnection() private readonly sequelize: Sequelize,
+    @Optional() private readonly policies?: GradingPolicyService,
   ) {}
 
   async options() {
@@ -76,6 +80,7 @@ export class ExamGradebookService {
 
   async get(query: ExamGradebookQueryDto) {
     const { group, offering } = await this.scope(query);
+    const currentPolicy = this.policies ? await this.policies.latest(offering.subjectId, group.academicYear || "") : LEGACY_GRADING_POLICY;
     const pageSize = Math.min(15, Math.max(1, query.pageSize || 15));
     const requestedPage = Math.max(1, query.page || 1);
     // Chỉ trả tối đa 15 hồ sơ. COUNT, tìm kiếm, lọc DS thi và khử trùng chạy trong PostgreSQL.
@@ -109,7 +114,7 @@ export class ExamGradebookService {
       ), filtered AS (
         SELECT * FROM roster
         WHERE (:mode <> 'exam' OR (
-          ("participantId" = ANY(STRING_TO_ARRAY(:includeIds, ',')) OR (grade->>'eligible' = 'true' AND COALESCE(grade->>'examExempt', 'false') <> 'true'))
+          ("participantId" = ANY(STRING_TO_ARRAY(:includeIds, ',')) OR grade->>'result' = 'passed')
           AND NOT ("participantId" = ANY(STRING_TO_ARRAY(:excludeIds, ',')))
         ))
           AND (:search = '' OR POSITION(LOWER(:search) IN LOWER(code || ' ' || "fullName")) > 0)
@@ -133,13 +138,16 @@ export class ExamGradebookService {
     return {
       group: { id: group.id, name: group.name, code: group.code, academicYear: group.academicYear }, offering,
       revision: result.revision, total: result.total, totalRows: result.totalRows, page: result.page, pageSize,
-      rows: result.rows.map(({ grade, ...person }: any) => ({ ...emptyExamGrade(person.participantId), ...grade, ...person })),
+      rows: result.rows.map(({ grade, ...person }: any) => ({ ...emptyExamGrade(person.participantId), ...grade, ...person,
+        attemptScores: grade.examScore == null ? [] : [grade.examScore],
+        gradingPolicy: grade.participantId ? grade.gradingPolicy || LEGACY_GRADING_POLICY : currentPolicy,
+      })),
     };
   }
 
   async save(dto: SaveExamGradebookDto) {
     await this.sequelize.transaction(async (transaction) => {
-      await this.scope(dto, transaction);
+      const { group, offering } = await this.scope(dto, transaction);
       // Khi lưu chỉ kiểm tra danh tính các học viên vừa sửa, không tải cả lớp.
       const participants = await this.sequelize.query<{ participantId: string }>(`
         SELECT DISTINCT CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
@@ -157,10 +165,6 @@ export class ExamGradebookService {
         if (!allowed.has(row.participantId)) throw new BadRequestException("Bảng điểm chứa học viên ngoài lớp đã chọn.");
         if (ids.has(row.participantId)) throw new BadRequestException("Bảng điểm có học viên bị lặp.");
         ids.add(row.participantId);
-        if (["passed", "failed"].includes(row.result) && row.courseScore == null) {
-          throw new BadRequestException("Phải nhập điểm học phần trước khi chọn Đạt hoặc Không đạt.");
-        }
-        if (row.examExempt && row.result !== "exempt") throw new BadRequestException("Học viên được miễn thi phải có kết quả Miễn thi.");
       }
       const where = { classGroupId: dto.classGroupId, courseOfferingId: dto.courseOfferingId };
       let book = await this.books.findOne({ where, transaction, lock: transaction.LOCK.UPDATE });
@@ -168,12 +172,24 @@ export class ExamGradebookService {
         throw new ConflictException("Bảng điểm đã được người khác cập nhật. Hãy tải lại trước khi lưu.");
       }
       const merged = new Map((book?.grades || []).map((row) => [row.participantId, row]));
-      for (const row of dto.rows) merged.set(row.participantId, {
-        ...emptyExamGrade(row.participantId), ...row, eligible: row.eligible ?? null,
-        testScore: row.testScore ?? null, assignmentScore: row.assignmentScore ?? null,
-        examScore: row.examScore ?? null, courseScore: row.courseScore ?? null, grade4: row.grade4 ?? null,
-        letterGrade: row.letterGrade.trim(),
-      });
+      const currentPolicy = this.policies ? await this.policies.latest(offering.subjectId, group.academicYear || "", transaction) : LEGACY_GRADING_POLICY;
+      for (const row of dto.rows) {
+        const previous = merged.get(row.participantId);
+        const gradingPolicy = previous ? previous.gradingPolicy || LEGACY_GRADING_POLICY : currentPolicy;
+        if (!previous && ((row.policyVersion ?? 0) !== currentPolicy.version || (row.policyRulesVersion ?? 0) !== (currentPolicy.rulesVersion ?? 0))) throw new ConflictException("Cách tính điểm của môn đã thay đổi trong lúc nhập. Hãy tải lại cấu hình trước khi lưu; điểm vừa nhập chưa bị lưu hoặc thay đổi.");
+        const scores = { testScore: roundExamScore(row.testScore), assignmentScore: roundExamScore(row.assignmentScore), examScore: roundExamScore(row.examScore) };
+        const unchanged = previous && COMPONENT_KEYS.every(key => (previous[key] ?? null) === (scores[key] ?? null)) && previous.examExempt === row.examExempt;
+        const calculated = unchanged ? { courseScore: previous.courseScore, grade4: previous.grade4, letterGrade: previous.letterGrade, result: previous.result }
+          : calculateExamGrade({ ...row, ...scores }, gradingPolicy);
+        const { policyVersion: _policyVersion, policyRulesVersion: _rulesVersion, ...values } = row;
+        merged.set(row.participantId, {
+          ...emptyExamGrade(row.participantId), ...values, eligible: row.eligible ?? null,
+          ...scores,
+          attemptScores: scores.examScore == null ? [] : [scores.examScore],
+          letterGrade: row.letterGrade.trim(),
+          ...calculated, gradingPolicy: structuredClone(gradingPolicy),
+        });
+      }
       const payload = { ...where, grades: [...merged.values()], revision: dto.revision + 1 };
       if (book) await book.update(payload, { transaction });
       else book = await this.books.create(payload as never, { transaction });

@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
-import { Op } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { BridgeKnowledgeSubject } from "../database/models/common/bridge-knowledge-subject.model.js";
@@ -13,6 +13,7 @@ import { CourseOffering } from "../database/models/training/course-offering.mode
 import { CourseOfferingStudent } from "../database/models/training/course-offering-student.model.js";
 import { LearnerSubjectResult } from "../database/models/training/learner-subject-result.model.js";
 import { SubjectRecognition } from "../database/models/training/subject-recognition.model.js";
+import { applyLearningExamResults, learningExamResults } from "./learning-exam-results.js";
 import {
   CreateLearningResultDto,
   DecideRecognitionDto,
@@ -33,7 +34,7 @@ const normalizeName = (value: unknown) => String(value || "")
 /**
  * Cơ chế công nhận học phần dùng chung cho cả chuyển chuyên ngành, tiền thạc sĩ và học trước.
  *
- * Nguồn dữ liệu duy nhất là `learner_subject_results` (kết quả học phần cá nhân). Không có
+ * Kết quả lấy nguyên trạng từ bảng điểm thi đã lưu. Kết quả học phần cá nhân cung cấp nguồn học.
  * ba luồng công nhận riêng: mọi luồng đều gọi chung `proposeForRecord()`.
  */
 @Injectable()
@@ -77,11 +78,51 @@ export class SubjectRecognitionService {
 
   async listLearningResults(admissionRecordId: string) {
     await this.requireRecord(admissionRecordId);
-    return this.results.findAll({
+    const rows = await this.results.findAll({
       where: { admissionRecordId },
       include: this.learningIncludes as never,
       order: [["academicYear", "DESC"], ["createdAt", "DESC"]],
     });
+    return applyLearningExamResults(rows, await learningExamResults(this.sequelize, admissionRecordId));
+  }
+
+  async listStudiedSubjects(admissionRecordId: string) {
+    const record = await this.records.findByPk(admissionRecordId);
+    if (!record) throw new NotFoundException("Không tìm thấy hồ sơ học viên.");
+    if (!record.majorId) return [];
+    const program = record.trainingLevel === "Tiến sĩ" ? "doctoral" : "masters";
+    const curriculum = await this.curriculums.findOne({
+      where: { majorId: record.majorId, program, applicableFromYear: record.academicYear || "" },
+      order: [["createdAt", "DESC"]],
+    });
+    if (!curriculum) return [];
+    // Read saved exam outcomes. Completing teaching alone is not a learner outcome.
+    return this.sequelize.query(`
+      WITH outcomes AS (
+        SELECT book.id::text id, offering.subject_id, 'regular' source_type,
+          COALESCE(grade.value->>'result', 'pending') result, book.updated_at recorded_at
+        FROM course_exam_gradebooks book
+        JOIN course_offerings offering ON offering.id = book.course_offering_id
+        CROSS JOIN LATERAL jsonb_array_elements(book.grades) grade(value)
+        LEFT JOIN admission_records identity ON grade.value->>'participantId' = 'admission:' || identity.id::text
+        WHERE grade.value->>'participantId' IN (:participantIds)
+          OR ('student:' || identity.student_id::text) IN (:participantIds)
+      ), ranked AS (
+        SELECT outcome.id, target.id subject_id, target.code_text, target.code_number, target.name,
+          outcome.source_type, outcome.result,
+          ROW_NUMBER() OVER (PARTITION BY target.id ORDER BY outcome.recorded_at DESC, outcome.id DESC) rank
+        FROM outcomes outcome JOIN subjects source ON source.id = outcome.subject_id
+        JOIN subjects target ON COALESCE(target.canonical_subject_id, target.id) = COALESCE(source.canonical_subject_id, source.id)
+        JOIN curriculum_subjects entry ON entry.subject_id = target.id AND entry.curriculum_id = :curriculumId
+      )
+      SELECT id, jsonb_build_object('id', subject_id, 'codeText', code_text, 'codeNumber', code_number, 'name', name) subject,
+        source_type AS "sourceType", 'completed' AS status,
+        result
+      FROM ranked WHERE rank = 1 AND result IN ('passed', 'failed', 'exempt') ORDER BY name, subject_id
+    `, { type: QueryTypes.SELECT, replacements: {
+      recordId: record.id, curriculumId: curriculum.id,
+      participantIds: [`admission:${record.id}`, ...(record.studentId ? [`student:${record.studentId}`] : [])],
+    } });
   }
 
   async createLearningResult(admissionRecordId: string, dto: CreateLearningResultDto) {
@@ -92,9 +133,10 @@ export class SubjectRecognitionService {
         ...payload,
         admissionRecordId,
         status: dto.status || "registered",
-        result: dto.result || (dto.status === "completed" ? "passed" : "pending"),
+        result: "pending",
       } as never, { transaction });
-      return this.results.findByPk(created.id, { include: this.learningIncludes as never, transaction });
+      const row = await this.results.findByPk(created.id, { include: this.learningIncludes as never, transaction });
+      return row ? applyLearningExamResults([row], await learningExamResults(this.sequelize, admissionRecordId, transaction))[0] : null;
     });
   }
 
@@ -104,11 +146,13 @@ export class SubjectRecognitionService {
       if (!row) throw new NotFoundException("Không tìm thấy kết quả học phần cá nhân.");
       const payload = await this.buildLearningPayload(dto, transaction, row);
       await row.update(payload as never, { transaction });
-      if (row.status === "completed" && isRecognizable(row)) {
+      const actualResult = applyLearningExamResults([row], await learningExamResults(this.sequelize, row.admissionRecordId, transaction))[0];
+      if (isRecognizable(actualResult)) {
         // Kết quả vừa đạt: đối chiếu lại với CTĐT hiện hành nếu học viên đã vào CTĐT chính thức.
         await this.proposeForRecord(row.admissionRecordId, {}, transaction);
       }
-      return this.results.findByPk(id, { include: this.learningIncludes as never, transaction });
+      const updated = await this.results.findByPk(id, { include: this.learningIncludes as never, transaction });
+      return updated ? applyLearningExamResults([updated], await learningExamResults(this.sequelize, row.admissionRecordId, transaction))[0] : null;
     });
   }
 
@@ -131,7 +175,7 @@ export class SubjectRecognitionService {
     }
     const payload: Record<string, unknown> = {};
     for (const key of ["subjectId", "bridgeKnowledgeSubjectId", "sourceType", "courseOfferingId", "academicYear",
-      "status", "result", "score", "completedAt", "decisionNo", "institution", "note"]) {
+      "status", "score", "completedAt", "decisionNo", "institution", "note"]) {
       if ((dto as never as Record<string, unknown>)[key] !== undefined) payload[key] = (dto as never as Record<string, unknown>)[key];
     }
     if (subjectId) {
@@ -156,7 +200,7 @@ export class SubjectRecognitionService {
   }
 
   /**
-   * Chuyển các lớp học phần đã hoàn thành giảng dạy mà học viên đã tham gia thành
+   * Chuyển các kết quả đã lưu trong bảng điểm thi của học viên thành
    * kết quả học phần cá nhân nguồn `regular`. Nhờ vậy mọi đối chiếu công nhận chỉ đọc
    * một nguồn dữ liệu duy nhất, kể cả dữ liệu cũ trước khi có bảng kết quả cá nhân.
    */
@@ -164,61 +208,26 @@ export class SubjectRecognitionService {
     const record = await this.records.findByPk(admissionRecordId, { attributes: ["id", "studentId"], transaction });
     if (!record) throw new NotFoundException("Không tìm thấy hồ sơ học viên.");
 
-    const identities: Array<{ courseOfferingId: string }> = [];
-    const individualRows = await this.offeringStudents.findAll({
-      where: { admissionRecordId },
-      attributes: ["courseOfferingId"],
-      transaction,
-    });
-    identities.push(...individualRows.map((row) => ({ courseOfferingId: row.courseOfferingId })));
-
-    const membershipRows = await this.memberships.findAll({
-      where: { [Op.or]: [{ admissionRecordId }, ...(record.studentId ? [{ studentId: record.studentId }] : [])] } as never,
-      attributes: ["classGroupId"],
-      transaction,
-    });
-    const classGroupIds = [...new Set(membershipRows.map((row) => row.classGroupId).filter(Boolean))];
-    if (classGroupIds.length > 0) {
-      const groupOfferings = await this.sequelize.query(`
-        SELECT g.course_offering_id AS "courseOfferingId"
-        FROM course_offering_class_groups g
-        JOIN course_offerings o ON o.id = g.course_offering_id
-        WHERE g.class_group_id IN (:classGroupIds) AND o.status = 'completed'
-      `, { replacements: { classGroupIds }, transaction }) as unknown as Array<{ courseOfferingId: string }>;
-      identities.push(...groupOfferings);
-    }
-
-    const offeringIds = [...new Set(identities.map((row) => row.courseOfferingId).filter(Boolean))];
-    if (offeringIds.length === 0) return 0;
-    const completedOfferings = await this.offerings.findAll({
-      where: { id: { [Op.in]: offeringIds }, status: "completed" },
-      attributes: ["id", "subjectId"],
-      transaction,
-    });
-    if (completedOfferings.length === 0) return 0;
-
-    const existing = await this.results.findAll({
-      where: {
-        admissionRecordId,
-        sourceType: "regular",
-        subjectId: { [Op.in]: completedOfferings.map((offering) => offering.subjectId) },
-      },
-      attributes: ["subjectId"],
-      transaction,
-    });
-    const known = new Set(existing.map((row) => row.subjectId));
-    const rows = completedOfferings
-      .filter((offering) => !known.has(offering.subjectId))
-      .map((offering) => ({
-        admissionRecordId,
-        subjectId: offering.subjectId,
-        bridgeKnowledgeSubjectId: null,
-        courseOfferingId: offering.id,
-        sourceType: "regular",
-        status: "completed",
-        result: "passed",
-        note: "Ghi nhận tự động từ lớp học phần đã hoàn thành giảng dạy.",
-      }));
+    const exams = await this.sequelize.query<any>(`
+      SELECT DISTINCT ON (offering.subject_id) offering.subject_id AS "subjectId", offering.id AS "courseOfferingId",
+        COALESCE(entry.value->>'result', 'pending') result,
+        NULLIF(entry.value->>'courseScore', '')::numeric score
+      FROM course_exam_gradebooks book JOIN course_offerings offering ON offering.id = book.course_offering_id
+      CROSS JOIN LATERAL jsonb_array_elements(book.grades) entry(value)
+      LEFT JOIN admission_records identity ON entry.value->>'participantId' = 'admission:' || identity.id::text
+      WHERE entry.value->>'participantId' IN (:participantIds)
+        OR ('student:' || identity.student_id::text) IN (:participantIds)
+      ORDER BY offering.subject_id, book.updated_at DESC, book.id DESC
+    `, { type: QueryTypes.SELECT, transaction, replacements: {
+      participantIds: [`admission:${record.id}`, ...(record.studentId ? [`student:${record.studentId}`] : [])],
+    } });
+    if (exams.length === 0) return 0;
+    const existing = await this.results.findAll({ where: { admissionRecordId, sourceType: "regular" }, transaction });
+    const known = new Set(existing.map(row => row.subjectId));
+    const rows = exams.filter(exam => !known.has(exam.subjectId) && ["passed", "failed", "exempt"].includes(exam.result))
+      .map(exam => ({ admissionRecordId, subjectId: exam.subjectId, courseOfferingId: exam.courseOfferingId,
+        bridgeKnowledgeSubjectId: null, sourceType: "regular", status: "completed", result: exam.result,
+        score: exam.score, note: "Ghi nhận từ kết quả đã lưu tại danh sách thi, điểm thi." }));
     if (rows.length > 0) await this.results.bulkCreate(rows as never, { transaction, ignoreDuplicates: true });
     return rows.length;
   }
@@ -246,12 +255,13 @@ export class SubjectRecognitionService {
         include: [{ model: Subject, as: "subject", required: true }] as never,
         transaction,
       });
-      const allResults = await this.results.findAll({
+      const storedResults = await this.results.findAll({
         where: { admissionRecordId },
         include: this.learningIncludes as never,
         transaction,
       });
 
+      const allResults = applyLearningExamResults(storedResults, await learningExamResults(this.sequelize, admissionRecordId, transaction));
       const targetByRoot = new Map<string, Subject>();
       const targetByName = new Map<string, Subject>();
       for (const row of targets) {
@@ -322,7 +332,9 @@ export class SubjectRecognitionService {
         include: this.recognitionIncludes as never,
         transaction,
       });
-      return { curriculum, ...summaries, recognitions: rows, totalCredits: curriculum.totalCredits };
+      const totalCredits = targets.reduce((total, entry) => total + (Number(entry.subject?.credits ?? entry.credits) || 0), 0);
+      const plainCurriculum = typeof curriculum.toJSON === "function" ? curriculum.toJSON() : curriculum;
+      return { curriculum: { ...plainCurriculum, totalCredits }, ...summaries, recognitions: await this.withExamResults(rows, admissionRecordId, transaction), totalCredits };
     };
     return outerTransaction ? run(outerTransaction) : this.sequelize.transaction(run);
   }
@@ -403,19 +415,33 @@ export class SubjectRecognitionService {
 
   async listRecognitions(admissionRecordId: string) {
     await this.requireRecord(admissionRecordId);
-    return this.recognitions.findAll({
+    const rows = await this.recognitions.findAll({
       where: { admissionRecordId },
       include: this.recognitionIncludes as never,
       order: [["createdAt", "DESC"]],
+    });
+    return this.withExamResults(rows, admissionRecordId);
+  }
+
+  private async withExamResults(rows: any[], admissionRecordId: string, transaction?: Transaction) {
+    if (rows.length === 0) return [];
+    const exams = await learningExamResults(this.sequelize, admissionRecordId, transaction);
+    return rows.map(row => {
+      const data = typeof row.toJSON === "function" ? row.toJSON() : row;
+      return { ...data, ...(data.learningResult ? { learningResult: applyLearningExamResults([data.learningResult], exams)[0] } : {}) };
     });
   }
 
   /** Tín chỉ hoàn thành chỉ tính cho học phần đã được công nhận (trạng thái `approved`). */
   async recognizedCredits(admissionRecordId: string): Promise<number> {
-    const rows = await this.recognitions.findAll({
+    const approved = await this.recognitions.findAll({
       where: { admissionRecordId, status: "approved" },
       include: [{ model: Subject, as: "targetSubject", attributes: ["id"] }] as never,
     });
+    if (approved.length === 0) return 0;
+    const exams = await learningExamResults(this.sequelize, admissionRecordId);
+    const passed = new Set(exams.filter(exam => ["passed", "exempt"].includes(exam.result)).map(exam => exam.id));
+    const rows = approved.filter(row => row.learningResultId && passed.has(row.learningResultId));
     if (rows.length === 0) return 0;
     const record = await this.records.findByPk(admissionRecordId, { attributes: ["majorId", "trainingLevel", "academicYear"] });
     if (!record?.majorId) return 0;
@@ -428,8 +454,9 @@ export class SubjectRecognitionService {
     const entries = await this.curriculumSubjects.findAll({
       where: { curriculumId: curriculum.id, subjectId: { [Op.in]: rows.map((row) => row.targetSubjectId) } },
       attributes: ["credits"],
+      include: [{ model: Subject, as: "subject", attributes: ["credits"] }],
     });
-    return entries.reduce((total, entry) => total + (Number(entry.credits) || 0), 0);
+    return entries.reduce((total, entry) => total + (Number(entry.subject?.credits ?? entry.credits) || 0), 0);
   }
 
   async decide(id: string, dto: DecideRecognitionDto) {
@@ -442,7 +469,8 @@ export class SubjectRecognitionService {
       const result = row.learningResultId
         ? await this.results.findByPk(row.learningResultId, { transaction })
         : null;
-      if (dto.decision === "approved" && result && !isRecognizable(result)) {
+      const actualResult = result ? applyLearningExamResults([result], await learningExamResults(this.sequelize, row.admissionRecordId, transaction))[0] : null;
+      if (dto.decision === "approved" && (!actualResult || !isRecognizable(actualResult))) {
         throw new ConflictException("Chỉ công nhận học phần đã hoàn thành và đạt.");
       }
       const targetSubjectId = dto.targetSubjectId || row.targetSubjectId;
@@ -460,7 +488,8 @@ export class SubjectRecognitionService {
         decidedAt: new Date(),
         note: dto.note || row.note,
       } as never, { transaction });
-      return this.recognitions.findByPk(id, { include: this.recognitionIncludes as never, transaction });
+      const updated = await this.recognitions.findByPk(id, { include: this.recognitionIncludes as never, transaction });
+      return updated ? (await this.withExamResults([updated], row.admissionRecordId, transaction))[0] : null;
     });
   }
 
@@ -480,11 +509,12 @@ export class SubjectRecognitionService {
   }
 
   async recognitionHistoryFor(admissionRecordId: string, majorTransferId: string) {
-    return this.recognitions.findAll({
+    const rows = await this.recognitions.findAll({
       where: { admissionRecordId, majorTransferId },
       include: this.recognitionIncludes as never,
       order: [["createdAt", "ASC"]],
     });
+    return this.withExamResults(rows, admissionRecordId);
   }
 
   private async requireRecord(admissionRecordId: string, transaction?: Transaction) {

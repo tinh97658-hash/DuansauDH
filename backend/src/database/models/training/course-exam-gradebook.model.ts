@@ -1,6 +1,7 @@
 import { BelongsTo, Column, DataType, Default, ForeignKey, Model, Table } from "sequelize-typescript";
 import { ClassGroup } from "./class-group.model.js";
 import { CourseOffering } from "./course-offering.model.js";
+import type { GradingPolicy } from "../../../masters/grading-policy.js";
 
 export interface CourseExamGrade {
   participantId: string;
@@ -12,6 +13,8 @@ export interface CourseExamGrade {
   courseScore: number | null;
   grade4: number | null;
   letterGrade: string;
+  notes?: string;
+  gradingPolicy?: GradingPolicy;
   attemptScores: number[];
   result: "pending" | "passed" | "failed" | "exempt";
 }

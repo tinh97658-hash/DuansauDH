@@ -1,4 +1,7 @@
 .scheduling-v20{font:12.5px var(--app-font-family);color:var(--text-primary);--blue:#075a9c;--nav:#084c71;--line:#c7d1d9;--muted:var(--text-secondary);--bg:#e8edf1;--amber:#d49315;--green:#2a714a}
+.scheduling-v20.v20-dialog .v20-dialog-head{background:var(--dialog-title-bg,#b4cae6);color:var(--dialog-title-text,#000000)}
+.scheduling-v20.v20-dialog .v20-dialog-head h2,.scheduling-v20.v20-dialog .v20-dialog-head .sl-btn{color:inherit}
+.scheduling-v20.v20-dialog .v20-dialog-body{padding:var(--dialog-content-inset,3mm)}
 .v20-workspace{height:100%;min-height:600px;display:flex;flex-direction:column;background:var(--bg);overflow:auto}
 @media(min-width:761px){.v20-workspace{min-height:0}}
 @media(min-width:1200px){.v20-workspace{min-height:0;overflow:hidden}}

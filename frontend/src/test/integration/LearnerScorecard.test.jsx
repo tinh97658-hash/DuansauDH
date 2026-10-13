@@ -78,7 +78,7 @@ it("loads the new tab on demand and preserves every subject, component, zero and
   expect(values("HP02")[12]).toBe("Không đạt");
   expect(values("HP03")[12]).toBe("Miễn thi");
   expect(values("HP04").slice(5, 12)).toEqual(Array(7).fill(""));
-  expect(values("HP04")[12]).toBe("Chưa có điểm");
+  expect(values("HP04")[12]).toBe("Chưa có kết quả");
   expect(values("HP05")[5]).toBe("0");
   expect(values("HP05")[8]).toBe("");
   expect(values("HP05")[12]).toBe("Chưa có kết quả");

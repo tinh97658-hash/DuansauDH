@@ -183,6 +183,22 @@ describe("PlanService major-scoped subject catalogs", () => {
 });
 
 describe("PlanService subject requirement synchronization", () => {
+  it.each([0, 5])("updates linked curriculum credits and totals atomically when catalog credits become %i", async (credits) => {
+    const transaction = { LOCK: { UPDATE: "UPDATE" } };
+    const subject = { id: "subject-1", majorId: "major-1", program: "masters", codeNumber: 1, codeText: "HP01",
+      sharedMajorIds: [], update: jest.fn().mockResolvedValue(undefined) };
+    const subjects = { findByPk: jest.fn().mockResolvedValue(subject), findOne: jest.fn().mockResolvedValue(null), count: jest.fn().mockResolvedValue(0) };
+    const entries = { update: jest.fn().mockResolvedValue([2]) };
+    const majors = { findByPk: jest.fn().mockResolvedValue({ id: "major-1", program: "masters", active: true }) };
+    const sequelize = { transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)), query: jest.fn().mockResolvedValue([[], 2]) };
+    const service = new PlanService(subjects as never, entries as never, {} as never, majors as never, {} as never,
+      sequelize as never, {} as never, {} as never, {} as never, {} as never);
+    await service.updateSubject(subject.id, { name: "Tên mới", credits });
+    expect(subject.update).toHaveBeenCalledWith(expect.objectContaining({ name: "Tên mới", credits }), { transaction });
+    expect(entries.update).toHaveBeenCalledWith({ credits }, { where: { subjectId: subject.id }, transaction });
+    expect(sequelize.query).toHaveBeenCalledWith(expect.stringContaining("SUM(s.credits)"), { replacements: { subjectId: subject.id }, transaction });
+  });
+
   it("updates existing curriculum entries when a catalog subject becomes elective", async () => {
     const subject = {
       id: "subject-1", majorId: "major-1", program: "masters",

@@ -915,8 +915,9 @@ const AdmissionRecords = ({ mode = "applications" }) => {
       >
         <DialogTitle
           sx={{
-            background: "linear-gradient(180deg, #1A4680 0%, #153A6B 100%)",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.15)",
+            background: "var(--dialog-title-bg, #b4cae6)",
+            color: "var(--dialog-title-text, #000000)",
+            borderBottom: "1px solid #B8C7D6",
             py: 1.25,
             px: 2.5,
             display: "flex",
@@ -925,17 +926,17 @@ const AdmissionRecords = ({ mode = "applications" }) => {
           }}
         >
           <Stack direction="row" spacing={1} alignItems="center">
-            <PersonRounded sx={{ color: "#FFFFFF", fontSize: 20 }} />
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#FFFFFF", fontSize: 14, letterSpacing: "0.3px" }}>
-              {formData.id ? "SỬA HỒ SƠ HỌC VIÊN" : "HỒ SƠ HỌC VIÊN - QUẢN LÝ HỌC VIÊN [MPS - VMU]"}
+            <PersonRounded sx={{ color: "inherit", fontSize: 20 }} />
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "inherit", fontSize: 14, letterSpacing: "0.3px" }}>
+              {formData.id ? "SỬA HỒ SƠ HỌC VIÊN" : "HỒ SƠ HỌC VIÊN - QUẢN LÝ HỌC VIÊN"}
             </Typography>
           </Stack>
-          <IconButton size="small" onClick={() => setIsFormOpen(false)} sx={{ color: "rgba(255, 255, 255, 0.75)", "&:hover": { color: "#FFF", bgcolor: "rgba(255, 255, 255, 0.15)" } }}>
+          <IconButton size="small" onClick={() => setIsFormOpen(false)} sx={{ color: "inherit", "&:hover": { bgcolor: "rgba(0, 0, 0, 0.06)" } }}>
             <CloseRounded fontSize="small" />
           </IconButton>
         </DialogTitle>
 
-        <DialogContent sx={{ p: 2, bgcolor: "#F5F7F8" }}>
+        <DialogContent sx={{ p: "var(--dialog-content-inset, 3mm)", bgcolor: "#F5F7F8" }}>
           {/* Main 3-Column A4 Layout Grid */}
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" }, gap: 1.5 }}>
             {/* COLUMN 1: THÔNG TIN CÁ NHÂN + ẢNH 3x4 */}

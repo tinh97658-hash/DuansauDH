@@ -10,6 +10,7 @@ import { PlanModule } from "../plan/plan.module.js";
 import { MastersController } from "./masters.controller.js";
 import { MastersService } from "./masters.service.js";
 import { ExamGradebookService } from "./exam-gradebook.service.js";
+import { GradingPolicyService } from "./grading-policy.service.js";
 import { CourseExamGradebook } from "../database/models/training/course-exam-gradebook.model.js";
 import { CourseOffering } from "../database/models/training/course-offering.model.js";
 import { CourseOfferingClassGroup } from "../database/models/training/course-offering-class-group.model.js";
@@ -29,7 +30,7 @@ import { Subject } from "../database/models/plan/subject.model.js";
     PlanModule,
   ],
   controllers: [MastersController],
-  providers: [MastersService, ExamGradebookService],
+  providers: [MastersService, ExamGradebookService, GradingPolicyService],
   exports: [MastersService],
 })
 export class MastersModule {}

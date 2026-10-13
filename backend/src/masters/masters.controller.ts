@@ -1,6 +1,8 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from "@nestjs/common";
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
-import { Roles } from "../common/auth-user.js";
+import { CurrentUser, Roles } from "../common/auth-user.js";
+import { GradingPolicyService } from "./grading-policy.service.js";
+import { GradingPoliciesQueryDto, SaveGradingPoliciesDto } from "./dto/grading-policy.dto.js";
 import { RolesGuard } from "../common/roles.guard.js";
 import {
   AssignMembersDto, AutoAssignDto, BatchCreateMastersClassGroupsDto, CreateMastersClassGroupDto, UpdateMastersClassGroupDto,
@@ -17,9 +19,16 @@ export class MastersController {
     private readonly masters: MastersService,
     private readonly gradebooks: ExamGradebookService,
     private readonly admissionEvaluation: AdmissionEvaluationService,
+    private readonly gradingPolicies: GradingPolicyService,
   ) {}
 
   @Get("bridge-course") bridgeCourse() { return this.masters.bridgeCourse(); }
+  @Get("grading-policies") @Roles("admin", "supervisor", "examiner") @UseGuards(RolesGuard)
+  listGradingPolicies(@Query() query: GradingPoliciesQueryDto) { return this.gradingPolicies.list(query); }
+  @Get("grading-rules") @Roles("admin", "supervisor", "examiner") @UseGuards(RolesGuard)
+  sharedGradingRules() { return this.gradingPolicies.shared(); }
+  @Put("grading-policies") @Roles("admin", "examiner") @UseGuards(RolesGuard)
+  saveGradingPolicies(@Body() dto: SaveGradingPoliciesDto, @CurrentUser() user: any) { return this.gradingPolicies.save(dto, user?.id ? String(user.id) : undefined); }
   @Get("admission-scores") @Roles("admin", "supervisor", "examiner") @UseGuards(RolesGuard)
   admissionScores(@Query("roundId") roundId?: string) { return roundId ? this.admissionEvaluation.ranking(roundId) : this.admissionEvaluation.listRounds(); }
   @Get("exam-eligibility") examEligibility() { return this.masters.examEligibility(); }

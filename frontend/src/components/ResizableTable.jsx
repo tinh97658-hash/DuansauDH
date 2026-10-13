@@ -9,10 +9,17 @@ export default function ResizableTable({ columns, storageKey, children, freezeTh
     } catch { return {}; }
   });
   const drag = useRef(null);
+  const wrapperRef = useRef(null);
   const tableRef = useRef(null);
+  const [availableWidth, setAvailableWidth] = useState(0);
   const [preview, setPreview] = useState(null);
-  const widthOf = (column) => Math.max(column.minWidth || 60, Math.min(1000,
-    Number.isFinite(widths[column.key]) ? widths[column.key] : column.width));
+  const baseWidthOf = (column) => Math.max(column.minWidth || 60, Math.min(1000,
+    Number.isFinite(widths[column.key]) ? widths[column.key] : column.width || column.minWidth || 120));
+  const baseWidth = columns.reduce((sum, column) => sum + baseWidthOf(column), 0);
+  const flexibleColumns = columns.filter(column => !Number.isFinite(widths[column.key]));
+  const stretchKeys = new Set((flexibleColumns.length ? flexibleColumns : columns).map(column => column.key));
+  const extraWidth = Math.max(0, availableWidth - baseWidth) / (stretchKeys.size || 1);
+  const widthOf = column => baseWidthOf(column) + (stretchKeys.has(column.key) ? extraWidth : 0);
   const setWidth = (column, width) => setWidths((previous) => ({
     ...previous, [column.key]: Math.max(column.minWidth || 60, Math.min(1000, width)),
   }));
@@ -55,7 +62,24 @@ export default function ResizableTable({ columns, storageKey, children, freezeTh
     try { localStorage.setItem(storageKey, JSON.stringify(widths)); } catch { /* Storage may be disabled. */ }
   }, [storageKey, widths]);
 
-  return <Box sx={{ position: "relative", width: "max-content" }}><Table ref={tableRef} size="small" stickyHeader className={className} aria-label={ariaLabel} sx={{
+  useEffect(() => {
+    const container = wrapperRef.current?.parentElement;
+    if (!container) return undefined;
+    const measure = () => {
+      const style = window.getComputedStyle(container);
+      setAvailableWidth(Math.max(0, container.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0)));
+    };
+    measure();
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(measure);
+      observer.observe(container);
+      return () => observer.disconnect();
+    }
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  return <Box ref={wrapperRef} sx={{ position: "relative", width: "100%", minWidth: baseWidth }}><Table ref={tableRef} size="small" stickyHeader className={className} aria-label={ariaLabel} sx={{
     tableLayout: "fixed", width: columns.reduce((sum, column) => sum + widthOf(column), 0),
     // Collapsed borders leave seams when cells stick at different scroll offsets.
     ...(frozenIndex >= 0 ? { borderCollapse: "separate", borderSpacing: 0 } : {}),

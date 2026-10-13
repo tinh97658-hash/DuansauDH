@@ -27,6 +27,8 @@ it("preserves all curriculum columns, zero scores, exemptions and students witho
   expect(data.rows[0].scores).toEqual({ hp1: { score: 0, result: "failed" } });
   expect(data.rows[1].scores).toEqual({ hp2: { score: null, result: "exempt" } });
   expect(data).toMatchObject({ total: 2, page: 1, pageSize: 50 });
+  expect(data.curriculum.totalCredits).toBe(16);
+  expect(data.group.curriculum.totalCredits).toBe(16);
 });
 
 it("returns the roster with a missing curriculum and avoids querying unrelated scores", async () => {

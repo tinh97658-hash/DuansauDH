@@ -1,4 +1,4 @@
-import { createEvent, fireEvent, render, screen } from "@testing-library/react";
+import { act, createEvent, fireEvent, render, screen } from "@testing-library/react";
 import { TableBody, TableCell, TableRow } from "@mui/material";
 import ResizableTable from "../../components/ResizableTable";
 
@@ -18,6 +18,39 @@ const pointer = (element, type, x) => {
 };
 
 beforeEach(() => localStorage.clear());
+
+it("shares spare container width evenly, preserves manual resizing, and updates frozen offsets on viewport changes", () => {
+  let available = 900;
+  const size = jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(() => available);
+  const originalObserver = global.ResizeObserver;
+  let measure;
+  const disconnect = jest.fn();
+  global.ResizeObserver = jest.fn(callback => { measure = callback; return { observe: jest.fn(), disconnect }; });
+  try {
+    const view = render(table("email"));
+    const name = screen.getByRole("slider", { name: "Độ rộng cột Họ đệm" });
+    const email = screen.getByRole("slider", { name: "Độ rộng cột Email" });
+    const emailHeader = screen.getByRole("columnheader", { name: /Email/ });
+    expect(name).toHaveAttribute("aria-valuenow", "410");
+    expect(email).toHaveAttribute("aria-valuenow", "490");
+    expect(emailHeader).toHaveStyle({ left: "410px" });
+    fireEvent.keyDown(email, { key: "ArrowRight" });
+    expect(email).toHaveAttribute("aria-valuenow", "500");
+    expect(name).toHaveAttribute("aria-valuenow", "400");
+    expect(JSON.parse(localStorage.getItem("test-column-widths"))).toEqual({ email: 500 });
+    available = 1000;
+    act(() => measure());
+    expect(name).toHaveAttribute("aria-valuenow", "500");
+    expect(emailHeader).toHaveStyle({ left: "500px" });
+    available = 300;
+    act(() => measure());
+    expect(name).toHaveAttribute("aria-valuenow", "160");
+    expect(email).toHaveAttribute("aria-valuenow", "500");
+    expect(screen.getByRole("table")).toHaveStyle({ width: "660px" });
+    view.unmount();
+    expect(disconnect).toHaveBeenCalledTimes(1);
+  } finally { size.mockRestore(); global.ResizeObserver = originalObserver; }
+});
 
 it("resizes only the dragged column and remembers its width after remounting", () => {
   const view = render(table());

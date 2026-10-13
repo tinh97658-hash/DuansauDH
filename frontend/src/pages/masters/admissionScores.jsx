@@ -13,10 +13,6 @@ import { API_BASE_URL } from "../../config/http";
 import { normalizeMajorsResponse } from "../../utils/majors";
 
 const options = { withCredentials: true };
-const toolbarSx = {
-  "& .MuiInputBase-root": { height: 40 },
-  "& > .MuiButton-root": { minHeight: 40, whiteSpace: "nowrap" },
-};
 const compactFieldLabelSx = {
   display: "block",
   mb: "5px",

@@ -8,7 +8,7 @@ const policies = {
   testScore: { min: 10, max: 14, nowrap: true }, assignmentScore: { min: 11, max: 14, nowrap: true },
   examScore: { min: 11, max: 14, nowrap: true }, courseScore: { min: 11, max: 14, nowrap: true },
   grade4: { min: 10, max: 12, nowrap: true }, letter: { min: 10, max: 12, nowrap: true },
-  attempts: { min: 14, max: 18 }, result: { min: 12, max: 18 },
+  attempts: { min: 14, max: 18 }, result: { min: 12, max: 18 }, notes: { min: 16, max: 28 },
 };
 
 // Approximate readable text width; merged report headings never participate.

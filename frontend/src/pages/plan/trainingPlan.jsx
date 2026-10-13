@@ -3,8 +3,8 @@ import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
-  Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions,
-  DialogContent, DialogTitle, Divider, FormControl, FormControlLabel,
+  Alert, Box, Button, Checkbox, Chip, CircularProgress,
+  Divider, FormControl, FormControlLabel,
   IconButton, MenuItem, Paper, Select, Stack, Switch, Tab, Tabs,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField,
   Tooltip, Typography,
@@ -22,6 +22,7 @@ import SubjectSharingCheckbox from "../../components/SubjectSharingCheckbox";
 import AppDialog from "../../components/AppDialog";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { getMockConfirmResult } from "../../utils/confirmHelper";
+import { notifySubjectCatalogChanged, useSubjectCatalogRevision } from "../../utils/subjectCatalog";
 import { disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline } from "../../utils/disciplineScope";
 import {
   compactClassCodes, countGroupClasses, groupCurriculumsByYear,
@@ -93,6 +94,7 @@ const cellInputSx = {
 };
 
 const TrainingPlan = () => {
+  const catalogRevision = useSubjectCatalogRevision(false);
   // Global Filters
   const [majors, setMajors] = useState([]);
   const year = String(currentYear);
@@ -268,7 +270,7 @@ const TrainingPlan = () => {
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [loadData, catalogRevision]);
 
   // Load detailed curriculum
   const loadCurriculumDetail = useCallback(async (targetCurriculumId) => {
@@ -289,7 +291,16 @@ const TrainingPlan = () => {
 
   useEffect(() => {
     loadCurriculumDetail(curriculumId);
-  }, [curriculumId, loadCurriculumDetail]);
+  }, [curriculumId, loadCurriculumDetail, catalogRevision]);
+
+  const publishSubjectCatalogChange = () => {
+    notifySubjectCatalogChanged();
+    if (!curriculumId) return;
+    loadCurriculumDetail(curriculumId);
+    axios.get(`${API_BASE_URL}/plan/curriculums?majorId=${majorId}&program=${level}`, { withCredentials: true })
+      .then(({ data }) => setCurriculums(Array.isArray(data) ? data : []))
+      .catch(() => toast.error("Không thể làm mới tổng tín chỉ chương trình đào tạo."));
+  };
 
   // Auto focus first input when adding draft row
   useEffect(() => {
@@ -524,6 +535,7 @@ const TrainingPlan = () => {
       setSharedExistingSubjectIds(null);
       setSharingPromptOpen(false);
       loadMajors();
+      publishSubjectCatalogChange();
 
       if (keepOpenForNext) {
         setSubjectDraft(initialSubjectDraft(Number(subjectDraft.sortOrder || 0) + 1));
@@ -597,11 +609,12 @@ const TrainingPlan = () => {
       setProgramSubjects((prev) => prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)));
       setCurriculumSubjects((prev) => prev.map((entry) => (
         entry.subjectId === updated.id
-          ? { ...entry, isRequired: updated.isRequired, blockCode: updated.subjectType }
+          ? { ...entry, code: updated.codeText || updated.code, name: updated.name, credits: updated.credits, active: updated.active, majorAssignment: updated.majorAssignment, isRequired: updated.isRequired, blockCode: updated.subjectType }
           : entry
       )));
       setEditingSubjectId(null);
       setEditingSubjectForm(null);
+      publishSubjectCatalogChange();
     } catch (err) {
       toast.error(err.response?.data?.message || "Không thể cập nhật học phần");
     }
@@ -624,6 +637,7 @@ const TrainingPlan = () => {
           entry.subjectId === subject.id ? { ...entry, isRequired: newValue } : entry
         )));
       }
+      publishSubjectCatalogChange();
     } catch (err) {
       toast.error(err.response?.data?.message || "Không thể cập nhật trạng thái");
     }
@@ -649,6 +663,7 @@ const TrainingPlan = () => {
       setCurriculumSubjects((current) => current.map((entry) => (
         entry.subjectId === subject.id ? { ...entry, blockCode: subjectType } : entry
       )));
+      publishSubjectCatalogChange();
     } catch (err) {
       setSubjects((current) => current.map((item) => (
         item.id === subject.id ? { ...item, subjectType: previousType } : item
@@ -707,6 +722,7 @@ const TrainingPlan = () => {
     );
     setSubjects((prev) => prev.map((item) => (item.id === subject.id ? { ...item, ...updated } : item)));
     setCatalogSubjects((prev) => prev.map((item) => (item.id === subject.id ? { ...item, ...updated } : item)));
+    publishSubjectCatalogChange();
   };
 
   // Keyboard helper for Subject Draft Row (Enter -> Save & Continue, Esc -> Cancel)

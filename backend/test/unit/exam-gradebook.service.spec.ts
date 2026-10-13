@@ -3,6 +3,7 @@ import { validate } from "class-validator";
 import { plainToInstance } from "class-transformer";
 import { emptyExamGrade, ExamGradebookService } from "../../src/masters/exam-gradebook.service.js";
 import { ExamGradebookQueryDto, SaveExamGradebookDto } from "../../src/masters/dto/exam-gradebook.dto.js";
+import { LEGACY_GRADING_POLICY } from "../../src/masters/grading-policy.js";
 
 const build = () => {
   const groups = { findOne: jest.fn<any>(), findAll: jest.fn<any>() };
@@ -18,7 +19,8 @@ const build = () => {
         { participantId: "admission:a2", code: "HV002", fullName: "Trần Bình", grade: {} }],
     }] : options.replacements.ids.filter((id: string) => ["student:s1", "admission:a2"].includes(id)).map((participantId: string) => ({ participantId }))),
   };
-  const service = new ExamGradebookService(groups as never, members as never, offerings as never, links as never, books as never, sequelize as never);
+  const policies = { latest: jest.fn<any>().mockResolvedValue(LEGACY_GRADING_POLICY) };
+  const service = new ExamGradebookService(groups as never, members as never, offerings as never, links as never, books as never, sequelize as never, policies as never);
   groups.findOne.mockResolvedValue({ id: "g1", name: "CNTT 2026", academicYear: "2026", program: "masters" });
   links.findOne.mockResolvedValue({ id: "link" });
   offerings.findByPk.mockResolvedValue({ id: "o1", subject: { program: "masters" } });
@@ -28,9 +30,68 @@ const build = () => {
     { admissionRecord: { id: "a2", code: "HV002", fullName: "Trần Bình", lastName: "Trần", firstName: "Bình" } },
   ]);
   books.findOne.mockResolvedValue(null);
-  return { service, groups, members, offerings, links, books, sequelize };
+  return { service, groups, members, offerings, links, books, sequelize, policies };
 };
 const query = { classGroupId: "g1", courseOfferingId: "o1" };
+
+it("returns frozen policies with saved grades and the current policy with unentered grades", async () => {
+  const { service, policies, sequelize, offerings } = build();
+  offerings.findByPk.mockResolvedValue({ id: "o1", subjectId: "subject-1", subject: { program: "masters" } });
+  const latest = { ...structuredClone(LEGACY_GRADING_POLICY), version: 2, courseMinimum: 8 };
+  policies.latest.mockResolvedValue(latest);
+  const grade = { ...emptyExamGrade("student:s1"), testScore: 7, assignmentScore: 7, examScore: 7, courseScore: 7, grade4: 3, letterGrade: "B", result: "passed" };
+  sequelize.query.mockResolvedValue([{ revision: 3, total: 2, totalRows: 2, page: 1,
+    rows: [{ participantId: "student:s1", grade }, { participantId: "admission:a2", grade: {} }] }]);
+  const result = await service.get(query);
+  expect(result.rows[0]).toMatchObject({ courseScore: 7, result: "passed", gradingPolicy: { version: 0, courseMinimum: 5.5 } });
+  expect(result.rows[1]).toMatchObject({ courseScore: null, result: "pending", gradingPolicy: latest });
+  expect(policies.latest).toHaveBeenCalledWith("subject-1", "2026");
+});
+
+it("preserves existing policy snapshots when editing old grades and applies the latest policy only to new rows", async () => {
+  const { service, books, policies } = build();
+  const oldPolicy = { ...structuredClone(LEGACY_GRADING_POLICY), version: 1, weights: { testScore: 100, assignmentScore: 0, examScore: 0 },
+    minimums: { testScore: 0, assignmentScore: 0, examScore: 0 }, courseMinimum: 5, useDefaultBands: false,
+    bands: [{ minimum: 0, letter: "OLD", grade4: 2 }] };
+  const newPolicy = { ...structuredClone(LEGACY_GRADING_POLICY), version: 2, weights: { testScore: 0, assignmentScore: 0, examScore: 100 } };
+  policies.latest.mockResolvedValue(newPolicy);
+  const old = { ...emptyExamGrade("student:s1"), testScore: 8, assignmentScore: 6, examScore: 7, courseScore: 8, gradingPolicy: oldPolicy };
+  const book = { revision: 1, grades: [old], update: jest.fn<any>().mockResolvedValue(undefined) };
+  books.findOne.mockResolvedValue(book);
+  await service.save({ ...query, revision: 1, rows: [
+    { ...old, testScore: 5, policyVersion: 2 },
+    { ...emptyExamGrade("admission:a2"), testScore: 5, assignmentScore: 10, examScore: 10, policyVersion: 2 },
+  ] });
+  const saved = book.update.mock.calls[0][0].grades;
+  expect(saved[0]).toMatchObject({ courseScore: 5, letterGrade: "OLD", grade4: 2, gradingPolicy: { version: 1 } });
+  expect(saved[1]).toMatchObject({ courseScore: 10, letterGrade: "A+", grade4: 4, gradingPolicy: { version: 2 } });
+  expect(book.grades[0].courseScore).toBe(8);
+});
+
+it("does not recalculate old saved outcomes when only notes or eligibility change", async () => {
+  const { service, books, policies } = build();
+  policies.latest.mockResolvedValue({ ...LEGACY_GRADING_POLICY, version: 3 });
+  const old = { ...emptyExamGrade("student:s1"), testScore: 8, assignmentScore: 8, examScore: 8, courseScore: 7.2, grade4: 3, letterGrade: "B", result: "passed" as const };
+  const book = { revision: 1, grades: [old], update: jest.fn<any>() };
+  books.findOne.mockResolvedValue(book);
+  await service.save({ ...query, revision: 1, rows: [{ ...old, notes: "Ghi chú mới", eligible: true }] });
+  expect(book.update.mock.calls[0][0].grades[0]).toMatchObject({ courseScore: 7.2, grade4: 3, letterGrade: "B", result: "passed", gradingPolicy: { version: 0 } });
+});
+
+it("rejects a changed policy during first-time grade entry without saving the draft", async () => {
+  const { service, books, policies } = build();
+  policies.latest.mockResolvedValue({ ...LEGACY_GRADING_POLICY, version: 2 });
+  await expect(service.save({ ...query, revision: 0, rows: [{ ...emptyExamGrade("student:s1"), policyVersion: 1 }] })).rejects.toThrow("Cách tính điểm của môn đã thay đổi");
+  expect(books.create).not.toHaveBeenCalled();
+});
+
+it("rejects changed shared rules during first-time entry while leaving saved snapshots unchanged", async () => {
+  const { service, books, policies } = build();
+  policies.latest.mockResolvedValue({ ...LEGACY_GRADING_POLICY, rulesVersion: 2 });
+  await expect(service.save({ ...query, revision: 0, rows: [{ ...emptyExamGrade("student:s1"), policyVersion: 0, policyRulesVersion: 1 }] }))
+    .rejects.toThrow("Cách tính điểm của môn đã thay đổi");
+  expect(books.create).not.toHaveBeenCalled();
+});
 
 it("provides majors and linked course classes for gradebook filters", async () => {
   const { service, groups, offerings } = build();
@@ -55,6 +116,7 @@ it("queries a bounded deduplicated page and keeps unentered scores and eligibili
   expect(data).toMatchObject({ total: 2, totalRows: 2, page: 1, pageSize: 15 });
   expect(sequelize.query.mock.calls[0][0]).toContain('DISTINCT ON ("participantId")');
   expect(sequelize.query.mock.calls[0][0]).toContain("LIMIT :pageSize OFFSET");
+  expect(sequelize.query.mock.calls[0][0]).toContain("OR grade->>'result' = 'passed'");
   expect(sequelize.query.mock.calls[0][1].replacements).toMatchObject({ page: 1, pageSize: 15 });
   expect(members.findAll).not.toHaveBeenCalled();
   expect(books.findOne).not.toHaveBeenCalled();
@@ -95,19 +157,36 @@ it("merges changed rows while preserving unchanged grades", async () => {
   const update = jest.fn<any>();
   const book = { revision: 1, grades: [{ ...emptyExamGrade("admission:a2"), courseScore: 8 }], update };
   books.findOne.mockResolvedValue(book);
-  await service.save({ ...query, revision: 1, rows: [{ ...emptyExamGrade("student:s1"), courseScore: 9, result: "passed" }] });
+  await service.save({ ...query, revision: 1, rows: [{ ...emptyExamGrade("student:s1"), testScore: 8, assignmentScore: 8, examScore: 10, courseScore: 0, grade4: 0, letterGrade: "F", result: "failed" }] });
   expect(update).toHaveBeenCalledWith(expect.objectContaining({ revision: 2, grades: expect.arrayContaining([
     expect.objectContaining({ participantId: "admission:a2", courseScore: 8 }),
-    expect.objectContaining({ participantId: "student:s1", courseScore: 9, result: "passed" }),
+    expect.objectContaining({ participantId: "student:s1", courseScore: 9, grade4: 4, letterGrade: "A+", result: "passed", attemptScores: [10] }),
   ]) }), expect.anything());
 });
 
-it("rejects foreign, duplicate, or incomplete grade rows", async () => {
+it("rejects foreign or duplicate grade rows", async () => {
   const { service, books } = build();
   await expect(service.save({ ...query, revision: 0, rows: [emptyExamGrade("student:outside")] })).rejects.toThrow("ngoài lớp");
   await expect(service.save({ ...query, revision: 0, rows: [emptyExamGrade("student:s1"), emptyExamGrade("student:s1")] })).rejects.toThrow("bị lặp");
-  await expect(service.save({ ...query, revision: 0, rows: [{ ...emptyExamGrade("student:s1"), result: "passed" }] })).rejects.toThrow("Phải nhập điểm học phần");
   expect(books.create).not.toHaveBeenCalled();
+});
+
+it("clears derived scores for incomplete components instead of trusting the payload", async () => {
+  const { service, books } = build();
+  await service.save({ ...query, revision: 0, rows: [{ ...emptyExamGrade("student:s1"), testScore: 8, courseScore: 9, grade4: 4, letterGrade: "A+", result: "passed" }] });
+  expect(books.create).toHaveBeenCalledWith(expect.objectContaining({ grades: [expect.objectContaining({ courseScore: null, grade4: null, letterGrade: "", result: "pending" })] }), expect.anything());
+});
+
+it("rounds component scores before storing and calculating the grade", async () => {
+  const { service, books } = build();
+  await service.save({ ...query, revision: 0, rows: [{ ...emptyExamGrade("student:s1"), testScore: 5.54, assignmentScore: 6, examScore: 5.76 }] });
+  expect(books.create).toHaveBeenCalledWith(expect.objectContaining({ grades: [expect.objectContaining({ testScore: 5.5, assignmentScore: 6, examScore: 5.8, courseScore: 5.8, attemptScores: [5.8], result: "passed" })] }), expect.anything());
+});
+
+it("stores notes with an exempt student's grade", async () => {
+  const { service, books } = build();
+  await service.save({ ...query, revision: 0, rows: [{ ...emptyExamGrade("student:s1"), examExempt: true, notes: "Miễn thi theo quyết định" }] });
+  expect(books.create).toHaveBeenCalledWith(expect.objectContaining({ grades: [expect.objectContaining({ examExempt: true, notes: "Miễn thi theo quyết định", result: "exempt" })] }), expect.anything());
 });
 
 it("validates component ranges and nested payloads on the API boundary", async () => {

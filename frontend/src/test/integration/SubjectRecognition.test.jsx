@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import axios from "axios";
 import AdminAdmissionRecordDetail from "../../pages/plan/admissionRecordDetail";
 import { toast } from "react-toastify";
@@ -47,9 +47,10 @@ const record = {
   documents: {},
 };
 
-const configureReads = ({ learningResults = [], recognitions = [] } = {}) => {
+const configureReads = ({ learningResults = [], recognitions = [], studiedSubjects = [] } = {}) => {
   axios.get.mockImplementation((url) => {
     if (url.includes("/plan/admission-records/record-1/learning-results")) return Promise.resolve({ data: learningResults });
+    if (url.includes("/plan/admission-records/record-1/studied-subjects")) return Promise.resolve({ data: studiedSubjects });
     if (url.includes("/plan/admission-records/record-1/subject-recognitions")) return Promise.resolve({ data: recognitions });
     if (url.includes("/plan/admission-records/record-1/recognized-credits")) return Promise.resolve({ data: { credits: 3 } });
     if (url.includes("/plan/admission-records/record-1/major-transfers")) return Promise.resolve({ data: [] });
@@ -79,7 +80,7 @@ describe("AdmissionRecordDetail shared subject recognition", () => {
       expect.anything(),
     ));
     expect(await screen.findByText(/Đã công nhận: 3 tín chỉ/)).toBeTruthy();
-    expect(screen.getByText(/Kết quả học phần cá nhân & công nhận/)).toBeTruthy();
+    expect(screen.getByText(/Học phần đã học trong chương trình đào tạo/)).toBeTruthy();
     expect(screen.getByRole("button", { name: /Đối chiếu CTĐT & đề xuất công nhận/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Thêm kết quả học phần/ })).toBeTruthy();
   });
@@ -130,8 +131,8 @@ describe("AdmissionRecordDetail shared subject recognition", () => {
 
     render(<AdminAdmissionRecordDetail />);
 
-    expect(await screen.findByText("Đang học", { selector: ".MuiChip-label" })).toBeTruthy();
-    expect(screen.getByText(/Học trước/)).toBeTruthy();
+    expect(await screen.findByText(/Học viên chưa có học phần đã học có kết quả/)).toBeTruthy();
+    expect(screen.queryByTestId("studied-subjects")).toBeNull();
   });
 
   it("lets the council edit or cancel an already decided recognition", async () => {
@@ -184,5 +185,45 @@ describe("AdmissionRecordDetail shared subject recognition", () => {
     ));
     expect(toast.success).toHaveBeenCalledWith("Đã hủy công nhận học phần.");
     confirmSpy.mockRestore();
+  });
+
+  it("shows studied curriculum subjects without scores and limits recognition cards to prior learning and bridge subjects", async () => {
+    const recognition = (id, sourceType, learningResult = {}) => ({ id, sourceType, status: "approved", basis: "canonical_subject", sourceSubject: subject, targetSubject: subject, learningResult });
+    configureReads({
+      studiedSubjects: [
+        { id: "grade-1", subject, sourceType: "regular", status: "completed", result: "passed", score: 9.25 },
+        { id: "grade-2", subject: { ...subject, id: "subject-2", name: "Học phần không đạt" }, sourceType: "regular", status: "completed", result: "failed", score: 3.25 },
+      ],
+      recognitions: [recognition("regular", "regular"), recognition("external", "external"),
+        recognition("early", "early_enrollment", { result: "passed", score: 9.25 }),
+        recognition("pre", "pre_masters", { result: "failed", score: 3.25 }),
+        recognition("bridge", "regular", { bridgeKnowledgeSubjectId: "bridge-1", result: "passed" })],
+    });
+    render(<AdminAdmissionRecordDetail />);
+    const studied = await screen.findByTestId("studied-subjects");
+    expect(within(studied).getByText("Đạt")).toBeInTheDocument();
+    expect(within(studied).getByText("Không đạt")).toBeInTheDocument();
+    expect(within(studied).queryByText("Điểm")).not.toBeInTheDocument();
+    expect(within(studied).queryByText("9.25")).not.toBeInTheDocument();
+    expect(within(studied).queryByText("3.25")).not.toBeInTheDocument();
+    expect(screen.getByText("Quyết định công nhận học phần (3)")).toBeInTheDocument();
+    expect(screen.queryByTestId("recognition-regular")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("recognition-external")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("recognition-early")).getByText("Kết quả: Đạt")).toBeInTheDocument();
+    expect(within(screen.getByTestId("recognition-pre")).getByText("Kết quả: Không đạt")).toBeInTheDocument();
+    expect(screen.getByTestId("recognition-bridge")).toBeInTheDocument();
+  });
+
+  it("preserves an exemption and a pending exam instead of displaying a pass", async () => {
+    configureReads({
+      studiedSubjects: [{ id: "grade-1", subject, sourceType: "regular", status: "completed", result: "exempt" }],
+      recognitions: [{ id: "rec-1", sourceType: "pre_masters", status: "approved", sourceSubject: subject,
+        targetSubject: subject, learningResult: { result: "pending" } }],
+    });
+    render(<AdminAdmissionRecordDetail />);
+    const studied = await screen.findByTestId("studied-subjects");
+    expect(within(studied).getByText("Miễn thi")).toBeInTheDocument();
+    expect(within(studied).queryByText("Đạt")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("recognition-rec-1")).getByText("Kết quả: Chưa có kết quả")).toBeInTheDocument();
   });
 });

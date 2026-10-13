@@ -975,8 +975,8 @@ describe("SchedulingService persisted reads", () => {
     teachingSessions.findAll.mockResolvedValue([session]);
 
     const result: any = await service.getClassCurriculumProgress({ majorId: "major-1", academicYear: "2027" });
-    // The curriculum entry can override the catalog subject's credits (3).
-    expect(result.classes[0].subjects.map((row: any) => row.credits)).toEqual([3, 2]);
+    // A legacy curriculum snapshot must not override the catalog's current credits.
+    expect(result.classes[0].subjects.map((row: any) => row.credits)).toEqual([3, 3]);
 
     expect(result.classes[0]).toEqual(expect.objectContaining({
       code: "CNT2027.01",

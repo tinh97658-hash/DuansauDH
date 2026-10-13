@@ -221,7 +221,7 @@ export class SchedulingService {
           curriculumSubjectId: entry?.id || null,
           subjectId: subject.id,
           logicalSubjectId: subjectId,
-          credits: entry?.credits ?? subject.credits,
+          credits: subject.credits,
           code: subject.code || "",
           name: subject.name || "",
           status,

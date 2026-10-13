@@ -16,6 +16,8 @@ export class ExamGradebookQueryDto extends ExamSubjectsQueryDto {
 }
 
 export class ExamGradeRowDto {
+  @IsOptional() @IsInt() @Min(0) policyVersion?: number;
+  @IsOptional() @IsInt() @Min(0) policyRulesVersion?: number;
   @IsString() @MaxLength(80) participantId!: string;
   @IsOptional() @IsBoolean() eligible?: boolean | null;
   @IsBoolean() examExempt!: boolean;
@@ -25,6 +27,7 @@ export class ExamGradeRowDto {
   @IsOptional() @IsNumber() @Min(0) @Max(10) courseScore?: number | null;
   @IsOptional() @IsNumber() @Min(0) @Max(4) grade4?: number | null;
   @IsString() @MaxLength(10) letterGrade!: string;
+  @IsOptional() @IsString() @MaxLength(1000) notes?: string;
   @IsArray() @ArrayMaxSize(20) @IsNumber({}, { each: true }) @Min(0, { each: true }) @Max(10, { each: true }) attemptScores!: number[];
   @IsIn(["pending", "passed", "failed", "exempt"]) result!: "pending" | "passed" | "failed" | "exempt";
 }
