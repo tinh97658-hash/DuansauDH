@@ -46,6 +46,30 @@ const classGroup = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+it("returns the same canonical order from detail and classSubjects across knowledge blocks without writes", async () => {
+  const mocks = buildService();
+  const entries = [
+    { id: "entry-t", subjectId: "t", sortOrder: 1, blockId: "block-cs", credits: 3, isRequired: true, subject: { id: "t", name: "Triết học", code: "T", subjectType: "CS" } },
+    { id: "entry-a", subjectId: "a", sortOrder: 2, blockId: "block-cn", credits: 4, isRequired: true, subject: { id: "a", name: "An toàn bảo mật", code: "A", subjectType: "CN" } },
+  ];
+  const curriculum = { id: "cur-1", majorId: "major-1", program: "masters", applicableFromYear: "2026", blocks: blockRows, subjectEntries: entries };
+  const group = classGroup({ curriculumId: "cur-1" });
+  mocks.curriculums.findByPk.mockResolvedValue(curriculum);
+  mocks.classGroups.findByPk.mockResolvedValue(group);
+  mocks.blocks.findAll.mockResolvedValue(blockRows);
+  mocks.entries.findAll.mockResolvedValue(entries);
+  const detail = await mocks.service.detail("cur-1");
+  const forClass = await mocks.service.classSubjects("class-1");
+  expect(detail.subjects.map(row => row.subjectId)).toEqual(["a", "t"]);
+  expect(forClass.subjects.map(row => row.subjectId)).toEqual(["a", "t"]);
+  expect(detail.subjects.map(row => [row.blockId, row.sortOrder])).toEqual([["block-cn", 2], ["block-cs", 1]]);
+  expect(forClass.subjects.map(row => row.blockCode)).toEqual(["CN", "CS"]);
+  expect(entries.map(row => row.subjectId)).toEqual(["t", "a"]);
+  expect(mocks.entries.bulkCreate).not.toHaveBeenCalled();
+  expect(mocks.curriculums.update).not.toHaveBeenCalled();
+  expect(group.update).not.toHaveBeenCalled();
+});
+
 describe("CurriculumService.assignToClassGroup", () => {
   it("requires the class to have a major", async () => {
     const mocks = buildService();

@@ -226,7 +226,7 @@ describe("Training Plan Subject identity persistence", () => {
     await act(async () => { render(<TrainingPlan />); });
 
     fireEvent.mouseDown(await screen.findByLabelText(`Phạm vi học chung: ${local.name}`));
-    await clickAndWait(screen.getByRole("option", { name: /QTKD — Quản trị kinh doanh/ }));
+    await clickAndWait(screen.getByRole("option", { name: /^Quản trị kinh doanh$/ }));
     await waitFor(() => expect(axios.put).toHaveBeenCalledWith(
       expect.stringContaining("/plan/subjects/local"),
       { allowCrossMajor: false, canonicalSubjectId: null, sharedMajorIds: [] },
@@ -234,7 +234,7 @@ describe("Training Plan Subject identity persistence", () => {
     ));
     axios.put.mockResolvedValueOnce({ data: { ...local, allowCrossMajor: true, canonicalSubjectId: null, sharedMajorIds: [otherMajor.id] } });
     fireEvent.mouseDown(screen.getByLabelText(`Phạm vi học chung: ${local.name}`));
-    await clickAndWait(screen.getByRole("option", { name: /QTKD — Quản trị kinh doanh/ }));
+    await clickAndWait(screen.getByRole("option", { name: /^Quản trị kinh doanh$/ }));
     expect(axios.put).toHaveBeenLastCalledWith(
       expect.stringContaining("/plan/subjects/local"),
       { allowCrossMajor: true, canonicalSubjectId: null, sharedMajorIds: [otherMajor.id] },
@@ -249,7 +249,7 @@ describe("Training Plan Subject identity persistence", () => {
     axios.put.mockRejectedValue({ response: { data: { message: "Học phần đang được sử dụng" } } });
     await act(async () => { render(<TrainingPlan />); });
     fireEvent.mouseDown(await screen.findByLabelText(`Phạm vi học chung: ${local.name}`));
-    await clickAndWait(screen.getByRole("option", { name: /QTKD — Quản trị kinh doanh/ }));
+    await clickAndWait(screen.getByRole("option", { name: /^Quản trị kinh doanh$/ }));
     expect(toast.error).toHaveBeenCalledWith("Học phần đang được sử dụng");
   });
 
@@ -265,9 +265,9 @@ describe("Training Plan Subject identity persistence", () => {
     fireEvent.change(screen.getByPlaceholderText("Mã chữ (CS01)"), { target: { value: "LOCAL" } });
     fireEvent.change(screen.getByPlaceholderText("Nhập tên học phần..."), { target: { value: root.name } });
     fireEvent.mouseDown(screen.getByLabelText(`Phạm vi học chung: ${root.name}`));
-    await clickAndWait(screen.getByRole("option", { name: /QTKD — Quản trị kinh doanh/ }));
+    await clickAndWait(screen.getByRole("option", { name: /^Quản trị kinh doanh$/ }));
     fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("option", { name: /QTKD — Quản trị kinh doanh/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("option", { name: /^Quản trị kinh doanh$/ })).not.toBeInTheDocument());
     expect(axios.put).not.toHaveBeenCalled();
     await clickAndWait(await screen.findByRole("button", { name: "Lưu & Thêm tiếp (Enter)" }));
     const numberInputs = await screen.findAllByLabelText("Mã số");
@@ -354,7 +354,7 @@ describe("Training Plan Subject identity persistence", () => {
     await clickAndWait(screen.getByRole("button", { name: "Lưu & Thêm tiếp (Enter)" }));
     await clickAndWait(await screen.findByRole("button", { name: "Có" }));
     expect(screen.getByText("Chọn tất cả")).toBeInTheDocument();
-    expect(screen.getByLabelText(/QTKD —/)).toBeChecked();
+    expect(screen.getByLabelText(/^Quản trị kinh doanh/)).toBeChecked();
     await clickAndWait(screen.getByRole("button", { name: "Xác nhận học chung" }));
     await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
       expect.stringContaining("/plan/subjects/link-existing"),
@@ -403,9 +403,9 @@ describe("Training Plan Subject identity persistence", () => {
     await clickAndWait(screen.getByRole("button", { name: "Lưu & Thêm tiếp (Enter)" }));
     await clickAndWait(await screen.findByRole("button", { name: "Có" }));
 
-    expect(screen.getByLabelText(/QTKD —/)).toBeChecked();
-    expect(screen.getByLabelText(/KTHH —/)).not.toBeChecked();
-    await clickAndWait(screen.getByLabelText(/KTHH —/));
+    expect(screen.getByLabelText(/^Quản trị kinh doanh/)).toBeChecked();
+    expect(screen.getByLabelText(/^Khai thác hàng hải/)).not.toBeChecked();
+    await clickAndWait(screen.getByLabelText(/^Khai thác hàng hải/));
     await clickAndWait(screen.getByRole("button", { name: "Xác nhận học chung" }));
 
     const numberInputs = await screen.findAllByLabelText("Mã số");
@@ -479,5 +479,37 @@ describe("Training Plan Subject identity persistence", () => {
     expect(screen.getByPlaceholderText("Mã chữ (CS01)")).toHaveValue("CLOSE-405");
     expect(screen.getByPlaceholderText("Nhập tên học phần...")).toHaveValue(root.name);
     expect(axios.post).not.toHaveBeenCalled();
+  });
+});
+
+describe("Training Plan canonical curriculum display", () => {
+  beforeEach(() => { jest.clearAllMocks(); });
+
+  it("renders canonical A–Z order with visible index STT, preserving block metadata and filter order", async () => {
+    const names = ["Triết học", "An toàn bảo mật", "Xử lý ngôn ngữ tự nhiên", "Công nghệ Chuỗi khối", "Học máy"];
+    const source = names.map((name, index) => ({ id: `entry-${index}`, subjectId: `subject-${index}`, name,
+      code: `${index === 1 || index === 4 ? "MATCH" : "OTHER"}-${index}`, sortOrder: [90, 40, 10, 70, 20][index],
+      credits: 3, isRequired: true, blockId: `block-${index}`, blockName: `Khối ${index}` }));
+    // The backend owns the canonical sorting; the frontend must consume this order.
+    const sorted = [source[1], source[3], source[4], source[0], source[2]];
+    const curriculum = { id: "canonical", code: "CT-QA", name: "CTĐT kiểm tra thứ tự", majorId: major.id,
+      applicableFromYear: String(new Date().getFullYear()), totalCredits: 15, classGroups: [], electiveGroups: [], subjects: sorted };
+    configureReads([]);
+    const defaultGet = axios.get.getMockImplementation();
+    axios.get.mockImplementation(url => url.includes("/plan/curriculums?") ? Promise.resolve({ data: [curriculum] })
+      : url.endsWith("/plan/curriculums/canonical") ? Promise.resolve({ data: curriculum }) : defaultGet(url));
+    await act(async () => { render(<TrainingPlan />); });
+    await clickAndWait(await screen.findByRole("tab", { name: /Chương trình đào tạo theo khóa/ }));
+    const table = (await screen.findByText("Xử lý ngôn ngữ tự nhiên")).closest("table");
+    const visibleRows = () => within(table).getAllByRole("row").slice(1).map(row => within(row).getAllByRole("cell").map(cell => cell.textContent));
+    expect(visibleRows().map(row => row[2])).toEqual(sorted.map(row => row.name));
+    expect(visibleRows().map(row => row[0])).toEqual(["1", "2", "3", "4", "5"]);
+    expect(visibleRows().map(row => row[4])).toEqual(sorted.map(row => row.blockName));
+    fireEvent.change(screen.getByLabelText("Tìm kiếm học phần trong chương trình đào tạo"), { target: { value: "MATCH" } });
+    expect(visibleRows().map(row => row[2])).toEqual(["An toàn bảo mật", "Học máy"]);
+    expect(visibleRows().map(row => row[0])).toEqual(["1", "2"]);
+    expect(axios.put).not.toHaveBeenCalled();
+    expect(axios.post).not.toHaveBeenCalled();
+    expect(axios.delete).not.toHaveBeenCalled();
   });
 });

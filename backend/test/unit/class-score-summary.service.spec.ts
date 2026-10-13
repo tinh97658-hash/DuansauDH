@@ -2,7 +2,7 @@ import { jest } from "@jest/globals";
 import { validate } from "class-validator";
 import { plainToInstance } from "class-transformer";
 import { ClassScoreSummaryService } from "../../src/reports/class-score-summary.service.js";
-import { ClassScoreSummaryQueryDto, LearnerScorecardQueryDto } from "../../src/reports/dto/class-score-summary.dto.js";
+import { ClassScoreRosterQueryDto, ClassScoreSummaryQueryDto, LearnerScorecardQueryDto } from "../../src/reports/dto/class-score-summary.dto.js";
 
 const build = () => {
   const groups = { findByPk: jest.fn<any>(), findAll: jest.fn<any>() };
@@ -24,6 +24,7 @@ it("preserves all curriculum columns, zero scores, exemptions and students witho
   const { service } = build();
   const data = await service.get({ classGroupId: "g1" });
   expect(data.subjects).toHaveLength(3);
+  expect(data.subjects.map(subject => subject.id)).toEqual(["hp3", "hp2", "hp1"]);
   expect(data.rows[0].scores).toEqual({ hp1: { score: 0, result: "failed" } });
   expect(data.rows[1].scores).toEqual({ hp2: { score: null, result: "exempt" } });
   expect(data).toMatchObject({ total: 2, page: 1, pageSize: 50 });
@@ -105,4 +106,14 @@ it("returns a clear unassigned state and rejects nonexistent learners", async ()
 it("validates the optional scorecard class ID", async () => {
   expect(await validate(plainToInstance(LearnerScorecardQueryDto, {}))).toHaveLength(0);
   expect(await validate(plainToInstance(LearnerScorecardQueryDto, { classGroupId: "bad" }))).not.toHaveLength(0);
+});
+
+it("rejects invalid roster scope and missing classes before reading memberships", async () => {
+  expect(await validate(plainToInstance(ClassScoreRosterQueryDto, {}))).not.toHaveLength(0);
+  expect(await validate(plainToInstance(ClassScoreRosterQueryDto, { classGroupId: "bad" }))).not.toHaveLength(0);
+  expect(await validate(plainToInstance(ClassScoreRosterQueryDto, { classGroupId: "00000000-0000-4000-8000-000000000001" }))).toHaveLength(0);
+  const { service, groups, sequelize } = build();
+  groups.findByPk.mockResolvedValue(null);
+  await expect(service.roster("missing")).rejects.toThrow("Không tìm thấy lớp học viên");
+  expect(sequelize.query).not.toHaveBeenCalled();
 });

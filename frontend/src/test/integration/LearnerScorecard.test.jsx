@@ -48,11 +48,16 @@ const mount = (entry = "/masters/admitted-records/ar1") => render(<MemoryRouter 
   </Routes>
 </MemoryRouter>);
 
+const waitForScorecard = async () => {
+  const panel = await screen.findByLabelText("B\u1ea3ng \u0111i\u1ec3m h\u1ecdc vi\u00ean", {}, { timeout: 5000 });
+  await within(panel).findByText("HP01", {}, { timeout: 5000 });
+};
+
 beforeEach(() => {
   jest.clearAllMocks(); localStorage.clear();
   axios.get.mockImplementation(async (url, config) => {
     if (url.endsWith("/class-score-summary/options")) return { data: { groups } };
-    if (url.endsWith("/class-score-summary/export")) return { data: classReport };
+    if (url.endsWith("/class-score-summary")) return { data: classReport };
     if (url.includes("/learner-scorecard/")) return { data: scorecard(config.params.classGroupId || "g1") };
     if (url.endsWith("/admission-records/ar1")) return { data: record };
     if (url.endsWith("/auth/isStaff")) return { data: { message: "admin" } };
@@ -67,7 +72,7 @@ it("loads the new tab on demand and preserves every subject, component, zero and
   const tab = await screen.findByRole("tab", { name: "Bảng điểm" });
   expect(axios.get.mock.calls.some(([url]) => url.includes("/learner-scorecard/"))).toBe(false);
   fireEvent.click(tab);
-  await screen.findByText("HP01");
+  await waitForScorecard();
   expect(tab).toHaveAttribute("aria-selected", "true");
   expect(screen.getByTestId("location")).toHaveTextContent("?tab=grades");
   const panel = screen.getByLabelText("Bảng điểm học viên");
@@ -91,8 +96,11 @@ it("opens the clicked learner's scorecard in the exact reported class and suppor
   mount("/reports/class-score-summary");
   const link = (await screen.findByText("An")).closest("a");
   expect(link).toHaveAttribute("href", "/masters/admitted-records/ar1?tab=grades&classGroupId=g1");
-  fireEvent.click(link);
-  await screen.findByText("HP01");
+  // The async report mounts Link after the initial router render. Flush its
+  // navigation effect before simulating a click.
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  await act(async () => { fireEvent.click(link); });
+  await waitForScorecard();
   expect(screen.getByRole("tab", { name: "Bảng điểm" })).toHaveAttribute("aria-selected", "true");
   expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/learner-scorecard\/ar1$/), { params: { classGroupId: "g1" } });
   expect(screen.getByLabelText("Lớp học viên")).toHaveTextContent("CNTT2026.1.1");
@@ -103,7 +111,7 @@ it("opens the clicked learner's scorecard in the exact reported class and suppor
 it("keeps the chosen class in the URL and discards a late response from a previous class", async () => {
   let resolveOld;
   mount("/masters/admitted-records/ar1?tab=grades&classGroupId=g1");
-  await screen.findByText("HP01");
+  await waitForScorecard();
   axios.get.mockImplementation((url, config) => new Promise(resolve => {
     if (config.params.classGroupId === "g2") resolveOld = resolve;
     else resolve({ data: scorecard("g1") });
@@ -122,7 +130,7 @@ it("supports the scorecard tab on a doctoral profile", async () => {
   const originalGet = axios.get.getMockImplementation();
   axios.get.mockImplementation(async (url, config) => url.endsWith("/admission-records/ar1") ? { data: { ...record, trainingLevel: "Tiến sĩ" } } : originalGet(url, config));
   mount("/plan/admission-records/ar1?tab=grades&classGroupId=g1");
-  await screen.findByText("HP01");
+  await waitForScorecard();
   expect(screen.getByRole("tab", { name: "Bảng điểm" })).toHaveAttribute("aria-selected", "true");
   expect(screen.queryByRole("tab", { name: "Xét tuyển" })).not.toBeInTheDocument();
 });
@@ -131,7 +139,7 @@ it("retries an API failure without losing the requested class", async () => {
   axios.get.mockRejectedValueOnce(new Error("Không tải được điểm"));
   render(<LearnerScorecard admissionRecordId="ar1" classGroupId="g2" onClassChange={jest.fn()} />);
   fireEvent.click(await screen.findByRole("button", { name: "Thử lại" }));
-  await screen.findByText("HP01");
+  await waitForScorecard();
   expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/learner-scorecard\/ar1$/), { params: { classGroupId: "g2" } });
 });
 

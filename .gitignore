@@ -21,3 +21,8 @@ ServerSide/config.env
 .env.*
 !.env.example
 !.env.*.example
+
+# Local transcript implementation diary and retired comparison fonts
+/TRANSCRIPT-EXPORT-CONTINUOUS-IMPLEMENTATION.md
+/frontend/public/fonts/transcript/NotoSerif-*.ttf
+/frontend/public/fonts/transcript/OFL.txt

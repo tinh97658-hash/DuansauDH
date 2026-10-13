@@ -190,6 +190,11 @@
 .sl-schedule-view .sl-section h2{height:32px;display:flex;align-items:center;justify-content:space-between;margin:0;color:#607486;font-size:12.5px}
 .sl-schedule-view .sl-section h2 span{margin:0;padding:0;background:transparent;font-size:12.5px}
 .sl-schedule-view .sl-section h2 b{min-width:31px;height:27px;display:grid;place-items:center;border-radius:4px;background:#f3f7f9;color:#607486;font-size:12.5px;font-weight:600}
+.sl-schedule-view .sl-section h2 .sl-offering-sort-actions{display:inline-flex;align-items:center;gap:6px}
+.sl-offering-sort{width:27px;height:27px;padding:3px;display:inline-grid;place-items:center;border:0;border-radius:4px;background:transparent;color:#607486;cursor:pointer}
+.sl-offering-sort svg{font-size:18px}
+.sl-offering-sort:hover,.sl-offering-sort[aria-pressed="true"]{background:#eaf4fb;color:#173e75}
+.sl-offering-sort:focus-visible{outline:2px solid #173e75;outline-offset:2px}
 .sl-schedule-view .sl-card{height:auto;min-height:98px;display:grid;grid-template-rows:auto auto;align-content:space-between;margin-bottom:7px;padding:8px 10px;border:1px solid #d7e1e9;border-left:1px solid #d7e1e9;border-radius:4px;background:#fff;cursor:default;overflow:hidden}
 .sl-schedule-view .sl-card.sl-selected{border-color:#72aed0;border-left:3px solid #1689b4;background:#eaf4fa}
 .sl-card-heading{display:flex;align-items:center;gap:12px;min-width:0}

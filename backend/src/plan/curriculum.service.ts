@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
 import { Op } from "sequelize";
+import { sortCurriculumSubjectsByVietnameseName } from "./curriculum-subject-order.js";
 import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { Major } from "../database/models/common/major.model.js";
@@ -162,7 +163,8 @@ export class CurriculumService {
       const blockById = new Map(blocks.map((block) => [block.id, block]));
       const groupById = new Map(electiveGroups.map((group) => [group.id, group]));
 
-      const subjectRows = rows.map((row: any) => {
+      const subjectRows = sortCurriculumSubjectsByVietnameseName(rows,
+        (row: any) => row.subject || { id: row.subjectId }).map((row: any) => {
         const plain = typeof row.get === "function" ? row.get({ plain: true }) : row;
         // The catalog is the source of truth for required/elective status.
         // Falling back to the entry keeps older/incomplete relations readable,
@@ -631,7 +633,8 @@ export class CurriculumService {
 
   private withTotals(curriculum: any) {
     const value = typeof curriculum.get === "function" ? curriculum.get({ plain: true }) : curriculum;
-    const entries = (value.subjectEntries || []).map((entry: any) => {
+    const entries = sortCurriculumSubjectsByVietnameseName(value.subjectEntries || [],
+      (entry: any) => entry.subject || { id: entry.subjectId }).map((entry: any) => {
       const subject = entry.subject || {};
       return {
         id: entry.id,

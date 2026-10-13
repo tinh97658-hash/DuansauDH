@@ -69,21 +69,30 @@ it("scopes majors and classes by discipline and resets unavailable choices when 
   expect(screen.getByLabelText("Chuyên ngành")).toHaveTextContent("Công nghệ thông tin");
 });
 
-it("searches the full class and exports matching students", async () => {
-  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups } : {
-    ...reportFor(config.params.classGroupId), total: config.params.search ? 1 : 60, page: config.params.page || 1,
-    rows: [{ ...student, code: config.params.search ? "HV060" : "HV001" }],
-  } }));
+it.each(["Nguyễn", "Không khớp"])("exports the whole selected class independently of table search '%s'", async (search) => {
+  const full = { ...reportFor("g1"), rows: [student,
+    { ...student, participantId: "student:two", code: "HV002", fullName: "Trần Văn Bình" }], total: 2 };
+  const matching = search === "Nguyễn" ? [student] : [];
+  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups }
+    : url.endsWith("/export") ? full : { ...full, rows: config.params.search ? matching : full.rows,
+      total: config.params.search ? matching.length : full.total, page: config.params.page, pageSize: 15 } }));
   mount();
   await screen.findByText("HV001");
-  fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: "HV060" } });
-  const row = (await screen.findByText("HV060")).closest("tr");
-  expect(within(row).getAllByRole("cell")[0]).toHaveTextContent("1");
-  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/class-score-summary\/export$/), { params: { classGroupId: "g1", search: "HV060" } });
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Xuất file Excel" })); });
-  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/export$/), { params: { classGroupId: "g1", search: "HV060" } }));
-  await waitFor(() => expect(createClassScoreWorkbook).toHaveBeenCalledWith(expect.objectContaining({ rows: [expect.objectContaining({ code: "HV060" })] })));
-  await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file Excel" })).toBeEnabled());
+  fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: search } });
+  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/class-score-summary$/),
+    { params: { classGroupId: "g1", search, page: 1, pageSize: 15 } }));
+  if (matching.length) await screen.findByText("HV001");
+  else await screen.findByText("Không có học viên phù hợp với tìm kiếm.");
+  await waitFor(() => expect(screen.getByRole("button", { name: "Xuất điểm" })).toBeEnabled());
+  expect(screen.queryByText("HV002")).not.toBeInTheDocument();
+  expect(axios.get.mock.calls.some(([url]) => url.endsWith("/export"))).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Xuất điểm" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất điểm cả lớp" }));
+  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/export$/), { params: { classGroupId: "g1" } }));
+  await waitFor(() => expect(createClassScoreWorkbook).toHaveBeenCalledWith(full));
+  expect(axios.get.mock.calls.filter(([url]) => url.endsWith("/export"))).toHaveLength(1);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Xuất điểm" })).toBeEnabled());
+  expect(screen.getByLabelText("Tìm kiếm")).toHaveValue(search);
 });
 
 it("filters classes by intake year and loads the selected class", async () => {
@@ -93,24 +102,30 @@ it("filters classes by intake year and loads the selected class", async () => {
   chooseFilter("Ngành", "Kinh tế");
   await screen.findByText("HV002");
   chooseFilter("Năm vào trường", "2025");
-  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/class-score-summary\/export$/), { params: { classGroupId: "g3" } }));
+  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/class-score-summary$/), { params: { classGroupId: "g3", search: "", page: 1, pageSize: 15 } }));
   await screen.findByText("HV003");
   expect(screen.getByLabelText("Chọn lớp")).toHaveTextContent("CNTT2025.1.1");
   expect(screen.getByLabelText("Chọn lớp")).not.toHaveTextContent("QTKD2026");
 });
 
-it("shows every student without pagination controls", async () => {
+it("loads only a page, requests the next page, and resets search to page one", async () => {
   axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups } : {
-    ...reportFor(config.params.classGroupId), total: 60,
-    rows: Array.from({ length: 60 }, (_, index) => ({ ...student, participantId: `student:${index}`, code: `HV${String(index + 1).padStart(3, "0")}` })),
+    ...reportFor(config.params.classGroupId), total: config.params.search ? 1 : 40,
+    page: config.params.page, pageSize: 15,
+    rows: [{ ...student, code: config.params.search ? "HV040" : config.params.page === 2 ? "HV016" : "HV001" }],
   } }));
   mount();
   await screen.findByText("HV001");
-  const row = screen.getByText("HV060").closest("tr");
-  expect(within(row).getAllByRole("cell")[0]).toHaveTextContent("60");
-  expect(screen.getAllByRole("row")).toHaveLength(61);
-  expect(screen.queryByRole("button", { name: "Trang sau" })).not.toBeInTheDocument();
-  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/class-score-summary\/export$/), { params: { classGroupId: "g1" } });
+  expect(axios.get.mock.calls.some(([url]) => url.endsWith("/export"))).toBe(false);
+  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/class-score-summary$/), { params: { classGroupId: "g1", search: "", page: 1, pageSize: 15 } });
+  fireEvent.click(screen.getByRole("button", { name: /page 2/i }));
+  const row = (await screen.findByText("HV016")).closest("tr");
+  expect(within(row).getAllByRole("cell")[0]).toHaveTextContent("16");
+  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/class-score-summary$/), { params: { classGroupId: "g1", search: "", page: 2, pageSize: 15 } });
+  fireEvent.change(screen.getByLabelText("T\u00ecm ki\u1ebfm"), { target: { value: "HV040" } });
+  await screen.findByText("HV040");
+  expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/class-score-summary$/), { params: { classGroupId: "g1", search: "HV040", page: 1, pageSize: 15 } });
+  expect(axios.get.mock.calls.some(([url]) => url.endsWith("/export"))).toBe(false);
 });
 
 it("exports all students using a separate full-class request", async () => {
@@ -118,7 +133,8 @@ it("exports all students using a separate full-class request", async () => {
   axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups } : url.endsWith("/export") ? full : reportFor(config.params.classGroupId) }));
   mount();
   await screen.findByText("HV001");
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Xuất file Excel" })); });
+  fireEvent.click(screen.getByRole("button", { name: "Xuất điểm" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất điểm cả lớp" }));
   await waitFor(() => expect(createClassScoreWorkbook).toHaveBeenCalledWith(full));
   expect(downloadDocumentFile).toHaveBeenCalledWith(expect.any(Blob), "Tong-hop-diem-CNTT2026.1.1.xlsx");
 });
@@ -139,7 +155,8 @@ it("shows missing curriculum and empty class states with export disabled", async
   mount();
   expect(await screen.findByText(/Lớp chưa được gán chương trình đào tạo/)).toBeInTheDocument();
   expect(screen.getByText("Lớp chưa có học viên.")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Xuất file Excel" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Xuất điểm" }));
+  expect(screen.getByRole("menuitem", { name: "Xuất điểm cả lớp" })).toHaveAttribute("aria-disabled", "true");
 });
 
 it("retries a failed report without changing the selected class", async () => {

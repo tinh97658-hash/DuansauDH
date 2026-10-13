@@ -1,0 +1,128 @@
+.transcript-dialog .MuiDialog-paper { max-height:calc(100% - 64px); background:var(--surface-bg); color:var(--text-primary); }
+.transcript-dialog .transcript-dialog-heading { flex:none; padding:20px 24px 16px; color:var(--secondary); font-size:18px; font-weight:700; line-height:1.4; }
+.transcript-dialog .transcript-class { margin:8px 0 0; color:var(--text-secondary); font-size:13px; font-weight:400; }
+.transcript-dialog .transcript-class strong { color:var(--text-primary); font-weight:600; }
+.transcript-dialog .transcript-dialog-content { display:flex; flex-direction:column; min-height:0; padding:0 24px; overflow:hidden; }
+.transcript-dialog .transcript-controls { flex:none; padding:0 0 16px; }
+.transcript-dialog .transcript-export-settings { padding:16px 0; border-top:1px solid var(--table-border-color); }
+.transcript-dialog .transcript-section-label { display:block; margin-bottom:8px; color:var(--text-secondary); font-size:12px; font-weight:600; }
+.transcript-dialog .transcript-format-options { gap:12px; }
+.transcript-dialog .transcript-format-option { box-sizing:border-box; height:46px; min-width:136px; margin:0; padding:0 12px; border:1px solid var(--table-border-color); border-radius:8px; background:var(--surface-bg); transition:background .15s,border-color .15s; }
+.transcript-dialog .transcript-format-option:hover { border-color:var(--primary); background:var(--table-hover-bg); }
+.transcript-dialog .transcript-format-option.is-selected { border-color:var(--primary); background:var(--primary-light); }
+.transcript-dialog .transcript-format-option:focus-within { outline:2px solid var(--primary); outline-offset:2px; }
+.transcript-dialog .transcript-format-option.Mui-disabled { opacity:.6; }
+.transcript-dialog .transcript-format-option > .MuiRadio-root { order:2; margin-left:16px; padding:4px; color:var(--text-secondary); }
+.transcript-dialog .transcript-format-option > .MuiRadio-root.Mui-checked { color:var(--primary); }
+.transcript-dialog .transcript-format-label { display:flex; align-items:center; gap:8px; color:var(--text-primary); font-size:14px; font-weight:600; }
+.transcript-dialog .transcript-file-icon { width:24px; height:24px; flex:none; }
+.transcript-dialog .transcript-file-icon-pdf { color:var(--danger); }
+.transcript-dialog .transcript-file-icon-word { color:var(--secondary); }
+.transcript-dialog .transcript-format-note { margin:12px 0 0; color:var(--text-secondary); font-size:12px; line-height:1.5; }
+.transcript-dialog .transcript-selection-controls { display:flex; align-items:center; flex-wrap:wrap; gap:8px 16px; padding:12px 0; margin-bottom:16px; border-top:1px solid var(--table-border-color); border-bottom:1px solid var(--table-border-color); }
+.transcript-dialog .transcript-selection-controls > .MuiFormControlLabel-root { margin:0; }
+.transcript-dialog .transcript-selection-controls .MuiFormControlLabel-label { font-size:13px; }
+.transcript-dialog .transcript-selection-controls .MuiCheckbox-root { padding:8px; margin-left:-8px; }
+.transcript-dialog .MuiCheckbox-root.Mui-checked,.transcript-dialog .MuiCheckbox-root.MuiCheckbox-indeterminate { color:var(--primary); }
+.transcript-dialog .transcript-selection-count { color:var(--text-secondary); font-size:12px; white-space:nowrap; }
+.transcript-dialog .transcript-selection-count strong { color:var(--secondary); font-weight:600; }
+.transcript-dialog .transcript-export-button { min-height:38px; margin-left:auto; padding:8px 16px; border-radius:8px; background:var(--primary); color:var(--surface-bg); font-size:13px; font-weight:600; text-transform:none; white-space:nowrap; }
+.transcript-dialog .transcript-export-button:hover { background:var(--secondary); }
+.transcript-dialog .transcript-export-button.Mui-disabled { background:var(--table-border-color); color:var(--text-secondary); cursor:not-allowed; }
+.transcript-dialog .transcript-search .MuiOutlinedInput-root { height:40px; border-radius:8px; font-size:13px; }
+.transcript-dialog .transcript-search .MuiOutlinedInput-notchedOutline { border-color:var(--table-border-color); }
+.transcript-dialog .transcript-search .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline { border-color:var(--text-secondary); }
+.transcript-dialog .transcript-search .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline { border-color:var(--primary); border-width:1px; }
+.transcript-dialog .transcript-search .MuiInputAdornment-root { color:var(--text-secondary); }
+.transcript-dialog .transcript-search .MuiSvgIcon-root { font-size:20px; }
+.transcript-dialog .transcript-dialog-content > .MuiAlert-root { flex:none; margin-bottom:12px; }
+.transcript-dialog .transcript-roster { min-height:0; overflow-y:auto; overscroll-behavior:contain; border-top:1px solid var(--table-border-color); }
+.transcript-dialog .transcript-roster-row { display:flex; align-items:center; flex-wrap:wrap; gap:4px 12px; min-height:62px; padding:8px 12px; box-sizing:border-box; border-bottom:1px solid var(--table-border-color); transition:background .15s; }
+.transcript-dialog .transcript-roster-row:hover { background:var(--table-hover-bg); }
+.transcript-dialog .transcript-roster-row.is-selected { background:var(--primary-light); }
+.transcript-dialog .transcript-roster-row .MuiFormControlLabel-root { flex:1; min-width:0; margin:0; }
+.transcript-dialog .transcript-roster-row .MuiCheckbox-root { padding:8px; margin-left:-8px; margin-right:8px; }
+.transcript-dialog .transcript-roster-row .MuiFormControlLabel-label { flex:1; min-width:0; }
+.transcript-dialog .transcript-student-label { display:grid; grid-template-columns:120px minmax(0,1fr); align-items:center; gap:12px; font-size:13px; }
+.transcript-dialog .transcript-student-label strong { color:var(--secondary); font-weight:600; overflow-wrap:anywhere; }
+.transcript-dialog .transcript-student-label > span { color:var(--text-primary); overflow-wrap:anywhere; }
+.transcript-dialog .transcript-preview-action { flex:none; }
+.transcript-dialog .transcript-preview-button { min-height:36px; padding:6px 8px; border-radius:6px; color:var(--primary); font-size:12px; text-transform:none; white-space:nowrap; }
+.transcript-dialog .transcript-preview-button:hover { background:var(--primary-light); }
+.transcript-dialog .transcript-preview-button .MuiSvgIcon-root { font-size:18px; }
+.transcript-dialog .transcript-roster-row small { flex-basis:100%; color:var(--text-secondary); padding-left:36px; font-size:12px; }
+.transcript-dialog .transcript-empty { display:flex; align-items:center; justify-content:center; gap:12px; padding:24px 0; margin:0; color:var(--text-secondary); font-size:13px; }
+.transcript-dialog .transcript-dialog-footer { flex:none; padding:12px 24px; border-top:1px solid var(--table-border-color); }
+.transcript-dialog .transcript-dialog-footer .MuiButton-root { border-radius:6px; color:var(--text-secondary); text-transform:none; }
+@media (max-width:600px) {
+  .transcript-dialog .MuiDialog-paper { margin:16px; width:calc(100% - 32px); max-height:calc(100% - 32px); }
+  .transcript-dialog .transcript-dialog-heading { padding:16px; font-size:16px; }
+  .transcript-dialog .transcript-dialog-content { padding:0 16px; }
+  .transcript-dialog .transcript-selection-controls { gap:8px 12px; }
+  .transcript-dialog .transcript-selection-controls > .MuiFormControlLabel-root { flex-basis:100%; }
+  .transcript-dialog .transcript-roster-row { padding:8px; gap:4px 8px; }
+  .transcript-dialog .transcript-student-label { grid-template-columns:minmax(0,1fr); gap:4px; }
+  .transcript-dialog .transcript-preview-button { padding:6px; }
+  .transcript-dialog .transcript-preview-button .MuiButton-startIcon { margin-right:4px; }
+  .transcript-dialog .transcript-dialog-footer { padding:12px 16px; }
+}
+.transcript-preview { background:#e7eaee; min-height:100vh; color:#000; }
+.transcript-viewer-toolbar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:10px 16px; border-bottom:1px solid #c5cad1; background:#fff; font-family:Arial,sans-serif; }
+.transcript-viewer-toolbar button,.transcript-preview > button { padding:7px 12px; border:1px solid #b8bec7; border-radius:4px; background:#fff; color:#172333; font:inherit; cursor:pointer; }
+.transcript-viewer-toolbar button:disabled { opacity:.55; cursor:default; }
+.transcript-viewer-toolbar button:focus-visible { outline:3px solid #2367bd; outline-offset:2px; }
+.transcript-viewer-toolbar .transcript-print-button { background:#235e9e; color:#fff; border-color:#235e9e; }
+.transcript-zoom-controls { display:flex; align-items:center; gap:8px; margin-left:auto; }
+.transcript-viewer-canvas { padding:24px 12px 40px; overflow:auto; }
+.transcript-page-frame { position:relative; margin:0 auto 44px; }
+.transcript-page-frame .transcript-sheet { width:595.28pt; max-width:none; height:841.89pt; min-height:841.89pt; margin:0; padding-bottom:34pt; transform-origin:top left; border:1px solid #c7cbd0; box-shadow:0 2px 8px #0002; }
+.transcript-page-label { position:absolute; top:100%; left:0; right:0; text-align:center; padding-top:8px; font:12px Arial,sans-serif; color:#485361; }
+.transcript-viewer-error { padding:12px; color:#8c1515; }
+.transcript-preview-notice { max-width:595.28pt; margin:0 auto 12px; font-size:13px; color:#444; }
+.transcript-sheet { box-sizing:border-box; display:flex; flex-direction:column; width:100%; max-width:595.28pt; min-height:841.89pt; margin:auto; padding:20pt 28.3pt 34pt 42.5pt; background:#fff; color:#000; font-family:"Times New Roman",Times,serif; font-size:12pt; line-height:13.5pt; }
+.transcript-sheet > * { flex-shrink:0; }
+.transcript-number { margin:0; height:15pt; line-height:13.5pt; white-space:pre-wrap; }
+.transcript-sheet h1 { text-align:center; font-size:14.25pt; line-height:16.5pt; height:21.75pt; font-weight:700; margin:0; }
+/* The application enforces its own font on headings/tables with #root rules.
+   Keep that chrome typography outside this administrative document. */
+#root .transcript-sheet h1,#root .transcript-sheet table { font-family:"Times New Roman",Times,serif !important; color:#000; }
+.transcript-fields { margin-bottom:3.75pt; }
+.transcript-metadata-row { display:grid; grid-template-columns:247.5pt minmax(0,1fr); gap:0; min-height:16.5pt; margin-bottom:0; }
+.transcript-metadata-row:nth-child(4) { min-height:17.25pt; }
+.transcript-metadata-row dl { min-width:0; margin:0; }
+.transcript-fields dt { display:inline; font-weight:400; margin-right:5px; }
+.transcript-fields dd { display:inline; font-weight:700; margin:0; overflow-wrap:break-word; }
+.transcript-table-scroll { width:100%; }
+.transcript-sheet table { width:517.3pt; margin-left:3.6pt; table-layout:fixed; border-collapse:collapse; font-size:12pt; font-family:inherit; color:#000; }
+.transcript-sheet th,.transcript-sheet td { border:0.75pt solid #000; padding:0 1.5pt; white-space:normal; overflow-wrap:normal; word-break:normal; vertical-align:top; line-height:13.5pt; }
+.transcript-sheet th { text-align:center; font-size:12pt; font-weight:700; background:#fff; }
+.transcript-sheet th { white-space:nowrap; height:16.5pt; vertical-align:middle; }
+.transcript-sheet tbody tr { height:14.15pt; }
+.transcript-sheet td { text-align:center; }
+.transcript-sheet td:nth-child(2) { text-align:left; }
+.transcript-sheet td::after { content:""; display:block; height:0.65pt; }
+.transcript-sheet td:nth-child(1),.transcript-sheet td:nth-child(3),.transcript-sheet td:nth-child(4),.transcript-sheet td:nth-child(5) { text-align:center; }
+.transcript-summary-band { width:517.3pt; display:grid; grid-template-columns:minmax(0,263.8pt) minmax(0,253.5pt); align-items:start; margin:3.75pt 0 6pt; font-size:12pt; }
+.transcript-gpa { margin:0; }
+.transcript-signoff { break-inside:avoid; page-break-inside:avoid; }
+.transcript-issue-date { text-align:center; font-style:italic; margin:0; }
+.transcript-signatures { width:517.3pt; display:grid; grid-template-columns:165pt 253.5pt; justify-content:space-between; gap:0; text-align:center; }
+.transcript-signature-roles { min-height:27pt; font-weight:700; line-height:13.5pt; }
+.transcript-signature-name { min-height:68.25pt; padding-top:54.75pt; box-sizing:border-box; display:flex; align-items:flex-end; justify-content:center; margin:0; font-weight:700; }
+.transcript-form-footer { display:flex; justify-content:space-between; gap:8px; margin-top:auto; border-top:0.75pt solid #000; padding-top:0.75pt; font-size:9.75pt; line-height:14.25pt; font-weight:700; color:#808080; transform:translateY(9.85pt); }
+@media screen and (max-width:600px) { .transcript-viewer-toolbar { padding:8px; gap:6px; font-size:13px; } .transcript-zoom-controls { margin-left:0; width:100%; } }
+@page learner-transcript { size:595.28pt 841.89pt; margin:20pt 28.3pt 34pt 42.5pt; }
+@media print {
+  .transcript-preview { padding:0; min-height:0; page:learner-transcript; }
+  .transcript-viewer-toolbar,.transcript-page-label,.transcript-viewer-error { display:none !important; }
+  .transcript-viewer-canvas { padding:0; overflow:visible; }
+  .transcript-page-frame { width:auto !important; height:auto !important; margin:0; break-after:page; }
+  .transcript-page-frame:last-child { break-after:auto; }
+  .transcript-page-frame .transcript-sheet { width:auto; height:787.89pt; min-height:0; padding:0; border:0; box-shadow:none; transform:none !important; display:flex; }
+  .transcript-preview-notice { display:none; }
+  .transcript-sheet { display:block; max-width:none; min-height:0; padding:0; margin:0; }
+  .transcript-sheet .transcript-form-footer { display:flex !important; position:static; margin-top:auto; }
+  .transcript-metadata-row { break-inside:avoid; }
+  .transcript-sheet thead { display:table-header-group; }
+  .transcript-sheet tr { break-inside:avoid; page-break-inside:avoid; }
+}

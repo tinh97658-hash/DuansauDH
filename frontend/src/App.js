@@ -86,6 +86,7 @@ import DoctoralGraduationDocs from "./pages/doctoral/graduationDocs";
 import ClassLists from "./pages/reports/classLists";
 import CourseScores from "./pages/reports/courseScores";
 import ClassScoreSummary from "./pages/reports/classScoreSummary";
+import LearnerTranscriptPreview from "./features/learners/LearnerTranscriptPreview";
 import MinisterialReport from "./pages/reports/ministerialReport";
 import TempScoreMasters from "./pages/reports/tempScoreMasters";
 import TempScoreDoctoral from "./pages/reports/tempScoreDoctoral";
@@ -185,6 +186,7 @@ function App() {
             <Route path="reports/class-lists" element={<ClassLists />} />
             <Route path="reports/course-scores" element={<CourseScores />} />
             <Route path="reports/class-score-summary" element={<ClassScoreSummary />} />
+            <Route path="reports/learner-transcript/preview" element={<LearnerTranscriptPreview />} />
             <Route path="reports/ministerial-report" element={<MinisterialReport />} />
             <Route path="reports/temp-score-masters" element={<TempScoreMasters />} />
             <Route path="reports/temp-score-doctoral" element={<TempScoreDoctoral />} />

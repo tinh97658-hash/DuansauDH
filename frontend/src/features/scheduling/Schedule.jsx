@@ -3,6 +3,9 @@ import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { Tooltip } from "@mui/material";
 import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
+import SwapVertRounded from "@mui/icons-material/SwapVertRounded";
+import ArrowUpwardRounded from "@mui/icons-material/ArrowUpwardRounded";
+import ArrowDownwardRounded from "@mui/icons-material/ArrowDownwardRounded";
 import { api, groupsOf, intersectDays, labelOf, message, Modal, normalize, Notice, offeringTitle, rows, SearchSelect, subjectLabel, unique, useLoad } from "./shared";
 import { addDays, formatDateKey, getBusinessTodayKey, isSessionPast, mondayOf, vietnameseDate, vietnameseDayMonth, vietnameseWeekdayShort, weekDaysFrom } from "../../utils/schedulingCalendar";
 import SessionEditor from "./SessionEditor";
@@ -12,6 +15,13 @@ import { disciplinesFromMajors, majorsForDiscipline } from "../../utils/discipli
 import { buildScheduleDocument, clearScheduleReturnView, createScheduleExcel, createScheduleWord, downloadScheduleFile, exportSchedule, readScheduleReturnView } from "./scheduleExport";
 import SchedulePrintTemplate from "./SchedulePrintTemplate";
 import DocumentExportMenu from "../../components/DocumentExportMenu";
+import { sortOfferingsByHeldSessions } from "./offeringSessionSort";
+
+const SESSION_SORT_STATES = {
+  default: { next: "asc", label: "Sắp xếp theo số buổi", Icon: SwapVertRounded },
+  asc: { next: "desc", label: "Số buổi tăng dần", Icon: ArrowUpwardRounded },
+  desc: { next: "default", label: "Số buổi giảm dần", Icon: ArrowDownwardRounded },
+};
 
 const WEEK_SLOT_LIMIT = 3;
 const DAY_FOCUS_STATUS_LANES = [
@@ -243,6 +253,8 @@ export default function Schedule({ user }) {
   const [year, setYear] = useState(previewReturn?.year || "");
   const [status, setStatus] = useState(previewReturn?.status || "active");
   const [query, setQuery] = useState(previewReturn?.query || "");
+  const [sessionSort, setSessionSort] = useState("default");
+  const { label: sessionSortLabel, Icon: SessionSortIcon } = SESSION_SORT_STATES[sessionSort];
   const [week, setWeek] = useState(() => previewReturn?.week || currentWeek);
   const [selectedId, setSelected] = useState(previewReturn?.selectedId ?? requested);
   const [editor, setEditor] = useState(null);
@@ -282,7 +294,7 @@ export default function Schedule({ user }) {
       && (!year || group.academicYear === year);
   });
   const scoped = all.filter(inScope);
-  const listed = scoped.filter((offering) => offering.status === status && normalize(`${offering.subject?.code} ${offering.subject?.name} ${labelOf(offering)}`).includes(normalize(query)));
+  const listed = sortOfferingsByHeldSessions(scoped.filter((offering) => offering.status === status && normalize(`${offering.subject?.code} ${offering.subject?.name} ${labelOf(offering)}`).includes(normalize(query))), sessionSort);
   const visibleSessions = (sessions.data || []).filter((session) => inScope(session.courseOffering));
   const weekDays = weekDaysFrom(week);
   const selectedDays = selected?.allowedWeekdays || intersectDays(groupsOf(selected));
@@ -370,7 +382,11 @@ export default function Schedule({ user }) {
     </div>
     {!canEdit && <div className="sl-attention">Quyền chỉ xem · Quản trị viên phân công người phụ trách tại Hệ thống → QL Người dùng.</div>}
     {majors.error && <Notice error={majors.error} />}
-  </div><div className="sl-worklist"><div className="sl-search-wrap"><span>⌕</span><input className="sl-search" aria-label="Tìm môn / lớp" placeholder="Tìm lớp học phần..." value={query} onChange={(event) => setQuery(event.target.value)} /></div><div className="sl-card-scroll">{offerings.loading ? <Notice>Đang tải lớp học phần...</Notice> : offerings.error ? <Notice error={offerings.error} /> : <section className="sl-section"><h2><span>LỚP HỌC PHẦN</span><b>{listed.length}</b></h2>{listed.map((offering) => {
+  </div><div className="sl-worklist"><div className="sl-search-wrap"><span>⌕</span><input className="sl-search" aria-label="Tìm môn / lớp" placeholder="Tìm lớp học phần..." value={query} onChange={(event) => setQuery(event.target.value)} /></div><div className="sl-card-scroll">{offerings.loading ? <Notice>Đang tải lớp học phần...</Notice> : offerings.error ? <Notice error={offerings.error} /> : <section className="sl-section"><h2><span>LỚP HỌC PHẦN</span><span className="sl-offering-sort-actions">
+      <Tooltip title={sessionSortLabel} arrow placement="top">
+        <button type="button" className="sl-offering-sort" aria-label={sessionSortLabel} aria-pressed={sessionSort !== "default"}
+          onClick={() => setSessionSort((current) => SESSION_SORT_STATES[current].next)}><SessionSortIcon aria-hidden="true" /></button>
+      </Tooltip><b>{listed.length}</b></span></h2>{listed.map((offering) => {
     const summary = offering.sessionSummary || {};
     const suggestClosing = shouldSuggestClosing(offering);
     const closingMessage = `Đã học được ${summary.heldCount || 0} buổi, bạn có muốn đóng lớp không?`;

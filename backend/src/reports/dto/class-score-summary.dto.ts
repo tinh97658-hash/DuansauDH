@@ -11,3 +11,7 @@ export class ClassScoreSummaryQueryDto {
 export class LearnerScorecardQueryDto {
   @IsOptional() @IsUUID() classGroupId?: string;
 }
+
+export class ClassScoreRosterQueryDto {
+  @IsUUID() classGroupId!: string;
+}
