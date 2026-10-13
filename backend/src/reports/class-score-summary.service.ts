@@ -7,6 +7,50 @@ import { Discipline } from "../database/models/common/discipline.model.js";
 import { Curriculum } from "../database/models/plan/curriculum.model.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
 import { ClassScoreSummaryQueryDto } from "./dto/class-score-summary.dto.js";
+import { sortCurriculumSubjectsByVietnameseName } from "../plan/curriculum-subject-order.js";
+
+// Shared identity selection and deduplication; neither path changes roster semantics.
+const CLASS_ROSTER_CTE = `
+      WITH identities AS (
+        SELECT cm.id AS member_id, ar.id AS admission_id, ar.id AS "admissionRecordId",
+          COALESCE(cm.student_id, ar.student_id) AS "studentId",
+          CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
+            THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text
+            WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END AS "participantId",
+          COALESCE(NULLIF(ar.code, ''), st.reg_no, '') AS code,
+          COALESCE(NULLIF(ar.full_name, ''), st.full_name, '') AS "fullName",
+          COALESCE(ar.last_name, '') AS "lastName", COALESCE(ar.first_name, '') AS "firstName",
+          COALESCE(ar.dob, '') AS dob, COALESCE(ar.gender, '') AS gender
+        FROM class_group_members cm
+        LEFT JOIN LATERAL (
+          SELECT a.* FROM admission_records a
+          WHERE a.id = cm.admission_record_id OR (cm.admission_record_id IS NULL AND a.student_id = cm.student_id)
+          ORDER BY CASE WHEN a.id = cm.admission_record_id THEN 0 ELSE 1 END,
+            CASE WHEN a.academic_year = :academicYear THEN 0 ELSE 1 END, a.created_at DESC, a.id
+          LIMIT 1
+        ) ar ON true
+        LEFT JOIN students st ON st.id = COALESCE(cm.student_id, ar.student_id)
+        WHERE cm.class_group_id = :groupId
+      ), people AS (
+        SELECT DISTINCT ON ("participantId") "participantId", "admissionRecordId", "studentId", code, "fullName", "lastName", "firstName", dob, gender
+        FROM identities WHERE "participantId" IS NOT NULL
+        ORDER BY "participantId", admission_id NULLS LAST, member_id
+      )`;
+const ROSTER_ORDER = `LOWER(COALESCE(NULLIF("firstName", ''), SUBSTRING(TRIM("fullName") FROM '[^ ]+$'))), LOWER("fullName"), "participantId"`;
+
+// Same profile projection for single and whole-class transcript datasets.
+const TRANSCRIPT_PROFILE_SQL = `
+      SELECT ar.id AS "admissionRecordId", ar.student_id AS "studentId", ar.code, ar.full_name AS "fullName",
+        ar.last_name AS "lastName", ar.first_name AS "firstName", ar.dob, ar.gender, ar.academic_year AS "academicYear",
+        ar.pob, ar.admission_date AS "admissionDate", ar.training_level AS "trainingLevel",
+        ar.training_mode_name AS "trainingModeName", ar.training_mode_group AS "trainingModeGroup", ar.language,
+        CASE WHEN m.id IS NOT NULL THEN jsonb_build_object('id', m.id, 'name', m.name)
+          WHEN NULLIF(ar.major_name, '') IS NOT NULL THEN jsonb_build_object('id', ar.major_id, 'name', ar.major_name)
+          ELSE NULL END AS major,
+        NULL::numeric AS "durationYears", NULL::text AS "masterDiplomaNumber",
+        CASE WHEN ar.student_id IS NOT NULL THEN 'student:' || ar.student_id::text
+          ELSE 'admission:' || ar.id::text END AS "participantId"
+      FROM admission_records ar LEFT JOIN majors m ON m.id = ar.major_id`;
 
 @Injectable()
 export class ClassScoreSummaryService {
@@ -24,13 +68,25 @@ export class ClassScoreSummaryService {
     }) };
   }
 
+  async roster(classGroupId: string) {
+    const classGroup = await this.groups.findByPk(classGroupId, {
+      attributes: ["id", "code", "name", "program", "academicYear"],
+    });
+    if (!classGroup) throw new NotFoundException("Không tìm thấy lớp học viên.");
+    const students = await this.sequelize.query<any>(`
+      ${CLASS_ROSTER_CTE}
+      SELECT "participantId", "admissionRecordId", "studentId", code, "fullName", "lastName", "firstName",
+        ("admissionRecordId" IS NOT NULL) AS "canPreview"
+      FROM people ORDER BY ${ROSTER_ORDER}
+    `, { type: QueryTypes.SELECT, replacements: { groupId: classGroup.id, academicYear: classGroup.academicYear || "" } });
+    return { classGroup, students };
+  }
+
   async learnerScorecard(admissionRecordId: string, classGroupId?: string) {
+    // Duration has several catalog sources without a precedence rule. The input
+    // diploma number is an undergraduate degree, so neither is inferred here.
     const [student] = await this.sequelize.query<any>(`
-      SELECT id AS "admissionRecordId", student_id AS "studentId", code, full_name AS "fullName",
-        last_name AS "lastName", first_name AS "firstName", dob, gender, academic_year AS "academicYear",
-        CASE WHEN student_id IS NOT NULL THEN 'student:' || student_id::text
-          ELSE 'admission:' || id::text END AS "participantId"
-      FROM admission_records WHERE id = :admissionRecordId
+      ${TRANSCRIPT_PROFILE_SQL} WHERE ar.id = :admissionRecordId
     `, { type: QueryTypes.SELECT, replacements: { admissionRecordId } });
     if (!student) throw new NotFoundException("Không tìm thấy học viên.");
     const groups = await this.sequelize.query<any>(`
@@ -53,6 +109,29 @@ export class ClassScoreSummaryService {
       subjects: report.subjects.map(subject => ({ ...subject, grade: person.scores[subject.id] || null })) };
   }
 
+  async transcripts(classGroupId: string) {
+    // One complete score resolution + one bulk profile read. Search and UI page
+    // are deliberately absent, and the existing score resolver is unchanged.
+    const report = await this.get({ classGroupId }, true, { includeDetails: true });
+    if (!report.rows.length) return { classGroup: report.group, scorecards: [] };
+    const admissionRecordIds = report.rows.map(row => row.admissionRecordId).filter(Boolean);
+    const profiles = admissionRecordIds.length ? await this.sequelize.query<any>(`
+      ${TRANSCRIPT_PROFILE_SQL} WHERE ar.id IN (:admissionRecordIds)
+    `, { type: QueryTypes.SELECT, replacements: { admissionRecordIds } }) : [];
+    const byId = new Map(profiles.map(profile => [profile.admissionRecordId, profile]));
+    return { classGroup: report.group, scorecards: report.rows.map(row => {
+      const student = byId.get(row.admissionRecordId);
+      if (!student || student.participantId !== row.participantId) {
+        // Preserve identity for exact selected-subset validation. An unavailable
+        // unselected profile must not block exporting other learners.
+        return { student: { participantId: row.participantId },
+          unavailableReason: `Không thể xuất ${row.code || row.participantId}: chưa có hồ sơ học viên phù hợp hoặc hồ sơ không còn khớp danh sách lớp.` };
+      }
+      return { student, group: report.group, curriculum: report.curriculum,
+        subjects: report.subjects.map(subject => ({ ...subject, grade: row.scores[subject.id] || null })) };
+    }) };
+  }
+
   async get(query: ClassScoreSummaryQueryDto, exportAll = false, scope: { participantId?: string; includeDetails?: boolean } = {}) {
     const group = await this.groups.findByPk(query.classGroupId, {
       attributes: ["id", "code", "name", "program", "academicYear", "curriculumId"],
@@ -62,7 +141,7 @@ export class ClassScoreSummaryService {
       ],
     });
     if (!group) throw new NotFoundException("Không tìm thấy lớp học viên.");
-    const subjects = group.curriculumId ? await this.sequelize.query<any>(`
+    const subjects = sortCurriculumSubjectsByVietnameseName(group.curriculumId ? await this.sequelize.query<any>(`
       SELECT s.id, COALESCE(NULLIF(s.code_text, ''), s.code) AS code, s.name, s.credits, s.is_required AS "isRequired", COALESCE(catalog_block.name, b.name) AS "blockName"
       FROM curriculum_subjects cs
       JOIN subjects s ON s.id = cs.subject_id
@@ -70,34 +149,11 @@ export class ClassScoreSummaryService {
       LEFT JOIN curriculum_blocks catalog_block ON catalog_block.curriculum_id = cs.curriculum_id AND catalog_block.code = s.subject_type
       WHERE cs.curriculum_id = :curriculumId
       ORDER BY b.sort_order, cs.sort_order, s.sort_order, s.code, s.id
-    `, { type: QueryTypes.SELECT, replacements: { curriculumId: group.curriculumId } }) : [];
+    `, { type: QueryTypes.SELECT, replacements: { curriculumId: group.curriculumId } }) : []);
     const pageSize = Math.min(100, Math.max(1, query.pageSize || 50));
     const [roster] = await this.sequelize.query<any>(`
-      WITH identities AS (
-        SELECT cm.id AS member_id, ar.id AS admission_id, ar.id AS "admissionRecordId",
-          CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
-            THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text
-            WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END AS "participantId",
-          COALESCE(NULLIF(ar.code, ''), st.reg_no, '') AS code,
-          COALESCE(NULLIF(ar.full_name, ''), st.full_name, '') AS "fullName",
-          COALESCE(ar.last_name, '') AS "lastName", COALESCE(ar.first_name, '') AS "firstName",
-          COALESCE(ar.dob, '') AS dob, COALESCE(ar.gender, '') AS gender
-        FROM class_group_members cm
-        LEFT JOIN LATERAL (
-          SELECT a.* FROM admission_records a
-          WHERE a.id = cm.admission_record_id OR (cm.admission_record_id IS NULL AND a.student_id = cm.student_id)
-          ORDER BY CASE WHEN a.id = cm.admission_record_id THEN 0 ELSE 1 END,
-            CASE WHEN a.academic_year = :academicYear THEN 0 ELSE 1 END, a.created_at DESC, a.id
-          LIMIT 1
-        ) ar ON true
-        LEFT JOIN students st ON st.id = COALESCE(cm.student_id, ar.student_id)
-        WHERE cm.class_group_id = :groupId
-      ), people AS (
-        SELECT DISTINCT ON ("participantId") "participantId", "admissionRecordId", code, "fullName", "lastName", "firstName", dob, gender
-        FROM identities WHERE "participantId" IS NOT NULL
-        ORDER BY "participantId", admission_id NULLS LAST, member_id
-      ), filtered AS (
-        SELECT * FROM people WHERE (:participantId = '' OR "participantId" = :participantId)
+      ${CLASS_ROSTER_CTE}, filtered AS (
+        SELECT "participantId", "admissionRecordId", code, "fullName", "lastName", "firstName", dob, gender FROM people WHERE (:participantId = '' OR "participantId" = :participantId)
           AND (:search = '' OR POSITION(LOWER(:search) IN LOWER(code || ' ' || "fullName" || ' ' || "lastName" || ' ' || "firstName")) > 0)
       ), metadata AS (
         SELECT COUNT(*)::int AS total FROM filtered
@@ -105,7 +161,7 @@ export class ClassScoreSummaryService {
         SELECT total, LEAST(:page, GREATEST(1, CEIL(total::numeric / :pageSize)::int)) AS page FROM metadata
       ), selected AS (
         SELECT * FROM filtered
-        ORDER BY LOWER(COALESCE(NULLIF("firstName", ''), SUBSTRING(TRIM("fullName") FROM '[^ ]+$'))), LOWER("fullName"), "participantId"
+        ORDER BY ${ROSTER_ORDER}
         ${exportAll ? "" : "LIMIT :pageSize OFFSET (SELECT (page - 1) * :pageSize FROM paging)"}
       )
       SELECT paging.*, COALESCE((SELECT jsonb_agg(to_jsonb(selected)) FROM selected), '[]'::jsonb) AS rows FROM paging

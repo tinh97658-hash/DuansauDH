@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
-import { Alert, Button, Chip, CircularProgress, MenuItem, Paper, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
-import { DownloadRounded } from "@mui/icons-material";
+import { Alert, Button, Chip, CircularProgress, Menu, MenuItem, Pagination, Paper, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
 import FeatureLayout from "../../components/FeatureLayout";
 import ResizableTable from "../../components/ResizableTable";
 import FilterSelectField from "../../components/FilterSelectField";
@@ -13,9 +12,11 @@ import { personNameParts } from "../../utils/personName";
 import { displayGradeDate } from "../../features/exams/gradebook";
 import { downloadDocumentFile } from "../../utils/documentFiles";
 import { createClassScoreWorkbook, scoreSummaryColumns, scoreSummaryValue } from "./classScoreSummaryExcel";
+import LearnerTranscriptDialog from "../../features/learners/LearnerTranscriptDialog";
 import "./classScoreSummary.css";
 import { useSubjectCatalogRevision } from "../../utils/subjectCatalog";
 
+const PAGE_SIZE = 15;
 const endpoint = `${API_BASE_URL}/reports/class-score-summary`;
 const errorMessage = (error, fallback) => error.response?.data?.message || error.message || fallback;
 
@@ -37,6 +38,9 @@ export default function ClassScoreSummary() {
   const [reload, setReload] = useState(0);
   const [optionsReload, setOptionsReload] = useState(0);
   const [selectedId, setSelectedId] = useState("");
+  const [page, setPage] = useState(1);
+  const [exportAnchor, setExportAnchor] = useState(null);
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -47,6 +51,7 @@ export default function ClassScoreSummary() {
       const available = data.groups || [];
       const years = [...new Set(available.map(group => group.academicYear || ""))].sort((a, b) => b.localeCompare(a, "vi", { numeric: true }));
       const initialYear = years[0] || "";
+      setPage(1);
       setGroups(available);
       setYear(initialYear);
       const initialGroup = available.find(group => (group.academicYear || "") === initialYear);
@@ -69,14 +74,14 @@ export default function ClassScoreSummary() {
     setReport(null);
     setError("");
     setSelectedId("");
-    if (!classGroupId || loadingOptions) { setLoading(false); return () => { active = false; }; }
+    if (!classGroupId || loadingOptions || search.trim() !== debouncedSearch) { setLoading(false); return () => { active = false; }; }
     setLoading(true);
-    axios.get(`${endpoint}/export`, { params: { classGroupId, ...(debouncedSearch ? { search: debouncedSearch } : {}) } }).then(({ data }) => {
+    axios.get(endpoint, { params: { classGroupId, search: debouncedSearch, page, pageSize: PAGE_SIZE } }).then(({ data }) => {
       if (active) setReport(data);
     }).catch(error => { if (active) setError(errorMessage(error, "Không tải được bảng điểm.")); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [classGroupId, loadingOptions, reload, debouncedSearch, catalogRevision]);
+  }, [classGroupId, loadingOptions, reload, debouncedSearch, search, page, catalogRevision]);
 
   const years = useMemo(() => [...new Set(groups.map(group => group.academicYear || ""))]
     .sort((a, b) => b.localeCompare(a, "vi", { numeric: true })), [groups]);
@@ -90,8 +95,10 @@ export default function ClassScoreSummary() {
   const currentReport = report?.group?.id === classGroupId ? report : null;
   const subjects = currentReport?.subjects || [];
   const columns = scoreSummaryColumns(subjects);
-  const busy = loadingOptions || loading;
+  const busy = loadingOptions || loading || search.trim() !== debouncedSearch;
   const selectGroup = (group) => {
+    setPage(1);
+    setTranscriptOpen(false);
     setYear(group?.academicYear || "");
     setDisciplineId(majorDisciplineId(group?.major));
     setMajorId(group?.majorId || group?.major?.id || "");
@@ -109,7 +116,7 @@ export default function ClassScoreSummary() {
     setExporting(true);
     setError("");
     try {
-      const { data } = await axios.get(`${endpoint}/export`, { params: { classGroupId, ...(debouncedSearch ? { search: debouncedSearch } : {}) } });
+      const { data } = await axios.get(`${endpoint}/export`, { params: { classGroupId } });
       const blob = await createClassScoreWorkbook(data);
       const code = (data.group.code || data.group.name).replace(/[<>:"/\\|?*]/g, "-");
       downloadDocumentFile(blob, `Tong-hop-diem-${code}.xlsx`);
@@ -136,8 +143,16 @@ export default function ClassScoreSummary() {
           {!classes.length && <MenuItem value="">Chọn lớp học viên</MenuItem>}
           {classes.map(group => <MenuItem key={group.id} value={group.id}>{group.code || group.name}{group.major?.name ? ` — ${group.major.name}` : ""}</MenuItem>)}
         </FilterSelectField>
-        <FilterSearchField placeholder="Tìm theo mã HV, họ tên..." value={search} disabled={loadingOptions || exporting} inputProps={{ maxLength: 200 }} onChange={event => setSearch(event.target.value)} />
-        <Button className="css-export" variant="contained" color="success" startIcon={exporting ? <CircularProgress size={16} color="inherit" /> : <DownloadRounded />} onClick={exportExcel} disabled={busy || exporting || search.trim() !== debouncedSearch || !currentReport?.rows?.length || !subjects.length}>Xuất file Excel</Button>
+        <FilterSearchField placeholder="Tìm theo mã HV, họ tên..." value={search} disabled={loadingOptions || exporting} inputProps={{ maxLength: 200 }} onChange={event => { setSearch(event.target.value); setPage(1); }} />
+        <Button className="css-export" variant="contained" color="success" aria-haspopup="menu"
+          aria-controls={exportAnchor ? "class-score-export-menu" : undefined} aria-expanded={!!exportAnchor}
+          onClick={event => setExportAnchor(event.currentTarget)} disabled={busy || exporting || !classGroupId || search.trim() !== debouncedSearch}>
+          {exporting ? "Đang xuất..." : "Xuất điểm"} <span aria-hidden="true"> ▼</span>
+        </Button>
+        <Menu id="class-score-export-menu" anchorEl={exportAnchor} open={!!exportAnchor} onClose={() => setExportAnchor(null)}>
+          <MenuItem disabled={!subjects.length} onClick={() => { setExportAnchor(null); exportExcel(); }}>Xuất điểm cả lớp</MenuItem>
+          <MenuItem onClick={() => { setExportAnchor(null); setTranscriptOpen(true); }}>Xuất bảng điểm cá nhân</MenuItem>
+        </Menu>
       </Paper>
       {(optionsError || error) && <Alert severity="error" action={<Button color="inherit" size="small" disabled={busy || exporting} onClick={() => optionsError ? setOptionsReload(value => value + 1) : setReload(value => value + 1)}>Thử lại</Button>}>{optionsError || error}</Alert>}
       <Paper variant="outlined" className="css-content">
@@ -159,7 +174,7 @@ export default function ClassScoreSummary() {
                 const detailPath = row.admissionRecordId ? `${currentReport.group.program === "doctoral" ? "/plan/admission-records" : "/masters/admitted-records"}/${row.admissionRecordId}?tab=grades&classGroupId=${currentReport.group.id}` : null;
                 const studentInfo = value => detailPath ? <Link className="css-student-link" to={detailPath} title={`Xem bảng điểm của ${row.fullName || row.code}`}>{value}</Link> : value;
                 return <TableRow key={row.participantId} hover selected={selectedId === row.participantId} onClick={() => setSelectedId(row.participantId)}>
-                  <TableCell align="center">{index + 1}</TableCell>
+                  <TableCell align="center">{((currentReport.page || page) - 1) * PAGE_SIZE + index + 1}</TableCell>
                   <TableCell title={row.code} sx={{ fontWeight: 600 }}>{studentInfo(row.code || "—")}</TableCell>
                   <TableCell title={name.familyAndMiddle}>{studentInfo(name.familyAndMiddle)}</TableCell>
                   <TableCell title={name.givenName}>{studentInfo(name.givenName)}</TableCell>
@@ -174,8 +189,15 @@ export default function ClassScoreSummary() {
             </TableBody>
           </ResizableTable>
         </TableContainer>
+        {currentReport.total > 0 && <div className="css-pagination">
+          <span>Hiển thị {((currentReport.page || page) - 1) * PAGE_SIZE + 1}–{((currentReport.page || page) - 1) * PAGE_SIZE + currentReport.rows.length} trên {currentReport.total} học viên</span>
+          {currentReport.total > PAGE_SIZE && <Pagination aria-label="Phân trang học viên" page={currentReport.page || page}
+            count={Math.ceil(currentReport.total / PAGE_SIZE)} onChange={(_event, nextPage) => setPage(nextPage)}
+            disabled={exporting} showFirstButton showLastButton color="primary" />}
+        </div>}
       </>}
       </Paper>
     </section>
+    {transcriptOpen && <LearnerTranscriptDialog key={classGroupId} classGroupId={classGroupId} onClose={() => setTranscriptOpen(false)} />}
   </FeatureLayout>;
 }

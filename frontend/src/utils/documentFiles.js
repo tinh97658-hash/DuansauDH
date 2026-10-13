@@ -33,3 +33,9 @@ export function downloadDocumentFile(blob, filename) {
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+export function sanitizeDocumentFilenamePart(input) {
+  return String(input ?? "").normalize("NFC").trim()
+    .replace(/[\p{Cc}<>:"/\\|?*]+/gu, "-")
+    .replace(/[. ]+$/g, "").slice(0, 100).replace(/[. ]+$/g, "");
+}

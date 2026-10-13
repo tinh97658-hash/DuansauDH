@@ -4,7 +4,7 @@ import { AuthenticatedGuard } from "../common/authenticated.guard.js";
 import { RolesGuard } from "../common/roles.guard.js";
 import { Roles } from "../common/auth-user.js";
 import { ClassScoreSummaryService } from "./class-score-summary.service.js";
-import { ClassScoreSummaryQueryDto, LearnerScorecardQueryDto } from "./dto/class-score-summary.dto.js";
+import { ClassScoreRosterQueryDto, ClassScoreSummaryQueryDto, LearnerScorecardQueryDto } from "./dto/class-score-summary.dto.js";
 
 @Controller("reports")
 export class ReportsController {
@@ -15,6 +15,12 @@ export class ReportsController {
   @Get("class-score-summary/options")
   @UseGuards(AuthenticatedGuard, RolesGuard) @Roles("admin", "supervisor", "examiner")
   classScoreSummaryOptions() { return this.scoreSummary.options(); }
+  @Get("class-score-summary/roster")
+  @UseGuards(AuthenticatedGuard, RolesGuard) @Roles("admin", "supervisor", "examiner")
+  classScoreRoster(@Query() query: ClassScoreRosterQueryDto) { return this.scoreSummary.roster(query.classGroupId); }
+  @Get("class-score-summary/transcripts")
+  @UseGuards(AuthenticatedGuard, RolesGuard) @Roles("admin", "supervisor", "examiner")
+  classTranscripts(@Query() query: ClassScoreRosterQueryDto) { return this.scoreSummary.transcripts(query.classGroupId); }
   @Get("class-score-summary/export")
   @UseGuards(AuthenticatedGuard, RolesGuard) @Roles("admin", "supervisor", "examiner")
   exportClassScoreSummary(@Query() query: ClassScoreSummaryQueryDto) { return this.scoreSummary.get(query, true); }
