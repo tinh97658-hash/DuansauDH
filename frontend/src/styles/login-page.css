@@ -1,46 +1,703 @@
-.login-page, .login-page * { box-sizing: border-box; }
-.login-page { width: 100%; min-width: 0; min-height: 100vh; overflow-x: hidden; background: #F5F7F8; color: var(--text-primary); font-family: var(--app-font-family); }
-.login-main { display: grid; width: 100%; min-width: 0; place-items: center; min-height: calc(100vh - 48px); padding: 42px 24px; overflow-x: hidden; background: #F5F7F8; }
-.login-shell { display: grid; grid-template-columns: minmax(360px, 1.05fr) minmax(390px, 0.95fr); width: min(1000px, 100%); min-height: 540px; overflow: hidden; background: #FFFFFF; border: 1px solid #DFE4E8; border-radius: 6px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06); }
-.login-visual { position: relative; display: flex; flex-direction: column; justify-content: space-between; padding: 48px 44px 36px; overflow: hidden; color: #FFFFFF; background: linear-gradient(145deg, #173E75 0%, #15588C 56%, #0788B8 100%); }
-.login-visual::before, .login-visual::after { position: absolute; content: ""; border-radius: 50%; background: rgba(255, 255, 255, 0.06); }
-.login-visual::before { width: 320px; height: 320px; top: -170px; right: -120px; }
-.login-visual::after { width: 230px; height: 230px; bottom: -130px; left: -90px; }
-.login-visual-copy, .login-visual-image, .login-visual-note { position: relative; z-index: 1; }
-.login-eyebrow { margin: 0 0 10px; color: #BCECFF; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
-.login-visual h1 { max-width: 440px; margin: 0; font-size: clamp(24px, 2.5vw, 34px); font-weight: 700; line-height: 1.2; }
-.login-visual-copy > p:last-child { max-width: 420px; margin: 14px 0 0; color: #D9ECFF; font-size: 14px; line-height: 1.5; }
-.login-visual-image { align-self: center; width: min(360px, 85%); margin: 8px auto; filter: drop-shadow(0 12px 20px rgba(4, 29, 65, 0.20)); }
-.login-visual-note { display: flex; gap: 8px; align-items: center; color: #D9ECFF; font-size: 12px; }
-.login-visual-note span { width: 8px; height: 8px; background: #64D8FF; border-radius: 50%; box-shadow: 0 0 0 4px rgba(100, 216, 255, 0.14); }
-.login-panel { display: flex; min-width: 0; align-items: center; padding: 44px 48px; }
-.login-form { width: 100%; min-width: 0; max-width: 380px; margin: 0 auto; }
-.login-form-header { margin-bottom: 24px; }
-.login-form-logo { display: block; width: 56px; height: 56px; margin-bottom: 14px; object-fit: contain; }
-.login-institute { margin: 0 0 6px !important; color: var(--secondary) !important; font-size: 12px !important; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
-.login-form h2 { margin: 0 0 6px; color: var(--secondary); font-size: 24px; font-weight: 700; }
-.login-form-header p { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
-.login-field { margin-bottom: 16px; }
-.login-field label { display: block; margin-bottom: 6px; color: var(--text-primary); font-size: 12px; font-weight: 600; }
-.login-input-wrap { position: relative; }
-.login-input-wrap input { width: 100%; height: 42px; padding: 0 40px 0 40px; border: 1px solid #DFE4E8; border-radius: 4px; color: var(--text-primary); background: #FFFFFF; font-size: 14px; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
-.login-input-wrap input:hover { border-color: #A0AEC0; }
-.login-input-wrap input:focus { border-color: #0788B8; box-shadow: 0 0 0 3px rgba(7, 136, 184, 0.12); }
-.login-input-icon { position: absolute; top: 50%; left: 12px; width: 18px !important; height: 18px !important; color: var(--text-muted); transform: translateY(-50%); pointer-events: none; }
-.login-password-toggle { position: absolute; top: 50%; right: 6px; display: grid; width: 32px; height: 32px; padding: 0; place-items: center; border: 0; border-radius: 4px; color: var(--text-muted); background: transparent; transform: translateY(-50%); cursor: pointer; }
-.login-password-toggle:hover { background: #F0F4F8; color: var(--text-primary); }
-.login-password-toggle svg { width: 18px; height: 18px; }
-.login-submit { display: flex; width: 100%; height: 42px; margin-top: 6px; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 4px; color: #FFFFFF; background: #0788B8; box-shadow: none; font-size: 14px; font-weight: 700; cursor: pointer; transition: background-color 0.15s; }
-.login-submit:hover:not(:disabled) { background: #056A8F; }
-.login-submit:disabled { opacity: 0.65; cursor: wait; }
-.login-spinner { width: 16px; height: 16px; border: 2px solid rgba(255, 255, 255, 0.45); border-top-color: #FFFFFF; border-radius: 50%; animation: login-spin 0.7s linear infinite; }
-@keyframes login-spin { to { transform: rotate(360deg); } }
-.login-divider { display: flex; align-items: center; gap: 12px; margin: 20px 0 16px; color: var(--text-muted); font-size: 12px; }
-.login-divider::before, .login-divider::after { flex: 1; height: 1px; content: ""; background: #DFE4E8; }
-.login-google { display: flex; width: 100%; height: 42px; align-items: center; justify-content: center; gap: 10px; border: 1px solid #DFE4E8; border-radius: 4px; color: var(--text-primary); background: #FFFFFF; font-size: 13px; font-weight: 600; cursor: pointer; transition: background-color 0.15s, border-color 0.15s; }
-.login-google:hover { background: #F7F9FA; border-color: #A0AEC0; }
-.login-google-mark { display: grid; width: 20px; height: 20px; place-items: center; color: #4285F4; font-size: 17px; font-weight: 800; }
-.login-internal-note { margin: 20px 0 0; color: var(--text-secondary); font-size: 11.5px; line-height: 1.5; text-align: center; }
-.login-footer { padding: 14px 20px 18px; color: var(--text-muted); font-size: 11.5px; text-align: center; }
-@media (max-width: 850px) { .login-main { display: block; min-height: calc(100vh - 48px); padding: 24px 16px; } .login-shell { display: block; width: 100%; max-width: 460px; min-height: 0; margin: 0 auto; } .login-visual { display: none; } .login-panel { padding: 32px 28px; } }
-@media (max-width: 480px) { .login-main { padding: 16px 10px; } .login-shell { max-width: calc(100vw - 20px); border-radius: 4px; } .login-panel { padding: 24px 18px 26px; } .login-form h2 { font-size: 22px; } .login-form-header { margin-bottom: 20px; } .login-footer { padding-top: 8px; } }
+/* ==========================================================================
+   VIỆN ĐÀO TẠO SAU ĐẠI HỌC - TRƯỜNG ĐẠI HỌC HÀNG HẢI VIỆT NAM (VMU)
+   GIAO DIỆN CỔNG ĐĂNG NHẬP QUẢN TRỊ HỆ THỐNG
+   ========================================================================== */
+
+.vmu-login-root,
+.vmu-login-root * {
+  box-sizing: border-box;
+}
+
+.vmu-login-root {
+  width: 100vw;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  background-color: #0b0d11;
+  color: #f1f5f9;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* ==========================================================================
+   CỘT TRÁI: FORM ĐĂNG NHẬP & XÁC THỰC QUẢN TRỊ
+   ========================================================================== */
+.vmu-login-left {
+  flex: 0 0 540px;
+  width: 540px;
+  max-width: 100%;
+  min-height: 100vh;
+  background: #0d0f14;
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 36px 44px 28px;
+  position: relative;
+  z-index: 5;
+}
+
+/* Header thương hiệu cột trái */
+.vmu-login-brand-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.vmu-login-brand-logo {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.4));
+  flex-shrink: 0;
+}
+
+.vmu-login-brand-titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vmu-login-brand-title {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.vmu-login-brand-sub {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  margin: 2px 0 0;
+}
+
+/* Huy hiệu Online */
+.vmu-login-badge-online {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.32);
+  color: #34d399;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.vmu-login-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: vmu-pulse 2s infinite ease-in-out;
+}
+
+@keyframes vmu-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.9); }
+}
+
+/* Khu vực nội dung Form */
+.vmu-login-body {
+  width: 100%;
+  max-width: 440px;
+  margin: 32px auto;
+}
+
+.vmu-login-title {
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 20px 0;
+}
+
+/* Ô STATUS ĐỘNG: Báo trạng thái chính xác */
+.vmu-login-status-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-bottom: 22px;
+  transition: all 0.25s ease;
+  line-height: 1.4;
+}
+
+.vmu-login-status-box.status-standby {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+}
+
+.vmu-login-status-box.status-loading {
+  background: rgba(14, 165, 233, 0.1);
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  color: #38bdf8;
+}
+
+.vmu-login-status-box.status-success {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.38);
+  color: #34d399;
+}
+
+.vmu-login-status-box.status-error {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.38);
+  color: #f87171;
+}
+
+.vmu-login-status-text {
+  flex: 1;
+  word-break: break-word;
+}
+
+.vmu-login-status-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 7px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.vmu-login-status-box.status-standby .vmu-login-status-code {
+  color: #64748b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.vmu-login-status-box.status-loading .vmu-login-status-code {
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.3);
+}
+
+.vmu-login-status-box.status-success .vmu-login-status-code {
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.vmu-login-status-box.status-error .vmu-login-status-code {
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Các trường nhập liệu */
+.vmu-login-field {
+  margin-bottom: 18px;
+}
+
+.vmu-login-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+
+.vmu-login-label {
+  color: #cbd5e1;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vmu-login-field-hint {
+  color: #64748b;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.vmu-login-forgot-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: #94a3b8;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease, text-decoration 0.15s ease;
+}
+
+.vmu-login-forgot-btn:hover {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+.vmu-login-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.vmu-login-input {
+  width: 100%;
+  height: 46px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 0 44px 0 14px;
+  color: #ffffff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+}
+
+.vmu-login-input::placeholder {
+  color: #475569;
+}
+
+.vmu-login-input:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.vmu-login-input:focus {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
+}
+
+.vmu-login-input-toggle {
+  position: absolute;
+  right: 6px;
+  width: 34px;
+  height: 34px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #64748b;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.vmu-login-input-toggle:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.vmu-login-input-toggle svg {
+  font-size: 19px;
+}
+
+/* Nút Submit */
+.vmu-login-submit {
+  display: flex;
+  width: 100%;
+  height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px 0 20px;
+  margin-top: 10px;
+  background: #ffffff;
+  color: #0b0d11;
+  border: none;
+  border-radius: 6px;
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.vmu-login-submit:hover:not(:disabled) {
+  background: #f1f5f9;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+.vmu-login-submit:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.vmu-login-submit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.vmu-login-submit-arrow {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  background: #e2e8f0;
+  display: grid;
+  place-items: center;
+  color: #0b0d11;
+  transition: transform 0.15s;
+}
+
+.vmu-login-submit:hover:not(:disabled) .vmu-login-submit-arrow {
+  transform: translateX(2px);
+}
+
+.vmu-login-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-top-color: #0b0d11;
+  border-radius: 50%;
+  animation: vmu-spin 0.7s linear infinite;
+}
+
+@keyframes vmu-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Nút Google (nếu hệ thống kích hoạt) */
+.vmu-login-google {
+  display: flex;
+  width: 100%;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.vmu-login-google:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Footer cột trái */
+.vmu-login-left-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #64748b;
+  font-size: 11.5px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.vmu-login-left-footer a {
+  color: #94a3b8;
+  text-decoration: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.vmu-login-left-footer a:hover {
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   CỘT PHẢI: BANNER THỰC TẾ & KHÔNG GIAN HỌC THUẬT
+   ========================================================================== */
+.vmu-login-right {
+  flex: 1;
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 32px 48px;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-color: #0b0d11;
+}
+
+/* Các lớp phủ Gradient để chữ luôn sắc nét */
+.vmu-login-right::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 240px;
+  background: linear-gradient(180deg, rgba(11, 13, 17, 0.85) 0%, rgba(11, 13, 17, 0.4) 60%, transparent 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.vmu-login-right::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 480px;
+  background: linear-gradient(0deg, rgba(11, 13, 17, 0.95) 0%, rgba(11, 13, 17, 0.75) 45%, rgba(11, 13, 17, 0.25) 75%, transparent 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Thanh header top trên cột phải */
+.vmu-login-right-top {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.vmu-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border-radius: 9999px;
+  background: rgba(13, 15, 20, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.vmu-pill-dot-amber {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+}
+
+.vmu-pill-clock {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #cbd5e1;
+}
+
+/* Khối nội dung ở chân cột phải */
+.vmu-login-right-bottom {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.vmu-hero-text {
+  max-width: 620px;
+}
+
+.vmu-hero-eyebrow {
+  color: #f59e0b;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 0 0 10px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.vmu-hero-title {
+  color: #ffffff;
+  font-size: clamp(26px, 2.3vw, 36px);
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 0 0 14px 0;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+.vmu-hero-desc {
+  color: #cbd5e1;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Thẻ liên hệ Email công vụ */
+.vmu-contact-card {
+  background: rgba(13, 15, 20, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 12px 18px;
+  text-align: left;
+  flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.vmu-contact-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.vmu-contact-email {
+  color: #f59e0b;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.vmu-contact-email:hover {
+  text-decoration: underline;
+  color: #fbbf24;
+}
+
+/* ==========================================================================
+   MODAL HỖ TRỢ / QUÊN MẬT KHẨU
+   ========================================================================== */
+.vmu-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: grid;
+  place-items: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.vmu-modal-card {
+  width: min(480px, 100%);
+  background: #11141c;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 28px 24px 22px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  animation: vmu-modal-in 0.2s ease-out;
+}
+
+@keyframes vmu-modal-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.vmu-modal-title {
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vmu-modal-desc {
+  color: #cbd5e1;
+  font-size: 13.5px;
+  line-height: 1.6;
+  margin: 0 0 16px 0;
+}
+
+.vmu-modal-info-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e2e8f0;
+}
+
+.vmu-modal-info-box strong {
+  color: #f59e0b;
+}
+
+.vmu-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.vmu-modal-close-btn {
+  padding: 8px 18px;
+  background: #ffffff;
+  color: #0b0d11;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.vmu-modal-close-btn:hover {
+  background: #e2e8f0;
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .vmu-login-right {
+    display: none;
+  }
+
+  .vmu-login-left {
+    flex: 1;
+    width: 100%;
+    min-height: 100vh;
+    border-right: none;
+    padding: 28px 24px 20px;
+  }
+
+  .vmu-login-body {
+    max-width: 420px;
+  }
+}
+
+@media (max-width: 480px) {
+  .vmu-login-left {
+    padding: 20px 16px 16px;
+  }
+
+  .vmu-login-title {
+    font-size: 24px;
+    margin-bottom: 16px;
+  }
+
+  .vmu-login-brand-title {
+    font-size: 12px;
+  }
+
+  .vmu-login-brand-sub {
+    font-size: 10px;
+  }
+
+  .vmu-login-badge-online {
+    padding: 3px 8px;
+    font-size: 10px;
+  }
+
+  .vmu-login-left-footer {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+}

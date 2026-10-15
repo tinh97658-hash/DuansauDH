@@ -24,7 +24,9 @@ export class StudentsService {
 
   async forgotPassword(email: string, baseUrl: string) {
     const student = await this.students.findByEmail(email);
-    if (!student) throw new NotFoundException("Không có người dùng nào sử dụng email này");
+    if (!student) {
+      return { status: "success", message: "Nếu email tồn tại trong hệ thống, mã đặt lại mật khẩu đã được gửi qua email" };
+    }
     const resetToken = crypto.randomBytes(32).toString("hex");
     await student.update({
       passwordResetToken: crypto.createHash("sha256").update(resetToken).digest("hex"),
@@ -36,7 +38,7 @@ export class StudentsService {
       await student.update({ passwordResetToken: null, passwordResetExpires: null });
       throw error;
     }
-    return { status: "success", message: "Mã đặt lại mật khẩu đã được gửi qua email" };
+    return { status: "success", message: "Nếu email tồn tại trong hệ thống, mã đặt lại mật khẩu đã được gửi qua email" };
   }
 
   async resetPassword(token: string, password: string) {

@@ -2,8 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import RibbonHeader, { isRibbonRouteActive, ribbons } from "../../components/RibbonHeader";
 
-// Decorative icons are not under test; keep real Ribbon buttons and routing.
-jest.mock("@mui/icons-material", () => new Proxy({}, { get: () => () => null }));
+
 
 describe("Masters scheduling ribbon", () => {
   it("keeps section navigation outside the collapsible action rail and supports action focus", async () => {

@@ -13,7 +13,8 @@ import { ExamGradebookQueryDto, ExamSubjectsQueryDto, SaveExamGradebookDto } fro
 import { AdmissionEvaluationService } from "../plan/admission-evaluation.service.js";
 
 @Controller("masters")
-@UseGuards(AuthenticatedGuard)
+@UseGuards(AuthenticatedGuard, RolesGuard)
+@Roles("admin", "supervisor", "examiner")
 export class MastersController {
   constructor(
     private readonly masters: MastersService,

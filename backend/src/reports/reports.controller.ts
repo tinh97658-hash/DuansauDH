@@ -7,6 +7,8 @@ import { ClassScoreSummaryService } from "./class-score-summary.service.js";
 import { ClassScoreRosterQueryDto, ClassScoreSummaryQueryDto, LearnerScorecardQueryDto } from "./dto/class-score-summary.dto.js";
 
 @Controller("reports")
+@UseGuards(AuthenticatedGuard, RolesGuard)
+@Roles("admin", "supervisor", "examiner")
 export class ReportsController {
   constructor(private readonly reports: ReportsService, private readonly scoreSummary: ClassScoreSummaryService) {}
 

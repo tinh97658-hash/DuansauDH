@@ -1,6 +1,6 @@
 import { QueryTypes, type Transaction } from "sequelize";
 import type { Sequelize } from "sequelize-typescript";
-import { studyLeaveFailureParticipantSql } from '../plan/exam-outcomes.js';
+import { examAttemptOrderSql, studyLeaveFailureParticipantSql } from '../plan/exam-outcomes.js';
 import { notWithdrawnSql, studyEligibleRecordSql } from "../plan/study-leave-policy.js";
 import { resolveSavedExamGrade } from "../masters/exam-grade-calculation.js";
 import type { CourseExamGrade } from "../database/models/training/course-exam-gradebook.model.js";
@@ -113,7 +113,7 @@ export async function readRetakeResults(db: Sequelize, groupIds: string[], subje
       AND ${studyEligibleRecordSql('ar')}
       AND ${notWithdrawnSql('person.participant_id', 'offering.id')}
       AND (link.participant_ids IS NULL OR person.participant_id = ANY(link.participant_ids))
-    ORDER BY book.class_group_id, person.participant_id, offering.subject_id, offering.created_at DESC, book.updated_at DESC, book.id DESC)
+    ORDER BY book.class_group_id, person.participant_id, offering.subject_id, ${examAttemptOrderSql('offering.created_at', 'book.updated_at', 'book.id')})
     SELECT * FROM graded
     UNION ALL
     SELECT link.class_group_id, offering.subject_id, participant_id, ar.id,

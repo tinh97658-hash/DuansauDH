@@ -16,7 +16,8 @@ import { MajorTransferService } from "./major-transfer.service.js";
 import { SubjectRecognitionService } from "./subject-recognition.service.js";
 
 @Controller("plan")
-@UseGuards(AuthenticatedGuard)
+@UseGuards(AuthenticatedGuard, RolesGuard)
+@Roles("admin", "supervisor", "examiner")
 export class PlanController {
   constructor(
     private readonly plan: PlanService,

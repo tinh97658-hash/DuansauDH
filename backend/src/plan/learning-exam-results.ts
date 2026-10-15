@@ -4,7 +4,7 @@ import { resolveSavedExamGrade } from "../masters/exam-grade-calculation.js";
 import type { CourseExamGrade } from "../database/models/training/course-exam-gradebook.model.js";
 import type { GradingPolicy } from "../masters/grading-policy.js";
 import { matchesExamSubjectSql } from "../masters/exam-subject-scope.js";
-import { examOutcomesSql } from "./exam-outcomes.js";
+import { examAttemptOrderSql, examOutcomesSql } from "./exam-outcomes.js";
 import { foreignLanguageExemptGrade, foreignLanguageSubjectSql } from "../masters/foreign-language-exemption.js";
 
 export const isPriorLearning = (row: { sourceType?: string }) => ["pre_masters", "early_enrollment", "external"].includes(row.sourceType || "");
@@ -35,7 +35,7 @@ export async function learningExamResults(sequelize: Sequelize, admissionRecordI
         AND ((source.id IS NOT NULL AND
             ${matchesExamSubjectSql('subject', 'source', 'outcome.course_offering_id', 'outcome.class_group_id')})
           OR (source.id IS NULL AND outcome.course_offering_id = learning.course_offering_id))
-      ORDER BY outcome.recorded_at DESC, outcome.id DESC LIMIT 1
+      ORDER BY ${examAttemptOrderSql('outcome.attempted_at', 'outcome.recorded_at', 'outcome.id')} LIMIT 1
     ) exam ON true
     WHERE learning.admission_record_id = :recordId
   `, { type: QueryTypes.SELECT, replacements: { recordId: admissionRecordId,

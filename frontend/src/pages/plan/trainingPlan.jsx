@@ -112,6 +112,7 @@ const TrainingPlan = () => {
   const [curriculumId, setCurriculumId] = useState("");
   // CTĐT của khóa đang chọn
   const [curriculum, setCurriculum] = useState(null);
+  const curriculumInUse = (curriculum?.classGroups || []).length > 0;
   const [curriculumSubjects, setCurriculumSubjects] = useState([]);
   const [curriculumSubjectSearch, setCurriculumSubjectSearch] = useState("");
 
@@ -864,7 +865,7 @@ const TrainingPlan = () => {
   };
 
   const handleRemoveSubjectFromCurriculum = (entry) => {
-    if (!isAdmin || matrixSaving || !curriculum) return;
+    if (!isAdmin || matrixSaving || !curriculum || curriculumInUse) return;
     requestConfirm({
       title: "Loại bỏ học phần khỏi CTĐT",
       content: `Bạn có chắc muốn loại học phần "${entry.name}" (${entry.code}) khỏi chương trình đào tạo của khóa này không?\n(Học phần vẫn được lưu an toàn trong Danh mục học phần chung của ngành)`,
@@ -894,7 +895,7 @@ const TrainingPlan = () => {
   };
 
   const handleClearAllSubjectsFromCurriculum = () => {
-    if (!isAdmin || matrixSaving || !curriculum) return;
+    if (!isAdmin || matrixSaving || !curriculum || curriculumInUse) return;
     requestConfirm({
       title: "Làm sạch toàn bộ học phần trong CTĐT",
       content: `Bạn có chắc muốn làm sạch toàn bộ học phần trong CTĐT (${curriculum.code}) của khóa này để tự chọn lại từ đầu từ danh mục không?`,
@@ -906,6 +907,7 @@ const TrainingPlan = () => {
 
   // Mở Dialog thêm môn từ danh mục
   const handleOpenAddSubjects = () => {
+    if (curriculumInUse) return;
     setSelectedCatalogSubjectIds([]);
     setAddSubjectSearch("");
     setAddSubjectTypeFilter("ALL");
@@ -1881,7 +1883,7 @@ const TrainingPlan = () => {
                           variant="contained"
                           startIcon={<AddRounded />}
                           onClick={handleOpenAddSubjects}
-                          disabled={matrixSaving}
+                          disabled={matrixSaving || curriculumInUse}
                           sx={{
                             height: 32,
                             flex: 1,
@@ -1905,7 +1907,7 @@ const TrainingPlan = () => {
                             color="error"
                             startIcon={<DeleteOutlineRounded />}
                             onClick={handleClearAllSubjectsFromCurriculum}
-                            disabled={matrixSaving}
+                            disabled={matrixSaving || curriculumInUse}
                             sx={{ height: 32, flex: 1, px: 1.25, fontSize: 11, fontWeight: 700, textTransform: "none", borderRadius: "8px", whiteSpace: "nowrap" }}
                           >
                             Làm sạch CTĐT
@@ -1915,6 +1917,12 @@ const TrainingPlan = () => {
                     )}
 
                   </Stack>
+
+                  {curriculumInUse && (
+                    <Alert severity="info" sx={{ mb: 1.5 }}>
+                      CTĐT này đã được gắn cho lớp học. Danh sách học phần được giữ nguyên để bảo toàn kết quả học tập; hãy lập CTĐT mới khi cần thay đổi.
+                    </Alert>
+                  )}
 
                   <Stack
                     direction={{ xs: "column", lg: "row" }}
@@ -2019,7 +2027,7 @@ const TrainingPlan = () => {
                                     <IconButton
                                       size="small"
                                       color="error"
-                                      disabled={matrixSaving}
+                                      disabled={matrixSaving || curriculumInUse}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleRemoveSubjectFromCurriculum(entry);

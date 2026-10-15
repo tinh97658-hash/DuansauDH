@@ -1,5 +1,12 @@
 import { notWithdrawnSql } from './study-leave-policy.js';
 
+// Rank the learning attempt before edits to its gradebook. Expressions are
+// application-owned SQL, never request input. Updates only break ties within
+// the same attempt chronology, so editing an old class cannot revive its marks.
+export function examAttemptOrderSql(attemptedAt: string, recordedAt: string, id: string) {
+  return `${attemptedAt} DESC, ${recordedAt} DESC, ${id} DESC`;
+}
+
 // Withdrawals are the immutable evidence for failed, interrupted attempts. Keep
 // original component marks in the snapshot; no unearned exam/final score is invented.
 export function studyLeaveFailureOutcomesSql() {
@@ -7,7 +14,7 @@ export function studyLeaveFailureOutcomesSql() {
     offering.id course_offering_id, withdrawal.class_group_id, offering.subject_id,
     CASE WHEN record.student_id IS NOT NULL THEN 'student:' || record.student_id::text
       ELSE 'admission:' || record.id::text END participant_id,
-    withdrawal.created_at recorded_at,
+    withdrawal.created_at recorded_at, offering.created_at attempted_at,
     COALESCE(withdrawal.snapshot->'grades'->0, '{}'::jsonb) || jsonb_build_object(
       'participantId', CASE WHEN record.student_id IS NOT NULL THEN 'student:' || record.student_id::text ELSE 'admission:' || record.id::text END,
       'studyLeaveFailure', true, 'result', 'failed', 'courseScore', NULL, 'grade4', NULL,
@@ -26,7 +33,7 @@ export function examOutcomesSql() {
     book.class_group_id, offering.subject_id,
     CASE WHEN identity.student_id IS NOT NULL THEN 'student:' || identity.student_id::text
       ELSE entry.value->>'participantId' END participant_id,
-    book.updated_at recorded_at, entry.value grade
+    book.updated_at recorded_at, offering.created_at attempted_at, entry.value grade
     FROM course_exam_gradebooks book JOIN course_offerings offering ON offering.id = book.course_offering_id
     CROSS JOIN LATERAL jsonb_array_elements(book.grades) entry(value)
     LEFT JOIN admission_records identity ON entry.value->>'participantId' = 'admission:' || identity.id::text

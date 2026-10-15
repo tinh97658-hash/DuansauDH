@@ -21,8 +21,8 @@ export const environmentSchema = Joi.object({
     return url.toString();
   }),
   DATABASE_SSL: Joi.boolean().truthy("true").falsy("false").default(false),
-  DB_POOL_MAX: Joi.number().integer().min(1).default(10),
-  DB_POOL_MIN: Joi.number().integer().min(0).default(0),
+  DB_POOL_MAX: Joi.number().integer().min(1).default(25),
+  DB_POOL_MIN: Joi.number().integer().min(0).default(2),
   DB_POOL_IDLE_MS: Joi.number().integer().min(1000).default(10000),
   DB_POOL_ACQUIRE_MS: Joi.number().integer().min(1000).default(30000),
   SESSION_SECRET: Joi.string().min(32).required(),

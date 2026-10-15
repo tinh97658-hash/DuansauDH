@@ -284,8 +284,37 @@ hệ thống đối chiếu toàn bộ kết quả với CTĐT hiện hành:
 | API `/plan/admission-records/:id/learning-results`, `/plan/learning-results/:id`, `/plan/admission-records/:id/subject-recognitions`, `/plan/subject-recognitions/:id/decision` | ✅ |
 | UI `admissionRecordDetail.jsx` (nhập kết quả học phần + duyệt công nhận), `bridgeKnowledge.jsx` (khai báo tương đương) | ✅ |
 | UI tab 2 `trainingPlan.jsx` (bảng CTĐT của lớp + chọn tự chọn); `createClassGroups.jsx` cho **chọn CTĐT** khi phạm vi có nhiều CTĐT | ✅ |
+| Khóa phạm vi lớp (bậc, chuyên ngành, khóa, mã lớp suy ra khóa, CTĐT) khi lớp đã có học viên hoặc dữ liệu đào tạo (F03) | ✅ |
+| Khóa CTĐT đã được lớp sử dụng: không sửa cấu trúc, tín chỉ, danh sách học phần và không xóa (F04) | ✅ |
+| Khóa học phần danh mục đã dùng trong đào tạo: không sửa mã, tên, tín chỉ, loại, quan hệ tương đương (F04) | ✅ |
+| UI tab 2 chặn thêm/loại học phần và làm sạch CTĐT khi CTĐT đã gắn lớp | ✅ |
 | Seeds `seed-demo`, `bulk-fixtures`, `scheduling-test-fixture` | ✅ |
 | Test unit backend + frontend | ✅ |
+
+### 5.1. Bất biến phạm vi sau khi phát sinh dữ liệu (F03 · F04)
+
+Mọi thao tác ghi có thể đổi phạm vi đào tạo đều đi qua một khóa tuần tự chung
+(`pg_advisory_xact_lock(714062)` trong `backend/src/plan/training-structure-integrity.ts`) rồi mới kiểm tra
+"đã dùng hay chưa" trong cùng transaction, nên không có khe hở giữa bước kiểm tra và bước ghi:
+
+- **`CLASS_SCOPE_IN_USE`** — lớp đã có thành viên, lớp học phần, bảng điểm, bằng chứng rút khỏi lớp học phần
+  hoặc lịch sử chuyển ngành thì không được đổi bậc, chuyên ngành, khóa, mã lớp suy ra khóa, CTĐT.
+  Áp dụng ở `ClassGroupService.update`, `CurriculumService.assignToClassGroup` và `findForClassGroup`
+  (kể cả đường đọc danh mục môn của lớp cũ).
+- **`CURRICULUM_IN_USE`** — CTĐT đã được lớp chọn hoặc đã xuất hiện trong lịch sử chuyển ngành thì không được
+  đổi chuyên ngành/bậc/khóa/tín chỉ, không được thay danh sách học phần, không được xóa.
+- **`SUBJECT_STRUCTURE_IN_USE`** — học phần (hoặc học phần gốc/tương đương cùng chuỗi) đã nằm trong CTĐT của
+  lớp, đã dùng ở lớp học phần, kết quả học tập, công nhận tín chỉ hoặc học bổ sung kiến thức thì không được
+  sửa các trường ảnh hưởng CTĐT và bảng điểm.
+
+Thao tác chỉ giữ nguyên phạm vi (ghi chú, sĩ số, giá trị ngành/khóa/CTĐT không đổi) vẫn được phép. Khi cần
+thay đổi chương trình, nghiệp vụ là **lập CTĐT mới** rồi chuyển lớp/học viên theo quy trình chuyển ngành có
+lịch sử, không sửa lên CTĐT đang chạy. Nhờ vậy tập môn của báo cáo (lấy từ `curriculum_subjects` của CTĐT
+lớp) không đổi khi có người sửa CTĐT hoặc danh mục học phần, và bảng điểm đã xuất vẫn khớp.
+
+Giao diện tab 2 (`frontend/src/pages/plan/trainingPlan.jsx`) đã chặn thêm/loại học phần và làm sạch CTĐT khi
+CTĐT đã gắn lớp, kèm cảnh báo lý do. Màn hình sửa lớp chưa tự khóa các trường phạm vi; máy chủ từ chối và trả
+thông báo, nên vẫn nên bổ sung khóa/giải thích ở UI trong lần chỉnh giao diện tới.
 
 ---
 
@@ -296,4 +325,6 @@ hệ thống đối chiếu toàn bộ kết quả với CTĐT hiện hành:
    Khi tạo mới, người dùng nhập thông tin học phần một lần, chọn phạm vi ngành và nhập mã riêng cho từng ngành; API tạo toàn bộ bản ghi trong cùng một transaction.
 3. **Điều kiện tiên quyết & tiến độ học kỳ**: chưa cần vì Viện không tổ chức theo học kỳ/đợt.
 4. **`seed-demo`**: phần dọn dữ liệu demo cũ xóa `class_groups` trực tiếp nên sẽ lỗi nếu các lớp demo đã được dùng để mở lớp học phần qua giao diện (ràng buộc `course_offering_class_groups`). Đây là hạn chế có từ trước, cần dọn thêm `course_offerings`/`teaching_sessions` nếu muốn chạy lại seed trên database đã thao tác.
+5. **Phiên bản CTĐT và snapshot bảng điểm đã phát hành**: F04 hiện được xử lý bằng bất biến phạm vi (khóa sửa, buộc lập CTĐT mới) chứ chưa đánh số phiên bản CTĐT theo quyết định. Muốn lưu bản bảng điểm "đã phát hành" độc lập với CTĐT và danh mục hiện hành thì cần thêm nghiệp vụ duyệt/khóa/phát hành bảng điểm (xem F07, F08 trong `BAO-CAO-LOGIC-VONG-DOI-HOC-VIEN.md`).
+6. **Khóa trường phạm vi ở màn hình sửa lớp**: hiện chỉ máy chủ từ chối (`CLASS_SCOPE_IN_USE`); UI chưa vô hiệu hóa ngành/khóa/CTĐT của lớp đã có dữ liệu.
 

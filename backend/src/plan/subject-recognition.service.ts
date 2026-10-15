@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
-import { examOutcomesSql } from "./exam-outcomes.js";
+import { examAttemptOrderSql, examOutcomesSql } from "./exam-outcomes.js";
 import { InjectModel } from "@nestjs/sequelize";
 import { Op, QueryTypes } from "sequelize";
 import type { Transaction } from "sequelize";
@@ -122,11 +122,11 @@ export class SubjectRecognitionService {
     const outcomes = await this.sequelize.query<any>(`
       WITH outcomes AS (
         SELECT attempt.id, attempt.subject_id, attempt.course_offering_id offering_id, attempt.class_group_id, 'regular' source_type,
-          COALESCE(attempt.grade->>'result', 'pending') result, attempt.grade, attempt.recorded_at
+          COALESCE(attempt.grade->>'result', 'pending') result, attempt.grade, attempt.recorded_at, attempt.attempted_at
         FROM (${examOutcomesSql()}) attempt WHERE attempt.participant_id IN (:participantIds)
         UNION ALL
         SELECT 'foreign-language-exemption:' || subject.id::text, subject.id, NULL::uuid, NULL::uuid,
-          'regular', 'passed', CAST(:foreignLanguageGrade AS jsonb), 'infinity'::timestamp
+          'regular', 'passed', CAST(:foreignLanguageGrade AS jsonb), 'infinity'::timestamp, 'infinity'::timestamp
         FROM curriculum_subjects entry JOIN subjects subject ON subject.id = entry.subject_id
         WHERE entry.curriculum_id = :curriculumId AND :foreignLanguageExempt
           AND ${foreignLanguageSubjectSql('subject.id')}
@@ -137,7 +137,7 @@ export class SubjectRecognitionService {
       ), ranked AS (
         SELECT outcome.id, target.id subject_id, target.code_text, target.code_number, target.name,
           outcome.source_type, outcome.result, outcome.grade,
-          ROW_NUMBER() OVER (PARTITION BY target.id ORDER BY outcome.recorded_at DESC, outcome.id DESC) rank
+          ROW_NUMBER() OVER (PARTITION BY target.id ORDER BY ${examAttemptOrderSql('outcome.attempted_at', 'outcome.recorded_at', 'outcome.id')}) rank
         FROM outcomes outcome JOIN subjects source ON source.id = outcome.subject_id
         JOIN subjects target ON ${matchesExamSubjectSql('source', 'target', 'outcome.offering_id', 'outcome.class_group_id')}
         JOIN curriculum_subjects entry ON entry.subject_id = target.id AND entry.curriculum_id = :curriculumId
@@ -274,7 +274,7 @@ export class SubjectRecognitionService {
         NULLIF(attempt.grade->>'courseScore', '')::numeric score, attempt.grade,
         (SELECT policy FROM shared_grading_rules ORDER BY version DESC LIMIT 1) AS "eligibilityPolicy"
       FROM (${examOutcomesSql()}) attempt WHERE attempt.participant_id IN (:participantIds)
-      ORDER BY attempt.subject_id, attempt.recorded_at DESC, attempt.id DESC
+      ORDER BY attempt.subject_id, ${examAttemptOrderSql('attempt.attempted_at', 'attempt.recorded_at', 'attempt.id')}
     `, { type: QueryTypes.SELECT, transaction, replacements: {
       participantIds: [`admission:${record.id}`, ...(record.studentId ? [`student:${record.studentId}`] : [])],
     } });

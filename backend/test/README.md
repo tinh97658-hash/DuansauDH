@@ -14,3 +14,15 @@ npm run test:integration
 npm run test:e2e
 npm run test:ci
 ```
+
+Regression tests for learner data access run with `npm run test:e2e` and use a real Nest HTTP app with mocked services, without a database.
+
+To check attempt ordering across reports, learning results, credits and retakes, use a disposable PostgreSQL instance (no migrations needed):
+
+```powershell
+$env:RUN_POSTGRES_REPORT_TESTS = 'true'
+$env:TEST_DATABASE_URL = 'postgres://test_user:test_password@127.0.0.1:TEST_PORT/test_db'
+npm test -- --runTestsByPath test/integration/exam-attempt-order-postgres.spec.ts test/integration/class-score-summary-postgres.spec.ts
+```
+
+These suites create connection-local temporary tables and roll back their fixtures. The attempt-order suite requires an explicit `TEST_DATABASE_URL`; the report suite also accepts it instead of local `.env` settings.

@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
 import { Op } from "sequelize";
+import { assertClassScopeEditable, assertCurriculumEditable, lockTrainingStructure } from "./training-structure-integrity.js";
 import { sortCurriculumSubjectsByVietnameseName } from "./curriculum-subject-order.js";
 import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
@@ -131,6 +132,8 @@ export class CurriculumService {
    */
   async classSubjects(classGroupId: string) {
     return this.sequelize.transaction(async (transaction) => {
+      // Legacy reads may bind an unlinked class, so serialize that path too.
+      await lockTrainingStructure(this.sequelize, transaction);
       const classGroup = await this.requireClassGroup(classGroupId, transaction);
       const curriculum = await this.findForClassGroup(classGroup, transaction);
       if (!curriculum) {
@@ -261,7 +264,12 @@ export class CurriculumService {
 
   async update(id: string, dto: UpdateCurriculumDto) {
     return this.sequelize.transaction(async (transaction) => {
+      await lockTrainingStructure(this.sequelize, transaction);
       const curriculum = await this.requireCurriculum(id, transaction);
+      if (["majorId", "program", "applicableFromYear", "totalCredits"].some(key =>
+        dto[key] !== undefined && dto[key] !== curriculum[key])) {
+        await assertCurriculumEditable(this.sequelize, id, transaction);
+      }
       const program = dto.program || curriculum.program;
       const majorId = dto.majorId || curriculum.majorId;
       await this.requireMajor(majorId, program, transaction);
@@ -285,11 +293,13 @@ export class CurriculumService {
 
   async remove(id: string) {
     return this.sequelize.transaction(async (transaction) => {
+      await lockTrainingStructure(this.sequelize, transaction);
       const curriculum = await this.requireCurriculum(id, transaction);
       const linkedClasses = await this.classGroups.count({ where: { curriculumId: id }, transaction });
       if (linkedClasses > 0) {
         throw new ConflictException(`Không thể xóa: còn ${linkedClasses} lớp đang dùng chương trình đào tạo này.`);
       }
+      await assertCurriculumEditable(this.sequelize, id, transaction);
       await curriculum.destroy({ transaction });
       return { success: true, message: "Đã xóa chương trình đào tạo." };
     });
@@ -297,7 +307,9 @@ export class CurriculumService {
 
   async setSubjects(id: string, dto: SetCurriculumSubjectsDto) {
     return this.sequelize.transaction(async (transaction) => {
+      await lockTrainingStructure(this.sequelize, transaction);
       const curriculum = await this.requireCurriculum(id, transaction);
+      await assertCurriculumEditable(this.sequelize, id, transaction);
       const [blocks, groups] = await Promise.all([
         this.blocks.findAll({ where: { curriculumId: id }, transaction }),
         this.electiveGroups.findAll({ where: { curriculumId: id }, transaction }),
@@ -317,6 +329,7 @@ export class CurriculumService {
   /** Đặt danh sách học phần tự chọn mà Viện chỉ định cho một lớp. */
   async setClassElectives(classGroupId: string, curriculumSubjectIds: string[]) {
     await this.sequelize.transaction(async (transaction) => {
+      await lockTrainingStructure(this.sequelize, transaction);
       const classGroup = await this.requireClassGroup(classGroupId, transaction);
       const curriculum = await this.findForClassGroup(classGroup, transaction);
       if (!curriculum) {
@@ -389,6 +402,8 @@ export class CurriculumService {
     });
     if (matches.length !== 1) return null;
     if (classGroup.curriculumId !== matches[0].id) {
+      await lockTrainingStructure(this.sequelize, transaction);
+      await assertClassScopeEditable(this.sequelize, classGroup.id, transaction);
       await classGroup.update({ curriculumId: matches[0].id } as never, { transaction });
     }
     return matches[0];
@@ -396,6 +411,7 @@ export class CurriculumService {
 
   /** Gắn (và tạo nếu chưa có) CTĐT của ngành + khóa cho một lớp. */
   async assignToClassGroup(classGroup: ClassGroup, transaction?: Transaction, requestedCurriculumId?: string): Promise<Curriculum> {
+    await lockTrainingStructure(this.sequelize, transaction);
     if (!classGroup.majorId) {
       throw new BadRequestException("Lớp học phải được gắn chuyên ngành trước khi xác định chương trình đào tạo.");
     }
@@ -429,6 +445,7 @@ export class CurriculumService {
       curriculum = matches[0] || await this.autoCreate(classGroup.majorId, classGroup.program, applicableFromYear, transaction);
     }
     if (classGroup.curriculumId !== curriculum.id) {
+      await assertClassScopeEditable(this.sequelize, classGroup.id, transaction);
       await classGroup.update({ curriculumId: curriculum.id } as never, { transaction });
     }
     return curriculum;
@@ -436,6 +453,7 @@ export class CurriculumService {
 
   async ensureForClass(classGroupId: string) {
     return this.sequelize.transaction(async (transaction) => {
+      await lockTrainingStructure(this.sequelize, transaction);
       const classGroup = await this.requireClassGroup(classGroupId, transaction);
       const curriculum = await this.assignToClassGroup(classGroup, transaction);
       return this.detail(curriculum.id, transaction);

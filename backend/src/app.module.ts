@@ -59,6 +59,13 @@ export class AppModule implements NestModule {
 
     consumer.apply(rateLimit({
       windowMs: 15 * 60 * 1000,
+      limit: 1500,
+      standardHeaders: "draft-7",
+      legacyHeaders: false,
+    })).forRoutes({ path: "*", method: RequestMethod.ALL });
+
+    consumer.apply(rateLimit({
+      windowMs: 15 * 60 * 1000,
       limit: 100,
       standardHeaders: "draft-7",
       legacyHeaders: false,

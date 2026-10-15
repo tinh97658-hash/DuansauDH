@@ -16,13 +16,15 @@ describePostgres("Class reports PostgreSQL queries", () => {
   let transaction: Transaction;
   let service: ClassScoreSummaryService;
   beforeAll(async () => {
-    const vars = Object.fromEntries(readFileSync(resolve(__dirname, "../../../.env"), "utf8")
+    const vars = process.env.TEST_DATABASE_URL ? {} : Object.fromEntries(readFileSync(resolve(__dirname, "../../../.env"), "utf8")
       .split(/\r?\n/).filter(line => /^[A-Z_]+=/.test(line)).map(line => {
         const index = line.indexOf("=");
         return [line.slice(0, index), line.slice(index + 1).replace(/^["']|["']$/g, "")];
       }));
-    db = new Sequelize({ dialect: "postgres", host: "127.0.0.1", port: Number(vars.DB_PORT),
-      username: vars.POSTGRES_USER, password: vars.POSTGRES_PASSWORD, database: vars.POSTGRES_DB, logging: false });
+    db = process.env.TEST_DATABASE_URL
+      ? new Sequelize(process.env.TEST_DATABASE_URL, { logging: false })
+      : new Sequelize({ dialect: "postgres", host: "127.0.0.1", port: Number(vars.DB_PORT),
+        username: vars.POSTGRES_USER, password: vars.POSTGRES_PASSWORD, database: vars.POSTGRES_DB, logging: false });
     transaction = await db.transaction();
     const query = (sql: string) => db.query(sql, { transaction });
     await query(`
@@ -42,7 +44,7 @@ describePostgres("Class reports PostgreSQL queries", () => {
         program text DEFAULT 'masters', allow_cross_major boolean DEFAULT false, shared_major_ids text[] DEFAULT '{}') ON COMMIT DROP;
       CREATE TEMP TABLE curriculum_blocks (id text, name text, sort_order int, curriculum_id text, code text) ON COMMIT DROP;
       CREATE TEMP TABLE curriculum_subjects (curriculum_id text, subject_id text, block_id text, credits int, is_required boolean, sort_order int) ON COMMIT DROP;
-      CREATE TEMP TABLE course_offerings (id text, subject_id text) ON COMMIT DROP;
+      CREATE TEMP TABLE course_offerings (id text, subject_id text, created_at timestamp NOT NULL DEFAULT '2026-01-01') ON COMMIT DROP;
       CREATE TEMP TABLE course_offering_class_groups (course_offering_id text, class_group_id text) ON COMMIT DROP;
       CREATE TEMP TABLE course_exam_gradebooks (id text, class_group_id text, course_offering_id text, updated_at timestamp, grades jsonb) ON COMMIT DROP;
       CREATE TEMP TABLE shared_grading_rules (version int, policy jsonb) ON COMMIT DROP;

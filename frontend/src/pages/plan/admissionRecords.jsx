@@ -474,6 +474,15 @@ const AdmissionRecords = ({ mode = "applications" }) => {
       note: rec.note || "",
     });
     setIsFormOpen(true);
+    if (rec.id && (rec.photo === undefined || rec.photo === null || rec.photo === "")) {
+      axios.get(`${API_BASE_URL}/plan/admission-records/${rec.id}`, { withCredentials: true })
+        .then(({ data }) => {
+          if (data?.photo) {
+            setFormData((prev) => (prev.id === rec.id ? { ...prev, photo: data.photo } : prev));
+          }
+        })
+        .catch(() => {});
+    }
   };
 
   // Save Form

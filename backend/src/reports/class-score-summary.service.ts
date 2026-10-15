@@ -13,7 +13,7 @@ import { calculateExamEligibility, resolveSavedExamGrade } from "../masters/exam
 import { matchesExamSubjectSql } from "../masters/exam-subject-scope.js";
 import { foreignLanguageExemptGrade, foreignLanguageSubjectSql } from "../masters/foreign-language-exemption.js";
 
-import { examOutcomesSql } from "../plan/exam-outcomes.js";
+import { examAttemptOrderSql, examOutcomesSql } from "../plan/exam-outcomes.js";
 // Shared identity selection and deduplication; neither path changes roster semantics.
 const CLASS_ROSTER_CTE = `
       WITH identities AS (
@@ -179,14 +179,15 @@ export class ClassScoreSummaryService {
 
     const rows: any[] = roster.rows.map((row: any) => ({ ...row, scores: {} }));
     if (subjects.length && rows.length) {
-      // The latest saved exam row is authoritative, even when its result is pending or its score is empty.
+      // The latest learning attempt is authoritative, even when pending or empty.
+      // Editing an older class's gradebook must not replace a newer retake.
       // Match aliases by their canonical subject, never by a coincidentally equal name.
       const scores = await this.sequelize.query<any>(`
         WITH candidates AS (
           SELECT attempt.participant_id, attempt.subject_id,
             NULLIF(attempt.grade->>'courseScore', '')::numeric AS score,
             COALESCE(attempt.grade->>'result', 'pending') AS result,
-            attempt.recorded_at, attempt.id, 0 AS priority,
+            attempt.recorded_at, attempt.attempted_at, attempt.id, 0 AS priority,
             attempt.grade || jsonb_build_object('source', 'gradebook', 'eligibilityPolicy', rules.policy) AS details,
             attempt.course_offering_id::text AS offering_id
           FROM (${examOutcomesSql()}) attempt
@@ -195,7 +196,7 @@ export class ClassScoreSummaryService {
           UNION ALL
           SELECT CASE WHEN ar.student_id IS NOT NULL THEN 'student:' || ar.student_id::text
               ELSE 'admission:' || ar.id::text END, recognition.target_subject_id,
-            learning.score, 'passed', recognition.updated_at, recognition.id::text, 1,
+            learning.score, 'passed', recognition.updated_at, recognition.updated_at, recognition.id::text, 1,
             jsonb_build_object('source', 'recognition', 'recognitionId', recognition.id,
               'courseScore', learning.score, 'result', 'passed', 'conversionPolicy', rules.policy), NULL::text
           FROM subject_recognitions recognition
@@ -211,7 +212,7 @@ export class ClassScoreSummaryService {
         ), ranked AS (
           SELECT c.participant_id AS "participantId", target.id AS "subjectId", c.score, c.result, c.details,
             ROW_NUMBER() OVER (PARTITION BY c.participant_id, target.id
-              ORDER BY c.priority DESC, c.recorded_at DESC, c.id DESC) AS rank
+              ORDER BY c.priority DESC, ${examAttemptOrderSql('c.attempted_at', 'c.recorded_at', 'c.id')}) AS rank
           FROM candidates c JOIN subjects source ON source.id = c.subject_id
           JOIN subjects target ON ${matchesExamSubjectSql('source', 'target', 'c.offering_id', ':groupId')}
           WHERE target.id IN (:subjectIds)
@@ -262,6 +263,6 @@ export class ClassScoreSummaryService {
     const curriculum = storedCurriculum ? { ...storedCurriculum, totalCredits: subjects.reduce((total: number, subject: any) => total + Number(subject.credits || 0), 0) } : null;
     const plainGroup = typeof group.toJSON === "function" ? group.toJSON() : group;
     return { group: { ...plainGroup, curriculum }, curriculum, subjects, rows, total: roster.total, page: roster.page, pageSize,
-      scorePolicy: "Điểm lấy từ kết quả học phần đã được công nhận hoặc danh sách thi, điểm thi đã lưu gần nhất. Ô trống: chưa có điểm; MT: miễn thi. Không đạt do bảo lưu: học phần đã có lịch buổi đầu hoặc đã có điểm khi duyệt bảo lưu." };
+      scorePolicy: "Điểm lấy từ kết quả học phần đã được công nhận hoặc kết quả đã lưu của lần học mới nhất, xác định theo thời điểm mở lớp học phần. Sửa bảng điểm lớp cũ không thay thế kết quả lần học mới hơn. Ô trống: chưa có điểm; MT: miễn thi. Không đạt do bảo lưu: học phần đã có lịch buổi đầu hoặc đã có điểm khi duyệt bảo lưu." };
   }
 }

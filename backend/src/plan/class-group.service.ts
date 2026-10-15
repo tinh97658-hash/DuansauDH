@@ -9,6 +9,7 @@ import { CourseOfferingClassGroup } from "../database/models/training/course-off
 import { Major } from "../database/models/common/major.model.js";
 import { CurriculumService } from "./curriculum.service.js";
 import { classGroupCode, parseClassGroupCode } from "./class-group-code.js";
+import { assertClassScopeEditable, lockTrainingStructure } from "./training-structure-integrity.js";
 
 export interface CreateClassGroupInput {
   code: string;
@@ -107,6 +108,7 @@ export class ClassGroupService {
 
   async create(input: CreateClassGroupInput, transaction?: Transaction) {
     if (!transaction) return this.sequelize.transaction((tx) => this.create(input, tx));
+    await lockTrainingStructure(this.sequelize, transaction);
     const program = input.program || "masters";
     const major = await this.requireMajorForProgram(input.majorId, program, transaction);
     if (program === "masters" && input.groupNumber != null) {
@@ -133,7 +135,8 @@ export class ClassGroupService {
 
   async update(id: string, input: UpdateClassGroupInput, transaction?: Transaction) {
     if (!transaction) return this.sequelize.transaction((tx) => this.update(id, input, tx));
-    const group = await this.classGroups.findByPk(id, { transaction });
+    await lockTrainingStructure(this.sequelize, transaction);
+    const group = await this.classGroups.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
     if (!group) throw new NotFoundException("Không tìm thấy nhóm học phần.");
 
     const program = input.program || group.program;
@@ -146,9 +149,13 @@ export class ClassGroupService {
       const academicYear = input.academicYear ?? parsed.academicYear;
       const code = classGroupCode(major!.code, academicYear, parsed.intakeRound, parsed.groupNumber);
       input = { ...input, code, name: code, academicYear };
-      await group.update({ intakeRound: parsed.intakeRound, groupNumber: parsed.groupNumber }, { transaction });
     }
     if (program === "masters" && input.code !== undefined) input = { ...input, name: input.code };
+
+    const scopeChanged = program !== group.program || majorId !== group.majorId
+      || (input.academicYear !== undefined && input.academicYear !== group.academicYear)
+      || (input.curriculumId && input.curriculumId !== group.curriculumId);
+    if (scopeChanged) await assertClassScopeEditable(this.sequelize, id, transaction);
 
     if (input.code !== undefined && input.code !== group.code) {
       await this.ensureCodeUnique(input.code, program, id, transaction);
@@ -161,6 +168,11 @@ export class ClassGroupService {
     }
 
     const payload: Record<string, unknown> = {};
+    if (program === "masters" && group.groupNumber) {
+      const parsed = parseClassGroupCode(input.code || group.code)!;
+      payload.intakeRound = parsed.intakeRound;
+      payload.groupNumber = parsed.groupNumber;
+    }
     for (const key of ["code", "name", "program", "majorId", "academicYear", "maxStudents", "status", "note"] as const) {
       const value = input[key as keyof UpdateClassGroupInput];
       if (value === undefined) continue;

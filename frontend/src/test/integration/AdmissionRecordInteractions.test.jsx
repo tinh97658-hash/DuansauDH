@@ -4,14 +4,14 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import axios from "axios";
 import AdmissionRecords from "../../pages/plan/admissionRecords";
 
-jest.mock("axios");
-jest.mock("@mui/icons-material", () => ({
+vi.mock("axios");
+vi.mock("@mui/icons-material", () => ({
   AddPhotoAlternateRounded: () => null, AddRounded: () => null, CheckCircleRounded: () => null,
   CloseRounded: () => null, DeleteRounded: () => null, EditRounded: () => null,
   PersonRounded: () => null, VisibilityRounded: () => null, SearchRounded: () => null,
 }));
-jest.mock("../../components/FeatureLayout", () => ({ children }) => <div>{children}</div>);
-jest.mock("react-toastify", () => ({ ToastContainer: () => null, toast: { success: jest.fn(), error: jest.fn() } }));
+vi.mock("../../components/FeatureLayout", () => ({ default: ({ children }) => <div>{children}</div> }));
+vi.mock("react-toastify", () => ({ ToastContainer: () => null, toast: { success: vi.fn(), error: vi.fn() } }));
 
 const record = {
   id: "record-1", code: "HV001", lastName: "Nguyễn Văn", firstName: "An", fullName: "Nguyễn Văn An",
@@ -19,7 +19,7 @@ const record = {
 };
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   localStorage.clear();
   axios.get.mockImplementation(async url => {
     if (url.includes("/auth/isStaff")) return { data: { message: "admin" } };

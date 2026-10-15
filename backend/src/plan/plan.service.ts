@@ -1,4 +1,6 @@
 import { Optional } from "@nestjs/common";
+import { isDeepStrictEqual } from "node:util";
+import { assertSubjectStructureEditable, lockTrainingStructure } from "./training-structure-integrity.js";
 import { admissionLearnerWhere } from "./admission-learner-policy.js";
 import { AdmissionEvaluationService } from "./admission-evaluation.service.js";
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
@@ -179,6 +181,7 @@ export class PlanService {
 
   async updateSubject(id: string, dto: UpdateSubjectDto) {
     return this.sequelize.transaction(async (transaction) => {
+      await lockTrainingStructure(this.sequelize, transaction);
       const subject = await this.subjects.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!subject) throw new NotFoundException("Không tìm thấy học phần.");
       const majorId = dto.majorId || subject.majorId;
@@ -188,13 +191,19 @@ export class PlanService {
         dto.sharedMajorIds ?? subject.sharedMajorIds ?? [], majorId, program, transaction,
       );
       if (dto.sharedMajorIds !== undefined || sharedMajorIds.length > 0) dto.allowCrossMajor = sharedMajorIds.length > 0;
-      await this.validateSubjectIdentityUpdate(subject, dto, program, transaction);
       const payload = this.pick(dto, [
         "codeNumber", "codeText", "name", "majorId", "program", "credits",
         "majorAssignment", "subjectType", "isRequired", "sortOrder", "active",
         "canonicalSubjectId", "allowCrossMajor", "sharedMajorIds",
       ]);
       payload.sharedMajorIds = sharedMajorIds;
+      const protectedFields = ["codeNumber", "codeText", "name", "majorId", "program", "credits",
+        "subjectType", "isRequired", "canonicalSubjectId", "allowCrossMajor", "sharedMajorIds"];
+      if (protectedFields.some(key => payload[key] !== undefined && !isDeepStrictEqual(
+        key === "sharedMajorIds" ? [...(payload[key] as string[] || [])].sort() : payload[key],
+        key === "sharedMajorIds" ? [...(subject[key] || [])].sort() : subject[key],
+      ))) await assertSubjectStructureEditable(this.sequelize, id, transaction);
+      await this.validateSubjectIdentityUpdate(subject, dto, program, transaction);
       if (dto.codeText !== undefined) {
         payload.code = dto.codeText;
       } else if (dto.codeNumber !== undefined && !subject.codeText) {
@@ -297,6 +306,7 @@ export class PlanService {
     const source = dto.source;
     const program = source.program || "masters";
     return this.sequelize.transaction(async (transaction) => {
+      await lockTrainingStructure(this.sequelize, transaction);
       await this.requireMajorForProgram(source.majorId, program, transaction);
       const existingSubjectIds = dto.existingSubjectIds || [];
       const counterparts = dto.counterparts || [];
@@ -311,6 +321,7 @@ export class PlanService {
       if (existingSubjects.length !== existingSubjectIds.length) {
         throw new BadRequestException("Có học phần gợi ý không còn tồn tại.");
       }
+      for (const subject of existingSubjects) await assertSubjectStructureEditable(this.sequelize, subject.id, transaction);
 
       const existingMajorIds = existingSubjects.map((subject) => subject.majorId);
       const counterpartMajorIds = counterparts.map((counterpart) => counterpart.majorId);
@@ -580,7 +591,7 @@ export class PlanService {
     const [result, mastersCount, doctoralCount, eligibleCount] = await Promise.all([
       this.admissionRecordsModel.findAndCountAll({
         where,
-        attributes: { exclude: ["studyStatus"], include: [[effectiveStatus, "studyStatus"]] },
+        attributes: { exclude: ["studyStatus", "photo"], include: [[effectiveStatus, "studyStatus"]] },
         include: [includeMajor],
         order: [["createdAt", "DESC"]],
         limit: pageSize,

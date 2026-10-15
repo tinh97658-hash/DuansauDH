@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { lockTrainingStructure } from "./training-structure-integrity.js";
 import { AdmissionEvaluationService } from "./admission-evaluation.service.js";
 import { InjectModel } from "@nestjs/sequelize";
 import { Op, QueryTypes } from "sequelize";
@@ -63,6 +64,7 @@ export class MajorTransferService {
 
   async request(admissionRecordId: string, dto: RequestMajorTransferDto) {
     return this.sequelize.transaction(async (transaction) => {
+      await lockTrainingStructure(this.sequelize, transaction);
       const record = await this.records.findByPk(admissionRecordId, { transaction, lock: transaction.LOCK.UPDATE });
       if (!record) throw new NotFoundException("Không tìm thấy hồ sơ học viên.");
       if (!record.majorId) throw new BadRequestException("Học viên chưa có chuyên ngành hiện tại.");
@@ -119,6 +121,7 @@ export class MajorTransferService {
 
   async decide(id: string, dto: DecideMajorTransferDto, actor?: any) {
     return this.sequelize.transaction(async (transaction) => {
+      await lockTrainingStructure(this.sequelize, transaction);
       const transfer = await this.transfers.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!transfer) throw new NotFoundException("Không tìm thấy yêu cầu chuyển chuyên ngành.");
       if (transfer.status !== "pending") throw new ConflictException("Yêu cầu chuyển chuyên ngành đã được xử lý.");

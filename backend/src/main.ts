@@ -23,8 +23,8 @@ async function bootstrap() {
     credentials: true,
     methods: ["GET", "POST", "DELETE", "PUT", "PATCH"],
   });
-  app.useBodyParser("json", { limit: "1mb" });
-  app.useBodyParser("urlencoded", { limit: "1mb", extended: true });
+  app.useBodyParser("json", { limit: "10mb" });
+  app.useBodyParser("urlencoded", { limit: "10mb", extended: true });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: false }));
   app.useGlobalFilters(new AllExceptionsFilter());
   app.enableShutdownHooks();

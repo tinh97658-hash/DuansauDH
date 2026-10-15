@@ -6,7 +6,8 @@ import { StudyLeaveService } from './study-leave.service.js';
 import { RequestStudyLeaveDto, StudyLeaveActionDto } from './dto/study-leave.dto.js';
 
 @Controller('plan')
-@UseGuards(AuthenticatedGuard)
+@UseGuards(AuthenticatedGuard, RolesGuard)
+@Roles('admin', 'supervisor', 'examiner')
 export class StudyLeaveController {
   constructor(private readonly leaves: StudyLeaveService) {}
   @Get('study-leaves') list(@Query() query: any) { return this.leaves.list(query); }

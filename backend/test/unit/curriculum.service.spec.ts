@@ -19,7 +19,7 @@ const buildService = () => {
   const classElectives = { findAll: jest.fn().mockResolvedValue([]), destroy: jest.fn(), bulkCreate: jest.fn() };
   const subjects = { findAll: jest.fn().mockResolvedValue([]) };
   const majors = { findByPk: jest.fn() };
-  const sequelize = { transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)) };
+  const sequelize = { query: jest.fn().mockResolvedValue([{ used: false }]), transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)) };
   const service = new CurriculumService(
     curriculums as never,
     blocks as never,
@@ -44,6 +44,64 @@ const classGroup = (overrides: Record<string, unknown> = {}) => ({
   curriculumId: null,
   update: jest.fn().mockResolvedValue(undefined),
   ...overrides,
+});
+
+describe("CurriculumService protects curricula already in use", () => {
+  const buildUsed = () => {
+    const mocks = buildService();
+    const curriculum = { id: "cur-1", majorId: "major-1", program: "masters", applicableFromYear: "2026", totalCredits: 30,
+      update: jest.fn(), destroy: jest.fn() };
+    mocks.curriculums.findByPk.mockResolvedValue(curriculum);
+    mocks.majors.findByPk.mockResolvedValue({ id: "major-1", program: "masters", active: true });
+    mocks.sequelize.query.mockResolvedValue([{ used: true }]);
+    return { ...mocks, curriculum };
+  };
+
+  it("rejects clearing the subjects of an assigned curriculum without any writes", async () => {
+    const mocks = buildUsed();
+    await expect(mocks.service.setSubjects("cur-1", { subjects: [] })).rejects.toMatchObject({ response: { code: "CURRICULUM_IN_USE" } });
+    expect(mocks.entries.destroy).not.toHaveBeenCalled();
+    expect(mocks.entries.create).not.toHaveBeenCalled();
+  });
+
+  it.each([{ majorId: "major-2" }, { program: "doctoral" }, { applicableFromYear: "2027" }, { totalCredits: 40 }])(
+    "blocks structural curriculum edits: %j", async patch => {
+      const mocks = buildUsed();
+      await expect(mocks.service.update("cur-1", patch)).rejects.toMatchObject({ response: { code: "CURRICULUM_IN_USE" } });
+      expect(mocks.curriculum.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it("preserves metadata edits and unchanged scope values", async () => {
+    const mocks = buildUsed();
+    jest.spyOn(mocks.service, "detail").mockResolvedValue({ id: "cur-1" } as never);
+    await mocks.service.update("cur-1", { majorId: "major-1", applicableFromYear: "2026", totalCredits: 30, note: "Metadata" });
+    expect(mocks.curriculum.update).toHaveBeenCalledWith(expect.objectContaining({ note: "Metadata" }), { transaction });
+  });
+
+  it("blocks replacing a used class curriculum through the assignment helper", async () => {
+    const mocks = buildUsed();
+    mocks.curriculums.findByPk.mockResolvedValue({ id: "cur-2", majorId: "major-1", program: "masters", applicableFromYear: "2026", active: true });
+    const group = classGroup({ curriculumId: "cur-1" });
+    await expect(mocks.service.assignToClassGroup(group as never, transaction as never, "cur-2"))
+      .rejects.toMatchObject({ response: { code: "CLASS_SCOPE_IN_USE" } });
+    expect(group.update).not.toHaveBeenCalled();
+  });
+
+  it("does not silently bind a legacy used class while reading subjects", async () => {
+    const mocks = buildUsed();
+    const group = classGroup();
+    mocks.classGroups.findByPk.mockResolvedValue(group);
+    mocks.curriculums.findAll.mockResolvedValue([{ id: "cur-1" }]);
+    await expect(mocks.service.classSubjects(group.id)).rejects.toMatchObject({ response: { code: "CLASS_SCOPE_IN_USE" } });
+    expect(group.update).not.toHaveBeenCalled();
+  });
+
+  it("preserves a curriculum referenced only by transfer history", async () => {
+    const mocks = buildUsed();
+    await expect(mocks.service.remove("cur-1")).rejects.toMatchObject({ response: { code: "CURRICULUM_IN_USE" } });
+    expect(mocks.curriculum.destroy).not.toHaveBeenCalled();
+  });
 });
 
 it("returns the same canonical order from detail and classSubjects across knowledge blocks without writes", async () => {

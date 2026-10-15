@@ -4,12 +4,19 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import axios from "axios";
 import ClassCourseHistory from "../../pages/masters/classCourseHistory";
 
-jest.mock("axios");
-jest.mock("@mui/icons-material", () => new Proxy({}, { get: () => () => null }));
-jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
-jest.mock("../../features/scheduling/OfferingDetails", () => function Details({ offering, onClose }) {
-  return <div role="dialog" aria-label="Chi tiết lớp học phần"><span>{offering.name}</span><button onClick={onClose}>Đóng</button></div>;
-});
+vi.mock("axios");
+jest.mock("@mui/icons-material", () => ({
+  SearchRounded: () => null,
+  WarningAmberRounded: () => null,
+  CheckCircleRounded: () => null,
+  ErrorOutlineRounded: () => null,
+}));
+jest.mock("../../components/FeatureLayout", () => ({ default: function Layout({ children }) { return <div>{children}</div>; } }));
+jest.mock("../../features/scheduling/OfferingDetails", () => ({
+  default: function Details({ offering, onClose }) {
+    return <div role="dialog" aria-label="Chi tiết lớp học phần"><span>{offering.name}</span><button onClick={onClose}>Đóng</button></div>;
+  }
+}));
 
 const discipline = { id: "discipline-1", name: "Khoa học máy tính" };
 const major = { id: "major-1", name: "Công nghệ thông tin", disciplineId: discipline.id, discipline };

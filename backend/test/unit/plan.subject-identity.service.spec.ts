@@ -28,7 +28,7 @@ const buildService = () => {
     findByPk: jest.fn().mockResolvedValue({ id: "major-2", program: "masters", active: true }),
     findAll: jest.fn(),
   };
-  const sequelize = { transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)) };
+  const sequelize = { query: jest.fn().mockResolvedValue([{ used: false }]), transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)) };
   const courseOfferings = { count: jest.fn().mockResolvedValue(0) };
   const service = new PlanService(
     subjects as never,
@@ -42,7 +42,7 @@ const buildService = () => {
     {} as never,
     {} as never,
   );
-  return { service, subjects, majors, courseOfferings };
+  return { service, subjects, majors, courseOfferings, sequelize };
 };
 
 const createDto = (overrides: Record<string, unknown> = {}) => ({
@@ -55,6 +55,16 @@ const createDto = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("PlanService Subject logical identity", () => {
+  it.each([{ credits: 5 }, { isRequired: false }, { name: "Changed" }, { canonicalSubjectId: "root" }])(
+    "blocks catalog edits affecting a used curriculum: %j", async patch => {
+      const { service, subjects, sequelize } = buildService();
+      const used = subject({ credits: 3, isRequired: true });
+      subjects.findByPk.mockResolvedValue(used);
+      sequelize.query.mockResolvedValue([{ used: true }]);
+      await expect(service.updateSubject(used.id, patch)).rejects.toMatchObject({ response: { code: "SUBJECT_STRUCTURE_IN_USE" } });
+      expect(used.update).not.toHaveBeenCalled();
+    },
+  );
   it("creates a normal Subject without requiring identity fields", async () => {
     const { service, subjects } = buildService();
     const created = subject({ id: "normal-subject" });
@@ -266,18 +276,16 @@ describe("PlanService Subject logical identity", () => {
     expect(root.update).not.toHaveBeenCalled();
   });
 
-  it("allows removing a legacy reference even when the Subject has an offering", async () => {
-    const { service, subjects, courseOfferings } = buildService();
+  it("blocks changing legacy sharing when the subject has an offering", async () => {
+    const { service, subjects, courseOfferings, sequelize } = buildService();
     const alias = subject();
     const root = subject({ id: "root", majorId: "major-1", canonicalSubjectId: null, allowCrossMajor: true });
     subjects.findByPk.mockImplementation(async (id: string) => id === root.id ? root : alias);
     courseOfferings.count.mockResolvedValue(1);
+    sequelize.query.mockResolvedValue([{ used: true }]);
 
     await expect(service.updateSubject(alias.id, { canonicalSubjectId: null, allowCrossMajor: true }))
-      .resolves.toBeDefined();
-    expect(alias.update).toHaveBeenCalledWith(
-      expect.objectContaining({ canonicalSubjectId: null, allowCrossMajor: true }),
-      { transaction },
-    );
+      .rejects.toMatchObject({ response: { code: "SUBJECT_STRUCTURE_IN_USE" } });
+    expect(alias.update).not.toHaveBeenCalled();
   });
 });
