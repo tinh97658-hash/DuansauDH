@@ -11,7 +11,7 @@ import SchedulePrintTemplate from "../../features/scheduling/SchedulePrintTempla
 import { buildScheduleDocument, createScheduleExcel, createScheduleWord, exportSchedule, readSchedulePreview, readScheduleReturnView, scheduleDocumentColumns, scheduleDocumentMetadata, scheduleExportRows } from "../../features/scheduling/scheduleExport";
 
 jest.mock("axios");
-jest.mock("@mui/material", () => ({ Dialog: ({ children, open }) => open ? <div>{children}</div> : null }));
+jest.mock("@mui/material", () => ({ Dialog: ({ children, open }) => open ? <div>{children}</div> : null, Tooltip: ({ children }) => children }));
 const snapshot = {
   week: "2026-10-05", end: "2026-10-11", discipline: "Công nghệ thông tin",
   major: "Khoa học máy tính", year: "2026",
@@ -273,19 +273,19 @@ it.each(["Xuất Word", "Xuất Excel", "Xuất PDF"])("%s uses the selected wee
         period: "MORNING", status: "planned", startTime: "08:00", endTime: "11:00",
       })) : [] }));
   const mounted = render(<MemoryRouter><Schedule user={{ canManageScheduling: false }} /></MemoryRouter>);
-  await waitFor(() => expect(screen.getByRole("button", { name: "In / Xuất lịch học" })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled());
   fireEvent.focus(screen.getByRole("combobox", { name: "Ngành" }));
   fireEvent.click(screen.getByRole("option", { name: snapshot.discipline }));
   fireEvent.focus(screen.getByRole("combobox", { name: "Chuyên ngành" }));
   fireEvent.click(screen.getByRole("option", { name: snapshot.major }));
   fireEvent.change(screen.getByLabelText("Khóa / Năm"), { target: { value: "2026" } });
   fireEvent.click(screen.getByRole("button", { name: "Tuần sau" }));
-  await waitFor(() => expect(screen.getByRole("button", { name: "In / Xuất lịch học" })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled());
   const previous = URL.createObjectURL;
   const createUrl = jest.fn(() => "blob:schedule");
   URL.createObjectURL = createUrl;
   const click = jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-  fireEvent.click(screen.getByRole("button", { name: "In / Xuất lịch học" }));
+  fireEvent.click(screen.getByRole("button", { name: "Xuất file" }));
   const menu = screen.getByRole("menu");
   expect(within(menu).getAllByRole("menuitem").map((item) => item.querySelector("span").textContent)).toEqual(["Xuất Word", "Xuất Excel", "Xuất PDF"]);
   within(menu).getAllByRole("menuitem").forEach((item, index) => {
@@ -320,7 +320,7 @@ it.each(["Xuất Word", "Xuất Excel", "Xuất PDF"])("%s uses the selected wee
       expect(text).toContain("Cơ sở dữ liệu");
       expect(text).not.toContain("Ngoài phạm vi");
       expect(text).not.toMatch(/Ngành:|Chuyên ngành:|Khóa \/ Năm học:/);
-      await waitFor(() => expect(screen.getByRole("button", { name: "In / Xuất lịch học" })).toBeEnabled());
+      await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled());
     } finally { URL.createObjectURL = previous; }
   }
   URL.createObjectURL = previous;
@@ -335,7 +335,7 @@ it.each(["Xuất Word", "Xuất Excel", "Xuất PDF"])("%s uses the selected wee
     expect(readScheduleReturnView()).toMatchObject({ disciplineId: discipline.id, majorId: major.id, year: "2026", week: lastQuery.get("from") });
     mounted.unmount();
     render(<MemoryRouter><Schedule user={{ canManageScheduling: false }} /></MemoryRouter>);
-    await waitFor(() => expect(screen.getByRole("button", { name: "In / Xuất lịch học" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled());
     expect(screen.getByRole("combobox", { name: "Ngành" })).toHaveValue(discipline.name);
     expect(screen.getByRole("combobox", { name: "Chuyên ngành" })).toHaveValue(major.name);
     expect(screen.getByLabelText("Khóa / Năm")).toHaveValue("2026");

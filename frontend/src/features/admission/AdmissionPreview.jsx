@@ -6,7 +6,7 @@ import { readAdmissionPreview } from "./admissionDocumentExport";
 export default function AdmissionPreview() {
   const [params] = useSearchParams();
   const [document] = useState(() => readAdmissionPreview(params.get("preview")));
-  if (!document) return <main className="admission-preview"><p role="alert">Không tìm thấy dữ liệu xem trước. Vui lòng quay lại hồ sơ và chọn In / Xuất → Xuất PDF.</p></main>;
+  if (!document) return <main className="admission-preview"><p role="alert">Không tìm thấy dữ liệu xem trước. Vui lòng quay lại hồ sơ và chọn Xuất file → Xuất PDF.</p></main>;
   return <main className="admission-preview">
     <nav className="admission-preview-actions" aria-label="In hồ sơ">
       <button type="button" onClick={() => window.print()}>In / Lưu PDF</button>

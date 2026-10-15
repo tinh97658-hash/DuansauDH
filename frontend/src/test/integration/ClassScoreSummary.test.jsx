@@ -83,15 +83,15 @@ it.each(["Nguyễn", "Không khớp"])("exports the whole selected class indepen
     { params: { classGroupId: "g1", search, page: 1, pageSize: 15 } }));
   if (matching.length) await screen.findByText("HV001");
   else await screen.findByText("Không có học viên phù hợp với tìm kiếm.");
-  await waitFor(() => expect(screen.getByRole("button", { name: "Xuất điểm" })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled());
   expect(screen.queryByText("HV002")).not.toBeInTheDocument();
   expect(axios.get.mock.calls.some(([url]) => url.endsWith("/export"))).toBe(false);
-  fireEvent.click(screen.getByRole("button", { name: "Xuất điểm" }));
+  fireEvent.click(screen.getByRole("button", { name: "Xuất file" }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Xuất điểm cả lớp" }));
   await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/export$/), { params: { classGroupId: "g1" } }));
   await waitFor(() => expect(createClassScoreWorkbook).toHaveBeenCalledWith(full));
   expect(axios.get.mock.calls.filter(([url]) => url.endsWith("/export"))).toHaveLength(1);
-  await waitFor(() => expect(screen.getByRole("button", { name: "Xuất điểm" })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled());
   expect(screen.getByLabelText("Tìm kiếm")).toHaveValue(search);
 });
 
@@ -133,7 +133,7 @@ it("exports all students using a separate full-class request", async () => {
   axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups } : url.endsWith("/export") ? full : reportFor(config.params.classGroupId) }));
   mount();
   await screen.findByText("HV001");
-  fireEvent.click(screen.getByRole("button", { name: "Xuất điểm" }));
+  fireEvent.click(screen.getByRole("button", { name: "Xuất file" }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Xuất điểm cả lớp" }));
   await waitFor(() => expect(createClassScoreWorkbook).toHaveBeenCalledWith(full));
   expect(downloadDocumentFile).toHaveBeenCalledWith(expect.any(Blob), "Tong-hop-diem-CNTT2026.1.1.xlsx");
@@ -155,7 +155,7 @@ it("shows missing curriculum and empty class states with export disabled", async
   mount();
   expect(await screen.findByText(/Lớp chưa được gán chương trình đào tạo/)).toBeInTheDocument();
   expect(screen.getByText("Lớp chưa có học viên.")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Xuất điểm" }));
+  fireEvent.click(screen.getByRole("button", { name: "Xuất file" }));
   expect(screen.getByRole("menuitem", { name: "Xuất điểm cả lớp" })).toHaveAttribute("aria-disabled", "true");
 });
 

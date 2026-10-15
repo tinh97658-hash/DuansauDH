@@ -144,10 +144,10 @@ export default function ClassScoreSummary() {
           {classes.map(group => <MenuItem key={group.id} value={group.id}>{group.code || group.name}{group.major?.name ? ` — ${group.major.name}` : ""}</MenuItem>)}
         </FilterSelectField>
         <FilterSearchField placeholder="Tìm theo mã HV, họ tên..." value={search} disabled={loadingOptions || exporting} inputProps={{ maxLength: 200 }} onChange={event => { setSearch(event.target.value); setPage(1); }} />
-        <Button className="css-export" variant="contained" color="success" aria-haspopup="menu"
+        <Button className="css-export" variant="contained" color="primary" aria-haspopup="menu"
           aria-controls={exportAnchor ? "class-score-export-menu" : undefined} aria-expanded={!!exportAnchor}
           onClick={event => setExportAnchor(event.currentTarget)} disabled={busy || exporting || !classGroupId || search.trim() !== debouncedSearch}>
-          {exporting ? "Đang xuất..." : "Xuất điểm"} <span aria-hidden="true"> ▼</span>
+          {exporting ? "Đang xuất..." : "Xuất file"} <span aria-hidden="true"> ▼</span>
         </Button>
         <Menu id="class-score-export-menu" anchorEl={exportAnchor} open={!!exportAnchor} onClose={() => setExportAnchor(null)}>
           <MenuItem disabled={!subjects.length} onClick={() => { setExportAnchor(null); exportExcel(); }}>Xuất điểm cả lớp</MenuItem>
