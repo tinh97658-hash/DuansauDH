@@ -59,7 +59,7 @@ it("downloads the active tab's columns, current draft values, and searched stude
     render(<ExamLists />);
     fireEvent.change(await screen.findByLabelText("Điểm học phần HV001"), { target: { value: "8,5" } });
     expect(screen.queryByRole("button", { name: "Xuất CSV" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "In / Xuất" }));
+    fireEvent.click(screen.getByRole("button", { name: "Xuất file" }));
     expect(screen.queryByRole("menuitem", { name: /Word/ })).not.toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "PDF / In" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("menuitem", { name: "Excel (.xlsx)" }));
@@ -272,7 +272,7 @@ it("exports all 30 students to PDF, preserves drafts and reflects the current se
   const snapshot = () => JSON.parse(sessionStorage.getItem(`gradebook-preview:${new URL(replace.mock.calls[replace.mock.calls.length - 1][0], "http://localhost").searchParams.get("preview")}`));
   try {
     render(<ExamLists />);
-    const menu = screen.getByRole("button", { name: "In / Xuất" });
+    const menu = screen.getByRole("button", { name: "Xuất file" });
     expect(menu).toBeDisabled();
     fireEvent.change(await screen.findByLabelText("Điểm kiểm tra HV001"), { target: { value: "9,5" } });
     expect(screen.getAllByRole("textbox", { name: /^Điểm kiểm tra HV/ })).toHaveLength(15);
@@ -301,7 +301,7 @@ it("disables controls while exporting and reports revision changes without produ
   const replace = jest.fn(), close = jest.fn();
   const open = jest.spyOn(window, "open").mockReturnValue({ sessionStorage, location: { replace }, close });
   try {
-    const menu = screen.getByRole("button", { name: "In / Xuất" });
+    const menu = screen.getByRole("button", { name: "Xuất file" });
     fireEvent.click(menu); fireEvent.click(screen.getByRole("menuitem", { name: "PDF / In" }));
     await waitFor(() => expect(menu).toBeDisabled());
     expect(screen.getByPlaceholderText("Tìm theo mã HV, họ tên...")).toBeDisabled();
@@ -316,15 +316,15 @@ it("disables the export menu for empty data and while saving", async () => {
   setup("admin", []);
   const view = render(<ExamLists />);
   await screen.findByText("Không có học viên phù hợp với danh sách đang chọn.");
-  expect(screen.getByRole("button", { name: "In / Xuất" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Xuất file" })).toBeDisabled();
   view.unmount(); setup();
   render(<ExamLists />);
   fireEvent.change(await screen.findByLabelText("Điểm kiểm tra HV001"), { target: { value: "7" } });
   let finish;
   axios.put.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
   fireEvent.click(screen.getByRole("button", { name: "Cập nhật cả bảng" }));
-  expect(screen.getByRole("button", { name: "In / Xuất" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Xuất file" })).toBeDisabled();
   finish({ data: { ...data, revision: 1 } });
   await screen.findByText("Đã cập nhật bảng điểm cho 1 học viên.");
-  expect(screen.getByRole("button", { name: "In / Xuất" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled();
 });

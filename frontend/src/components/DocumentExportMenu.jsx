@@ -5,7 +5,7 @@ import { ReactComponent as ExcelFileIcon } from "../assets/icons/filetype-xlsx.s
 import { ReactComponent as PdfFileIcon } from "../assets/icons/filetype-pdf.svg";
 import "./documentExportMenu.css";
 
-export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, showFileIcons = true, disabled = false, className = "", label = "In / Xuất", excelLabel = "Xuất Excel", pdfLabel = "Xuất PDF" }) {
+export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, showFileIcons = true, disabled = false, className = "", label = "Xuất file", excelLabel = "Xuất Excel", pdfLabel = "Xuất PDF" }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const root = useRef(null);
@@ -72,7 +72,7 @@ export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, sh
     <button ref={trigger} type="button" className={`document-export-trigger ${className}`} aria-label={label}
       aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined}
       aria-busy={busy} disabled={disabled || busy} onClick={() => setOpen(!open)}>
-      {busy ? "Đang xuất…" : "In / Xuất"} <span aria-hidden="true">▼</span>
+      {busy ? "Đang xuất…" : label} <span aria-hidden="true">▼</span>
     </button>
     {open && !disabled && createPortal(<div ref={menu} id={menuId} role="menu" aria-label={label} className="document-export-options" style={position}>
       {items.map(({ name, action, Icon, format }) => <button key={format} type="button" role="menuitem" onClick={() => select(action)}>

@@ -7,7 +7,7 @@ export { TRANSCRIPT_COLUMN_WIDTHS, TRANSCRIPT_TABLE_WIDTH } from "./transcriptFo
 const PREFIX = "learner-transcript-preview:";
 const text = (input) => input == null || input === "" ? null : String(input);
 const display = (input) => input == null || input === "" ? "—" : String(input);
-export const TRANSCRIPT_HEADERS = ["Stt", "Học Phần", "Mã số", "Số tín chỉ", "Điểm", "Ghi chú"];
+export const TRANSCRIPT_HEADERS = ["STT", "Học Phần", "Mã số", "Số tín chỉ", "Điểm", "Ghi chú"];
 
 // A report dataset, not a second score resolver. Scores, codes, credits and
 // subject ordering are taken unchanged from learner-scorecard.

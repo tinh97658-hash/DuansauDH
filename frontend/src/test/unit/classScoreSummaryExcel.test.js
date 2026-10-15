@@ -71,25 +71,30 @@ it.each([15, 25])("round-trips a %i-subject report with full borders, sensible w
   for (let column = 1; column <= count + 6; column += 1) {
     expect(sheet.getColumn(column).width).toBe(widths[column - 1] || 12);
     const header = sheet.getCell(10, column);
-    expect(header.font).toMatchObject({ name: "Times New Roman", size: 10, bold: true, color: { argb: "FF000000" } });
+    expect(header.font).toMatchObject({ name: "Times New Roman", size: 10, bold: true, color: { argb: "FF173A5E" } });
     expect(header.alignment).toMatchObject({ wrapText: true, horizontal: "center", vertical: "middle" });
-    expect(header.fill.fgColor.argb).toBe("FFF2F2F2");
+    expect(header.fill.fgColor.argb).toBe("FFEAF4FB");
     for (let row = 10; row <= 70; row += 1) {
       const cell = sheet.getCell(row, column);
       expect(cell.font.name).toBe("Times New Roman");
       expect(cell.alignment.vertical).toBe("middle");
       for (const side of ["top", "bottom", "left", "right"]) {
-        expect(["thin", "medium"]).toContain(cell.border[side].style);
-        expect(cell.border[side].color.argb).toBe("FF000000");
+        expect(["hair", "thin"]).toContain(cell.border[side].style);
+        expect(cell.border[side].color.argb).toBe(cell.border[side].style === "thin" ? "FF595959" : "FF707070");
       }
     }
   }
-  expect(sheet.getCell(10, 1).border).toMatchObject({ top: { style: "medium" }, left: { style: "medium" } });
-  expect(sheet.getCell(70, count + 6).border).toMatchObject({ bottom: { style: "medium" }, right: { style: "medium" } });
+  expect(sheet.getCell(10, 1).border).toMatchObject({ top: { style: "thin" }, left: { style: "thin" } });
+  expect(sheet.getCell(70, count + 6).border).toMatchObject({ bottom: { style: "thin" }, right: { style: "thin" } });
   expect(sheet.getCell("I11").alignment).toMatchObject({ horizontal: "center", vertical: "middle" });
   expect([null, ""]).toContain(sheet.getCell("I11").value);
   expect(sheet.getCell("C11").alignment.horizontal).toBe("left");
   expect(sheet.getCell("D11").alignment.horizontal).toBe("left");
+  for (const address of ["B11", "E11"]) {
+    expect(sheet.getCell(address).alignment.horizontal).toBe("center");
+    // ExcelJS omits false wrapping in XML; absent wrapText also means off.
+    expect(sheet.getCell(address).alignment.wrapText).not.toBe(true);
+  }
   expect(sheet.views[0]).toMatchObject({ state: "frozen", xSplit: 6, ySplit: 10, showGridLines: false, topLeftCell: "G11" });
   expect(sheet.pageSetup).toMatchObject({ paperSize: 9, orientation: "landscape", fitToPage: false, scale: 100,
     fitToWidth: 0, fitToHeight: 0, printTitlesColumn: "A:F", printTitlesRow: "10:10",
@@ -100,12 +105,12 @@ it.each([15, 25])("round-trips a %i-subject report with full borders, sensible w
   expect(sheet.pageSetup.margins).toMatchObject({ left: 0.4, right: 0.4, top: 0.5, bottom: 0.5 });
 });
 
-it.each([3, 25])("does not extend the gray header fill past the last subject for %i subjects", async (count) => {
+it.each([3, 25])("does not extend the blue header fill past the last subject for %i subjects", async (count) => {
   const sheet = await loadSheet(sampleReport(count, 4));
   const lastColumn = 6 + count;
   expect(sheet.getRow(10).fill?.pattern || "none").toBe("none");
-  expect(sheet.getCell(10, lastColumn).fill.fgColor.argb).toBe("FFF2F2F2");
-  expect(sheet.getCell(10, lastColumn).border.right.style).toBe("medium");
+  expect(sheet.getCell(10, lastColumn).fill.fgColor.argb).toBe("FFEAF4FB");
+  expect(sheet.getCell(10, lastColumn).border.right.style).toBe("thin");
   for (const column of [lastColumn + 1, lastColumn + 10, 16384]) {
     expect(sheet.getCell(10, column).value).toBeNull();
     expect(sheet.getCell(10, column).fill?.pattern || "none").toBe("none");
@@ -141,5 +146,5 @@ it("exports an empty roster without invented metadata and includes the backend's
   expect(textOf(sheet.getCell("A8"))).toBe("CTĐT: ");
   expect(sheet.getCell("A13").value).toContain("Điểm học phần đã lưu gần nhất; gồm kết quả cá nhân đã hoàn thành");
   expect(sheet.pageSetup.printArea).toBe("A1:F15");
-  expect(sheet.getCell("F10").border.bottom.style).toBe("medium");
+  expect(sheet.getCell("F10").border.bottom.style).toBe("thin");
 });

@@ -64,9 +64,9 @@ export async function createClassScoreWorkbook(report) {
 
   const header = sheet.getRow(TABLE_HEADER_ROW);
   header.values = columns.map(column => column.label);
-  header.font = reportFont(10, { bold: true });
+  header.font = reportFont(10, { bold: true, color: { argb: "FF173A5E" } });
   for (let column = 1; column <= columns.length; column += 1) {
-    header.getCell(column).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F2F2" } };
+    header.getCell(column).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEAF4FB" } };
   }
   header.alignment = { wrapText: true, horizontal: "center", vertical: "middle" };
   header.height = 60;
@@ -79,19 +79,19 @@ export async function createClassScoreWorkbook(report) {
     columns.forEach((column, columnIndex) => {
       const cell = row.getCell(columnIndex + 1);
       cell.font = reportFont();
-      cell.alignment = { horizontal: [2, 3].includes(columnIndex) ? "left" : "center", vertical: "middle", wrapText: true };
+      cell.alignment = { horizontal: [2, 3].includes(columnIndex) ? "left" : "center", vertical: "middle", wrapText: ![1, 4].includes(columnIndex) };
       if (columnIndex >= 6) cell.numFmt = "0.##";
     });
   });
   const tableLastRow = TABLE_HEADER_ROW + report.rows.length;
   for (let row = TABLE_HEADER_ROW; row <= tableLastRow; row += 1) {
     for (let column = 1; column <= columns.length; column += 1) {
-      const edge = style => ({ style, color: { argb: "FF000000" } });
+      const edge = outer => ({ style: outer ? "thin" : "hair", color: { argb: outer ? "FF595959" : "FF707070" } });
       sheet.getCell(row, column).border = {
-        top: edge(row === TABLE_HEADER_ROW ? "medium" : "thin"),
-        bottom: edge(row === tableLastRow ? "medium" : "thin"),
-        left: edge(column === 1 ? "medium" : "thin"),
-        right: edge(column === columns.length ? "medium" : "thin"),
+        top: edge(row === TABLE_HEADER_ROW),
+        bottom: edge(row === tableLastRow),
+        left: edge(column === 1),
+        right: edge(column === columns.length),
       };
     }
   }

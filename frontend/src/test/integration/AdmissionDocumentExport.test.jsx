@@ -155,7 +155,7 @@ it("both detail dropdowns export the current unsaved form, and blocked PDF tabs 
   await screen.findByDisplayValue(record.fullName);
   const input = screen.getByDisplayValue(record.fullName);
   fireEvent.change(input, { target: { value: "Tên đang chỉnh sửa" } });
-  const triggers = screen.getAllByRole("button", { name: "In / Xuất", exact: true });
+  const triggers = screen.getAllByRole("button", { name: "Xuất file", exact: true });
   expect(triggers).toHaveLength(2);
   fireEvent.click(triggers[0]);
   for (const format of ["word", "pdf"]) expect(document.querySelector(`.document-export-icon-${format}`)).toBeInTheDocument();

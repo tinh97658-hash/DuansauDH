@@ -59,7 +59,7 @@ it("offers exactly summary Excel and personal transcript actions, loading roster
   render(<MemoryRouter><ClassScoreSummary /></MemoryRouter>);
   await screen.findByText("HV001");
   expect(axios.get.mock.calls.some(([url]) => url.endsWith("/roster") || url.endsWith("/export"))).toBe(false);
-  fireEvent.click(screen.getByRole("button", { name: "Xuất điểm" }));
+  fireEvent.click(screen.getByRole("button", { name: "Xuất file" }));
   expect(screen.getAllByRole("menuitem").map(item => item.textContent)).toEqual(["Xuất điểm cả lớp", "Xuất bảng điểm cá nhân"]);
   fireEvent.click(screen.getByRole("menuitem", { name: "Xuất bảng điểm cá nhân" }));
   const dialog = await loadedDialog();
