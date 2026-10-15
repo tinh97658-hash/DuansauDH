@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
-import { Op, Transaction } from "sequelize";
+import { Op, QueryTypes, Transaction } from "sequelize";
+import { assignedLearnerSql } from "./learner-study-status.js";
 import { Sequelize } from "sequelize-typescript";
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
@@ -179,6 +180,9 @@ export class AdmissionEvaluationService {
       const record = await this.records.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       const evaluation = await this.evaluations.findOne({ where: { admissionRecordId: id }, transaction, lock: transaction.LOCK.UPDATE });
       if (!record || !evaluation) throw new NotFoundException("Không tìm thấy hồ sơ xét tuyển.");
+      if (["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Đã thôi học"].includes(record.studyStatus || "")) {
+        throw new ConflictException("Học viên đang bảo lưu hoặc đã thôi học; cần xử lý nghiệp vụ học viên trước khi thay đổi quyết định xét tuyển.");
+      }
       this.requireVersion(evaluation, dto.version);
       if (evaluation.roundId !== round.id) throw new ConflictException("Hồ sơ đã chuyển đợt. Tải lại dữ liệu.");
       if (!dto.note.trim()) throw new BadRequestException("Nhập ghi chú/lý do duyệt.");
@@ -224,7 +228,10 @@ export class AdmissionEvaluationService {
       const previousPayment = record.extraData?.tuitionPayment || null;
       if (previousPayment?.paid === dto.paid) return { id: record.id, extraData: record.extraData, studyStatus: record.studyStatus, updatedAt: record.updatedAt };
       const payment = { paid: dto.paid, updatedAt: new Date().toISOString(), updatedBy: String(actor?.name || actor?.email || actor?.id || "unknown"), updatedById: actor?.id || null };
-      await record.update({ extraData: { ...record.extraData, tuitionPayment: payment }, studyStatus: dto.paid ? "Đang học" : "Đã trúng tuyển" }, { transaction });
+      const [assignment] = await this.sequelize.query<{ assigned: boolean }>(
+        `SELECT ${assignedLearnerSql('ar')} AS assigned FROM admission_records ar WHERE ar.id = :id`,
+        { type: QueryTypes.SELECT, replacements: { id }, transaction });
+      await record.update({ extraData: { ...record.extraData, tuitionPayment: payment }, studyStatus: assignment?.assigned ? "Đang học" : "Đã trúng tuyển" }, { transaction });
       await this.history.create({ admissionRecordId: id, action: dto.paid ? "tuition_paid" : "tuition_unpaid", actor: payment.updatedBy,
         snapshot: { actorId: payment.updatedById, tuitionPayment: payment, previousPayment, record: { ...admissionRecordSnapshot(record), fullName: record.fullName, studyStatus: record.studyStatus } },
       } as any, { transaction });
@@ -242,14 +249,20 @@ export class AdmissionEvaluationService {
       throw new BadRequestException("Xác nhận học phí bằng ô Đã nộp học phí nhập học trong danh sách học viên hoặc chi tiết hồ sơ.");
     }
     if (!record) return;
-    if (dto.studyStatus === "Đang học" && record.studyStatus !== "Đang học" && record.extraData?.tuitionPayment?.paid !== true) {
-      throw new BadRequestException("Xác nhận đã nộp học phí trước khi chuyển sang Đang học.");
+    const learnerStatusUpdate = ["Đã trúng tuyển", "Đang học"].includes(dto.studyStatus)
+      && ["Đã trúng tuyển", "Đang học"].includes(record.studyStatus || "");
+    if (learnerStatusUpdate) {
+      const [assignment] = await this.sequelize.query<{ assigned: boolean }>(
+        `SELECT ${assignedLearnerSql('ar')} AS assigned FROM admission_records ar WHERE ar.id = :id`,
+        { type: QueryTypes.SELECT, replacements: { id: record.id }, transaction });
+      const expectedStatus = assignment?.assigned ? "Đang học" : "Đã trúng tuyển";
+      if (dto.studyStatus !== expectedStatus) throw new BadRequestException("Trạng thái Đang học được xác định theo phân lớp học viên.");
     }
     const evaluation = await this.evaluations.findOne({ where: { admissionRecordId: record.id }, transaction });
     if (!evaluation || evaluation.decision === "pending") return;
     if (ADMISSION_CORE_FIELDS.some((key) => dto[key] !== undefined && !isDeepStrictEqual(normalizedAdmissionValue(key, dto[key]), normalizedAdmissionValue(key, record[key] ?? null)))
       || (dto.status !== undefined && dto.status !== record.status)
-      || (dto.studyStatus !== undefined && dto.studyStatus !== record.studyStatus && !(evaluation.decision === "admitted" && dto.studyStatus === "Đang học"))) {
+      || (dto.studyStatus !== undefined && dto.studyStatus !== record.studyStatus && !learnerStatusUpdate)) {
       throw new ConflictException("Thông tin xét tuyển đã được duyệt. Mở lại kết quả trước khi thay đổi.");
     }
   }

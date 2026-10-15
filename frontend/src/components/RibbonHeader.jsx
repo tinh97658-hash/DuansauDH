@@ -74,16 +74,20 @@ export const ribbons = {
       action("Học bổ sung kiến thức", "/masters/bridge-course", AddTaskOutlined, "#168bc2"),
       action("Điểm xét tuyển thạc sĩ", "/masters/admission-scores", ScoreboardOutlined, "#c0792a"),
       action("Hồ sơ trúng tuyển", "/masters/admitted-records", CheckCircleOutline, "#137b3b"),
+      action("Quản lý bảo lưu", "/masters/study-leaves", HistoryEduOutlined, "#a04f86"),
       action("Tạo nhóm học viên", "/masters/create-class-groups", GroupAddOutlined, "#168b7c"),
       action("Phân nhóm học viên", "/masters/assign-class-groups", GroupWorkOutlined, "#81952c"),
       action("Thống kê tiến độ", "/masters/class-course-history", HistoryEduOutlined, "#a04f86"),
     ]),
-    group("QUÁ TRÌNH HỌC TẬP", [
+    group("XẾP LỊCH HỌC", [
       action("Tạo lớp học phần", "/masters/course-offerings", NoteAddOutlined, "#0788b8"),
       action("Xếp lịch", "/masters/schedule", EventNoteOutlined, "#7b5fac"),
       action("Ma trận lớp học phần", "/masters/course-matrix", TableChartOutlined, "#168b7c"),
+    ]),
+    group("QUẢN LÝ ĐIỂM", [
       action("Xét tư cách thi hết môn", "/masters/exam-eligibility", RuleOutlined, "#397c8d"),
       action("Danh sách thi, điểm thi", "/masters/exam-lists", ListAltOutlined, "#a04f86"),
+      action("Tổng hợp điểm của lớp", "/reports/class-score-summary", SummarizeOutlined, "#168b7c"),
     ]),
     group("THỦ TỤC ĐẦU RA", [
       action("Tạo đợt thi English", "/masters/english-exam", EventOutlined, "#168bc2"),
@@ -115,7 +119,6 @@ export const ribbons = {
     group("BÁO CÁO CHUNG", [
       action("Danh sách lớp", "/reports/class-lists", GroupsOutlined, "#168bc2"),
       action("Bảng điểm môn học", "/reports/course-scores", TableChartOutlined, "#c0792a"),
-      action("Tổng hợp điểm của lớp", "/reports/class-score-summary", SummarizeOutlined, "#168b7c"),
       action("Báo cáo gửi Bộ", "/reports/ministerial-report", SendOutlined, "#7b5fac"),
     ]),
     group("BẢNG ĐIỂM TẠM THỜI", [
@@ -148,7 +151,8 @@ const RibbonHeader = () => {
 
   const path = location.pathname;
   useEffect(() => {
-    const matched = tabs.find(([id]) => path === `/${id}` || path.startsWith(`/${id}/`));
+    const matched = tabs.find(([id]) => ribbons[id].some(section => section.actions.some(item => isRibbonRouteActive(path, item.route))))
+      || tabs.find(([id]) => path === `/${id}` || path.startsWith(`/${id}/`));
     if (matched) setActiveTab(matched[0]);
   }, [path]);
 
@@ -185,7 +189,7 @@ const RibbonHeader = () => {
             {visibleActions.map((item) => {
               const Icon = item.icon;
               const isActive = isRibbonRouteActive(path, item.route);
-              return <button type="button" className={`ribbon-action${isActive ? " active" : ""}`} key={item.label} onClick={() => runAction(item)} title={item.label}
+              return <button type="button" className={`ribbon-action${isActive ? " active" : ""}`} key={item.label} onClick={() => runAction(item)}
                 style={{ "--ribbon-icon-color": item.color }}
                 aria-current={isActive ? "page" : undefined}>
                 <Icon className="ribbon-action-icon" /><span>{item.label}</span>

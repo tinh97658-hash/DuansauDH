@@ -16,7 +16,7 @@ function model(values: any) {
 // same model stores. In particular, the admission guard is never mocked away.
 async function setup() {
   const tx = { LOCK: { UPDATE: "UPDATE" } };
-  const db = { transaction: jest.fn(async (callback) => callback(tx)) };
+  const db = { transaction: jest.fn(async (callback) => callback(tx)), query: jest.fn(async (sql: string) => sql.includes('FROM study_leaves') ? [] : [{ assigned: true }]) };
   const actor = { id: "admin", name: "Quản trị viên" };
   const record = model({ id: "record", code: "HV26001", studentId: "student", fullName: "Nguyễn Văn A",
     majorId: "A", majorName: "Ngành A", trainingLevel: "Thạc sĩ", academicYear: "2026",
@@ -115,7 +115,9 @@ describe("Approved major transfer and admission cycles", () => {
   });
 
   it("rejecting keeps A admitted and its existing class and evaluation", async () => {
-    const s = await setup(); await s.request(); const before = s.record.toJSON();
+    const s = await setup();
+    s.record.studyStatus = "Đang học";
+    await s.request(); const before = s.record.toJSON();
     await s.service.decide("transfer", { decision: "rejected", note: "Không đồng ý" }, s.actor);
     expect(s.record.toJSON()).toEqual(before); expect(s.transfer().status).toBe("rejected");
     expect(s.memberships.destroy).not.toHaveBeenCalled(); expect(s.memberships.create).not.toHaveBeenCalled();
@@ -165,14 +167,16 @@ describe("Approved major transfer and admission cycles", () => {
     const s = await setup(); await s.request();
     const source = { id: "subject-A", name: "Triết học", credits: 3, canonicalSubjectId: "root" };
     const target = { id: "subject-B", name: "Triết học", credits: 3, canonicalSubjectId: "root" };
-    const results = { findAll: jest.fn(async ({ attributes }) => attributes ? [] : [
+    const results = { findAll: jest.fn(async ({ attributes, where }) => attributes || where?.sourceType === "regular" ? [] : [
       { id: "result", subjectId: source.id, subject: source, sourceType: "regular", status: "completed", result: "passed", courseOfferingId: "completed-1" },
     ]), bulkCreate: jest.fn() };
     const recognitions = { findAll: jest.fn(async () => []), create: jest.fn(async (values) => model({ id: "recognition", ...values })) };
     const memberships = { findAll: jest.fn(async () => {
       expect(s.memberships.destroy).not.toHaveBeenCalled(); return [{ classGroupId: "class-A" }];
     }) };
-    const db = { query: jest.fn(async () => [{ courseOfferingId: "completed-1" }]) };
+    const db = { query: jest.fn(async (sql: string) => sql.includes("SELECT learning.id")
+      ? [{ id: "result", result: "passed", score: 8 }]
+      : [{ subjectId: source.id, courseOfferingId: "completed-1", result: "passed", score: 8 }]) };
     const realRecognition = new SubjectRecognitionService(results as never, recognitions as never, {} as never,
       s.records as never, s.curriculums as never, { findAll: jest.fn(async () => [{ subject: target }]) } as never,
       {} as never, { findAll: jest.fn(async () => [{ id: "completed-1", subjectId: source.id }]) } as never,

@@ -13,6 +13,12 @@ it("lets the administrator review the transfer before assigning a real account",
   ] });
   axios.put.mockResolvedValue({ data: { id: "new" } });
   render(<Users />);
+  await screen.findByRole("table", { name: "Phân quyền người dùng" });
+  expect(screen.getAllByRole("slider")).toHaveLength(5);
+  const emailWidth = screen.getByRole("slider", { name: "Độ rộng cột Email" });
+  const initialWidth = Number(emailWidth.getAttribute("aria-valuenow"));
+  fireEvent.keyDown(emailWidth, { key: "ArrowRight" });
+  expect(emailWidth).toHaveAttribute("aria-valuenow", String(initialWidth + 10));
   fireEvent.click(await screen.findByRole("button", { name: "Phân công phụ trách" }));
   expect(screen.getByText(/Quyền phụ trách của Người cũ/)).toBeInTheDocument();
   expect(axios.put).not.toHaveBeenCalled();

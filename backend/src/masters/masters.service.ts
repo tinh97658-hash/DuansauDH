@@ -56,7 +56,7 @@ export class MastersService {
     const where: Record<PropertyKey, unknown> = {
       trainingLevel: "Thạc sĩ",
       academicYear: group.academicYear,
-      ...admissionLearnerWhere(),
+      ...admissionLearnerWhere(true),
     };
     if (group.majorId) where.majorId = group.majorId;
     if (ids) where.id = { [Op.in]: ids };
@@ -225,7 +225,7 @@ export class MastersService {
   async listEligibleStudents(majorId?: string, academicYear?: string) {
     const where: Record<PropertyKey, unknown> = {
       trainingLevel: "Thạc sĩ",
-      ...admissionLearnerWhere(),
+      ...admissionLearnerWhere(true),
     };
     if (majorId) where.majorId = majorId;
     if (academicYear) where.academicYear = academicYear;
@@ -279,7 +279,8 @@ export class MastersService {
         majorName: r.major?.name || r.majorName,
         academicYear: r.academicYear,
         status: r.status,
-        studyStatus: r.studyStatus,
+        studyStatus: ["Đã trúng tuyển", "Đang học"].includes(r.studyStatus || "")
+          ? (assignment ? "Đang học" : "Đã trúng tuyển") : r.studyStatus,
         tuitionPaid: r.extraData?.tuitionPayment?.paid === true,
         note: r.note || "",
         assignedGroup: assignment ? assignment.group : null,
@@ -350,6 +351,7 @@ export class MastersService {
         }
         throw error;
       }
+      await this.admissionRecords.update({ studyStatus: "Đang học" }, { where: { id: { [Op.in]: admissionRecordIds } }, transaction });
       return { success: true, message: `Đã phân ${records.length} học viên vào nhóm "${group.name}".`, count: records.length };
     });
   }
@@ -516,6 +518,9 @@ export class MastersService {
       }
       throw error;
     }
+    await this.admissionRecords.update({ studyStatus: "Đang học" }, {
+      where: { id: { [Op.in]: newMemberships.map(member => member.admissionRecordId) } }, transaction,
+    });
     return {
       success: true,
       message: `Đã phân ${newMemberships.length} học viên vào ${groups.length} nhóm học phần.`,

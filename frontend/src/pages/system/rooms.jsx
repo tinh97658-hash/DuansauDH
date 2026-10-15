@@ -17,6 +17,7 @@ const Rooms = () => (
     addButtonLabel="Thêm phòng"
     activeField="isActive"
     activeStatusLabel={(active) => active ? "Đang sử dụng" : "Ngừng sử dụng"}
+    showStatusBadge={false}
     activeSwitchAriaLabel={(active, row) => `${active ? "Vô hiệu hóa" : "Kích hoạt"} phòng ${row.code}`}
     sortable={false}
     showDeleteAction={false}

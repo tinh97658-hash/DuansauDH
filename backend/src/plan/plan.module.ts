@@ -2,6 +2,10 @@ import { AdmissionEvaluationService } from "./admission-evaluation.service.js";
 import { AdmissionEvaluationController } from "./admission-evaluation.controller.js";
 import { AdmissionRound, AdmissionEvaluation, AdmissionEvaluationHistory } from "../database/models/plan/admission-evaluation.model.js";
 import { Module } from "@nestjs/common";
+import { APP_INTERCEPTOR } from "@nestjs/core";
+import { StudyLeaveService } from "./study-leave.service.js";
+import { StudyLeaveController } from "./study-leave.controller.js";
+import { StudyLeaveInterceptor } from "./study-leave.interceptor.js";
 import { SequelizeModule } from "@nestjs/sequelize";
 import { RolesGuard } from "../common/roles.guard.js";
 import { Major } from "../database/models/common/major.model.js";
@@ -36,8 +40,8 @@ import { SubjectRecognitionService } from "./subject-recognition.service.js";
     MajorTransfer, SubjectRecognition, LearnerSubjectResult, BridgeKnowledgeSubject,
     Major, AdmissionRecord, CourseOffering, AdmissionRound, AdmissionEvaluation, AdmissionEvaluationHistory,
   ])],
-  controllers: [PlanController, AdmissionEvaluationController],
-  providers: [AdmissionEvaluationService, PlanService, ClassGroupService, CurriculumService, MajorTransferService, SubjectRecognitionService, RolesGuard],
+  controllers: [PlanController, AdmissionEvaluationController, StudyLeaveController],
+  providers: [StudyLeaveService, { provide: APP_INTERCEPTOR, useClass: StudyLeaveInterceptor }, AdmissionEvaluationService, PlanService, ClassGroupService, CurriculumService, MajorTransferService, SubjectRecognitionService, RolesGuard],
   exports: [AdmissionEvaluationService, PlanService, ClassGroupService, CurriculumService, SubjectRecognitionService],
 })
 export class PlanModule {}

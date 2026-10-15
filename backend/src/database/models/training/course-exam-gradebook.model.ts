@@ -7,6 +7,10 @@ export interface CourseExamGrade {
   participantId: string;
   eligible: boolean | null;
   examExempt: boolean;
+  /** Derived from the admission profile; never accepted as an editable mark. */
+  profileForeignLanguageExempt?: boolean;
+  /** Server-derived result of an interrupted attempt; never accepted as an editable mark. */
+  studyLeaveFailure?: boolean;
   testScore: number | null;
   assignmentScore: number | null;
   examScore: number | null;

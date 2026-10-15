@@ -12,7 +12,7 @@ import ConfirmDialog from "../../components/ConfirmDialog";
 import GradingPolicyEditor from "./GradingPolicyEditor";
 import { announcePolicyChange, clonePolicy, DEFAULT_GRADING_POLICY, numericPolicy, policyError } from "./gradingPolicy";
 
-const scoreKeys = new Set([...SCORE_FIELDS.map(([key]) => key).filter(key => key !== "grade4"), "result"]);
+const scoreKeys = new Set(SCORE_FIELDS.map(([key]) => key).filter(key => key !== "grade4"));
 const scoreColumns = gradebookColumns().filter((column) => scoreKeys.has(column.key));
 const weightKeys = new Set(["testScore", "assignmentScore", "examScore"]);
 const columns = [
@@ -212,7 +212,6 @@ export default function GradeSettingsDialog({ initialMajorId = "", initialYear =
                 {scoreColumns.map((column) => {
                   const policy = policyOf(subject);
                   if (column.key === "courseScore") return <TableCell key={column.key} align="center">≥ {policy.courseMinimum}</TableCell>;
-                  if (column.key === "result") return <TableCell key={column.key} align="center" title={`Kiểm tra ≥ ${policy.minimums.testScore}; BTL/TL/KT ≥ ${policy.minimums.assignmentScore}; Thi ≥ ${policy.minimums.examScore}; Học phần ≥ ${policy.courseMinimum}`}>Theo điều kiện môn</TableCell>;
                   if (!weightKeys.has(column.key)) return <TableCell key={column.key} align="center" sx={{ color: "var(--text-secondary, #607486)" }}>—</TableCell>;
                   const key = `${year}:${subject.id}:${column.key}`;
                   const value = String(policy.weights[column.key] ?? "");

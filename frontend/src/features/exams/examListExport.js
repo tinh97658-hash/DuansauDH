@@ -1,15 +1,16 @@
 import { BRAND } from "../../config/branding";
-import { gradebookColumns, gradebookRowValues } from "./gradebook";
+import { gradebookColumns, gradebookRowValues, isExamCandidate } from "./gradebook";
 import { gradebookDocumentColumns } from "./gradebookLayout";
 
 export const EXAM_LIST_HEADER_ROW = 4;
 
 export function buildExamListDocument(group, offering, rows) {
   return {
+    kind: "exam-list", signingDate: "",
     university: BRAND.university.toLocaleUpperCase("vi"), institute: BRAND.institute.toLocaleUpperCase("vi"),
     title: "DANH SÁCH THI", group: group?.name || group?.code || "", subject: offering?.subject?.name || "",
     headers: gradebookColumns(true).map(column => column.label),
-    rows: rows.map((row, index) => gradebookRowValues(row, index, true)),
+    rows: rows.filter(isExamCandidate).map((row, index) => gradebookRowValues(row, index, true)),
   };
 }
 

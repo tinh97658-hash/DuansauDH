@@ -12,7 +12,7 @@ const buildService = () => {
   const offeringGroups = { findAll: jest.fn().mockResolvedValue([]) };
   const offeringStudents = { findAll: jest.fn().mockResolvedValue([]), bulkCreate: jest.fn() };
   const recognitions = { proposeForRecord: jest.fn().mockResolvedValue({ autoApproved: 0 }), decide: jest.fn().mockResolvedValue({ id: "rec-1", status: "approved" }) };
-  const sequelize = { transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)) };
+  const sequelize = { query: jest.fn().mockResolvedValue([]), transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)) };
   const admissionEvaluation = { guardRecordUpdate: jest.fn(), archiveForApprovedMajorTransfer: jest.fn() };
   const service = new MajorTransferService(
     transfers as never, records as never, majors as never,

@@ -7,7 +7,7 @@ import {
   Menu, MenuItem, Stack, Tooltip, Typography, useMediaQuery, useTheme,
 } from "@mui/material";
 import {
-  AccountCircleRounded, AddTaskRounded, AssessmentRounded, CategoryRounded,
+  AccountBalanceRounded, AccountCircleRounded, AddTaskRounded, AssessmentRounded, CategoryRounded,
   CheckCircleRounded, ChevronRightRounded, ClassRounded, DashboardRounded,
   DeleteRounded, EditRounded, EventNoteRounded, EventRounded, ExpandLessRounded,
   ExpandMoreRounded, FactCheckRounded, FlagRounded, FolderOpenRounded, GavelRounded,
@@ -47,6 +47,7 @@ const NAV_GROUPS = [
       { label: "Học bổ sung kiến thức", path: "/masters/bridge-course", icon: AddTaskRounded },
       { label: "Điểm xét tuyển thạc sĩ", path: "/masters/admission-scores", icon: ScoreboardRounded },
       { label: "Danh sách học viên", path: "/masters/admitted-records", icon: CheckCircleRounded },
+      { label: "Quản lý bảo lưu", path: "/masters/study-leaves", icon: HistoryEduRounded },
       { label: "Tạo nhóm học viên", path: "/masters/create-class-groups", icon: GroupAddRounded },
       { label: "Phân nhóm học viên", path: "/masters/assign-class-groups", icon: GroupWorkRounded },
       { label: "Thống kê tiến độ", path: "/masters/class-course-history", icon: HistoryEduRounded },
@@ -54,6 +55,7 @@ const NAV_GROUPS = [
       { label: "Xếp lịch", path: "/masters/schedule", icon: EventNoteRounded },
       { label: "Xét tư cách thi hết môn", path: "/masters/exam-eligibility", icon: RuleRounded },
       { label: "Danh sách thi, điểm thi", path: "/masters/exam-lists", icon: ListAltRounded },
+      { label: "Tổng hợp điểm của lớp", path: "/reports/class-score-summary", icon: SummarizeRounded },
       { label: "Tạo đợt thi English", path: "/masters/english-exam", icon: EventRounded },
       { label: "Điểm thi English", path: "/masters/english-scores", icon: GradingRounded },
       { label: "Đạt chuẩn ngoại ngữ", path: "/masters/english-certification", icon: LanguageRounded },
@@ -83,7 +85,6 @@ const NAV_GROUPS = [
     items: [
       { label: "Danh sách lớp", path: "/reports/class-lists", icon: GroupsRounded },
       { label: "Bảng điểm môn học", path: "/reports/course-scores", icon: TableChartRounded },
-      { label: "Tổng hợp điểm của lớp", path: "/reports/class-score-summary", icon: SummarizeRounded },
       { label: "Báo cáo gửi Bộ", path: "/reports/ministerial-report", icon: SendRounded },
       { label: "Bảng điểm Thạc sĩ", path: "/reports/temp-score-masters", icon: TableChartRounded },
       { label: "Bảng điểm Tiến sĩ", path: "/reports/temp-score-doctoral", icon: TableChartRounded },

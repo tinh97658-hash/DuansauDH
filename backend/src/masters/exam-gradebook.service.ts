@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import { Sequelize } from "sequelize-typescript";
-import { QueryTypes, type Transaction } from "sequelize";
+import { Op, QueryTypes, type Transaction } from "sequelize";
 import { Subject } from "../database/models/plan/subject.model.js";
 import { Major } from "../database/models/common/major.model.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
@@ -9,10 +9,16 @@ import { ClassGroupMember } from "../database/models/training/class-group-member
 import { CourseOffering } from "../database/models/training/course-offering.model.js";
 import { CourseOfferingClassGroup } from "../database/models/training/course-offering-class-group.model.js";
 import { CourseExamGrade, CourseExamGradebook } from "../database/models/training/course-exam-gradebook.model.js";
-import { ExamGradebookQueryDto, SaveExamGradebookDto } from "./dto/exam-gradebook.dto.js";
-import { calculateExamGrade, roundExamScore } from "./exam-grade-calculation.js";
+import { ExamGradebookQueryDto, ExamGradeRowDto, SaveExamGradebookDto } from "./dto/exam-gradebook.dto.js";
+import { calculateExamEligibility, calculateExamGrade, roundExamScore } from "./exam-grade-calculation.js";
 import { GradingPolicyService } from "./grading-policy.service.js";
-import { COMPONENT_KEYS, LEGACY_GRADING_POLICY } from "./grading-policy.js";
+import { excludeRecognizedExamParticipant } from "./recognized-exam-participant.js";
+import { LEGACY_GRADING_POLICY, type GradingPolicy } from "./grading-policy.js";
+import { examCurriculumInclude, examSubjectForGroup } from "./exam-subject-scope.js";
+import { enrolledOfferingMemberSql } from "../scheduling/retake-groups.js";
+import { notWithdrawnSql } from "../plan/study-leave-policy.js";
+import { studyLeaveFailureOutcomesSql, studyLeaveFailureParticipantSql } from '../plan/exam-outcomes.js';
+import { foreignLanguageExemptGrade, profileForeignLanguageExemptSql } from "./foreign-language-exemption.js";
 
 export const emptyExamGrade = (participantId: string): CourseExamGrade => ({
   participantId, eligible: null, examExempt: false, testScore: null, assignmentScore: null,
@@ -34,23 +40,29 @@ export class ExamGradebookService {
   async options() {
     const groups = await this.groups.findAll({
       where: { program: "masters" }, attributes: ["id", "code", "name", "academicYear", "majorId"],
-      include: [{ model: Major, as: "major", attributes: ["id", "name"] }],
+      include: [{ model: Major, as: "major", attributes: ["id", "name"] }, examCurriculumInclude],
       order: [["academicYear", "DESC"], ["name", "ASC"]],
     });
     const courseOfferings = await this.offerings.findAll({
       attributes: ["id", "name", "subjectId", "status"],
       include: [
-        { model: Subject, as: "subject", attributes: ["id", "code", "name", "credits"], where: { program: "masters" }, required: true },
+        { model: Subject, as: "subject", attributes: ["id", "code", "name", "credits", "canonicalSubjectId"], where: { program: "masters" }, required: true },
         { model: CourseOfferingClassGroup, as: "groupLinks", attributes: ["classGroupId"], required: true },
       ],
       order: [["createdAt", "DESC"]],
     });
-    return { groups, courseOfferings };
+    const byId = new Map(groups.map(group => [group.id, group]));
+    return { groups, courseOfferings: courseOfferings.map(offering => {
+      const value = typeof offering.get === "function" ? offering.get({ plain: true }) : offering;
+      return { ...value, groupLinks: value.groupLinks.map((link: any) => ({ ...link,
+        subject: byId.has(link.classGroupId) ? examSubjectForGroup(byId.get(link.classGroupId), value.subject) : value.subject,
+      })) };
+    }) };
   }
 
   private async requireGroup(id: string, transaction?: Transaction) {
-    const group = await this.groups.findOne({ where: { id, program: "masters" }, transaction,
-      ...(transaction ? { lock: transaction.LOCK.UPDATE } : {}) });
+    const group = await this.groups.findOne({ where: { id, program: "masters" }, include: [examCurriculumInclude], transaction,
+      ...(transaction ? { lock: { level: transaction.LOCK.UPDATE, of: ClassGroup } } : {}) });
     if (!group) throw new NotFoundException("Không tìm thấy lớp học viên Thạc sĩ.");
     return group;
   }
@@ -67,61 +79,107 @@ export class ExamGradebookService {
   }
 
   private async scope(query: ExamGradebookQueryDto, transaction?: Transaction) {
+    const offering = await this.offerings.findByPk(query.courseOfferingId, {
+      attributes: ["id", "name", "subjectId", "status"],
+      include: [{ model: Subject, as: "subject", attributes: ["id", "code", "name", "credits", "program", "canonicalSubjectId"] }], transaction,
+      ...(transaction ? { lock: { level: transaction.LOCK.UPDATE, of: CourseOffering } } : {}),
+    });
+    if (!offering || offering.subject?.program !== "masters") throw new NotFoundException("Không tìm thấy học phần Thạc sĩ.");
     const group = await this.requireGroup(query.classGroupId, transaction);
     const link = await this.links.findOne({ where: { classGroupId: query.classGroupId, courseOfferingId: query.courseOfferingId }, transaction });
     if (!link) throw new BadRequestException("Học phần không thuộc lớp đã chọn.");
-    const offering = await this.offerings.findByPk(query.courseOfferingId, {
-      attributes: ["id", "name", "subjectId", "status"],
-      include: [{ model: Subject, as: "subject", attributes: ["id", "code", "name", "credits", "program"] }], transaction,
-    });
-    if (!offering || offering.subject?.program !== "masters") throw new NotFoundException("Không tìm thấy học phần Thạc sĩ.");
     return { group, offering };
+  }
+
+  private async offeringGroups(offeringId: string, transaction?: Transaction) {
+    const links = await this.links.findAll({ where: { courseOfferingId: offeringId },
+      include: [{ model: ClassGroup, as: "classGroup", where: { program: "masters" }, required: true,
+        include: [examCurriculumInclude] }], transaction, order: [["classGroupId", "ASC"]] });
+    return links.map(link => link.classGroup);
   }
 
   async get(query: ExamGradebookQueryDto) {
     const { group, offering } = await this.scope(query);
-    const currentPolicy = this.policies ? await this.policies.latest(offering.subjectId, group.academicYear || "") : LEGACY_GRADING_POLICY;
+    const shared = query.rosterScope === "offering";
+    const scopedGroups = shared ? await this.offeringGroups(offering.id) : [group];
+    const groupIds = scopedGroups.map(item => item.id);
+    const policies = Object.fromEntries(await Promise.all(scopedGroups.map(async item => [item.id, this.policies
+      ? await this.policies.latest(examSubjectForGroup(item, offering.subject).id || offering.subjectId, item.academicYear || "")
+      : LEGACY_GRADING_POLICY])));
+    const currentPolicy = policies[group.id];
     const pageSize = Math.min(15, Math.max(1, query.pageSize || 15));
     const requestedPage = Math.max(1, query.page || 1);
     // Chỉ trả tối đa 15 hồ sơ. COUNT, tìm kiếm, lọc DS thi và khử trùng chạy trong PostgreSQL.
     const [result] = await this.sequelize.query<any>(`
       WITH book AS (
-        SELECT revision, grades FROM course_exam_gradebooks
-        WHERE class_group_id = :groupId AND course_offering_id = :offeringId
+        SELECT revision, grades, class_group_id, updated_at FROM course_exam_gradebooks
+        WHERE class_group_id IN (:groupIds) AND course_offering_id = :offeringId
       ), identities AS (
-        SELECT cm.id member_id, ar.id admission_id,
+        SELECT cm.id member_id, ar.id admission_id, cm.class_group_id AS "classGroupId",
           CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
             THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text
             WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END AS "participantId",
           COALESCE(NULLIF(ar.code, ''), st.reg_no, '') AS code,
           COALESCE(NULLIF(ar.full_name, ''), st.full_name, '') AS "fullName",
           COALESCE(ar.last_name, '') AS "lastName", COALESCE(ar.first_name, '') AS "firstName",
-          COALESCE(ar.dob::text, '') AS dob, COALESCE(ar.gender, '') AS gender
+          COALESCE(ar.dob::text, '') AS dob, COALESCE(ar.gender, '') AS gender,
+          ar.study_status AS "studyStatus"
         FROM class_group_members cm
         LEFT JOIN admission_records ar ON ar.id = cm.admission_record_id
         LEFT JOIN students st ON st.id = cm.student_id
-        WHERE cm.class_group_id = :groupId
+        WHERE cm.class_group_id IN (:groupIds)
+          AND ${enrolledOfferingMemberSql('cm.class_group_id', `(CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
+            THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text ELSE 'admission:' || ar.id::text END)`, true)}
+        ${shared ? `UNION ALL
+        SELECT os.id, ar.id, CAST(:individualGroupId AS uuid),
+          CASE WHEN ar.student_id IS NOT NULL THEN 'student:' || ar.student_id::text ELSE 'admission:' || ar.id::text END,
+          COALESCE(NULLIF(ar.code, ''), st.reg_no, ''), COALESCE(NULLIF(ar.full_name, ''), st.full_name, ''),
+          COALESCE(ar.last_name, ''), COALESCE(ar.first_name, ''), COALESCE(ar.dob::text, ''), COALESCE(ar.gender, ''), ar.study_status
+        FROM course_offering_students os JOIN admission_records ar ON ar.id = os.admission_record_id
+        LEFT JOIN students st ON st.id = ar.student_id WHERE os.course_offering_id = :offeringId` : ""}
       ), people AS (
-        SELECT DISTINCT ON ("participantId") "participantId", code, "fullName", "lastName", "firstName", dob, gender
+        SELECT DISTINCT ON ("participantId") "participantId", "classGroupId", code, "fullName", "lastName", "firstName", dob, gender, "studyStatus"
         FROM identities WHERE "participantId" IS NOT NULL
-        ORDER BY "participantId", admission_id NULLS LAST, member_id
+          AND (${notWithdrawnSql('"participantId"')} OR ${studyLeaveFailureParticipantSql('"participantId"')})
+          AND ${excludeRecognizedExamParticipant('"participantId"')}
+        ORDER BY "participantId", "classGroupId", admission_id NULLS LAST, member_id
       ), grade_map AS (
-        SELECT value->>'participantId' participant_id, value grade
+        SELECT DISTINCT ON (value->>'participantId') value->>'participantId' participant_id, value grade
         FROM book, LATERAL jsonb_array_elements(book.grades)
+        ORDER BY value->>'participantId', book.updated_at DESC, book.class_group_id
       ), roster AS (
-        SELECT p.*, COALESCE(g.grade, '{}'::jsonb) grade FROM people p
+        SELECT p.*, COALESCE((SELECT failure.grade FROM (${studyLeaveFailureOutcomesSql()}) failure
+          WHERE failure.course_offering_id = :offeringId AND failure.participant_id = p."participantId" LIMIT 1),
+          CASE WHEN ${profileForeignLanguageExemptSql('p."participantId"', ':subjectId', '(SELECT academic_year FROM class_groups WHERE id = p."classGroupId")')}
+          THEN COALESCE(g.grade, '{}'::jsonb) || CAST(:foreignLanguageGrade AS jsonb)
+          ELSE COALESCE(g.grade, '{}'::jsonb) END) grade,
+          CAST(:policies AS jsonb)->p."classGroupId"::text AS policy FROM people p
         LEFT JOIN grade_map g ON g.participant_id = p."participantId"
+      ), assessed AS (
+        SELECT roster.*, CASE
+          WHEN grade->>'studyLeaveFailure' = 'true' THEN false
+          WHEN grade->>'examExempt' = 'true' THEN false
+          WHEN jsonb_typeof(grade->'testScore') IS DISTINCT FROM 'number'
+            OR jsonb_typeof(grade->'assignmentScore') IS DISTINCT FROM 'number' THEN NULL
+          WHEN (grade->>'testScore')::numeric NOT BETWEEN 0 AND 10
+            OR (grade->>'assignmentScore')::numeric NOT BETWEEN 0 AND 10 THEN NULL
+          ELSE ROUND((grade->>'testScore')::numeric, 1) >= (policy->'minimums'->>'testScore')::numeric
+            AND ROUND((grade->>'assignmentScore')::numeric, 1) >= (policy->'minimums'->>'assignmentScore')::numeric
+        END AS eligibility FROM roster
       ), filtered AS (
-        SELECT * FROM roster
+        SELECT * FROM assessed
         WHERE (:mode <> 'exam' OR (
-          ("participantId" = ANY(STRING_TO_ARRAY(:includeIds, ',')) OR grade->>'result' = 'passed')
+          ("participantId" = ANY(STRING_TO_ARRAY(:includeIds, ',')) OR eligibility = true)
+          AND grade->>'examExempt' IS DISTINCT FROM 'true'
+          AND grade->>'studyLeaveFailure' IS DISTINCT FROM 'true'
           AND NOT ("participantId" = ANY(STRING_TO_ARRAY(:excludeIds, ',')))
         ))
           AND (:search = '' OR POSITION(LOWER(:search) IN LOWER(code || ' ' || "fullName")) > 0)
       ), metadata AS (
         SELECT (SELECT COUNT(*)::int FROM roster) AS "totalRows",
+          (SELECT COUNT(*)::int FROM assessed WHERE eligibility IS NULL) AS "unassessedRows",
           (SELECT COUNT(*)::int FROM filtered) AS total,
-          COALESCE((SELECT revision FROM book), 0) AS revision
+          COALESCE((SELECT SUM(revision)::int FROM book), 0) AS revision
       ), paging AS (
         SELECT *, LEAST(:page, GREATEST(1, CEIL(total::numeric / :pageSize)::int)) AS page FROM metadata
       ), selected AS (
@@ -131,34 +189,52 @@ export class ExamGradebookService {
       )
       SELECT paging.*, COALESCE((SELECT jsonb_agg(to_jsonb(selected)) FROM selected), '[]'::jsonb) AS rows FROM paging
     `, { type: QueryTypes.SELECT, replacements: {
-      groupId: query.classGroupId, offeringId: query.courseOfferingId,
+      groupId: query.classGroupId, offeringId: query.courseOfferingId, subjectId: offering.subjectId,
+      groupIds, individualGroupId: groupIds[0], policies: JSON.stringify(policies), foreignLanguageGrade: JSON.stringify(foreignLanguageExemptGrade()),
       page: requestedPage, pageSize, mode: query.mode || "all", search: (query.search || "").trim(),
       includeIds: query.includeIds || "", excludeIds: query.excludeIds || "",
+      testMinimum: currentPolicy.minimums.testScore, assignmentMinimum: currentPolicy.minimums.assignmentScore,
     } });
     return {
       group: { id: group.id, name: group.name, code: group.code, academicYear: group.academicYear }, offering,
-      revision: result.revision, total: result.total, totalRows: result.totalRows, page: result.page, pageSize,
-      rows: result.rows.map(({ grade, ...person }: any) => ({ ...emptyExamGrade(person.participantId), ...grade, ...person,
-        attemptScores: grade.examScore == null ? [] : [grade.examScore],
-        gradingPolicy: grade.participantId ? grade.gradingPolicy || LEGACY_GRADING_POLICY : currentPolicy,
-      })),
+      revision: result.revision, total: result.total, totalRows: result.totalRows, unassessedRows: result.unassessedRows, page: result.page, pageSize,
+      eligibilityPolicy: currentPolicy,
+      ...(shared ? { eligibilityPolicies: policies } : {}),
+      rows: result.rows.map(({ grade, policy, eligibility: _eligibility, ...person }: any) => {
+        const eligibilityPolicy = policy || currentPolicy;
+        const gradingPolicy = grade.participantId ? grade.gradingPolicy || LEGACY_GRADING_POLICY : eligibilityPolicy;
+        const row = { ...emptyExamGrade(person.participantId), ...grade, ...person };
+        return { ...row, ...calculateExamGrade(row, gradingPolicy, eligibilityPolicy), eligible: calculateExamEligibility(row, eligibilityPolicy),
+          attemptScores: row.examScore == null ? [] : [row.examScore],
+          gradingPolicy, eligibilityPolicy,
+        };
+      }),
     };
   }
 
   async save(dto: SaveExamGradebookDto) {
+    if (dto.rosterScope === "offering") return this.saveOffering(dto);
     await this.sequelize.transaction(async (transaction) => {
       const { group, offering } = await this.scope(dto, transaction);
+      this.requireCompletedTeaching(offering);
       // Khi lưu chỉ kiểm tra danh tính các học viên vừa sửa, không tải cả lớp.
-      const participants = await this.sequelize.query<{ participantId: string }>(`
+      const participants = await this.sequelize.query<{ participantId: string; profileForeignLanguageExempt?: boolean }>(`
         SELECT DISTINCT CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
           THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text
-          WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END AS "participantId"
+          WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END AS "participantId",
+          ${profileForeignLanguageExemptSql(`(CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
+            THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text ELSE 'admission:' || ar.id::text END)`, ':subjectId', ':academicYear')} AS "profileForeignLanguageExempt"
         FROM class_group_members cm LEFT JOIN admission_records ar ON ar.id = cm.admission_record_id
-        WHERE cm.class_group_id = :groupId AND
+        WHERE cm.class_group_id = :groupId
+          AND ${enrolledOfferingMemberSql('cm.class_group_id', `(CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
+            THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text ELSE 'admission:' || ar.id::text END)`)}
+          AND ${excludeRecognizedExamParticipant(`(CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
+            THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text
+            WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END)`)} AND
           (CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
             THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text
             WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END) IN (:ids)
-      `, { type: QueryTypes.SELECT, transaction, replacements: { groupId: dto.classGroupId, ids: dto.rows.map(row => row.participantId) } });
+      `, { type: QueryTypes.SELECT, transaction, replacements: { groupId: dto.classGroupId, offeringId: offering.id, subjectId: offering.subjectId, academicYear: group.academicYear || "", ids: dto.rows.map(row => row.participantId) } });
       const allowed = new Set(participants.map(row => row.participantId));
       const ids = new Set<string>();
       for (const row of dto.rows) {
@@ -166,33 +242,118 @@ export class ExamGradebookService {
         if (ids.has(row.participantId)) throw new BadRequestException("Bảng điểm có học viên bị lặp.");
         ids.add(row.participantId);
       }
+      this.requireEditableParticipants(participants);
       const where = { classGroupId: dto.classGroupId, courseOfferingId: dto.courseOfferingId };
       let book = await this.books.findOne({ where, transaction, lock: transaction.LOCK.UPDATE });
       if ((book?.revision || 0) !== dto.revision) {
         throw new ConflictException("Bảng điểm đã được người khác cập nhật. Hãy tải lại trước khi lưu.");
       }
       const merged = new Map((book?.grades || []).map((row) => [row.participantId, row]));
-      const currentPolicy = this.policies ? await this.policies.latest(offering.subjectId, group.academicYear || "", transaction) : LEGACY_GRADING_POLICY;
+      const currentPolicy = this.policies ? await this.policies.latest(examSubjectForGroup(group, offering.subject).id || offering.subjectId, group.academicYear || "", transaction) : LEGACY_GRADING_POLICY;
       for (const row of dto.rows) {
-        const previous = merged.get(row.participantId);
-        const gradingPolicy = previous ? previous.gradingPolicy || LEGACY_GRADING_POLICY : currentPolicy;
-        if (!previous && ((row.policyVersion ?? 0) !== currentPolicy.version || (row.policyRulesVersion ?? 0) !== (currentPolicy.rulesVersion ?? 0))) throw new ConflictException("Cách tính điểm của môn đã thay đổi trong lúc nhập. Hãy tải lại cấu hình trước khi lưu; điểm vừa nhập chưa bị lưu hoặc thay đổi.");
-        const scores = { testScore: roundExamScore(row.testScore), assignmentScore: roundExamScore(row.assignmentScore), examScore: roundExamScore(row.examScore) };
-        const unchanged = previous && COMPONENT_KEYS.every(key => (previous[key] ?? null) === (scores[key] ?? null)) && previous.examExempt === row.examExempt;
-        const calculated = unchanged ? { courseScore: previous.courseScore, grade4: previous.grade4, letterGrade: previous.letterGrade, result: previous.result }
-          : calculateExamGrade({ ...row, ...scores }, gradingPolicy);
-        const { policyVersion: _policyVersion, policyRulesVersion: _rulesVersion, ...values } = row;
-        merged.set(row.participantId, {
-          ...emptyExamGrade(row.participantId), ...values, eligible: row.eligible ?? null,
-          ...scores,
-          attemptScores: scores.examScore == null ? [] : [scores.examScore],
-          letterGrade: row.letterGrade.trim(),
-          ...calculated, gradingPolicy: structuredClone(gradingPolicy),
-        });
+        merged.set(row.participantId, this.savedGrade(row, merged.get(row.participantId), currentPolicy));
       }
       const payload = { ...where, grades: [...merged.values()], revision: dto.revision + 1 };
       if (book) await book.update(payload, { transaction });
       else book = await this.books.create(payload as never, { transaction });
+    });
+    return this.get(dto);
+  }
+
+  private savedGrade(row: ExamGradeRowDto, previous: CourseExamGrade | undefined, currentPolicy: GradingPolicy): CourseExamGrade {
+    const gradingPolicy = previous ? previous.gradingPolicy || LEGACY_GRADING_POLICY : currentPolicy;
+    if (!previous && ((row.policyVersion ?? 0) !== currentPolicy.version || (row.policyRulesVersion ?? 0) !== (currentPolicy.rulesVersion ?? 0))) {
+      throw new ConflictException("Cách tính điểm của môn đã thay đổi trong lúc nhập. Hãy tải lại cấu hình trước khi lưu; điểm vừa nhập chưa bị lưu hoặc thay đổi.");
+    }
+    const scores = { testScore: roundExamScore(row.testScore), assignmentScore: roundExamScore(row.assignmentScore), examScore: roundExamScore(row.examScore) };
+    const { policyVersion: _policyVersion, policyRulesVersion: _rulesVersion, ...values } = row;
+    return { ...emptyExamGrade(row.participantId), ...values, ...scores,
+      eligible: calculateExamEligibility({ ...row, ...scores }, currentPolicy),
+      attemptScores: scores.examScore == null ? [] : [scores.examScore],
+      ...calculateExamGrade({ ...row, ...scores }, gradingPolicy, currentPolicy), gradingPolicy: structuredClone(gradingPolicy),
+    };
+  }
+
+  private requireCompletedTeaching(offering: CourseOffering) {
+    if (offering.status !== "completed") throw new ConflictException({
+      code: "TEACHING_NOT_COMPLETED",
+      message: "Vui lòng xác nhận hoàn thành giảng dạy trước khi nhập điểm.",
+    });
+  }
+
+  private requireEditableParticipants(participants: { profileForeignLanguageExempt?: boolean }[]) {
+    if (participants.some(row => row.profileForeignLanguageExempt)) throw new ConflictException("Học viên được miễn thi ngoại ngữ theo hồ sơ. Hãy cập nhật trạng thái miễn thi trong hồ sơ học viên.");
+  }
+
+  private async saveOffering(dto: SaveExamGradebookDto) {
+    await this.sequelize.transaction(async transaction => {
+      const { offering } = await this.scope(dto, transaction);
+      this.requireCompletedTeaching(offering);
+      const groups = await this.offeringGroups(offering.id, transaction);
+      const groupIds = groups.map(group => group.id);
+      const participants = await this.sequelize.query<{ participantId: string; classGroupId: string; profileForeignLanguageExempt?: boolean }>(`
+        WITH identities AS (
+          SELECT cm.class_group_id AS "classGroupId",
+            CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
+              THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text
+              WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END AS "participantId"
+          FROM class_group_members cm LEFT JOIN admission_records ar ON ar.id = cm.admission_record_id
+          WHERE cm.class_group_id IN (:groupIds)
+            AND ${enrolledOfferingMemberSql('cm.class_group_id', `(CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
+              THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text ELSE 'admission:' || ar.id::text END)`)}
+          UNION ALL
+          SELECT CAST(:individualGroupId AS uuid), CASE WHEN ar.student_id IS NOT NULL
+            THEN 'student:' || ar.student_id::text ELSE 'admission:' || ar.id::text END
+          FROM course_offering_students os JOIN admission_records ar ON ar.id = os.admission_record_id
+          WHERE os.course_offering_id = :offeringId
+        ) SELECT DISTINCT ON ("participantId") "participantId", "classGroupId",
+          ${profileForeignLanguageExemptSql('"participantId"', ':subjectId', '(SELECT academic_year FROM class_groups WHERE id = identities."classGroupId")')} AS "profileForeignLanguageExempt" FROM identities
+        WHERE "participantId" IN (:ids) AND ${excludeRecognizedExamParticipant('"participantId"')}
+          AND ${notWithdrawnSql('"participantId"')}
+        ORDER BY "participantId", "classGroupId"
+      `, { type: QueryTypes.SELECT, transaction, replacements: {
+        groupIds, individualGroupId: groupIds[0], offeringId: offering.id, subjectId: offering.subjectId, ids: dto.rows.map(row => row.participantId),
+      } });
+      const owners = new Map(participants.map(person => [person.participantId, person.classGroupId]));
+      const ids = new Set<string>();
+      for (const row of dto.rows) {
+        if (!owners.has(row.participantId)) throw new BadRequestException("Bảng điểm chứa học viên ngoài lớp đã chọn.");
+        if (ids.has(row.participantId)) throw new BadRequestException("Bảng điểm có học viên bị lặp.");
+        ids.add(row.participantId);
+      }
+      this.requireEditableParticipants(participants);
+      const books = await this.books.findAll({ where: { courseOfferingId: offering.id, classGroupId: { [Op.in]: groupIds } },
+        transaction, lock: transaction.LOCK.UPDATE, order: [["updatedAt", "DESC"], ["classGroupId", "ASC"]] });
+      if (books.reduce((sum, book) => sum + book.revision, 0) !== dto.revision) {
+        throw new ConflictException("Bảng điểm đã được người khác cập nhật. Hãy tải lại trước khi lưu.");
+      }
+      const previous = new Map<string, CourseExamGrade>();
+      for (const book of books) for (const grade of book.grades) if (!previous.has(grade.participantId)) previous.set(grade.participantId, grade);
+      const policies = new Map<string, GradingPolicy>();
+      const changes = new Map<string, Map<string, CourseExamGrade>>();
+      for (const row of dto.rows) {
+        const ownerId = owners.get(row.participantId)!;
+        if (!policies.has(ownerId)) {
+          const group = groups.find(group => group.id === ownerId)!;
+          policies.set(ownerId, this.policies ? await this.policies.latest(examSubjectForGroup(group, offering.subject).id || offering.subjectId,
+            group.academicYear || "", transaction) : LEGACY_GRADING_POLICY);
+        }
+        const grade = this.savedGrade(row, previous.get(row.participantId), policies.get(ownerId)!);
+        // Keep legacy group gradebooks usable, including duplicate membership.
+        const targetIds = new Set([ownerId, ...books.filter(book => book.grades.some(saved => saved.participantId === row.participantId)).map(book => book.classGroupId)]);
+        for (const targetId of targetIds) {
+          if (!changes.has(targetId)) changes.set(targetId, new Map());
+          changes.get(targetId)!.set(row.participantId, grade);
+        }
+      }
+      for (const [classGroupId, changed] of changes) {
+        const book = books.find(book => book.classGroupId === classGroupId);
+        const merged = new Map((book?.grades || []).map(grade => [grade.participantId, grade]));
+        for (const [id, grade] of changed) merged.set(id, grade);
+        const payload = { classGroupId, courseOfferingId: offering.id, grades: [...merged.values()], revision: (book?.revision || 0) + 1 };
+        if (book) await book.update(payload, { transaction });
+        else await this.books.create(payload as never, { transaction });
+      }
     });
     return this.get(dto);
   }

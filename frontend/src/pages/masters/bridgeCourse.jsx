@@ -118,7 +118,7 @@ export default function BridgeCourse() {
     { key: "status", label: "Trạng thái", width: 130, minWidth: 100 },
     { key: "score", label: "Điểm", width: 70, minWidth: 60, align: "center" },
     { key: "result", label: "Kết quả", width: 140, minWidth: 100 },
-    ...(admin ? [{ key: "actions", label: "Thao tác", width: 110, minWidth: 90, align: "right" }] : []),
+    ...(admin ? [{ key: "actions", label: "Thao tác", width: 110, minWidth: 90, align: "center" }] : []),
   ], [admin]);
 
   const visible = useMemo(() => {
@@ -206,7 +206,7 @@ export default function BridgeCourse() {
                 <TableCell align="center">{r.score ?? "—"}</TableCell>
                 <TableCell><Chip size="small" variant="outlined" label={(RESULTS[r.result] || RESULTS.pending)[0]} color={(RESULTS[r.result] || RESULTS.pending)[1]} sx={{ borderRadius: "4px" }} /></TableCell>
                 {admin && (
-                  <TableCell align="right">
+                  <TableCell align="center">
                     <IconButton size="small" color="primary" onClick={() => edit(r)}><EditRounded fontSize="small" /></IconButton>
                     <IconButton size="small" color="error" onClick={() => setDeleting(r)}><DeleteRounded fontSize="small" /></IconButton>
                   </TableCell>

@@ -5,7 +5,7 @@ import "react-toastify/dist/ReactToastify.css";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress,
   FormControl, FormControlLabel, IconButton, MenuItem, Paper, Select, Stack,
-  Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField,
+  Switch, TableBody, TableCell, TableContainer, TableRow, TextField,
   Tooltip, Typography, ListSubheader,
 } from "@mui/material";
 import { AddRounded, DeleteRounded, EditRounded } from "@mui/icons-material";
@@ -15,6 +15,7 @@ import AppDialog from "./AppDialog";
 import ConfirmDialog from "./ConfirmDialog";
 import { personNameParts } from "../utils/personName";
 import FilterSearchField from "./FilterSearchField";
+import ResizableTable from "./ResizableTable";
 import { alphabeticalOptionGroups } from "../utils/optionGroups";
 
 const buildEmptyForm = (parent, fields, sortable, activeField = "active") => {
@@ -97,6 +98,7 @@ const CatalogManager = ({
   validate = null,
   activeSwitchAriaLabel = null,
   activeStatusLabel = null,
+  showStatusBadge = true,
   addButtonLabel = null,
 }) => {
   const apiBase = baseEndpoint || endpoint.split("?")[0];
@@ -249,7 +251,23 @@ const CatalogManager = ({
   }, [rows, search, parent, tableFields, showCode, fieldOptions]);
 
   const showActions = isAdmin && (showEditAction || showDeleteAction);
-  const colSpan = (showIndex ? 1 : 0) + (showCode ? 1 : 0) + (splitPersonName ? 2 : 1) + (parent ? 1 : 0) + tableFields.length + (showSortColumn ? 1 : 0) + 1 + (showActions ? 1 : 0);
+  const parentColumn = parent && { key: `parent:${parent.field}`, label: parent.columnLabel || parent.label, width: 220, minWidth: 100 };
+  const columns = [
+    ...(showIndex ? [{ key: "index", label: "STT", width: 60, minWidth: 50 }] : []),
+    ...(showCode ? [{ key: "code", label: codeLabel, width: 150, minWidth: 80 }] : []),
+    ...(parent && parentBeforeName ? [parentColumn] : []),
+    ...(splitPersonName ? [
+      { key: "lastName", label: "Họ đệm", width: 180, minWidth: 100 },
+      { key: "firstName", label: "Tên", width: 100, minWidth: 70 },
+    ] : [{ key: "name", label: nameLabel, width: 240, minWidth: 100 }]),
+    ...(parent && !parentBeforeName ? [parentColumn] : []),
+    ...tableFields.map(field => ({ key: `field:${field.key}`, label: field.label, align: field.align || "left", width: field.width || 180, minWidth: field.minWidth || 80 })),
+    ...(showSortColumn ? [{ key: "sortOrder", label: "Thứ tự", align: "center", width: 90, minWidth: 70 }] : []),
+    { key: "status", label: "Trạng thái", align: "center", width: activeStatusLabel && showStatusBadge ? 200 : 110, minWidth: 100 },
+    ...(showActions ? [{ key: "actions", label: "Thao tác", align: "center", width: 110, minWidth: 90 }] : []),
+  ];
+  const colSpan = columns.length;
+  const columnStorageKey = `system-catalog-columns:${endpoint}`;
 
   const openAdd = () => { setEditingId(null); setForm(buildEmptyForm(parent, fields, sortable, activeField)); setDialogOpen(true); };
   const openEdit = (row) => {
@@ -420,20 +438,7 @@ const CatalogManager = ({
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       <TableContainer component={Paper} variant="outlined">
-        <Table size="small">
-          <TableHead>
-            <TableRow sx={{ bgcolor: "#f0f4fa" }}>
-              {showIndex && <TableCell sx={{ width: 60, fontWeight: 700 }}>STT</TableCell>}
-              {showCode && <TableCell sx={{ fontWeight: 700 }}>{codeLabel}</TableCell>}
-              {parent && parentBeforeName && <TableCell sx={{ fontWeight: 700 }}>{parent.columnLabel || parent.label}</TableCell>}
-              {splitPersonName ? <><TableCell sx={{ fontWeight: 700 }}>Họ đệm</TableCell><TableCell sx={{ fontWeight: 700 }}>Tên</TableCell></> : <TableCell sx={{ fontWeight: 700 }}>{nameLabel}</TableCell>}
-              {parent && !parentBeforeName && <TableCell sx={{ fontWeight: 700 }}>{parent.columnLabel || parent.label}</TableCell>}
-              {tableFields.map((f) => <TableCell key={f.key} align={f.align || "left"} sx={{ fontWeight: 700 }}>{f.label}</TableCell>)}
-              {showSortColumn && <TableCell align="center" sx={{ fontWeight: 700, width: 90 }}>Thứ tự</TableCell>}
-              <TableCell align="center" sx={{ fontWeight: 700, width: 110 }}>Trạng thái</TableCell>
-              {showActions && <TableCell align="right" sx={{ fontWeight: 700, width: 110 }}>Thao tác</TableCell>}
-            </TableRow>
-          </TableHead>
+        <ResizableTable key={columnStorageKey} columns={columns} storageKey={columnStorageKey} aria-label={title}>
           <TableBody>
             {loading ? (
               <TableRow><TableCell colSpan={colSpan} align="center" sx={{ py: 4 }}><CircularProgress size={28} /></TableCell></TableRow>
@@ -451,7 +456,7 @@ const CatalogManager = ({
                 {tableFields.map((f) => <TableCell key={f.key} align={f.align || "left"}>{renderFieldValue(row, f)}</TableCell>)}
                 {showSortColumn && <TableCell align="center">{row.sortOrder}</TableCell>}
                 <TableCell align="center" onDoubleClick={(event) => event.stopPropagation()}>
-                  {activeStatusLabel && (
+                  {showStatusBadge && activeStatusLabel && (
                     <Chip
                       size="small"
                       label={activeStatusLabel(Boolean(row[activeField]), row)}
@@ -459,10 +464,11 @@ const CatalogManager = ({
                       sx={{ mr: isAdmin ? 1 : 0 }}
                     />
                   )}
-                  {isAdmin ? (
+                  {isAdmin || !showStatusBadge ? (
                     <Tooltip title={row[activeField] ? "Đang hoạt động" : "Đã ẩn"}>
                       <Switch
                         size="small"
+                        disabled={!isAdmin}
                         checked={Boolean(row[activeField])}
                         onChange={() => toggleActive(row)}
                         inputProps={{
@@ -477,7 +483,7 @@ const CatalogManager = ({
                   ) : null}
                 </TableCell>
                 {showActions && (
-                  <TableCell align="right" onDoubleClick={(event) => event.stopPropagation()}>
+                  <TableCell align="center" onDoubleClick={(event) => event.stopPropagation()}>
                     {showEditAction && <Tooltip title={inlineEdit ? "Nhấp đúp để sửa" : "Sửa"}><IconButton aria-label="Sửa" size="small" color="primary" onClick={inlineEdit ? undefined : () => openEdit(row)} onDoubleClick={inlineEdit ? () => openEdit(row) : undefined}><EditRounded fontSize="small" /></IconButton></Tooltip>}
                     {showDeleteAction && <Tooltip title="Xóa"><IconButton size="small" color="error" onClick={() => setDeleting(row)}><DeleteRounded fontSize="small" /></IconButton></Tooltip>}
                   </TableCell>
@@ -485,7 +491,7 @@ const CatalogManager = ({
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </ResizableTable>
       </TableContainer>
 
       <AppDialog

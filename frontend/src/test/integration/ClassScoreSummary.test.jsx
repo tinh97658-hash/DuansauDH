@@ -4,6 +4,7 @@ import axios from "axios";
 import ClassScoreSummary from "../../pages/reports/classScoreSummary";
 import { createClassScoreWorkbook } from "../../pages/reports/classScoreSummaryExcel";
 import { downloadDocumentFile } from "../../utils/documentFiles";
+import { notifyGradebookSaved } from "../../utils/gradebookRevision";
 
 jest.mock("axios");
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
@@ -36,6 +37,30 @@ const chooseFilter = (label, text) => {
   fireEvent.mouseDown(screen.getByLabelText(label));
   fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: new RegExp(`^${text}`) }));
 };
+
+it("refreshes the open class summary after exam grades are saved", async () => {
+  let updated = false;
+  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups }
+    : { ...reportFor(config.params.classGroupId), rows: [{ ...student, scores: { hp1: { score: updated ? 8.5 : 0, result: updated ? "passed" : "failed" } } }] } }));
+  mount();
+  await screen.findByText("HV001");
+  updated = true;
+  act(() => notifyGradebookSaved());
+  expect(await screen.findByText("8.5")).toBeInTheDocument();
+});
+
+it("shows a profile language exemption as passed in the summary after the profile is saved", async () => {
+  let exempt = false;
+  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups }
+    : { ...reportFor(config.params.classGroupId), rows: [{ ...student, scores: {
+      hp2: exempt ? { score: null, result: "passed", profileForeignLanguageExempt: true } : null,
+    } }] } }));
+  mount();
+  await screen.findByText("HV001");
+  exempt = true;
+  act(() => notifyGradebookSaved("profile"));
+  expect(await screen.findByText("MT")).toBeInTheDocument();
+});
 
 it("shows the whole curriculum, preserving zero, exemption and blank ungraded cells", async () => {
   mount();

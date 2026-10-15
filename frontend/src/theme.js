@@ -4,9 +4,9 @@ export const APP_FONT_FAMILY = '"Segoe UI", -apple-system, BlinkMacSystemFont, R
 export const TABLE_BORDER_COLOR = "#D7E4EE";
 export const TABLE_ROW_BORDER_COLOR = "#E2EBF2";
 export const TABLE_HEADER_BACKGROUND = "#EDF4FA";
-export const TABLE_BORDER_RADIUS = 12;
+export const TABLE_BORDER_RADIUS = 0;
 export const TABLE_HOVER_BACKGROUND = "#F5FAFE";
-export const CONTROL_BORDER_RADIUS = 4;
+export const CONTROL_BORDER_RADIUS = 0;
 
 /**
  * Institutional Theme for University Postgraduate Operations System
@@ -100,7 +100,7 @@ export const theme = createTheme({
           fontWeight: 600,
           fontSize: "12.5px",
           fontFamily: "inherit",
-          borderRadius: 3,
+          borderRadius: 0,
           boxShadow: "none",
           padding: "6px 14px",
           "&:hover": {
@@ -151,7 +151,7 @@ export const theme = createTheme({
     MuiIconButton: {
       styleOverrides: {
         root: {
-          borderRadius: 3,
+          borderRadius: 0,
           "&:hover": {
             backgroundColor: "#F0F4F8",
           },
@@ -165,13 +165,13 @@ export const theme = createTheme({
         },
         outlined: {
           borderColor: "#DFE4E8",
-          borderRadius: 6,
+          borderRadius: 0,
           boxShadow: "none",
         },
         elevation1: {
           boxShadow: "none",
           border: "1px solid #DFE4E8",
-          borderRadius: 6,
+          borderRadius: 0,
         },
       },
     },
@@ -179,7 +179,7 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           border: "1px solid #DFE4E8",
-          borderRadius: 6,
+          borderRadius: 0,
           boxShadow: "none",
         },
       },
@@ -321,7 +321,7 @@ export const theme = createTheme({
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: 999,
+          borderRadius: 0,
           fontWeight: 600,
           fontSize: "11px",
           height: "22px",
@@ -334,7 +334,7 @@ export const theme = createTheme({
     MuiDialog: {
       styleOverrides: {
         paper: {
-          borderRadius: 6,
+          borderRadius: 0,
           border: "1px solid #DFE4E8",
           boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
         },
@@ -400,7 +400,7 @@ export const theme = createTheme({
     MuiAlert: {
       styleOverrides: {
         root: {
-          borderRadius: 3,
+          borderRadius: 0,
           fontSize: "12.5px",
         },
       },

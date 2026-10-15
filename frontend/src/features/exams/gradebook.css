@@ -1,7 +1,32 @@
 .exam-gradebook { width: 100%; min-width: 0; }
 .exam-gradebook .exam-table-container { --control-radius: 0px; }
 .exam-print-sheet { display: none; }
+.exam-warning-toast-container { width: min(380px, calc(100vw - 24px)); }
+.exam-warning-toast {
+  background: #fff8e1;
+  color: #704b00;
+  border: 1px solid #f0d483;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  box-shadow: 0 3px 12px rgba(70, 52, 0, .18);
+}
+.exam-warning-toast .Toastify__toast-icon svg { fill: #d99c00; }
+.exam-warning-toast .Toastify__close-button { color: #704b00; }
+.exam-warning-progress { background: #e5ad16; }
+@media screen {
+  body #root .exam-gradebook table > thead > tr > th:has(.exam-calculated-label) {
+    background: #e2ebf3 !important;
+  }
+  .exam-gradebook .exam-derived-cell {
+    background: #edf2f6 !important;
+    color: #435b72;
+  }
+  .exam-gradebook .exam-derived-cell input[readonly] { cursor: default; }
+}
 @media print {
+  .exam-gradebook[data-exam-print-blocked="true"] { display: none !important; }
   @page { size: A4 landscape; margin: 8mm; }
   body:has(.exam-gradebook) * { visibility: hidden; }
   .exam-gradebook, .exam-gradebook * { visibility: visible !important; }

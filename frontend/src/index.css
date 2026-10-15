@@ -8,9 +8,9 @@
   --table-border-color: #D7E4EE;
   --table-row-border-color: #E2EBF2;
   --table-header-bg: #EDF4FA;
-  --table-radius: 12px;
+  --table-radius: 0px;
   --table-hover-bg: #F5FAFE;
-  --control-radius: 4px;
+  --control-radius: 0px;
   --text-primary: #172B3A;
   --text-secondary: #607486;
   --text-muted: #8A9AAA;
@@ -27,8 +27,8 @@
   --warning-light: #FEF7E0;
   --danger: #B52D2D;
   --danger-light: #FCE8E6;
-  --radius-sm: 2px;
-  --radius-md: 4px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
   --bs-body-font-family: var(--app-font-family);
   --bs-body-color: var(--text-primary);
   --bs-link-color: var(--primary);
@@ -238,5 +238,31 @@ a:hover {
   @page {
     size: A4 portrait;
     margin: 8mm 10mm;
+  }
+}
+
+/* Application-wide square corners, including portals and generated decorations.
+   Layered important rules take precedence over page and library radius overrides. */
+@layer app-square-corners {
+  *,
+  *::before,
+  *::after {
+    border-radius: 0 !important;
+  }
+
+  *::-webkit-scrollbar-thumb,
+  *::-webkit-scrollbar-track {
+    border-radius: 0 !important;
+  }
+
+  /* Toggle switches retain circular thumbs and rounded tracks throughout the app. */
+  .MuiSwitch-thumb,
+  .MuiSwitch-switchBase,
+  .sl-schedule-view .sl-today-indicator {
+    border-radius: 50% !important;
+  }
+
+  .MuiSwitch-track {
+    border-radius: 999px !important;
   }
 }

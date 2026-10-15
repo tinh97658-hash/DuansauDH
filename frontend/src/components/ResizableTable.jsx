@@ -30,9 +30,11 @@ export default function ResizableTable({ columns, storageKey, children, freezeTh
     const cell = `:nth-of-type(${index + 1}):not([colspan])`;
     frozenStyles[`& > thead > tr > th${cell}`] = {
       position: "sticky", left: frozenLeft, zIndex: 4, bgcolor: "var(--table-header-bg, #EDF4FA)",
+      ...(index === frozenIndex ? { borderRight: "1px solid var(--table-border-color, #D7E4EE)", boxShadow: "none" } : {}),
     };
     frozenStyles[`& > tbody > tr > td${cell}`] = {
       position: "sticky", left: frozenLeft, zIndex: 2, bgcolor: "var(--surface-bg, #fff)",
+      ...(index === frozenIndex ? { borderRight: "1px solid var(--table-border-color, #D7E4EE)", boxShadow: "none" } : {}),
     };
     frozenStyles[`& > tbody > tr:hover > td${cell}`] = { bgcolor: "var(--table-hover-bg, #F5FAFE)" };
     frozenStyles[`& > tbody > tr.Mui-selected > td${cell}`] = { bgcolor: "#EDF4FA" };

@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import axios from "axios";
 import CourseOfferings from "../../pages/masters/courseOfferings";
@@ -31,7 +31,82 @@ const reach = async () => {
   fireEvent.change(screen.getByRole("combobox", { name: "Khóa / Năm học" }), { target: { value: "2026" } });
   fireEvent.click(await screen.findByRole("button", { name: /HP01.*Khai thác cảng/ }));
 };
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => { jest.clearAllMocks(); sessionStorage.clear(); });
+
+it("keeps the confirmation and entered note mounted while focus rechecks the session", async () => {
+  mocks();
+  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  await reach();
+  fireEvent.click(screen.getByRole("button", { name: /KTHH-2026.*Nhóm 1/ }));
+  const next = screen.getByRole("button", { name: "Tạo lớp học phần" });
+  await waitFor(() => expect(next).toBeEnabled());
+  fireEvent.click(next);
+  const note = screen.getByRole("textbox", { name: "Ghi chú HV001" });
+  fireEvent.change(note, { target: { value: "Giữ nguyên khi chụp màn hình" } });
+  const originalGet = axios.get.getMockImplementation();
+  let resolveSession;
+  axios.get.mockImplementation(url => url.endsWith("/auth/session")
+    ? new Promise(resolve => { resolveSession = resolve; }) : originalGet(url));
+  fireEvent.focus(window);
+  await waitFor(() => expect(resolveSession).toBeDefined());
+  expect(screen.getByRole("dialog", { name: "Xem trước danh sách lớp" })).toBeInTheDocument();
+  expect(note).toHaveValue("Giữ nguyên khi chụp màn hình");
+  await act(async () => resolveSession({ data: { user: { role: "admin" } } }));
+  expect(screen.getByRole("textbox", { name: "Ghi chú HV001" })).toBe(note);
+});
+
+it("restores the scope, course, class and custom name after leaving and reopening the page", async () => {
+  mocks();
+  const first = render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  await reach();
+  fireEvent.click(screen.getByRole("button", { name: /KTHH-2026.*Nhóm 1/ }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Tên lớp học phần" }), { target: { value: "Lớp đang soạn" } });
+  await screen.findByText("HV001");
+  first.unmount();
+  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  await screen.findByText("HV001");
+  expect(screen.getByRole("combobox", { name: "Khóa / Năm học" })).toHaveValue("2026");
+  expect(screen.getByRole("textbox", { name: "Tên lớp học phần" })).toHaveValue("Lớp đang soạn");
+  expect(screen.getByRole("button", { name: /KTHH-2026.*Nhóm 1/ })).toHaveAttribute("aria-pressed", "true");
+});
+it("selects a retake group as one class, previews only its failed learner and submits the group scope", async () => {
+  mocks();
+  const retake = { ...group, id: "retake-class", code: "CKTM2026.01", name: "CKTM2026.01 – Học lại", isRetake: true, memberCount: 1 };
+  const originalGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation(async url => url.includes("/course-offering-candidates")
+    ? { data: { subjects: [{ subject, eligibleClassGroups: [group], retakeClassGroups: [retake] }] } } : originalGet(url));
+  const failed = { id: "admission:failed", code: "HV-FAILED", fullName: "Phan Hải Yến" };
+  axios.post.mockImplementation(async url => ({ data: url.endsWith("/roster-preview")
+    ? { participants: [failed], participantCount: 1 } : { id: "retake-offering", participantCount: 1 } }));
+  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  await reach();
+  fireEvent.click(screen.getByRole("button", { name: /CKTM2026.01/ }));
+  await screen.findByText("HV-FAILED");
+  const next = screen.getByRole("button", { name: "Tạo lớp học phần" });
+  await waitFor(() => expect(next).toBeEnabled());
+  fireEvent.click(next);
+  const dialog = screen.getByRole("dialog", { name: "Xem trước danh sách lớp" });
+  expect(within(dialog).getByText("Yến")).toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole("button", { name: /Xác nhận tạo lớp/ }));
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringMatching(/\/scheduling\/course-offerings$/),
+    expect.objectContaining({ classGroupIds: [retake.id], retakeClassGroupIds: [retake.id] }), expect.anything()));
+});
+
+it("shows a short class title with retake and newcomer counts", async () => {
+  mocks();
+  const mixed = { ...group, code: "CKTM2026.1.1", name: "CKTM2026.1.1", isRetake: true, memberCount: 2, retakeCount: 1, unstudiedCount: 1 };
+  const originalGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation(url => url.includes("/course-offering-candidates")
+    ? Promise.resolve({ data: { subjects: [{ subject, eligibleClassGroups: [], retakeClassGroups: [mixed] }] } }) : originalGet(url));
+  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  await reach();
+  const card = screen.getByRole("button", { name: /CKTM2026.1.1/ });
+  expect(within(card).getByText("CKTM2026.1.1")).toBeInTheDocument();
+  expect(within(card).getByText("1 học lại")).toBeInTheDocument();
+  expect(within(card).getByText("1 chưa học")).toBeInTheDocument();
+  expect(within(card).getByText("2 học viên")).toBeInTheDocument();
+  expect(within(card).queryByText(/Không đạt|Cần bố trí/)).not.toBeInTheDocument();
+});
 it("labels only KC knowledge-block subjects as common", async () => {
   const crossMajorSubject = { ...subject, subjectType: "CN", allowCrossMajor: true };
   const commonSubject = { id: "common-subject", code: "HP02", name: "Học phần kiến thức chung", subjectType: "KC", allowCrossMajor: true };

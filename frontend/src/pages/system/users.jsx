@@ -1,10 +1,19 @@
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
-import { Alert, Button, CircularProgress, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
+import { Alert, Button, CircularProgress, Stack, TableBody, TableCell, TableContainer, TableRow, Typography } from "@mui/material";
 import FeatureLayout from "../../components/FeatureLayout";
 import AppDialog from "../../components/AppDialog";
 import { API_BASE_URL } from "../../config/http";
 import { personNameParts } from "../../utils/personName";
+import ResizableTable from "../../components/ResizableTable";
+
+const userColumns = [
+  { key: "lastName", label: "Họ đệm", width: 180, minWidth: 100 },
+  { key: "firstName", label: "Tên", width: 100, minWidth: 70 },
+  { key: "email", label: "Email", width: 240, minWidth: 120 },
+  { key: "role", label: "Vai trò", width: 150, minWidth: 100 },
+  { key: "scheduling", label: "Quyền tổ chức lớp và xếp lịch", width: 260, minWidth: 220 },
+];
 
 const Users = () => {
   const [users, setUsers] = useState([]);
@@ -52,14 +61,13 @@ const Users = () => {
         {error && <Alert severity="error">{error}</Alert>}
         {success && <Alert severity="success">{success}</Alert>}
         <Button onClick={loadUsers} disabled={loading || saving} sx={{ alignSelf: "flex-start" }}>Tải lại danh sách</Button>
-        {loading ? <CircularProgress aria-label="Đang tải người dùng" /> : !error && <TableContainer><Table aria-label="Phân quyền người dùng">
-          <TableHead><TableRow>{["Họ đệm", "Tên", "Email", "Vai trò", "Quyền tổ chức lớp và xếp lịch"].map((label) => <TableCell key={label}>{label}</TableCell>)}</TableRow></TableHead>
+        {loading ? <CircularProgress aria-label="Đang tải người dùng" /> : !error && <TableContainer><ResizableTable columns={userColumns} storageKey="system-users-columns" aria-label="Phân quyền người dùng">
           <TableBody>{users.map((user) => <TableRow key={user.id}>
             <TableCell>{personNameParts(user).familyAndMiddle}</TableCell><TableCell>{personNameParts(user).givenName}</TableCell><TableCell>{user.email}</TableCell>
             <TableCell>{{ admin: "Quản trị viên", supervisor: "Chuyên viên", examiner: "Khảo thí" }[user.role] || user.role}</TableCell>
             <TableCell>{user.canManageScheduling ? "Đang phụ trách" : <Button variant="outlined" disabled={saving} onClick={() => { setSelected(user); setSuccess(""); }}>Phân công phụ trách</Button>}</TableCell>
           </TableRow>)}{!users.length && <TableRow><TableCell colSpan={5}>Chưa có tài khoản nội bộ.</TableCell></TableRow>}</TableBody>
-        </Table></TableContainer>}
+        </ResizableTable></TableContainer>}
       </Stack>
 
       <AppDialog

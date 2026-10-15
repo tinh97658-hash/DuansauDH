@@ -29,11 +29,19 @@ describe("Room admin catalog", () => {
   });
 
   it("loads inactive rooms through the admin includeInactive view and has no delete action", async () => {
+    axios.get.mockImplementation((url) => Promise.resolve({ data: url.includes("/system/rooms")
+      ? [room, { ...room, id: "room-2", code: "302", name: "Phòng 302", isActive: true }]
+      : { user: { role: "admin" } } }));
     await renderPage();
     expect(await screen.findByText("301")).toBeInTheDocument();
-    expect(screen.getByText("Chưa khai báo")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByText("Ngừng sử dụng")).toBeInTheDocument();
+    expect(screen.getAllByText("Chưa khai báo")).toHaveLength(2);
+    expect(screen.getAllByText("3")).toHaveLength(2);
+    expect(screen.queryByText("Đang sử dụng")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ngừng sử dụng")).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Kích hoạt phòng 301" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Vô hiệu hóa phòng 302" })).toBeChecked();
+    expect(screen.getByRole("columnheader", { name: /Thao tác/ })).toHaveStyle({ textAlign: "center" });
+    screen.getAllByRole("button", { name: "Sửa" }).forEach(button => expect(button.closest("td")).toHaveStyle({ textAlign: "center" }));
     expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/system/rooms?includeInactive=true"), { withCredentials: true });
     expect(screen.queryByRole("button", { name: /xóa/i })).not.toBeInTheDocument();
   });

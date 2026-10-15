@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { AdmissionEvaluationService } from "./admission-evaluation.service.js";
 import { InjectModel } from "@nestjs/sequelize";
-import { Op } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { Major } from "../database/models/common/major.model.js";
 import { AdmissionRecord } from "../database/models/plan/admission-record.model.js";
@@ -66,6 +66,12 @@ export class MajorTransferService {
       const record = await this.records.findByPk(admissionRecordId, { transaction, lock: transaction.LOCK.UPDATE });
       if (!record) throw new NotFoundException("Không tìm thấy hồ sơ học viên.");
       if (!record.majorId) throw new BadRequestException("Học viên chưa có chuyên ngành hiện tại.");
+      const paused = await this.sequelize.query("SELECT id FROM study_leaves WHERE admission_record_id = :id AND status IN ('pending','approved')", {
+        replacements: { id: admissionRecordId }, transaction, type: QueryTypes.SELECT,
+      });
+      if (paused.length || ["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học"].includes(record.studyStatus || "")) {
+        throw new ConflictException("Cần kết thúc xử lý bảo lưu trước khi chuyển chuyên ngành.");
+      }
       if (record.majorId === dto.toMajorId) throw new BadRequestException("Chuyên ngành mới phải khác chuyên ngành hiện tại.");
       const pending = await this.transfers.findOne({ where: { admissionRecordId, status: "pending" }, transaction });
       if (pending) throw new ConflictException("Học viên đang có một yêu cầu chuyển chuyên ngành chờ xử lý.");

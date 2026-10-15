@@ -42,9 +42,10 @@ export default function AdmissionEvaluationPanel({ record, isAdmin = false, disa
     finally { setLoading(false); }
   }, [record.id]);
   useEffect(() => { load(); }, [load, record]);
+  const hasStudyWorkflow = ["Đang học", "Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Đã thôi học"].includes(record.studyStatus);
   const canAdmit = evaluation?.decision === "pending" && !evaluation.stale
     && evaluation.result?.eligibility === "eligible" && evaluation.result?.meetsCutoff === true
-    && record.studyStatus !== "Đang học";
+    && !hasStudyWorkflow;
   const confirmDecision = async () => {
     if (busy || disabled || !decision || !note.trim()) return;
     setBusy(true); onBusyChange?.(true); setError(""); setSuccess("");
@@ -77,9 +78,9 @@ export default function AdmissionEvaluationPanel({ record, isAdmin = false, disa
         <Button href="/masters/admission-scores" disabled={busy || disabled}>Mở điểm xét tuyển thạc sĩ</Button>
         {isAdmin && evaluation?.decision === "pending" && <>
           <Button variant="contained" color="success" disabled={busy || disabled || !canAdmit} onClick={() => openDecision("admitted")}>Duyệt trúng tuyển</Button>
-          <Button variant="outlined" color="error" disabled={busy || disabled} onClick={() => openDecision("rejected")}>Không trúng tuyển</Button>
+          <Button variant="outlined" color="error" disabled={busy || disabled || hasStudyWorkflow} onClick={() => openDecision("rejected")}>Không trúng tuyển</Button>
         </>}
-        {isAdmin && evaluation && evaluation.decision !== "pending" && <Button variant="outlined" disabled={busy || disabled || record.studyStatus === "Đang học"} onClick={() => openDecision("reopen")}>Mở lại xét tuyển</Button>}
+        {isAdmin && evaluation && evaluation.decision !== "pending" && <Button variant="outlined" disabled={busy || disabled || hasStudyWorkflow} onClick={() => openDecision("reopen")}>Mở lại xét tuyển</Button>}
       </Stack>
     </Paper>
     <Paper variant="outlined" sx={{ p: 2.5 }}>

@@ -20,7 +20,7 @@ beforeEach(() => {
   axios.get.mockImplementation(async (url) => ({ data: url.endsWith("/auth/session") ? { user: { canManageScheduling: true } } : url.includes("/course-offerings?") ? [offering] : url.endsWith("/course-offerings/offering") ? offering : url.includes("/lecturers") ? lecturers : url.includes("/rooms") ? rooms : url.endsWith("/roster") ? { participants: [{ id: "student:one", code: "HV001", fullName: "Nguyễn An", note: "" }] } : [] }));
   axios.post.mockResolvedValue({ data: {} }); axios.put.mockResolvedValue({ data: {} }); axios.delete.mockResolvedValue({ data: {} });
 });
-it.each([[2, 4], [2, 5], [3, 6], [3, 7]])("suggests closing a %i-credit offering at %i held sessions on hover", async (credits, heldCount) => {
+it.each([[1, 4], [2, 4], [2, 5], [3, 4], [3, 6], [5, 4]])("suggests closing a %i-credit offering at %i held sessions on hover", async (credits, heldCount) => {
   const fullOffering = { ...offering, subject: { ...offering.subject, credits }, sessionSummary: { heldCount, plannedCount: 0 } };
   const defaultGet = axios.get.getMockImplementation();
   axios.get.mockImplementation(async (url) => url.includes("/course-offerings?") ? { data: [fullOffering] } : defaultGet(url));
@@ -39,7 +39,7 @@ it.each([[2, 4], [2, 5], [3, 6], [3, 7]])("suggests closing a %i-credit offering
   expect(axios.post).not.toHaveBeenCalled();
 });
 
-it.each([[2, 3], [3, 5]])("keeps a %i-credit offering schedulable without a closing warning at %i held sessions", async (credits, heldCount) => {
+it.each([[1, 3], [2, 3], [3, 3], [5, 3]])("keeps a %i-credit offering schedulable without a closing warning at %i held sessions", async (credits, heldCount) => {
   const defaultGet = axios.get.getMockImplementation();
   axios.get.mockImplementation(async (url) => url.includes("/course-offerings?")
     ? { data: [{ ...offering, subject: { ...offering.subject, credits }, sessionSummary: { heldCount, plannedCount: 10, pendingCount: 8, notHeldCount: 5 } }] }
@@ -624,6 +624,47 @@ it("suppresses occupied date-period slots from complete week data while preservi
   fireEvent.click(screen.getAllByRole("button", { name: /Lớp đã chọn.*ĐÃ XẾP/ })[0]);
   dialog = screen.getByRole("dialog");
   expect(dialog).toHaveTextContent("CHI TIẾT BUỔI HỌC");
+});
+
+it("shows the add affordance and saves another class in an occupied period with independent resources", async () => {
+  const defaultGet = axios.get.getMockImplementation();
+  const otherOffering = {
+    ...offering, id: "other-offering", name: "Lớp khác cùng buổi",
+    groupLinks: [{ classGroupId: "other-group", classGroup: { ...offering.groupLinks[0].classGroup, id: "other-group" } }],
+  };
+  let targetDate;
+  axios.get.mockImplementation(async (url) => {
+    if (url.includes("/teaching-sessions?")) {
+      const query = new URLSearchParams(url.split("?")[1]);
+      targetDate = query.get("from");
+      return { data: [{
+        id: "existing", courseOfferingId: otherOffering.id, courseOffering: otherOffering,
+        sessionDate: targetDate, period: "MORNING", status: "planned",
+        startTime: "07:00:00", endTime: "11:30:00", lecturerId: "other-lecturer", roomId: "other-room",
+      }] };
+    }
+    return defaultGet(url);
+  });
+  render(<MemoryRouter><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole("button", { name: "Xếp lịch" }));
+  const nextMonday = formatDateKey(addDays(mondayOf(getBusinessTodayKey()), 7));
+  fireEvent.click(screen.getByRole("button", { name: "Tuần sau" }));
+  const add = await screen.findByRole("button", { name: `Xếp Sáng ${nextMonday}` });
+  await waitFor(() => expect(add).toBeEnabled());
+  const slot = add.closest(".sl-slot");
+  expect(within(slot).getByRole("button", { name: /Lớp khác cùng buổi.*ĐÃ XẾP/ })).toBeInTheDocument();
+  expect(within(slot).getByText("+ Xếp buổi")).toBeVisible();
+  fireEvent.click(add);
+  const dialog = screen.getByRole("dialog");
+  await waitFor(() => expect(within(dialog).getByRole("button", { name: "Lưu buổi học" })).toBeEnabled());
+  fireEvent.click(within(dialog).getByRole("button", { name: "Giảng viên" }));
+  fireEvent.click(within(dialog).getByRole("option", { name: "Nguyễn Bình" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: /301.*40 chỗ.*TRỐNG/ }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Lưu buổi học" }));
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/scheduling/teaching-sessions"), expect.objectContaining({
+    courseOfferingId: offering.id, sessionDate: targetDate, period: "MORNING", lecturerId: "l", roomId: "r",
+  }), { withCredentials: true }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 });
 
 it("retains the editor and reports a server conflict instead of claiming success", async () => {

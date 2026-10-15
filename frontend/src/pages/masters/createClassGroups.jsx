@@ -118,7 +118,7 @@ const CompactField = ({ label, htmlFor, helper, error = false, children, sx }) =
     <Typography component="label" htmlFor={htmlFor} sx={compactFieldLabelSx}>{label}</Typography>
     {children}
     {helper && (
-      <Typography sx={{ mt: "4px", color: error ? "error.main" : "#607486", fontSize: "10.5px", fontWeight: 500, lineHeight: "14px" }}>
+      <Typography variant="caption" component="p" sx={{ mt: "4px", mb: 0, color: error ? "error.main" : "#607486", fontSize: "13px", fontWeight: 400, lineHeight: 1.45 }}>
         {helper}
       </Typography>
     )}
@@ -616,7 +616,7 @@ const CreateClassGroups = () => {
         title={editingId ? "CHỈNH SỬA NHÓM HỌC VIÊN" : "THÊM NHÓM HỌC VIÊN MỚI"}
         PaperProps={{
           sx: {
-            width: 640,
+            width: 800,
             maxWidth: "calc(100vw - 32px)",
           },
         }}
@@ -646,7 +646,7 @@ const CreateClassGroups = () => {
             <Stack spacing="14px">
               <Box sx={{ p: 1.75, border: "1px solid #d7e1e8", borderRadius: "8px", backgroundColor: "#fbfcfd" }}>
                 <Stack spacing="13px">
-                  <Box sx={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.4fr) minmax(120px, .7fr)", gap: 1.5 }}>
+                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1fr) minmax(0, 1.4fr) minmax(120px, .7fr)" }, gap: 1.5 }}>
                     <CompactField label="NGÀNH" htmlFor="edit-discipline">
                       <FormControl fullWidth size="small" sx={compactControlSx}>
                         <Select id="edit-discipline" value={dialogDisciplineId} inputProps={{ "aria-label": "Ngành" }} onChange={(e) => handleDialogDisciplineChange(e.target.value)}>
@@ -770,7 +770,7 @@ const CreateClassGroups = () => {
             <Stack spacing="14px">
               <Box sx={{ p: 1.75, border: "1px solid #d7e1e8", borderRadius: "8px", backgroundColor: "#fbfcfd" }}>
                 <Stack spacing="13px">
-                  <Box sx={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.4fr) minmax(120px, .7fr)", gap: 1.5 }}>
+                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1fr) minmax(0, 1.4fr) minmax(120px, .7fr)" }, gap: 1.5 }}>
                     <CompactField label="NGÀNH" htmlFor="create-discipline">
                       <FormControl fullWidth size="small" sx={compactControlSx}>
                         <Select id="create-discipline" value={dialogDisciplineId} inputProps={{ "aria-label": "Ngành" }} onChange={(e) => handleDialogDisciplineChange(e.target.value)}>
@@ -808,7 +808,7 @@ const CreateClassGroups = () => {
                     </FormControl>
                   </CompactField>
 
-                  <Box sx={{ display: "grid", gridTemplateColumns: "minmax(0, .8fr) minmax(0, 1fr) minmax(0, .6fr) minmax(0, 1.6fr)", gap: 1.5, alignItems: "start" }}>
+                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "minmax(0, .8fr) minmax(0, 1fr) minmax(0, .6fr) minmax(0, 1.6fr)" }, gap: 1.5, alignItems: "start" }}>
                     <CompactField label="SỐ NHÓM CẦN TẠO" htmlFor="create-group-count">
                       <TextField id="create-group-count" type="number" value={form.count} onChange={(e) => setForm((p) => ({ ...p, count: e.target.value }))} fullWidth size="small" inputProps={{ min: 1, max: 10, "aria-label": "Số nhóm cần tạo" }} sx={compactControlSx} />
                     </CompactField>

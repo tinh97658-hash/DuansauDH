@@ -8,6 +8,30 @@ jest.mock("axios");
 jest.mock("@mui/icons-material", () => new Proxy({}, { get: () => () => null }));
 jest.mock("../../components/FeatureLayout", () => ({ children }) => <div>{children}</div>);
 
+it("fills the screen with a small catalog and remembers independently resized columns", async () => {
+  localStorage.clear();
+  const size = jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1000);
+  axios.get.mockImplementation(async (url) => ({ data: url.endsWith("/auth/isStaff") ? { message: "admin" }
+    : [{ id: "unit-ck", code: "CK", name: "Viện Cơ khí", active: true }] }));
+  try {
+    const view = render(<Units />);
+    await screen.findByRole("button", { name: "Sửa mã đơn vị CK" });
+    const widths = () => screen.getAllByRole("slider").map(handle => Number(handle.getAttribute("aria-valuenow")));
+    expect(widths()).toHaveLength(5);
+    expect(widths().reduce((sum, width) => sum + width, 0)).toBeCloseTo(1000);
+    expect(screen.getByRole("table", { name: "Đơn vị" })).toHaveStyle({ width: "1000px" });
+    const name = screen.getByRole("slider", { name: "Độ rộng cột Tên đơn vị" });
+    const initial = Number(name.getAttribute("aria-valuenow"));
+    fireEvent.keyDown(name, { key: "ArrowRight" });
+    expect(Number(name.getAttribute("aria-valuenow"))).toBe(initial + 10);
+    expect(widths().reduce((sum, width) => sum + width, 0)).toBeCloseTo(1000);
+    view.unmount();
+    render(<Units />);
+    await screen.findByRole("button", { name: "Sửa mã đơn vị CK" });
+    expect(screen.getByRole("slider", { name: "Độ rộng cột Tên đơn vị" })).toHaveAttribute("aria-valuenow", String(initial + 10));
+  } finally { size.mockRestore(); localStorage.clear(); }
+});
+
 it("manages faculty names separately from disciplines and reflects a renamed unit on lecturers", async () => {
   const unit = { id: "unit-ck", code: "CK", name: "Viện Cơ khí", active: true };
   axios.get.mockImplementation(async (url) => ({ data: url.endsWith("/auth/isStaff") ? { message: "admin" }

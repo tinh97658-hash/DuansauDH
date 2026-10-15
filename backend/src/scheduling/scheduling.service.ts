@@ -1,10 +1,14 @@
 import { isSessionEndedInBusinessTimezone } from "./scheduling-time.js";
 import { randomUUID } from "node:crypto";
 import { QueryTypes } from "sequelize";
+import { excludeRecognizedExamParticipant } from "../masters/recognized-exam-participant.js";
+import { profileForeignLanguageExemptSql } from "../masters/foreign-language-exemption.js";
 import { commonWeekdays, isEarlierAcademicYear, readRetakes } from "./retake-policy.js";
+import { failedRetakeMembers, readRetakeResults, readLateUnstudiedMembers, readReturnedMembers, type RetakeResult } from "./retake-groups.js";
+import { availableParticipantSql, BLOCKED_STUDY_STATUSES, BUSINESS_DATE_SQL, notWithdrawnSql } from "../plan/study-leave-policy.js";
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
-import { Op } from "sequelize";
+import { Op, literal } from "sequelize";
 import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { Major } from "../database/models/common/major.model.js";
@@ -168,20 +172,36 @@ export class SchedulingService {
             WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END AS participant_id
         FROM class_group_members cm LEFT JOIN admission_records ar ON ar.id = cm.admission_record_id
         WHERE cm.class_group_id IN (:groupIds)
-      ), completed_grades AS (
-        SELECT DISTINCT book.class_group_id, book.course_offering_id, grade->>'participantId' AS participant_id
+      ), saved_grades AS (
+        SELECT DISTINCT ON (book.course_offering_id, grade->>'participantId')
+          book.course_offering_id, grade->>'participantId' AS participant_id, grade
         FROM course_exam_gradebooks book CROSS JOIN LATERAL jsonb_array_elements(book.grades) grade
-        WHERE book.class_group_id IN (:groupIds) AND book.course_offering_id IN (:completedOfferingIds)
-          AND (jsonb_typeof(grade->'courseScore') = 'number'
-            OR grade->>'result' = 'exempt' OR grade->>'examExempt' = 'true')
+        WHERE book.course_offering_id IN (:completedOfferingIds)
+        ORDER BY book.course_offering_id, grade->>'participantId', book.updated_at DESC, book.class_group_id
+      ), completed_grades AS (
+        SELECT saved.* FROM saved_grades saved
+        WHERE jsonb_typeof(grade->'courseScore') = 'number'
+          OR grade->>'result' = 'exempt' OR grade->>'examExempt' = 'true'
+          OR (jsonb_typeof(grade->'testScore') = 'number'
+            AND jsonb_typeof(grade->'assignmentScore') = 'number'
+            AND (grade->>'testScore')::numeric BETWEEN 0 AND 10
+            AND (grade->>'assignmentScore')::numeric BETWEEN 0 AND 10
+            AND (ROUND((grade->>'testScore')::numeric, 1) < COALESCE(
+              (SELECT (policy->'minimums'->>'testScore')::numeric FROM shared_grading_rules ORDER BY version DESC LIMIT 1), 4)
+              OR ROUND((grade->>'assignmentScore')::numeric, 1) < COALESCE(
+              (SELECT (policy->'minimums'->>'assignmentScore')::numeric FROM shared_grading_rules ORDER BY version DESC LIMIT 1), 4)))
       )
       SELECT link.class_group_id AS "classGroupId", link.course_offering_id AS "courseOfferingId",
-        COUNT(DISTINCT person.participant_id) FILTER (WHERE saved.participant_id IS NULL)::int AS "missingGradeCount"
+        COUNT(DISTINCT person.participant_id) FILTER (WHERE saved.participant_id IS NULL
+          AND NOT ${profileForeignLanguageExemptSql('person.participant_id', 'offering.subject_id', '(SELECT academic_year FROM class_groups WHERE id = link.class_group_id)')})::int AS "missingGradeCount"
       FROM course_offering_class_groups link
+      JOIN course_offerings offering ON offering.id = link.course_offering_id
       LEFT JOIN people person ON person.class_group_id = link.class_group_id
-      LEFT JOIN completed_grades saved ON saved.class_group_id = link.class_group_id
-        AND saved.course_offering_id = link.course_offering_id AND saved.participant_id = person.participant_id
+        AND (link.participant_ids IS NULL OR person.participant_id = ANY(link.participant_ids))
+      LEFT JOIN completed_grades saved ON saved.course_offering_id = link.course_offering_id AND saved.participant_id = person.participant_id
       WHERE link.class_group_id IN (:groupIds) AND link.course_offering_id IN (:completedOfferingIds)
+        AND ${excludeRecognizedExamParticipant('person.participant_id', 'offering.subject_id')}
+        AND ${notWithdrawnSql('person.participant_id', 'offering.id')}
       GROUP BY link.class_group_id, link.course_offering_id
     `, { type: QueryTypes.SELECT, replacements: { groupIds, completedOfferingIds } });
     const missingGradeCounts = new Map(gradeEntryCounts.map((row) => [`${row.classGroupId}:${row.courseOfferingId}`, Number(row.missingGradeCount)]));
@@ -418,6 +438,23 @@ export class SchedulingService {
     else offering.participantCount = participantCount;
   }
 
+  private availableMemberWhere() {
+    return { [Op.and]: literal(availableParticipantSql(`CASE WHEN "ClassGroupMember".student_id IS NOT NULL
+      THEN 'student:' || "ClassGroupMember".student_id::text
+      ELSE 'admission:' || "ClassGroupMember".admission_record_id::text END`)) };
+  }
+
+  private async withdrawnIdentities(offeringIds: string[], transaction?: Transaction) {
+    if (!offeringIds.length) return new Set<string>();
+    const rows = await this.sequelize.query<{ offeringId: string; participantId: string }>(`
+      SELECT withdrawal.course_offering_id AS "offeringId", identities.id AS "participantId"
+      FROM course_offering_withdrawals withdrawal JOIN admission_records record ON record.id = withdrawal.admission_record_id
+      CROSS JOIN LATERAL (VALUES (withdrawal.participant_id), ('admission:' || record.id::text),
+        ('student:' || record.student_id::text)) identities(id)
+      WHERE withdrawal.course_offering_id IN (:offeringIds)`, { type: QueryTypes.SELECT, replacements: { offeringIds }, transaction });
+    return new Set(rows.map(row => `${row.offeringId}:${row.participantId}`));
+  }
+
   /**
    * Sĩ số lớp học phần = thành viên các nhóm + học viên chọn lẻ, trừ những người đã được công
    * nhận học phần đó. Việc trừ phải theo phạm vi học phần tương đương, không chỉ theo đúng mã
@@ -425,6 +462,7 @@ export class SchedulingService {
    * này phải loại học viên khỏi sĩ số ở mã kia.
    */
   private async attachParticipantCounts(offerings: Array<CourseOffering | any>, transaction?: Transaction) {
+    const withdrawn = await this.withdrawnIdentities(offerings.map(row => row.id).filter(Boolean), transaction);
     const groupIds = [...new Set(offerings.flatMap((offering) => (
       (offering.groupLinks || []).map((link: CourseOfferingClassGroup | any) => link.classGroupId || link.classGroup?.id)
     )).filter(Boolean))];
@@ -435,7 +473,7 @@ export class SchedulingService {
     const members = await this.classGroupMembers.findAll({
       where: { classGroupId: { [Op.in]: groupIds } },
       attributes: ["id", "classGroupId", "studentId", "admissionRecordId"],
-      include: [{ model: AdmissionRecord, attributes: ["id", "studentId"] }],
+      include: [{ model: AdmissionRecord, attributes: ["id", "studentId", "studyStatus"] }],
       transaction,
     });
     const recordIds = [...new Set([
@@ -479,12 +517,17 @@ export class SchedulingService {
       const scope = effectiveScopes.get(offering.subjectId);
       const identities = new Set<string>();
       for (const entry of offering.individualStudents || []) {
+        if (withdrawn.has(`${offering.id}:${this.memberIdentity(entry)}`)) continue;
+        if (offering.status !== "completed" && BLOCKED_STUDY_STATUSES.includes(entry.admissionRecord?.studyStatus)) continue;
         if (!SchedulingService.isRecognizedFor(recognized, scope, entry.admissionRecordId)) identities.add(this.memberIdentity(entry));
       }
       for (const link of offering.groupLinks || []) {
         const groupId = link.classGroupId || link.classGroup?.id;
         const groupMembers = byGroup.get(groupId) || [];
         const groupIdentities = new Set(groupMembers
+          .filter(member => !withdrawn.has(`${offering.id}:${this.memberIdentity(member)}`))
+          .filter(member => offering.status === "completed" || !BLOCKED_STUDY_STATUSES.includes(member.admissionRecord?.studyStatus || ""))
+          .filter((member) => !Array.isArray(link.participantIds) || link.participantIds.includes(this.memberIdentity(member)))
           .filter((member) => !SchedulingService.isRecognizedFor(recognized, scope, member.admissionRecordId))
           .map((member) => this.memberIdentity(member)));
         if (link.classGroup) {
@@ -508,7 +551,7 @@ export class SchedulingService {
    */
   private async participantCountForGroups(classGroupIds: string[], subjectId?: string, transaction?: Transaction) {
     const members = await this.classGroupMembers.findAll({
-      where: { classGroupId: { [Op.in]: classGroupIds } },
+      where: { classGroupId: { [Op.in]: classGroupIds }, ...this.availableMemberWhere() },
       attributes: ["id", "classGroupId", "studentId", "admissionRecordId"],
       include: [{ model: AdmissionRecord, attributes: ["id", "studentId"] }],
       transaction,
@@ -531,7 +574,7 @@ export class SchedulingService {
   }
 
   async previewCourseOfferingParticipants(dto: PreviewCourseOfferingParticipantsDto) {
-    if (dto.admissionRecordIds?.length) {
+    if (dto.admissionRecordIds?.length || dto.retakeClassGroupIds?.length) {
       const roster = await this.previewCourseOfferingRoster(dto);
       return { classGroupCount: dto.classGroupIds.length, participantCount: roster.participantCount };
     }
@@ -548,12 +591,16 @@ export class SchedulingService {
     };
   }
 
-  async previewCourseOfferingRoster(dto: PreviewCourseOfferingParticipantsDto) {
+  async previewCourseOfferingRoster(dto: PreviewCourseOfferingParticipantsDto, savedLinks?: CourseOfferingClassGroup[], savedOfferingId?: string) {
     await this.previewCourseOfferingParticipants({ classGroupIds: dto.classGroupIds });
-    const individuals = await this.requireIndividualStudents(dto.subjectId, dto.admissionRecordIds || []);
+    const retakeIds = dto.retakeClassGroupIds || [];
+    if (retakeIds.some(id => !dto.classGroupIds.includes(id))) throw new BadRequestException("Nhóm học lại phải thuộc danh sách lớp đã chọn.");
+    const retakes = retakeIds.length ? await this.retakeGroupRosters(dto.subjectId!, retakeIds) : new Map<string, RetakeResult[]>();
+    const individuals = await this.requireIndividualStudents(dto.subjectId, dto.admissionRecordIds || [], undefined, Boolean(savedOfferingId));
+    const withdrawn = await this.withdrawnIdentities(savedOfferingId ? [savedOfferingId] : []);
     const members = await this.classGroupMembers.findAll({
-      where: { classGroupId: { [Op.in]: dto.classGroupIds } },
-      attributes: ["id", "studentId", "admissionRecordId"],
+      where: { classGroupId: { [Op.in]: dto.classGroupIds }, ...(!savedOfferingId ? this.availableMemberWhere() : {}) },
+      attributes: ["id", "classGroupId", "studentId", "admissionRecordId"],
       include: [
         { model: Student, attributes: ["id", "regNo", "fullName"] },
         { model: AdmissionRecord, attributes: ["id", "code", "fullName", "studentId"] },
@@ -575,6 +622,11 @@ export class SchedulingService {
     const recognizedSet = new Set(recognized.map((row) => `${row.admissionRecordId}:${row.targetSubjectId}`));
     const participants = new Map<string, { id: string; code: string; fullName: string; note: string }>();
     for (const member of [...members, ...individuals.map((record) => ({ admissionRecordId: record.id, admissionRecord: record, studentId: record.studentId, student: null }))]) {
+      const groupId = (member as any).classGroupId;
+      if (withdrawn.has(`${savedOfferingId}:${this.memberIdentity(member)}`)) continue;
+      if (retakeIds.includes(groupId)) continue;
+      const snapshot = savedLinks?.find(link => link.classGroupId === groupId)?.participantIds;
+      if (Array.isArray(snapshot) && !snapshot.includes(this.memberIdentity(member))) continue;
       if (SchedulingService.isRecognizedFor(recognizedSet, scope, member.admissionRecordId)) continue;
       const id = this.memberIdentity(member);
       const previous = participants.get(id);
@@ -584,8 +636,42 @@ export class SchedulingService {
       participants.set(id, { id, code: member.student?.regNo || member.admissionRecord?.code || "",
         fullName: member.student?.fullName || member.admissionRecord?.fullName || "", note: "" });
     }
+    for (const rows of retakes.values()) for (const row of rows) {
+      participants.set(row.participantId, { id: row.participantId, code: row.code, fullName: row.fullName, note: "" });
+    }
     const rows = [...participants.values()].sort((a, b) => a.fullName.localeCompare(b.fullName, "vi") || a.code.localeCompare(b.code, "vi", { numeric: true }));
     return { participants: rows, participantCount: rows.length };
+  }
+
+  private async retakeGroupRosters(subjectId: string, groupIds: string[], transaction?: Transaction) {
+    const subject = await this.subjects.findByPk(subjectId, { transaction });
+    if (!subject) throw new NotFoundException("Không tìm thấy học phần.");
+    const scopes = await this.equivalentSubjectScopes([subject], transaction);
+    const scope = scopes.get(subjectId) || new Set([subjectId]);
+    const active = await this.offeringGroups.findAll({ where: { classGroupId: { [Op.in]: groupIds } },
+      include: [{ model: CourseOffering, as: "courseOffering", required: true,
+        where: { subjectId: { [Op.in]: [...scope] }, status: "active" } }], transaction });
+    const results = await readRetakeResults(this.sequelize, groupIds, [...scope], transaction);
+    const unstudied = await readLateUnstudiedMembers(this.sequelize, groupIds, [...scope], transaction);
+    const returned = await readReturnedMembers(this.sequelize, groupIds, [...scope], transaction);
+    if (active.length && !returned.length) throw new ConflictException("Nhóm học lại đã được xếp vào lớp đang hoạt động. Hãy tải lại danh sách.");
+    const recordIds = [...new Set([...results, ...unstudied, ...returned].map(row => row.admissionRecordId))];
+    const recognitions = recordIds.length ? await this.subjectRecognitions.findAll({
+      where: { admissionRecordId: { [Op.in]: recordIds }, targetSubjectId: { [Op.in]: [...scope] }, status: "approved" }, transaction,
+    }) : [];
+    const recognized = new Set(recognitions.map(row => row.admissionRecordId));
+    const rosters = new Map(groupIds.map(id => [id, [...new Map([...failedRetakeMembers(results, id, scope).map(row => ({ ...row, studyType: "retake" as const })),
+      ...unstudied.filter(row => row.classGroupId === id), ...returned.filter(row => row.classGroupId === id)]
+      .filter(row => !recognized.has(row.admissionRecordId)).map(row => [row.participantId, row])).values()]]));
+    const withdrawn = await this.withdrawnIdentities(active.map(link => link.courseOfferingId), transaction);
+    for (const link of active) {
+      const overlapping = (rosters.get(link.classGroupId) || []).some(row =>
+        (!Array.isArray(link.participantIds) || link.participantIds.includes(row.participantId))
+          && !withdrawn.has(`${link.courseOfferingId}:${row.participantId}`));
+      if (overlapping) throw new ConflictException("Có học viên đã được bố trí trong lớp đang hoạt động. Hãy tải lại danh sách.");
+    }
+    if ([...rosters.values()].some(rows => !rows.length)) throw new ConflictException("Nhóm không còn học viên cần bố trí học. Hãy tải lại danh sách.");
+    return rosters;
   }
 
   private sessionHasEnded(session: Pick<TeachingSession, "sessionDate" | "endTime"> | any, now = new Date()) {
@@ -598,12 +684,13 @@ export class SchedulingService {
     this.requireEnabledProgram(subject.program);
     return this.admissionRecords.findAll({
       where: { majorId: subject.majorId, trainingLevel: "Thạc sĩ", status: "approved",
+        studyStatus: { [Op.notIn]: BLOCKED_STUDY_STATUSES },
         ...(search.trim() ? { [Op.or]: [{ code: { [Op.iLike]: `%${search.trim().slice(0, 100)}%` } }, { fullName: { [Op.iLike]: `%${search.trim().slice(0, 100)}%` } }] } : {}) },
       attributes: ["id", "code", "fullName", "academicYear", "studentId"], order: [["fullName", "ASC"], ["id", "ASC"]], limit: 100,
     });
   }
 
-  private async requireIndividualStudents(subjectId: string | undefined, ids: string[], transaction?: Transaction) {
+  private async requireIndividualStudents(subjectId: string | undefined, ids: string[], transaction?: Transaction, historical = false) {
     if (!ids.length) return [];
     if (!subjectId || new Set(ids).size !== ids.length) throw new BadRequestException("Danh sách học viên hoặc học phần không hợp lệ.");
     const subject = await this.subjects.findByPk(subjectId, { transaction });
@@ -611,7 +698,8 @@ export class SchedulingService {
     this.requireEnabledProgram(subject.program);
     const eligibleMajorIds = [subject.majorId, ...(Array.isArray(subject.sharedMajorIds) ? subject.sharedMajorIds : [])];
     const records = await this.admissionRecords.findAll({
-      where: { id: { [Op.in]: ids }, majorId: { [Op.in]: eligibleMajorIds }, trainingLevel: "Thạc sĩ", status: "approved" },
+      where: { id: { [Op.in]: ids }, majorId: { [Op.in]: eligibleMajorIds }, trainingLevel: "Thạc sĩ", status: "approved",
+        ...(!historical ? { studyStatus: { [Op.notIn]: BLOCKED_STUDY_STATUSES } } : {}) },
       attributes: ["id", "code", "fullName", "studentId"], order: [["id", "ASC"]], transaction,
       ...(transaction ? { lock: transaction.LOCK.UPDATE } : {}),
     });
@@ -620,9 +708,12 @@ export class SchedulingService {
   }
 
   private async offeringMemberIdentities(courseOfferingId: string, groupIds: string[], transaction?: Transaction) {
+    const withdrawn = await this.withdrawnIdentities([courseOfferingId], transaction);
+    const links = await this.offeringGroups.findAll({ where: { courseOfferingId }, transaction }) || [];
+    const snapshots = new Map(links.map(link => [link.classGroupId, link.participantIds]));
     const [members, individuals, offering] = await Promise.all([
       this.classGroupMembers.findAll({ where: { classGroupId: { [Op.in]: groupIds } },
-        attributes: ["id", "studentId", "admissionRecordId"], include: [{ model: AdmissionRecord, attributes: ["id", "studentId"] }], transaction }),
+        attributes: ["id", "classGroupId", "studentId", "admissionRecordId"], include: [{ model: AdmissionRecord, attributes: ["id", "studentId"] }], transaction }),
       this.individualStudents.findAll({ where: { courseOfferingId }, include: [{ model: AdmissionRecord, attributes: ["id", "studentId"] }], transaction }),
       this.courseOfferings.findByPk(courseOfferingId, { attributes: ["id", "subjectId"], transaction }),
     ]);
@@ -640,6 +731,8 @@ export class SchedulingService {
     }) : [];
     const recognizedSet = new Set(recognized.map((row) => `${row.admissionRecordId}:${row.targetSubjectId}`));
     return new Set([...members, ...individuals]
+      .filter(member => !withdrawn.has(`${courseOfferingId}:${this.memberIdentity(member)}`))
+      .filter((member: any) => !Array.isArray(snapshots.get(member.classGroupId)) || snapshots.get(member.classGroupId)!.includes(this.memberIdentity(member)))
       .filter((member) => !SchedulingService.isRecognizedFor(recognizedSet, scope, member.admissionRecordId))
       .map((member) => this.memberIdentity(member)));
   }
@@ -721,7 +814,7 @@ export class SchedulingService {
 
     const groupIds = groups.map((group) => group.id);
     const groupMembers = await this.classGroupMembers.findAll({
-      where: { classGroupId: { [Op.in]: groupIds } },
+      where: { classGroupId: { [Op.in]: groupIds }, ...this.availableMemberWhere() },
       attributes: ["id", "classGroupId", "studentId", "admissionRecordId"],
       include: [{ model: AdmissionRecord, attributes: ["id", "studentId"] }],
     });
@@ -840,15 +933,19 @@ export class SchedulingService {
         const logicalSubjectId = logicalIdByLocalId.get(link.courseOffering.subjectId) || link.courseOffering.subjectId;
         const key = `${link.classGroupId}:${logicalSubjectId}`;
         const nextStatus = link.courseOffering.status as OfferingStatus;
-        if (nextStatus === "completed" || !stateByPair.has(key)) stateByPair.set(key, nextStatus);
+        if (nextStatus === "active" || !stateByPair.has(key)) stateByPair.set(key, nextStatus);
       }
     }
 
+    const retakeResults = [...stateByPair.values()].includes("completed")
+      ? await readRetakeResults(this.sequelize, groupIds, [...allScopeIds]) : [];
+    const returnedResults = await readReturnedMembers(this.sequelize, groupIds, [...allScopeIds]);
     const result = new Map<string, {
       subject: any;
       eligibleClassGroups: any[];
       activeClassGroups: any[];
       completedClassGroups: any[];
+      retakeClassGroups: any[];
     }>();
     for (const pair of candidatePairs) {
       const subject = pair.logicalSubject;
@@ -856,18 +953,41 @@ export class SchedulingService {
       let row = result.get(subject.id);
       if (!row) {
         const value = typeof (subject as any).get === "function" ? (subject as any).get({ plain: true }) : subject;
-        row = { subject: value, eligibleClassGroups: [], activeClassGroups: [], completedClassGroups: [] };
+        row = { subject: value, eligibleClassGroups: [], activeClassGroups: [], completedClassGroups: [], retakeClassGroups: [] };
         result.set(subject.id, row);
       }
       const status = stateByPair.get(`${pair.classGroupId}:${subject.id}`);
       const summary = this.groupSummary(group, pair.localSubject, pendingMemberCountFor(pair.classGroupId, subject.id));
-      if (status === "completed") row.completedClassGroups.push(summary);
-      else if (status === "active") row.activeClassGroups.push(summary);
-      else row.eligibleClassGroups.push(summary);
+      const scope = pairScope.get(`${pair.classGroupId}:${subject.id}`) || new Set([subject.id]);
+      const returned = [...new Map(returnedResults.filter(member => member.classGroupId === group.id && scope.has(member.subjectId)
+        && !SchedulingService.isRecognizedFor(recognizedSet, scope, member.admissionRecordId))
+        .map(member => [member.participantId, member])).values()];
+      if (status === "completed") {
+        row.completedClassGroups.push(summary);
+        const failed = failedRetakeMembers(retakeResults, group.id, scope)
+          .filter(member => !SchedulingService.isRecognizedFor(recognizedSet, scope, member.admissionRecordId));
+        const unstudied = (await readLateUnstudiedMembers(this.sequelize, [group.id], [...scope]))
+          .filter(member => !SchedulingService.isRecognizedFor(recognizedSet, scope, member.admissionRecordId));
+        const waiting = [...new Map([...failed, ...unstudied, ...returned].map(member => [member.participantId, member])).values()];
+        if (waiting.length) row.retakeClassGroups.push({ ...summary, isRetake: true,
+          memberCount: waiting.length, retakeCount: failed.length + returned.filter(member => member.studyType !== 'first_time').length,
+          unstudiedCount: unstudied.length + returned.filter(member => member.studyType === 'first_time').length,
+          returningCount: returned.length,
+          name: summary.code || summary.name,
+          sourceCourseOfferingIds: [...new Set(failed.map(member => member.sourceCourseOfferingId))] });
+      }
+      else if (status === "active") {
+        row.activeClassGroups.push(summary);
+        if (returned.length) row.retakeClassGroups.push({ ...summary, isRetake: true, memberCount: returned.length,
+          returningCount: returned.length, retakeCount: returned.filter(member => member.studyType !== 'first_time').length,
+          unstudiedCount: returned.filter(member => member.studyType === 'first_time').length,
+          name: summary.code || summary.name, sourceCourseOfferingIds: returned.map(member => member.sourceCourseOfferingId) });
+      }
+      else row.eligibleClassGroups.push({ ...summary, retakeCount: 0, unstudiedCount: summary.memberCount });
     }
 
     const subjects = [...result.values()]
-      .filter((row) => row.eligibleClassGroups.some((group) => anchorGroupIds.has(group.id)))
+      .filter((row) => [...row.eligibleClassGroups, ...row.retakeClassGroups].some((group) => anchorGroupIds.has(group.id)))
       .sort((left, right) => {
         const leftKC = left.subject.subjectType === "KC" ? 0 : 1;
         const rightKC = right.subject.subjectType === "KC" ? 0 : 1;
@@ -886,15 +1006,19 @@ export class SchedulingService {
   }
 
   async createCourseOffering(dto: CreateCourseOfferingDto) {
+    if (dto.admissionRecordIds?.length) throw new BadRequestException("Học lại phải được tổ chức theo nhóm lớp gốc, không chọn lẻ học viên.");
     if (!Array.isArray(dto.classGroupIds) || dto.classGroupIds.length === 0) {
       throw new BadRequestException("Lớp học phần phải có ít nhất một nhóm học viên.");
     }
     const uniqueGroupIds = [...new Set(dto.classGroupIds)];
+    const retakeGroupIds = [...new Set(dto.retakeClassGroupIds || [])];
+    if (retakeGroupIds.some(id => !uniqueGroupIds.includes(id))) throw new BadRequestException("Nhóm học lại phải thuộc danh sách lớp đã chọn.");
     if (uniqueGroupIds.length !== dto.classGroupIds.length) {
       throw new BadRequestException("Danh sách nhóm học viên bị trùng lặp.");
     }
 
     return this.sequelize.transaction(async (transaction) => {
+      await this.sequelize.query('SELECT pg_advisory_xact_lock(21026)', { transaction });
       const requestedSubject = await this.subjects.findByPk(dto.subjectId, {
         transaction,
         lock: transaction.LOCK.UPDATE,
@@ -980,49 +1104,32 @@ export class SchedulingService {
       });
       const completedGroupIds = new Set(history.filter((link) => link.courseOffering.status === "completed").map((link) => link.classGroupId));
       const activeGroupIds = new Set(history.filter((link) => link.courseOffering.status === "active").map((link) => link.classGroupId));
-      if (completedGroupIds.size > 0) {
+      if ([...completedGroupIds].some(id => !retakeGroupIds.includes(id))) {
         throw new ConflictException("Có nhóm đã hoàn thành học phần này; không thể mở lại cho toàn bộ nhóm.");
       }
-      if (activeGroupIds.size > 0) {
+      if ([...activeGroupIds].some(id => !retakeGroupIds.includes(id))) {
         throw new ConflictException("Có nhóm đang thuộc một lớp học phần đang hoạt động của học phần này.");
       }
+      const retakeRosters = retakeGroupIds.length
+        ? await this.retakeGroupRosters(subject.id, retakeGroupIds, transaction) : new Map<string, RetakeResult[]>();
 
-      const individuals = await this.requireIndividualStudents(subject.id, dto.admissionRecordIds || [], transaction);
       if (!commonWeekdays(groups).length) throw new BadRequestException("Các nhóm đã chọn không có ngày học chung.");
       // When academicYear is specified, at least one group must belong to this organizing cohort/academic year.
       // Groups from other cohorts (e.g. earlier years) are allowed to be merged if eligible.
       if (dto.academicYear && !groups.some((group) => group.academicYear === dto.academicYear)) {
         throw new BadRequestException("Lớp học phần phải có ít nhất một nhóm thuộc khóa / năm học đang tổ chức.");
       }
-      let selectedRetakes: any[] = [];
-      if (individuals.length) {
-        const retakes = await readRetakes(this.sequelize, subject.id, transaction);
-        selectedRetakes = retakes.filter((request) => individuals.some((record) => record.id === request.id));
-        if (!commonWeekdays([...groups, ...selectedRetakes]).length) throw new BadRequestException("Học viên học lại không có ngày học chung với nhóm đã chọn.");
-        const members = await this.classGroupMembers.findAll({ where: { classGroupId: { [Op.in]: sortedGroupIds } }, include: [{ model: AdmissionRecord, attributes: ["id", "studentId"] }], transaction });
-        const memberIds = new Set(members.map((member) => this.memberIdentity(member)));
-        if (individuals.some((record) => memberIds.has(this.memberIdentity({ admissionRecordId: record.id, admissionRecord: record })))) {
-          throw new BadRequestException("Học viên học lại đã nằm trong nhóm được chọn.");
-        }
-        const targetYears = dto.academicYear ? [dto.academicYear] : groups.map((group) => group.academicYear || "");
-        for (const record of individuals) {
-          const request = retakes.find((item) => item.id === record.id);
-          if (!request || !targetYears.some((year) => isEarlierAcademicYear(request.academicYear, year))) {
-            throw new BadRequestException("Học viên bổ sung phải có nhu cầu học lại đã ghi nhận từ khóa trước và chưa thuộc lớp đang dạy của học phần.");
-          }
-        }
-      }
       const participantNotes = (dto.participantNotes || []).map((entry) => ({ ...entry, note: entry.note.trim() })).filter((entry) => entry.note);
       if (participantNotes.length) {
         const members = await this.classGroupMembers.findAll({
           where: { classGroupId: { [Op.in]: sortedGroupIds } },
-          attributes: ["id", "studentId", "admissionRecordId"],
+          attributes: ["id", "classGroupId", "studentId", "admissionRecordId"],
           include: [{ model: AdmissionRecord, attributes: ["id", "studentId"] }],
           transaction,
         });
         const identities = new Set([
-          ...members.map((member) => this.memberIdentity(member)),
-          ...individuals.map((record) => this.memberIdentity({ admissionRecordId: record.id, admissionRecord: record })),
+          ...members.filter(member => !retakeGroupIds.includes(member.classGroupId)).map((member) => this.memberIdentity(member)),
+          ...[...retakeRosters.values()].flat().map(row => row.participantId),
         ]);
         if (participantNotes.some((entry) => !identities.has(entry.participantId))) {
           throw new BadRequestException("Ghi chú chứa học viên không thuộc danh sách lớp.");
@@ -1033,18 +1140,32 @@ export class SchedulingService {
         subjectId: subject.id,
         status: "active",
         note: dto.note || null,
-        ...(selectedRetakes.length ? { retakeWeekdays: commonWeekdays(selectedRetakes) } : {}),
         ...(participantNotes.length ? { participantNotes } : {}),
       }, { transaction });
       await this.offeringGroups.bulkCreate(sortedGroupIds.map((classGroupId) => ({
         courseOfferingId: offering.id,
         classGroupId,
+        ...(retakeRosters.has(classGroupId) ? { participantIds: retakeRosters.get(classGroupId)!.map(row => row.participantId) } : {}),
       })), { transaction });
 
-      if (individuals.length) await this.individualStudents.bulkCreate(individuals.map((record) => ({ courseOfferingId: offering.id, admissionRecordId: record.id })), { transaction });
-      if (individuals.length) await this.sequelize.query(`UPDATE scheduling_retakes SET assigned_course_offering_id = :offeringId WHERE subject_id = :subjectId AND admission_record_id IN (:ids) AND assigned_course_offering_id IS NULL`, {
-        replacements: { offeringId: offering.id, subjectId: subject.id, ids: individuals.map((record) => record.id) }, transaction,
+      // Keep missing courses visible for later placement when a class opens during leave.
+      await this.sequelize.query(`INSERT INTO course_offering_withdrawals
+        (id,study_leave_id,admission_record_id,course_offering_id,class_group_id,participant_id,effective_date,snapshot)
+        SELECT gen_random_uuid(), pause.id, record.id, :offeringId, member.class_group_id,
+          CASE WHEN record.student_id IS NULL THEN 'admission:' || record.id::text ELSE 'student:' || record.student_id::text END,
+          ${BUSINESS_DATE_SQL}, jsonb_build_object('courseOfferingId', :offeringId, 'offeringName', :offeringName,
+            'subjectId', :subjectId, 'subjectName', :subjectName, 'classGroupId', member.class_group_id,
+            'classCode', groups.code, 'phase', 'not_started', 'notEnrolled', true, 'grades', '[]'::jsonb)
+        FROM study_leaves pause JOIN admission_records record ON record.id = pause.admission_record_id
+        JOIN class_group_members member ON member.admission_record_id = record.id OR member.student_id = record.student_id
+        JOIN class_groups groups ON groups.id = member.class_group_id
+        WHERE pause.status = 'approved'
+          AND member.class_group_id IN (:groupIds)
+        ON CONFLICT (admission_record_id,course_offering_id) DO NOTHING`, {
+        replacements: { offeringId: offering.id, offeringName: offering.name || '', subjectId: subject.id,
+          subjectName: subject.name, groupIds: sortedGroupIds }, transaction,
       });
+
       return this.findCourseOfferingById(offering.id, transaction);
     });
   }
@@ -1647,7 +1768,7 @@ export class SchedulingService {
       subjectId: offering.subjectId,
       classGroupIds: offering.groupLinks.map((link) => link.classGroupId),
       admissionRecordIds: (offering.individualStudents || []).map((entry) => entry.admissionRecordId),
-    });
+    }, offering.groupLinks, offering.id);
     const notes = new Map((offering.participantNotes || []).map((entry) => [entry.participantId, entry.note]));
     return { ...result, participants: result.participants.map((row) => ({ ...row, note: notes.get(row.id) || "" })) };
   }

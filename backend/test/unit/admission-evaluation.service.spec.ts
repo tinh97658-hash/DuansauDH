@@ -15,12 +15,18 @@ function setup() {
   const majors = { findAll: jest.fn().mockResolvedValue([{ id: "major", name: "Major", active: true, program: "masters" }]) };
   const evaluations = { findOne: jest.fn().mockResolvedValue(evaluation), findAll: jest.fn().mockResolvedValue([evaluation]), count: jest.fn().mockResolvedValue(0) };
   const history = { create: jest.fn().mockResolvedValue({}), findAll: jest.fn().mockResolvedValue([]) };
-  const db = { transaction: jest.fn(async (callback) => callback(tx)) };
+  const db = { transaction: jest.fn(async (callback) => callback(tx)), query: jest.fn().mockResolvedValue([{ assigned: false }]) };
   const service = new AdmissionEvaluationService(records as never, rounds as never, evaluations as never, history as never, majors as never, db as never, {} as never);
   const decision = { decision: "admitted" as const, decisionNo: "QD-2", decisionDate: "2026-10-06", note: "Hội đồng duyệt", version: 1 };
   return { service, record, records, rounds, majors, round, evaluation, evaluations, history, tx, decision, db };
 }
 describe("Duyệt hồ sơ đầu vào", () => {
+  it.each(["Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học"])("không mở lại xét tuyển để bỏ qua trạng thái %s", async studyStatus => {
+    const { service, record, evaluation, decision, history } = setup();
+    record.studyStatus = studyStatus; evaluation.decision = "admitted";
+    await expect(service.decide(record.id, { ...decision, decision: "reopen" }, { id: "admin" })).rejects.toThrow("nghiệp vụ học viên");
+    expect(record.update).not.toHaveBeenCalled(); expect(evaluation.update).not.toHaveBeenCalled(); expect(history.create).not.toHaveBeenCalled();
+  });
   it("xác nhận học phí nhiều hồ sơ trong một transaction, lưu lịch sử từng người", async () => {
     const { service, record, records, evaluation, history, db, tx } = setup();
     record.status = "approved"; record.studyStatus = "Đã trúng tuyển"; record.updatedAt = new Date("2026-10-07T01:00:00Z"); evaluation.decision = "admitted";
@@ -29,8 +35,8 @@ describe("Duyệt hồ sơ đầu vào", () => {
     const result = await service.confirmTuitionBatch({ rows: [second, record].map((row) => ({ admissionRecordId: row.id, updatedAt: row.updatedAt.toISOString() })) }, { id: "admin" });
     expect(result.confirmedCount).toBe(2); expect(db.transaction).toHaveBeenCalledTimes(1);
     for (const row of [record, second]) {
-      expect(row.studyStatus).toBe("Đang học");
-      expect(row.update).toHaveBeenCalledWith(expect.objectContaining({ studyStatus: "Đang học" }), { transaction: tx });
+      expect(row.studyStatus).toBe("Đã trúng tuyển");
+      expect(row.update).toHaveBeenCalledWith(expect.objectContaining({ studyStatus: "Đã trúng tuyển" }), { transaction: tx });
     }
     expect(history.create).toHaveBeenCalledTimes(2); expect(evaluation.update).not.toHaveBeenCalled();
   });
@@ -49,17 +55,26 @@ describe("Duyệt hồ sơ đầu vào", () => {
     for (const rows of [[], [row, row]]) await expect(service.confirmTuitionBatch({ rows }, {})).rejects.toThrow();
     expect(db.transaction).not.toHaveBeenCalled();
   });
-  it("xác nhận học phí và chuyển sang Đang học cùng lịch sử, giữ nguyên kết quả xét tuyển", async () => {
+  it("xác nhận học phí khi chưa phân lớp vẫn là Đã trúng tuyển, giữ nguyên kết quả xét tuyển", async () => {
     const { service, record, evaluation, history, tx } = setup();
     record.updatedAt = new Date("2026-10-07T01:00:00Z");
     record.status = "approved"; record.studyStatus = "Đã trúng tuyển";
     record.extraData = { existing: "keep" }; evaluation.decision = "admitted";
     const result = await service.updateTuition(record.id, { paid: true, updatedAt: record.updatedAt.toISOString() }, { id: "admin", name: "Quản trị viên" });
-    expect(result.studyStatus).toBe("Đang học");
+    expect(result.studyStatus).toBe("Đã trúng tuyển");
     expect(result.extraData).toMatchObject({ existing: "keep", tuitionPayment: { paid: true, updatedBy: "Quản trị viên", updatedById: "admin" } });
-    expect(record.update).toHaveBeenCalledWith(expect.objectContaining({ studyStatus: "Đang học" }), { transaction: tx });
+    expect(record.update).toHaveBeenCalledWith(expect.objectContaining({ studyStatus: "Đã trúng tuyển" }), { transaction: tx });
     expect(history.create).toHaveBeenCalledWith(expect.objectContaining({ action: "tuition_paid", snapshot: expect.objectContaining({ tuitionPayment: expect.objectContaining({ paid: true }) }) }), { transaction: tx });
     expect(evaluation.update).not.toHaveBeenCalled();
+  });
+  it.each([true, false])("giữ Đang học cho học viên đã phân lớp khi cập nhật học phí paid=%s", async (paid) => {
+    const { service, record, evaluation, db } = setup();
+    record.status = "approved"; record.studyStatus = "Đang học";
+    record.updatedAt = new Date("2026-10-07T01:00:00Z"); evaluation.decision = "admitted";
+    record.extraData = { tuitionPayment: { paid: !paid } };
+    db.query.mockResolvedValue([{ assigned: true }]);
+    const result = await service.updateTuition(record.id, { paid, updatedAt: record.updatedAt.toISOString() }, {});
+    expect(result.studyStatus).toBe("Đang học");
   });
   it("hủy xác nhận nhầm và hỗ trợ học viên trúng tuyển từ dữ liệu cũ", async () => {
     const { service, record, evaluations, history } = setup();
@@ -80,7 +95,7 @@ describe("Duyệt hồ sơ đầu vào", () => {
   it("không cho xác nhận học phí hay chuyển sang Đang học qua chỉnh sửa hồ sơ thông thường", async () => {
     const { service, record, evaluation } = setup();
     record.status = "approved"; record.studyStatus = "Đã trúng tuyển"; evaluation.decision = "admitted";
-    await expect(service.guardRecordUpdate(record, { studyStatus: "Đang học" })).rejects.toThrow("học phí");
+    await expect(service.guardRecordUpdate(record, { studyStatus: "Đang học" })).rejects.toThrow("phân lớp");
     await expect(service.guardRecordUpdate(record, { extraData: { tuitionPayment: { paid: true } } })).rejects.toThrow("học phí");
   });
   it("giữ kết quả đã duyệt theo snapshot dù ngành, năm và ngưỡng hiện tại thay đổi", async () => {

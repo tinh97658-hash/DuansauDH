@@ -188,7 +188,7 @@ const AssignClassGroups = () => {
     : 0;
 
   const unassignedStudents = useMemo(
-    () => students.filter((student) => !student.assignedGroup && (
+    () => students.filter((student) => !student.assignedGroup && !["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Đã thôi học"].includes(student.studyStatus) && (
       student.status === "approved" || ["Đã trúng tuyển", "Đang học"].includes(student.studyStatus)
     )),
     [students],

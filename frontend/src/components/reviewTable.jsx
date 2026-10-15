@@ -30,7 +30,7 @@ const ReviewTable = () => {
             <TableRow>
               <TableCell sx={{ fontWeight: 700, color: "#173E75" }}>Họ đệm</TableCell>
               <TableCell sx={{ fontWeight: 700, color: "#173E75" }}>Tên</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 700, color: "#173E75" }}>Thao tác</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 700, color: "#173E75" }}>Thao tác</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -41,7 +41,7 @@ const ReviewTable = () => {
                   <TableRow key={student._id} hover>
                     <TableCell>{name.familyAndMiddle}</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>{name.givenName}</TableCell>
-                    <TableCell align="right">
+                    <TableCell align="center">
                       <Button
                         size="small"
                         variant="outlined"

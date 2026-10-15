@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, MenuItem, Pagination, Paper, Stack, TableBody, TableCell, TableContainer, TableRow, TextField, Tooltip, Typography } from "@mui/material";
-import { DownloadRounded, ListAltRounded, SaveRounded } from "@mui/icons-material";
+import { ListAltRounded, SaveRounded } from "@mui/icons-material";
 import SettingsRounded from "@mui/icons-material/SettingsRounded";
 import GradeSettingsDialog from "../../features/exams/GradeSettingsDialog";
 import FeatureLayout from "../../components/FeatureLayout";
@@ -15,9 +17,10 @@ import { buildGradebookDocument, createGradebookExcel, fetchAllGradebookRows, gr
 import { buildExamListDocument, createExamListExcel } from "../../features/exams/examListExport";
 import { API_BASE_URL } from "../../config/http";
 import { personNameParts } from "../../utils/personName";
-import { displayGradeDate, draftOf, formatScore, gradebookColumns, gradebookRowValues, gradePayload, numericScore, RESULT_LABELS, rowError, SCORE_FIELDS, updateGradeDraft, visibleGradeRows } from "../../features/exams/gradebook";
+import { displayGradeDate, draftOf, formatAttemptScores, formatScore, gradebookColumns, gradebookRowValues, gradePayload, isExamCandidate, numericScore, RESULT_LABELS, rowError, SCORE_FIELDS, updateGradeDraft, visibleGradeRows } from "../../features/exams/gradebook";
 import "../../features/exams/gradebook.css";
 import { useSubjectCatalogRevision } from "../../utils/subjectCatalog";
+import { notifyGradebookSaved } from "../../utils/gradebookRevision";
 
 const panelSx = { borderColor: "#D7E4EE", borderRadius: "10px", bgcolor: "#fff", boxShadow: "0 2px 6px rgba(18,59,98,.07)" };
 const inputSx = {
@@ -31,6 +34,23 @@ const inputSx = {
 };
 const modes = { all: "Cả bảng điểm", exam: "DS thi" };
 const PAGE_SIZE = 15;
+const EXAM_WARNING_ID = "exam-missing-component-scores";
+const EXAM_WARNING_CONTAINER = "exam-gradebook-warnings";
+const COMPLETION_WARNING_ID = "exam-teaching-not-completed";
+const COMPLETION_WARNING_MESSAGE = "Vui lòng xác nhận hoàn thành giảng dạy trước khi nhập điểm.";
+const showCompletionWarning = () => {
+  if (toast.isActive(COMPLETION_WARNING_ID)) toast.update(COMPLETION_WARNING_ID, { render: COMPLETION_WARNING_MESSAGE, autoClose: 5000 });
+  else toast.warn(COMPLETION_WARNING_MESSAGE, { toastId: COMPLETION_WARNING_ID, containerId: EXAM_WARNING_CONTAINER });
+};
+const subjectNameKey = subject => (subject?.name || "").normalize("NFC").trim().replace(/\s+/g, " ").toLocaleLowerCase("vi");
+const subjectKey = subject => subject?.id || subject?.code || "";
+const subjectLabel = subject => [subject?.code, subject?.name].filter(Boolean).join(" - ");
+const showMissingScoresWarning = () => {
+  const message = "Hãy nhập đủ điểm thành phần cho tất cả học viên!";
+  if (toast.isActive(EXAM_WARNING_ID)) toast.update(EXAM_WARNING_ID, { render: message, autoClose: 5000 });
+  else toast.warn(message, { toastId: EXAM_WARNING_ID, containerId: EXAM_WARNING_CONTAINER });
+};
+const calculatedColumns = new Set(["eligible", "courseScore", "grade4", "letter", "attempts", "result"]);
 const errorMessage = (error, fallback) => {
   const message = error.response?.data?.message;
   return Array.isArray(message) ? message.join(" ") : message || fallback;
@@ -41,14 +61,25 @@ export default function ExamLists() {
   const [policyRevision, setPolicyRevision] = useState(0);
   useEffect(() => {
     const refresh = () => setPolicyRevision(value => value + 1);
-    const storage = event => { if (event.key === "grading-policy-revision") refresh(); };
+    const profileRefresh = event => { if (event.detail?.source === "profile") refresh(); };
+    const storage = event => { if (["grading-policy-revision", "exam-gradebook-revision"].includes(event.key)) refresh(); };
+    const visible = () => { if (document.visibilityState === "visible") refresh(); };
     window.addEventListener("grading-policy-changed", refresh);
+    window.addEventListener("exam-gradebook-saved", profileRefresh);
     window.addEventListener("storage", storage);
-    return () => { window.removeEventListener("grading-policy-changed", refresh); window.removeEventListener("storage", storage); };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      window.removeEventListener("grading-policy-changed", refresh); window.removeEventListener("storage", storage);
+      window.removeEventListener("exam-gradebook-saved", profileRefresh);
+      window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", visible);
+    };
   }, []);
   const [groups, setGroups] = useState([]), [subjects, setSubjects] = useState([]);
+  const [loadedOffering, setLoadedOffering] = useState(null);
   const [majorId, setMajorId] = useState("");
-  const [year, setYear] = useState(""), [groupId, setGroupId] = useState(""), [offeringId, setOfferingId] = useState("");
+  const [yearFilter, setYearFilter] = useState("");
+  const [groupId, setGroupId] = useState(""), [offeringId, setOfferingId] = useState("");
   const [rows, setRows] = useState([]), [revision, setRevision] = useState(0), [dirty, setDirty] = useState({});
   const [mode, setMode] = useState("all"), [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -57,8 +88,10 @@ export default function ExamLists() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
-  const includeIds = Object.values(dirty).filter(row => row.result === "passed").map(row => row.participantId).join(",");
-  const excludeIds = Object.values(dirty).filter(row => row.result !== "passed").map(row => row.participantId).join(",");
+  const [unassessedRows, setUnassessedRows] = useState(null);
+  const pendingExamWarning = useRef(false);
+  const includeIds = Object.values(dirty).filter(isExamCandidate).map(row => row.participantId).join(",");
+  const excludeIds = Object.values(dirty).filter(row => !isExamCandidate(row)).map(row => row.participantId).join(",");
   const examIncludeIds = mode === "exam" ? includeIds : "", examExcludeIds = mode === "exam" ? excludeIds : "";
   const [role, setRole] = useState(""), [optionsLoading, setOptionsLoading] = useState(true), [loading, setLoading] = useState(false), [saving, setSaving] = useState(false);
   const [error, setError] = useState(""), [success, setSuccess] = useState(""), [pendingChange, setPendingChange] = useState(null);
@@ -75,7 +108,7 @@ export default function ExamLists() {
         setGroups(list); setSubjects(offerings); setRole(auth.data.message || "");
         const first = list[0];
         const offering = offerings.find((item) => item.groupLinks?.some((link) => link.classGroupId === first?.id));
-        setMajorId(first?.majorId || ""); setYear(first?.academicYear || "");
+        setMajorId(first?.majorId || "");
         setGroupId(offering ? first.id : ""); setOfferingId(offering?.id || "");
       })
       .catch((failure) => active && setError(errorMessage(failure, "Không thể tải danh sách lớp. Hãy tải lại trang.")))
@@ -86,14 +119,27 @@ export default function ExamLists() {
   useEffect(() => {
     let active = true;
     setRows([]);
+    setUnassessedRows(null);
     if (!groupId || !offeringId) { setLoading(false); return () => { active = false; }; }
     setLoading(true); setError("");
     axios.get(`${API_BASE_URL}/masters/exam-lists`, { params: {
-      classGroupId: groupId, courseOfferingId: offeringId, page, pageSize: PAGE_SIZE, mode, search,
+      classGroupId: groupId, courseOfferingId: offeringId, rosterScope: "offering", page, pageSize: PAGE_SIZE, mode, search,
       ...(mode === "exam" ? { includeIds: examIncludeIds, excludeIds: examExcludeIds } : {}),
     } })
       .then(({ data }) => { if (active) {
-        setRows(data.rows.map(row => dirtyRef.current[row.participantId] || draftOf(row)));
+        if (data.offering) setLoadedOffering({ id: offeringId, status: data.offering.status });
+        const refreshedDirty = { ...dirtyRef.current };
+        setRows(data.rows.map(row => {
+          const draft = row.profileForeignLanguageExempt || row.studyLeaveFailure ? undefined : dirtyRef.current[row.participantId];
+          if (row.profileForeignLanguageExempt || row.studyLeaveFailure) delete refreshedDirty[row.participantId];
+          const merged = { ...row, ...draft, studyStatus: row.studyStatus, studyLeaveFailure: row.studyLeaveFailure, eligibilityPolicy: row.eligibilityPolicy, profileForeignLanguageExempt: row.profileForeignLanguageExempt };
+          const next = { ...(draft ? updateGradeDraft(merged) : draftOf(row)), savedEligibility: row.eligible };
+          if (draft) refreshedDirty[row.participantId] = next;
+          return next;
+        }));
+        dirtyRef.current = refreshedDirty;
+        setDirty(refreshedDirty);
+        setUnassessedRows(data.unassessedRows ?? null);
         if (!Object.keys(dirtyRef.current).length) setRevision(data.revision);
         setTotal(data.total); setTotalRows(data.totalRows);
         if (data.page !== page) setPage(data.page);
@@ -120,32 +166,68 @@ export default function ExamLists() {
   }, [catalogRevision]);
 
   const majors = [...new Map(groups.filter((group) => group.majorId).map((group) => [group.majorId, { id: group.majorId, name: group.major?.name || group.major?.code || group.majorId }])).values()];
-  const majorGroups = groups.filter((group) => !majorId || group.majorId === majorId);
-  const years = [...new Set(majorGroups.map((group) => group.academicYear || ""))].sort().reverse();
   const classChoices = useMemo(() => subjects.flatMap((offering) => (offering.groupLinks || []).flatMap((link) => {
     const group = groups.find((item) => item.id === link.classGroupId);
-    return group ? [{ key: `${group.id}:${offering.id}`, group, offering }] : [];
+    return group ? [{ key: `${group.id}:${offering.id}`, group, offering, subject: link.subject || offering.subject }] : [];
   })), [subjects, groups]);
-  const visibleClasses = classChoices.filter(({ group }) => (!majorId || group.majorId === majorId) && (group.academicYear || "") === year);
-  const subjectKey = (offering) => offering?.subjectId || offering?.subject?.id || offering?.subject?.code || "";
-  const subjectChoices = [...new Map(visibleClasses.map(({ offering }) => [subjectKey(offering), offering.subject])).entries()];
-  const selectedGroup = groups.find((group) => group.id === groupId);
-  const selectedOffering = subjects.find((subject) => subject.id === offeringId);
+  const years = [...new Set(groups.filter(group => !majorId || group.majorId === majorId)
+    .map(group => group.academicYear).filter(Boolean))].sort().reverse();
+  const visibleClasses = classChoices.filter(({ group }) => (!majorId || group.majorId === majorId)
+    && (!yearFilter || group.academicYear === yearFilter));
+  const offeringChoices = [...new Map(visibleClasses.map(entry => [entry.offering.id, entry])).values()];
+  const selectedEntry = classChoices.find(entry => entry.key === `${groupId}:${offeringId}`);
+  const year = selectedEntry?.group.academicYear || "";
+  const teachingCompleted = (loadedOffering?.id === offeringId ? loadedOffering.status : selectedEntry?.offering.status) === "completed";
+  useEffect(() => {
+    if (canEdit && offeringId && !teachingCompleted) showCompletionWarning();
+    else toast.dismiss(COMPLETION_WARNING_ID);
+    return () => toast.dismiss(COMPLETION_WARNING_ID);
+  }, [canEdit, offeringId, teachingCompleted]);
+  const selectedName = subjectNameKey(selectedEntry?.subject);
+  const offeringLabel = entry => {
+    const classNames = (entry.offering.groupLinks || []).map(link => groups.find(group => group.id === link.classGroupId))
+      .filter(Boolean).map(group => group.code || group.name);
+    const name = entry.offering.name || entry.subject?.name || "Lớp học phần";
+    return classNames.length && !classNames.every(value => name.includes(value)) ? `${name} — ${classNames.join(" + ")}` : name;
+  };
+  const linkedGroups = (selectedEntry?.offering.groupLinks || []).map(link => groups.find(group => group.id === link.classGroupId)).filter(Boolean);
+  const selectedGroup = linkedGroups.length > 1 ? {
+    ...selectedEntry?.group, name: linkedGroups.map(group => group.name).join(" + "), code: linkedGroups.map(group => group.code || group.name).join(" + "),
+  } : selectedEntry?.group;
+  const selectedOffering = selectedEntry ? { ...selectedEntry.offering, subject: selectedEntry.subject, subjectId: subjectKey(selectedEntry.subject) } : undefined;
   const visible = visibleGradeRows(rows, mode, "");
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = page;
   const pageStart = (currentPage - 1) * PAGE_SIZE;
   const pageRows = visible;
-  const examPrintRows = mode === "exam" ? pageRows : [];
+  const examPrintReady = unassessedRows === 0 && !dirtyCount;
+  const remainingUnassessed = unassessedRows === null ? null : Math.max(0, unassessedRows + Object.values(dirty).reduce(
+    (count, row) => count + Number(row.eligible === null) - Number(row.savedEligibility == null), 0,
+  ));
+  useEffect(() => {
+    if (mode !== "exam" || remainingUnassessed === null || !pendingExamWarning.current) return;
+    pendingExamWarning.current = false;
+    if (remainingUnassessed > 0) showMissingScoresWarning();
+  }, [mode, remainingUnassessed]);
+  const selectMode = (next) => {
+    pendingExamWarning.current = next === "exam" && remainingUnassessed === null;
+    if (next === "exam" && remainingUnassessed > 0) showMissingScoresWarning();
+    else toast.dismiss(EXAM_WARNING_ID);
+    setPage(1); setMode(next);
+  };
+  const examPrintRows = mode === "exam" && examPrintReady ? pageRows : [];
   const requestChange = (change) => { if (dirtyCount) setPendingChange(() => change); else change(); };
-  const selectClass = (entry) => { setDirty({}); dirtyRef.current = {}; setSuccess(""); setPage(1); setGroupId(entry?.group.id || ""); setOfferingId(entry?.offering.id || ""); };
+  const selectClass = (entry) => { pendingExamWarning.current = false; toast.dismiss(EXAM_WARNING_ID); setDirty({}); dirtyRef.current = {}; setSuccess(""); setPage(1); setGroupId(entry?.group.id || ""); setOfferingId(entry?.offering.id || ""); };
   const edit = (id, patch) => {
+    if (!canEdit || !teachingCompleted) { if (canEdit) showCompletionWarning(); return; }
+    if (rows.find(row => row.participantId === id)?.profileForeignLanguageExempt || rows.find(row => row.participantId === id)?.studyLeaveFailure) return;
     const apply = row => ["testScore", "assignmentScore", "examScore", "examExempt"].some(key => key in patch) ? updateGradeDraft({ ...row, ...patch }) : { ...row, ...patch };
     setRows((current) => current.map((row) => row.participantId === id ? apply(row) : row));
     const row = dirty[id] || rows.find(item => item.participantId === id);
     setDirty((current) => ({ ...current, [id]: apply(row) })); setSuccess("");
   };
   const save = async () => {
+    if (!canEdit || !teachingCompleted) { if (canEdit) showCompletionWarning(); return; }
     const changed = Object.values(dirty);
     for (const row of changed) {
       const invalid = rowError(row);
@@ -154,17 +236,25 @@ export default function ExamLists() {
     setSaving(true); setError(""); setSuccess("");
     try {
       const { data } = await axios.put(`${API_BASE_URL}/masters/exam-lists`, {
-        classGroupId: groupId, courseOfferingId: offeringId, revision, rows: changed.map(gradePayload),
+        classGroupId: groupId, courseOfferingId: offeringId, rosterScope: "offering", revision, rows: changed.map(gradePayload),
         page, pageSize: PAGE_SIZE, mode, search,
       });
-      setRows(data.rows.map(draftOf)); setRevision(data.revision); setDirty({}); dirtyRef.current = {};
+      setRows(data.rows.map(row => ({ ...draftOf(row), savedEligibility: row.eligible }))); setRevision(data.revision); setDirty({}); dirtyRef.current = {};
       setTotal(data.total); setTotalRows(data.totalRows); setPage(data.page);
+      setUnassessedRows(data.unassessedRows ?? null);
       setSuccess(`Đã cập nhật bảng điểm cho ${changed.length} học viên.`);
-    } catch (failure) { setError(errorMessage(failure, "Không thể lưu bảng điểm. Các điểm vừa nhập vẫn được giữ trên màn hình.")); }
+      notifyGradebookSaved();
+    } catch (failure) {
+      if (failure.response?.data?.code === "TEACHING_NOT_COMPLETED") {
+        setLoadedOffering({ id: offeringId, status: "active" });
+        showCompletionWarning();
+      } else setError(errorMessage(failure, "Không thể lưu bảng điểm. Các điểm vừa nhập vẫn được giữ trên màn hình."));
+    }
     finally { setSaving(false); }
   };
   const exportGradebook = async (format) => {
     if (!groupId || !offeringId || !total || optionsLoading || loading || saving || exporting) return;
+    if (mode === "exam" && !examPrintReady) return;
     setExporting(true); setError("");
     let previewTab;
     try {
@@ -175,11 +265,14 @@ export default function ExamLists() {
         previewTab.opener = null;
       }
       const exported = await fetchAllGradebookRows(params => axios.get(`${API_BASE_URL}/masters/exam-lists`, { params }), {
-        classGroupId: groupId, courseOfferingId: offeringId, mode, search,
+        classGroupId: groupId, courseOfferingId: offeringId, rosterScope: "offering", mode, search,
         ...(mode === "exam" ? { includeIds, excludeIds } : {}),
       }, () => dirtyRef.current);
       if (mode === "exam") {
-        downloadDocumentFile(await createExamListExcel(buildExamListDocument(selectedGroup, selectedOffering, exported)), gradebookFilename(selectedGroup, selectedOffering, "DS-thi"));
+        const document = buildExamListDocument(selectedGroup, selectedOffering, exported);
+        if (!document.rows.length) throw new Error("Không có học viên đủ tư cách và không miễn thi để in.");
+        if (format === "excel") downloadDocumentFile(await createExamListExcel(document), gradebookFilename(selectedGroup, selectedOffering, "DS-thi"));
+        else openGradebookPreview(document, previewTab);
         return;
       }
       const document = buildGradebookDocument(selectedGroup, selectedOffering, exported);
@@ -189,50 +282,70 @@ export default function ExamLists() {
     finally { setExporting(false); }
   };
   const blank = mode === "exam";
-  const locked = !canEdit || saving || exporting || blank;
-  const columns = gradebookColumns(blank);
+  const locked = !canEdit || !teachingCompleted || saving || exporting || blank;
+  const columns = gradebookColumns(blank).map(column => calculatedColumns.has(column.key) ? {
+    ...column, header: <span className="exam-calculated-label">{column.label}</span>,
+  } : column);
   const busy = optionsLoading || loading;
 
   return <FeatureLayout title="Danh sách thi, điểm thi" group="Quá trình học tập" maxWidth={1880}>
-    <Box className="exam-gradebook">
+    <Box className="exam-gradebook" data-exam-print-blocked={blank && !examPrintReady ? "true" : undefined}>
+      <ToastContainer containerId={EXAM_WARNING_CONTAINER} enableMultiContainer position="top-right" autoClose={5000}
+        newestOnTop limit={1} className="exam-warning-toast-container exam-no-print" toastClassName="exam-warning-toast"
+        progressClassName="exam-warning-progress" />
       <Paper variant="outlined" sx={{ ...panelSx, p: 1.5, mb: 1.5 }} className="exam-no-print">
         <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="flex-end">
-          <FilterSelectField label="Chuyên ngành" value={majorId} disabled={optionsLoading || saving || exporting} sx={{ flex: "2 1 220px", minWidth: 180 }} onChange={(event) => {
+          <FilterSelectField label="Chuyên ngành" value={majorId} disabled={optionsLoading || saving || exporting} sx={{ flex: "0 1 240px", minWidth: 180 }} onChange={(event) => {
             const next = event.target.value;
             requestChange(() => {
-              const scopedGroups = groups.filter((group) => !next || group.majorId === next);
-              const nextYear = scopedGroups.some((group) => (group.academicYear || "") === year) ? year : scopedGroups[0]?.academicYear || "";
-              setMajorId(next); setYear(nextYear);
-              selectClass(classChoices.find(({ group }) => (!next || group.majorId === next) && (group.academicYear || "") === nextYear));
+              setMajorId(next);
+              const nextYear = groups.some(group => (!next || group.majorId === next) && group.academicYear === yearFilter) ? yearFilter : "";
+              setYearFilter(nextYear);
+              const candidates = classChoices.filter(({ group }) => (!next || group.majorId === next)
+                && (!nextYear || group.academicYear === nextYear));
+              selectClass(candidates.find(entry => entry.offering.id === offeringId)
+                || candidates.find(entry => subjectNameKey(entry.subject) === selectedName) || candidates[0]);
             });
           }}><MenuItem value="">Tất cả chuyên ngành</MenuItem>{majors.map((major) => <MenuItem key={major.id} value={major.id}>{major.name}</MenuItem>)}</FilterSelectField>
-          <FilterSelectField label="Năm" value={year} disabled={optionsLoading || saving || exporting} sx={{ flex: "1 1 100px", minWidth: 100 }} onChange={(event) => {
+          <FilterSelectField label="Năm" value={yearFilter} disabled={optionsLoading || saving || exporting} sx={{ flex: "0 0 110px", minWidth: 110 }} onChange={(event) => {
             const next = event.target.value;
-            requestChange(() => { setYear(next); selectClass(classChoices.find(({ group }) => (!majorId || group.majorId === majorId) && (group.academicYear || "") === next)); });
-          }}>{!years.length && <MenuItem value="">Chưa có năm tuyển sinh</MenuItem>}{years.map((value) => <MenuItem key={value} value={value}>{value || "Chưa có năm"}</MenuItem>)}</FilterSelectField>
-          <FilterSelectField label="Lớp học phần" value={groupId && offeringId ? `${groupId}:${offeringId}` : ""} disabled={optionsLoading || saving || exporting || !visibleClasses.length} sx={{ flex: "3 1 280px", minWidth: 230 }} onChange={(event) => { const value = event.target.value; requestChange(() => selectClass(visibleClasses.find((entry) => entry.key === value))); }}>
-            {!visibleClasses.length && <MenuItem value="">Chưa có lớp học phần</MenuItem>}{visibleClasses.map((entry) => <MenuItem key={entry.key} value={entry.key}>{entry.offering.name || entry.offering.subject?.name} · {entry.group.name}</MenuItem>)}
+            requestChange(() => {
+              setYearFilter(next);
+              const candidates = classChoices.filter(({ group }) => (!majorId || group.majorId === majorId)
+                && (!next || group.academicYear === next));
+              selectClass(candidates.find(entry => entry.offering.id === offeringId)
+                || candidates.find(entry => subjectNameKey(entry.subject) === selectedName) || candidates[0]);
+            });
+          }}><MenuItem value="">Tất cả năm</MenuItem>{years.map(value => <MenuItem key={value} value={value}>{value}</MenuItem>)}</FilterSelectField>
+          <FilterSelectField label="Tên lớp học phần" value={offeringChoices.some(entry => entry.offering.id === offeringId) ? offeringId : ""}
+            disabled={optionsLoading || saving || exporting || !offeringChoices.length} sx={{ flex: "1 1 500px", minWidth: 260 }}
+            selectSx={{ height: 38, "& .MuiSelect-select": { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", py: 0, pr: "34px !important" } }}
+            MenuProps={{ PaperProps: { sx: { maxWidth: "calc(100vw - 32px)", "& .MuiMenuItem-root": { whiteSpace: "normal", overflowWrap: "anywhere" } } } }}
+            onChange={(event) => { const value = event.target.value; requestChange(() => selectClass(offeringChoices.find(entry => entry.offering.id === value))); }}>
+            {!offeringChoices.length && <MenuItem value="">Chưa có lớp học phần</MenuItem>}
+            {offeringChoices.map(entry => <MenuItem key={entry.offering.id} value={entry.offering.id}>{offeringLabel(entry)}</MenuItem>)}
           </FilterSelectField>
-          <FilterSelectField label="Môn" value={subjectKey(selectedOffering)} disabled={optionsLoading || saving || exporting || !subjectChoices.length} sx={{ flex: "2 1 220px", minWidth: 180 }} onChange={(event) => { const value = event.target.value; requestChange(() => selectClass(visibleClasses.find((entry) => subjectKey(entry.offering) === value))); }}>
-            {!subjectChoices.length && <MenuItem value="">Chưa có môn học</MenuItem>}{subjectChoices.map(([id, subject]) => <MenuItem key={id} value={id}>{subject?.name}</MenuItem>)}
+          <FilterSelectField label="Môn" value={subjectKey(selectedEntry?.subject)} disabled sx={{ flex: "0 1 220px", minWidth: 180 }}>
+            <MenuItem value={subjectKey(selectedEntry?.subject)}>{selectedEntry ? subjectLabel(selectedEntry.subject) : "Chưa có môn học"}</MenuItem>
           </FilterSelectField>
-          <FilterSearchField placeholder="Tìm theo mã HV, họ tên..." value={search} disabled={saving || exporting} onChange={(event) => { setPage(1); setSearch(event.target.value); }} sx={{ flex: "2 1 250px", minWidth: 230 }} />
+          <FilterSearchField placeholder="Mã HV, họ tên..." value={search} disabled={saving || exporting} onChange={(event) => { setPage(1); setSearch(event.target.value); }} sx={{ flex: "0 0 200px", minWidth: 200 }} />
         </Stack>
       </Paper>
 
       <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} sx={{ mb: 1.5 }} className="exam-no-print">
         <Stack direction="row" flexWrap="wrap" gap={0.75}>
-          <Button variant="contained" startIcon={<SaveRounded />} disabled={!canEdit || !dirtyCount || saving || exporting || busy} onClick={save} sx={{ bgcolor: "#0788B8", boxShadow: "none", borderRadius: "7px" }}>{saving ? "Đang lưu..." : "Cập nhật cả bảng"}</Button>
-          {Object.entries(modes).map(([key, label]) => <Button key={key} startIcon={<ListAltRounded />} disabled={saving || exporting} variant={mode === key ? "contained" : "outlined"} onClick={() => { setPage(1); setMode(key); }} sx={{ borderRadius: "7px", boxShadow: "none", ...(mode === key ? { bgcolor: "#173E75" } : { bgcolor: "#fff" }) }}>{label}</Button>)}
+          <Button variant="contained" startIcon={<SaveRounded />} disabled={!canEdit || !teachingCompleted || !dirtyCount || saving || exporting || busy} onClick={save} sx={{ bgcolor: "#0788B8", boxShadow: "none", borderRadius: "7px" }}>{saving ? "Đang lưu..." : "Cập nhật cả bảng"}</Button>
+          {Object.entries(modes).map(([key, label]) => <Button key={key} startIcon={<ListAltRounded />} disabled={saving || exporting} variant={mode === key ? "contained" : "outlined"} onClick={() => selectMode(key)} sx={{ borderRadius: "7px", boxShadow: "none", ...(mode === key ? { bgcolor: "#173E75" } : { bgcolor: "#fff" }) }}>{label}</Button>)}
         </Stack>
         <Stack direction="row" gap={0.75} sx={{ ml: "auto" }}>
-          {mode === "all" ? <DocumentExportMenu disabled={!groupId || !offeringId || !total || busy || saving || exporting}
+          <DocumentExportMenu disabled={!groupId || !offeringId || !total || busy || saving || exporting || (blank && !examPrintReady)}
             excelLabel="Excel (.xlsx)" pdfLabel="PDF / In" onExcel={() => exportGradebook("excel")} onPdf={() => exportGradebook("pdf")} />
-            : <Button variant="contained" startIcon={<DownloadRounded />} disabled={!groupId || !offeringId || !total || busy || saving || exporting}
-              onClick={() => exportGradebook("excel")} sx={{ bgcolor: "#107C41", color: "#fff", boxShadow: "none", borderRadius: "7px", "&:hover": { bgcolor: "#0E6B38", boxShadow: "none" } }}>Xuất Excel</Button>}
         </Stack>
       </Stack>
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
+      {blank && !busy && !examPrintReady && dirtyCount > 0 && <Alert severity="info" sx={{ mb: 1.5 }} className="exam-no-print">
+        Cập nhật cả bảng để lưu tư cách trước khi in danh sách thi.
+      </Alert>}
       {success && <Alert severity="success" sx={{ mb: 1.5 }} className="exam-no-print">{success}</Alert>}
       <Paper variant="outlined" sx={{ ...panelSx, overflow: "hidden" }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1} sx={{ p: 1.5, borderBottom: "1px solid #D7E4EE" }}>
@@ -247,25 +360,30 @@ export default function ExamLists() {
             <Chip size="small" label={`${total} / ${totalRows} học viên`} sx={{ bgcolor: "#EDF4FA", color: "#173E75" }} />{dirtyCount > 0 && <Chip size="small" color="warning" variant="outlined" label={`${dirtyCount} học viên chưa lưu`} />}
           </Stack>
         </Stack>
-        {busy ? <Box sx={{ py: 6, textAlign: "center" }}><CircularProgress size={30} aria-label="Đang tải bảng điểm" /></Box> : <TableContainer sx={{ overflowX: "auto" }} className="exam-table-container exam-no-print">
+        {busy ? <Box sx={{ py: 6, textAlign: "center" }}><CircularProgress size={30} aria-label="Đang tải bảng điểm" /></Box> : <TableContainer sx={{ overflowX: "auto" }} className="exam-table-container exam-no-print" onPointerDownCapture={() => { if (canEdit && !teachingCompleted) showCompletionWarning(); }}>
           <ResizableTable columns={columns} storageKey="masters-exam-gradebook-columns" freezeThrough="firstName">
             <TableBody>{!visible.length ? <TableRow><TableCell colSpan={columns.length} align="center" sx={{ py: 6, color: "#607486" }}>{!groupId ? "Chưa có lớp học viên." : !offeringId ? "Lớp chưa có học phần được tổ chức. Hãy tạo lớp học phần để nhập điểm." : "Không có học viên phù hợp với danh sách đang chọn."}</TableCell></TableRow> : pageRows.map((row, index) => {
               const name = personNameParts(row);
+              const rowLocked = locked || !!row.profileForeignLanguageExempt || !!row.studyLeaveFailure;
               return <TableRow key={row.participantId} hover sx={{ "& td": { fontSize: 12.5, py: 0.75, borderColor: "#E2EBF2" }, ...(dirty[row.participantId] ? { bgcolor: "#FFFDF5" } : {}) }}>
-                <TableCell align="center">{pageStart + index + 1}</TableCell><TableCell sx={{ fontWeight: 600 }}>{row.code || "—"}</TableCell>
+                <TableCell align="center">{pageStart + index + 1}</TableCell><TableCell sx={{ fontWeight: 600 }}>{row.code || "—"}
+                  {["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn"].includes(row.studyStatus) && <Typography component="span" variant="caption" display="block" sx={{ color: "#B86216", fontWeight: 500, fontSize: 11, whiteSpace: "nowrap" }}>{row.studyStatus}</Typography>}
+                </TableCell>
                 <TableCell title={name.familyAndMiddle}>{name.familyAndMiddle}</TableCell><TableCell>{name.givenName}</TableCell>
                 <TableCell align="center">{displayGradeDate(row.dob)}</TableCell><TableCell align="center">{row.gender || "—"}</TableCell>
-                <TableCell align="center"><Checkbox size="small" disabled={locked} checked={row.eligible === true} inputProps={{ "aria-label": `Tư cách thi ${row.code}` }} onChange={(event) => edit(row.participantId, { eligible: event.target.checked })} /></TableCell>
-                <TableCell align="center"><Checkbox size="small" disabled={locked} checked={row.examExempt} inputProps={{ "aria-label": `Miễn thi ${row.code}` }} onChange={(event) => edit(row.participantId, { examExempt: event.target.checked, result: event.target.checked ? "exempt" : "pending" })} /></TableCell>
-                {!blank && <>{SCORE_FIELDS.map(([key, label, max]) => <TableCell key={key} align="center" sx={{ bgcolor: "#F7FAFC" }}>
-                  <TextField fullWidth size="small" value={blank ? "" : row[key]} disabled={locked} InputProps={{ readOnly: ["courseScore", "grade4"].includes(key) }} error={!blank && numericScore(row[key]) !== null && (!Number.isFinite(numericScore(row[key])) || numericScore(row[key]) < 0 || numericScore(row[key]) > max)} onChange={["courseScore", "grade4"].includes(key) ? undefined : (event) => { const value = event.target.value; const score = numericScore(value); if (value === "" || (/^\d*(?:[.,]\d*)?$/.test(value) && Number.isFinite(score) && score >= 0 && score <= max)) edit(row.participantId, { [key]: value }); }} onBlur={(event) => { const value = formatScore(event.target.value, max); if (value !== row[key]) edit(row.participantId, { [key]: value }); }} inputProps={{ "aria-label": `${label} ${row.code}`, inputMode: "decimal" }} sx={inputSx} />
+                <TableCell align="center" className="exam-derived-cell"><Checkbox size="small" disabled checked={row.eligible === true} inputProps={{ "aria-label": `Tư cách thi ${row.code}` }} sx={{ "&.Mui-checked.Mui-disabled": { color: "#0788B8" } }} />
+                  {row.eligible !== true && <Typography variant="caption" component="div">{row.examExempt ? "Miễn thi" : row.eligible === false ? "Không đủ tư cách" : "Chưa đủ điểm"}</Typography>}
+                </TableCell>
+                <TableCell align="center" title={row.profileForeignLanguageExempt ? "Miễn thi ngoại ngữ theo hồ sơ học viên" : undefined}><Checkbox size="small" disabled={rowLocked} checked={row.examExempt} inputProps={{ "aria-label": `Miễn thi ${row.code}` }} onChange={(event) => edit(row.participantId, { examExempt: event.target.checked, result: event.target.checked ? "exempt" : "pending" })} /></TableCell>
+                {!blank && <>{SCORE_FIELDS.map(([key, label, max]) => <TableCell key={key} align="center" className={calculatedColumns.has(key) ? "exam-derived-cell" : undefined}>
+                  <TextField fullWidth size="small" value={blank ? "" : key === "examScore" && !row.studyLeaveFailure && row.eligible === false && !row.examExempt ? "0.0" : row[key]} disabled={rowLocked || (row.eligible === false && !row.examExempt && !["testScore", "assignmentScore"].includes(key))} InputProps={{ readOnly: ["courseScore", "grade4"].includes(key) }} error={!blank && numericScore(row[key]) !== null && (!Number.isFinite(numericScore(row[key])) || numericScore(row[key]) < 0 || numericScore(row[key]) > max)} onChange={["courseScore", "grade4"].includes(key) ? undefined : (event) => { const value = event.target.value; const score = numericScore(value); if (value === "" || (/^\d*(?:[.,]\d*)?$/.test(value) && Number.isFinite(score) && score >= 0 && score <= max)) edit(row.participantId, { [key]: value }); }} onBlur={calculatedColumns.has(key) ? undefined : (event) => { const value = formatScore(event.target.value, max); if (value !== row[key]) edit(row.participantId, { [key]: value }); }} inputProps={{ "aria-label": `${label} ${row.code}`, inputMode: "decimal" }} sx={inputSx} />
                 </TableCell>)}
-                <TableCell><TextField fullWidth size="small" value={blank ? "" : row.letterGrade} disabled={locked} InputProps={{ readOnly: true }} inputProps={{ "aria-label": `Thang điểm chữ ${row.code}`, maxLength: 10 }} sx={inputSx} /></TableCell>
-                <TableCell><TextField fullWidth size="small" value={blank ? "" : row.attemptScores} disabled={locked} InputProps={{ readOnly: true }} inputProps={{ "aria-label": `Điểm các lần thi ${row.code}` }} sx={inputSx} /></TableCell></>}
-                <TableCell><TextField select fullWidth size="small" SelectProps={{ native: true }} value={row.result} disabled inputProps={{ "aria-label": `Kết quả điểm ${row.code}` }} sx={{ ...inputSx, "& select": { py: 0.5, fontSize: 12, color: row.result === "failed" ? "#B52D2D" : row.result === "passed" ? "#137B3B" : "#607486" } }}>
-                  {Object.entries(RESULT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </TextField></TableCell>
-                {blank && <TableCell><TextField fullWidth size="small" value={row.notes} disabled={!canEdit || saving || exporting} onChange={(event) => edit(row.participantId, { notes: event.target.value })} inputProps={{ "aria-label": `Ghi chú ${row.code}`, maxLength: 1000 }} sx={{ ...inputSx, "& input": { px: 0.75, py: 0.5, textAlign: "left" } }} /></TableCell>}
+                <TableCell className="exam-derived-cell"><TextField fullWidth size="small" value={blank ? "" : row.letterGrade} disabled={rowLocked || (row.eligible === false && !row.examExempt)} InputProps={{ readOnly: true }} inputProps={{ "aria-label": `Thang điểm chữ ${row.code}`, maxLength: 10 }} sx={inputSx} /></TableCell>
+                <TableCell className="exam-derived-cell"><TextField fullWidth size="small" value={blank ? "" : formatAttemptScores(row.attemptScores)} disabled={rowLocked || (row.eligible === false && !row.examExempt)} InputProps={{ readOnly: true }} inputProps={{ "aria-label": `Điểm các lần thi ${row.code}` }} sx={inputSx} /></TableCell></>}
+                {!blank && <TableCell className="exam-derived-cell"><TextField select fullWidth size="small" SelectProps={{ native: true }} value={row.result} disabled inputProps={{ "aria-label": `Kết quả điểm ${row.code}` }} sx={{ ...inputSx, "& select": { py: 0.5, fontSize: 12, color: row.result === "failed" ? "#B52D2D" : row.result === "passed" ? "#137B3B" : "#607486" } }}>
+                  {Object.entries(RESULT_LABELS).map(([value, label]) => <option key={value} value={value}>{row.studyLeaveFailure && value === "failed" ? "Không đạt" : label}</option>)}
+                </TextField></TableCell>}
+                {blank && <TableCell><TextField fullWidth size="small" value={row.notes} disabled={!canEdit || !teachingCompleted || saving || exporting || !!row.profileForeignLanguageExempt || !!row.studyLeaveFailure} onChange={(event) => edit(row.participantId, { notes: event.target.value })} inputProps={{ "aria-label": `Ghi chú ${row.code}`, maxLength: 1000 }} sx={{ ...inputSx, "& input": { px: 0.75, py: 0.5, textAlign: "left" } }} /></TableCell>}
               </TableRow>;
             })}</TableBody>
           </ResizableTable>
@@ -290,8 +408,8 @@ export default function ExamLists() {
           </table>
         </Box>}
       </Paper>
-      <Typography sx={{ mt: 1, color: "#607486", fontSize: 11.5 }} className="exam-no-print">Điểm học phần được tính theo tỷ trọng, điều kiện đạt và bảng quy đổi của từng môn, làm tròn 1 chữ số thập phân. Điểm đã lưu giữ nguyên phiên bản cấu hình cũ, kể cả khi sửa lại điểm. Thành phần có tỷ trọng 0% không bắt buộc nhập. DS thi hiển thị học viên có kết quả Đạt. Nháy đúp mép tiêu đề để tự căn độ rộng cột.</Typography>
-      {dirtyCount > 0 && <Alert severity="warning" sx={{ mt: 1 }} className="exam-no-print">Bạn có điểm chưa lưu. {mode === "all" ? "Excel và PDF sử dụng các điểm vừa nhập." : "Excel sử dụng danh sách theo tư cách thi vừa chỉnh sửa."}</Alert>}
+      <Typography sx={{ mt: 1, color: "#607486", fontSize: 11.5 }} className="exam-no-print">Tư cách tự xét theo điểm kiểm tra và BTL/TL/KT, dùng ngưỡng trong cài đặt điểm. DS thi chỉ gồm học viên đủ tư cách và không miễn thi; nhập đủ điểm quá trình của cả lớp và cập nhật bảng trước khi in. Không đủ tư cách thi: kết quả chuyển ngay sang Không đạt và khóa nhập điểm thi. Đủ tư cách thi: kết quả cập nhật khi có điểm thi hết môn. Các ô nền xanh xám được tính tự động. Nháy đúp mép tiêu đề để tự căn độ rộng cột.</Typography>
+      {dirtyCount > 0 && !blank && <Alert severity="warning" sx={{ mt: 1 }} className="exam-no-print">Bạn có điểm chưa lưu. Bảng điểm Excel và PDF sử dụng các điểm vừa nhập.</Alert>}
       {settingsOpen && <GradeSettingsDialog canEdit={canEdit} initialMajorId={majorId} initialYear={year} groups={groups} onClose={() => setSettingsOpen(false)} />}
       <ConfirmDialog
         open={Boolean(pendingChange)}

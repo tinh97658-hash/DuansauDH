@@ -3,6 +3,8 @@ import { createTheme, ThemeProvider } from "@mui/material";
 import axios from "axios";
 import ExcelJS from "exceljs";
 import ExamLists from "../../pages/masters/examLists";
+import { draftOf, isExamCandidate } from "../../features/exams/gradebook";
+import { calculateExamEligibility } from "../../features/exams/gradingPolicy";
 import { notifySubjectCatalogChanged } from "../../utils/subjectCatalog";
 
 jest.mock("axios");
@@ -16,21 +18,263 @@ jest.mock("../../components/FeatureLayout", () => function Layout({ children }) 
 const testTheme = createTheme({ components: { MuiButtonBase: { defaultProps: { disableRipple: true } } } });
 const render = ui => renderUi(<ThemeProvider theme={testTheme}>{ui}</ThemeProvider>);
 const savedRow = { participantId: "student:one", code: "HV001", fullName: "Nguyễn Văn An", dob: "1990-01-02", gender: "Nam", eligible: null, examExempt: false, testScore: null, assignmentScore: null, examScore: null, courseScore: null, grade4: null, letterGrade: "", attemptScores: [], result: "pending" };
-const data = { revision: 0, rows: [savedRow], total: 1, totalRows: 1, page: 1, pageSize: 15 };
+const data = { revision: 0, rows: [savedRow], total: 1, totalRows: 1, unassessedRows: 1, page: 1, pageSize: 15 };
 const paged = (gradeRows, params = {}) => {
   const include = (params.includeIds || "").split(","), exclude = (params.excludeIds || "").split(",");
-  const found = gradeRows.filter(row => (params.mode !== "exam" || ((include.includes(row.participantId) || row.result === "passed") && !exclude.includes(row.participantId))) &&
+  const assessed = gradeRows.map(draftOf);
+  const found = assessed.filter(row => (params.mode !== "exam" || ((include.includes(row.participantId) || isExamCandidate(row)) && !exclude.includes(row.participantId))) &&
     (!params.search || `${row.code} ${row.fullName}`.toLowerCase().includes(params.search.toLowerCase())));
   const page = Math.min(params.page || 1, Math.max(1, Math.ceil(found.length / 15)));
-  return { revision: 0, rows: found.slice((page - 1) * 15, page * 15), total: found.length, totalRows: gradeRows.length, page, pageSize: 15 };
+  return { revision: 0, rows: found.slice((page - 1) * 15, page * 15), total: found.length, totalRows: gradeRows.length, unassessedRows: assessed.filter(row => row.eligible === null).length, page, pageSize: 15 };
 };
 const setup = (role = "admin", gradeRows = data.rows) => {
+  axios.put.mockImplementation(async (_, payload) => {
+    payload.rows.forEach(value => Object.assign(gradeRows.find(row => row.participantId === value.participantId), value));
+    return { data: { ...paged(gradeRows, payload), revision: 1 } };
+  });
   axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? {
     groups: [{ id: "g1", name: "CNTT 2026", code: "N01", academicYear: "2026", majorId: "m1", major: { name: "Công nghệ thông tin" } }],
-    courseOfferings: [{ id: "o1", name: "Lớp An toàn thông tin", subjectId: "s1", subject: { id: "s1", code: "HP01", name: "An toàn thông tin" }, groupLinks: [{ classGroupId: "g1" }] }],
+    courseOfferings: [{ id: "o1", status: "completed", name: "Lớp An toàn thông tin", subjectId: "s1", subject: { id: "s1", code: "HP01", name: "An toàn thông tin" }, groupLinks: [{ classGroupId: "g1" }] }],
   } : url.endsWith("/isStaff") ? { message: role } : paged(gradeRows, config?.params) }));
 };
 beforeEach(() => { jest.clearAllMocks(); localStorage.clear(); setup(); });
+
+it.each([
+  { result: "passed", examScore: 8, courseScore: 8 },
+  { result: "failed", examScore: 2, courseScore: 4.4 },
+])("keeps a paused learner's completed $result attempt visible with the study status", async outcome => {
+  setup("admin", [{ ...savedRow, studyStatus: "Đang bảo lưu", testScore: 8, assignmentScore: 8,
+    examScore: outcome.examScore, courseScore: outcome.courseScore, result: outcome.result }]);
+  render(<ExamLists />);
+  expect(await screen.findByLabelText("Kết quả điểm HV001")).toHaveValue(outcome.result);
+  const row = screen.getByText("HV001").closest("tr");
+  expect(within(row).getByText("Đang bảo lưu")).toBeInTheDocument();
+  expect(screen.getByLabelText("Điểm thi hết môn HV001")).toHaveValue(`${outcome.examScore}.0`);
+  expect(screen.getByLabelText("Điểm học phần HV001")).toHaveValue(outcome.courseScore.toFixed(1));
+  expect(axios.put).not.toHaveBeenCalled();
+});
+
+it("locks unfinished classes, shows the yellow warning at the right, and unlocks after completion on refocus", async () => {
+  let status = "active";
+  const defaultGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation(async (url, config) => {
+    const response = await defaultGet(url, config);
+    if (url.endsWith("/options")) response.data.courseOfferings[0].status = status;
+    else if (url.endsWith("/exam-lists")) response.data = { ...response.data, offering: { id: "o1", status } };
+    return response;
+  });
+  render(<ExamLists />);
+  const input = await screen.findByLabelText("Điểm kiểm tra HV001");
+  expect(input).toBeDisabled();
+  expect(screen.getByLabelText("Điểm BTL/TL/KT HV001")).toBeDisabled();
+  expect(screen.getByLabelText("Điểm thi hết môn HV001")).toBeDisabled();
+  expect(screen.getByLabelText("Miễn thi HV001")).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Cập nhật cả bảng" })).toBeDisabled();
+  const warning = await screen.findByText("Vui lòng xác nhận hoàn thành giảng dạy trước khi nhập điểm.");
+  expect(warning.closest(".Toastify__toast")).toHaveClass("exam-warning-toast");
+  expect(warning.closest(".Toastify__toast-container")).toHaveClass("Toastify__toast-container--top-right");
+  fireEvent.change(input, { target: { value: "8" } });
+  expect(input).toHaveValue("");
+  expect(axios.put).not.toHaveBeenCalled();
+  status = "completed";
+  fireEvent(window, new Event("focus"));
+  await waitFor(() => expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeEnabled());
+  fireEvent.change(screen.getByLabelText("Điểm kiểm tra HV001"), { target: { value: "8" } });
+  fireEvent.click(screen.getByRole("button", { name: "Cập nhật cả bảng" }));
+  await waitFor(() => expect(axios.put).toHaveBeenCalledTimes(1));
+});
+
+it("refreshes a profile exemption as checked and passed, discards a stale draft, and restores entry when removed", async () => {
+  const gradeRows = [{ ...savedRow, testScore: null, assignmentScore: null, examScore: null }];
+  setup("admin", gradeRows);
+  render(<ExamLists />);
+  fireEvent.change(await screen.findByLabelText("Điểm kiểm tra HV001"), { target: { value: "8" } });
+  expect(screen.getByRole("button", { name: "Cập nhật cả bảng" })).toBeEnabled();
+  Object.assign(gradeRows[0], { profileForeignLanguageExempt: true, examExempt: true, result: "passed" });
+  fireEvent(window, new CustomEvent("exam-gradebook-saved", { detail: { source: "profile" } }));
+  await waitFor(() => expect(screen.getByLabelText("Miễn thi HV001")).toBeChecked());
+  expect(screen.getByLabelText("Miễn thi HV001")).toBeDisabled();
+  expect(screen.getByLabelText("Kết quả điểm HV001")).toHaveValue("passed");
+  expect(screen.getByLabelText("Điểm kiểm tra HV001")).toHaveValue("");
+  expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Cập nhật cả bảng" })).toBeDisabled();
+  expect(axios.put).not.toHaveBeenCalled();
+  Object.assign(gradeRows[0], { profileForeignLanguageExempt: false, examExempt: false, result: "pending" });
+  fireEvent(window, new CustomEvent("exam-gradebook-saved", { detail: { source: "profile" } }));
+  await waitFor(() => expect(screen.getByLabelText("Miễn thi HV001")).not.toBeChecked());
+  expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeEnabled();
+  expect(screen.getByLabelText("Kết quả điểm HV001")).toHaveValue("pending");
+});
+
+it("shows interrupted study-leave failures read-only without replacing missing marks with zero", async () => {
+  setup("admin", [{ ...savedRow, studyLeaveFailure: true, testScore: 7, assignmentScore: 8, result: "failed", studyStatus: "Đang bảo lưu" }]);
+  render(<ExamLists />);
+  expect(await screen.findByLabelText("Kết quả điểm HV001")).toHaveValue("failed");
+  expect(screen.getByLabelText("Kết quả điểm HV001").selectedOptions[0]).toHaveTextContent("Không đạt");
+  expect(screen.getByLabelText("Điểm kiểm tra HV001")).toHaveValue("7.0");
+  expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeDisabled();
+  expect(screen.getByLabelText("Điểm thi hết môn HV001")).toHaveValue("");
+  expect(screen.getByLabelText("Điểm học phần HV001")).toHaveValue("");
+  expect(screen.getByLabelText("Miễn thi HV001")).toBeDisabled();
+  expect(axios.put).not.toHaveBeenCalled();
+});
+
+it("shows saved ineligible rows as failed on initial load even when the stored result is pending", async () => {
+  setup("admin", [{ ...savedRow, testScore: 6, assignmentScore: 3, result: "pending" }]);
+  render(<ExamLists />);
+  expect(await screen.findByLabelText("Kết quả điểm HV001")).toHaveValue("failed");
+  expect(screen.getByLabelText("Điểm thi hết môn HV001")).toHaveValue("0.0");
+  expect(screen.getByLabelText("Điểm học phần HV001")).toHaveValue("0.0");
+  expect(screen.getByLabelText("Thang điểm 4 HV001")).toHaveValue("0.0");
+  expect(screen.getByLabelText("Thang điểm chữ HV001")).toHaveValue("F");
+  expect(screen.getByLabelText("Điểm thi hết môn HV001")).toBeDisabled();
+  expect(axios.put).not.toHaveBeenCalled();
+});
+
+it("immediately fails an ineligible learner, locks exam entry and allows saving without an exam", async () => {
+  setup("admin", [{ ...savedRow }]);
+  render(<ExamLists />);
+  const test = await screen.findByLabelText("Điểm kiểm tra HV001");
+  fireEvent.change(test, { target: { value: "6" } });
+  expect(screen.getByLabelText("Kết quả điểm HV001")).toHaveValue("pending");
+  fireEvent.change(screen.getByLabelText("Điểm BTL/TL/KT HV001"), { target: { value: "3" } });
+  expect(screen.getByLabelText("Kết quả điểm HV001")).toHaveValue("failed");
+  expect(screen.getByLabelText("Điểm thi hết môn HV001")).toBeDisabled();
+  expect(test).not.toBeDisabled();
+  expect(screen.getByLabelText("Điểm BTL/TL/KT HV001")).not.toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Cập nhật cả bảng" }));
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+    rows: [expect.objectContaining({ result: "failed", examScore: null, courseScore: 0 })],
+  })));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Cập nhật cả bảng" })).toBeDisabled());
+  expect(screen.getByLabelText("Kết quả điểm HV001")).toHaveValue("failed");
+  fireEvent.change(screen.getByLabelText("Điểm BTL/TL/KT HV001"), { target: { value: "6" } });
+  expect(screen.getByLabelText("Điểm thi hết môn HV001")).not.toBeDisabled();
+  expect(screen.getByLabelText("Kết quả điểm HV001")).toHaveValue("pending");
+  fireEvent.change(screen.getByLabelText("Điểm thi hết môn HV001"), { target: { value: "3" } });
+  expect(screen.getByLabelText("Kết quả điểm HV001")).toHaveValue("failed");
+  expect(screen.getByLabelText("Điểm thi hết môn HV001")).not.toBeDisabled();
+});
+
+it("selects subject names and local curriculum codes while keeping the entire shared roster", async () => {
+  const groups = [
+    { id: "g1", name: "CKTM 2026", code: "CKTM", academicYear: "2026", majorId: "m1", major: { name: "Cơ khí thông minh và Robot" } },
+    { id: "g2", name: "CNTT 2026", code: "CNTT", academicYear: "2026", majorId: "m2", major: { name: "Công nghệ thông tin" } },
+    { id: "g3", name: "TĐH 2026", code: "TDH", academicYear: "2026", majorId: "m3", major: { name: "Tự động hóa" } },
+  ];
+  const english = { id: "english-robot", name: "Tiếng anh", code: "HPTA" };
+  const ai = { id: "ai-robot", name: "Trí tuệ nhân tạo", code: "CKAI" };
+  const courseOfferings = [
+    { id: "english", status: "completed", name: "Lớp Tiếng anh ghép 3 chuyên ngành", subject: english, groupLinks: groups.map((group, index) => ({ classGroupId: group.id, subject: { ...english, id: `english-${index}` } })) },
+    { id: "ai", status: "completed", name: "Lớp Trí tuệ nhân tạo ghép 3 chuyên ngành", subject: ai, groupLinks: groups.map((group, index) => ({ classGroupId: group.id, subject: { ...ai, id: `ai-${index}`, code: ["CKAI", "ITAI", "TDAI"][index] } })) },
+  ];
+  const gradeRows = Array.from({ length: 18 }, (_, index) => ({ ...savedRow,
+    participantId: `student:${index + 1}`, code: `HV${String(index + 1).padStart(3, "0")}`, fullName: `Học viên ${index + 1}`,
+  }));
+  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups, courseOfferings }
+    : url.endsWith("/isStaff") ? { message: "admin" }
+      : paged(config?.params?.rosterScope === "offering" ? gradeRows : gradeRows.slice(0, 6), config?.params) }));
+  axios.put.mockImplementation(async (_, payload) => ({ data: { ...paged(gradeRows, payload), revision: 1 } }));
+  render(<ExamLists />);
+  await screen.findByLabelText("Điểm kiểm tra HV001");
+  expect(screen.getByLabelText("Tên lớp học phần")).toHaveTextContent("Tiếng anh");
+  expect(screen.getByLabelText("Môn")).toHaveTextContent("HPTA - Tiếng anh");
+  expect(screen.getByText("18 / 18 học viên")).toBeInTheDocument();
+  fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
+  const names = screen.getByRole("listbox");
+  expect(within(names).getAllByRole("option")).toHaveLength(2);
+  expect(names).toHaveTextContent("Lớp Tiếng anh ghép 3 chuyên ngành");
+  fireEvent.click(within(names).getByRole("option", { name: /Lớp Trí tuệ nhân tạo/ }));
+  expect(screen.getByLabelText("Môn")).toHaveTextContent("CKAI - Trí tuệ nhân tạo");
+  fireEvent.mouseDown(screen.getByLabelText("Chuyên ngành"));
+  fireEvent.click(within(screen.getByRole("listbox")).getByText("Công nghệ thông tin"));
+  await waitFor(() => expect(screen.getByLabelText("Môn")).toHaveTextContent("ITAI - Trí tuệ nhân tạo"));
+  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g2", courseOfferingId: "ai", rosterScope: "offering" }) });
+  fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
+  fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /Lớp Tiếng anh/ }));
+  await waitFor(() => expect(screen.getByLabelText("Môn")).toHaveTextContent("HPTA - Tiếng anh"));
+  await waitFor(() => expect(screen.getByRole("button", { name: /page 2/i })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: /page 2/i }));
+  fireEvent.change(await screen.findByLabelText("Điểm kiểm tra HV018"), { target: { value: "8" } });
+  fireEvent.click(screen.getByRole("button", { name: "Cập nhật cả bảng" }));
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), expect.objectContaining({
+    classGroupId: "g2", courseOfferingId: "english", rosterScope: "offering", rows: [expect.objectContaining({ participantId: "student:18", testScore: 8 })],
+  })));
+});
+
+it("opens and saves the old CNTT–QLTC gradebook separately from a newer cross-cohort offering of HPTA", async () => {
+  const groups = [
+    { id: "g1", code: "CNTT 2026.1.1", academicYear: "2026", majorId: "cntt", major: { name: "Công nghệ thông tin" } },
+    { id: "g2", code: "QLTC 2026.1.1", academicYear: "2026", majorId: "qltc", major: { name: "Quản lý tài chính" } },
+    { id: "g3", code: "CNTT 2025.1.1", academicYear: "2025", majorId: "cntt", major: { name: "Công nghệ thông tin" } },
+    { id: "g4", code: "CNTT 2026.1.2", academicYear: "2026", majorId: "cntt", major: { name: "Công nghệ thông tin" } },
+  ];
+  const subject = { id: "english", code: "HPTA", name: "Tiếng Anh" };
+  const newName = "Tiếng Anh — CNTT 2025.1.1 + CNTT 2026.1.1 + CNTT 2026.1.2";
+  const oldName = "Tiếng Anh — CNTT 2026.1.1 + QLTC 2026.1.1";
+  const courseOfferings = [
+    { id: "new", name: newName, status: "active", subject, groupLinks: ["g1", "g3", "g4"].map(classGroupId => ({ classGroupId })) },
+    { id: "old", name: oldName, status: "completed", subject, groupLinks: ["g1", "g2"].map(classGroupId => ({ classGroupId })) },
+  ];
+  const oldRow = { ...savedRow, code: "OLD001", testScore: 8, assignmentScore: 8, examScore: 8, courseScore: 8, result: "passed" };
+  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups, courseOfferings }
+    : url.endsWith("/isStaff") ? { message: "admin" }
+      : { ...data, offering: courseOfferings.find(offering => offering.id === config.params.courseOfferingId),
+        rows: [config.params.courseOfferingId === "old" ? oldRow : { ...savedRow, code: "NEW001", testScore: null }] } }));
+  axios.put.mockImplementation(async (_, payload) => ({ data: { ...data, offering: courseOfferings[1], revision: 1, rows: [{ ...oldRow, ...payload.rows[0] }] } }));
+  render(<ExamLists />);
+  expect(await screen.findByLabelText("Điểm kiểm tra NEW001")).toBeDisabled();
+  fireEvent.mouseDown(screen.getByLabelText("Năm"));
+  fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: "2025" }));
+  await screen.findByLabelText("Điểm kiểm tra NEW001");
+  fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
+  expect(within(screen.getByRole("listbox")).getAllByRole("option")).toHaveLength(1);
+  fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: newName }));
+  fireEvent.mouseDown(screen.getByLabelText("Năm"));
+  fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: "2026" }));
+  await screen.findByLabelText("Điểm kiểm tra NEW001");
+  fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
+  const list = screen.getByRole("listbox");
+  expect(within(list).getAllByRole("option")).toHaveLength(2);
+  expect(within(list).getByRole("option", { name: newName })).toBeInTheDocument();
+  fireEvent.click(within(list).getByRole("option", { name: oldName }));
+  const input = await screen.findByLabelText("Điểm kiểm tra OLD001");
+  expect(input).toBeEnabled();
+  expect(input).toHaveValue("8.0");
+  expect(screen.queryByLabelText("Điểm kiểm tra NEW001")).not.toBeInTheDocument();
+  fireEvent.change(input, { target: { value: "9" } });
+  fireEvent.click(screen.getByRole("button", { name: "Cập nhật cả bảng" }));
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+    classGroupId: "g1", courseOfferingId: "old", rosterScope: "offering",
+    rows: [expect.objectContaining({ testScore: 9 })],
+  })));
+});
+
+it("locks qualification and derives it from current minimums while waiting for the exam outcome", async () => {
+  const policy = { minimums: { testScore: 6, assignmentScore: 7, examScore: 4 } };
+  setup("admin", [{ ...savedRow, eligibilityPolicy: policy }]);
+  render(<ExamLists />);
+  const testScore = await screen.findByLabelText("Điểm kiểm tra HV001");
+  const qualification = screen.getByLabelText("Tư cách thi HV001");
+  expect(qualification).toBeDisabled();
+  fireEvent.change(testScore, { target: { value: "6" } });
+  expect(qualification).not.toBeChecked();
+  fireEvent.change(screen.getByLabelText("Điểm BTL/TL/KT HV001"), { target: { value: "6" } });
+  expect(qualification).not.toBeChecked();
+  expect(screen.getByText("Không đủ tư cách")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Điểm BTL/TL/KT HV001"), { target: { value: "7" } });
+  expect(qualification).toBeChecked();
+  expect(screen.getByLabelText("Kết quả điểm HV001")).toHaveValue("pending");
+  fireEvent.change(screen.getByLabelText("Điểm thi hết môn HV001"), { target: { value: "8" } });
+  expect(screen.getByLabelText("Kết quả điểm HV001")).toHaveValue("passed");
+  fireEvent.change(screen.getByLabelText("Điểm thi hết môn HV001"), { target: { value: "3" } });
+  expect(screen.getByLabelText("Kết quả điểm HV001")).toHaveValue("failed");
+  fireEvent.click(screen.getByLabelText("Miễn thi HV001"));
+  expect(qualification).not.toBeChecked();
+  expect(screen.getByLabelText("Kết quả điểm HV001")).toHaveValue("exempt");
+  expect(screen.getByLabelText("Điểm học phần HV001")).toHaveAttribute("readonly");
+  expect(screen.getByLabelText("Điểm học phần HV001").closest("td")).toHaveClass("exam-derived-cell");
+});
 
 it("refreshes catalog metadata without discarding unsaved grades or changing the selected class", async () => {
   render(<ExamLists />);
@@ -46,16 +290,16 @@ it("refreshes catalog metadata without discarding unsaved grades or changing the
   await waitFor(() => expect(screen.getByLabelText("Môn")).toHaveTextContent("Học phần cập nhật"));
   expect(screen.getByLabelText("Điểm kiểm tra HV001")).toHaveValue("8");
   expect(screen.getByText("1 học viên chưa lưu")).toBeInTheDocument();
-  expect(screen.getByLabelText("Lớp học phần")).toHaveTextContent("CNTT 2026");
+  expect(screen.getByLabelText("Tên lớp học phần")).toHaveTextContent("Lớp An toàn thông tin");
   expect(axios.get.mock.calls.filter(([url]) => url.endsWith("/exam-lists"))).toHaveLength(gradeRequests);
 });
 
 it("downloads the active tab's columns, current draft values, and searched students", async () => {
   setup("admin", [
-    { ...savedRow, eligible: true, courseScore: 9, result: "passed" },
-    { ...savedRow, participantId: "student:two", code: "HV002", eligible: false },
-    { ...savedRow, participantId: "student:three", code: "HV003", eligible: true, result: "passed" },
-    ...Array.from({ length: 19 }, (_, index) => ({ ...savedRow, participantId: `student:${index + 4}`, code: `HV${String(index + 4).padStart(3, "0")}` })),
+    { ...savedRow, testScore: 6, assignmentScore: 6, eligible: true, courseScore: 9, result: "passed" },
+    { ...savedRow, participantId: "student:two", code: "HV002", testScore: 3, assignmentScore: 6, eligible: false },
+    { ...savedRow, participantId: "student:three", code: "HV003", testScore: 6, assignmentScore: 6, eligible: true, result: "passed" },
+    ...Array.from({ length: 19 }, (_, index) => ({ ...savedRow, participantId: `student:${index + 4}`, code: `HV${String(index + 4).padStart(3, "0")}`, testScore: 3, assignmentScore: 6 })),
   ]);
   const originalCreate = URL.createObjectURL;
   const originalRevoke = URL.revokeObjectURL;
@@ -65,9 +309,10 @@ it("downloads the active tab's columns, current draft values, and searched stude
   const click = jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function () { downloads.push(this.download); });
   const exportExamExcel = async () => {
     const count = URL.createObjectURL.mock.calls.length;
-    const button = await screen.findByRole("button", { name: "Xuất Excel" });
+    const button = await screen.findByRole("button", { name: "Xuất file" });
     await waitFor(() => expect(button).toBeEnabled());
     fireEvent.click(button);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Excel (.xlsx)" }));
     await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(count + 1));
     const blob = URL.createObjectURL.mock.calls[count][0];
     const buffer = await new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsArrayBuffer(blob); });
@@ -94,23 +339,26 @@ it("downloads the active tab's columns, current draft values, and searched stude
     expect(sheet.getCell("E10").value).toBe("02/01/1990");
     expect(sheet.getCell("B11").value).toBe("HV002");
     expect(downloads[0]).toBe("Bang-diem-mon-hoc-N01-HP01.xlsx");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cập nhật cả bảng" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Cập nhật cả bảng" }));
+    await waitFor(() => expect(screen.queryByText("1 học viên chưa lưu")).not.toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
     const examSheet = await exportExamExcel();
     expect(examSheet.getRow(4).values.slice(1)).toEqual(screen.getAllByRole("columnheader").map(cell => cell.textContent));
     expect(examSheet.rowCount).toBe(6);
     expect(examSheet.getCell("B5").value).toBe("HV001");
     expect(examSheet.getCell("B6").value).toBe("HV003");
-    expect(examSheet.getCell("I5").value).toBe("Đạt");
+    expect(examSheet.getCell("I4").value).toBe("Ghi chú");
     expect(examSheet.getCell("A4").fill.fgColor.argb).toBe("FFDCE6F1");
     expect(examSheet.pageSetup).toMatchObject({ paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1 });
     expect(downloads[1]).toBe("DS-thi-N01-HP01.xlsx");
     expect(screen.queryByRole("button", { name: "Xuất CSV" })).not.toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText("Tìm theo mã HV, họ tên..."), { target: { value: "HV003" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Tìm kiếm" }), { target: { value: "HV003" } });
     const searchedSheet = await exportExamExcel();
     expect(searchedSheet.rowCount).toBe(5);
     expect(searchedSheet.getCell("A5").value).toBe(1);
     expect(searchedSheet.getCell("B5").value).toBe("HV003");
-    expect(axios.put).not.toHaveBeenCalled();
+    expect(axios.put).toHaveBeenCalledTimes(1);
   } finally {
     // Đợi các URL tải file được giải phóng trước khi khôi phục API trình duyệt.
     await new Promise((resolve) => setTimeout(resolve, 1100));
@@ -120,7 +368,7 @@ it("downloads the active tab's columns, current draft values, and searched stude
   }
 });
 
-it("filters real course classes by major and year and selects the matching subject", async () => {
+it("selects separate offerings of the same subject with an optional year filter", async () => {
   const groups = [
     { id: "g1", name: "CNTT 2026", academicYear: "2026", majorId: "m1", major: { name: "Công nghệ thông tin" } },
     { id: "g2", name: "QTKD 2026", academicYear: "2026", majorId: "m2", major: { name: "Quản trị kinh doanh" } },
@@ -135,24 +383,37 @@ it("filters real course classes by major and year and selects the matching subje
   axios.get.mockImplementation(async (url) => ({ data: url.endsWith("/options") ? { groups, courseOfferings } : url.endsWith("/isStaff") ? { message: "admin" } : data }));
   render(<ExamLists />);
   await screen.findByLabelText("Điểm kiểm tra HV001");
-  expect(screen.getByLabelText("Lớp học phần")).toHaveTextContent("Lớp An toàn thông tin");
+  expect(screen.getByLabelText("Tên lớp học phần")).toHaveTextContent("An toàn thông tin");
   fireEvent.mouseDown(screen.getByLabelText("Chuyên ngành"));
   fireEvent.click(within(screen.getByRole("listbox")).getByText("Quản trị kinh doanh"));
   await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g2", courseOfferingId: "o2", pageSize: 15 }) }));
   expect(screen.getByLabelText("Môn")).toHaveTextContent("Marketing");
-  fireEvent.mouseDown(screen.getByLabelText("Năm"));
-  fireEvent.click(within(screen.getByRole("listbox")).getByText("2025"));
-  await waitFor(() => expect(screen.getByLabelText("Lớp học phần")).toHaveTextContent("Lớp Marketing 2025"));
-  fireEvent.mouseDown(screen.getByLabelText("Lớp học phần"));
+  expect(screen.getByLabelText("Năm")).toHaveTextContent("Tất cả năm");
+  fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
   const classes = screen.getByRole("listbox");
   expect(within(classes).queryByText(/An toàn thông tin/)).not.toBeInTheDocument();
-  expect(within(classes).queryByText(/Marketing 2026/)).not.toBeInTheDocument();
-  fireEvent.click(within(classes).getByText(/Lớp Quản trị 2025/));
+  expect(within(classes).getByRole("option", { name: /Marketing 2026/ })).toBeInTheDocument();
+  expect(within(classes).getByRole("option", { name: /Marketing 2025/ })).toBeInTheDocument();
+  fireEvent.click(within(classes).getByRole("option", { name: /Quản trị 2025/ }));
   await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g3", courseOfferingId: "o4", pageSize: 15 }) }));
   expect(screen.getByLabelText("Môn")).toHaveTextContent("Quản trị chiến lược");
-  fireEvent.mouseDown(screen.getByLabelText("Môn"));
-  fireEvent.click(within(screen.getByRole("listbox")).getByText("Marketing"));
-  await waitFor(() => expect(screen.getByLabelText("Lớp học phần")).toHaveTextContent("Lớp Marketing 2025"));
+  fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
+  fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /Marketing 2025/ }));
+  await waitFor(() => expect(screen.getByLabelText("Tên lớp học phần")).toHaveTextContent("Marketing"));
+  expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g3", courseOfferingId: "o3" }) });
+  fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
+  fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /Marketing 2026/ }));
+  await waitFor(() => expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g2", courseOfferingId: "o2" }) }));
+  fireEvent.mouseDown(screen.getByLabelText("Năm"));
+  fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: "2025" }));
+  await waitFor(() => expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g3", courseOfferingId: "o3" }) }));
+  fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
+  expect(within(screen.getByRole("listbox")).queryByRole("option", { name: /Marketing 2026/ })).not.toBeInTheDocument();
+  fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /Marketing 2025/ }));
+  fireEvent.mouseDown(screen.getByLabelText("Năm"));
+  fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: "Tất cả năm" }));
+  fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
+  expect(within(screen.getByRole("listbox")).getByRole("option", { name: /Marketing 2026/ })).toBeInTheDocument();
 });
 
 it("keeps unsaved grades until a filter change is confirmed", async () => {
@@ -169,6 +430,8 @@ it("keeps unsaved grades until a filter change is confirmed", async () => {
 });
 
 it("loads a real class roster and saves only the edited row with its revision", async () => {
+  const savedEvent = jest.fn();
+  window.addEventListener("exam-gradebook-saved", savedEvent, { once: true });
   axios.put.mockResolvedValue({ data: { ...data, revision: 1, rows: [{ ...savedRow, courseScore: 8.5 }] } });
   render(<ExamLists />);
   const score = await screen.findByLabelText("Điểm học phần HV001");
@@ -183,6 +446,8 @@ it("loads a real class roster and saves only the edited row with its revision", 
   fireEvent.click(screen.getByRole("button", { name: "Cập nhật cả bảng" }));
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.stringContaining("/masters/exam-lists"), expect.objectContaining({ classGroupId: "g1", courseOfferingId: "o1", revision: 0, rows: [expect.objectContaining({ participantId: "student:one", courseScore: 8.5 })] })));
   expect(await screen.findByText("Đã cập nhật bảng điểm cho 1 học viên.")).toBeInTheDocument();
+  expect(savedEvent).toHaveBeenCalledTimes(1);
+  expect(localStorage.getItem("exam-gradebook-revision")).toBeTruthy();
 });
 
 it("retains a draft when saving fails", async () => {
@@ -234,18 +499,18 @@ it("only accepts scores from 0 to 10 when typing or pasting into any component",
 });
 
 it("shows blank exam sheets without clearing drafts and keeps supervisors read-only", async () => {
-  setup("supervisor", [{ ...savedRow, eligible: true, result: "passed" }]);
+  setup("supervisor", [{ ...savedRow, testScore: 6, assignmentScore: 6, eligible: true, result: "passed" }]);
   render(<ExamLists />);
   expect(await screen.findByLabelText("Điểm học phần HV001")).toBeDisabled();
   expect(screen.getByRole("button", { name: "Cập nhật cả bảng" })).toBeDisabled();
   fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
-  await screen.findByRole("columnheader", { name: /^Kết quả điểm/ });
+  await screen.findByLabelText("Ghi chú HV001");
   expect(screen.queryByLabelText("Điểm học phần HV001")).not.toBeInTheDocument();
   for (const label of ["Điểm kiểm tra", "Điểm BTL/TL/KT", "Điểm thi hết môn", "Điểm học phần", "Thang điểm 4", "Thang điểm chữ", "Điểm các lần thi hết môn"]) {
     expect(screen.queryByRole("columnheader", { name: new RegExp(`^${label}`) })).not.toBeInTheDocument();
   }
-  expect(within(screen.getByTestId("exam-print-table")).getAllByRole("columnheader", { hidden: true })).toHaveLength(10);
-  expect(screen.getByRole("columnheader", { name: /^Kết quả điểm/ })).toBeInTheDocument();
+  expect(within(screen.getByTestId("exam-print-table")).getAllByRole("columnheader", { hidden: true })).toHaveLength(9);
+  expect(screen.queryByRole("columnheader", { name: /^Kết quả điểm/ })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Cả bảng điểm" }));
   expect(await screen.findByLabelText("Điểm học phần HV001")).toBeInTheDocument();
   expect(axios.put).not.toHaveBeenCalled();
@@ -253,7 +518,7 @@ it("shows blank exam sheets without clearing drafts and keeps supervisors read-o
 
 it("shows an unsaved passed student in DS thi and saves notes included in the print table", async () => {
   const passedRow = { ...savedRow, testScore: 6, assignmentScore: 6, examScore: 6, courseScore: 6, result: "passed", notes: "Ghi chú học viên" };
-  axios.put.mockResolvedValue({ data: { ...data, revision: 1, rows: [passedRow] } });
+  axios.put.mockResolvedValue({ data: { ...data, unassessedRows: 0, revision: 1, rows: [passedRow] } });
   render(<ExamLists />);
   await screen.findByLabelText("Điểm kiểm tra HV001");
   for (const label of ["Điểm kiểm tra", "Điểm BTL/TL/KT", "Điểm thi hết môn"]) {
@@ -261,50 +526,74 @@ it("shows an unsaved passed student in DS thi and saves notes included in the pr
   }
   fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
   expect(await screen.findByLabelText("Miễn thi HV001")).not.toBeChecked();
-  expect(screen.getByLabelText("Kết quả điểm HV001")).toHaveValue("passed");
-  expect(screen.getByLabelText("Tư cách thi HV001")).not.toBeChecked();
+  expect(screen.queryByLabelText("Kết quả điểm HV001")).not.toBeInTheDocument();
+  expect(screen.queryByText("Hãy nhập đủ điểm thành phần cho tất cả học viên!")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Tư cách thi HV001")).toBeChecked();
+  expect(screen.getByLabelText("Tư cách thi HV001")).toBeDisabled();
   const headers = screen.getAllByRole("columnheader").map(cell => cell.textContent);
-  expect(headers.slice(-2)).toEqual(["Kết quả điểm", "Ghi chú"]);
+  expect(headers.slice(-2)).toEqual(["Miễn thi", "Ghi chú"]);
   const notes = screen.getByLabelText("Ghi chú HV001");
   expect(notes).toBeEnabled();
   fireEvent.change(notes, { target: { value: passedRow.notes } });
-  expect(within(screen.getByTestId("exam-print-table")).getByText(passedRow.notes)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Xuất file" })).toBeDisabled();
   fireEvent.click(screen.getByRole("button", { name: "Cập nhật cả bảng" }));
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ rows: [expect.objectContaining({ result: "passed", notes: passedRow.notes })] })));
   expect(await screen.findByText("Đã cập nhật bảng điểm cho 1 học viên.")).toBeInTheDocument();
   expect(screen.getByLabelText("Ghi chú HV001")).toHaveValue(passedRow.notes);
+  expect(within(screen.getByTestId("exam-print-table")).getByText(passedRow.notes)).toBeInTheDocument();
 });
 
-it("prints the loaded page with the current search and mode without fetching the whole roster", async () => {
+it("blocks exam exports if even one student elsewhere in the class is not assessed", async () => {
+  const roster = Array.from({ length: 16 }, (_, index) => ({ ...savedRow, participantId: `student:${index}`, code: `HV${index + 1}`, testScore: 4, assignmentScore: index === 15 ? null : 4 }));
+  setup("admin", roster);
+  render(<ExamLists />);
+  await screen.findByLabelText("\u0110i\u1ec3m ki\u1ec3m tra HV1");
+  fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
+  await screen.findByLabelText("T\u01b0 c\u00e1ch thi HV1");
+  expect(screen.getByRole("button", { name: "Xuất file" })).toBeDisabled();
+  const warning = await screen.findByText("Hãy nhập đủ điểm thành phần cho tất cả học viên!");
+  expect(warning.closest('[role="alert"]')).toBeInTheDocument();
+  expect(warning.closest(".Toastify__toast")).toHaveClass("exam-warning-toast");
+  expect(warning.closest(".Toastify__toast-container")).toHaveClass("Toastify__toast-container--top-right");
+  expect(within(screen.getByTestId("exam-print-table")).getAllByRole("row", { hidden: true })).toHaveLength(1);
+  fireEvent.change(screen.getByRole("textbox", { name: "Tìm kiếm" }), { target: { value: "HV1" } });
+  await screen.findByLabelText("T\u01b0 c\u00e1ch thi HV1");
+  expect(screen.getByRole("button", { name: "Xuất file" })).toBeDisabled();
+  expect(screen.getByText("Hãy nhập đủ điểm thành phần cho tất cả học viên!")).toBeInTheDocument();
+});
+
+it("shows the missing-score toast on click while the exam list is still loading", async () => {
+  render(<ExamLists />);
+  await screen.findByLabelText("Điểm kiểm tra HV001");
+  const original = axios.get.getMockImplementation();
+  let finishRequest;
+  axios.get.mockImplementation((url, config) => config?.params?.mode === "exam"
+    ? new Promise(resolve => { finishRequest = () => resolve({ data: paged([{ ...savedRow }], config.params) }); })
+    : original(url, config));
+  fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
+  expect(await screen.findByText("Hãy nhập đủ điểm thành phần cho tất cả học viên!")).toBeInTheDocument();
+  expect(screen.getByLabelText("Đang tải bảng điểm")).toBeInTheDocument();
+  await act(async () => finishRequest());
+  expect(screen.getByText("Hãy nhập đủ điểm thành phần cho tất cả học viên!")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Xuất file" })).toBeDisabled();
+});
+
+it("shows eligible pending and failed examinees, excluding exemptions and failed prerequisites", async () => {
   setup("admin", [
-    { ...savedRow, eligible: true, result: "passed" },
-    { ...savedRow, participantId: "student:two", code: "HV002", eligible: null, result: "pending" },
-    { ...savedRow, participantId: "student:three", code: "HV003", eligible: false, result: "passed" },
-    { ...savedRow, participantId: "student:four", code: "HV004", eligible: true, examExempt: true, result: "exempt" },
-    { ...savedRow, participantId: "student:five", code: "HV005", eligible: true, result: "failed" },
+    { ...savedRow, testScore: 4, assignmentScore: 4 },
+    { ...savedRow, participantId: "student:two", code: "HV002", testScore: 3, assignmentScore: 8, result: "passed" },
+    { ...savedRow, participantId: "student:three", code: "HV003", testScore: 8, assignmentScore: 8, examExempt: true },
+    { ...savedRow, participantId: "student:four", code: "HV004", testScore: 6, assignmentScore: 6, examScore: 3, result: "failed" },
   ]);
   render(<ExamLists />);
-  const printRows = () => within(screen.getByTestId("exam-print-table")).getAllByRole("row", { hidden: true });
-  await screen.findByLabelText("Điểm học phần HV001");
-  expect(screen.queryByRole("button", { name: "DS thi có điểm" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Danh sách không đạt" })).not.toBeInTheDocument();
-  fireEvent.change(screen.getByPlaceholderText("Tìm theo mã HV, họ tên..."), { target: { value: "HV002" } });
-  expect(screen.queryByTestId("exam-print-table")).not.toBeInTheDocument();
+  await screen.findByLabelText("\u0110i\u1ec3m ki\u1ec3m tra HV001");
   fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
-  await waitFor(() => expect(printRows()).toHaveLength(1));
-  fireEvent.change(screen.getByPlaceholderText("Tìm theo mã HV, họ tên..."), { target: { value: "" } });
-  await waitFor(() => expect(printRows()).toHaveLength(3));
-  const printed = printRows();
-  expect(printed).toHaveLength(3);
-  expect(printed[1]).toHaveTextContent("HV001");
-  expect(printed[2]).toHaveTextContent("HV003");
-  for (const code of ["HV002", "HV004", "HV005"]) expect(within(screen.getByTestId("exam-print-table")).queryByText(code)).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "In danh sách" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Tải lại" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Xuất CSV" })).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Xuất Excel" })).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Cả bảng điểm" }));
-  await waitFor(() => expect(screen.queryByTestId("exam-print-table")).not.toBeInTheDocument());
+  await screen.findByLabelText("T\u01b0 c\u00e1ch thi HV001");
+  expect(screen.getByLabelText("T\u01b0 c\u00e1ch thi HV001")).toBeDisabled();
+  expect(screen.queryByText("HV002")).not.toBeInTheDocument();
+  expect(screen.queryByText("HV003")).not.toBeInTheDocument();
+  expect(screen.getAllByText("HV004").length).toBeGreaterThan(0);
+  expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled();
 });
 
 it("requests only 15 students per page and saves drafts from different pages together", async () => {
@@ -342,16 +631,16 @@ it("requests only 15 students per page and saves drafts from different pages tog
 
 it("returns to the first page when searching or changing the list mode", async () => {
   setup("admin", Array.from({ length: 22 }, (_, index) => ({
-    ...savedRow, participantId: `student:${index + 1}`, code: `HV${String(index + 1).padStart(3, "0")}`, eligible: true, result: "passed",
+    ...savedRow, participantId: `student:${index + 1}`, code: `HV${String(index + 1).padStart(3, "0")}`, testScore: 6, assignmentScore: 6, eligible: true, result: "passed",
   })));
   render(<ExamLists />);
   await screen.findByLabelText("Điểm kiểm tra HV001");
   fireEvent.click(screen.getByRole("button", { name: /page 2/i }));
   await screen.findByLabelText("Điểm kiểm tra HV016");
-  fireEvent.change(screen.getByPlaceholderText("Tìm theo mã HV, họ tên..."), { target: { value: "HV001" } });
+  fireEvent.change(screen.getByRole("textbox", { name: "Tìm kiếm" }), { target: { value: "HV001" } });
   expect(await screen.findByLabelText("Điểm kiểm tra HV001")).toBeInTheDocument();
   expect(screen.getByText("Hiển thị 1–1 trên 1 học viên")).toBeInTheDocument();
-  fireEvent.change(screen.getByPlaceholderText("Tìm theo mã HV, họ tên..."), { target: { value: "" } });
+  fireEvent.change(screen.getByRole("textbox", { name: "Tìm kiếm" }), { target: { value: "" } });
   fireEvent.click(await screen.findByRole("button", { name: /page 2/i }));
   await screen.findByLabelText("Điểm kiểm tra HV016");
   fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
@@ -374,7 +663,7 @@ it("exports all 30 students to PDF, preserves drafts and reflects the current se
     await waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
     expect(snapshot().rows).toHaveLength(30); expect(snapshot().rows[0][8]).toBe("9.5"); expect(snapshot().rows[29][1]).toBe("HV030");
     await waitFor(() => expect(menu).toBeEnabled());
-    fireEvent.change(screen.getByPlaceholderText("Tìm theo mã HV, họ tên..."), { target: { value: "HV030" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Tìm kiếm" }), { target: { value: "HV030" } });
     await screen.findByLabelText("Điểm kiểm tra HV030");
     fireEvent.click(menu); fireEvent.click(screen.getByRole("menuitem", { name: "PDF / In" }));
     await waitFor(() => expect(replace).toHaveBeenCalledTimes(2));
@@ -398,7 +687,7 @@ it("disables controls while exporting and reports revision changes without produ
     const menu = screen.getByRole("button", { name: "Xuất file" });
     fireEvent.click(menu); fireEvent.click(screen.getByRole("menuitem", { name: "PDF / In" }));
     await waitFor(() => expect(menu).toBeDisabled());
-    expect(screen.getByPlaceholderText("Tìm theo mã HV, họ tên...")).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "Tìm kiếm" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "DS thi" })).toBeDisabled();
     finish({ data: { revision: 1, total: 30, page: 1, rows: [savedRow] } });
     expect(await screen.findByText("Bảng điểm đã thay đổi trong lúc xuất. Vui lòng xuất lại.")).toBeInTheDocument();

@@ -140,7 +140,7 @@ it.each(["applications", "admitted-masters"])("%s list keeps the relevant row ac
   render(<MemoryRouter><AdmissionRecords mode={mode} /></MemoryRouter>);
   await screen.findAllByText(record.email);
   expect(screen.queryByRole("button", { name: /In \/ Xuất/ })).not.toBeInTheDocument();
-  expect(screen.getAllByRole("button", { name: "Sửa hồ sơ" })).toHaveLength(2);
+  expect(screen.getAllByRole("button", { name: /^Sửa hồ sơ / })).toHaveLength(2);
   if (mode === "admitted-masters") {
     expect(screen.queryByRole("button", { name: "Xóa hồ sơ" })).not.toBeInTheDocument();
   } else {

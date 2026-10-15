@@ -13,7 +13,7 @@ export default function AdmissionTuitionCheckbox({ record, disabled = false, sho
     try {
       const { data } = await axios.put(`${API_BASE_URL}/plan/admission-records/${record.id}/tuition`, { paid, updatedAt: record.updatedAt }, { withCredentials: true });
       await onSaved?.({ ...record, ...data });
-      toast.success(paid ? "Đã xác nhận học phí nhập học. Trạng thái chuyển sang Đang học." : "Đã hủy xác nhận học phí nhập học. Trạng thái trở về Đã trúng tuyển.");
+      toast.success(paid ? "Đã xác nhận học phí nhập học." : "Đã hủy xác nhận học phí nhập học.");
     } catch (error) {
       toast.error(error.response?.data?.message || "Không thể cập nhật học phí nhập học. Vui lòng tải lại hồ sơ.");
     } finally { setPending(false); onBusyChange?.(false); }
@@ -22,7 +22,7 @@ export default function AdmissionTuitionCheckbox({ record, disabled = false, sho
   if (!showDetails) return checkbox;
   return <Stack spacing={0.5}>
     <FormControlLabel control={checkbox} label="Đã nộp học phí nhập học" />
-    <Typography variant="caption">Tích để chuyển từ Đã trúng tuyển sang Đang học. Bỏ tích để sửa xác nhận nhầm.</Typography>
+    <Typography variant="caption">Trạng thái Đang học được cập nhật khi học viên được phân lớp. Bỏ tích để sửa xác nhận học phí nhầm.</Typography>
     {payment?.updatedAt && <Typography variant="caption">Cập nhật: {new Date(payment.updatedAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })} · {payment.updatedBy || "—"}</Typography>}
   </Stack>;
 }

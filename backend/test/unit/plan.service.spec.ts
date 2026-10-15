@@ -136,7 +136,8 @@ describe("PlanService admission record pagination", () => {
       offset: 20,
     }));
     const query = admissionRecords.findAndCountAll.mock.calls[0][0] as any;
-    expect(query.where.studyStatus[Op.ne]).toBe("Đã trúng tuyển");
+    expect(query.where[Op.and][0].logic).toEqual({ [Op.ne]: "Đã trúng tuyển" });
+    expect(query.where[Op.and][0].attribute.val).toContain("class_group_members");
     expect(result.data).toHaveLength(20);
     expect(result.data[0].assignedGroup).toEqual({
       id: "group-1", name: "CNT2026.01", code: "26CNT01", academicYear: "2026",

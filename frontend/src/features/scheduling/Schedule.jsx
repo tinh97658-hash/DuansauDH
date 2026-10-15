@@ -6,7 +6,8 @@ import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 import SwapVertRounded from "@mui/icons-material/SwapVertRounded";
 import ArrowUpwardRounded from "@mui/icons-material/ArrowUpwardRounded";
 import ArrowDownwardRounded from "@mui/icons-material/ArrowDownwardRounded";
-import { api, groupsOf, intersectDays, labelOf, message, Modal, normalize, Notice, offeringTitle, rows, SearchSelect, subjectLabel, unique, useLoad } from "./shared";
+import { api, groupsOf, intersectDays, labelOf, message, Modal, normalize, Notice, offeringTitle, rows, SearchSelect, unique, useLoad } from "./shared";
+
 import { addDays, formatDateKey, getBusinessTodayKey, isSessionPast, mondayOf, vietnameseDate, vietnameseDayMonth, vietnameseWeekdayShort, weekDaysFrom } from "../../utils/schedulingCalendar";
 import SessionEditor from "./SessionEditor";
 import { shouldSuggestClosing } from "./sessionWarning";
@@ -16,6 +17,8 @@ import { buildScheduleDocument, clearScheduleReturnView, createScheduleExcel, cr
 import SchedulePrintTemplate from "./SchedulePrintTemplate";
 import DocumentExportMenu from "../../components/DocumentExportMenu";
 import { sortOfferingsByHeldSessions } from "./offeringSessionSort";
+
+const subjectLabel = (offering) => offering?.subject?.name || "Học phần";
 
 const SESSION_SORT_STATES = {
   default: { next: "asc", label: "Sắp xếp theo số buổi", Icon: SwapVertRounded },
@@ -324,9 +327,8 @@ export default function Schedule({ user }) {
     const style = { held: "sl-held", not: "sl-not", planned: "" }[dayFocusStatusKey(session)];
     const title = offeringTitle(session.courseOffering);
     const subject = subjectLabel(session.courseOffering);
-    const subjectCode = session.courseOffering?.subject?.code || subject || "Chưa có mã học phần";
     const room = session.room?.code || "Chưa có phòng";
-    return <SessionMagnifier key={session.id} session={session} stateClass={style} className={`sl-session sl-focus-session ${style}`} onClick={() => openSession(session)}><strong title={title}>{title}</strong><span className="sl-focus-meta" title={`${subject} · ${room}`}><span>{subjectCode}</span><span>· {room}</span></span></SessionMagnifier>;
+    return <SessionMagnifier key={session.id} session={session} stateClass={style} className={`sl-session sl-focus-session ${style}`} onClick={() => openSession(session)}><strong title={title}>{title}</strong><span className="sl-focus-meta" title={`${subject} · ${room}`}><span>{subject}</span><span>· {room}</span></span></SessionMagnifier>;
   };
   const changeWeek = (nextWeek) => {
     const focusedWeekdayIndex = focusedDate
@@ -445,7 +447,7 @@ export default function Schedule({ user }) {
           <div className="v20-slot-items">
           {sessions.loading ? <span className="v20-hint">Đang tải...</span> : items.slice(0, WEEK_SLOT_LIMIT).map((session) => sessionCard(session, true))}
           {items.length > WEEK_SLOT_LIMIT && <WeekOverflowPreview date={date} dayLabel={vietnameseWeekdayShort(day)} period={period} hiddenSessions={items.slice(WEEK_SLOT_LIMIT)} onOpenDay={() => setFocusedDate(date)} />}
-          {!items.length && availability.visible && <span className={`v20-add-slot sl-week-slot-affordance${availability.enabled ? "" : " sl-disabled"}`} aria-hidden="true">+ Xếp buổi</span>}
+          {availability.visible && <span className={`v20-add-slot sl-week-slot-affordance${availability.enabled ? "" : " sl-disabled"}`} aria-hidden="true">+ Xếp buổi</span>}
           {!items.length && !selecting && !sessions.loading && <span className="v20-hint">{past ? "Buổi đã qua" : "Chưa có lịch"}</span>}
           {incompatible && <span className="v20-hint">Không thuộc ngày học chung</span>}
         </div></div>;

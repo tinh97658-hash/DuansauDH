@@ -4,6 +4,7 @@ import axios from "axios";
 import AdmissionRecordDetail from "../../pages/plan/admissionRecordDetail";
 import ClassScoreSummary from "../../pages/reports/classScoreSummary";
 import LearnerScorecard from "../../features/learners/LearnerScorecard";
+import { notifyGradebookSaved } from "../../utils/gradebookRevision";
 
 jest.mock("axios", () => ({ get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn(), defaults: {} }));
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
@@ -35,6 +36,16 @@ const subjects = [
 ];
 const scorecard = (id = "g1") => ({ student, groups, group: groups.find(group => group.id === id), curriculum: { id: "c1", name: "CTĐT Công nghệ thông tin", totalCredits: 60 }, subjects });
 const classReport = { ...scorecard(), rows: [student], total: 1 };
+
+it("shows an interrupted study-leave failure with preserved coursework and no invented final mark", async () => {
+  const interrupted = { ...subjects[0], grade: { score: null, result: "failed", studyLeaveFailure: true,
+    details: { source: "gradebook", studyLeaveFailure: true, testScore: 7, assignmentScore: 8, examScore: null } } };
+  axios.get.mockResolvedValue({ data: { ...scorecard(), subjects: [interrupted] } });
+  render(<LearnerScorecard admissionRecordId="ar1" classGroupId="g1" />);
+  const result = await screen.findByText("Không đạt");
+  const cells = within(result.closest("tr")).getAllByRole("cell").map(cell => cell.textContent);
+  expect(cells.slice(5)).toEqual(["7", "8", "", "", "", "", "", "Không đạt"]);
+});
 const LocationProbe = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -67,6 +78,46 @@ beforeEach(() => {
   });
 });
 
+it("maps old ineligible profile grades to zeros and F without replacing prerequisite scores or ungraded subjects", async () => {
+  axios.get.mockResolvedValue({ data: { ...scorecard(), subjects: [
+    { ...subjects[0], grade: { score: null, result: "pending", details: { source: "gradebook", testScore: 6, assignmentScore: 3 } } },
+    subjects[3],
+  ] } });
+  render(<LearnerScorecard admissionRecordId="ar1" classGroupId="g1" />);
+  const row = (await screen.findByText("HP01")).closest("tr");
+  const cells = within(row).getAllByRole("cell").map(cell => cell.textContent);
+  expect(cells.slice(5)).toEqual(["6", "3", "0", "0", "0", "F", "0.0", "Không đạt"]);
+  expect(screen.getByText("1/2 học phần có kết quả")).toBeInTheDocument();
+  expect(within(screen.getByText("HP04").closest("tr")).getByText("Chưa có kết quả")).toBeInTheDocument();
+});
+
+it("counts a profile language exemption as a passed course without making up numerical grades", async () => {
+  axios.get.mockResolvedValue({ data: { ...scorecard(), subjects: [{ ...subjects[1], grade: {
+    score: null, result: "passed", profileForeignLanguageExempt: true,
+    details: { source: "profile_foreign_language_exemption", examExempt: true, profileForeignLanguageExempt: true },
+  } }, subjects[3]] } });
+  render(<LearnerScorecard admissionRecordId="ar1" classGroupId="g1" />);
+  const row = (await screen.findByText("HP02")).closest("tr");
+  expect(within(row).getAllByRole("cell").map(cell => cell.textContent).slice(5))
+    .toEqual(["", "", "", "", "", "", "", "Miễn thi"]);
+  expect(screen.getByText("1/2 học phần có kết quả")).toBeInTheDocument();
+});
+
+it("refreshes an open personal scorecard after exam grades are saved", async () => {
+  let updated = false;
+  const defaultGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation(async (url, config) => url.includes("/learner-scorecard/")
+    ? { data: { ...scorecard(), subjects: [{ ...subjects[0], grade: updated
+      ? { score: 10, result: "passed", details: { source: "gradebook", testScore: 10, assignmentScore: 10, examScore: 10, courseScore: 10, grade4: 4, letterGrade: "A+" } }
+      : null }] } } : defaultGet(url, config));
+  render(<LearnerScorecard admissionRecordId="ar1" classGroupId="g1" />);
+  await screen.findByText("Chưa có kết quả");
+  updated = true;
+  act(() => notifyGradebookSaved());
+  await screen.findByText("A+");
+  expect(screen.getByText("1/1 học phần có kết quả")).toBeInTheDocument();
+});
+
 it("loads the new tab on demand and preserves every subject, component, zero and ungraded value", async () => {
   mount();
   const tab = await screen.findByRole("tab", { name: "Bảng điểm" });
@@ -78,7 +129,7 @@ it("loads the new tab on demand and preserves every subject, component, zero and
   const panel = screen.getByLabelText("Bảng điểm học viên");
   expect(within(panel).getAllByRole("row")).toHaveLength(6);
   const values = code => within(within(panel).getByText(code).closest("tr")).getAllByRole("cell").map(cell => cell.textContent);
-  expect(values("HP01")).toEqual(["1", "HP01", "Triết học", "3", "Bắt buộc", "8", "8.5", "7", "7.3", "3", "B", "Lần 1: 6; Lần 2: 7", "Đạt"]);
+  expect(values("HP01")).toEqual(["1", "HP01", "Triết học", "3", "Bắt buộc", "8", "8.5", "7", "7.3", "3", "B", "6.0, 7.0", "Đạt"]);
   expect(values("HP02")[8]).toBe("0");
   expect(values("HP02")[12]).toBe("Không đạt");
   expect(values("HP03")[12]).toBe("Miễn thi");
@@ -87,9 +138,19 @@ it("loads the new tab on demand and preserves every subject, component, zero and
   expect(values("HP05")[5]).toBe("0");
   expect(values("HP05")[8]).toBe("");
   expect(values("HP05")[12]).toBe("Chưa có kết quả");
-  fireEvent.click(screen.getByRole("tab", { name: "Thông tin hồ sơ & học tập" }));
-  expect(screen.getByRole("tab", { name: "Thông tin hồ sơ & học tập" })).toHaveAttribute("aria-selected", "true");
+  fireEvent.click(screen.getByRole("tab", { name: "Thông tin hồ sơ" }));
+  expect(screen.getByRole("tab", { name: "Thông tin hồ sơ" })).toHaveAttribute("aria-selected", "true");
   expect(screen.queryByLabelText("Bảng điểm học viên")).not.toBeInTheDocument();
+});
+
+it("shows a recognized course total and conversions without inventing exam component marks", async () => {
+  axios.get.mockResolvedValue({ data: { ...scorecard(), subjects: [{ ...subjects[0], grade: {
+    score: 9, result: "passed", details: { source: "recognition", courseScore: 9, grade4: 4, letterGrade: "A+" },
+  } }] } });
+  render(<LearnerScorecard admissionRecordId="ar1" />);
+  await waitForScorecard();
+  const cells = within(screen.getByText("HP01").closest("tr")).getAllByRole("cell").map(cell => cell.textContent);
+  expect(cells.slice(5)).toEqual(["", "", "", "9", "4", "A+", "", "Đạt"]);
 });
 
 it("opens the clicked learner's scorecard in the exact reported class and supports browser back", async () => {
@@ -121,7 +182,7 @@ it("keeps the chosen class in the URL and discards a late response from a previo
   await waitFor(() => expect(resolveOld).toBeDefined());
   expect(screen.getByTestId("location")).toHaveTextContent("classGroupId=g2");
   // Leaving the tab while a request is in flight must not populate the next tab mount.
-  fireEvent.click(screen.getByRole("tab", { name: "Thông tin hồ sơ & học tập" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Thông tin hồ sơ" }));
   await act(async () => resolveOld({ data: scorecard("g2") }));
   expect(screen.queryByLabelText("Bảng điểm học viên")).not.toBeInTheDocument();
 });

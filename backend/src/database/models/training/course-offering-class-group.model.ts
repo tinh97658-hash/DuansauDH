@@ -12,4 +12,7 @@ export class CourseOfferingClassGroup extends Model {
 
   @ForeignKey(() => ClassGroup) @Column({ type: DataType.UUID, allowNull: false }) declare classGroupId: string;
   @BelongsTo(() => ClassGroup, { foreignKey: "classGroupId", as: "classGroup" }) declare classGroup: ClassGroup;
+
+  // Null enrolls the whole class; a non-null list freezes a retake group's roster.
+  @Column({ type: DataType.ARRAY(DataType.TEXT), allowNull: true }) declare participantIds: string[] | null;
 }

@@ -1,6 +1,7 @@
 import { QueryTypes } from "sequelize";
 import type { Transaction } from "sequelize";
 import type { Sequelize } from "sequelize-typescript";
+import { studyEligibleRecordSql } from "../plan/study-leave-policy.js";
 
 export const commonWeekdays = (groups: Array<{ allowedWeekdays?: number[] }>) =>
   [1, 2, 3, 4, 5, 6, 0].filter((day) => groups.every((group) => (group.allowedWeekdays || [1, 2, 3, 4, 5, 6, 0]).includes(day)));
@@ -27,6 +28,7 @@ export async function readRetakes(sequelize: Sequelize, subjectId: string, trans
     JOIN course_offerings source ON source.id = r.source_course_offering_id AND source.status = 'completed'
     WHERE r.subject_id = :subjectId AND r.assigned_course_offering_id IS NULL
       AND a.status = 'approved' AND a.training_level = 'Thạc sĩ'
+      AND ${studyEligibleRecordSql('a')}
       AND NOT EXISTS (
         SELECT 1 FROM course_offerings active
         WHERE active.subject_id = r.subject_id AND active.status = 'active' AND (

@@ -344,16 +344,11 @@ it("combines all filters and preserves discipline dependency and the selected vi
   ["Tìm kiếm", "Ngành", "Chuyên ngành", "Khóa / năm học"].forEach(label => expect(screen.getByLabelText(label)).toHaveValue(""));
   expect(screen.getByLabelText("Tình trạng lịch")).toHaveValue("all");
   expect(screen.getByRole("button", { name: "Bảng ma trận môn" })).toHaveAttribute("aria-pressed", "true");
-  const labels = ["Tổng số lớp học phần", "Chưa xếp lịch", "Đang học / Đã xếp lịch", "Ghép liên khóa"];
-  const descriptions = ["Trong phạm vi đang lọc", "Cần ưu tiên sắp xếp", "Đã có buổi học", "Học chung từ 2 khóa"];
   const cards = container.querySelectorAll(".sl-matrix-kpi");
-  for (let i = 0; i < cards.length; i++) {
-    fireEvent.mouseOver(cards[i]);
-    const tip = await screen.findByRole("tooltip");
-    expect(within(tip).getByText(labels[i])).toBeInTheDocument();
-    expect(within(tip).getByText(descriptions[i])).toBeInTheDocument();
-    expect(container.contains(tip)).toBe(false);
-    fireEvent.mouseLeave(cards[i]);
-    await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
+  for (const card of cards) {
+    fireEvent.mouseOver(card);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(card).not.toHaveAttribute("aria-describedby");
+    fireEvent.mouseLeave(card);
   }
 });

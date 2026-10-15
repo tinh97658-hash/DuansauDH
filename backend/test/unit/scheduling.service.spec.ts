@@ -105,7 +105,7 @@ describe("SchedulingService participant preview", () => {
     expect(preview.participantCount).toBe(0);
   });
 
-  it("deduplicates individual selections against group members and persists the selection", async () => {
+  it("reads legacy individual rosters but rejects creating new classes from individual retake selections", async () => {
     const mocks = buildService();
     const record = { id: "admission-a", studentId: "student-a", code: "HV01", fullName: "Nguyễn An" };
     mocks.subjects.findByPk.mockResolvedValue(subject);
@@ -122,9 +122,9 @@ describe("SchedulingService participant preview", () => {
     mocks.courseOfferings.findByPk.mockResolvedValue({ id: "created", subject, groupLinks: [{ classGroupId: "group-a" }], individualStudents: [{ admissionRecordId: record.id, admissionRecord: record }] });
     mocks.classGroupMembers.findAll.mockResolvedValue([]);
     mocks.sequelize.query.mockResolvedValue([{ id: record.id, academicYear: "2025" }]);
-    const created: any = await mocks.service.createCourseOffering(dto);
-    expect(created.participantCount).toBe(1);
-    expect(mocks.individualStudents.bulkCreate).toHaveBeenCalledWith([{ courseOfferingId: "created", admissionRecordId: record.id }], { transaction });
+    await expect(mocks.service.createCourseOffering(dto)).rejects.toThrow("không chọn lẻ học viên");
+    expect(mocks.individualStudents.bulkCreate).not.toHaveBeenCalled();
+    expect(mocks.courseOfferings.create).not.toHaveBeenCalled();
   });
 
   it("rejects individual IDs outside the permitted major and admission status", async () => {

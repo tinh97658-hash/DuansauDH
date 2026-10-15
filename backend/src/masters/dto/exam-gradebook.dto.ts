@@ -7,6 +7,7 @@ export class ExamSubjectsQueryDto {
 
 export class ExamGradebookQueryDto extends ExamSubjectsQueryDto {
   @IsUUID() courseOfferingId!: string;
+  @IsOptional() @IsIn(["group", "offering"]) rosterScope?: "group" | "offering";
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(15) pageSize?: number;
   @IsOptional() @IsIn(["all", "exam"]) mode?: "all" | "exam";

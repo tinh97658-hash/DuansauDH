@@ -30,11 +30,44 @@ it.each([4, 30, 40])("fetches every page for %i students with filters and drafts
   fetch.mock.calls.forEach(([params], index) => expect(params).toEqual({ classGroupId: "g1", courseOfferingId: "o1", mode: "all", search: "Nguyễn", page: index + 1, pageSize: 15 }));
 });
 
+it("exports the current profile exemption instead of an older unsaved grade draft", async () => {
+  const row = { ...roster(1)[0], examExempt: true, profileForeignLanguageExempt: true, result: "passed",
+    testScore: null, assignmentScore: null, examScore: null, courseScore: null, grade4: null, letterGrade: "" };
+  const exported = await fetchAllGradebookRows(async () => ({ data: { revision: 1, total: 1, page: 1, rows: [row] } }),
+    { mode: "all" }, () => ({ [row.participantId]: { ...row, examExempt: false, result: "failed", courseScore: 0 } }));
+  const document = buildGradebookDocument(group, offering, exported);
+  expect(document.rows[0][7]).toBe("Có");
+  expect(document.rows[0].slice(-5)).toEqual(["", "", "", "", "Đạt"]);
+});
+
 it("cancels on revision or page changes instead of returning a partial export", async () => {
   const fetch = jest.fn().mockResolvedValueOnce({ data: { revision: 1, total: 30, page: 1, rows: roster(15) } })
     .mockResolvedValueOnce({ data: { revision: 2, total: 30, page: 2, rows: roster(15) } });
   await expect(fetchAllGradebookRows(fetch, { mode: "all" })).rejects.toThrow("Vui lòng xuất lại");
   await expect(fetchAllGradebookRows(async () => ({ data: { revision: 1, total: 30, page: 2, rows: [] } }), { mode: "all" })).rejects.toThrow("Danh sách đã thay đổi");
+});
+
+it("exports the approved study-leave failure instead of an older unsaved passing draft", async () => {
+  const row = { ...roster(1)[0], studyLeaveFailure: true, testScore: 7, assignmentScore: 8,
+    examScore: null, courseScore: null, grade4: null, letterGrade: "", result: "failed" };
+  const exported = await fetchAllGradebookRows(async () => ({ data: { revision: 1, total: 1, page: 1, rows: [row] } }),
+    { mode: "all" }, () => ({ [row.participantId]: { ...row, studyLeaveFailure: false, result: "passed", courseScore: 8 } }));
+  expect(buildGradebookDocument(group, offering, exported).rows[0].slice(-5)).toEqual(["", "", "", "", "Không đạt"]);
+});
+
+it("blocks exam export using class-wide assessment status independently of filtered rows", async () => {
+  const rows = [{ ...roster(1)[0], testScore: 6, assignmentScore: 6 }];
+  await expect(fetchAllGradebookRows(async () => ({ data: { revision: 1, total: 1, totalRows: 40, page: 1, rows, unassessedRows: 1 } }), { mode: "exam" }))
+    .rejects.toThrow("Chưa xét đủ tư cách của cả lớp");
+  const exported = await fetchAllGradebookRows(async () => ({ data: { revision: 1, total: 1, totalRows: 40, page: 1, rows, unassessedRows: 0 } }), { mode: "exam" });
+  expect(exported).toHaveLength(1);
+});
+
+it("excludes failed prerequisites and exemptions when building an exam document", () => {
+  const base = { ...roster(1)[0], testScore: 4, assignmentScore: 4, examScore: null, result: "pending" };
+  const document = buildExamListDocument(group, offering, [base, { ...base, code: "FAILED", testScore: 3.9, eligible: true }, { ...base, code: "EXEMPT", examExempt: true }]);
+  expect(document.rows).toHaveLength(1);
+  expect(document.rows[0][1]).toBe(base.code);
 });
 
 it.each([4, 40])("writes an actual single-sheet workbook with %i students and bounded styles", async count => {
@@ -105,8 +138,8 @@ it("uses the business timezone and sanitizes filename components", () => {
   expect(gradebookFilename(group, offering, "DS-thi")).toBe("DS-thi-CNTT-2026-HP-01.xlsx");
 });
 
-it("prints ten exam columns including notes with the schedule Excel format", async () => {
-  const rows = roster(40).map(draftOf);
+it("prints nine exam columns including notes without the final outcome column", async () => {
+  const rows = roster(40).map(row => draftOf({ ...row, testScore: 6, assignmentScore: 6, examExempt: false }));
   rows[0].code = "=HV-2026-001";
   rows[0].courseScore = "8,5";
   rows[0].notes = "Miễn thi theo quyết định";
@@ -121,18 +154,18 @@ it("prints ten exam columns including notes with the schedule Excel format", asy
   expect(sheet.getRow(2).values).toContain(`Lớp: ${group.name}`);
   expect(sheet.getCell("A3").value).toBe(`Học phần: ${offering.subject.name}`);
   expect(sheet.getRow(EXAM_LIST_HEADER_ROW).values.slice(1)).toEqual(gradebookColumns(true).map(column => column.label));
-  expect(sheet.columnCount).toBe(10);
+  expect(sheet.columnCount).toBe(9);
   expect(sheet.rowCount).toBe(EXAM_LIST_HEADER_ROW + rows.length);
   expect(sheet.getCell("B5").value).toBe(rows[0].code);
   expect(sheet.getCell("B5").type).toBe(ExcelJS.ValueType.String);
   expect(sheet.getCell("E5").value).toBe("02/01/1990");
-  expect(sheet.getCell("G5").value).toBe("Chưa xét");
-  expect(sheet.getCell("H6").value).toBe("Có");
-  expect(sheet.getCell("I5").value).toBe("Đạt");
+  expect(sheet.getCell("G5").value).toBe("Đủ tư cách");
+  expect(sheet.getCell("H6").value).toBe("Không");
+  expect(sheet.getCell("I5").value).toBe(rows[0].notes);
   expect(sheet.getCell("B44").value).toBe("HV40");
   expect(sheet.getCell("B5").alignment.wrapText).not.toBe(true);
   expect(sheet.getCell("B5").alignment.shrinkToFit).toBe(true);
-  expect(gradebookDocumentColumns(document, true)[8].key).toBe("result");
+  expect(gradebookDocumentColumns(document, true)[8].key).toBe("notes");
   for (let column = 1; column <= 9; column++) {
     const header = sheet.getCell(EXAM_LIST_HEADER_ROW, column);
     const scheduleHeader = schedule.getCell(4, column);
@@ -145,12 +178,11 @@ it("prints ten exam columns including notes with the schedule Excel format", asy
     expect(sheet.getCell(5, column).isMerged).toBe(false);
   }
   expect(sheet.pageSetup).toMatchObject({ paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0,
-    printTitlesRow: "4:4", printArea: "A1:J44", margins: schedule.pageSetup.margins });
+    printTitlesRow: "4:4", printArea: "A1:I44", margins: schedule.pageSetup.margins });
   expect(sheet.views[0]).toMatchObject({ state: "frozen", ySplit: 4, showGridLines: true });
-  expect(sheet.autoFilter).toBe("A4:J44");
-  expect(sheet.getCell("J4").value).toBe("Ghi chú");
-  expect(sheet.getCell("J5").value).toBe(rows[0].notes);
-  expect(sheet.getCell("K4").value).toBeNull();
+  expect(sheet.autoFilter).toBe("A4:I44");
+  expect(sheet.getCell("I4").value).toBe("Ghi chú");
+  expect(sheet.getCell("J4").value).toBeNull();
   expect(JSON.stringify(sheet.model)).not.toContain("8,5");
   expect(JSON.stringify(rows)).toBe(before);
 });

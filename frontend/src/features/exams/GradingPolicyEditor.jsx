@@ -35,13 +35,13 @@ export default function GradingPolicyEditor({ subject, policy, mode, onApply, re
           label="Dùng bảng quy đổi chung" />
         <Typography variant="body2">Mỗi mức áp dụng từ ngưỡng đã nhập đến trước ngưỡng cao hơn kế tiếp. Điểm học phần được làm tròn 1 chữ số thập phân trước khi quy đổi.</Typography>
         <TableContainer><Table size="small" aria-label="Bảng quy đổi điểm">
-          <TableHead><TableRow><TableCell>Điểm thang 10 từ</TableCell><TableCell>Điểm chữ</TableCell><TableCell>Điểm thang 4</TableCell><TableCell>Thao tác</TableCell></TableRow></TableHead>
+          <TableHead><TableRow><TableCell>Điểm thang 10 từ</TableCell><TableCell>Điểm chữ</TableCell><TableCell>Điểm thang 4</TableCell><TableCell align="center">Thao tác</TableCell></TableRow></TableHead>
           <TableBody>{bands.map((band, index) => <TableRow key={index}>
             <TableCell>{field(`Ngưỡng thang 10 mức ${index + 1}`, band.minimum, value => editBand(index, "minimum", value), 10, draft.useDefaultBands, false)}</TableCell>
             <TableCell><TextField size="small" fullWidth value={band.letter} disabled={readOnly || draft.useDefaultBands} onChange={event => editBand(index, "letter", event.target.value.toUpperCase())}
               inputProps={{ "aria-label": `Điểm chữ mức ${index + 1}`, maxLength: 10 }} /></TableCell>
             <TableCell>{field(`Thang 4 mức ${index + 1}`, band.grade4, value => editBand(index, "grade4", value), 4, draft.useDefaultBands, false)}</TableCell>
-            <TableCell><IconButton size="small" color="error" disabled={readOnly || draft.useDefaultBands || bands.length <= 1} onClick={() => setDraft(current => ({ ...current, bands: current.bands.filter((_, position) => position !== index) }))}
+            <TableCell align="center"><IconButton size="small" color="error" disabled={readOnly || draft.useDefaultBands || bands.length <= 1} onClick={() => setDraft(current => ({ ...current, bands: current.bands.filter((_, position) => position !== index) }))}
               aria-label={`Xóa mức quy đổi ${index + 1}`} title="Xóa mức quy đổi" sx={{ "&.Mui-disabled": { color: "error.main", opacity: 0.4 } }}><DeleteRounded fontSize="small" /></IconButton></TableCell>
           </TableRow>)}</TableBody>
         </Table></TableContainer>

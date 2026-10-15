@@ -8,6 +8,7 @@ import {
   DialogTitle,
   IconButton,
 } from "@mui/material";
+import "../styles/dialogs.css";
 
 /**
  * Standardized institutional dialog component.
@@ -41,6 +42,8 @@ const AppDialog = ({
   contentSx = {},
   actionsSx = {},
   titleSx = {},
+  referenceStyle = true,
+  className = "",
   ...rest
 }) => {
   const isBusy = Boolean(loading || saving || confirmLoading);
@@ -48,6 +51,7 @@ const AppDialog = ({
 
   return (
     <Dialog
+      className={[referenceStyle && "app-popup", className].filter(Boolean).join(" ")}
       open={Boolean(open)}
       onClose={isBusy ? undefined : onClose}
       maxWidth={maxWidth}

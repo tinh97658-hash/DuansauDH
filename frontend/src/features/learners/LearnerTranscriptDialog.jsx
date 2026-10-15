@@ -117,7 +117,7 @@ export default function LearnerTranscriptDialog({ classGroupId, onClose }) {
     }
   };
 
-  return <Dialog open onClose={onClose} fullWidth maxWidth="md" aria-labelledby="transcript-dialog-title" className="transcript-dialog">
+  return <Dialog open onClose={onClose} fullWidth maxWidth="md" aria-labelledby="transcript-dialog-title" className="transcript-dialog app-popup">
     <DialogTitle id="transcript-dialog-title" className="transcript-dialog-heading">
       <span>XUẤT BẢNG ĐIỂM CÁ NHÂN</span>
       <p className="transcript-class"><strong>{roster?.classGroup?.code || roster?.classGroup?.name || "Lớp hiện tại"}</strong>

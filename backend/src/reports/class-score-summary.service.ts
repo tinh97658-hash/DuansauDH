@@ -8,7 +8,12 @@ import { Curriculum } from "../database/models/plan/curriculum.model.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
 import { ClassScoreSummaryQueryDto } from "./dto/class-score-summary.dto.js";
 import { sortCurriculumSubjectsByVietnameseName } from "../plan/curriculum-subject-order.js";
+import { LEGACY_GRADING_POLICY, type GradingPolicy } from "../masters/grading-policy.js";
+import { calculateExamEligibility, resolveSavedExamGrade } from "../masters/exam-grade-calculation.js";
+import { matchesExamSubjectSql } from "../masters/exam-subject-scope.js";
+import { foreignLanguageExemptGrade, foreignLanguageSubjectSql } from "../masters/foreign-language-exemption.js";
 
+import { examOutcomesSql } from "../plan/exam-outcomes.js";
 // Shared identity selection and deduplication; neither path changes roster semantics.
 const CLASS_ROSTER_CTE = `
       WITH identities AS (
@@ -20,7 +25,8 @@ const CLASS_ROSTER_CTE = `
           COALESCE(NULLIF(ar.code, ''), st.reg_no, '') AS code,
           COALESCE(NULLIF(ar.full_name, ''), st.full_name, '') AS "fullName",
           COALESCE(ar.last_name, '') AS "lastName", COALESCE(ar.first_name, '') AS "firstName",
-          COALESCE(ar.dob, '') AS dob, COALESCE(ar.gender, '') AS gender
+          COALESCE(ar.dob, '') AS dob, COALESCE(ar.gender, '') AS gender,
+          COALESCE(ar.is_exempt_foreign_language, false) AS "isExemptForeignLanguage"
         FROM class_group_members cm
         LEFT JOIN LATERAL (
           SELECT a.* FROM admission_records a
@@ -32,7 +38,7 @@ const CLASS_ROSTER_CTE = `
         LEFT JOIN students st ON st.id = COALESCE(cm.student_id, ar.student_id)
         WHERE cm.class_group_id = :groupId
       ), people AS (
-        SELECT DISTINCT ON ("participantId") "participantId", "admissionRecordId", "studentId", code, "fullName", "lastName", "firstName", dob, gender
+        SELECT DISTINCT ON ("participantId") "participantId", "admissionRecordId", "studentId", code, "fullName", "lastName", "firstName", dob, gender, "isExemptForeignLanguage"
         FROM identities WHERE "participantId" IS NOT NULL
         ORDER BY "participantId", admission_id NULLS LAST, member_id
       )`;
@@ -142,7 +148,8 @@ export class ClassScoreSummaryService {
     });
     if (!group) throw new NotFoundException("Không tìm thấy lớp học viên.");
     const subjects = sortCurriculumSubjectsByVietnameseName(group.curriculumId ? await this.sequelize.query<any>(`
-      SELECT s.id, COALESCE(NULLIF(s.code_text, ''), s.code) AS code, s.name, s.credits, s.is_required AS "isRequired", COALESCE(catalog_block.name, b.name) AS "blockName"
+      SELECT s.id, COALESCE(NULLIF(s.code_text, ''), s.code) AS code, s.name, s.credits, s.is_required AS "isRequired", COALESCE(catalog_block.name, b.name) AS "blockName",
+        ${foreignLanguageSubjectSql('s.id')} AS "isForeignLanguage"
       FROM curriculum_subjects cs
       JOIN subjects s ON s.id = cs.subject_id
       JOIN curriculum_blocks b ON b.id = cs.block_id
@@ -153,7 +160,7 @@ export class ClassScoreSummaryService {
     const pageSize = Math.min(100, Math.max(1, query.pageSize || 50));
     const [roster] = await this.sequelize.query<any>(`
       ${CLASS_ROSTER_CTE}, filtered AS (
-        SELECT "participantId", "admissionRecordId", code, "fullName", "lastName", "firstName", dob, gender FROM people WHERE (:participantId = '' OR "participantId" = :participantId)
+        SELECT "participantId", "admissionRecordId", code, "fullName", "lastName", "firstName", dob, gender, "isExemptForeignLanguage" FROM people WHERE (:participantId = '' OR "participantId" = :participantId)
           AND (:search = '' OR POSITION(LOWER(:search) IN LOWER(code || ' ' || "fullName" || ' ' || "lastName" || ' ' || "firstName")) > 0)
       ), metadata AS (
         SELECT COUNT(*)::int AS total FROM filtered
@@ -176,23 +183,37 @@ export class ClassScoreSummaryService {
       // Match aliases by their canonical subject, never by a coincidentally equal name.
       const scores = await this.sequelize.query<any>(`
         WITH candidates AS (
-          SELECT CASE WHEN identity.student_id IS NOT NULL THEN 'student:' || identity.student_id::text ELSE g.value->>'participantId' END AS participant_id, co.subject_id,
-            NULLIF(g.value->>'courseScore', '')::numeric AS score,
-            COALESCE(g.value->>'result', 'pending') AS result,
-            book.updated_at AS recorded_at, book.id,
-            g.value || jsonb_build_object('source', 'gradebook') AS details
-          FROM course_exam_gradebooks book
-          JOIN course_offerings co ON co.id = book.course_offering_id
-          CROSS JOIN LATERAL jsonb_array_elements(book.grades) g(value)
-          LEFT JOIN admission_records identity ON g.value->>'participantId' = 'admission:' || identity.id::text
-          WHERE g.value->>'participantId' IN (:participantIds)
-            OR ('student:' || identity.student_id::text) IN (:participantIds)
+          SELECT attempt.participant_id, attempt.subject_id,
+            NULLIF(attempt.grade->>'courseScore', '')::numeric AS score,
+            COALESCE(attempt.grade->>'result', 'pending') AS result,
+            attempt.recorded_at, attempt.id, 0 AS priority,
+            attempt.grade || jsonb_build_object('source', 'gradebook', 'eligibilityPolicy', rules.policy) AS details,
+            attempt.course_offering_id::text AS offering_id
+          FROM (${examOutcomesSql()}) attempt
+          LEFT JOIN LATERAL (SELECT policy FROM shared_grading_rules ORDER BY version DESC LIMIT 1) rules ON true
+          WHERE attempt.participant_id IN (:participantIds)
+          UNION ALL
+          SELECT CASE WHEN ar.student_id IS NOT NULL THEN 'student:' || ar.student_id::text
+              ELSE 'admission:' || ar.id::text END, recognition.target_subject_id,
+            learning.score, 'passed', recognition.updated_at, recognition.id::text, 1,
+            jsonb_build_object('source', 'recognition', 'recognitionId', recognition.id,
+              'courseScore', learning.score, 'result', 'passed', 'conversionPolicy', rules.policy), NULL::text
+          FROM subject_recognitions recognition
+          JOIN admission_records ar ON ar.id = recognition.admission_record_id
+          JOIN learner_subject_results learning ON learning.id = recognition.learning_result_id
+            AND learning.admission_record_id = ar.id
+          LEFT JOIN LATERAL (SELECT policy FROM shared_grading_rules ORDER BY version DESC LIMIT 1) rules ON true
+          WHERE recognition.status = 'approved' AND learning.status = 'completed'
+            AND learning.source_type IN ('pre_masters', 'early_enrollment', 'external')
+            AND learning.result = 'passed' AND learning.score BETWEEN 0 AND 10
+            AND (CASE WHEN ar.student_id IS NOT NULL THEN 'student:' || ar.student_id::text
+              ELSE 'admission:' || ar.id::text END) IN (:participantIds)
         ), ranked AS (
           SELECT c.participant_id AS "participantId", target.id AS "subjectId", c.score, c.result, c.details,
             ROW_NUMBER() OVER (PARTITION BY c.participant_id, target.id
-              ORDER BY c.recorded_at DESC, c.id DESC) AS rank
+              ORDER BY c.priority DESC, c.recorded_at DESC, c.id DESC) AS rank
           FROM candidates c JOIN subjects source ON source.id = c.subject_id
-          JOIN subjects target ON COALESCE(target.canonical_subject_id, target.id) = COALESCE(source.canonical_subject_id, source.id)
+          JOIN subjects target ON ${matchesExamSubjectSql('source', 'target', 'c.offering_id', ':groupId')}
           WHERE target.id IN (:subjectIds)
         )
         SELECT "participantId", "subjectId", score, result, details FROM ranked WHERE rank = 1
@@ -201,15 +222,46 @@ export class ClassScoreSummaryService {
       } });
       const people = new Map(rows.map(row => [row.participantId, row]));
       for (const entry of scores) {
+        if (entry.details?.source === "gradebook") {
+          const grade = entry.details;
+          const policy = grade.eligibilityPolicy || LEGACY_GRADING_POLICY;
+          const calculated = resolveSavedExamGrade(grade, policy);
+          entry.score = calculated.courseScore;
+          entry.result = calculated.result;
+          entry.details = { ...grade, ...calculated, eligibilityPolicy: policy };
+          if (!grade.studyLeaveFailure && !grade.examExempt && calculateExamEligibility(grade, policy) === false) {
+            entry.score = 0;
+            entry.result = "failed";
+            entry.details = { ...entry.details, examScore: 0, attemptScores: [0] };
+          }
+        }
+        if (entry.details?.source === "recognition") {
+          const policy: GradingPolicy = entry.details.conversionPolicy || LEGACY_GRADING_POLICY;
+          const band = [...policy.bands].sort((a, b) => b.minimum - a.minimum)
+            .find(item => Number(entry.score) >= item.minimum);
+          entry.details = { source: "recognition", recognitionId: entry.details.recognitionId,
+            courseScore: Number(entry.score), grade4: band?.grade4 ?? null,
+            letterGrade: band?.letter || "", result: "passed" };
+        }
         const person = people.get(entry.participantId);
         if (person) person.scores[entry.subjectId] = { score: entry.score == null ? null : Number(entry.score), result: entry.result,
+          ...(entry.details?.studyLeaveFailure ? { studyLeaveFailure: true } : {}),
           ...(scope.includeDetails ? { details: entry.details } : {}) };
+      }
+      for (const person of rows) {
+        if (!person.isExemptForeignLanguage) continue;
+        for (const subject of subjects) {
+          if (!subject.isForeignLanguage) continue;
+          if (person.scores[subject.id]?.studyLeaveFailure) continue;
+          person.scores[subject.id] = { score: null, result: "passed", profileForeignLanguageExempt: true,
+            ...(scope.includeDetails ? { details: { ...foreignLanguageExemptGrade(), source: "profile_foreign_language_exemption" } } : {}) };
+        }
       }
     }
     const storedCurriculum = typeof group.curriculum?.toJSON === "function" ? group.curriculum.toJSON() : group.curriculum;
     const curriculum = storedCurriculum ? { ...storedCurriculum, totalCredits: subjects.reduce((total: number, subject: any) => total + Number(subject.credits || 0), 0) } : null;
     const plainGroup = typeof group.toJSON === "function" ? group.toJSON() : group;
     return { group: { ...plainGroup, curriculum }, curriculum, subjects, rows, total: roster.total, page: roster.page, pageSize,
-      scorePolicy: "Điểm và kết quả lấy nguyên trạng từ danh sách thi, điểm thi đã lưu gần nhất. Ô trống: chưa có điểm; MT: miễn thi." };
+      scorePolicy: "Điểm lấy từ kết quả học phần đã được công nhận hoặc danh sách thi, điểm thi đã lưu gần nhất. Ô trống: chưa có điểm; MT: miễn thi. Không đạt do bảo lưu: học phần đã có lịch buổi đầu hoặc đã có điểm khi duyệt bảo lưu." };
   }
 }

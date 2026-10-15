@@ -6,24 +6,41 @@ import { isCommonMajor } from "../../utils/majorScope";
 import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 import { personNameParts } from "../../utils/personName";
 
-const groupLabel = (group) => [...new Set([group?.code, group?.name].filter(Boolean))].join(" · ");
+const groupLabel = (group) => group?.isRetake ? group.code || group.name : [...new Set([group?.code, group?.name].filter(Boolean))].join(" · ");
+
+const readDraft = key => {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(key) || "{}");
+    return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
+  } catch { return {}; }
+};
 
 export default function CreateOffering({ user }) {
   const navigate = useNavigate();
   const canEdit = user.role === "admin" || user.canManageScheduling === true;
-  const [majorId, setMajor] = useState("");
-  const [disciplineId, setDiscipline] = useState("");
-  const [year, setYear] = useState("");
-  const [subjectId, setSubject] = useState("");
-  const [offeringName, setOfferingName] = useState("");
-  const [isCustomName, setIsCustomName] = useState(false);
-  const [query, setQuery] = useState("");
-  const [groupQuery, setGroupQuery] = useState("");
-  const [groupIds, setGroups] = useState([]);
+  const draftKey = `scheduling:create-offering:${user.id || user.email || "current"}`;
+  const [initialDraft] = useState(() => readDraft(draftKey));
+  const draftText = field => typeof initialDraft[field] === "string" ? initialDraft[field] : "";
+  const [majorId, setMajor] = useState(() => draftText("majorId"));
+  const [disciplineId, setDiscipline] = useState(() => draftText("disciplineId"));
+  const [year, setYear] = useState(() => draftText("year"));
+  const [subjectId, setSubject] = useState(() => draftText("subjectId"));
+  const [offeringName, setOfferingName] = useState(() => draftText("offeringName"));
+  const [isCustomName, setIsCustomName] = useState(initialDraft.isCustomName === true);
+  const [query, setQuery] = useState(() => draftText("query"));
+  const [groupQuery, setGroupQuery] = useState(() => draftText("groupQuery"));
+  const [groupIds, setGroups] = useState(() => Array.isArray(initialDraft.groupIds) ? initialDraft.groupIds.filter(id => typeof id === "string") : []);
   const [roster, setRoster] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [created, setCreated] = useState(null);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(draftKey, JSON.stringify({ majorId, disciplineId, year, query, groupQuery,
+        subjectId: created ? "" : subjectId, groupIds: created ? [] : groupIds,
+        offeringName: created ? "" : offeringName, isCustomName: !created && isCustomName }));
+    } catch { /* The form remains usable when storage is unavailable. */ }
+  }, [draftKey, majorId, disciplineId, year, subjectId, groupIds, offeringName, isCustomName, query, groupQuery, created]);
   const confirmationPanelRef = useRef(null);
   const [confirmationScroll, setConfirmationScroll] = useState({ visible: false, offset: 0, height: 80 });
 
@@ -61,13 +78,15 @@ export default function CreateOffering({ user }) {
   const candidates = useLoad(async () => majorId && year ? (await api.get(`/scheduling/course-offering-candidates?${new URLSearchParams({ program: "masters", majorId, academicYear: year })}`)).subjects : [], [majorId, year, created?.id]);
   const candidate = candidates.data?.find((item) => item.subject.id === subjectId);
   const subject = candidate?.subject;
-  const eligible = candidate?.eligibleClassGroups || [];
+  const eligible = [...(candidate?.eligibleClassGroups || []), ...(candidate?.retakeClassGroups || [])];
   const otherCohortGroups = eligible.filter((group) => group.academicYear && group.academicYear !== year);
   const otherMajorGroups = eligible.filter((group) => (group.majorId || group.major?.id) !== majorId);
   const chosen = eligible.filter((group) => groupIds.includes(group.id));
   const suggestedName = suggestOfferingName(subject, chosen, year);
   const effectiveOfferingName = isCustomName ? offeringName : (suggestedName || offeringName);
-  const draft = { subjectId, classGroupIds: groupIds, majorId, academicYear: year, name: effectiveOfferingName.trim() };
+  const retakeClassGroupIds = chosen.filter(group => group.isRetake).map(group => group.id);
+  const draft = { subjectId, classGroupIds: groupIds, majorId, academicYear: year, name: effectiveOfferingName.trim(),
+    ...(retakeClassGroupIds.length ? { retakeClassGroupIds } : {}) };
   const preview = useLoad(async () => groupIds.length ? api.post("/scheduling/course-offerings/roster-preview", draft) : { participants: [], participantCount: 0 }, [subjectId, majorId, year, groupIds.join(",")]);
   const days = intersectDays(chosen);
 
@@ -240,7 +259,7 @@ export default function CreateOffering({ user }) {
                 {isCommon && <span className="sl-common-tag">Môn chung</span>}
               </div>
               <span>{item.subject.name}</span>
-              <small>{item.eligibleClassGroups.length} lớp / nhóm có thể chọn</small>
+              <small>{item.eligibleClassGroups.length + (item.retakeClassGroups?.length || 0)} lớp / nhóm có thể chọn</small>
             </button>
           );
         })}
@@ -319,6 +338,10 @@ export default function CreateOffering({ user }) {
                         <span className="sl-group-label-text">{groupLabel(group)}</span>
                       </span>
                       <span className="sl-group-tags-row">
+                        {group.retakeCount > 0 && <span className="sl-badge sl-study-retake">{group.retakeCount} học lại</span>}
+                        {(group.unstudiedCount ?? (group.isRetake ? 0 : group.memberCount)) > 0 && (
+                          <span className="sl-badge sl-study-first">{group.unstudiedCount ?? group.memberCount} chưa học</span>
+                        )}
                         <span className={`sl-badge sl-major-badge ${isCrossMajor ? "sl-badge-cross-major" : ""}`}>
                           {groupMajorName(group)}
                         </span>

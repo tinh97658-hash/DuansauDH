@@ -15,8 +15,6 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
-  const [retakeId, setRetakeId] = useState("");
-  const [retakeOpen, setRetakeOpen] = useState(false);
   const [success, setSuccess] = useState("");
   const value = detail.data || offering;
   const canManage = user?.canManageScheduling === true;
@@ -56,12 +54,12 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
   const saveNotes = () => mutate(() => api.put(`/scheduling/course-offerings/${offering.id}/roster-notes`, {
     participantNotes: (roster.data?.participants || []).map((row) => ({ participantId: row.id, note: (notes[row.id] !== undefined ? notes[row.id] : row.note || "").trim() })).filter((row) => row.note),
   }), () => { setSuccess("Đã lưu ghi chú."); roster.reload(); setNotes({}); });
-  return <Modal wide hideHeader className="sl-offering-drawer" bodyClassName="sl-offering-body" title="CHI TIẾT LỚP HỌC PHẦN" busy={saving} onClose={onClose} actions={<>
-    {canManage && value.status === "active" && onSelect && <><button className="sl-btn" onClick={() => onSelect(value)}>Xếp lịch / Xếp thêm</button><button className="sl-btn sl-btn-primary" disabled={saving || detail.loading || unresolved.loading || !!unresolved.error || !summary.heldCount} onClick={() => { setError(""); unresolved.reload(); setCompleting(true); }}>Xác nhận hoàn thành giảng dạy</button></>}
-    {canManage && value.status === "completed" && <button className="sl-btn" disabled={roster.loading || !!roster.error} onClick={() => setRetakeOpen(true)}>Ghi nhận học viên cần học lại</button>}
-  </>}>
-    <header className="sl-offering-hero"><div><div className="sl-eyebrow">LỚP HỌC PHẦN</div><h2>{offeringTitle(value)}</h2><strong>{subjectLabel(value)}</strong><p>{groupsOf(value).length} lớp/nhóm · {value.participantCount ?? 0} học viên</p><span className={`sl-state ${value.status === "completed" ? "sl-complete" : "sl-progress"}`}>{value.status === "completed" ? "HOÀN THÀNH" : "ĐANG DẠY"}</span></div><button className="sl-drawer-close" aria-label="Đóng" disabled={saving} onClick={onClose}>×</button></header>
-    <div className="sl-offering-content">{detail.error && <Notice error={detail.error} />}{error && <Notice error={error} />}{success && <Notice>{success}</Notice>}
+  return <Modal wide hideHeader className="sl-offering-drawer" bodyClassName="sl-offering-body" title="CHI TIẾT LỚP HỌC PHẦN" busy={saving} onClose={onClose} actions={canManage && value.status === "active" && onSelect ? <>
+    <button className="sl-btn" onClick={() => onSelect(value)}>Xếp lịch / Xếp thêm</button><button className="sl-btn sl-btn-primary" disabled={saving || detail.loading || unresolved.loading || !!unresolved.error || !summary.heldCount} onClick={() => { setError(""); unresolved.reload(); setCompleting(true); }}>Xác nhận hoàn thành giảng dạy</button>
+  </> : null}>
+    <header className="sl-offering-hero"><div><div className="sl-eyebrow">LỚP HỌC PHẦN</div><h2>{offeringTitle(value)}</h2><strong>{subjectLabel(value)}</strong><p>{groupsOf(value).length} lớp/nhóm · {value.participantCount ?? 0} học viên</p></div><div className="sl-offering-hero-actions"><button className="sl-drawer-close" aria-label="Đóng" disabled={saving} onClick={onClose}>×</button><span className={`sl-state ${value.status === "completed" ? "sl-complete" : "sl-progress"}`}>{value.status === "completed" ? "HOÀN THÀNH" : "ĐANG DẠY"}</span></div></header>
+    <div className={`sl-offering-content ${activeTab === "people" ? "sl-offering-content-people" : ""}`}>{detail.error && <Notice error={detail.error} />}{error && <Notice error={error} />}{success && <Notice>{success}</Notice>}
+      {value.status === "completed" && <p>Học viên có kết quả Không đạt được tự động tổng hợp thành nhóm Học lại theo lớp gốc tại Tạo lớp học phần.</p>}
       <div className="sl-offering-tabs" role="tablist" aria-label="Nội dung lớp học phần">
         <button
           type="button"
@@ -304,9 +302,6 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
     }), () => { setCompleting(false); if (onSaved) onSaved(); })}>Xác nhận đóng lớp</button></>}>
       {unresolved.loading ? <Notice>Đang kiểm tra các buổi đã xếp...</Notice> : unresolved.error ? <Notice error={unresolved.error} /> : unresolved.data?.length ? <p>Còn {unresolved.data.length} buổi đã xếp chưa xác nhận diễn ra. Bạn có muốn tiếp tục đóng lớp không? Nếu xác nhận, các buổi này sẽ bị xóa và lớp sẽ hoàn thành giảng dạy.</p> : <p>Xác nhận lớp {value.subject?.code} đã hoàn thành giảng dạy? Lớp hoàn thành sẽ không được xếp thêm buổi học.</p>}
       {error && <Notice error={error} />}
-    </Modal>}
-    {retakeOpen && <Modal title="Ghi nhận nhu cầu học lại" onClose={() => setRetakeOpen(false)} busy={saving} actions={<><button className="sl-btn" disabled={saving} onClick={() => setRetakeOpen(false)}>Hủy</button><button className="sl-btn sl-btn-primary" disabled={saving || !retakeId} onClick={() => mutate(() => api.post("/scheduling/retakes", { sourceCourseOfferingId: value.id, participantId: retakeId }), () => { setRetakeOpen(false); setSuccess("Đã ghi nhận nhu cầu học lại. Học viên sẽ xuất hiện khi tổ chức học phần phù hợp cho khóa sau."); })}>Ghi nhận học lại</button></>}>
-      <p>Chọn học viên của lớp đã hoàn thành có nhu cầu học lại học phần {value.subject?.name}.</p><label className="v20-field">Học viên<select aria-label="Học viên cần học lại" value={retakeId} onChange={(event) => setRetakeId(event.target.value)}><option value="">Chọn học viên</option>{roster.data?.participants.map((row) => <option key={row.id} value={row.id}>{row.code} · {row.fullName}</option>)}</select></label>{error && <Notice error={error} />}
     </Modal>}
   </Modal>;
 }

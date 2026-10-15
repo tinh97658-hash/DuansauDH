@@ -24,6 +24,7 @@ import FilterSelectField from "../../components/FilterSelectField";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { getSelectableMajors, normalizeMajorsResponse, selectMajorForLevel } from "../../utils/majors";
 import { personNameParts } from "../../utils/personName";
+import { notifyGradebookSaved } from "../../utils/gradebookRevision";
 import {
   disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline,
 } from "../../utils/disciplineScope";
@@ -70,6 +71,10 @@ const STUDY_STATUSES = [
   "Đã trúng tuyển",
   "Không trúng tuyển",
   "Đang học",
+  "Bảo lưu",
+  "Đang bảo lưu",
+  "Bảo lưu quá hạn",
+  "Thôi học",
   "Tạm hoãn",
   "Từ chối",
 ];
@@ -268,7 +273,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
       const { data } = await axios.put(`${API_BASE_URL}/plan/admission-records/tuition/confirm-batch`, { rows: selectedTuition }, { withCredentials: true });
       setSelectedTuition([]);
       await loadRecords();
-      toast.success(`Đã xác nhận học phí nhập học cho ${data.confirmedCount} học viên và chuyển sang Đang học.`);
+      toast.success(`Đã xác nhận học phí nhập học cho ${data.confirmedCount} học viên.`);
     } catch (error) {
       toast.error(error.response?.data?.message || "Không thể xác nhận học phí hàng loạt.");
       if (error.response?.status === 409) { setSelectedTuition([]); await loadRecords(); }
@@ -505,6 +510,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
         await axios.post(`${API_BASE_URL}/plan/admission-records`, payload, { withCredentials: true });
         toast.success("Thêm mới hồ sơ học viên thành công");
       }
+      notifyGradebookSaved("profile");
       setIsFormOpen(false);
       await loadRecords();
     } catch (err) {
@@ -600,7 +606,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
 
             <FilterSelectField disabled={saving} label="Trạng thái" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} sx={{ flex: "1 1 150px", minWidth: 150 }}>
                 <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả trạng thái</MenuItem>
-                {STUDY_STATUSES.filter((s) => isAdmittedMasters ? ["Đã trúng tuyển", "Đang học", "Tạm hoãn", "Từ chối"].includes(s) : !["Đã trúng tuyển", "Đang học"].includes(s)).map((s) => (
+                {STUDY_STATUSES.filter((s) => isAdmittedMasters ? ["Đã trúng tuyển", "Đang học", "Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Tạm hoãn", "Từ chối"].includes(s) : !["Đã trúng tuyển", "Đang học"].includes(s)).map((s) => (
                   <MenuItem key={s} value={s} sx={{ fontSize: 12 }}>{s}</MenuItem>
                 ))}
             </FilterSelectField>
@@ -680,7 +686,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
             boxShadow: "0 5px 18px rgba(23, 62, 117, 0.06)",
           }}
         >
-          <ResizableTable key={mode} columns={columns} storageKey={`admission-records-columns:${mode}`} freezeThrough={isAdmittedMasters ? "firstName" : undefined}>
+          <ResizableTable key={mode} columns={columns} storageKey={`admission-records-columns:${mode}`} freezeThrough="firstName">
 
             <TableBody>
               {records.length === 0 ? (
@@ -701,7 +707,12 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                   <TableRow
                     key={r.id}
                     hover
+                    onDoubleClick={(event) => {
+                      if (event.target.closest("a, button, input, label, [role='button']")) return;
+                      handleOpenEdit(r);
+                    }}
                     sx={{
+                      cursor: "pointer",
                       "&:hover": { bgcolor: "#F5FAFE" },
                       "& td": {
                         py: "7px",
@@ -845,7 +856,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                       <Stack direction="row" spacing={0.5} justifyContent="center">
                         {isAdmin && (
                           <Tooltip title="Sửa hồ sơ">
-                            <IconButton size="small" color="inherit" onClick={() => handleOpenEdit(r)}>
+                            <IconButton size="small" color="inherit" aria-label={`Sửa hồ sơ ${r.code || r.fullName}`} onClick={() => handleOpenEdit(r)}>
                               <EditRounded sx={{ fontSize: 17, color: "#607486" }} />
                             </IconButton>
                           </Tooltip>
@@ -1304,7 +1315,10 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                         sx={{ height: 30, fontSize: 12, bgcolor: "#fff" }}
                       >
                         {STUDY_STATUSES.map((s) => (
-                          <MenuItem key={s} value={s} disabled={formData.trainingLevel === "Thạc sĩ" && ["Đã trúng tuyển", "Không trúng tuyển"].includes(s) && s !== records.find((record) => record.id === formData.id)?.studyStatus} sx={{ fontSize: 12 }}>{s}</MenuItem>
+                          <MenuItem key={s} value={s} disabled={(["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học"].includes(s)
+                            || ["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học"].includes(records.find(record => record.id === formData.id)?.studyStatus)
+                            || (formData.trainingLevel === "Thạc sĩ" && ["Đã trúng tuyển", "Không trúng tuyển"].includes(s)))
+                            && s !== records.find((record) => record.id === formData.id)?.studyStatus} sx={{ fontSize: 12 }}>{s}</MenuItem>
                         ))}
                       </Select>
                     </Box>
@@ -1529,6 +1543,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
 
       {/* Delete Confirmation */}
       <ConfirmDialog
+        referenceStyle={false}
         open={Boolean(deletingRecord)}
         onClose={() => setDeletingRecord(null)}
         onConfirm={handleDeleteRecord}

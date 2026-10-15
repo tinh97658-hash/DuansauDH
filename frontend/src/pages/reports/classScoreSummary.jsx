@@ -15,6 +15,7 @@ import { createClassScoreWorkbook, scoreSummaryColumns, scoreSummaryValue } from
 import LearnerTranscriptDialog from "../../features/learners/LearnerTranscriptDialog";
 import "./classScoreSummary.css";
 import { useSubjectCatalogRevision } from "../../utils/subjectCatalog";
+import { useGradebookRevision } from "../../utils/gradebookRevision";
 
 const PAGE_SIZE = 15;
 const endpoint = `${API_BASE_URL}/reports/class-score-summary`;
@@ -22,6 +23,7 @@ const errorMessage = (error, fallback) => error.response?.data?.message || error
 
 export default function ClassScoreSummary() {
   const catalogRevision = useSubjectCatalogRevision();
+  const gradebookRevision = useGradebookRevision();
   const [groups, setGroups] = useState([]);
   const [year, setYear] = useState("");
   const [disciplineId, setDisciplineId] = useState("");
@@ -81,7 +83,7 @@ export default function ClassScoreSummary() {
     }).catch(error => { if (active) setError(errorMessage(error, "Không tải được bảng điểm.")); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [classGroupId, loadingOptions, reload, debouncedSearch, search, page, catalogRevision]);
+  }, [classGroupId, loadingOptions, reload, debouncedSearch, search, page, catalogRevision, gradebookRevision]);
 
   const years = useMemo(() => [...new Set(groups.map(group => group.academicYear || ""))]
     .sort((a, b) => b.localeCompare(a, "vi", { numeric: true })), [groups]);
@@ -173,7 +175,7 @@ export default function ClassScoreSummary() {
                 const name = personNameParts(row);
                 const detailPath = row.admissionRecordId ? `${currentReport.group.program === "doctoral" ? "/plan/admission-records" : "/masters/admitted-records"}/${row.admissionRecordId}?tab=grades&classGroupId=${currentReport.group.id}` : null;
                 const studentInfo = value => detailPath ? <Link className="css-student-link" to={detailPath} title={`Xem bảng điểm của ${row.fullName || row.code}`}>{value}</Link> : value;
-                return <TableRow key={row.participantId} hover selected={selectedId === row.participantId} onClick={() => setSelectedId(row.participantId)}>
+                return <TableRow key={row.participantId} sx={{ height: 42 }} hover selected={selectedId === row.participantId} onClick={() => setSelectedId(row.participantId)}>
                   <TableCell align="center">{((currentReport.page || page) - 1) * PAGE_SIZE + index + 1}</TableCell>
                   <TableCell title={row.code} sx={{ fontWeight: 600 }}>{studentInfo(row.code || "—")}</TableCell>
                   <TableCell title={name.familyAndMiddle}>{studentInfo(name.familyAndMiddle)}</TableCell>
@@ -182,10 +184,15 @@ export default function ClassScoreSummary() {
                   <TableCell align="center">{studentInfo(row.gender || "—")}</TableCell>
                   {subjects.map(subject => {
                     const entry = row.scores?.[subject.id];
-                    return <TableCell key={subject.id} align="center" className={entry?.result === "failed" ? "css-failed" : entry?.result === "exempt" ? "css-exempt" : ""} title={`${subject.name}: ${entry?.result === "exempt" ? "Miễn thi" : entry?.score == null ? "Chưa có điểm" : scoreSummaryValue(entry)}`}>{scoreSummaryValue(entry)}</TableCell>;
+                    return <TableCell key={subject.id} align="center" className={entry?.result === "failed" ? "css-failed" : entry?.result === "exempt" ? "css-exempt" : ""}>{scoreSummaryValue(entry)}</TableCell>;
                   })}
                 </TableRow>;
               })}
+              {currentReport.rows.length > 0 && Array.from({ length: Math.max(0, PAGE_SIZE - currentReport.rows.length) }, (_, index) => (
+                <TableRow key={`empty-${index}`} aria-hidden="true" sx={{ height: 42, "@media print": { display: "none" } }}>
+                  {columns.map(column => <TableCell key={column.key} />)}
+                </TableRow>
+              ))}
             </TableBody>
           </ResizableTable>
         </TableContainer>

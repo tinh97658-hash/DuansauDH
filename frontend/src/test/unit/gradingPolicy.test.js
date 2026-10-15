@@ -1,4 +1,4 @@
-import { calculatePolicyGrade, clonePolicy, numericPolicy, policyError } from "../../features/exams/gradingPolicy";
+import { calculateExamEligibility, calculatePolicyGrade, clonePolicy, numericPolicy, policyError } from "../../features/exams/gradingPolicy";
 import { calculateGrade, draftOf, gradePayload } from "../../features/exams/gradebook";
 
 it("uses the row's frozen policy for calculations and sends its version to the server", () => {
@@ -31,4 +31,22 @@ it("does not accept incomplete or contradictory configuration", () => {
   expect(policyError(policy)).toBe("");
   const normalized = numericPolicy(policy);
   expect(calculatePolicyGrade({ testScore: 5, assignmentScore: 5, examScore: 5 }, normalized)).toMatchObject({ letterGrade: "C", grade4: 2, result: "failed" });
+});
+
+it("derives exam eligibility from both current configured minimums and never qualifies exemptions", () => {
+  const policy = { ...clonePolicy(), minimums: { testScore: 6, assignmentScore: 7, examScore: 4 } };
+  const row = { testScore: 6, assignmentScore: 7, examExempt: false, eligible: false };
+  expect(calculateExamEligibility(row, policy)).toBe(true);
+  expect(calculateExamEligibility({ ...row, assignmentScore: 6.9, eligible: true }, policy)).toBe(false);
+  expect(calculateExamEligibility({ ...row, testScore: "" }, policy)).toBeNull();
+  expect(calculateExamEligibility({ ...row, assignmentScore: "abc" }, policy)).toBeNull();
+  expect(calculateExamEligibility({ ...row, testScore: 0 }, policy)).toBe(false);
+  expect(calculateExamEligibility({ ...row, examExempt: true }, policy)).toBe(false);
+  expect(calculateExamEligibility({ ...row, eligibilityPolicy: policy, gradingPolicy: clonePolicy(), assignmentScore: 6 })).toBe(false);
+});
+
+it("keeps the outcome pending until an exam score is entered even when its weight is zero", () => {
+  const policy = { ...clonePolicy(), weights: { testScore: 50, assignmentScore: 50, examScore: 0 } };
+  expect(calculatePolicyGrade({ testScore: 8, assignmentScore: 8, examScore: null }, policy)).toMatchObject({ result: "pending", courseScore: null });
+  expect(calculatePolicyGrade({ testScore: 8, assignmentScore: 8, examScore: 0 }, policy)).toMatchObject({ result: "passed", courseScore: 8 });
 });

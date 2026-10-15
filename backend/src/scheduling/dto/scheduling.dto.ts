@@ -22,6 +22,7 @@ export class CourseOfferingParticipantNoteDto {
 }
 
 export class CreateCourseOfferingDto {
+  @IsOptional() @IsArray() @ArrayUnique() @IsUUID("all", { each: true }) retakeClassGroupIds?: string[];
   @IsOptional() @IsString() @MaxLength(255) @Transform(trim) name?: string;
   @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsString() @MaxLength(20) @Transform(trim) academicYear?: string;
@@ -35,6 +36,7 @@ export class CreateCourseOfferingDto {
 }
 
 export class PreviewCourseOfferingParticipantsDto {
+  @IsOptional() @IsArray() @ArrayUnique() @IsUUID("all", { each: true }) retakeClassGroupIds?: string[];
   @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsString() @MaxLength(20) @Transform(trim) academicYear?: string;
   @IsOptional() @IsUUID() subjectId?: string;

@@ -85,7 +85,7 @@ it("shows every catalog subject of one major regardless of year or curriculum me
   expect(screen.queryByText("Cơ học")).not.toBeInTheDocument();
   expect(screen.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
     "STT", "Mã học phần", "Tên học phần", "Số TC", "Điểm kiểm tra", "Điểm BTL/TL/KT", "Điểm thi hết môn",
-    "Điểm học phần", "Kết quả điểm",
+    "Điểm học phần",
   ]);
   await choose("Năm", "2025");
   expect(await screen.findByText("Mạng máy tính")).toBeInTheDocument();

@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { examOutcomesSql } from "./exam-outcomes.js";
 import { InjectModel } from "@nestjs/sequelize";
 import { Op, QueryTypes } from "sequelize";
 import type { Transaction } from "sequelize";
@@ -9,11 +10,16 @@ import { Curriculum } from "../database/models/plan/curriculum.model.js";
 import { CurriculumSubject } from "../database/models/plan/curriculum-subject.model.js";
 import { Subject } from "../database/models/plan/subject.model.js";
 import { ClassGroupMember } from "../database/models/training/class-group-member.model.js";
+import { ClassGroup } from "../database/models/training/class-group.model.js";
 import { CourseOffering } from "../database/models/training/course-offering.model.js";
 import { CourseOfferingStudent } from "../database/models/training/course-offering-student.model.js";
 import { LearnerSubjectResult } from "../database/models/training/learner-subject-result.model.js";
 import { SubjectRecognition } from "../database/models/training/subject-recognition.model.js";
-import { applyLearningExamResults, learningExamResults } from "./learning-exam-results.js";
+import { applyLearningExamResults, isPriorLearning, learningExamResults } from "./learning-exam-results.js";
+import { resolveSavedExamGrade } from "../masters/exam-grade-calculation.js";
+import { matchesExamSubjectSql } from "../masters/exam-subject-scope.js";
+import { LEGACY_GRADING_POLICY } from "../masters/grading-policy.js";
+import { foreignLanguageExemptGrade, foreignLanguageSubjectSql } from "../masters/foreign-language-exemption.js";
 import {
   CreateLearningResultDto,
   DecideRecognitionDto,
@@ -90,39 +96,69 @@ export class SubjectRecognitionService {
     const record = await this.records.findByPk(admissionRecordId);
     if (!record) throw new NotFoundException("Không tìm thấy hồ sơ học viên.");
     if (!record.majorId) return [];
+    const curriculum = await this.currentLearningCurriculum(record);
+    if (!curriculum) return [];
+    return this.studiedSubjectsInCurriculum(record, curriculum);
+  }
+
+  private async currentLearningCurriculum(record: AdmissionRecord) {
     const program = record.trainingLevel === "Tiến sĩ" ? "doctoral" : "masters";
-    const curriculum = await this.curriculums.findOne({
+    const memberships = await this.memberships.findAll({
+      where: { [Op.or]: [{ admissionRecordId: record.id }, ...(record.studentId ? [{ studentId: record.studentId }] : [])] },
+      include: [{ model: ClassGroup, as: "classGroup", required: true,
+        where: { majorId: record.majorId, program, academicYear: record.academicYear || "" }, attributes: ["curriculumId"] }],
+      order: [["enrolledAt", "DESC"], ["id", "ASC"]],
+    });
+    const assignedId = memberships.find(row => row.classGroup?.curriculumId)?.classGroup.curriculumId;
+    if (assignedId) return this.curriculums.findByPk(assignedId);
+    return this.curriculums.findOne({
       where: { majorId: record.majorId, program, applicableFromYear: record.academicYear || "" },
       order: [["createdAt", "DESC"]],
     });
-    if (!curriculum) return [];
-    // Read saved exam outcomes. Completing teaching alone is not a learner outcome.
-    return this.sequelize.query(`
+  }
+
+  private async studiedSubjectsInCurriculum(record: AdmissionRecord, curriculum: Curriculum) {
+    // Resolve saved components using the same rules as the gradebook before filtering outcomes.
+    const outcomes = await this.sequelize.query<any>(`
       WITH outcomes AS (
-        SELECT book.id::text id, offering.subject_id, 'regular' source_type,
-          COALESCE(grade.value->>'result', 'pending') result, book.updated_at recorded_at
-        FROM course_exam_gradebooks book
-        JOIN course_offerings offering ON offering.id = book.course_offering_id
-        CROSS JOIN LATERAL jsonb_array_elements(book.grades) grade(value)
-        LEFT JOIN admission_records identity ON grade.value->>'participantId' = 'admission:' || identity.id::text
-        WHERE grade.value->>'participantId' IN (:participantIds)
-          OR ('student:' || identity.student_id::text) IN (:participantIds)
+        SELECT attempt.id, attempt.subject_id, attempt.course_offering_id offering_id, attempt.class_group_id, 'regular' source_type,
+          COALESCE(attempt.grade->>'result', 'pending') result, attempt.grade, attempt.recorded_at
+        FROM (${examOutcomesSql()}) attempt WHERE attempt.participant_id IN (:participantIds)
+        UNION ALL
+        SELECT 'foreign-language-exemption:' || subject.id::text, subject.id, NULL::uuid, NULL::uuid,
+          'regular', 'passed', CAST(:foreignLanguageGrade AS jsonb), 'infinity'::timestamp
+        FROM curriculum_subjects entry JOIN subjects subject ON subject.id = entry.subject_id
+        WHERE entry.curriculum_id = :curriculumId AND :foreignLanguageExempt
+          AND ${foreignLanguageSubjectSql('subject.id')}
+          AND NOT EXISTS (SELECT 1 FROM (${examOutcomesSql()}) interrupted
+            JOIN subjects interrupted_subject ON interrupted_subject.id = interrupted.subject_id
+            WHERE interrupted.participant_id IN (:participantIds) AND interrupted.grade->>'studyLeaveFailure' = 'true'
+              AND ${matchesExamSubjectSql('interrupted_subject', 'subject', 'interrupted.course_offering_id', 'interrupted.class_group_id')})
       ), ranked AS (
         SELECT outcome.id, target.id subject_id, target.code_text, target.code_number, target.name,
-          outcome.source_type, outcome.result,
+          outcome.source_type, outcome.result, outcome.grade,
           ROW_NUMBER() OVER (PARTITION BY target.id ORDER BY outcome.recorded_at DESC, outcome.id DESC) rank
         FROM outcomes outcome JOIN subjects source ON source.id = outcome.subject_id
-        JOIN subjects target ON COALESCE(target.canonical_subject_id, target.id) = COALESCE(source.canonical_subject_id, source.id)
+        JOIN subjects target ON ${matchesExamSubjectSql('source', 'target', 'outcome.offering_id', 'outcome.class_group_id')}
         JOIN curriculum_subjects entry ON entry.subject_id = target.id AND entry.curriculum_id = :curriculumId
       )
       SELECT id, jsonb_build_object('id', subject_id, 'codeText', code_text, 'codeNumber', code_number, 'name', name) subject,
         source_type AS "sourceType", 'completed' AS status,
-        result
-      FROM ranked WHERE rank = 1 AND result IN ('passed', 'failed', 'exempt') ORDER BY name, subject_id
+        result, grade,
+        (SELECT policy FROM shared_grading_rules ORDER BY version DESC LIMIT 1) AS "eligibilityPolicy"
+      FROM ranked WHERE rank = 1 ORDER BY name, subject_id
     `, { type: QueryTypes.SELECT, replacements: {
-      recordId: record.id, curriculumId: curriculum.id,
+      recordId: record.id, curriculumId: curriculum.id, foreignLanguageExempt: !!record.isExemptForeignLanguage,
+      foreignLanguageGrade: JSON.stringify(foreignLanguageExemptGrade()),
       participantIds: [`admission:${record.id}`, ...(record.studentId ? [`student:${record.studentId}`] : [])],
     } });
+    return outcomes.map(({ grade, eligibilityPolicy, ...row }) => {
+      if (!grade) return row;
+      const calculated = resolveSavedExamGrade(grade, eligibilityPolicy || LEGACY_GRADING_POLICY);
+      return { ...row, result: calculated.result,
+        ...(grade.studyLeaveFailure ? { studyLeaveFailure: true } : {}),
+        ...(grade.profileForeignLanguageExempt ? { profileForeignLanguageExempt: true } : {}) };
+    }).filter(row => ["passed", "failed", "exempt"].includes(row.result));
   }
 
   async createLearningResult(admissionRecordId: string, dto: CreateLearningResultDto) {
@@ -133,9 +169,12 @@ export class SubjectRecognitionService {
         ...payload,
         admissionRecordId,
         status: dto.status || "registered",
-        result: "pending",
+        result: payload.result || "pending",
       } as never, { transaction });
       const row = await this.results.findByPk(created.id, { include: this.learningIncludes as never, transaction });
+      if (row && isPriorLearning(row) && isRecognizable(row)) {
+        await this.proposeForRecord(admissionRecordId, { requireReview: true }, transaction);
+      }
       return row ? applyLearningExamResults([row], await learningExamResults(this.sequelize, admissionRecordId, transaction))[0] : null;
     });
   }
@@ -144,12 +183,19 @@ export class SubjectRecognitionService {
     return this.sequelize.transaction(async (transaction) => {
       const row = await this.results.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!row) throw new NotFoundException("Không tìm thấy kết quả học phần cá nhân.");
+      const decisions = await this.recognitions.findAll({ where: { learningResultId: id }, transaction, lock: transaction.LOCK.UPDATE });
+      if (decisions.some(decision => decision.status === "approved" || decision.status === "rejected")) {
+        throw new ConflictException("Kết quả đã có quyết định công nhận được chốt, không thể sửa.");
+      }
       const payload = await this.buildLearningPayload(dto, transaction, row);
       await row.update(payload as never, { transaction });
+      if (isPriorLearning(row)) {
+        for (const decision of decisions) await decision.update({ status: "pending", decidedAt: null } as never, { transaction });
+      }
       const actualResult = applyLearningExamResults([row], await learningExamResults(this.sequelize, row.admissionRecordId, transaction))[0];
       if (isRecognizable(actualResult)) {
         // Kết quả vừa đạt: đối chiếu lại với CTĐT hiện hành nếu học viên đã vào CTĐT chính thức.
-        await this.proposeForRecord(row.admissionRecordId, {}, transaction);
+        await this.proposeForRecord(row.admissionRecordId, { requireReview: isPriorLearning(row) }, transaction);
       }
       const updated = await this.results.findByPk(id, { include: this.learningIncludes as never, transaction });
       return updated ? applyLearningExamResults([updated], await learningExamResults(this.sequelize, row.admissionRecordId, transaction))[0] : null;
@@ -157,10 +203,16 @@ export class SubjectRecognitionService {
   }
 
   async removeLearningResult(id: string) {
-    const row = await this.results.findByPk(id);
-    if (!row) throw new NotFoundException("Không tìm thấy kết quả học phần cá nhân.");
-    await row.destroy();
-    return { success: true, message: "Đã xóa kết quả học phần cá nhân." };
+    return this.sequelize.transaction(async transaction => {
+      const row = await this.results.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!row) throw new NotFoundException("Không tìm thấy kết quả học phần cá nhân.");
+      const decisions = await this.recognitions.findAll({ where: { learningResultId: id }, transaction, lock: transaction.LOCK.UPDATE });
+      if (decisions.some(decision => decision.status === "approved" || decision.status === "rejected")) {
+        throw new ConflictException("Kết quả đã có quyết định công nhận được chốt, không thể xóa.");
+      }
+      await row.destroy({ transaction });
+      return { success: true, message: "Đã xóa kết quả học phần cá nhân." };
+    });
   }
 
   private async buildLearningPayload(
@@ -178,6 +230,11 @@ export class SubjectRecognitionService {
       "status", "score", "completedAt", "decisionNo", "institution", "note"]) {
       if ((dto as never as Record<string, unknown>)[key] !== undefined) payload[key] = (dto as never as Record<string, unknown>)[key];
     }
+    const sourceType = dto.sourceType ?? current?.sourceType;
+    const status = dto.status ?? current?.status ?? "registered";
+    if (isPriorLearning({ sourceType })) {
+      payload.result = status === "completed" ? dto.result ?? current?.result ?? "pending" : "pending";
+    } else payload.result = "pending";
     if (subjectId) {
       const subject = await this.subjects.findByPk(subjectId, { transaction });
       if (!subject || subject.active === false) throw new BadRequestException("Học phần không tồn tại hoặc đã ngừng sử dụng.");
@@ -196,6 +253,9 @@ export class SubjectRecognitionService {
     if (payload.status === "completed" && !payload.completedAt && !current?.completedAt) {
       throw new BadRequestException("Kết quả đã hoàn thành phải có ngày hoàn thành.");
     }
+    if (isPriorLearning({ sourceType }) && status === "completed" && payload.result === "pending") {
+      throw new BadRequestException("Vui lòng chọn kết quả của học phần đã hoàn thành.");
+    }
     return payload;
   }
 
@@ -208,19 +268,21 @@ export class SubjectRecognitionService {
     const record = await this.records.findByPk(admissionRecordId, { attributes: ["id", "studentId"], transaction });
     if (!record) throw new NotFoundException("Không tìm thấy hồ sơ học viên.");
 
-    const exams = await this.sequelize.query<any>(`
-      SELECT DISTINCT ON (offering.subject_id) offering.subject_id AS "subjectId", offering.id AS "courseOfferingId",
-        COALESCE(entry.value->>'result', 'pending') result,
-        NULLIF(entry.value->>'courseScore', '')::numeric score
-      FROM course_exam_gradebooks book JOIN course_offerings offering ON offering.id = book.course_offering_id
-      CROSS JOIN LATERAL jsonb_array_elements(book.grades) entry(value)
-      LEFT JOIN admission_records identity ON entry.value->>'participantId' = 'admission:' || identity.id::text
-      WHERE entry.value->>'participantId' IN (:participantIds)
-        OR ('student:' || identity.student_id::text) IN (:participantIds)
-      ORDER BY offering.subject_id, book.updated_at DESC, book.id DESC
+    const storedExams = await this.sequelize.query<any>(`
+      SELECT DISTINCT ON (attempt.subject_id) attempt.subject_id AS "subjectId", attempt.course_offering_id AS "courseOfferingId",
+        COALESCE(attempt.grade->>'result', 'pending') result,
+        NULLIF(attempt.grade->>'courseScore', '')::numeric score, attempt.grade,
+        (SELECT policy FROM shared_grading_rules ORDER BY version DESC LIMIT 1) AS "eligibilityPolicy"
+      FROM (${examOutcomesSql()}) attempt WHERE attempt.participant_id IN (:participantIds)
+      ORDER BY attempt.subject_id, attempt.recorded_at DESC, attempt.id DESC
     `, { type: QueryTypes.SELECT, transaction, replacements: {
       participantIds: [`admission:${record.id}`, ...(record.studentId ? [`student:${record.studentId}`] : [])],
     } });
+    const exams = storedExams.map(({ grade, eligibilityPolicy, ...row }) => {
+      if (!grade) return row;
+      const calculated = resolveSavedExamGrade(grade, eligibilityPolicy);
+      return { ...row, result: calculated.result, score: calculated.courseScore };
+    });
     if (exams.length === 0) return 0;
     const existing = await this.results.findAll({ where: { admissionRecordId, sourceType: "regular" }, transaction });
     const known = new Set(existing.map(row => row.subjectId));
@@ -282,7 +344,8 @@ export class SubjectRecognitionService {
       const summaries = { autoApproved: 0, pendingReview: 0, skipped: 0, carriedOver: 0 };
       const touched: string[] = [];
       for (const result of allResults) {
-        if (!isRecognizable(result)) {
+        const needsReview = dto.requireReview && isPriorLearning(result);
+        if (!isRecognizable(result) && !needsReview) {
           if (result.status === "registered" || result.status === "studying") {
             // Mới đăng ký hoặc đang học: chỉ kế thừa đăng ký và tiếp tục học, tuyệt đối không tính tín chỉ.
             if (result.subjectId) summaries.carriedOver += 1;
@@ -297,6 +360,7 @@ export class SubjectRecognitionService {
           summaries.skipped += 1;
           continue;
         }
+        if (needsReview) candidate.status = "pending";
         const payload = {
           admissionRecordId,
           majorTransferId: dto.majorTransferId || null,
@@ -432,37 +496,44 @@ export class SubjectRecognitionService {
     });
   }
 
-  /** Tín chỉ hoàn thành chỉ tính cho học phần đã được công nhận (trạng thái `approved`). */
+  /** Earned credits include passed/exempt exams and approved recognition, once per curriculum subject. */
   async recognizedCredits(admissionRecordId: string): Promise<number> {
+    const record = await this.records.findByPk(admissionRecordId);
+    if (!record) throw new NotFoundException("Không tìm thấy hồ sơ học viên.");
+    if (!record.majorId) return 0;
+    const curriculum = await this.currentLearningCurriculum(record);
+    if (!curriculum) return 0;
+    const studied = await this.studiedSubjectsInCurriculum(record, curriculum);
+    const completedIds = new Set<string>(studied.filter(row => ["passed", "exempt"].includes(row.result)).map(row => row.subject.id));
     const approved = await this.recognitions.findAll({
       where: { admissionRecordId, status: "approved" },
       include: [{ model: Subject, as: "targetSubject", attributes: ["id"] }] as never,
     });
-    if (approved.length === 0) return 0;
-    const exams = await learningExamResults(this.sequelize, admissionRecordId);
+    const exams = approved.length ? await learningExamResults(this.sequelize, admissionRecordId) : [];
     const passed = new Set(exams.filter(exam => ["passed", "exempt"].includes(exam.result)).map(exam => exam.id));
     const rows = approved.filter(row => row.learningResultId && passed.has(row.learningResultId));
-    if (rows.length === 0) return 0;
-    const record = await this.records.findByPk(admissionRecordId, { attributes: ["majorId", "trainingLevel", "academicYear"] });
-    if (!record?.majorId) return 0;
-    const program = String(record.trainingLevel || "").toLowerCase().includes("tiến sĩ") ? "doctoral" : "masters";
-    const curriculum = await this.curriculums.findOne({
-      where: { majorId: record.majorId, program, applicableFromYear: record.academicYear || "" },
-      order: [["createdAt", "DESC"]],
-    });
-    if (!curriculum) return 0;
+    rows.forEach(row => completedIds.add(row.targetSubjectId));
+    if (!completedIds.size) return 0;
     const entries = await this.curriculumSubjects.findAll({
-      where: { curriculumId: curriculum.id, subjectId: { [Op.in]: rows.map((row) => row.targetSubjectId) } },
-      attributes: ["credits"],
-      include: [{ model: Subject, as: "subject", attributes: ["credits"] }],
+      where: { curriculumId: curriculum.id, subjectId: { [Op.in]: [...completedIds] } },
+      attributes: ["subjectId", "credits"],
+      include: [{ model: Subject, as: "subject", attributes: ["id", "canonicalSubjectId", "credits"] }],
     });
-    return entries.reduce((total, entry) => total + (Number(entry.subject?.credits ?? entry.credits) || 0), 0);
+    const credits = new Map<string, number>();
+    entries.forEach(entry => {
+      const subjectId = entry.subject?.canonicalSubjectId || entry.subject?.id || entry.subjectId;
+      if (!credits.has(subjectId)) credits.set(subjectId, Number(entry.subject?.credits ?? entry.credits) || 0);
+    });
+    return [...credits.values()].reduce((total, value) => total + value, 0);
   }
 
   async decide(id: string, dto: DecideRecognitionDto) {
     return this.sequelize.transaction(async (transaction) => {
       const row = await this.recognitions.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!row) throw new NotFoundException("Không tìm thấy quyết định công nhận học phần.");
+      if (row.status === "approved" || row.status === "rejected") {
+        throw new ConflictException("Quyết định đã được chốt, không thể sửa hoặc duyệt lại.");
+      }
       if (dto.decision === "approved" && !row.learningResultId) {
         throw new ConflictException("Đề xuất công nhận không còn gắn với kết quả học phần cá nhân hợp lệ.");
       }
@@ -472,6 +543,11 @@ export class SubjectRecognitionService {
       const actualResult = result ? applyLearningExamResults([result], await learningExamResults(this.sequelize, row.admissionRecordId, transaction))[0] : null;
       if (dto.decision === "approved" && (!actualResult || !isRecognizable(actualResult))) {
         throw new ConflictException("Chỉ công nhận học phần đã hoàn thành và đạt.");
+      }
+      if (dto.decision === "approved" && actualResult?.sourceType === "pre_masters"
+        && (actualResult.score == null || !Number.isFinite(Number(actualResult.score))
+          || Number(actualResult.score) < 0 || Number(actualResult.score) > 10)) {
+        throw new ConflictException("Học phần tiền thạc sĩ phải có điểm từ 0 đến 10 trước khi công nhận.");
       }
       const targetSubjectId = dto.targetSubjectId || row.targetSubjectId;
       if (dto.targetSubjectId && dto.targetSubjectId !== row.targetSubjectId) {
@@ -493,19 +569,15 @@ export class SubjectRecognitionService {
     });
   }
 
-  /**
-   * Hủy một quyết định/đề xuất công nhận học phần.
-   *
-   * Xóa hẳn bản ghi là chủ ý: quyết định đã chốt vẫn phải sửa lại được khi nhập nhầm hoặc khi
-   * hội đồng đổi ý. Sau khi xóa, `proposeForRecord()` có thể tạo lại đề xuất mới dựa trên đúng
-   * dữ liệu kết quả học phần hiện hành. Vì vậy không dùng trạng thái "rejected" thay cho việc xóa:
-   * một dòng đã `rejected` sẽ bị `proposeForRecord()` bỏ qua và không bao giờ được đề xuất lại.
-   */
+  /** Only undecided proposals can be removed. Final decisions are immutable. */
   async removeRecognition(id: string) {
-    const row = await this.recognitions.findByPk(id);
-    if (!row) throw new NotFoundException("Không tìm thấy quyết định công nhận học phần.");
-    await row.destroy();
-    return { success: true, message: "Đã hủy công nhận học phần." };
+    return this.sequelize.transaction(async transaction => {
+      const row = await this.recognitions.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!row) throw new NotFoundException("Không tìm thấy quyết định công nhận học phần.");
+      if (row.status === "approved" || row.status === "rejected") throw new ConflictException("Quyết định đã được chốt, không thể hủy.");
+      await row.destroy({ transaction });
+      return { success: true, message: "Đã hủy công nhận học phần." };
+    });
   }
 
   async recognitionHistoryFor(admissionRecordId: string, majorTransferId: string) {

@@ -20,7 +20,12 @@ export const rows = (value) => {
 };
 export const unique = (items) => [...new Set(items.filter(Boolean))];
 export const normalize = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").toLowerCase();
-export const groupsOf = (offering) => (offering?.groupLinks || []).map((link) => link.classGroup).filter(Boolean);
+export const groupsOf = (offering) => (offering?.groupLinks || []).map((link) => {
+  const group = link.classGroup;
+  return group && Array.isArray(link.participantIds)
+    ? { ...group, isRetake: true, name: group.code || group.name, memberCount: group.memberCount ?? link.participantIds.length }
+    : group;
+}).filter(Boolean);
 export const labelOf = (offering) => groupsOf(offering).map((group) => group.code).join(" · ");
 export const offeringTitle = (offering) => {
   if (offering?.name && offering.name.trim()) return offering.name.trim();
@@ -63,11 +68,23 @@ export function useLoad(loader, dependencies) {
   const [state, setState] = useState({ data: null, loading: true, error: "" });
   const [revision, setRevision] = useState(0);
   const lastRevalidation = useRef(0);
+  const previousDependencies = useRef(null);
+  const backgroundRefresh = useRef(false);
   useEffect(() => {
     let active = true;
-    setState({ data: null, loading: true, error: "" });
+    const scopeChanged = !previousDependencies.current || dependencies.length !== previousDependencies.current.length
+      || dependencies.some((value, index) => !Object.is(value, previousDependencies.current[index]));
+    previousDependencies.current = [...dependencies];
+    const inBackground = backgroundRefresh.current && !scopeChanged;
+    backgroundRefresh.current = false;
+    // Focus/reload refreshes existing data in place; changing scope clears it.
+    setState(previous => scopeChanged ? { data: null, loading: true, error: "" }
+      : { ...previous, loading: !inBackground || previous.data == null, error: "" });
     Promise.resolve().then(loader).then((data) => { if (active) setState({ data, loading: false, error: "" }); })
-      .catch((error) => { if (active) setState({ data: null, loading: false, error: message(error) }); });
+      .catch((error) => { if (active) setState(previous => ({
+        data: [401, 403].includes(error?.response?.status) ? null : previous.data,
+        loading: false, error: message(error),
+      })); });
     return () => { active = false; };
     // Callers supply the values used by their loader, as with useEffect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -77,6 +94,7 @@ export function useLoad(loader, dependencies) {
       if (event?.type === "focus" && event.target !== window) return;
       if (document.visibilityState === "hidden" || Date.now() - lastRevalidation.current < 250) return;
       lastRevalidation.current = Date.now();
+      backgroundRefresh.current = true;
       setRevision((value) => value + 1);
     };
     window.addEventListener("focus", revalidate);
@@ -86,7 +104,7 @@ export function useLoad(loader, dependencies) {
       document.removeEventListener("visibilitychange", revalidate);
     };
   }, []);
-  return { ...state, reload: () => setRevision((value) => value + 1) };
+  return { ...state, reload: () => { backgroundRefresh.current = false; setRevision((value) => value + 1); } };
 }
 
 export function Notice({ error, children }) {
@@ -94,7 +112,7 @@ export function Notice({ error, children }) {
 }
 export function Modal({ title, children, onClose, busy = false, wide = false, drawer = false, actions, className = "", hideHeader = false, bodyClassName = "", transparentBackdrop = false }) {
   const titleId = useId();
-  return <Dialog open hideBackdrop={transparentBackdrop} onClose={busy ? undefined : onClose} maxWidth={false} aria-labelledby={titleId}
+  return <Dialog className="app-popup" open hideBackdrop={transparentBackdrop} onClose={busy ? undefined : onClose} maxWidth={false} aria-labelledby={titleId}
     PaperProps={{ className: `scheduling-v20 v20-dialog ${wide ? "v20-wide" : ""} ${drawer ? "v20-drawer" : ""} ${className}` }}>
     {hideHeader ? <h2 id={titleId} className="sl-sr-only">{title}</h2> : <header className="v20-dialog-head"><h2 id={titleId}>{title}</h2><button className="sl-btn" aria-label="Đóng" disabled={busy} onClick={onClose}>×</button></header>}
     <div className={`v20-dialog-body ${bodyClassName}`}>{children}</div>

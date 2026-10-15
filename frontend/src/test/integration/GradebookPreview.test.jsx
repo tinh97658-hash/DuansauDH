@@ -3,9 +3,27 @@ import { MemoryRouter } from "react-router-dom";
 import GradebookPreview from "../../features/exams/GradebookPreview";
 import { buildGradebookDocument, openGradebookPreview, readGradebookPreview } from "../../features/exams/gradebookExport";
 import { draftOf } from "../../features/exams/gradebook";
+import { buildExamListDocument } from "../../features/exams/examListExport";
 
 
 beforeEach(() => sessionStorage.clear());
+it("previews only qualified non-exempt students with exam-list columns", () => {
+  const row = { code: "HV001", fullName: "Nguyễn Văn An", testScore: 4, assignmentScore: 4, examScore: null, result: "pending" };
+  const document = buildExamListDocument({ name: "Lớp CNTT" }, { subject: { name: "Triết học" } }, [row, { ...row, code: "HV002", examExempt: true }, { ...row, code: "HV003", testScore: 3 }]);
+  const replace = jest.fn();
+  const open = jest.spyOn(window, "open").mockReturnValue({ sessionStorage, location: { replace }, close: jest.fn() });
+  try {
+    openGradebookPreview(document);
+    const url = replace.mock.calls[0][0];
+    render(<MemoryRouter initialEntries={[url]}><GradebookPreview /></MemoryRouter>);
+    expect(screen.getByRole("table", { name: "Danh sách thi" })).toBeInTheDocument();
+    expect(screen.getByText("HV001")).toBeInTheDocument();
+    expect(screen.queryByText("HV002")).not.toBeInTheDocument();
+    expect(screen.queryByText("HV003")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader")).toHaveLength(9);
+    expect(screen.queryByRole("columnheader", { name: "Kết quả điểm" })).not.toBeInTheDocument();
+  } finally { open.mockRestore(); }
+});
 it("previews every student with metadata, signing roles and an explicit print action", () => {
   const rows = Array.from({ length: 40 }, (_, i) => draftOf({ code: `HV${i + 1}`, fullName: "Nguyễn Văn An", attemptScores: [], result: "pending" }));
   const document = buildGradebookDocument({ name: "Lớp CNTT" }, { subject: { name: "An toàn thông tin" } }, rows);

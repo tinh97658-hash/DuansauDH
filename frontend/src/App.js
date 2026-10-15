@@ -87,6 +87,7 @@ import ClassLists from "./pages/reports/classLists";
 import CourseScores from "./pages/reports/courseScores";
 import ClassScoreSummary from "./pages/reports/classScoreSummary";
 import LearnerTranscriptPreview from "./features/learners/LearnerTranscriptPreview";
+import StudyLeaves from "./pages/masters/studyLeaves";
 import MinisterialReport from "./pages/reports/ministerialReport";
 import TempScoreMasters from "./pages/reports/tempScoreMasters";
 import TempScoreDoctoral from "./pages/reports/tempScoreDoctoral";
@@ -149,6 +150,7 @@ function App() {
 
             {/* ĐÀO TẠO THẠC SĨ */}
             <Route path="masters/admitted-records" element={<MastersAdmittedRecords />} />
+            <Route path="masters/study-leaves" element={<StudyLeaves />} />
             <Route path="masters/admitted-records/:id" element={<AdmissionRecordDetail returnPath="/masters/admitted-records" />} />
             <Route path="masters/bridge-course" element={<MastersBridgeCourse />} />
             <Route path="masters/admission-scores" element={<MastersAdmissionScores />} />

@@ -297,6 +297,7 @@ export class UpdateLearningResultDto {
 }
 
 export class ProposeRecognitionsDto {
+  @IsOptional() @IsBoolean() requireReview?: boolean;
   @IsOptional() @IsUUID() curriculumId?: string;
   @IsOptional() @IsUUID() majorTransferId?: string;
 }

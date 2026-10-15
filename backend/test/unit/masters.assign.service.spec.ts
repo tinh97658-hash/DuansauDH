@@ -1,6 +1,7 @@
 import { jest } from "@jest/globals";
 import { MastersService } from "../../src/masters/masters.service.js";
 import { Op } from "sequelize";
+import { admissionLearnerWhere } from "../../src/plan/admission-learner-policy.js";
 
 /**
  * Unit tests for MastersService student-assignment operations:
@@ -10,7 +11,7 @@ import { Op } from "sequelize";
 const buildService = () => {
   const classGroups = { findOne: jest.fn(), findAll: jest.fn(), findByPk: jest.fn(), create: jest.fn() };
   const classGroupMembers = { count: jest.fn(), destroy: jest.fn(), bulkCreate: jest.fn(), findAll: jest.fn(), findOne: jest.fn() };
-  const admissionRecords = { findAll: jest.fn(), findByPk: jest.fn(), create: jest.fn() };
+  const admissionRecords = { findAll: jest.fn(), findByPk: jest.fn(), create: jest.fn(), update: jest.fn() };
   const students = { findAll: jest.fn() };
   const majors = { findByPk: jest.fn() };
   const sequelize = {
@@ -61,7 +62,7 @@ describe("MastersService.assignMembers", () => {
     const { service, classGroups, admissionRecords, classGroupMembers } = buildService();
     classGroups.findOne.mockResolvedValue(openGroup);
     admissionRecords.findAll.mockImplementation(async ({ where }: any) => {
-      expect(where.studyStatus).toBeUndefined();
+      expect(where.studyStatus).toEqual(admissionLearnerWhere(true).studyStatus);
       return record.status === where[Op.or][0].status || where[Op.or][1].studyStatus[Op.in].includes(record.studyStatus)
         ? [{ ...record, id: "a1", extraData: { tuitionPayment: { paid: false } } }] : [];
     });
@@ -70,6 +71,8 @@ describe("MastersService.assignMembers", () => {
     classGroupMembers.bulkCreate.mockResolvedValue([{}]);
     await expect(service.assignMembers("g1", { admissionRecordIds: ["a1"] })).resolves.toMatchObject({ count: 1 });
     expect(classGroupMembers.bulkCreate).toHaveBeenCalled();
+    expect(admissionRecords.update).toHaveBeenCalledWith({ studyStatus: "Đang học" },
+      expect.objectContaining({ where: { id: { [Op.in]: ["a1"] } } }));
   });
   it("assigns eligible students to an open group inside a transaction", async () => {
     const { service, classGroups, classGroupMembers, admissionRecords } = buildService();
@@ -281,8 +284,9 @@ describe("MastersService assignment lists", () => {
       { id: "pending", studyStatus: "Nộp hồ sơ đầu vào", status: "pending" },
     ];
     admissionRecords.findAll.mockImplementation(async ({ where }: any) => {
-      expect(where).toEqual({ trainingLevel: "Thạc sĩ", [Op.or]: [{ status: "approved" }, { studyStatus: { [Op.in]: ["Đã trúng tuyển", "Đang học"] } }], academicYear: "2026" });
-      return records.filter((record) => record.status === where[Op.or][0].status || where[Op.or][1].studyStatus[Op.in].includes(record.studyStatus));
+      expect(where).toEqual({ trainingLevel: "Thạc sĩ", ...admissionLearnerWhere(true), academicYear: "2026" });
+      return records.filter((record) => (record.status === where[Op.or][0].status || where[Op.or][1].studyStatus[Op.in].includes(record.studyStatus))
+        && (record.studyStatus == null || !where.studyStatus[Op.or][0][Op.notIn].includes(record.studyStatus)));
     });
     const classGroup = { id: "other-year", code: "OLD", name: "Lớp cũ" };
     classGroupMembers.findAll.mockResolvedValue([
@@ -290,10 +294,9 @@ describe("MastersService assignment lists", () => {
       { id: "member2", studentId: "s1", classGroup },
     ]);
     expect(await service.listEligibleStudents(undefined, "2026")).toEqual([
-      expect.objectContaining({ id: "free", studyStatus: "Đang học", tuitionPaid: false, note: "Ghi chú hồ sơ", gender: "", assignedGroup: null }),
+      expect.objectContaining({ id: "free", studyStatus: "Đã trúng tuyển", tuitionPaid: false, note: "Ghi chú hồ sơ", gender: "", assignedGroup: null }),
       expect.objectContaining({ id: "paid", tuitionPaid: true, assignedGroup: null }),
       expect.objectContaining({ id: "unpaid", tuitionPaid: false, assignedGroup: null }),
-      expect.objectContaining({ id: "paused", tuitionPaid: false, assignedGroup: null }),
       expect.objectContaining({ id: "admitted", tuitionPaid: false, assignedGroup: null }),
     ]);
   });

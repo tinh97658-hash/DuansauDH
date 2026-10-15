@@ -3,7 +3,8 @@ import { admissionLearnerWhere } from "./admission-learner-policy.js";
 import { AdmissionEvaluationService } from "./admission-evaluation.service.js";
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
-import { col, fn, Op } from "sequelize";
+import { col, fn, Op, literal, where as sqlWhere } from "sequelize";
+import { learnerStudyStatusSql } from "./learner-study-status.js";
 import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { Major } from "../database/models/common/major.model.js";
@@ -543,8 +544,6 @@ export class PlanService {
     if (majorId) where.majorId = majorId;
     if (trainingLevel) where.trainingLevel = trainingLevel;
     if (academicYear) where.academicYear = academicYear;
-    if (status && status !== "ALL") where.studyStatus = status;
-    else if (excludeStatus) where.studyStatus = { [Op.ne]: excludeStatus };
     if (admissionStage === "learners") {
       where[Op.and] = [admissionLearnerWhere()];
     } else if (admissionStage === "applications") {
@@ -554,6 +553,9 @@ export class PlanService {
       ];
     }
 
+    const effectiveStatus = literal(learnerStudyStatusSql('"AdmissionRecord"'));
+    if (status && status !== "ALL") where[Op.and] = [...(where[Op.and] || []), sqlWhere(effectiveStatus, status)];
+    else if (excludeStatus) where[Op.and] = [...(where[Op.and] || []), sqlWhere(effectiveStatus, { [Op.ne]: excludeStatus })];
     const keyword = search?.trim().slice(0, 100);
     if (keyword) {
       const pattern = `%${keyword}%`;
@@ -578,6 +580,7 @@ export class PlanService {
     const [result, mastersCount, doctoralCount, eligibleCount] = await Promise.all([
       this.admissionRecordsModel.findAndCountAll({
         where,
+        attributes: { exclude: ["studyStatus"], include: [[effectiveStatus, "studyStatus"]] },
         include: [includeMajor],
         order: [["createdAt", "DESC"]],
         limit: pageSize,
@@ -641,6 +644,7 @@ export class PlanService {
 
   async getAdmissionRecord(id: string) {
     const record = await this.admissionRecordsModel.findByPk(id, {
+      attributes: { exclude: ["studyStatus"], include: [[literal(learnerStudyStatusSql('"AdmissionRecord"')), "studyStatus"]] },
       include: [{ model: Major, as: "major", attributes: ["id", "name"] }],
     });
     if (!record) throw new NotFoundException("Không tìm thấy hồ sơ tuyển sinh");
@@ -648,6 +652,9 @@ export class PlanService {
   }
 
   async createAdmissionRecord(dto: CreateAdmissionRecordDto) {
+    if (["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Đã thôi học"].includes(dto.studyStatus || "")) {
+      throw new BadRequestException("Tạo hồ sơ học viên trước, sau đó xử lý trong mục Bảo lưu.");
+    }
     await this.admissionEvaluation?.guardRecordUpdate(null, dto);
     let fullName = dto.fullName?.trim();
     if (!fullName) {
@@ -676,6 +683,11 @@ export class PlanService {
       const record = await this.admissionRecordsModel.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!record) throw new NotFoundException("Không tìm thấy hồ sơ tuyển sinh");
 
+      if (dto.studyStatus !== undefined && dto.studyStatus !== record.studyStatus
+        && [dto.studyStatus, record.studyStatus].some(value => ["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Đã thôi học"].includes(value || ""))) {
+        throw new BadRequestException("Hãy xử lý bảo lưu, tiếp nhận học lại hoặc thôi học trong mục Bảo lưu của học viên.");
+      }
+
       let fullName = dto.fullName?.trim();
       if (!fullName && (dto.lastName !== undefined || dto.firstName !== undefined)) {
         fullName = `${dto.lastName ?? record.lastName ?? ""} ${dto.firstName ?? record.firstName ?? ""}`.trim();
@@ -700,6 +712,7 @@ export class PlanService {
         }
       }
       return this.admissionRecordsModel.findByPk(id, {
+        attributes: { exclude: ["studyStatus"], include: [[literal(learnerStudyStatusSql('"AdmissionRecord"')), "studyStatus"]] },
         include: [{ model: Major, as: "major", attributes: ["id", "name"] }], transaction,
       });
     });

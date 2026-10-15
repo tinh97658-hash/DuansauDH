@@ -37,7 +37,7 @@ export function normalizeLearnerTranscript(scorecard, { now = new Date() } = {})
     form: { code: TRANSCRIPT_FORM.code, publishedOn: TRANSCRIPT_FORM.publishedOn, revision: TRANSCRIPT_FORM.revision },
     subjects: (scorecard.subjects || []).map((subject, index) => {
       const grade = subject.grade;
-      const note = grade?.result === "exempt" && grade.details?.source !== "gradebook"
+      const note = grade?.studyLeaveFailure || grade?.details?.studyLeaveFailure ? "Không đạt" : grade?.profileForeignLanguageExempt ? "Đạt (Miễn thi ngoại ngữ)" : grade?.result === "exempt" && grade.details?.source !== "gradebook"
         ? "Miễn học" : grade?.result === "pending" ? "" : RESULT_LABELS[grade?.result] || "";
       return { index: index + 1, subjectId: text(subject.id), name: text(subject.name), code: text(subject.code),
         credits: subject.credits ?? null, score: grade?.score ?? null, note };

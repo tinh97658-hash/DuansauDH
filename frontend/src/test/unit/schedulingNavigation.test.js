@@ -44,9 +44,17 @@ describe("Masters scheduling ribbon", () => {
     }
   });
 
-  it("moves both scheduling actions into the learning-process group without changing routes", () => {
+  it("separates scheduling and grade management without changing routes", () => {
     const entryGroup = ribbons.masters.find((section) => section.label === "THỦ TỤC ĐẦU VÀO");
-    const learningGroup = ribbons.masters.find((section) => section.label === "QUÁ TRÌNH HỌC TẬP");
+    const learningGroup = ribbons.masters.find((section) => section.label === "XẾP LỊCH HỌC");
+    const gradeGroup = ribbons.masters.find((section) => section.label === "QUẢN LÝ ĐIỂM");
+    expect(learningGroup.actions).toHaveLength(3);
+    expect(gradeGroup.actions.map(({ label, route }) => ({ label, route }))).toEqual([
+      { label: "Xét tư cách thi hết môn", route: "/masters/exam-eligibility" },
+      { label: "Danh sách thi, điểm thi", route: "/masters/exam-lists" },
+      { label: "Tổng hợp điểm của lớp", route: "/reports/class-score-summary" },
+    ]);
+    expect(ribbons.reports.flatMap(section => section.actions).map(item => item.route)).not.toContain("/reports/class-score-summary");
 
     expect(entryGroup.actions.map((item) => item.label)).not.toEqual(expect.arrayContaining(["Tạo lớp học phần", "Xếp lịch"]));
     expect(learningGroup.actions.slice(0, 2).map(({ label, route }) => ({ label, route }))).toEqual([
@@ -78,6 +86,7 @@ describe("Masters scheduling ribbon", () => {
     ["/masters/course-offerings", "Tạo lớp học phần", "Xếp lịch"],
     ["/masters/schedule?offeringId=persisted-id", "Xếp lịch", "Tạo lớp học phần"],
     ["/masters/course-matrix", "Ma trận lớp học phần", "Xếp lịch"],
+    ["/reports/class-score-summary", "Tổng hợp điểm của lớp", "Danh sách thi, điểm thi"],
   ])("highlights only the current scheduling route %s and follows navigation", async (path, activeLabel, otherLabel) => {
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ message: "admin" }) });

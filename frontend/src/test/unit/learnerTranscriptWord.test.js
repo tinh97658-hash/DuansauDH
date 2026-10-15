@@ -16,6 +16,26 @@ const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const nodes = (parent, name) => Array.from(parent.getElementsByTagNameNS(W, name));
 const contents = (parent) => nodes(parent, "t").map(node => node.textContent).join("");
 
+it("prints a passed language exemption with no invented numeric score", async () => {
+  const transcript = normalizeLearnerTranscript({ ...transcriptScorecardFixture, subjects: [{
+    id: "english", code: "HPTA", name: "Tiếng Anh", credits: 3,
+    grade: { score: null, result: "passed", profileForeignLanguageExempt: true, details: { examExempt: true } },
+  }] });
+  expect(transcript.subjects[0]).toMatchObject({ score: null, note: "Đạt (Miễn thi ngoại ngữ)" });
+  const zip = await JSZip.loadAsync(await bufferOf(await createLearnerTranscriptWord(transcript)));
+  expect(await zip.file("word/document.xml").async("string")).toContain("Đạt (Miễn thi ngoại ngữ)");
+});
+
+it("prints Không đạt for interrupted study leave in the shared transcript dataset and DOCX", async () => {
+  const transcript = normalizeLearnerTranscript({ ...transcriptScorecardFixture, subjects: [{
+    id: "interrupted", code: "HP01", name: "Triết học", credits: 3,
+    grade: { score: null, result: "failed", studyLeaveFailure: true },
+  }] });
+  expect(transcriptSubjectValues(transcript.subjects[0]).slice(-2)).toEqual(["", "Không đạt"]);
+  const zip = await JSZip.loadAsync(await bufferOf(await createLearnerTranscriptWord(transcript)));
+  expect(await zip.file("word/document.xml").async("string")).toContain("Không đạt");
+});
+
 it.each([transcriptScorecardFixture, longTranscriptScorecardFixture, officialTranscriptScorecardFixture, missingMetadataTranscriptFixture, hardSpecTranscriptScorecardFixture, referenceTranscriptScorecardFixture])("creates a real DOCX with the exact shared dataset and a readable multi-page layout", async (scorecard) => {
   const transcript = normalizeLearnerTranscript(scorecard);
   const blob = await createLearnerTranscriptWord(transcript);

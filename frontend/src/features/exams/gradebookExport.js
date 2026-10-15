@@ -11,13 +11,20 @@ const PREVIEW_PREFIX = "gradebook-preview:";
 export async function fetchAllGradebookRows(fetchPage, params, getDirty = () => ({})) {
   const exported = [];
   let page = 1, total = 0, revision;
+  let eligibilitySnapshot;
   do {
     const { data } = await fetchPage({ ...params, page, pageSize: 15 });
+    if (params.mode === "exam") {
+      if (data.unassessedRows !== 0) throw new Error("Chưa xét đủ tư cách của cả lớp. Nhập đủ điểm kiểm tra và BTL/TL/KT, rồi cập nhật bảng trước khi in danh sách thi.");
+      const snapshot = JSON.stringify([data.totalRows, data.eligibilityPolicies || data.eligibilityPolicy]);
+      if (eligibilitySnapshot !== undefined && snapshot !== eligibilitySnapshot) throw new Error("Tư cách thi hoặc danh sách lớp đã thay đổi. Vui lòng xuất lại.");
+      eligibilitySnapshot = snapshot;
+    }
     if (revision !== undefined && data.revision !== revision) throw new Error("Bảng điểm đã thay đổi trong lúc xuất. Vui lòng xuất lại.");
     revision = data.revision;
     total = data.total;
     if (data.page !== page) throw new Error("Danh sách đã thay đổi trong lúc xuất. Vui lòng xuất lại.");
-    exported.push(...data.rows.map(row => getDirty()[row.participantId] || draftOf(row)));
+    exported.push(...data.rows.map(row => row.profileForeignLanguageExempt || row.studyLeaveFailure ? draftOf(row) : getDirty()[row.participantId] || draftOf(row)));
     page++;
   } while ((page - 1) * 15 < total);
   return visibleGradeRows(exported, params.mode, params.search);
@@ -99,7 +106,7 @@ export function readGradebookPreview(id) {
   try {
     const data = JSON.parse(window.sessionStorage.getItem(`${PREVIEW_PREFIX}${id}`));
     return data?.version === 1 && ["university", "institute", "title", "group", "subject", "signingDate"].every(key => typeof data[key] === "string") &&
-      Array.isArray(data.headers) && data.headers.length === gradebookColumns().length && data.headers.every(value => typeof value === "string") &&
+      Array.isArray(data.headers) && data.headers.length === gradebookColumns(data.kind === "exam-list").length && data.headers.every(value => typeof value === "string") &&
       Array.isArray(data.rows) && data.rows.every(row => Array.isArray(row) && row.length === data.headers.length && row.every(value => value == null || ["string", "number"].includes(typeof value))) ? data : null;
   } catch { return null; }
 }

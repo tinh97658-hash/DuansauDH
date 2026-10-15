@@ -21,6 +21,13 @@ const loadSheet = async (report) => {
 };
 const textOf = (cell) => cell.value?.richText ? cell.value.richText.map(run => run.text).join("") : cell.value;
 
+it("exports interrupted study-leave attempts as Không đạt instead of an empty mark", async () => {
+  const report = sampleReport(1, 1);
+  report.rows[0].scores.hp0 = { score: null, result: "failed", studyLeaveFailure: true };
+  const sheet = await loadSheet(report);
+  expect(sheet.getCell("G11").value).toBe("Không đạt");
+});
+
 it("produces a readable xlsx with numeric marks, missing marks, exemptions and all rows", async () => {
   const subjects = ["Triết học", "Tiếng Anh", "Luận văn"].map((name, index) => ({ id: `hp${index}`, code: `HP${index}`, name, credits: 3, isRequired: true }));
   const rows = Array.from({ length: 60 }, (_, index) => ({ code: `HV${index}`, fullName: "Nguyễn Văn An", dob: "1997-04-16", gender: "Nam", scores: { hp0: { score: index === 0 ? 0 : 8.2, result: index === 0 ? "failed" : "passed" }, hp1: { score: null, result: "exempt" } } }));
