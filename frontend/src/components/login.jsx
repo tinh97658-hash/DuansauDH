@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { MailOutlineRounded, LockOutlined, VisibilityOffRounded, VisibilityRounded, ArrowForwardRounded, InfoOutlined } from "@mui/icons-material";
+import { MailOutlineRounded, LockOutlined, VisibilityOffRounded, VisibilityRounded, ArrowForwardRounded, LocationOnOutlined, PhoneRounded } from "@mui/icons-material";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import LoginIllustration from "../images/login-campus-reference.png";
 import LoginLogo from "../images/login-vmu-logo.png";
 import { BRAND } from "../config/branding";
 import { API_BASE_URL } from "../config/http";
+import LoginClock from "./loginClock";
 
 export const loginErrorMessage = (error) => {
   const payload = error?.response?.data;
@@ -56,21 +57,35 @@ const Login = () => {
         <img className="login-visual-image" src={LoginIllustration} alt="" fetchpriority="high" />
       </aside>
 
+      <div className="login-image-contacts" aria-label="Thông tin liên hệ Viện Đào tạo Sau đại học">
+        <div className="login-contact-strip">
+          <div className="login-contact-chip login-location-chip">
+            <LocationOnOutlined aria-hidden="true" /><span>Phòng 203, Nhà A6, 484 Lạch Tray, Hải Phòng</span>
+          </div>
+          <div className="login-contact-chip login-hotline-chip">
+            <PhoneRounded aria-hidden="true" />
+            <div className="login-hotline-copy"><span>HOTLINE: 0225.3.735.879</span><span className="login-contact-separator" aria-hidden="true">|</span><LoginClock /></div>
+          </div>
+        </div>
+        <div className="login-office-email">
+          <MailOutlineRounded aria-hidden="true" /><div><span>EMAIL CÔNG VỤ VIỆN SDH</span><strong>sdh@vimaru.edu.vn</strong></div>
+        </div>
+      </div>
+
       <div className="login-panel">
+        <div className="login-panel-body">
         <header className="login-brand">
           <img className="login-form-logo" src={LoginLogo} alt={`Biểu trưng ${BRAND.university}`} />
           <div className="login-brand-text"><strong>{BRAND.university}</strong><span>{BRAND.institute}</span></div>
         </header>
         <form className="login-form" onSubmit={handleSubmit} noValidate>
           <div className="login-form-header">
-            <p className="login-institute">CỔNG QUẢN LÝ ĐÀO TẠO</p>
-            <h2 id="login-title">Đăng nhập hệ thống</h2>
+            <h2 id="login-title">Đăng nhập quản trị</h2>
             <span className="login-title-rule" aria-hidden="true" />
-            <p className="login-description">Sử dụng tài khoản nội bộ đã được cấp để<br className="login-description-break" /> truy cập hệ thống quản lý đào tạo sau đại học.</p>
           </div>
 
           <div className="login-field">
-            <label htmlFor="login-email">Địa chỉ email</label>
+            <div className="login-field-heading"><label htmlFor="login-email">Địa chỉ email công vụ</label><span className="login-domain-badge">@vimaru.edu.vn</span></div>
             <div className="login-input-wrap">
               <MailOutlineRounded className="login-input-icon" aria-hidden="true" />
               <input id="login-email" name="email" type="email" value={values.email} onChange={handleChange}
@@ -79,7 +94,7 @@ const Login = () => {
           </div>
 
           <div className="login-field">
-            <label htmlFor="login-password">Mật khẩu</label>
+            <label htmlFor="login-password">Mật khẩu quản trị</label>
             <div className="login-input-wrap">
               <LockOutlined className="login-input-icon" aria-hidden="true" />
               <input id="login-password" name="password" type={showPassword ? "text" : "password"}
@@ -87,14 +102,14 @@ const Login = () => {
                 autoComplete="current-password" minLength="8" required />
               <button className="login-password-toggle" type="button" onClick={() => setShowPassword((current) => !current)}
                 aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"} aria-pressed={showPassword}>
-                {showPassword ? <VisibilityOffRounded /> : <VisibilityRounded />}
+                {showPassword ? <VisibilityRounded /> : <VisibilityOffRounded />}
               </button>
             </div>
           </div>
 
           <button className="login-submit" type="submit" disabled={submitting}>
             {submitting && <span className="login-spinner" aria-hidden="true" />}
-            {submitting ? "Đang đăng nhập..." : "Đăng nhập"}
+            {submitting ? "Đang đăng nhập..." : "Đăng nhập hệ thống"}
             <ArrowForwardRounded className="login-submit-arrow" aria-hidden="true" />
           </button>
 
@@ -107,9 +122,10 @@ const Login = () => {
             </>
           )}
 
-          <p className="login-internal-note"><InfoOutlined aria-hidden="true" /><span>Liên hệ quản trị viên nếu cần cấp tài khoản.</span></p>
           <ToastContainer newestOnTop limit={2} />
         </form>
+        </div>
+        <p className="login-internal-note"><LocationOnOutlined aria-hidden="true" /><span>Nhà A6, 484 Lạch Tray, Hải Phòng</span></p>
       </div>
     </section>
   );
