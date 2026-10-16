@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { EmailRounded, LockRounded, VisibilityOffRounded, VisibilityRounded } from "@mui/icons-material";
+import { MailOutlineRounded, LockOutlined, VisibilityOffRounded, VisibilityRounded, ArrowForwardRounded, InfoOutlined } from "@mui/icons-material";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import LoginIllustration from "../images/loginSide.webp";
+import LoginIllustration from "../images/login-campus-reference.png";
+import LoginLogo from "../images/login-vmu-logo.png";
 import { BRAND } from "../config/branding";
 import { API_BASE_URL } from "../config/http";
 
@@ -51,38 +52,36 @@ const Login = () => {
 
   return (
     <section className="login-shell" aria-labelledby="login-title">
-      <aside className="login-visual">
-        <div className="login-visual-copy">
-          <p className="login-eyebrow">{BRAND.university}</p>
-          <h1>{BRAND.institute}</h1>
-          <p>Quản lý hồ sơ, tiến độ học tập, báo cáo và quy trình đào tạo sau đại học trên một hệ thống thống nhất.</p>
-        </div>
-        <img className="login-visual-image" src={LoginIllustration} alt="Minh họa hệ thống quản lý đào tạo sau đại học" />
-        <div className="login-visual-note"><span />Hệ thống nội bộ dành cho tài khoản đã được cấp</div>
+      <aside className="login-visual" aria-hidden="true">
+        <img className="login-visual-image" src={LoginIllustration} alt="" fetchpriority="high" />
       </aside>
 
       <div className="login-panel">
+        <header className="login-brand">
+          <img className="login-form-logo" src={LoginLogo} alt={`Biểu trưng ${BRAND.university}`} />
+          <div className="login-brand-text"><strong>{BRAND.university}</strong><span>{BRAND.institute}</span></div>
+        </header>
         <form className="login-form" onSubmit={handleSubmit} noValidate>
-          <img className="login-form-logo" src={BRAND.logoUrl} alt={`Biểu trưng ${BRAND.university}`} />
           <div className="login-form-header">
-            <p className="login-institute">{BRAND.institute}</p>
+            <p className="login-institute">CỔNG QUẢN LÝ ĐÀO TẠO</p>
             <h2 id="login-title">Đăng nhập hệ thống</h2>
-            <p>Sử dụng tài khoản nội bộ đã được quản trị viên cấp.</p>
+            <span className="login-title-rule" aria-hidden="true" />
+            <p className="login-description">Sử dụng tài khoản nội bộ đã được cấp để<br className="login-description-break" /> truy cập hệ thống quản lý đào tạo sau đại học.</p>
           </div>
 
           <div className="login-field">
             <label htmlFor="login-email">Địa chỉ email</label>
             <div className="login-input-wrap">
-              <EmailRounded className="login-input-icon" />
+              <MailOutlineRounded className="login-input-icon" aria-hidden="true" />
               <input id="login-email" name="email" type="email" value={values.email} onChange={handleChange}
-                placeholder="ten.nguoidung@vimaru.edu.vn" autoComplete="email" inputMode="email" required autoFocus />
+                placeholder="Nhập địa chỉ email của bạn" autoComplete="email" inputMode="email" required autoFocus />
             </div>
           </div>
 
           <div className="login-field">
             <label htmlFor="login-password">Mật khẩu</label>
             <div className="login-input-wrap">
-              <LockRounded className="login-input-icon" />
+              <LockOutlined className="login-input-icon" aria-hidden="true" />
               <input id="login-password" name="password" type={showPassword ? "text" : "password"}
                 value={values.password} onChange={handleChange} placeholder="Nhập mật khẩu"
                 autoComplete="current-password" minLength="8" required />
@@ -96,6 +95,7 @@ const Login = () => {
           <button className="login-submit" type="submit" disabled={submitting}>
             {submitting && <span className="login-spinner" aria-hidden="true" />}
             {submitting ? "Đang đăng nhập..." : "Đăng nhập"}
+            <ArrowForwardRounded className="login-submit-arrow" aria-hidden="true" />
           </button>
 
           {googleAuthEnabled && (
@@ -107,7 +107,7 @@ const Login = () => {
             </>
           )}
 
-          <p className="login-internal-note">Không hỗ trợ đăng ký công khai. Vui lòng liên hệ quản trị viên nếu cần cấp tài khoản.</p>
+          <p className="login-internal-note"><InfoOutlined aria-hidden="true" /><span>Liên hệ quản trị viên nếu cần cấp tài khoản.</span></p>
           <ToastContainer newestOnTop limit={2} />
         </form>
       </div>
