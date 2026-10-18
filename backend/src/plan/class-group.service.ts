@@ -195,6 +195,7 @@ export class ClassGroupService {
     if (offeringCount > 0) {
       throw new ConflictException(`Không thể xóa nhóm "${group.code}" vì đang được sử dụng trong ${offeringCount} lớp học phần.`);
     }
+    await assertClassScopeEditable(this.sequelize, id, transaction);
     await group.destroy({ transaction });
     return { success: true, message: "Đã xóa nhóm học phần." };
   }

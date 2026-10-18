@@ -8,7 +8,7 @@ const buildService = () => {
   const records = { findByPk: jest.fn() };
   const majors = { findByPk: jest.fn() };
   const curriculums = { findByPk: jest.fn() };
-  const memberships = { findOne: jest.fn(), create: jest.fn(), destroy: jest.fn() };
+  const memberships = { findAll: jest.fn().mockResolvedValue([]), findOne: jest.fn(), create: jest.fn(), destroy: jest.fn() };
   const offeringGroups = { findAll: jest.fn().mockResolvedValue([]) };
   const offeringStudents = { findAll: jest.fn().mockResolvedValue([]), bulkCreate: jest.fn() };
   const recognitions = { proposeForRecord: jest.fn().mockResolvedValue({ autoApproved: 0 }), decide: jest.fn().mockResolvedValue({ id: "rec-1", status: "approved" }) };

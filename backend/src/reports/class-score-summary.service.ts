@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
+import { serializeSnapshot, snapshotDigest } from "./transcript-snapshot.js";
+import { academicProgress } from "./academic-progress.js";
+import { auditActor } from "../plan/membership-history.js";
+import { CurriculumBlock } from "../database/models/plan/curriculum-block.model.js";
+import { CurriculumElectiveGroup } from "../database/models/plan/curriculum-elective-group.model.js";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import { QueryTypes } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
@@ -27,7 +33,7 @@ const CLASS_ROSTER_CTE = `
           COALESCE(ar.last_name, '') AS "lastName", COALESCE(ar.first_name, '') AS "firstName",
           COALESCE(ar.dob, '') AS dob, COALESCE(ar.gender, '') AS gender,
           COALESCE(ar.is_exempt_foreign_language, false) AS "isExemptForeignLanguage"
-        FROM class_group_members cm
+        FROM academic_class_members cm
         LEFT JOIN LATERAL (
           SELECT a.* FROM admission_records a
           WHERE a.id = cm.admission_record_id OR (cm.admission_record_id IS NULL AND a.student_id = cm.student_id)
@@ -97,22 +103,25 @@ export class ClassScoreSummaryService {
     if (!student) throw new NotFoundException("Không tìm thấy học viên.");
     const groups = await this.sequelize.query<any>(`
       SELECT DISTINCT cg.id, cg.code, cg.name, cg.program, cg.academic_year AS "academicYear",
-        cg.curriculum_id AS "curriculumId"
-      FROM class_group_members cm JOIN class_groups cg ON cg.id = cm.class_group_id
+        cg.curriculum_id AS "curriculumId", EXISTS (SELECT 1 FROM class_group_members active_member
+          WHERE active_member.class_group_id = cg.id AND (active_member.admission_record_id = :admissionRecordId
+            OR (:studentId IS NOT NULL AND active_member.student_id = :studentId))) AS active
+      FROM academic_class_members cm JOIN class_groups cg ON cg.id = cm.class_group_id
       LEFT JOIN admission_records member_record ON member_record.id = cm.admission_record_id
       WHERE cm.admission_record_id = :admissionRecordId OR
         (:studentId IS NOT NULL AND (cm.student_id = :studentId OR member_record.student_id = :studentId))
-      ORDER BY "academicYear" DESC NULLS LAST, cg.code, cg.id
+      ORDER BY active DESC, "academicYear" DESC NULLS LAST, cg.code, cg.id
     `, { type: QueryTypes.SELECT, replacements: { admissionRecordId, studentId: student.studentId } });
     const selected = classGroupId ? groups.find(group => group.id === classGroupId)
-      : groups.find(group => group.academicYear === student.academicYear) || groups[0];
+      : groups.find(group => group.active) || groups.find(group => group.academicYear === student.academicYear) || groups[0];
     if (classGroupId && !selected) throw new NotFoundException("Học viên không thuộc lớp được chọn.");
     if (!selected) return { student, groups, group: null, curriculum: null, subjects: [] };
     const report = await this.get({ classGroupId: selected.id }, true, { participantId: student.participantId, includeDetails: true });
     const person = report.rows.find(row => row.participantId === student.participantId);
     if (!person) throw new NotFoundException("Học viên không còn thuộc lớp được chọn.");
-    return { student, groups, group: report.group, curriculum: report.curriculum,
+    const scorecard = { student, groups, group: report.group, curriculum: report.curriculum,
       subjects: report.subjects.map(subject => ({ ...subject, grade: person.scores[subject.id] || null })) };
+    return { ...scorecard, progress: academicProgress(scorecard) };
   }
 
   async transcripts(classGroupId: string) {
@@ -143,12 +152,14 @@ export class ClassScoreSummaryService {
       attributes: ["id", "code", "name", "program", "academicYear", "curriculumId"],
       include: [
         { model: Major, attributes: ["id", "name"] },
-        { model: Curriculum, attributes: ["id", "code", "name", "totalCredits"] },
+        { model: Curriculum, attributes: ["id", "code", "name", "totalCredits"], include: [
+          { model: CurriculumBlock, as: "blocks" }, { model: CurriculumElectiveGroup, as: "electiveGroups" },
+        ] },
       ],
     });
     if (!group) throw new NotFoundException("Không tìm thấy lớp học viên.");
     const subjects = sortCurriculumSubjectsByVietnameseName(group.curriculumId ? await this.sequelize.query<any>(`
-      SELECT s.id, COALESCE(NULLIF(s.code_text, ''), s.code) AS code, s.name, s.credits, s.is_required AS "isRequired", COALESCE(catalog_block.name, b.name) AS "blockName",
+      SELECT s.id, s.canonical_subject_id AS "canonicalSubjectId", COALESCE(NULLIF(s.code_text, ''), s.code) AS code, s.name, s.credits, s.is_required AS "isRequired", cs.block_id AS "blockId", cs.elective_group_id AS "electiveGroupId", COALESCE(catalog_block.name, b.name) AS "blockName",
         ${foreignLanguageSubjectSql('s.id')} AS "isForeignLanguage"
       FROM curriculum_subjects cs
       JOIN subjects s ON s.id = cs.subject_id
@@ -188,7 +199,8 @@ export class ClassScoreSummaryService {
             NULLIF(attempt.grade->>'courseScore', '')::numeric AS score,
             COALESCE(attempt.grade->>'result', 'pending') AS result,
             attempt.recorded_at, attempt.attempted_at, attempt.id, 0 AS priority,
-            attempt.grade || jsonb_build_object('source', 'gradebook', 'eligibilityPolicy', rules.policy) AS details,
+            attempt.grade || jsonb_build_object('source', 'gradebook', 'eligibilityPolicy',
+              CASE WHEN attempt.grade->>'finalized' = 'true' THEN attempt.grade->'eligibilityPolicy' ELSE rules.policy END) AS details,
             attempt.course_offering_id::text AS offering_id
           FROM (${examOutcomesSql()}) attempt
           LEFT JOIN LATERAL (SELECT policy FROM shared_grading_rules ORDER BY version DESC LIMIT 1) rules ON true
@@ -196,9 +208,9 @@ export class ClassScoreSummaryService {
           UNION ALL
           SELECT CASE WHEN ar.student_id IS NOT NULL THEN 'student:' || ar.student_id::text
               ELSE 'admission:' || ar.id::text END, recognition.target_subject_id,
-            learning.score, 'passed', recognition.updated_at, recognition.updated_at, recognition.id::text, 1,
+            learning.score, learning.result, recognition.updated_at, recognition.updated_at, recognition.id::text, 1,
             jsonb_build_object('source', 'recognition', 'recognitionId', recognition.id,
-              'courseScore', learning.score, 'result', 'passed', 'conversionPolicy', rules.policy), NULL::text
+              'courseScore', learning.score, 'result', learning.result, 'conversionPolicy', rules.policy), NULL::text
           FROM subject_recognitions recognition
           JOIN admission_records ar ON ar.id = recognition.admission_record_id
           JOIN learner_subject_results learning ON learning.id = recognition.learning_result_id
@@ -206,7 +218,7 @@ export class ClassScoreSummaryService {
           LEFT JOIN LATERAL (SELECT policy FROM shared_grading_rules ORDER BY version DESC LIMIT 1) rules ON true
           WHERE recognition.status = 'approved' AND learning.status = 'completed'
             AND learning.source_type IN ('pre_masters', 'early_enrollment', 'external')
-            AND learning.result = 'passed' AND learning.score BETWEEN 0 AND 10
+            AND (learning.result = 'exempt' OR (learning.result = 'passed' AND learning.score BETWEEN 0 AND 10))
             AND (CASE WHEN ar.student_id IS NOT NULL THEN 'student:' || ar.student_id::text
               ELSE 'admission:' || ar.id::text END) IN (:participantIds)
         ), ranked AS (
@@ -225,12 +237,12 @@ export class ClassScoreSummaryService {
       for (const entry of scores) {
         if (entry.details?.source === "gradebook") {
           const grade = entry.details;
-          const policy = grade.eligibilityPolicy || LEGACY_GRADING_POLICY;
+          const policy = grade.finalized ? grade.eligibilityPolicy || grade.gradingPolicy || LEGACY_GRADING_POLICY : grade.eligibilityPolicy || LEGACY_GRADING_POLICY;
           const calculated = resolveSavedExamGrade(grade, policy);
           entry.score = calculated.courseScore;
           entry.result = calculated.result;
           entry.details = { ...grade, ...calculated, eligibilityPolicy: policy };
-          if (!grade.studyLeaveFailure && !grade.examExempt && calculateExamEligibility(grade, policy) === false) {
+          if (!grade.finalized && !grade.studyLeaveFailure && !grade.examExempt && calculateExamEligibility(grade, policy) === false) {
             entry.score = 0;
             entry.result = "failed";
             entry.details = { ...entry.details, examScore: 0, attemptScores: [0] };
@@ -241,11 +253,12 @@ export class ClassScoreSummaryService {
           const band = [...policy.bands].sort((a, b) => b.minimum - a.minimum)
             .find(item => Number(entry.score) >= item.minimum);
           entry.details = { source: "recognition", recognitionId: entry.details.recognitionId,
-            courseScore: Number(entry.score), grade4: band?.grade4 ?? null,
-            letterGrade: band?.letter || "", result: "passed" };
+            courseScore: entry.score == null ? null : Number(entry.score), grade4: entry.result === "exempt" ? null : band?.grade4 ?? null,
+            letterGrade: entry.result === "exempt" ? "" : band?.letter || "", result: entry.result };
         }
         const person = people.get(entry.participantId);
         if (person) person.scores[entry.subjectId] = { score: entry.score == null ? null : Number(entry.score), result: entry.result,
+          ...(entry.details?.finalized ? { finalized: true } : {}),
           ...(entry.details?.studyLeaveFailure ? { studyLeaveFailure: true } : {}),
           ...(scope.includeDetails ? { details: entry.details } : {}) };
       }
@@ -253,7 +266,7 @@ export class ClassScoreSummaryService {
         if (!person.isExemptForeignLanguage) continue;
         for (const subject of subjects) {
           if (!subject.isForeignLanguage) continue;
-          if (person.scores[subject.id]?.studyLeaveFailure) continue;
+          if (person.scores[subject.id]?.studyLeaveFailure || person.scores[subject.id]?.finalized) continue;
           person.scores[subject.id] = { score: null, result: "passed", profileForeignLanguageExempt: true,
             ...(scope.includeDetails ? { details: { ...foreignLanguageExemptGrade(), source: "profile_foreign_language_exemption" } } : {}) };
         }
@@ -264,5 +277,38 @@ export class ClassScoreSummaryService {
     const plainGroup = typeof group.toJSON === "function" ? group.toJSON() : group;
     return { group: { ...plainGroup, curriculum }, curriculum, subjects, rows, total: roster.total, page: roster.page, pageSize,
       scorePolicy: "Điểm lấy từ kết quả học phần đã được công nhận hoặc kết quả đã lưu của lần học mới nhất, xác định theo thời điểm mở lớp học phần. Sửa bảng điểm lớp cũ không thay thế kết quả lần học mới hơn. Ô trống: chưa có điểm; MT: miễn thi. Không đạt do bảo lưu: học phần đã có lịch buổi đầu hoặc đã có điểm khi duyệt bảo lưu." };
+  }
+
+  async issue(admissionRecordId: string, classGroupId: string, actor: any) {
+    return this.sequelize.transaction(async transaction => {
+      // Serialize publication with grade, membership, policy and recognition
+      // mutations before reading the scorecard used for the immutable snapshot.
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
+      const snapshot = await this.learnerScorecard(admissionRecordId, classGroupId);
+      if (!(snapshot as any).progress?.completed) throw new ConflictException("Chưa hoàn thành các điều kiện học phần và chốt điểm của CTĐT.");
+      (snapshot as any).issuedAt = new Date().toISOString();
+      const id = randomUUID();
+      const payload = serializeSnapshot(snapshot);
+      const digest = snapshotDigest(snapshot);
+      await this.sequelize.query(`INSERT INTO learner_transcript_issues (id,admission_record_id,class_group_id,actor,snapshot,digest)
+        VALUES (:id,:recordId,:groupId,CAST(:actor AS jsonb),CAST(:snapshot AS jsonb),:digest)`, {
+        transaction, replacements: { id, recordId: admissionRecordId, groupId: classGroupId,
+          actor: JSON.stringify(auditActor(actor)), snapshot: payload, digest },
+      });
+      return { id, digest, snapshot };
+    });
+  }
+
+  async issued(id: string) {
+    const [row] = await this.sequelize.query<any>(`SELECT id,admission_record_id AS "admissionRecordId",actor,snapshot,digest,created_at AS "createdAt"
+      FROM learner_transcript_issues WHERE id = :id`, { type: QueryTypes.SELECT, replacements: { id } });
+    if (!row) throw new NotFoundException("Không tìm thấy bản kết quả học tập đã chốt.");
+    if (snapshotDigest(row.snapshot) !== row.digest) throw new ConflictException("Bản kết quả đã lưu không khớp mã kiểm tra toàn vẹn.");
+    return row;
+  }
+
+  async issuesForRecord(id: string) {
+    return this.sequelize.query(`SELECT id,actor,created_at AS "createdAt",digest FROM learner_transcript_issues
+      WHERE admission_record_id = :id ORDER BY created_at DESC,id DESC`, { type: QueryTypes.SELECT, replacements: { id } });
   }
 }

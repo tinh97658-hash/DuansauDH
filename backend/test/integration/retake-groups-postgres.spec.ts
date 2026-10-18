@@ -24,6 +24,9 @@ import { CourseOfferingClassGroup } from "../../src/database/models/training/cou
 import { CourseExamGradebook } from "../../src/database/models/training/course-exam-gradebook.model.js";
 import { Staff } from "../../src/database/models/staff.model.js";
 import { SubjectRecognition } from "../../src/database/models/training/subject-recognition.model.js";
+import { MastersService } from "../../src/masters/masters.service.js";
+import { PlanService } from "../../src/plan/plan.service.js";
+import { LEGACY_GRADING_POLICY } from "../../src/masters/grading-policy.js";
 
 const describeDb = process.env.RUN_POSTGRES_SCHEDULING_TESTS === "true" ? describe : describe.skip;
 // Every read and write uses one rolled-back transaction, including service-created transactions.
@@ -76,6 +79,65 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
   afterEach(async () => {
     jest.restoreAllMocks();
     try { await tx?.rollback(); } finally { await app?.close(); }
+  });
+
+  async function fillAndApprove() {
+    const scope = { classGroupId: original.id, courseOfferingId: source.id, rosterScope: "offering" as const };
+    const before = await exams.get(scope);
+    const saved = await exams.save({ ...scope, revision: before.revision, rows: learners.slice(0, 3).map(learner => ({
+      participantId: `admission:${learner.id}`, testScore: 8, assignmentScore: 8, examScore: 8,
+      examExempt: false, letterGrade: "", attemptScores: [], result: "pending" as const,
+    })) }, { id: staff.id, role: "examiner" });
+    const submitted = await exams.transition({ ...scope, action: "submit", note: "Submit all rows", revision: saved.revision, version: 0 }, { id: staff.id, role: "examiner" });
+    await expect(exams.save({ ...scope, revision: submitted.revision, rows: [
+      { participantId: `admission:${learners[0].id}`, testScore: 1 } as any,
+    ] })).rejects.toThrow("gửi duyệt");
+    return exams.transition({ ...scope, action: "approve", note: "Approved by administrator", revision: submitted.revision, version: 1 }, { id: staff.id, role: "admin" });
+  }
+
+  it("archives a removed member, fixes the stored study status and preserves the old scorecard", async () => {
+    await expect(app.get(PlanService).removeAdmissionRecord(learners[0].id)).rejects.toThrow("lịch sử đào tạo");
+    const member = await ClassGroupMember.findOne({ where: { admissionRecordId: learners[0].id } });
+    await app.get(MastersService).removeMember(original.id, member!.id, { id: staff.id, role: "admin" });
+    await expect(app.get(PlanService).removeAdmissionRecord(learners[0].id)).rejects.toThrow("lịch sử đào tạo");
+    await learners[0].reload();
+    expect(learners[0].studyStatus).toBe("Đã trúng tuyển");
+    expect(await ClassGroupMember.count({ where: { admissionRecordId: learners[0].id } })).toBe(0);
+    const reports = app.get(ClassScoreSummaryService);
+    const historical = await reports.learnerScorecard(learners[0].id, original.id);
+    expect(historical.subjects[0].grade).toMatchObject({ score: 8, result: "passed" });
+    expect((await reports.roster(original.id)).students.some(row => row.admissionRecordId === learners[0].id)).toBe(true);
+    await app.get(MastersService).assignMembers(next.id, { admissionRecordIds: [learners[0].id] });
+    expect((await reports.learnerScorecard(learners[0].id)).group!.id).toBe(next.id);
+    expect((await reports.learnerScorecard(learners[0].id, original.id)).subjects[0].grade?.score).toBe(8);
+  });
+
+  it("requires complete rows, an administrator and a reason before locking or reopening grades", async () => {
+    const scope = { classGroupId: original.id, courseOfferingId: source.id, rosterScope: "offering" as const };
+    await expect(exams.transition({ ...scope, action: "submit", revision: 1, version: 0, note: "Incomplete" }, { role: "examiner" })).rejects.toThrow("đủ kết quả");
+    const approved = await fillAndApprove();
+    expect(approved.workflow.status).toBe("approved");
+    expect(approved.rows.every(row => row.finalized)).toBe(true);
+    await expect(exams.transition({ ...scope, action: "reopen", revision: approved.revision, version: 2, note: "Correction" }, { role: "examiner" })).rejects.toThrow("quản trị viên");
+    await expect(exams.transition({ ...scope, action: "reopen", revision: approved.revision, version: 2, note: " " }, { role: "admin" })).rejects.toThrow("lý do");
+    expect((await exams.history(scope)).map((event: any) => event.action)).toEqual(expect.arrayContaining(["save", "submit", "approve"]));
+  });
+
+  it("freezes confirmed marks and published snapshots while allowing an audited reopening", async () => {
+    const approved = await fillAndApprove();
+    const reports = app.get(ClassScoreSummaryService);
+    const card = await reports.learnerScorecard(learners[0].id, original.id);
+    expect((card as any).progress).toMatchObject({ completed: true, earnedCredits: 2 });
+    const issue = await reports.issue(learners[0].id, original.id, { id: staff.id, role: "admin" });
+    await db.query("INSERT INTO shared_grading_rules (version,policy,created_at) VALUES (1,CAST(:policy AS jsonb),NOW())", {
+      replacements: { policy: JSON.stringify({ ...LEGACY_GRADING_POLICY, version: 1, minimums: { testScore: 9, assignmentScore: 9, examScore: 9 } }) },
+    });
+    expect((await reports.learnerScorecard(learners[0].id, original.id)).subjects[0].grade).toMatchObject({ score: 8, result: "passed" });
+    const scope = { classGroupId: original.id, courseOfferingId: source.id, rosterScope: "offering" as const };
+    await exams.transition({ ...scope, action: "reopen", revision: approved.revision, version: 2, note: "Apply correction" }, { id: staff.id, role: "admin" });
+    expect((await reports.learnerScorecard(learners[0].id, original.id)).subjects[0].grade?.result).toBe("failed");
+    expect((await reports.issued(issue.id)).snapshot.subjects[0].grade).toMatchObject({ score: 8, result: "passed" });
+    await expect(reports.issue(learners[0].id, original.id, { id: staff.id, role: "admin" })).rejects.toThrow("Chưa hoàn thành");
   });
 
   it("offers only failures from a closed class, merges the group, and preserves old grades and administrative membership", async () => {

@@ -19,7 +19,7 @@ export async function learningExamResults(sequelize: Sequelize, admissionRecordI
         ELSE NULLIF(exam.grade->>'courseScore', '')::numeric END score,
       learning.source_type AS "sourceType", CASE WHEN record.is_exempt_foreign_language
         AND ${foreignLanguageSubjectSql('source.id')}
-        AND COALESCE(exam.grade->>'studyLeaveFailure', 'false') <> 'true'
+        AND COALESCE(exam.grade->>'studyLeaveFailure', 'false') <> 'true' AND COALESCE(exam.grade->>'finalized','false') <> 'true'
         THEN CAST(:foreignLanguageGrade AS jsonb) ELSE exam.grade END AS grade,
       (SELECT policy FROM shared_grading_rules ORDER BY version DESC LIMIT 1) AS "eligibilityPolicy"
     FROM learner_subject_results learning

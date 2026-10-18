@@ -40,6 +40,7 @@ export class GradingPolicyService {
     const keys = dto.rows.map(row => `${row.subjectId}:${row.year}`);
     if (new Set(keys).size !== keys.length) throw new BadRequestException("Mỗi môn và năm chỉ được lưu một cấu hình trong một lần cập nhật.");
     return this.sequelize.transaction(async transaction => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
       // Serialize shared edits, including first creation, and keep batch saves atomic.
       await this.sequelize.query("SELECT pg_advisory_xact_lock(714055)", { transaction });
       let shared = await this.shared(transaction);

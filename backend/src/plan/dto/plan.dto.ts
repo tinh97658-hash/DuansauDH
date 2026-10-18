@@ -1,4 +1,5 @@
 import { Transform, Type } from "class-transformer";
+import { normalizeTrainingLevel, STUDY_STATUS_VALUES } from "../admission-values.js";
 import { ArrayMaxSize, ArrayMinSize, ArrayNotEmpty, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min, ValidateNested } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim());
@@ -160,13 +161,13 @@ export class CreateAdmissionRecordDto {
 
   @IsOptional() @IsBoolean() isExemptForeignLanguage?: boolean;
   @IsOptional() @IsString() trainingModeGroup?: string;
-  @IsOptional() @IsString() trainingLevel?: string;
+  @IsOptional() @Transform(({ value }) => normalizeTrainingLevel(value)) @IsIn(["Thạc sĩ", "Tiến sĩ"]) trainingLevel?: string;
   @IsOptional() @IsUUID() trainingModeId?: string;
   @IsOptional() @IsString() trainingModeName?: string;
   @IsUUID() majorId!: string;
   @IsOptional() @IsString() majorName?: string;
   @IsOptional() @IsString() language?: string;
-  @IsOptional() @IsString() studyStatus?: string;
+  @IsOptional() @Transform(trim) @IsIn(STUDY_STATUS_VALUES) studyStatus?: string;
   @IsOptional() @IsString() academicYear?: string;
 
   @IsOptional() @IsString() nationality?: string;
@@ -190,7 +191,7 @@ export class CreateAdmissionRecordDto {
   @IsOptional() @IsString() diplomaNumber?: string;
   @IsOptional() @IsString() registryBookNumber?: string;
 
-  @IsOptional() @IsString() status?: string;
+  @IsOptional() @IsIn(["pending", "approved", "rejected"]) status?: string;
   @IsOptional() @IsString() note?: string;
   @IsOptional() extraData?: Record<string, any>;
 }
@@ -213,13 +214,13 @@ export class UpdateAdmissionRecordDto {
 
   @IsOptional() @IsBoolean() isExemptForeignLanguage?: boolean;
   @IsOptional() @IsString() trainingModeGroup?: string;
-  @IsOptional() @IsString() trainingLevel?: string;
+  @IsOptional() @Transform(({ value }) => normalizeTrainingLevel(value)) @IsIn(["Thạc sĩ", "Tiến sĩ"]) trainingLevel?: string;
   @IsOptional() @IsUUID() trainingModeId?: string;
   @IsOptional() @IsString() trainingModeName?: string;
   @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsString() majorName?: string;
   @IsOptional() @IsString() language?: string;
-  @IsOptional() @IsString() studyStatus?: string;
+  @IsOptional() @Transform(trim) @IsIn(STUDY_STATUS_VALUES) studyStatus?: string;
   @IsOptional() @IsString() academicYear?: string;
 
   @IsOptional() @IsString() nationality?: string;
@@ -243,7 +244,7 @@ export class UpdateAdmissionRecordDto {
   @IsOptional() @IsString() diplomaNumber?: string;
   @IsOptional() @IsString() registryBookNumber?: string;
 
-  @IsOptional() @IsString() status?: string;
+  @IsOptional() @IsIn(["pending", "approved", "rejected"]) status?: string;
   @IsOptional() @IsString() note?: string;
   @IsOptional() extraData?: Record<string, any>;
 }

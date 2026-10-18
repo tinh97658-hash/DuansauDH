@@ -28,6 +28,8 @@ const paged = (gradeRows, params = {}) => {
   return { revision: 0, rows: found.slice((page - 1) * 15, page * 15), total: found.length, totalRows: gradeRows.length, unassessedRows: assessed.filter(row => row.eligible === null).length, page, pageSize: 15 };
 };
 const setup = (role = "admin", gradeRows = data.rows) => {
+  // A save must not mutate the shared baseline used by subsequent tests.
+  gradeRows = gradeRows.map(row => row === savedRow ? { ...row, attemptScores: [...(row.attemptScores || [])] } : row);
   axios.put.mockImplementation(async (_, payload) => {
     payload.rows.forEach(value => Object.assign(gradeRows.find(row => row.participantId === value.participantId), value));
     return { data: { ...paged(gradeRows, payload), revision: 1 } };
@@ -37,7 +39,53 @@ const setup = (role = "admin", gradeRows = data.rows) => {
     courseOfferings: [{ id: "o1", status: "completed", name: "Lớp An toàn thông tin", subjectId: "s1", subject: { id: "s1", code: "HP01", name: "An toàn thông tin" }, groupLinks: [{ classGroupId: "g1" }] }],
   } : url.endsWith("/isStaff") ? { message: role } : paged(gradeRows, config?.params) }));
 };
-beforeEach(() => { jest.clearAllMocks(); localStorage.clear(); setup(); });
+// Toastify queues dismissal events. Flush the previous unmounted container's
+// events before a new test reuses the same warning IDs.
+beforeEach(async () => {
+  await new Promise(resolve => setTimeout(resolve, 0));
+  jest.clearAllMocks(); localStorage.clear(); setup();
+});
+
+it("locks approved grades and requires an explicit reopening reason", async () => {
+  setup("admin", [{ ...savedRow, testScore: 8, assignmentScore: 8, examScore: 8 }]);
+  const original = axios.get.getMockImplementation();
+  let workflow = { status: "approved", version: 2 };
+  axios.get.mockImplementation(async (url, config) => {
+    const result = await original(url, config);
+    return url.endsWith("/exam-lists") ? { data: { ...result.data, workflow } } : result;
+  });
+  axios.post.mockImplementation(async () => { workflow = { status: "draft", version: 3 }; return { data: {} }; });
+  render(<ExamLists />);
+  expect(await screen.findByLabelText("Điểm kiểm tra HV001")).toBeDisabled();
+  expect(screen.getByText("Đã duyệt và khóa")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Mở lại để sửa" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(within(dialog).getByRole("button", { name: "Xác nhận" })).toBeDisabled();
+  fireEvent.change(within(dialog).getByLabelText("Lý do hoặc căn cứ"), { target: { value: "Điều chỉnh theo biên bản" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận" }));
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/exam-lists/workflow"), expect.objectContaining({ action: "reopen", version: 2, note: "Điều chỉnh theo biên bản" })));
+  await waitFor(() => expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeEnabled());
+});
+
+it("allows an examiner to submit but not approve a complete gradebook", async () => {
+  setup("examiner", [{ ...savedRow, testScore: 8, assignmentScore: 8, examScore: 8 }]);
+  const original = axios.get.getMockImplementation();
+  let workflow = { status: "draft", version: 0 };
+  axios.get.mockImplementation(async (url, config) => {
+    const result = await original(url, config);
+    return url.endsWith("/exam-lists") ? { data: { ...result.data, workflow } } : result;
+  });
+  axios.post.mockImplementation(async () => { workflow = { status: "submitted", version: 1 }; return { data: {} }; });
+  render(<ExamLists />);
+  await screen.findByLabelText("Điểm kiểm tra HV001");
+  fireEvent.click(screen.getByRole("button", { name: "Gửi duyệt điểm" }));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText("Lý do hoặc căn cứ"), { target: { value: "Đã đối chiếu điểm" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận" }));
+  await screen.findByText("Chờ duyệt");
+  expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "Duyệt và khóa điểm" })).not.toBeInTheDocument();
+});
 
 it.each([
   { result: "passed", examScore: 8, courseScore: 8 },
@@ -336,7 +384,7 @@ it("downloads the active tab's columns, current draft values, and searched stude
     expect(sheet.rowCount).toBe(31);
     expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), expect.objectContaining({ params: expect.objectContaining({ page: 2, pageSize: 15 }) }));
     expect(sheet.getCell("L10").value).toBe("8.5");
-    expect(sheet.getCell("E10").value).toBe("02/01/1990");
+    expect(sheet.getCell("E10").value).toBe("02/01/90");
     expect(sheet.getCell("B11").value).toBe("HV002");
     expect(downloads[0]).toBe("Bang-diem-mon-hoc-N01-HP01.xlsx");
     await waitFor(() => expect(screen.getByRole("button", { name: "Cập nhật cả bảng" })).toBeEnabled());
@@ -517,8 +565,8 @@ it("shows blank exam sheets without clearing drafts and keeps supervisors read-o
 });
 
 it("shows an unsaved passed student in DS thi and saves notes included in the print table", async () => {
+  setup("admin", [{ ...savedRow }]);
   const passedRow = { ...savedRow, testScore: 6, assignmentScore: 6, examScore: 6, courseScore: 6, result: "passed", notes: "Ghi chú học viên" };
-  axios.put.mockResolvedValue({ data: { ...data, unassessedRows: 0, revision: 1, rows: [passedRow] } });
   render(<ExamLists />);
   await screen.findByLabelText("Điểm kiểm tra HV001");
   for (const label of ["Điểm kiểm tra", "Điểm BTL/TL/KT", "Điểm thi hết môn"]) {

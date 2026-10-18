@@ -91,6 +91,18 @@ npm run db:seed:common
 
 ## Cấu hình môi trường
 
+### Cập nhật vòng đời học viên (migration 061)
+
+Sao lưu database trước khi cập nhật, chạy từ thư mục gốc:
+
+```powershell
+npm --prefix backend run db:migrate
+```
+
+Khởi động lại backend/frontend sau migration. Migration 061 thêm lịch sử thành viên lớp, trạng thái duyệt điểm, nhật ký thay đổi và bản kết quả học tập đã chốt; đối soát trạng thái học theo phân lớp hiện tại. Điểm cũ giữ trạng thái nháp và phải được gửi/duyệt để tính vào hoàn thành học phần. Migration không hỗ trợ tự động xóa lịch sử bằng `down`; rollback dùng bản sao lưu đã kiểm chứng.
+
+Sau khi hoàn thành giảng dạy: lưu đủ điểm → gửi duyệt → admin duyệt và khóa. Admin muốn sửa phải mở lại với lý do. Bảng điểm cá nhân hiển thị điều kiện học phần còn thiếu và cho admin lưu bản kết quả khi đủ điều kiện; các bản cũ vẫn mở lại được sau điều chỉnh. Hoàn thành học phần được tách riêng với xét tốt nghiệp/GPA. Xem [kế hoạch và báo cáo vòng đời học viên](BAO-CAO-LOGIC-VONG-DOI-HOC-VIEN.md).
+
 Toàn bộ cấu hình local nằm trong **`.env` ở thư mục gốc**, được Git bỏ qua.
 Docker Compose, backend, migration, seed và frontend đều đọc file này.
 Backend không còn tìm `config.env` hoặc `.env` riêng trong thư mục con.

@@ -6,6 +6,9 @@ import { CourseOfferingStudent } from "./course-offering-student.model.js";
 
 @Table({ tableName: "course_offerings", underscored: true, timestamps: true })
 export class CourseOffering extends Model {
+  @Default("draft") @Column(DataType.STRING(20)) declare gradebookStatus: "draft" | "submitted" | "approved";
+  @Default(0) @Column(DataType.INTEGER) declare gradebookVersion: number;
+  @Column(DataType.JSONB) declare gradebookSnapshot: any;
   @HasMany(() => CourseOfferingStudent) declare individualStudents: CourseOfferingStudent[];
   @Default(DataType.UUIDV4) @Column({ type: DataType.UUID, primaryKey: true }) declare id: string;
 

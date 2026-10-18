@@ -25,6 +25,11 @@ export default defineConfig(({ mode }) => {
       if (!/\.[jt]sx?$/.test(id)) return null;
 
       let transformed = code;
+      // Legacy CommonJS factories must expose the default imported by ESM.
+      transformed = transformed.replace(
+        /(?:jest|vi)\.mock\(\s*["']axios["']\s*,\s*\(\)\s*=>\s*\(\{([\s\S]*?)\}\)\s*\);/g,
+        (match, body) => /\bdefault\s*:/.test(body) ? match : `vi.mock("axios", () => ({ default: { ${body} } }));`,
+      );
       // Remove @mui/icons-material mock so real esbuild-bundled icons are used
       transformed = transformed.replace(
         /(?:jest|vi)\.mock\(\s*["']@mui\/icons-material["'][\s\S]*?\);/g,

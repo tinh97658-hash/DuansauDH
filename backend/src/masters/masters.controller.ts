@@ -9,7 +9,7 @@ import {
 } from "./dto/masters-class-group.dto.js";
 import { MastersService } from "./masters.service.js";
 import { ExamGradebookService } from "./exam-gradebook.service.js";
-import { ExamGradebookQueryDto, ExamSubjectsQueryDto, SaveExamGradebookDto } from "./dto/exam-gradebook.dto.js";
+import { ExamGradebookQueryDto, ExamSubjectsQueryDto, SaveExamGradebookDto, GradebookWorkflowDto } from "./dto/exam-gradebook.dto.js";
 import { AdmissionEvaluationService } from "../plan/admission-evaluation.service.js";
 
 @Controller("masters")
@@ -22,6 +22,12 @@ export class MastersController {
     private readonly admissionEvaluation: AdmissionEvaluationService,
     private readonly gradingPolicies: GradingPolicyService,
   ) {}
+
+  @Get("exam-lists/history")
+  gradebookHistory(@Query() query: ExamGradebookQueryDto) { return this.gradebooks.history(query); }
+
+  @Post("exam-lists/workflow") @Roles("admin", "examiner")
+  gradebookWorkflow(@Body() dto: GradebookWorkflowDto, @CurrentUser() actor: any) { return this.gradebooks.transition(dto, actor); }
 
   @Get("bridge-course") bridgeCourse() { return this.masters.bridgeCourse(); }
   @Get("grading-policies") @Roles("admin", "supervisor", "examiner") @UseGuards(RolesGuard)
@@ -40,7 +46,7 @@ export class MastersController {
   @Get("exam-lists") @Roles("admin", "supervisor", "examiner") @UseGuards(RolesGuard)
   examLists(@Query() query: ExamGradebookQueryDto) { return this.gradebooks.get(query); }
   @Put("exam-lists") @Roles("admin", "examiner") @UseGuards(RolesGuard)
-  saveExamLists(@Body() dto: SaveExamGradebookDto) { return this.gradebooks.save(dto); }
+  saveExamLists(@Body() dto: SaveExamGradebookDto, @CurrentUser() actor: any) { return this.gradebooks.save(dto, actor); }
   @Get("english-exam") englishExam() { return this.masters.englishExam(); }
   @Get("english-scores") englishScores() { return this.masters.englishScores(); }
   @Get("english-certification") englishCertification() { return this.masters.englishCertification(); }
@@ -109,8 +115,8 @@ export class MastersController {
   @Delete("class-groups/:id/members/:memberId")
   @Roles("admin")
   @UseGuards(RolesGuard)
-  removeMember(@Param("id") id: string, @Param("memberId") memberId: string) {
-    return this.masters.removeMember(id, memberId);
+  removeMember(@Param("id") id: string, @Param("memberId") memberId: string, @CurrentUser() actor: any) {
+    return this.masters.removeMember(id, memberId, actor);
   }
 
   @Post("class-groups/auto-assign")

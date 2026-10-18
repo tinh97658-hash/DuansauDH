@@ -15,6 +15,9 @@ import { MastersService } from "../../src/masters/masters.service.js";
 import { ExamGradebookService } from "../../src/masters/exam-gradebook.service.js";
 import { GradingPolicyService } from "../../src/masters/grading-policy.service.js";
 import { AdmissionEvaluationService } from "../../src/plan/admission-evaluation.service.js";
+import { ReportsController } from "../../src/reports/reports.controller.js";
+import { ReportsService } from "../../src/reports/reports.service.js";
+import { ClassScoreSummaryService } from "../../src/reports/class-score-summary.service.js";
 
 describe("Learner data access over HTTP", () => {
   let app: INestApplication;
@@ -34,11 +37,15 @@ describe("Learner data access over HTTP", () => {
     "/masters/class-groups",
     "/masters/class-groups/eligible-students",
     `/masters/class-groups/${id}`,
+    `/masters/exam-lists/history?classGroupId=${id}&courseOfferingId=${id}`,
+    `/reports/learner-scorecard/${id}`,
+    `/reports/learner-scorecard/${id}/issues`,
+    `/reports/transcript-issues/${id}`,
   ];
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
-      controllers: [PlanController, StudyLeaveController, MastersController],
+      controllers: [PlanController, StudyLeaveController, MastersController, ReportsController],
       providers: [
         { provide: PlanService, useValue: { listAdmissionRecords: read, getAdmissionRecord: read, createAdmissionRecord: write } },
         { provide: CurriculumService, useValue: {} },
@@ -48,7 +55,9 @@ describe("Learner data access over HTTP", () => {
         } },
         { provide: StudyLeaveService, useValue: { list: read, detail: read } },
         { provide: MastersService, useValue: { listClassGroups: read, getClassGroup: read, listEligibleStudents: read } },
-        { provide: ExamGradebookService, useValue: {} },
+        { provide: ExamGradebookService, useValue: { history: read, transition: write } },
+        { provide: ReportsService, useValue: {} },
+        { provide: ClassScoreSummaryService, useValue: { learnerScorecard: read, issuesForRecord: read, issued: read, issue: write } },
         { provide: GradingPolicyService, useValue: {} },
         { provide: AdmissionEvaluationService, useValue: {} },
       ],
@@ -105,5 +114,23 @@ describe("Learner data access over HTTP", () => {
     await request(app.getHttpServer()).post("/plan/admission-records").set("x-test-role", "admin")
       .send({ fullName: "Applicant" }).expect(201).expect({ created: true });
     expect(write).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["student", "supervisor", "examiner"])("keeps issued transcript creation admin-only for %s", async role => {
+    await request(app.getHttpServer()).post(`/reports/learner-scorecard/${id}/issue`)
+      .set("x-test-role", role).send({ classGroupId: id }).expect(401);
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("allows an admin to create an issued transcript", async () => {
+    await request(app.getHttpServer()).post(`/reports/learner-scorecard/${id}/issue`)
+      .set("x-test-role", "admin").send({ classGroupId: id }).expect(201);
+    expect(write).toHaveBeenCalledWith(id, id, expect.anything());
+  });
+
+  it.each(["student", "supervisor"])("rejects gradebook workflow writes for %s", async role => {
+    await request(app.getHttpServer()).post("/masters/exam-lists/workflow")
+      .set("x-test-role", role).send({ action: "approve" }).expect(401);
+    expect(write).not.toHaveBeenCalled();
   });
 });

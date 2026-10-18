@@ -32,7 +32,7 @@ export function normalizeLearnerTranscript(scorecard, { now = new Date() } = {})
     // There is no canonical postgraduate GPA, issue-number or transcript signer
     // source in the current API. Never reuse undergraduate GPA or the login user.
     summary: { gpa: null, gradeScale: null },
-    issuance: { number: null, date: getBusinessTodayKey(now) },
+    issuance: { number: null, date: getBusinessTodayKey(scorecard.issuedAt ? new Date(scorecard.issuedAt) : now) },
     signers: { specialistName: null, instituteDirectorName: null },
     form: { code: TRANSCRIPT_FORM.code, publishedOn: TRANSCRIPT_FORM.publishedOn, revision: TRANSCRIPT_FORM.revision },
     subjects: (scorecard.subjects || []).map((subject, index) => {

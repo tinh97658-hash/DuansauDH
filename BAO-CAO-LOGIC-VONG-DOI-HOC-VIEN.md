@@ -2,15 +2,17 @@
 
 Ngày đánh giá: 15/10/2026. Đối tượng: mã nguồn hiện có trong workspace, bao gồm các thay đổi chưa commit.
 
+**Cập nhật triển khai 18/10/2026:** đã xử lý F01–F08. Các mô tả hiện trạng, tình huống và đề xuất trong từng phát hiện bên dưới ghi nhận thời điểm rà soát ban đầu; đoạn **Đã xử lý** ghi nhận cách sửa hiện tại. Kế hoạch thực hiện và hướng dẫn triển khai được cập nhật ở mục 7; kết quả kiểm thử mới ở cuối mục 9.
+
 ## 1. Kết luận
 
-Luồng thạc sĩ đã có phần triển khai thực tế từ tiếp nhận hồ sơ, xét tuyển theo ngưỡng, xác nhận học phí, phân lớp, gắn CTĐT, mở lớp học phần, xếp lịch đến nhập điểm và xuất kết quả học tập. Tuy nhiên, **chưa thể coi đây là quy trình khép kín để xác nhận học viên đã hoàn thành toàn bộ các môn**: thiếu bước chốt điểm, quy tắc hoàn thành CTĐT và một số ràng buộc giữa trạng thái, lớp, CTĐT và kết quả học lại.
+Luồng thạc sĩ đã triển khai từ tiếp nhận hồ sơ, xét tuyển theo ngưỡng, xác nhận học phí, phân lớp, gắn CTĐT, mở lớp học phần, xếp lịch đến nhập điểm, gửi duyệt, khóa điểm và lưu bản kết quả học tập. Sau xử lý F01–F08, hệ thống kiểm tra hoàn thành học phần theo CTĐT áp dụng, chỉ tính điểm đã duyệt hoặc công nhận đã duyệt, đồng thời giữ lịch sử lớp và kết quả đã lưu. **Hoàn thành học phần không đồng nghĩa đủ điều kiện tốt nghiệp**; luận văn, bảo vệ, GPA và các điều kiện quản lý khác cần quy định riêng.
 
 Luồng tiến sĩ chưa hoàn chỉnh: các nghiệp vụ trong `DoctoralService` trả `not_implemented`; scheduling hiện chỉ bật `masters`.
 
 Phạm vi rà soát gồm cấu trúc repository, tài liệu nghiệp vụ, controller/guard, model/migration và các service/UI/test liên quan đến vòng đời học viên. Không có nghĩa là kiểm tra thủ công từng dòng tài nguyên, thư viện, mã sinh tự động hoặc mọi chức năng ngoài phạm vi này. Đây là đánh giá mã nguồn và kiểm thử sẵn có; chưa phải nghiệm thu một hồ sơ thật qua trình duyệt và PostgreSQL.
 
-Không thay đổi mã nghiệp vụ, không chạy migration/seed và không ghi vào database phục vụ công việc trong lần đánh giá này.
+Lần đánh giá ban đầu chỉ đọc mã. Các lần sửa sau đó có thay đổi mã và chạy migration/kiểm thử trên PostgreSQL tạm riêng; không ghi vào database phục vụ công việc.
 
 ## 2. Các thực thể cần phân biệt
 
@@ -170,7 +172,11 @@ Tình huống: bỏ môn đã có điểm khỏi CTĐT của khóa đang học r
 
 Nguồn: `backend/src/plan/curriculum.service.ts:298`, `:605`, `backend/src/reports/class-score-summary.service.ts:149`.
 
+*Cập nhật phần còn lại của F04: bản kết quả bất biến đã được bổ sung ở F08. Phương án CTĐT hiện tại là khóa cấu trúc đã dùng; version hóa/chuyển đổi hồi tố CTĐT vẫn là nghiệp vụ mở rộng riêng.*
+
 ### F05 — P2: xóa khỏi lớp làm trạng thái hiển thị và trạng thái nghiệp vụ khác nhau
+
+**Đã xử lý 18/10/2026:** rút học viên được thực hiện trong transaction, khóa lớp/hồ sơ, lưu lịch sử membership trước khi xóa thành viên hiện tại, rồi cập nhật trạng thái lưu theo phân lớp thực tế. Không còn lớp cùng bậc thì trở về `Đã trúng tuyển`; còn lớp thì giữ `Đang học`. Chặn thao tác trực tiếp khi đang bảo lưu/thôi học. Migration 061 đối soát hai trạng thái này cho dữ liệu cũ, không ghi đè các trạng thái bảo lưu/thôi học/hoàn thành. Phân lớp, chuyển ngành và duyệt điểm dùng cùng khóa transaction để tránh thay đổi roster trong lúc chốt điểm.
 
 `removeMember()` chỉ xóa membership. `AdmissionRecord.studyStatus` còn `Đang học`. API đọc hồ sơ lại dùng SQL suy diễn thành `Đã trúng tuyển` khi không có lớp.
 
@@ -182,6 +188,8 @@ Nguồn: `backend/src/masters/masters.service.ts:359`, `backend/src/plan/learner
 
 ### F06 — P2: bỏ thành viên lớp có thể làm mất khả năng tra cứu theo lớp cũ
 
+**Đã xử lý 18/10/2026:** thêm `class_membership_history` và view `academic_class_members`. Rút lớp và duyệt chuyển ngành lưu thời gian vào/rời lớp, người thực hiện, lý do trong cùng transaction. Báo cáo và bảng điểm cá nhân đọc cả lớp hiện tại và lớp lịch sử; ưu tiên lớp hiện tại khi mở mặc định. Roster điểm không kéo học viên đã rời lớp vào lớp học phần mở sau ngày rời. Chặn xóa lớp/hồ sơ có lịch sử cần giữ. Migration chỉ khôi phục membership đã mất nếu bảng điểm cũ còn định danh học viên; không suy đoán từ họ tên. Dữ liệu đã mất cả membership lẫn bằng chứng điểm cần đối soát thủ công từ nguồn lưu trữ.
+
 Danh sách bảng điểm và API bảng điểm cá nhân dựa vào membership hiện tại. Xóa membership không giữ lịch sử thành viên, cũng không bảo toàn đăng ký lớp học phần đã hoàn thành như nghiệp vụ chuyển ngành đang làm.
 
 Hệ quả: điểm JSONB cũ chưa chắc bị xóa, nhưng học viên có thể biến mất khỏi roster lớp cũ và bảng điểm cá nhân không còn lớp để chọn. Nếu vào lớp mới, khả năng hiện lại điểm còn phụ thuộc CTĐT/môn tương đương.
@@ -191,6 +199,8 @@ Hệ quả: điểm JSONB cũ chưa chắc bị xóa, nhưng học viên có th�
 Nguồn: `backend/src/masters/masters.service.ts:359`, `backend/src/reports/class-score-summary.service.ts:20`, `:91`, đối chiếu `backend/src/plan/major-transfer.service.ts:173`.
 
 ### F07 — P2: chưa có quy trình duyệt và khóa điểm chính thức
+
+**Đã xử lý 18/10/2026:** bổ sung vòng `draft → submitted → approved`, mở lại về `draft` phải có lý do. Admin/examiner gửi duyệt; chỉ admin duyệt hoặc mở lại. Máy chủ kiểm tra toàn bộ roster của lớp học phần, không phụ thuộc trang/bộ lọc trên giao diện; thiếu kết quả thì không gửi duyệt. Kiểm tra version trạng thái, tổng revision, roster và chính sách so với bản gửi duyệt; thay đổi phải mở lại và gửi lại. Bảng đã gửi/duyệt khóa mọi đường lưu điểm. Mỗi lần lưu/chuyển trạng thái ghi actor, căn cứ và dữ liệu trước/sau trong `gradebook_events`. Khi duyệt, điểm và chính sách xét được đóng băng; đổi ngưỡng hoặc miễn ngoại ngữ ở hồ sơ không làm tính lại điểm đã duyệt. Mở lại làm mất hiệu lực chốt của dữ liệu đang sửa, vẫn giữ audit và bản kết quả đã lưu trước đó. UI có nút xử lý trạng thái và xem lịch sử.
 
 Gradebook chỉ có revision, grades và timestamps; lưu điểm chưa nhận actor để ghi từng thay đổi. Admin/examiner có thể sửa lại khi lớp đã completed. Revision chống ghi đè đồng thời không phải lịch sử kiểm toán và không phải khóa nghiệp vụ.
 
@@ -202,6 +212,8 @@ Nguồn: `backend/src/database/models/training/course-exam-gradebook.model.ts`, 
 
 ### F08 — P2: chưa có bộ kiểm tra hoàn thành toàn bộ học phần
 
+**Đã xử lý 18/10/2026:** `academicProgress()` trả kết luận và các điều kiện thiếu: học phần bắt buộc, học phần tự chọn chưa gắn nhóm, tín chỉ tối thiểu theo nhóm/khối, điểm chưa duyệt và cấu hình nhóm không hợp lệ. Tín chỉ chỉ tính kết quả đạt/miễn đã chốt hoặc công nhận đã duyệt, khử trùng theo học phần gốc; cùng học phần gốc nằm ở nhiều nhóm yêu cầu bị chặn để đối soát. `maxCredits = 0` giữ nghĩa không giới hạn như cấu hình hiện tại. Bảng điểm cá nhân hiển thị tiến độ và điều kiện thiếu. Admin chỉ lưu được bản kết quả khi hoàn thành học phần; snapshot chứa danh sách môn, tín chỉ, điểm, chính sách, thời điểm và người lưu, kèm SHA-256 kiểm tra toàn vẹn. Có thể mở lại bản cũ sau khi dữ liệu hiện hành thay đổi; giữ nguyên ngày của bản đã lưu. Không tự sinh GPA, số văn bằng, chữ ký hay quyết định tốt nghiệp.
+
 Có điểm từng môn, số tín chỉ đã đạt/công nhận và bảng điểm, nhưng chưa có kết luận chính thức hoàn thành CTĐT với danh sách điều kiện thiếu: môn bắt buộc, tín chỉ tự chọn theo nhóm, môn tương đương, điểm chưa chốt, học lại chưa hoàn thành, ngoại ngữ và phần luận văn nếu thuộc phạm vi.
 
 `graduationDocs/finalDefense` của thạc sĩ còn stub. Xuất được PDF/DOCX không chứng minh học viên đã hoàn thành các môn; bằng nhau về tổng tín chỉ cũng chưa đủ nếu thiếu một môn bắt buộc.
@@ -210,7 +222,7 @@ Có điểm từng môn, số tín chỉ đã đạt/công nhận và bảng đi
 
 Nguồn: `backend/src/plan/subject-recognition.service.ts:500`, `backend/src/masters/masters.service.ts:41`, `frontend/src/features/learners/learnerTranscript.js:37`.
 
-## 5. Các chính sách cần xác nhận trước khi sửa
+## 5. Các chính sách nghiệp vụ cần quyết định riêng
 
 Đây là hành vi hiện tại hoặc khoảng trống nghiệp vụ, không tự động coi tất cả là lỗi lập trình:
 
@@ -220,15 +232,15 @@ Nguồn: `backend/src/plan/subject-recognition.service.ts:500`, `backend/src/mas
 | Xác minh đầu vào | Nhập tổng điểm có thể bỏ qua cờ xác minh | Kết quả ngoài hệ thống là đủ hay cần checklist bắt buộc trước duyệt? |
 | Tư cách thi | Chủ yếu suy từ hai điểm quá trình | Có thêm chuyên cần, học phí, kỷ luật, quyết định hội đồng? |
 | Hoàn thành giảng dạy | Chỉ cần ít nhất một buổi held và xử lý planned | Có cần đủ giờ chuẩn/tín chỉ và quyết định đóng sớm? |
-| Thay đổi ngưỡng điểm | Cách tính cũ được snapshot, tư cách dùng ngưỡng hiện hành | Có cho áp dụng ngược quy định mới lên điểm cũ đã đạt? |
+| Thay đổi ngưỡng điểm | Điểm nháp dùng ngưỡng hiện hành; điểm đã duyệt giữ chính sách lúc duyệt | Việc hồi tố điểm đã duyệt phải qua mở lại có căn cứ và duyệt lại |
 | Miễn ngoại ngữ | Tick hồ sơ suy ra passed, không cần điểm | Đây là miễn thi tuyển sinh hay miễn học phần trong CTĐT? Có cần minh chứng, thời hạn, người duyệt? |
 | Điểm học lại | Scheduling ưu tiên lần học mới; báo cáo ưu tiên lần sửa mới | Chọn lần học cuối, điểm cao nhất hay quyết định riêng? |
 | Hệ thống học viên | Hồ sơ mới không tự tạo/liên kết tài khoản | Có yêu cầu học viên đăng nhập theo dõi hồ sơ/điểm của mình? |
 | GPA | Chưa cung cấp, để trống có chủ ý | Thang, trọng số tín chỉ, môn miễn/công nhận, lần học, làm tròn |
 
-Lưu ý: test hiện có chủ ý kiểm tra ngưỡng tư cách mới áp dụng cho điểm cũ (`exam-gradebook.service.spec.ts:118`, `exam-grade-calculation.spec.ts:63`). Vì vậy thay đổi hành vi này cần quyết định nghiệp vụ, không nên gọi là lỗi do quên snapshot.
+Lưu ý: test áp dụng ngưỡng tư cách mới lên điểm cũ tiếp tục có hiệu lực với **điểm nháp**. F07 bổ sung ranh giới rõ ràng: điểm đã duyệt được đóng băng, chỉ thay đổi sau mở lại có lý do và duyệt lại.
 
-DTO `trainingLevel` và `studyStatus` đang chấp nhận chuỗi tự do trong khi nhiều service so sánh đúng chuỗi tiếng Việt. `programForTrainingLevel()` còn chấp nhận dạng tiếng Anh/không dấu. Nên chuẩn hóa về mã cố định và chỉ dùng tiếng Việt làm nhãn; nếu không, cùng ý nghĩa thạc sĩ có thể được lưu khác nhau và bị bỏ khỏi các bộ lọc phía sau. `status` cũng nên validate enum ở DTO để phản hồi lỗi rõ ràng trước khi chạm enum PostgreSQL.
+**Đã xử lý chuẩn hóa đầu vào:** DTO tạo/sửa hồ sơ chuẩn hóa các tên bậc tiếng Anh/không dấu về hai giá trị đang dùng trong hệ thống (`Thạc sĩ`, `Tiến sĩ`), giới hạn tập `studyStatus`, validate enum `status`. Migration chuẩn hóa các alias cũ đã biết. Chưa chuyển toàn bộ schema sang hệ mã mới; dữ liệu lạ khác cần đối soát, không tự suy diễn.
 
 ## 6. Bảo lưu, công nhận tín chỉ và chuyển ngành
 
@@ -239,17 +251,25 @@ Những phần đã có kiểm soát tốt:
 - Chuyển ngành ghi yêu cầu trước, không đổi ngành ngay khi mới đề nghị. Khi duyệt có đối chiếu CTĐT đích, công nhận môn và giữ đăng ký các lớp học phần đã hoàn thành.
 - Công nhận môn kiểm tra bằng chứng học trước; trường hợp tương đương cần xem xét không được suy từ số tín chỉ đơn thuần; tín chỉ được tính khử trùng.
 
-Các test PostgreSQL cho bảo lưu, scheduling, học lại và bảng điểm đã tồn tại trong repository nhưng chưa được chạy trong lần rà soát này. Cần chạy trên database test riêng để xác nhận khóa, transaction, truy vấn SQL và tác động dây chuyền khi đổi lớp/CTĐT.
+Các test PostgreSQL cho bảo lưu, scheduling, học lại và bảng điểm đã được chạy trên database test riêng trong lần xử lý F05–F08; xem số liệu ở cuối mục 9.
 
-## 7. Thứ tự xử lý đề nghị
+## 7. Kế hoạch thực hiện — cập nhật 18/10/2026
 
-1. Chặn quyền đọc hồ sơ ngoài phạm vi; thống nhất quyền cán bộ và quyền học viên.
-2. Dùng chung thứ tự lần học và resolver kết quả cho học lại, báo cáo, công nhận và tín chỉ.
-3. Khóa ngành/khóa/CTĐT của lớp sau khi có dữ liệu; version CTĐT và bảo toàn lịch sử membership.
-   *(Phần khóa phạm vi lớp và khóa CTĐT/học phần danh mục đã xong — F03, F04. Version hóa CTĐT và lịch sử membership còn lại.)*
-4. Đồng nhất trạng thái lưu và trạng thái suy diễn; sửa thao tác bỏ/chuyển lớp theo transaction.
-5. Bổ sung audit, duyệt, khóa điểm và mở sửa có căn cứ.
-6. Chốt các chính sách ở mục 5, sau đó thêm service đánh giá hoàn thành CTĐT và test liên thông.
+- [x] F01: giới hạn quyền API hồ sơ, điểm và bảo lưu cho cán bộ.
+- [x] F02: thống nhất thứ tự lần học/kết quả giữa học lại, báo cáo, công nhận và tín chỉ.
+- [x] F03/F04: khóa phạm vi lớp và cấu trúc CTĐT/học phần đã dùng. Áp dụng phương án bất biến và tạo CTĐT khác cho khóa mới; chưa xây quy trình version hóa/chuyển đổi hồi tố một lớp đang học.
+- [x] F05: đồng nhất trạng thái lưu với phân lớp; rút lớp và cập nhật trạng thái cùng transaction; đối soát dữ liệu cũ bằng migration.
+- [x] F06: giữ lịch sử membership, tra cứu bảng điểm lớp cũ, bảo vệ lịch sử khi xóa.
+- [x] F07: gửi duyệt, duyệt/khóa, mở lại có lý do; audit và đóng băng chính sách điểm đã duyệt.
+- [x] F08: kiểm tra hoàn thành học phần, hiển thị điều kiện thiếu, lưu/mở bản kết quả bất biến và kiểm tra toàn vẹn.
+- [x] Chuẩn hóa và validate bậc/trạng thái hồ sơ tại API.
+- [x] Kiểm thử đơn vị, HTTP, PostgreSQL riêng, migration từ database trống và build.
+
+**Triển khai:** sao lưu database, sau đó chạy `npm --prefix backend run db:migrate` từ thư mục gốc và khởi động lại backend/frontend. Migration `061-academic-lifecycle` tạo lịch sử lớp, trạng thái duyệt điểm, audit và bản kết quả; điểm cũ mặc định là nháp, không tự coi là đã được duyệt. Migration không hỗ trợ tự động `down` vì không được xóa lịch sử học tập; rollback cần bản sao lưu đã kiểm chứng. Chưa chạy migration trên database công việc trong lần sửa này.
+
+**Nghiệm thu vận hành:** hoàn thành giảng dạy → lưu đủ điểm → gửi duyệt toàn lớp học phần → admin duyệt/khóa → mở bảng điểm cá nhân kiểm tra điều kiện thiếu → lưu bản kết quả đã chốt. Khi điều chỉnh: admin mở lại với lý do → sửa/lưu → gửi/duyệt lại; bản kết quả cũ vẫn tra cứu riêng.
+
+**Ngoài phạm vi F01–F08:** các quyết định ở mục 5, cổng học viên tự phục vụ, quy trình luận văn/bảo vệ và nghiệp vụ tiến sĩ chưa triển khai. Không tự đặt chính sách học phí, chuyên cần, GPA hoặc điều kiện tốt nghiệp. Tài liệu `NGHIEP-VU-KE-HOACH-DAO-TAO.md` là phân tích gói học phần cũ; trạng thái triển khai hiện hành theo mục này.
 
 ## 8. Các kịch bản nghiệm thu bắt buộc
 
@@ -272,6 +292,8 @@ Các test PostgreSQL cho bảo lưu, scheduling, học lại và bảng điểm 
 
 ## 9. Kết quả kiểm thử trong lần đánh giá
 
+Các số liệu bên dưới giữ lịch sử các lần kiểm tra. Kết quả mới nhất cho F05–F08 nằm ở tiểu mục cuối.
+
 - Backend: `npm run test:unit -- --silent` — **37 suite đạt; 538/538 test đạt**.
 - Frontend: `npm run test:ci -- --reporter=dot` — **39 tệp đạt, 20 tệp lỗi trong 59 tệp; 419 test đạt, 9 test thất bại trong 428 test được báo cáo; exit code 1**. Vitest còn báo một lỗi worker `Timeout calling "onTaskUpdate"`. Log có cảnh báo React `act(...)` và jsdom không parse được một số CSS in. Chưa phân loại nguyên nhân từng tệp lỗi; không suy diễn rằng cả 20 tệp đều lỗi logic nghiệp vụ, cũng không coi toàn bộ frontend đã được kiểm chứng. Số test thống kê không bao gồm đầy đủ các trường hợp trong những suite không chạy được.
 - Chưa chạy migration, seed, PostgreSQL integration hay hành trình E2E với hồ sơ thật.
@@ -292,3 +314,12 @@ Các test PostgreSQL cho bảo lưu, scheduling, học lại và bảng điểm 
 - PostgreSQL: **33 test đạt trong 4 suite chạy được** (`exam-attempt-order-postgres`, `class-score-summary-postgres`, `training-structure-postgres`, `health.controller`); 26 test bị skip ở 3 suite cần biến `RUN_POSTGRES_SCHEDULING_TESTS` và schema đầy đủ. Suite mới `training-structure-postgres.spec.ts` dùng bảng tạm trong transaction rồi rollback, xác nhận: cho phép khi chưa dùng; chặn theo từng bảng thành viên/lớp học phần/bảng điểm/bằng chứng rút; giữ phạm vi sau khi chuyển ngành đã xóa membership; khóa CTĐT ngay khi lớp rỗng chọn CTĐT; khóa cả học phần alias và học phần gốc; và khóa tuần tự giữa hai kết nối. Không dùng database công việc.
 - `npm run typecheck`: đạt.
 - Frontend: `npm run test:ci -- --reporter=dot` — **39 tệp đạt, 20 tệp lỗi trong 59 tệp; 419 test đạt, 9 test thất bại trong 428 test; exit code 1**, không đổi so với lần đánh giá trước (vẫn còn lỗi worker `Timeout calling "onTaskUpdate"`). Một tệp liên quan chức năng CTĐT (`TrainingPlanSubjectIdentity.test.jsx`, không nằm trong các tệp đã sửa) lỗi ngay khi nạp module do mock axios ESM. Các tệp đã sửa cho F03/F04 ở frontend nằm trong `trainingPlan.jsx`; test logic tab 2 (`trainingPlan.logic.test.js`) đạt 11/11.
+
+### Kiểm chứng sau khi sửa F05–F08 (18/10/2026)
+
+- Backend unit: **580/580 đạt**, 40 suite.
+- Backend HTTP E2E: **49/49 đạt**, 2 suite; gồm chặn student đọc lịch sử điểm/bản kết quả, giới hạn người lưu bản kết quả là admin và chặn supervisor thao tác quy trình điểm.
+- PostgreSQL: **69/69 đạt**, 7 suite, bật đầy đủ test bảo lưu, scheduling, học lại và báo cáo trên PostgreSQL 16 tạm riêng. Sau bổ sung chặn xóa hồ sơ hiện tại/lịch sử, chạy lại suite học lại và vòng đời: **10/10 đạt**. Các fixture được rollback; không dùng database công việc.
+- Migration: chạy toàn bộ **65 migration** (đến `061-academic-lifecycle`, tính cả các migration cùng số có hậu tố) trên database trống riêng thành công. Không seed hoặc thay đổi database công việc.
+- Frontend liên quan: **125/125 đạt**, 10 tệp (`ExamLists`, `LearnerScorecard`, các test xuất bảng điểm và bản kết quả). Bổ sung kiểm tra khóa điểm đã duyệt, lý do mở lại, quyền gửi/duyệt và thông báo điều kiện còn thiếu. Sửa tương thích mock axios ESM để các suite cũ nạp được; cách ly fixture điểm và sự kiện Toastify giữa các test.
+- Backend typecheck/build và frontend production build: đạt. Chưa nghiệm thu thao tác thủ công toàn hành trình bằng trình duyệt với hồ sơ thật.

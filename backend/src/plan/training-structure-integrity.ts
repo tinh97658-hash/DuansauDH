@@ -12,6 +12,7 @@ export async function assertClassScopeEditable(db: Sequelize, id: string, transa
   if (transaction) await db.query("SELECT id FROM class_groups WHERE id = :id FOR UPDATE", { replacements: { id }, transaction });
   const [usage] = await db.query<{ used: boolean }>(`SELECT (
     EXISTS (SELECT 1 FROM class_group_members WHERE class_group_id = :id)
+    OR EXISTS (SELECT 1 FROM class_membership_history WHERE class_group_id = :id)
     OR EXISTS (SELECT 1 FROM course_offering_class_groups WHERE class_group_id = :id)
     OR EXISTS (SELECT 1 FROM course_exam_gradebooks WHERE class_group_id = :id)
     OR EXISTS (SELECT 1 FROM course_offering_withdrawals WHERE class_group_id = :id)

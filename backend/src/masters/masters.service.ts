@@ -12,6 +12,8 @@ import { Curriculum } from "../database/models/plan/curriculum.model.js";
 import { ClassGroupService } from "../plan/class-group.service.js";
 import { admissionLearnerWhere } from "../plan/admission-learner-policy.js";
 import { classGroupCode, parseClassGroupCode } from "../plan/class-group-code.js";
+import { archiveMembership } from "../plan/membership-history.js";
+import { assignedLearnerSql } from "../plan/learner-study-status.js";
 import {
   AssignMembersDto, AutoAssignDto, BatchCreateMastersClassGroupsDto, CreateMastersClassGroupDto, UpdateMastersClassGroupDto,
 } from "./dto/masters-class-group.dto.js";
@@ -292,6 +294,7 @@ export class MastersService {
   // ===== PHÂN NHÓM HỌC VIÊN =====
   async assignMembers(classGroupId: string, dto: AssignMembersDto) {
     return this.sequelize.transaction(async (transaction) => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
       const group = await this.classGroups.findOne({
         where: { id: classGroupId, program: "masters", status: "open" },
         transaction,
@@ -356,13 +359,29 @@ export class MastersService {
     });
   }
 
-  async removeMember(classGroupId: string, memberId: string) {
-    const member = await this.classGroupMembers.findOne({
-      where: { id: memberId, classGroupId },
+  async removeMember(classGroupId: string, memberId: string, actor?: any) {
+    return this.sequelize.transaction(async transaction => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
+      const group = await this.classGroups.findOne({ where: { id: classGroupId, program: "masters" }, transaction, lock: transaction.LOCK.UPDATE });
+      if (!group) throw new NotFoundException("Không tìm thấy lớp học viên.");
+      const member = await this.classGroupMembers.findOne({
+        where: { id: memberId, classGroupId }, transaction, lock: transaction.LOCK.UPDATE,
     });
     if (!member) throw new NotFoundException("Không tìm thấy học viên trong nhóm.");
-    await member.destroy();
-    return { success: true, message: "Đã xóa học viên khỏi nhóm học phần." };
+    const records = await this.admissionRecords.findAll({ where: { [Op.or]: [
+      ...(member.admissionRecordId ? [{ id: member.admissionRecordId }] : []),
+      ...(member.studentId ? [{ studentId: member.studentId }] : []),
+    ] }, transaction, lock: transaction.LOCK.UPDATE });
+    if (records.some(record => ["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Đã thôi học"].includes(record.studyStatus || ""))) {
+      throw new ConflictException("Hãy kết thúc xử lý bảo lưu/thôi học trước khi thay đổi lớp.");
+    }
+    await archiveMembership(this.sequelize, member.id, actor, "Rút khỏi lớp học viên", transaction);
+    await member.destroy({ transaction });
+    for (const record of records) await this.sequelize.query(`UPDATE admission_records ar SET study_status =
+      CASE WHEN ${assignedLearnerSql('ar')} THEN 'Đang học' ELSE 'Đã trúng tuyển' END, updated_at = NOW()
+      WHERE ar.id = :id AND ar.study_status IN ('Đang học','Đã trúng tuyển')`, { replacements: { id: record.id }, transaction });
+    return { success: true, message: "Đã rút học viên khỏi lớp." };
+    });
   }
 
   private sortAdmissionRecords(records: AdmissionRecord[]) {
@@ -433,6 +452,7 @@ export class MastersService {
   }
 
   private async autoAssignInTransaction(dto: AutoAssignDto, transaction: Transaction) {
+    await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
     if (dto.classGroupIds.length < 2) throw new BadRequestException("Vui lòng chọn ít nhất 2 nhóm học phần.");
     const groups = await this.classGroups.findAll({
       where: { id: { [Op.in]: dto.classGroupIds }, program: "masters", status: "open" },

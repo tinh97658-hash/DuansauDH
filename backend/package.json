@@ -32,7 +32,8 @@
     "db:seed:bulk:preview": "npm run db:seed:bulk -- --preview",
     "db:test:bulk": "npm run db:seed:bulk -- --rollback",
     "db:seed:realistic-test": "npm run build && node dist/database/seeds/seed-realistic-test.js",
-    "db:seed:realistic-test:preview": "npm run db:seed:realistic-test -- --preview"
+    "db:seed:realistic-test:preview": "npm run db:seed:realistic-test -- --preview",
+    "db:seed:vmu": "npm run build && node dist/database/seeds/seed-vmu-sample.js"
   },
   "author": "Jeewantha Udeshika Ariyawansha",
   "license": "ISC",

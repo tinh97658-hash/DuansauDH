@@ -4,6 +4,8 @@ import { CourseOffering } from "./course-offering.model.js";
 import type { GradingPolicy } from "../../../masters/grading-policy.js";
 
 export interface CourseExamGrade {
+  finalized?: boolean;
+  eligibilityPolicy?: GradingPolicy;
   participantId: string;
   eligible: boolean | null;
   examExempt: boolean;

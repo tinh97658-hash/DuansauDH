@@ -1,8 +1,8 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Post, Param, ParseUUIDPipe, Query, UseGuards } from "@nestjs/common";
 import { ReportsService } from "./reports.service.js";
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
 import { RolesGuard } from "../common/roles.guard.js";
-import { Roles } from "../common/auth-user.js";
+import { CurrentUser, Roles } from "../common/auth-user.js";
 import { ClassScoreSummaryService } from "./class-score-summary.service.js";
 import { ClassScoreRosterQueryDto, ClassScoreSummaryQueryDto, LearnerScorecardQueryDto } from "./dto/class-score-summary.dto.js";
 
@@ -11,6 +11,17 @@ import { ClassScoreRosterQueryDto, ClassScoreSummaryQueryDto, LearnerScorecardQu
 @Roles("admin", "supervisor", "examiner")
 export class ReportsController {
   constructor(private readonly reports: ReportsService, private readonly scoreSummary: ClassScoreSummaryService) {}
+
+  @Post("learner-scorecard/:admissionRecordId/issue") @Roles("admin")
+  issue(@Param("admissionRecordId", ParseUUIDPipe) id: string, @Body() dto: ClassScoreRosterQueryDto, @CurrentUser() actor: any) {
+    return this.scoreSummary.issue(id, dto.classGroupId, actor);
+  }
+
+  @Get("transcript-issues/:id")
+  issued(@Param("id", ParseUUIDPipe) id: string) { return this.scoreSummary.issued(id); }
+
+  @Get("learner-scorecard/:admissionRecordId/issues")
+  issues(@Param("admissionRecordId", ParseUUIDPipe) id: string) { return this.scoreSummary.issuesForRecord(id); }
 
   @Get("class-lists") classLists() { return this.reports.classLists(); }
   @Get("course-scores") courseScores() { return this.reports.courseScores(); }

@@ -19,6 +19,11 @@ import { enrolledOfferingMemberSql } from "../scheduling/retake-groups.js";
 import { notWithdrawnSql } from "../plan/study-leave-policy.js";
 import { studyLeaveFailureOutcomesSql, studyLeaveFailureParticipantSql } from '../plan/exam-outcomes.js';
 import { foreignLanguageExemptGrade, profileForeignLanguageExemptSql } from "./foreign-language-exemption.js";
+import { randomUUID } from "node:crypto";
+import { auditActor } from "../plan/membership-history.js";
+import { GradebookWorkflowDto } from "./dto/exam-gradebook.dto.js";
+import { resolveSavedExamGrade } from "./exam-grade-calculation.js";
+import { isDeepStrictEqual } from "node:util";
 
 export const emptyExamGrade = (participantId: string): CourseExamGrade => ({
   participantId, eligible: null, examExempt: false, testScore: null, assignmentScore: null,
@@ -44,7 +49,7 @@ export class ExamGradebookService {
       order: [["academicYear", "DESC"], ["name", "ASC"]],
     });
     const courseOfferings = await this.offerings.findAll({
-      attributes: ["id", "name", "subjectId", "status"],
+      attributes: ["id", "name", "subjectId", "status", "gradebookStatus", "gradebookVersion"],
       include: [
         { model: Subject, as: "subject", attributes: ["id", "code", "name", "credits", "canonicalSubjectId"], where: { program: "masters" }, required: true },
         { model: CourseOfferingClassGroup, as: "groupLinks", attributes: ["classGroupId"], required: true },
@@ -70,7 +75,7 @@ export class ExamGradebookService {
   async subjects(classGroupId: string) {
     await this.requireGroup(classGroupId);
     return this.offerings.findAll({
-      attributes: ["id", "name", "subjectId", "status"],
+      attributes: ["id", "name", "subjectId", "status", "gradebookStatus", "gradebookVersion"],
       include: [
         { model: Subject, as: "subject", attributes: ["id", "code", "name", "credits"], where: { program: "masters" }, required: true },
         { model: CourseOfferingClassGroup, as: "groupLinks", attributes: [], where: { classGroupId }, required: true },
@@ -80,7 +85,7 @@ export class ExamGradebookService {
 
   private async scope(query: ExamGradebookQueryDto, transaction?: Transaction) {
     const offering = await this.offerings.findByPk(query.courseOfferingId, {
-      attributes: ["id", "name", "subjectId", "status"],
+      attributes: ["id", "name", "subjectId", "status", "gradebookStatus", "gradebookVersion", ...(transaction ? ["gradebookSnapshot"] : [])],
       include: [{ model: Subject, as: "subject", attributes: ["id", "code", "name", "credits", "program", "canonicalSubjectId"] }], transaction,
       ...(transaction ? { lock: { level: transaction.LOCK.UPDATE, of: CourseOffering } } : {}),
     });
@@ -124,10 +129,10 @@ export class ExamGradebookService {
           COALESCE(ar.last_name, '') AS "lastName", COALESCE(ar.first_name, '') AS "firstName",
           COALESCE(ar.dob::text, '') AS dob, COALESCE(ar.gender, '') AS gender,
           ar.study_status AS "studyStatus"
-        FROM class_group_members cm
+        FROM academic_class_members cm
         LEFT JOIN admission_records ar ON ar.id = cm.admission_record_id
         LEFT JOIN students st ON st.id = cm.student_id
-        WHERE cm.class_group_id IN (:groupIds)
+        WHERE (cm.left_at IS NULL OR cm.left_at >= (SELECT created_at FROM course_offerings WHERE id = :offeringId)) AND cm.class_group_id IN (:groupIds)
           AND ${enrolledOfferingMemberSql('cm.class_group_id', `(CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
             THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text ELSE 'admission:' || ar.id::text END)`, true)}
         ${shared ? `UNION ALL
@@ -150,10 +155,10 @@ export class ExamGradebookService {
       ), roster AS (
         SELECT p.*, COALESCE((SELECT failure.grade FROM (${studyLeaveFailureOutcomesSql()}) failure
           WHERE failure.course_offering_id = :offeringId AND failure.participant_id = p."participantId" LIMIT 1),
-          CASE WHEN ${profileForeignLanguageExemptSql('p."participantId"', ':subjectId', '(SELECT academic_year FROM class_groups WHERE id = p."classGroupId")')}
+          CASE WHEN COALESCE(g.grade->>'finalized', 'false') <> 'true' AND ${profileForeignLanguageExemptSql('p."participantId"', ':subjectId', '(SELECT academic_year FROM class_groups WHERE id = p."classGroupId")')}
           THEN COALESCE(g.grade, '{}'::jsonb) || CAST(:foreignLanguageGrade AS jsonb)
           ELSE COALESCE(g.grade, '{}'::jsonb) END) grade,
-          CAST(:policies AS jsonb)->p."classGroupId"::text AS policy FROM people p
+          COALESCE(CASE WHEN g.grade->>'finalized' = 'true' THEN g.grade->'eligibilityPolicy' END, CAST(:policies AS jsonb)->p."classGroupId"::text) AS policy FROM people p
         LEFT JOIN grade_map g ON g.participant_id = p."participantId"
       ), assessed AS (
         SELECT roster.*, CASE
@@ -197,14 +202,15 @@ export class ExamGradebookService {
     } });
     return {
       group: { id: group.id, name: group.name, code: group.code, academicYear: group.academicYear }, offering,
+      workflow: { status: offering.gradebookStatus || "draft", version: offering.gradebookVersion || 0 },
       revision: result.revision, total: result.total, totalRows: result.totalRows, unassessedRows: result.unassessedRows, page: result.page, pageSize,
       eligibilityPolicy: currentPolicy,
       ...(shared ? { eligibilityPolicies: policies } : {}),
       rows: result.rows.map(({ grade, policy, eligibility: _eligibility, ...person }: any) => {
-        const eligibilityPolicy = policy || currentPolicy;
+        const eligibilityPolicy = grade.finalized ? grade.eligibilityPolicy || grade.gradingPolicy : policy || currentPolicy;
         const gradingPolicy = grade.participantId ? grade.gradingPolicy || LEGACY_GRADING_POLICY : eligibilityPolicy;
         const row = { ...emptyExamGrade(person.participantId), ...grade, ...person };
-        return { ...row, ...calculateExamGrade(row, gradingPolicy, eligibilityPolicy), eligible: calculateExamEligibility(row, eligibilityPolicy),
+        return { ...row, ...resolveSavedExamGrade({ ...row, gradingPolicy }, eligibilityPolicy), eligible: calculateExamEligibility(row, eligibilityPolicy),
           attemptScores: row.examScore == null ? [] : [row.examScore],
           gradingPolicy, eligibilityPolicy,
         };
@@ -212,11 +218,13 @@ export class ExamGradebookService {
     };
   }
 
-  async save(dto: SaveExamGradebookDto) {
-    if (dto.rosterScope === "offering") return this.saveOffering(dto);
+  async save(dto: SaveExamGradebookDto, actor?: any) {
+    if (dto.rosterScope === "offering") return this.saveOffering(dto, actor);
     await this.sequelize.transaction(async (transaction) => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
       const { group, offering } = await this.scope(dto, transaction);
       this.requireCompletedTeaching(offering);
+      this.requireDraft(offering);
       // Khi lưu chỉ kiểm tra danh tính các học viên vừa sửa, không tải cả lớp.
       const participants = await this.sequelize.query<{ participantId: string; profileForeignLanguageExempt?: boolean }>(`
         SELECT DISTINCT CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
@@ -224,8 +232,8 @@ export class ExamGradebookService {
           WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END AS "participantId",
           ${profileForeignLanguageExemptSql(`(CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
             THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text ELSE 'admission:' || ar.id::text END)`, ':subjectId', ':academicYear')} AS "profileForeignLanguageExempt"
-        FROM class_group_members cm LEFT JOIN admission_records ar ON ar.id = cm.admission_record_id
-        WHERE cm.class_group_id = :groupId
+        FROM academic_class_members cm LEFT JOIN admission_records ar ON ar.id = cm.admission_record_id
+        WHERE (cm.left_at IS NULL OR cm.left_at >= (SELECT created_at FROM course_offerings WHERE id = :offeringId)) AND cm.class_group_id = :groupId
           AND ${enrolledOfferingMemberSql('cm.class_group_id', `(CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
             THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text ELSE 'admission:' || ar.id::text END)`)}
           AND ${excludeRecognizedExamParticipant(`(CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
@@ -254,8 +262,10 @@ export class ExamGradebookService {
         merged.set(row.participantId, this.savedGrade(row, merged.get(row.participantId), currentPolicy));
       }
       const payload = { ...where, grades: [...merged.values()], revision: dto.revision + 1 };
+      const before = book?.grades || [];
       if (book) await book.update(payload, { transaction });
       else book = await this.books.create(payload as never, { transaction });
+      await this.audit(offering.id, "save", actor, "Lưu điểm", before, payload.grades, transaction);
     });
     return this.get(dto);
   }
@@ -281,14 +291,95 @@ export class ExamGradebookService {
     });
   }
 
+  private requireDraft(offering: CourseOffering) {
+    if (offering.gradebookStatus && offering.gradebookStatus !== "draft") {
+      throw new ConflictException("Bảng điểm đã gửi duyệt hoặc đã khóa. Cần quản trị viên mở lại trước khi sửa.");
+    }
+  }
+
+  private async audit(offeringId: string, action: string, actor: any, note: string, before: any, after: any, transaction: Transaction) {
+    await this.sequelize.query(`INSERT INTO gradebook_events (id,course_offering_id,action,actor,note,before_data,after_data)
+      VALUES (:id,:offeringId,:action,CAST(:actor AS jsonb),:note,CAST(:before AS jsonb),CAST(:after AS jsonb))`, {
+      transaction, replacements: { id: randomUUID(), offeringId, action, actor: JSON.stringify(auditActor(actor)), note,
+        before: JSON.stringify(before), after: JSON.stringify(after) },
+    });
+  }
+
+  async history(query: ExamGradebookQueryDto) {
+    await this.scope(query);
+    return this.sequelize.query(`SELECT id,action,actor,note,before_data AS "before",after_data AS "after",created_at AS "createdAt"
+      FROM gradebook_events WHERE course_offering_id = :id ORDER BY created_at DESC,id DESC`, {
+      type: QueryTypes.SELECT, replacements: { id: query.courseOfferingId },
+    });
+  }
+
+  async transition(dto: GradebookWorkflowDto, actor: any) {
+    if (!["admin", "examiner"].includes(actor?.role) || (dto.action !== "submit" && actor?.role !== "admin")) {
+      throw new BadRequestException("Chỉ quản trị viên được duyệt hoặc mở lại bảng điểm.");
+    }
+    if (!dto.note?.trim()) throw new BadRequestException("Nhập lý do hoặc căn cứ xử lý bảng điểm.");
+    await this.sequelize.transaction(async transaction => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
+      const { offering } = await this.scope(dto, transaction);
+      this.requireCompletedTeaching(offering);
+      const status = offering.gradebookStatus || "draft";
+      if ((offering.gradebookVersion || 0) !== dto.version) throw new ConflictException("Trạng thái bảng điểm đã thay đổi. Hãy tải lại.");
+      const expected = dto.action === "submit" ? "draft" : dto.action === "approve" ? "submitted" : null;
+      if (expected ? status !== expected : status === "draft") throw new ConflictException("Thao tác không phù hợp trạng thái bảng điểm.");
+      const books = await this.books.findAll({ where: { courseOfferingId: offering.id }, transaction, lock: transaction.LOCK.UPDATE });
+      if (books.reduce((sum, book) => sum + book.revision, 0) !== dto.revision) throw new ConflictException("Điểm đã thay đổi. Hãy tải lại trước khi xử lý.");
+      let snapshot: any = null;
+      const before = { status, books: books.map(book => ({ classGroupId: book.classGroupId, grades: book.grades, revision: book.revision })) };
+      if (dto.action !== "reopen") {
+        // Offering is locked before reading, as it is for every grade save.
+        // One unfiltered roster is used, independent of the page/search in the UI.
+        const rows: any[] = [];
+        for (let page = 1; ; page += 1) {
+          const result = await this.get({ classGroupId: dto.classGroupId, courseOfferingId: offering.id, rosterScope: "offering", page, pageSize: 15 });
+          rows.push(...result.rows);
+          if (page * result.pageSize >= result.total) break;
+        }
+        if (!rows.length || rows.some(row => row.result === "pending")) throw new ConflictException("Chưa có đủ kết quả cho toàn bộ học viên của lớp học phần.");
+        const fingerprint = (values: any[]) => values.map(row => Object.fromEntries([
+          "participantId", "classGroupId", "testScore", "assignmentScore", "examScore", "examExempt", "result", "courseScore",
+          "gradingPolicy", "eligibilityPolicy", "studyLeaveFailure", "profileForeignLanguageExempt",
+        ].map(key => [key, row[key] ?? null])));
+        if (dto.action === "approve" && !isDeepStrictEqual(fingerprint(rows), fingerprint(offering.gradebookSnapshot?.rows || []))) {
+          throw new ConflictException("Danh sách học viên, cấu hình hoặc kết quả đã thay đổi sau khi gửi duyệt. Mở lại và gửi duyệt lại.");
+        }
+        snapshot = { at: new Date().toISOString(), actor: auditActor(actor), rows };
+        if (dto.action === "approve") {
+          for (const group of await this.offeringGroups(offering.id, transaction)) {
+            const book = books.find(item => item.classGroupId === group.id);
+            const merged = new Map((book?.grades || []).map(row => [row.participantId, row]));
+            for (const row of rows.filter(row => row.classGroupId === group.id)) {
+              merged.set(row.participantId, { ...row, finalized: true, eligibilityPolicy: structuredClone(row.eligibilityPolicy) });
+            }
+            const payload = { classGroupId: group.id, courseOfferingId: offering.id, grades: [...merged.values()], revision: (book?.revision || 0) + 1 };
+            if (book) await book.update(payload, { transaction });
+            else await this.books.create(payload as never, { transaction });
+          }
+        }
+      } else {
+        for (const book of books) await book.update({ revision: book.revision + 1, grades: book.grades.map(({ finalized, eligibilityPolicy, ...row }) => row) }, { transaction });
+      }
+      const next = dto.action === "submit" ? "submitted" : dto.action === "approve" ? "approved" : "draft";
+      await offering.update({ gradebookStatus: next, gradebookVersion: (offering.gradebookVersion || 0) + 1, gradebookSnapshot: snapshot }, { transaction });
+      await this.audit(offering.id, dto.action, actor, dto.note.trim(), before, { status: next, snapshot }, transaction);
+    });
+    return this.get({ ...dto, rosterScope: "offering" });
+  }
+
   private requireEditableParticipants(participants: { profileForeignLanguageExempt?: boolean }[]) {
     if (participants.some(row => row.profileForeignLanguageExempt)) throw new ConflictException("Học viên được miễn thi ngoại ngữ theo hồ sơ. Hãy cập nhật trạng thái miễn thi trong hồ sơ học viên.");
   }
 
-  private async saveOffering(dto: SaveExamGradebookDto) {
+  private async saveOffering(dto: SaveExamGradebookDto, actor?: any) {
     await this.sequelize.transaction(async transaction => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
       const { offering } = await this.scope(dto, transaction);
       this.requireCompletedTeaching(offering);
+      this.requireDraft(offering);
       const groups = await this.offeringGroups(offering.id, transaction);
       const groupIds = groups.map(group => group.id);
       const participants = await this.sequelize.query<{ participantId: string; classGroupId: string; profileForeignLanguageExempt?: boolean }>(`
@@ -297,8 +388,8 @@ export class ExamGradebookService {
             CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
               THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text
               WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END AS "participantId"
-          FROM class_group_members cm LEFT JOIN admission_records ar ON ar.id = cm.admission_record_id
-          WHERE cm.class_group_id IN (:groupIds)
+          FROM academic_class_members cm LEFT JOIN admission_records ar ON ar.id = cm.admission_record_id
+          WHERE (cm.left_at IS NULL OR cm.left_at >= (SELECT created_at FROM course_offerings WHERE id = :offeringId)) AND cm.class_group_id IN (:groupIds)
             AND ${enrolledOfferingMemberSql('cm.class_group_id', `(CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
               THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text ELSE 'admission:' || ar.id::text END)`)}
           UNION ALL
@@ -351,8 +442,10 @@ export class ExamGradebookService {
         const merged = new Map((book?.grades || []).map(grade => [grade.participantId, grade]));
         for (const [id, grade] of changed) merged.set(id, grade);
         const payload = { classGroupId, courseOfferingId: offering.id, grades: [...merged.values()], revision: (book?.revision || 0) + 1 };
+        const before = book?.grades || [];
         if (book) await book.update(payload, { transaction });
         else await this.books.create(payload as never, { transaction });
+        await this.audit(offering.id, "save", actor, "Lưu điểm", { classGroupId, grades: before }, payload, transaction);
       }
     });
     return this.get(dto);

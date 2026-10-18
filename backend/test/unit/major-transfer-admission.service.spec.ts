@@ -50,7 +50,7 @@ async function setup() {
   const curriculum = { id: "curriculum-B", majorId: "B", program: "masters", applicableFromYear: "2026", active: true };
   const curriculums = { findByPk: jest.fn(async () => curriculum) };
   const membership = { classGroupId: "class-A", $get: jest.fn(async () => ({ curriculumId: "curriculum-A" })) };
-  const memberships = { findOne: jest.fn(async () => membership), create: jest.fn(), destroy: jest.fn() };
+  const memberships = { findAll: jest.fn().mockResolvedValue([]), findOne: jest.fn(async () => membership), create: jest.fn(), destroy: jest.fn() };
   const offeringGroups = { findAll: jest.fn(async () => [{ courseOfferingId: "completed-1" }, { courseOfferingId: "completed-2" }]) };
   const offeringStudents = { bulkCreate: jest.fn() };
   const recognitions = { proposeForRecord: jest.fn(), decide: jest.fn() };

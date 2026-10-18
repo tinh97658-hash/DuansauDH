@@ -26,7 +26,7 @@ const build = () => {
       revision: 0, total: 2, totalRows: 2, page: 1,
       rows: [{ participantId: "student:s1", code: "HV001", fullName: "Nguyễn Văn An", grade: {} },
         { participantId: "admission:a2", code: "HV002", fullName: "Trần Bình", grade: {} }],
-    }] : options.replacements.ids.filter((id: string) => ["student:s1", "admission:a2"].includes(id)).map((participantId: string) => ({ participantId }))),
+    }] : (options.replacements?.ids || []).filter((id: string) => ["student:s1", "admission:a2"].includes(id)).map((participantId: string) => ({ participantId }))),
   };
   const policies = { latest: jest.fn<any>().mockResolvedValue(LEGACY_GRADING_POLICY) };
   const service = new ExamGradebookService(groups as never, members as never, offerings as never, links as never, books as never, sequelize as never, policies as never);
@@ -51,7 +51,7 @@ it.each(["group", "offering"] as const)("blocks grade writes before teaching com
   expect(books.create).not.toHaveBeenCalled();
   expect(books.findOne).not.toHaveBeenCalled();
   expect(books.findAll).not.toHaveBeenCalled();
-  expect(sequelize.query).not.toHaveBeenCalled();
+  expect(sequelize.query.mock.calls.every(([sql]) => String(sql).includes("pg_advisory_xact_lock"))).toBe(true);
   expect((await service.get(query)).rows).toHaveLength(2);
 });
 

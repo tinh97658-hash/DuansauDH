@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, MenuItem, Pagination, Paper, Stack, TableBody, TableCell, TableContainer, TableRow, TextField, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, MenuItem, Pagination, Paper, Stack, TableBody, TableCell, TableContainer, TableRow, TextField, Tooltip, Typography } from "@mui/material";
 import ListAltRounded from "@mui/icons-material/ListAltRounded";
 import SaveRounded from "@mui/icons-material/SaveRounded";
 import SettingsRounded from "@mui/icons-material/SettingsRounded";
@@ -78,6 +78,10 @@ export default function ExamLists() {
       window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", visible);
     };
   }, []);
+  const [workflow, setWorkflow] = useState({ status: "draft", version: 0 });
+  const [workflowAction, setWorkflowAction] = useState("");
+  const [workflowNote, setWorkflowNote] = useState("");
+  const [auditRows, setAuditRows] = useState(null);
   const [groups, setGroups] = useState([]), [subjects, setSubjects] = useState([]);
   const [loadedOffering, setLoadedOffering] = useState(null);
   const [majorId, setMajorId] = useState("");
@@ -130,10 +134,11 @@ export default function ExamLists() {
       ...(mode === "exam" ? { includeIds: examIncludeIds, excludeIds: examExcludeIds } : {}),
     } })
       .then(({ data }) => { if (active) {
+        setWorkflow(data.workflow || { status: "draft", version: 0 });
         if (data.offering) setLoadedOffering({ id: offeringId, status: data.offering.status });
         const refreshedDirty = { ...dirtyRef.current };
         setRows(data.rows.map(row => {
-          const draft = row.profileForeignLanguageExempt || row.studyLeaveFailure ? undefined : dirtyRef.current[row.participantId];
+          const draft = row.profileForeignLanguageExempt || row.studyLeaveFailure || (data.workflow && data.workflow.status !== "draft") ? undefined : dirtyRef.current[row.participantId];
           if (row.profileForeignLanguageExempt || row.studyLeaveFailure) delete refreshedDirty[row.participantId];
           const merged = { ...row, ...draft, studyStatus: row.studyStatus, studyLeaveFailure: row.studyLeaveFailure, eligibilityPolicy: row.eligibilityPolicy, profileForeignLanguageExempt: row.profileForeignLanguageExempt };
           const next = { ...(draft ? updateGradeDraft(merged) : draftOf(row)), savedEligibility: row.eligible };
@@ -222,12 +227,27 @@ export default function ExamLists() {
   const requestChange = (change) => { if (dirtyCount) setPendingChange(() => change); else change(); };
   const selectClass = (entry) => { pendingExamWarning.current = false; toast.dismiss(EXAM_WARNING_ID); setDirty({}); dirtyRef.current = {}; setSuccess(""); setPage(1); setGroupId(entry?.group.id || ""); setOfferingId(entry?.offering.id || ""); };
   const edit = (id, patch) => {
+    if (workflow.status !== "draft") return;
     if (!canEdit || !teachingCompleted) { if (canEdit) showCompletionWarning(); return; }
     if (rows.find(row => row.participantId === id)?.profileForeignLanguageExempt || rows.find(row => row.participantId === id)?.studyLeaveFailure) return;
     const apply = row => ["testScore", "assignmentScore", "examScore", "examExempt"].some(key => key in patch) ? updateGradeDraft({ ...row, ...patch }) : { ...row, ...patch };
     setRows((current) => current.map((row) => row.participantId === id ? apply(row) : row));
     const row = dirty[id] || rows.find(item => item.participantId === id);
     setDirty((current) => ({ ...current, [id]: apply(row) })); setSuccess("");
+  };
+  const runWorkflow = async () => {
+    setSaving(true); setError("");
+    try {
+      await axios.post(`${API_BASE_URL}/masters/exam-lists/workflow`, { classGroupId: groupId, courseOfferingId: offeringId,
+        rosterScope: "offering", revision, version: workflow.version, action: workflowAction, note: workflowNote });
+      setWorkflowAction(""); setWorkflowNote(""); setPolicyRevision(value => value + 1);
+      notifyGradebookSaved();
+    } catch (failure) { setError(errorMessage(failure, "Không thể xử lý bảng điểm.")); }
+    finally { setSaving(false); }
+  };
+  const loadHistory = async () => {
+    try { const { data } = await axios.get(`${API_BASE_URL}/masters/exam-lists/history`, { params: { classGroupId: groupId, courseOfferingId: offeringId } }); setAuditRows(data); }
+    catch (failure) { setError(errorMessage(failure, "Không tải được lịch sử.")); }
   };
   const save = async () => {
     if (!canEdit || !teachingCompleted) { if (canEdit) showCompletionWarning(); return; }
@@ -270,7 +290,7 @@ export default function ExamLists() {
       const exported = await fetchAllGradebookRows(params => axios.get(`${API_BASE_URL}/masters/exam-lists`, { params }), {
         classGroupId: groupId, courseOfferingId: offeringId, rosterScope: "offering", mode, search,
         ...(mode === "exam" ? { includeIds, excludeIds } : {}),
-      }, () => dirtyRef.current);
+      }, () => workflow.status === "draft" ? dirtyRef.current : {});
       if (mode === "exam") {
         const document = buildExamListDocument(selectedGroup, selectedOffering, exported);
         if (!document.rows.length) throw new Error("Không có học viên đủ tư cách và không miễn thi để in.");
@@ -285,7 +305,7 @@ export default function ExamLists() {
     finally { setExporting(false); }
   };
   const blank = mode === "exam";
-  const locked = !canEdit || !teachingCompleted || saving || exporting || blank;
+  const locked = workflow.status !== "draft" || !canEdit || !teachingCompleted || saving || exporting || blank;
   const columns = gradebookColumns(blank).map(column => calculatedColumns.has(column.key) ? {
     ...column, header: <span className="exam-calculated-label">{column.label}</span>,
   } : column);
@@ -335,9 +355,16 @@ export default function ExamLists() {
         </Stack>
       </Paper>
 
+      <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mb: 1.5 }} className="exam-no-print">
+        <Chip label={{ draft: "Điểm nháp", submitted: "Chờ duyệt", approved: "Đã duyệt và khóa" }[workflow.status]} />
+        {canEdit && workflow.status === "draft" && <Button disabled={busy || saving || dirtyCount > 0 || !teachingCompleted || !offeringId} onClick={() => setWorkflowAction("submit")}>Gửi duyệt điểm</Button>}
+        {role === "admin" && workflow.status === "submitted" && <Button disabled={busy || saving || dirtyCount > 0} onClick={() => setWorkflowAction("approve")}>Duyệt và khóa điểm</Button>}
+        {role === "admin" && workflow.status !== "draft" && <Button disabled={busy || saving} onClick={() => setWorkflowAction("reopen")}>Mở lại để sửa</Button>}
+        <Button disabled={!offeringId || saving} onClick={loadHistory}>Lịch sử điểm</Button>
+      </Stack>
       <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} sx={{ mb: 1.5 }} className="exam-no-print">
         <Stack direction="row" flexWrap="wrap" gap={0.75}>
-          <Button variant="contained" startIcon={<SaveRounded />} disabled={!canEdit || !teachingCompleted || !dirtyCount || saving || exporting || busy} onClick={save} sx={{ bgcolor: "#0788B8", boxShadow: "none", borderRadius: "7px" }}>{saving ? "Đang lưu..." : "Cập nhật cả bảng"}</Button>
+          <Button variant="contained" startIcon={<SaveRounded />} disabled={workflow.status !== "draft" || !canEdit || !teachingCompleted || !dirtyCount || saving || exporting || busy} onClick={save} sx={{ bgcolor: "#0788B8", boxShadow: "none", borderRadius: "7px" }}>{saving ? "Đang lưu..." : "Cập nhật cả bảng"}</Button>
           {Object.entries(modes).map(([key, label]) => <Button key={key} startIcon={<ListAltRounded />} disabled={saving || exporting} variant={mode === key ? "contained" : "outlined"} onClick={() => selectMode(key)} sx={{ borderRadius: "7px", boxShadow: "none", ...(mode === key ? { bgcolor: "#173E75" } : { bgcolor: "#fff" }) }}>{label}</Button>)}
         </Stack>
         <Stack direction="row" gap={0.75} sx={{ ml: "auto" }}>
@@ -386,7 +413,7 @@ export default function ExamLists() {
                 {!blank && <TableCell className="exam-derived-cell"><TextField select fullWidth size="small" SelectProps={{ native: true }} value={row.result} disabled inputProps={{ "aria-label": `Kết quả điểm ${row.code}` }} sx={{ ...inputSx, "& select": { py: 0.5, fontSize: 12, color: row.result === "failed" ? "#B52D2D" : row.result === "passed" ? "#137B3B" : "#607486" } }}>
                   {Object.entries(RESULT_LABELS).map(([value, label]) => <option key={value} value={value}>{row.studyLeaveFailure && value === "failed" ? "Không đạt" : label}</option>)}
                 </TextField></TableCell>}
-                {blank && <TableCell><TextField fullWidth size="small" value={row.notes} disabled={!canEdit || !teachingCompleted || saving || exporting || !!row.profileForeignLanguageExempt || !!row.studyLeaveFailure} onChange={(event) => edit(row.participantId, { notes: event.target.value })} inputProps={{ "aria-label": `Ghi chú ${row.code}`, maxLength: 1000 }} sx={{ ...inputSx, "& input": { px: 0.75, py: 0.5, textAlign: "left" } }} /></TableCell>}
+                {blank && <TableCell><TextField fullWidth size="small" value={row.notes} disabled={workflow.status !== "draft" || !canEdit || !teachingCompleted || saving || exporting || !!row.profileForeignLanguageExempt || !!row.studyLeaveFailure} onChange={(event) => edit(row.participantId, { notes: event.target.value })} inputProps={{ "aria-label": `Ghi chú ${row.code}`, maxLength: 1000 }} sx={{ ...inputSx, "& input": { px: 0.75, py: 0.5, textAlign: "left" } }} /></TableCell>}
               </TableRow>;
             })}</TableBody>
           </ResizableTable>
@@ -414,6 +441,18 @@ export default function ExamLists() {
       <Typography sx={{ mt: 1, color: "#607486", fontSize: 11.5 }} className="exam-no-print">Tư cách tự xét theo điểm kiểm tra và BTL/TL/KT, dùng ngưỡng trong cài đặt điểm. DS thi chỉ gồm học viên đủ tư cách và không miễn thi; nhập đủ điểm quá trình của cả lớp và cập nhật bảng trước khi in. Không đủ tư cách thi: kết quả chuyển ngay sang Không đạt và khóa nhập điểm thi. Đủ tư cách thi: kết quả cập nhật khi có điểm thi hết môn. Các ô nền xanh xám được tính tự động. Nháy đúp mép tiêu đề để tự căn độ rộng cột.</Typography>
       {dirtyCount > 0 && !blank && <Alert severity="warning" sx={{ mt: 1 }} className="exam-no-print">Bạn có điểm chưa lưu. Bảng điểm Excel và PDF sử dụng các điểm vừa nhập.</Alert>}
       {settingsOpen && <GradeSettingsDialog canEdit={canEdit} initialMajorId={majorId} initialYear={year} groups={groups} onClose={() => setSettingsOpen(false)} />}
+      <Dialog open={!!workflowAction} onClose={() => !saving && setWorkflowAction("")} fullWidth maxWidth="sm">
+        <DialogTitle>{{ submit: "Gửi duyệt toàn bộ bảng điểm", approve: "Duyệt và khóa điểm", reopen: "Mở lại bảng điểm" }[workflowAction]}</DialogTitle>
+        <DialogContent><TextField autoFocus fullWidth multiline minRows={3} label="Lý do hoặc căn cứ" value={workflowNote} onChange={event => setWorkflowNote(event.target.value)} sx={{ mt: 1 }} /></DialogContent>
+        <DialogActions><Button disabled={saving} onClick={() => setWorkflowAction("")}>Hủy</Button><Button disabled={saving || !workflowNote.trim()} onClick={runWorkflow}>Xác nhận</Button></DialogActions>
+      </Dialog>
+      <Dialog open={auditRows !== null} onClose={() => setAuditRows(null)} fullWidth maxWidth="md">
+        <DialogTitle>Lịch sử bảng điểm</DialogTitle><DialogContent>{(auditRows || []).map(event => <Box key={event.id} sx={{ mb: 2 }}>
+          <Typography>{event.createdAt} · {event.actor?.name} · {{ save: "Lưu điểm", submit: "Gửi duyệt", approve: "Duyệt và khóa", reopen: "Mở lại" }[event.action]}</Typography><Typography>{event.note}</Typography>
+          <details><summary>Kết quả tại thời điểm xử lý</summary>{(event.after?.snapshot?.rows || event.after?.grades || (Array.isArray(event.after) ? event.after : [])).map(row =>
+            <Typography key={row.participantId}>{row.code || row.fullName || row.participantId}: {row.courseScore ?? "—"} · {RESULT_LABELS[row.result]}</Typography>)}</details>
+        </Box>)}</DialogContent><DialogActions><Button onClick={() => setAuditRows(null)}>Đóng</Button></DialogActions>
+      </Dialog>
       <ConfirmDialog
         open={Boolean(pendingChange)}
         onClose={() => setPendingChange(null)}

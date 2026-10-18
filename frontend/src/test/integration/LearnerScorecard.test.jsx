@@ -20,6 +20,15 @@ jest.mock("@mui/icons-material", () => ({
 }));
 jest.setTimeout(20000);
 
+it("explains missing coursework without making a graduation decision", async () => {
+  axios.get.mockResolvedValue({ data: { student: { fullName: "Learner" }, groups: [], group: null, subjects: [],
+    progress: { completed: false, earnedCredits: 3, completedSubjects: 1, totalSubjects: 2,
+      blockers: [{ code: "REQUIRED_SUBJECT", message: "Còn thiếu học phần bắt buộc." }] } } });
+  render(<LearnerScorecard admissionRecordId="ar1" onClassChange={() => {}} />);
+  expect(await screen.findByText("Còn thiếu học phần bắt buộc.")).toBeInTheDocument();
+  expect(screen.getByText(/Việc xét tốt nghiệp được xử lý riêng/)).toBeInTheDocument();
+});
+
 const major = { id: "m1", name: "Công nghệ thông tin", program: "masters", disciplineId: "d1", discipline: { id: "d1", name: "Công nghệ thông tin" } };
 const groups = [
   { id: "g1", code: "CNTT2026.1.1", name: "CNTT2026.1.1", program: "masters", academicYear: "2026", major },
