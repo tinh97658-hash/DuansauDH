@@ -3,7 +3,8 @@ import { GUARDS_METADATA } from "@nestjs/common/constants";
 import { Staff } from "../../src/database/models/staff.model.js";
 import { SchedulingWriteGuard } from "../../src/common/scheduling-write.guard.js";
 import { CourseOfferingWriteGuard } from "../../src/common/course-offering-write.guard.js";
-import { RolesGuard } from "../../src/common/roles.guard.js";
+import { PermissionsGuard } from "../../src/common/permissions.guard.js";
+import { RbacService } from "../../src/auth/rbac.service.js";
 import { SchedulingController } from "../../src/scheduling/scheduling.controller.js";
 
 const contextFor = (user: unknown) => ({
@@ -46,15 +47,18 @@ describe("SchedulingWriteGuard", () => {
     }
   });
 
-  it("allows administrators to organize classes without granting scheduling writes", () => {
+  it("allows administrators to organize classes without granting scheduling writes", async () => {
+    const rbac = {
+      effectiveAccess: async (user: any) => ({ superadmin: user?.role === "admin", permissions: new Set<string>(), roleCodes: user?.role ? [user.role] : [] }),
+    } as unknown as RbacService;
     const admin = Object.assign(staffUser(false), { role: "admin" });
-    expect(new CourseOfferingWriteGuard().canActivate(contextFor(admin))).toBe(true);
+    expect(await new CourseOfferingWriteGuard(rbac).canActivate(contextFor(admin))).toBe(true);
     expect(() => guard.canActivate(contextFor(admin))).toThrow(ForbiddenException);
-    expect(() => new CourseOfferingWriteGuard().canActivate(contextFor(Object.assign(staffUser(false), { role: "examiner" })))).toThrow(ForbiddenException);
+    await expect(new CourseOfferingWriteGuard(rbac).canActivate(contextFor(Object.assign(staffUser(false), { role: "examiner" })))).rejects.toThrow(ForbiddenException);
   });
 
-  it("keeps unresolved-session reads under RolesGuard without requiring scheduling write access", () => {
-    expect(Reflect.getMetadata(GUARDS_METADATA, SchedulingController)).toContain(RolesGuard);
+  it("keeps unresolved-session reads under the view permission without requiring scheduling write access", () => {
+    expect(Reflect.getMetadata(GUARDS_METADATA, SchedulingController)).toContain(PermissionsGuard);
     expect(Reflect.getMetadata(GUARDS_METADATA, SchedulingController.prototype.listUnresolvedTeachingSessions) || []).not.toContain(SchedulingWriteGuard);
   });
 });

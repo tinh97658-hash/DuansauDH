@@ -1,12 +1,12 @@
 import { Controller, Get, UseGuards } from "@nestjs/common";
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
-import { Roles } from "../common/auth-user.js";
-import { RolesGuard } from "../common/roles.guard.js";
+import { RequirePermissions } from "../common/permissions.decorator.js";
+import { PermissionsGuard } from "../common/permissions.guard.js";
 import { DoctoralService } from "./doctoral.service.js";
 
 @Controller("doctoral")
-@UseGuards(AuthenticatedGuard, RolesGuard)
-@Roles("admin", "supervisor", "examiner")
+@UseGuards(AuthenticatedGuard, PermissionsGuard)
+@RequirePermissions("doctoral.view")
 export class DoctoralController {
   constructor(private readonly doctoral: DoctoralService) {}
 

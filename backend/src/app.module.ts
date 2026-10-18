@@ -8,7 +8,10 @@ import { rateLimit } from "express-rate-limit";
 import session from "express-session";
 import passport from "passport";
 import { Sequelize } from "sequelize-typescript";
+import { AccountsModule } from "./accounts/accounts.module.js";
+import { AuditModule } from "./audit/audit.module.js";
 import { AuthModule } from "./auth/auth.module.js";
+import { RbacModule } from "./auth/rbac.module.js";
 import { environmentFiles, environmentSchema } from "./config/configuration.js";
 import { DatabaseModule } from "./database/database.module.js";
 import { DoctoralModule } from "./doctoral/doctoral.module.js";
@@ -17,6 +20,7 @@ import { ManagementModule } from "./management/management.module.js";
 import { MastersModule } from "./masters/masters.module.js";
 import { PlanModule } from "./plan/plan.module.js";
 import { ReportsModule } from "./reports/reports.module.js";
+import { RolesModule } from "./roles/roles.module.js";
 import { SchedulingModule } from "./scheduling/scheduling.module.js";
 import { SystemModule } from "./system/system.module.js";
 
@@ -25,6 +29,10 @@ import { SystemModule } from "./system/system.module.js";
     ConfigModule.forRoot({ isGlobal: true, envFilePath: environmentFiles, expandVariables: true, validationSchema: environmentSchema }),
     DatabaseModule,
     AuthModule,
+    RbacModule,
+    AuditModule,
+    AccountsModule,
+    RolesModule,
     ManagementModule,
     HealthModule,
     SystemModule,

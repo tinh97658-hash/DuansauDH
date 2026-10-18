@@ -1,17 +1,19 @@
 # KẾ HOẠCH: MODULE QUẢN LÝ TÀI KHOẢN & PHÂN QUYỀN (RBAC)
 
-> Trạng thái: **Kế hoạch** — chưa triển khai.
-> Ngày lập: 2026-10-18
+> Trạng thái: **Đã hoàn thành — Phase 1–5 xong (RBAC, API tài khoản/vai trò, chuyển `@Roles`→permission, giao diện, dọn dẹp/test/tài liệu).**
+> Ngày lập: 2026-10-18 (cập nhật sau khi chốt).
 > Phạm vi áp dụng: `backend/` (NestJS 11 + Sequelize + Umzug) và `frontend/` (React + MUI).
 
 ---
 
-## 0. Chốt phạm vi
+## 0. Chốt phạm vi (đã thống nhất)
 
-- **Mô hình phân quyền**: RBAC đầy đủ — bảng `roles`, `permissions`, `role_permissions`; admin tự tạo vai trò và tick quyền.
+- **Mô hình phân quyền**: RBAC đầy đủ — `roles`, `permissions`, `role_permissions`, `staff_roles`.
+- **Nhiều vai trò / một nhân sự**: quyền hiệu lực = **hợp quyền của mọi vai trò** được gán. Vẫn giữ **1 vai trò chính (primary)** để `user.role` phía API đổi sang mã chuỗi như cũ.
 - **Đối tượng quản lý**: chỉ tài khoản **cán bộ/nhân sự** (`staff`). Không đụng luồng học viên.
-- **Vòng đời tài khoản**: tạo kèm mật khẩu ban đầu · khóa/mở khóa · admin đặt lại mật khẩu · buộc đăng xuất · audit log.
-- **Giữ tương thích**: API vẫn trả `role` dạng **mã chuỗi** (`admin`/`supervisor`/`examiner`) để các chỗ frontend `session.user.role === "admin"` không vỡ.
+- **Vòng đời tài khoản**: tạo kèm mật khẩu ban đầu (nhập tay hoặc sinh ngẫu nhiên) · luôn `mustChangePassword` · khóa/mở khóa · admin đặt lại mật khẩu · buộc đăng xuất · audit log.
+- **Chuyển đổi**: chuyển **toàn bộ 121 chỗ `@Roles`** sang kiểm tra permission trong đợt này; gỡ `@Roles`/`RolesGuard` khi xong.
+- **Tương thích**: API `/auth/session` vẫn trả `user.role` = mã vai trò **chính**, để các chỗ frontend `session.user.role === "admin"` không vỡ.
 
 ---
 
@@ -27,7 +29,7 @@ Vị trí: `backend/src/database/migrations/062-account-management-rbac.ts` (đ�
 | `code` | STRING UNIQUE NOT NULL | `admin`, `supervisor`, `examiner` + vai trò tùy tạo |
 | `name` | STRING NOT NULL | tên hiển thị |
 | `description` | TEXT | |
-| `is_system` | BOOLEAN default false | vai trò hệ thống, không cho xóa/đổi code |
+| `is_system` | BOOLEAN default false | không cho xóa/đổi `code` |
 | `is_superadmin` | BOOLEAN default false | bỏ qua mọi kiểm tra quyền (gán cho `admin`) |
 | `sort_order` | INT default 0 | |
 | `active` | BOOLEAN default true | |
@@ -51,7 +53,17 @@ Catalog **cố định trong code** (`backend/src/auth/permissions.ts`), seed v�
 
 `role_id` FK→`roles` ON DELETE CASCADE, `permission_id` FK→`permissions` ON DELETE CASCADE, PK tổng hợp `(role_id, permission_id)`.
 
-### 1.4 Bảng `auth_audit_logs`
+### 1.4 Bảng `staff_roles` (n-n, hỗ trợ nhiều vai trò)
+
+| Cột | Kiểu | Ghi chú |
+| --- | --- | --- |
+| `staff_id` | UUID FK→`staff` ON DELETE CASCADE | PK tổng hợp |
+| `role_id` | UUID FK→`roles` ON DELETE RESTRICT | PK tổng hợp |
+| `created_at` / `updated_at` | TIMESTAMPTZ | |
+
+Vai trò **chính** (đại diện `user.role`) lưu ở cột `staff.role` — xem §1.6. Ràng buộc "≥1 vai trò" được kiểm ở service.
+
+### 1.5 Bảng `auth_audit_logs`
 
 | Cột | Kiểu |
 | --- | --- |
@@ -64,27 +76,23 @@ Catalog **cố định trong code** (`backend/src/auth/permissions.ts`), seed v�
 | `user_agent` | TEXT |
 | `created_at` | TIMESTAMPTZ |
 
-Hành động ghi log: `staff.create`, `staff.update`, `staff.disable`, `staff.enable`, `staff.password.reset`, `staff.session.revoke`, `role.create`, `role.update`, `role.delete`, `role.permissions.update`.
-
+Hành động: `staff.create`, `staff.update`, `staff.roles.update`, `staff.disable`, `staff.enable`, `staff.password.reset`, `staff.session.revoke`, `role.create`, `role.update`, `role.delete`, `role.permissions.update`.
 Index theo `created_at`, `target_staff_id`.
 
-### 1.5 Nâng cấp bảng `staff`
+### 1.6 Nâng cấp bảng `staff`
 
-- `role_id` UUID FK→`roles` ON DELETE RESTRICT (nullable trong lúc migrate).
 - `status` ENUM(`active`, `disabled`) default `active`.
 - `session_version` INT default 0.
 - `must_change_password` BOOLEAN default false.
 - `last_login_at` TIMESTAMPTZ nullable.
 - `password_changed_at` TIMESTAMPTZ nullable.
-- **Backfill**: với mỗi staff, tìm role theo cột `role` hiện tại → gán `role_id`.
-- Sau backfill có thể drop cột enum `role` (xem 1.6).
-- `down`: khôi phục cột enum `role` + xóa các bảng mới.
+- **Giữ cột `role` nhưng đổi ENUM → VARCHAR(50)**: đây là **mã vai trò chính**, giữ nguyên giá trị cũ để các chỗ đọc `user.role` không vỡ trong giai đoạn chuyển đổi. Sau khi Phase 3 xong (không còn `@Roles`) mới xem xét bỏ hẳn.
+- Backfill `staff_roles` từ `staff.role` hiện có.
 
-### 1.6 Chiến lược tương thích `staff.role`
+### 1.7 Tương thích `user.role`
 
-- Thêm association `belongsTo(Role, { as: "roleRef" })` và **virtual** `role` trên model trả `roleRef.code`.
-- Repository luôn eager-load `roleRef` (`include` trong `findById`, `findByEmail`, default scope).
-- ⇒ `request.user.role`, `@Roles`, `user.role === "admin"` (frontend) **không đổi**. Sau đó mới xóa cột enum.
+- `staff.role` tiếp tục là mã vai trò chính ⇒ `request.user.role`, `user.role === "admin"` (frontend) hoạt động như cũ, không cần sửa serializer hay guard cũ.
+- Quyền hiệu lực đầy đủ được `RbacService` hợp từ các vai trò trong `staff_roles` (fallback về `staff.role` nếu chưa có bản ghi).
 
 ---
 
@@ -92,76 +100,100 @@ Index theo `created_at`, `target_staff_id`.
 
 ### 2.1 Model mới (`backend/src/database/models/`)
 
-`role.model.ts`, `permission.model.ts`, `role-permission.model.ts`, `auth-audit-log.model.ts` — đăng ký vào mảng `databaseModels` trong `backend/src/database/database.module.ts`.
+`role.model.ts`, `permission.model.ts`, `role-permission.model.ts`, `staff-role.model.ts`, `auth-audit-log.model.ts` — đăng ký vào `databaseModels` trong `backend/src/database/database.module.ts`.
 
 ### 2.2 Catalog quyền — `backend/src/auth/permissions.ts`
 
-Hằng số + nhóm:
+Hằng số + nhóm (dùng chung backend/frontend qua API `/roles/permissions`):
 
-- Tài khoản: `account.view`, `account.manage`, `account.password.reset`
-- Phân quyền: `role.view`, `role.manage`, `audit.view`
-- Danh mục: `catalog.view`, `catalog.manage`
-- Kế hoạch/CTĐT: `plan.view`, `plan.manage`
-- Tuyển sinh: `admission.view`, `admission.manage`
-- Thạc sĩ / Tiến sĩ: `masters.view`, `masters.manage`, `doctoral.view`, `doctoral.manage`
-- Học vụ: `scheduling.view`, `scheduling.write`, `gradebook.view`, `gradebook.submit`, `gradebook.approve`, `studyleave.manage`
-- Báo cáo: `reports.view`, `reports.export`
+- **Tài khoản**: `account.view`, `account.manage`, `account.password.reset`
+- **Phân quyền**: `role.view`, `role.manage`, `audit.view`
+- **Danh mục**: `catalog.view`, `catalog.manage`
+- **Kế hoạch/CTĐT**: `plan.view`, `plan.manage`
+- **Tuyển sinh**: `admission.view`, `admission.manage`
+- **Thạc sĩ / Tiến sĩ**: `masters.view`, `masters.manage`, `doctoral.view`, `doctoral.manage`
+- **Học vụ**: `scheduling.view`, `scheduling.write`, `gradebook.view`, `gradebook.submit`, `gradebook.approve`, `studyleave.manage`
+- **Báo cáo**: `reports.view`, `reports.export`
+- **Hướng dẫn**: `supervision.review`
 
-Kèm `DEFAULT_ROLE_PERMISSIONS` tái lập hành vi hiện tại (admin = superadmin; supervisor/examiner theo các `@Roles` đang có).
+Kèm `DEFAULT_ROLE_PERMISSIONS` tái lập **đúng hành vi hiện tại** cho 3 vai trò hệ thống (xem bảng map ở §2.6).
 
 ### 2.3 Guard & decorator
 
-- `backend/src/common/permissions.decorator.ts`: `@RequirePermissions("account.manage")` (metadata `PERMISSIONS_KEY`).
-- `backend/src/common/permissions.guard.ts`: `PermissionsGuard` — lấy `request.user` (Staff), resolve role → permission codes, cache ngắn hạn (Map + TTL ~30s, invalidate khi sửa matrix); superadmin bypass.
-- Giữ `RolesGuard` cho `@Roles` cũ; chuyển dần từng controller sang `@RequirePermissions` (Phase 3).
+- `backend/src/common/permissions.decorator.ts`: `@RequirePermissions("account.manage")` (metadata `PERMISSIONS_KEY`, hỗ trợ nhiều mã = yêu cầu **tất cả**; tùy chọn `mode: "any"`).
+- `backend/src/common/permissions.guard.ts`: `PermissionsGuard` — user là `Staff` → nếu có vai trò `is_superadmin` thì bỏ qua; ngược lại **hợp quyền** của tất cả vai trò active, so khớp. Cache theo `staffId` + `rolesVersion` (bump khi sửa matrix hoặc gán vai trò).
+- Thay toàn bộ `@Roles` bằng `@RequirePermissions`; xóa `roles.guard.ts`/`auth-user.ts` (`Roles`) khi hoàn tất.
+- Chuyển các chỗ đọc `user.role` inline (`course-offering-write.guard.ts`, `exam-gradebook.service.ts`) sang permission tương ứng.
+- Cờ `canManageScheduling` **giữ nguyên** (đây là "người phụ trách xếp lịch" dạng chỉ định, không phải `@Roles`) và bổ trợ cho `scheduling.write`.
 
-### 2.4 Module tài khoản — `backend/src/accounts/`
+### 2.4 Module tài khoản & phân quyền
 
-- `accounts.module.ts`, `accounts.controller.ts`, `accounts.service.ts`, `dto/*.dto.ts`.
-- Mở rộng `StaffService`/`StaffRepository` cho nghiệp vụ tài khoản.
+- `backend/src/accounts/`: `accounts.module.ts`, `accounts.controller.ts`, `accounts.service.ts`, `dto/*.dto.ts`.
+- `backend/src/roles/`: `roles.module.ts`, `roles.controller.ts`, `roles.service.ts`.
+- Kế thừa `StaffService`/`StaffRepository` cho nghiệp vụ tài khoản.
 
 ### 2.5 API contract
 
-Tất cả đều `@UseGuards(AuthenticatedGuard)` + kiểm tra quyền.
+Tất cả `@UseGuards(AuthenticatedGuard)` + `@RequirePermissions(...)`.
 
 | Method | Path | Quyền | Chức năng |
 | --- | --- | --- | --- |
 | GET | `/accounts` | `account.view` | Danh sách staff (lọc `status`, `role`, search) |
-| POST | `/accounts` | `account.manage` | Tạo staff + mật khẩu ban đầu (bcrypt cost 12) |
-| GET | `/accounts/:id` | `account.view` | Chi tiết |
-| PUT | `/accounts/:id` | `account.manage` | Sửa tên/email/vai trò |
+| POST | `/accounts` | `account.manage` | Tạo staff + mật khẩu ban đầu + `roleIds[]`/`primaryRoleId` |
+| GET | `/accounts/:id` | `account.view` | Chi tiết (kèm vai trò) |
+| PUT | `/accounts/:id` | `account.manage` | Sửa tên/email; cập nhật vai trò |
 | PATCH | `/accounts/:id/status` | `account.manage` | Khóa/mở khóa (bump `session_version` khi khóa) |
-| POST | `/accounts/:id/reset-password` | `account.password.reset` | Đặt lại MK, `must_change_password=true`, bump version |
+| POST | `/accounts/:id/reset-password` | `account.password.reset` | Đặt lại MK, `mustChangePassword=true`, bump version |
 | POST | `/accounts/:id/revoke-sessions` | `account.manage` | Buộc đăng xuất |
 | GET | `/accounts/audit-logs` | `audit.view` | Nhật ký (lọc actor/action/thời gian, phân trang) |
+| GET | `/accounts/me/permissions` | (đăng nhập) | Quyền hiệu lực cho frontend |
 | GET | `/roles` | `role.view` | Danh sách vai trò |
 | POST | `/roles` | `role.manage` | Tạo vai trò |
 | PUT | `/roles/:id` | `role.manage` | Sửa vai trò |
 | DELETE | `/roles/:id` | `role.manage` | Xóa (chặn `is_system` / đang được gán) |
 | GET | `/roles/permissions` | `role.view` | Catalog quyền theo nhóm |
 | PUT | `/roles/:id/permissions` | `role.manage` | Cập nhật ma trận quyền |
-| GET | `/accounts/me/permissions` | (đăng nhập) | Quyền hiệu lực cho frontend |
 
-Ghi audit cho mọi thao tác ghi, lấy `actor` từ `@CurrentUser()`.
+Quy tắc nghiệp vụ: mật khẩu ban đầu **nhập tay hoặc sinh ngẫu nhiên** (trả về một lần trong response khi sinh); luôn `mustChangePassword=true`; mọi thao tác ghi đều ghi audit.
 
-### 2.6 Buộc đăng xuất (thu hồi phiên)
+### 2.6 Chuyển `@Roles` → permission (toàn bộ 121 chỗ)
 
-Dùng cơ chế **session version** (không cần đụng bảng `sessions`):
+Nguyên tắc map (giữ nguyên hành vi bằng `DEFAULT_ROLE_PERMISSIONS`):
+
+| Mẫu `@Roles` hiện tại | Permission thay thế | admin | supervisor | examiner |
+| --- | --- | --- | --- | --- |
+| `("admin","supervisor","examiner")` lớp (doctora/masters/plan/reports/scheduling/admission-evaluation/study-leave) | `*.view` của module tương ứng | ✓ | ✓ | ✓ |
+| `("admin")` (CRUD danh mục, plan, masters admin…) | `*.manage` của module | ✓ | – | – |
+| `("admin","examiner")` (exam-lists workflow, grading-policies) | `gradebook.approve` | ✓ | – | ✓ |
+| `("supervisor","admin")` (data tobereviewed/submitreview) | `supervision.review` | ✓ | ✓ | – |
+| `("supervisor","admin")` room admin-only (profile) | `account.view`/`admission.view` | ✓ | – | – |
+| `("admin","supervisor","examiner")` `GET system/rooms` | `catalog.view` | ✓ | ✓ | ✓ |
+| `("admin")` reports issue learner-scorecard | `reports.export` | ✓ | – | – |
+| `("student")` (user.controller) | giữ nhánh student (không thuộc RBAC staff) | – | – | – |
+
+- Tiến hành **theo module**: `system`, `plan`, `management`, `masters`, `doctoral`, `scheduling`, `reports`, `auth`.
+- Sau mỗi module: chạy test, xác nhận 403/200 khớp hành vi cũ, rồi mới sang module kế.
+- Kết thúc: xóa `@Roles`, `RolesGuard`, hằng `ROLES_KEY`.
+
+### 2.7 Buộc đăng xuất (thu hồi phiên)
+
+Cơ chế **session version** (không cần đụng bảng `sessions`):
 
 - `SessionSerializer.serializeUser` → key `staff:<id>:<sessionVersion>` (giữ `student:<id>` nguyên).
 - `AuthService.deserialize` parse version; nếu staff `status !== 'active'` **hoặc** version khác `staff.sessionVersion` → trả `false` (coi như hết phiên). Vì deserialize đọc DB mỗi request ⇒ hiệu lực tức thì.
-- Bump `sessionVersion` khi: khóa tài khoản, đặt lại MK, đổi vai trò, hoặc gọi `revoke-sessions`.
+- Bump `sessionVersion` khi: khóa tài khoản, đặt lại MK, thay đổi vai trò, hoặc gọi `revoke-sessions`.
 
-### 2.7 Đăng nhập
+### 2.8 Đăng nhập
 
 - `AuthService.validateLocal`: chặn nếu `status !== 'active'` ("Tài khoản đã bị khóa").
+- Nếu `mustChangePassword` → cho đăng nhập nhưng frontend buộc đổi MK trước khi dùng tính năng (endpoint đổi MK bắt buộc).
 - Cập nhật `lastLoginAt` khi đăng nhập thành công.
-- `auth.controller.isStaff` trả `role` code (giữ nguyên).
+- `auth.controller.isStaff` trả `role` code (vai trò chính) như cũ.
 
-### 2.8 Dọn dẹp
+### 2.9 Dọn dẹp
 
-- `AddStaffDto`/`POST /admin/addStaff` và `staff/add` → thay bằng `POST /accounts` (giữ route cũ trỏ về service mới trong 1 nhịp để không vỡ, sau đó bỏ).
-- `GET /system/users` (`SystemService.users`) → để nguyên hoặc trỏ sang `AccountsService.list()`.
+- `AddStaffDto` / `POST /admin/addStaff` / `staff/add` → thay bằng `POST /accounts` (route cũ trỏ về service mới trong 1 nhịp rồi bỏ).
+- `GET /system/users` (`SystemService.users`) → chuyển sang `AccountsService.list()` và bỏ endpoint cũ khi frontend chuyển xong.
 
 ---
 
@@ -169,20 +201,23 @@ Dùng cơ chế **session version** (không cần đụng bảng `sessions`):
 
 ### 3.1 Service layer
 
-`frontend/src/features/accounts/api.js` (axios, dùng `API_BASE_URL`, `withCredentials`) — tách khỏi component.
+- `frontend/src/features/accounts/api.js` — tài khoản + audit.
+- `frontend/src/features/accounts/rolesApi.js` — vai trò + ma trận quyền.
+- Dùng `API_BASE_URL`, `withCredentials`; tách khỏi component.
 
 ### 3.2 Trang & component
 
-- **`frontend/src/pages/system/accounts.jsx`** — bảng tài khoản: toolbar tìm kiếm + lọc (trạng thái, vai trò); cột Họ đệm/Tên/Email/Vai trò/Trạng thái/Hành động; dialog Thêm (tên, email, vai trò, mật khẩu ban đầu), Sửa, Khóa/Mở, Đặt lại MK, Buộc đăng xuất; `ConfirmDialog` cho thao tác nguy hiểm. Dùng `FeatureLayout`, `ResizableTable`, `AppDialog`, `ConfirmDialog`.
-- **`frontend/src/pages/system/roles.jsx`** — danh sách vai trò + **ma trận quyền** (bảng permission × checkbox, nhóm theo module); tạo/sửa/xóa vai trò tùy chỉnh.
+- **`frontend/src/pages/system/accounts.jsx`** — bảng tài khoản: toolbar tìm kiếm + lọc (trạng thái, vai trò); cột Họ đệm/Tên/Email/Vai trò (chính + phụ)/Trạng thái/Hành động; dialog Thêm (tên, email, mật khẩu ban đầu hoặc "sinh tự động", chọn nhiều vai trò + vai trò chính), Sửa, Khóa/Mở, Đặt lại MK, Buộc đăng xuất; `ConfirmDialog` cho thao tác nguy hiểm. Dùng `FeatureLayout`, `ResizableTable`, `AppDialog`, `ConfirmDialog`.
+- **`frontend/src/pages/system/roles.jsx`** — danh sách vai trò + **ma trận quyền** (permission × checkbox, nhóm theo module); tạo/sửa/xóa vai trò tùy chỉnh.
 - **`frontend/src/pages/system/auditLogs.jsx`** — nhật ký, lọc + phân trang.
-- Trang `pages/system/users.jsx` cũ: giữ chức năng "chuyển quyền xếp lịch" như một hành động trong trang accounts (hoặc giữ riêng).
+- **Bắt buộc đổi mật khẩu**: khi `mustChangePassword` → chặn điều hướng tới trang đổi mật khẩu đến khi đổi xong (xử lý trong `ProtectedRoute`/`AppLayout`).
+- `pages/system/users.jsx` cũ: chuyển chức năng "chuyển quyền xếp lịch" thành một hành động trong trang accounts.
 
 ### 3.3 Định tuyến & điều hướng
 
 - `frontend/src/App.js`: thêm `system/accounts`, `system/roles`, `system/audit-logs` (lazyPage + `<Route>`).
-- `frontend/src/components/AppLayout.jsx` (nhóm "DANH MỤC & HỆ THỐNG") và `RibbonHeader.jsx`: thêm mục với `roles: ["admin"]`.
-- Nạp `/accounts/me/permissions` vào `AuthSessionContext` để ẩn/hiện nút theo quyền (thay dần `role === "admin"`).
+- `frontend/src/components/AppLayout.jsx` (nhóm "DANH MỤC & HỆ THỐNG") và `RibbonHeader.jsx`: thêm mục với quyền `["admin"]` (tạm) và chuyển dần sang kiểm tra `me/permissions`.
+- Nạp `/accounts/me/permissions` vào `AuthSessionContext`; thay dần `role === "admin"` bằng kiểm tra permission.
 
 ---
 
@@ -190,56 +225,79 @@ Dùng cơ chế **session version** (không cần đụng bảng `sessions`):
 
 Tổ chức theo `backend/test/` và `frontend/src/test/`.
 
-- Unit backend: `PermissionsGuard` (role thường, superadmin, thiếu quyền), session-version invalidation, `AccountsService` (tạo trùng email, khóa, reset MK).
-- Integration backend: endpoints `/accounts`, `/roles`, `/roles/:id/permissions` (401/403/200, audit được ghi).
-- Integration frontend: render trang accounts, ẩn nút khi thiếu quyền, luồng đặt lại MK + xác nhận (mock axios), cập nhật ma trận quyền.
-- Cập nhật `frontend/src/test/integration/SystemUsers.test.jsx` nếu thay trang users.
+- Unit backend: `PermissionsGuard` (union nhiều vai trò, superadmin, thiếu quyền), session-version invalidation, `AccountsService` (trùng email, khóa, reset MK, sinh MK), ràng buộc 1 vai trò chính.
+- Integration backend: `/accounts`, `/roles`, `/roles/:id/permissions` (401/403/200), audit được ghi; **regression toàn bộ API sau khi thay `@Roles`** (ma trận 200/403 theo vai trò).
+- Integration frontend: render accounts/roles, ẩn nút khi thiếu quyền, luồng reset MK + xác nhận, cập nhật ma trận quyền, buộc đổi MK.
+- Cập nhật `frontend/src/test/integration/SystemUsers.test.jsx`.
 
 Lệnh: `npm test`, `npm run test:coverage` (từ thư mục gốc).
 
 ---
 
-## 5. Thứ tự thực hiện (phases)
+## 5. Lộ trình thực hiện (phases)
 
-### Phase 1 — Nền tảng dữ liệu & RBAC core
-1. Migration `062` (bảng + cột + backfill).
-2. Model mới + đăng ký `database.module.ts`.
-3. `permissions.ts` catalog + seed.
-4. `@RequirePermissions` + `PermissionsGuard`.
-5. Virtual `role` + eager-load `roleRef` (đảm bảo `user.role` không đổi).
+### Phase 1 — Nền tảng dữ liệu & RBAC core ✅ (đã xong)
+1. ✅ Migration `062` (bảng + cột + seed roles/permissions/role_permissions + backfill `staff_roles`).
+2. ✅ Model mới (`role`, `permission`, `role-permission`, `staff-role`, `auth-audit-log`) + đăng ký `database.module.ts`.
+3. ✅ `permissions.ts` catalog + `DEFAULT_ROLE_PERMISSIONS`.
+4. ✅ `@RequirePermissions` + `PermissionsGuard` + `RbacService` + `RbacModule` (global).
+5. ✅ Giữ `staff.role` (VARCHAR, vai trò chính) để tương thích `user.role`.
+6. ✅ Seed đồng bộ: `npm run db:seed:auth`.
+7. ✅ Unit test: `rbac.service.spec.ts`, `permissions.guard.spec.ts` (590 test pass).
 
-### Phase 2 — Nghiệp vụ tài khoản (module `accounts`)
-6. `AccountsModule` + service/controller + DTO.
-7. Session-version (serializer/deserialize) + chặn đăng nhập khi khóa + `lastLoginAt`.
-8. Audit service ghi log.
-9. Roles/permissions API.
+### Phase 2 — Nghiệp vụ tài khoản & phân quyền ✅ (đã xong)
+1. ✅ `AccountsModule` + service/controller + DTO (`POST /accounts` sinh MK ban đầu hoặc nhập tay, luôn `mustChangePassword`; đa vai trò + vai trò chính; khóa/mở; reset MK; buộc đăng xuất; `GET /accounts/me/permissions`).
+2. ✅ `RolesModule` + service/controller + ma trận quyền (`GET /roles`, `GET /roles/permissions`, tạo/sửa/xóa vai trò tùy tạo, `PUT /roles/:id/permissions`).
+3. ✅ Session-version: khóa tài khoản / reset MK / buộc đăng xuất đều tăng `session_version` → phiên cũ bị vô hiệu; chặn đăng nhập khi `status = disabled`; cập nhật `last_login_at`.
+4. ✅ `AuditService` (`@Global`) ghi `auth_audit_logs` cho mọi thao tác + `GET /accounts/audit-logs` lọc/phân trang.
+5. ✅ Bảo vệ quản trị cuối: chặn tự khóa và chặn gỡ vai trò superadmin cuối cùng; chặn xóa vai trò đang gán / vai trò hệ thống.
+6. ✅ Test: `accounts.service.spec.ts`, `roles.service.spec.ts` + kiểm chứng HTTP thực tế (tạo vai trò/tài khoản, 403 khi thiếu quyền, 401 sau khi khóa, 409 các ràng buộc).
 
-### Phase 3 — Migration `@Roles` → quyền
-10. Chuyển từng controller (`system`, `plan`, `masters`, `doctoral`, `scheduling`, `reports`, `management`, `auth`) sang `@RequirePermissions`, theo `DEFAULT_ROLE_PERMISSIONS` để giữ nguyên hành vi.
-11. Bỏ `@Roles`/`RolesGuard` khi đã chuyển hết (hoặc giữ cho vài endpoint cố định).
+### Phase 3 — Chuyển toàn bộ `@Roles` → permission ✅ (đã xong)
+1. ✅ Chuyển 118/121 `@Roles` sang `@RequirePermissions` theo module (`system` → `plan` → `management` → `masters` → `doctoral` → `scheduling` → `reports`), dùng quyền `.view` ở cấp class và `.manage`/`.approve`/`.submit`/`.export` cho thao tác ghi.
+2. ✅ 3 `@Roles("student")` (đổi MK, nộp bài, ảnh) → `StudentGuard` riêng (nhân sự không thuộc RBAC).
+3. ✅ `course-offering-write.guard` → xác định superadmin qua `RbacService`; `exam-gradebook.service.transition` → `gradebook.submit`/`gradebook.approve`.
+4. ✅ Bổ sung quyền `scheduling.assign` (phân công quản lý lịch) và `gradebook.policy` (quy chế chấm điểm); cập nhật `DEFAULT_ROLE_PERMISSIONS` giữ đúng hành vi cũ (examiner nhập/gửi điểm, không duyệt điểm).
+5. ✅ Xóa `@Roles`, `ROLES_KEY`, `RolesGuard`; cập nhật guard trong module + test metadata.
+6. ✅ Typecheck + build sạch; 654 test pass; smoke HTTP thực tế: admin 200 toàn bộ, tài khoản chỉ có `plan.view` bị 403 đúng chỗ, ghi bị chặn.
 
-### Phase 4 — Frontend
-12. Service + 3 trang + routing + nav + `me/permissions`.
 
-### Phase 5 — Dọn dẹp, test, tài liệu
-13. Bỏ `addStaffPage`/`addStaff.jsx` cũ sau khi thay thế.
-14. Test + cập nhật `README.md` (mục tính năng + migration).
-15. `npm --prefix backend run db:migrate` + seed; chạy build/lint.
+### Phase 4 — Frontend ✅ (đã xong)
+1. ✅ Service layer: `frontend/src/features/accounts/api.js` (tài khoản + audit + đổi MK), `rolesApi.js` (vai trò + ma trận quyền), `constants.js` (nhãn), `usePermissions.js` (hook quyền từ `AuthSessionContext`).
+2. ✅ `pages/system/accounts.jsx`: bảng tài khoản (tìm kiếm + lọc trạng thái/vai trò + phân trang); dialog Thêm/Sửa (đa vai trò + vai trò chính, mật khẩu ban đầu nhập tay hoặc sinh tự động); khóa/mở khóa, đặt lại MK (dialog + hiển thị MK đã sinh), buộc đăng xuất, phân công phụ trách xếp lịch; `ConfirmDialog` cho thao tác nguy hiểm; ẩn/hiện nút theo quyền.
+3. ✅ `pages/system/roles.jsx`: danh sách vai trò + ma trận quyền nhóm theo module (tick chọn, chọn cả nhóm); tạo/sửa/xóa vai trò tùy chỉnh, tạm ẩn/kích hoạt; chặn xóa vai trò hệ thống/đang gán; ghi chú vai trò toàn quyền.
+4. ✅ `pages/system/auditLogs.jsx`: nhật ký lọc theo hành động + khoảng ngày, phân trang phía máy chủ.
+5. ✅ `pages/system/changePassword.jsx`: form đổi MK (kiểm tra hiện tại/mới/xác nhận), gọi `PATCH /accounts/me/password`, làm mới phiên rồi về trang chủ.
+6. ✅ Backend bổ sung: `PATCH /accounts/me/password` (`ChangeOwnPasswordDto`, `AccountsService.changeOwnPassword`) để nhân sự tự đổi MK — phục vụ luồng "buộc đổi MK".
+7. ✅ `ProtectedRoute.jsx`: nạp `/accounts/me/permissions` vào `AuthSessionContext` (kèm `refresh`), buộc chuyển tới trang đổi MK khi `mustChangePassword`.
+8. ✅ `RibbonHeader.jsx`: thêm nhóm "TÀI KHOẢN & PHÂN QUYỀN" (Tài khoản nhân sự / Vai trò & phân quyền / Nhật ký thao tác), ẩn/hiện theo quyền; bỏ mục "QL Người dùng".
+9. ✅ `App.js`: route `system/accounts`, `system/roles`, `system/audit-logs`; `/system/users` chuyển hướng về `/system/accounts`.
+10. ✅ Kiểm chứng: build backend + frontend sạch; backend 654 test pass; các test frontend liên quan (ProtectedRoute, schedulingNavigation, SystemUsers) pass; lỗi test frontend còn lại là **có sẵn từ trước** (đã xác nhận bằng cách stash thay đổi Phase 4 rồi chạy lại).
+
+### Phase 5 — Dọn dẹp, test, tài liệu ✅ (đã xong)
+1. ✅ Bỏ luồng thêm nhân sự cũ: xóa `addStaffPage.js`, `addStaff.jsx`, route `/addStaff`, `AdminController` (`POST /admin/addStaff`), `AddStaffDto` và `StaffService.add` (kèm `NotificationService` không còn dùng).
+2. ✅ Bỏ `GET /system/users` (`SystemController.users` + `SystemService.users`) và trang cũ `pages/system/users.jsx`; `/system/users` vẫn chuyển hướng về `/system/accounts`.
+3. ✅ Test frontend mới: `Accounts.test.jsx` (liệt kê, ẩn nút theo quyền, tạo tài khoản + MK sinh tự động, đặt lại MK, lọc), `Roles.test.jsx` (render vai trò hệ thống, tick ma trận + lưu, khóa khi thiếu quyền, tạo vai trò), `ChangePassword.test.jsx` (buộc đổi MK + validate); bổ sung case buộc đổi MK vào `ProtectedRoute.test.jsx`. Gỡ `SystemUsers.test.jsx` (trang không còn).
+4. ✅ Cập nhật `README.md`: bảng dữ liệu RBAC, mục "Quản lý tài khoản & phân quyền (migration 062)", tính năng chính và mục scheduling.
+5. ✅ `npm --prefix backend run db:migrate` + `db:seed:auth` (idempotent, chạy lại an toàn); build backend + frontend sạch; chạy toàn bộ test backend + frontend.
+6. ✅ Thay nốt kiểm tra `user.role === "admin"` còn sót ở `GET /system/rooms` (`includeInactive`) bằng quyền `catalog.manage` qua `RbacService`; cập nhật `test/unit/system-room.service.spec.ts`.
 
 ---
 
-## 6. Rủi ro & quyết định
+## 6. Rủi ro & biện pháp
 
-- **Bán kính `staff.role`**: ~121 `@Roles` + nhiều chỗ đọc `user.role`. Giảm rủi ro bằng virtual `role` + eager-load (giữ API trả code như cũ).
-- **Hiệu năng guard**: mỗi request tra role→permissions; dùng cache TTL + invalidate khi sửa matrix.
-- **Bảo vệ admin cuối**: chặn khóa/hạ quyền admin cuối cùng và tự khóa mình.
-- **Xóa role đang gán**: chặn ở service + FK RESTRICT.
-- **Audit retention**: nên có job/`DELETE` theo thời hạn (cấu hình), hoặc bỏ qua ở phạm vi này.
+- **Bán kính `@Roles` (121 chỗ)**: chuyển theo từng module + bảng map cố định + regression 200/403 sau mỗi module.
+- **`user.role` phụ thuộc nhiều nơi**: giữ `staff.role` (VARCHAR) = mã vai trò chính ⇒ không đổi hành vi cũ; sau Phase 3 mới xem xét bỏ hẳn.
+- **Hiệu năng guard**: cache theo `staffId` + `rolesVersion`, invalidate khi sửa matrix/gán vai trò.
+- **Bảo vệ admin cuối**: chặn khóa/hạ quyền vai trò superadmin cuối cùng và tự khóa mình.
+- **Xóa vai trò đang gán**: chặn ở service + FK RESTRICT.
+- **Ràng buộc "≥1 vai trò"**: không ép được ở DB → validate ở service khi tạo/sửa và khi xóa vai trò.
+- **Audit retention**: thêm job/`DELETE` theo thời hạn cấu hình (hoặc để lại ngoài phạm vi).
 
 ---
 
-## 7. Câu hỏi mở cần chốt
+## 7. Quyết định đã chốt
 
-1. Chuyển toàn bộ 121 `@Roles` sang permission ngay trong đợt này, hay chỉ Phase 1–2 trước rồi Phase 3 sau?
-2. Mật khẩu ban đầu: admin **tự nhập**, hay hệ thống **sinh ngẫu nhiên** + bắt đổi lần đầu? (đề xuất: cho nhập tay hoặc sinh, luôn `mustChangePassword`).
-3. Có cần **nhiều vai trò / một nhân sự** không? (mặc định 1 vai trò chính để giữ tương thích).
+1. Chuyển **toàn bộ 121 `@Roles`** sang permission ngay trong đợt này.
+2. Mật khẩu ban đầu: **nhập tay hoặc sinh ngẫu nhiên**, luôn `mustChangePassword`.
+3. **Nhiều vai trò / một nhân sự** (bảng `staff_roles`), giữ 1 vai trò chính cho tương thích `user.role`.

@@ -917,6 +917,7 @@ async function run() {
     }
 
     // Sinh 4 buổi học mẫu (2 buổi quá khứ, 2 buổi sắp tới)
+    const adminStaff = await M.Staff.findOne({ where: { role: "admin" } });
     const anchor = new Date("2026-10-18");
     for (let w = -2; w <= 2; w++) {
       if (w === 0) continue;
@@ -928,6 +929,11 @@ async function run() {
       const sessionDateStr = sDate.toISOString().slice(0, 10);
 
       const isMorning = off.period === "MORNING";
+      const isPast = w < 0;
+      const sessionStatus = isPast && adminStaff ? "held" : "planned";
+      const confirmedAt = sessionStatus === "held" ? new Date(`${sessionDateStr}T17:00:00.000Z`) : null;
+      const confirmedByStaffId = sessionStatus === "held" ? adminStaff.id : null;
+
       const [sess] = await M.TeachingSession.findOrCreate({
         where: { courseOfferingId: offering.id, sessionDate: sessionDateStr, period: off.period },
         defaults: {
@@ -938,7 +944,9 @@ async function run() {
           period: off.period,
           lecturerId: lec.id,
           roomId: rm.id,
-          status: w < 0 ? "held" : "planned",
+          status: sessionStatus,
+          confirmedAt,
+          confirmedByStaffId,
           note: `Buổi học Sau đại học ngày ${sessionDateStr} tại ${rm.name}`,
         },
       });

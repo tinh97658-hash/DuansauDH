@@ -18,6 +18,20 @@ import { AdmissionEvaluationService } from "../../src/plan/admission-evaluation.
 import { ReportsController } from "../../src/reports/reports.controller.js";
 import { ReportsService } from "../../src/reports/reports.service.js";
 import { ClassScoreSummaryService } from "../../src/reports/class-score-summary.service.js";
+import { RbacService } from "../../src/auth/rbac.service.js";
+
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  supervisor: ["catalog.view", "plan.view", "admission.view", "masters.view", "doctoral.view", "scheduling.view", "gradebook.view", "reports.view"],
+  examiner: ["catalog.view", "plan.view", "admission.view", "masters.view", "doctoral.view", "scheduling.view", "gradebook.view", "reports.view"],
+};
+const fakeRbac = {
+  effectiveAccess: async (staff: any) => ({
+    superadmin: staff?.role === "admin",
+    permissions: new Set(ROLE_PERMISSIONS[staff?.role] ?? []),
+    roleCodes: staff?.role ? [staff.role] : [],
+  }),
+  invalidate: () => undefined,
+};
 
 describe("Learner data access over HTTP", () => {
   let app: INestApplication;
@@ -60,6 +74,7 @@ describe("Learner data access over HTTP", () => {
         { provide: ClassScoreSummaryService, useValue: { learnerScorecard: read, issuesForRecord: read, issued: read, issue: write } },
         { provide: GradingPolicyService, useValue: {} },
         { provide: AdmissionEvaluationService, useValue: {} },
+        { provide: RbacService, useValue: fakeRbac },
       ],
     }).compile();
     app = module.createNestApplication();
@@ -88,7 +103,7 @@ describe("Learner data access over HTTP", () => {
   });
 
   it.each(routes)("rejects a student before reading %s", async route => {
-    await request(app.getHttpServer()).get(route).set("x-test-role", "student").expect(401);
+    await request(app.getHttpServer()).get(route).set("x-test-role", "student").expect(403);
     expect(read).not.toHaveBeenCalled();
   });
 
@@ -101,12 +116,12 @@ describe("Learner data access over HTTP", () => {
   });
 
   it.each(["unknown", "spoofed-admin"])("rejects an untrusted identity %s", async role => {
-    for (const route of routes) await request(app.getHttpServer()).get(route).set("x-test-role", role).expect(401);
+    for (const route of routes) await request(app.getHttpServer()).get(route).set("x-test-role", role).expect(403);
     expect(read).not.toHaveBeenCalled();
   });
 
   it.each(["student", "supervisor", "examiner"])("keeps admission writes admin-only for %s", async role => {
-    await request(app.getHttpServer()).post("/plan/admission-records").set("x-test-role", role).send({}).expect(401);
+    await request(app.getHttpServer()).post("/plan/admission-records").set("x-test-role", role).send({}).expect(403);
     expect(write).not.toHaveBeenCalled();
   });
 
@@ -118,7 +133,7 @@ describe("Learner data access over HTTP", () => {
 
   it.each(["student", "supervisor", "examiner"])("keeps issued transcript creation admin-only for %s", async role => {
     await request(app.getHttpServer()).post(`/reports/learner-scorecard/${id}/issue`)
-      .set("x-test-role", role).send({ classGroupId: id }).expect(401);
+      .set("x-test-role", role).send({ classGroupId: id }).expect(403);
     expect(write).not.toHaveBeenCalled();
   });
 
@@ -130,7 +145,7 @@ describe("Learner data access over HTTP", () => {
 
   it.each(["student", "supervisor"])("rejects gradebook workflow writes for %s", async role => {
     await request(app.getHttpServer()).post("/masters/exam-lists/workflow")
-      .set("x-test-role", role).send({ action: "approve" }).expect(401);
+      .set("x-test-role", role).send({ action: "approve" }).expect(403);
     expect(write).not.toHaveBeenCalled();
   });
 });

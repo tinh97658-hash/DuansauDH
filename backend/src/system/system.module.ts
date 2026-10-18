@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
 import { SequelizeModule } from "@nestjs/sequelize";
-import { RolesGuard } from "../common/roles.guard.js";
+import { PermissionsGuard } from "../common/permissions.guard.js";
 import { BridgeKnowledgeSubject } from "../database/models/common/bridge-knowledge-subject.model.js";
 import { City } from "../database/models/common/city.model.js";
 import { Discipline } from "../database/models/common/discipline.model.js";
@@ -30,7 +30,7 @@ import { ClassGroup } from "../database/models/training/class-group.model.js";
     Staff, Unit,
   ])],
   controllers: [SystemController],
-  providers: [SystemService, RolesGuard],
+  providers: [SystemService, PermissionsGuard],
   exports: [SystemService],
 })
 export class SystemModule {}

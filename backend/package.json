@@ -22,6 +22,7 @@
     "db:migrate:undo": "npm run build && node dist/database/migrate.js down",
     "db:migrate:status": "npm run build && node dist/database/migrate.js status",
     "db:seed:admin": "npm run build && node dist/database/seed-admin.js",
+    "db:seed:auth": "npm run build && node dist/database/seed-auth.js",
     "db:seed:common": "npm run build && node dist/database/seed-common.js",
     "db:seed:demo": "npm run build && node dist/database/seed-demo.js",
     "db:seed:scheduling-test": "npm run build && node dist/database/seeds/seed-scheduling-test.js",

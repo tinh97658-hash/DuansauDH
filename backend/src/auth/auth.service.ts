@@ -10,8 +10,12 @@ export class AuthService {
   async validateLocal(email: string, password: string) {
     const staff = await this.staff.findByEmail(email);
     if (staff) {
+      if (staff.status === "disabled") throw new UnauthorizedException("Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.");
       if (!staff.password) throw new UnauthorizedException("Tài khoản cán bộ này yêu cầu đăng nhập bằng Google");
-      if (await bcrypt.compare(password, staff.password)) return staff;
+      if (await bcrypt.compare(password, staff.password)) {
+        await staff.update({ lastLoginAt: new Date() });
+        return staff;
+      }
       throw new UnauthorizedException("Email hoặc mật khẩu không chính xác");
     }
     const student = await this.students.findByEmail(email);
@@ -25,11 +29,18 @@ export class AuthService {
   async validateGoogle(email: string) {
     const staff = await this.staff.findByEmail(email);
     if (!staff) throw new UnauthorizedException("Tài khoản cán bộ chưa được cấp quyền sử dụng hệ thống");
+    if (staff.status === "disabled") throw new UnauthorizedException("Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.");
+    await staff.update({ lastLoginAt: new Date() });
     return staff;
   }
 
   async deserialize(key: string) {
-    const [type, id] = String(key).split(":");
-    return type === "staff" ? this.staff.findById(id) : this.students.findById(id);
+    const [type, id, version] = String(key).split(":");
+    if (type !== "staff") return this.students.findById(id);
+
+    const staff = await this.staff.findById(id);
+    if (!staff || staff.status !== "active") return null;
+    if (version !== undefined && Number(version) !== staff.sessionVersion) return null;
+    return staff;
   }
 }

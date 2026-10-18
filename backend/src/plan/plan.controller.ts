@@ -1,7 +1,8 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from "@nestjs/common";
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
-import { CurrentUser, Roles } from "../common/auth-user.js";
-import { RolesGuard } from "../common/roles.guard.js";
+import { CurrentUser } from "../common/auth-user.js";
+import { RequirePermissions } from "../common/permissions.decorator.js";
+import { PermissionsGuard } from "../common/permissions.guard.js";
 import {
   CreateAdmissionRecordDto, CreateClassDto, CreateCurriculumDto, CreateLearningResultDto, CreateSharedSubjectsDto, CreateSubjectDto,
   CreateSubjectFromExistingDto,
@@ -16,8 +17,8 @@ import { MajorTransferService } from "./major-transfer.service.js";
 import { SubjectRecognitionService } from "./subject-recognition.service.js";
 
 @Controller("plan")
-@UseGuards(AuthenticatedGuard, RolesGuard)
-@Roles("admin", "supervisor", "examiner")
+@UseGuards(AuthenticatedGuard, PermissionsGuard)
+@RequirePermissions("plan.view")
 export class PlanController {
   constructor(
     private readonly plan: PlanService,
@@ -37,29 +38,29 @@ export class PlanController {
   ) {
     return this.plan.listSubjects(majorId, program, includeCommon === "true");
   }
-  @Post("subjects") @Roles("admin") @UseGuards(RolesGuard) createSubject(@Body() dto: CreateSubjectDto) { return this.plan.createSubject(dto); }
-  @Post("subjects/link-existing") @Roles("admin") @UseGuards(RolesGuard) createSubjectFromExisting(@Body() dto: CreateSubjectFromExistingDto) { return this.plan.createSubjectFromExisting(dto); }
-  @Post("subjects/shared") @Roles("admin") @UseGuards(RolesGuard) createSharedSubjects(@Body() dto: CreateSharedSubjectsDto) { return this.plan.createSharedSubjects(dto); }
-  @Put("subjects/:id") @Roles("admin") @UseGuards(RolesGuard) updateSubject(@Param("id") id: string, @Body() dto: UpdateSubjectDto) { return this.plan.updateSubject(id, dto); }
-  @Delete("subjects/:id") @Roles("admin") @UseGuards(RolesGuard) removeSubject(@Param("id") id: string) { return this.plan.removeSubject(id); }
+  @Post("subjects") @RequirePermissions("plan.manage") createSubject(@Body() dto: CreateSubjectDto) { return this.plan.createSubject(dto); }
+  @Post("subjects/link-existing") @RequirePermissions("plan.manage") createSubjectFromExisting(@Body() dto: CreateSubjectFromExistingDto) { return this.plan.createSubjectFromExisting(dto); }
+  @Post("subjects/shared") @RequirePermissions("plan.manage") createSharedSubjects(@Body() dto: CreateSharedSubjectsDto) { return this.plan.createSharedSubjects(dto); }
+  @Put("subjects/:id") @RequirePermissions("plan.manage") updateSubject(@Param("id") id: string, @Body() dto: UpdateSubjectDto) { return this.plan.updateSubject(id, dto); }
+  @Delete("subjects/:id") @RequirePermissions("plan.manage") removeSubject(@Param("id") id: string) { return this.plan.removeSubject(id); }
 
   // ===== Lớp học =====
   @Get("classes") classes(@Query("majorId") majorId?: string, @Query("program") program?: string, @Query("year") year?: string) { return this.plan.listClasses(majorId, program, year); }
-  @Post("classes") @Roles("admin") @UseGuards(RolesGuard) createClass(@Body() dto: CreateClassDto) { return this.plan.createClass(dto); }
-  @Put("classes/:id") @Roles("admin") @UseGuards(RolesGuard) updateClass(@Param("id") id: string, @Body() dto: UpdateClassDto) { return this.plan.updateClass(id, dto); }
-  @Delete("classes/:id") @Roles("admin") @UseGuards(RolesGuard) removeClass(@Param("id") id: string) { return this.plan.removeClass(id); }
+  @Post("classes") @RequirePermissions("plan.manage") createClass(@Body() dto: CreateClassDto) { return this.plan.createClass(dto); }
+  @Put("classes/:id") @RequirePermissions("plan.manage") updateClass(@Param("id") id: string, @Body() dto: UpdateClassDto) { return this.plan.updateClass(id, dto); }
+  @Delete("classes/:id") @RequirePermissions("plan.manage") removeClass(@Param("id") id: string) { return this.plan.removeClass(id); }
 
   // ===== Chương trình đào tạo (theo ngành + bậc + khóa) =====
   @Get("curriculums") listCurriculums(@Query("majorId") majorId?: string, @Query("program") program?: string) { return this.curriculums.list(majorId, program); }
   @Get("curriculums/:id") curriculum(@Param("id") id: string) { return this.curriculums.detail(id); }
-  @Post("curriculums") @Roles("admin") @UseGuards(RolesGuard) createCurriculum(@Body() dto: CreateCurriculumDto) { return this.curriculums.create(dto); }
-  @Put("curriculums/:id") @Roles("admin") @UseGuards(RolesGuard) updateCurriculum(@Param("id") id: string, @Body() dto: UpdateCurriculumDto) { return this.curriculums.update(id, dto); }
-  @Put("curriculums/:id/subjects") @Roles("admin") @UseGuards(RolesGuard) setCurriculumSubjects(@Param("id") id: string, @Body() dto: SetCurriculumSubjectsDto) { return this.curriculums.setSubjects(id, dto); }
-  @Delete("curriculums/:id") @Roles("admin") @UseGuards(RolesGuard) removeCurriculum(@Param("id") id: string) { return this.curriculums.remove(id); }
+  @Post("curriculums") @RequirePermissions("plan.manage") createCurriculum(@Body() dto: CreateCurriculumDto) { return this.curriculums.create(dto); }
+  @Put("curriculums/:id") @RequirePermissions("plan.manage") updateCurriculum(@Param("id") id: string, @Body() dto: UpdateCurriculumDto) { return this.curriculums.update(id, dto); }
+  @Put("curriculums/:id/subjects") @RequirePermissions("plan.manage") setCurriculumSubjects(@Param("id") id: string, @Body() dto: SetCurriculumSubjectsDto) { return this.curriculums.setSubjects(id, dto); }
+  @Delete("curriculums/:id") @RequirePermissions("plan.manage") removeCurriculum(@Param("id") id: string) { return this.curriculums.remove(id); }
 
   // ===== Học phần của lớp: toàn bộ học phần thuộc CTĐT lớp đã chọn =====
   @Get("classes/:id/subjects") classSubjects(@Param("id") id: string) { return this.curriculums.classSubjects(id); }
-  @Post("classes/:id/curriculum") @Roles("admin") @UseGuards(RolesGuard) ensureClassCurriculum(@Param("id") id: string) { return this.curriculums.ensureForClass(id); }
+  @Post("classes/:id/curriculum") @RequirePermissions("plan.manage") ensureClassCurriculum(@Param("id") id: string) { return this.curriculums.ensureForClass(id); }
 
   // ===== Hồ sơ tuyển sinh (Admission Records) =====
   @Get("admission-records")
@@ -88,22 +89,19 @@ export class PlanController {
   }
 
   @Post("admission-records")
-  @Roles("admin")
-  @UseGuards(RolesGuard)
+  @RequirePermissions("admission.manage")
   createAdmissionRecord(@Body() dto: CreateAdmissionRecordDto) {
     return this.plan.createAdmissionRecord(dto);
   }
 
   @Put("admission-records/:id")
-  @Roles("admin")
-  @UseGuards(RolesGuard)
+  @RequirePermissions("admission.manage")
   updateAdmissionRecord(@Param("id") id: string, @Body() dto: UpdateAdmissionRecordDto) {
     return this.plan.updateAdmissionRecord(id, dto);
   }
 
   @Delete("admission-records/:id")
-  @Roles("admin")
-  @UseGuards(RolesGuard)
+  @RequirePermissions("admission.manage")
   removeAdmissionRecord(@Param("id") id: string) {
     return this.plan.removeAdmissionRecord(id);
   }
@@ -112,19 +110,19 @@ export class PlanController {
   majorTransferHistory(@Param("id") id: string) { return this.majorTransfers.list(id); }
 
   @Post("admission-records/:id/major-transfers")
-  @Roles("admin") @UseGuards(RolesGuard)
+  @RequirePermissions("admission.manage")
   requestMajorTransfer(@Param("id") id: string, @Body() dto: RequestMajorTransferDto) {
     return this.majorTransfers.request(id, dto);
   }
 
   @Put("major-transfers/:id/decision")
-  @Roles("admin") @UseGuards(RolesGuard)
+  @RequirePermissions("admission.manage")
   decideMajorTransfer(@Param("id") id: string, @Body() dto: DecideMajorTransferDto, @CurrentUser() actor: any) {
     return this.majorTransfers.decide(id, dto, actor);
   }
 
   @Put("subject-recognitions/:id")
-  @Roles("admin") @UseGuards(RolesGuard)
+  @RequirePermissions("admission.manage")
   updateSubjectRecognition(@Param("id") id: string, @Body() dto: UpdateSubjectRecognitionDto) {
     return this.majorTransfers.updateRecognition(id, dto);
   }
@@ -137,19 +135,19 @@ export class PlanController {
   studiedSubjects(@Param("id") id: string) { return this.recognitions.listStudiedSubjects(id); }
 
   @Post("admission-records/:id/learning-results")
-  @Roles("admin") @UseGuards(RolesGuard)
+  @RequirePermissions("admission.manage")
   createLearningResult(@Param("id") id: string, @Body() dto: CreateLearningResultDto) {
     return this.recognitions.createLearningResult(id, dto);
   }
 
   @Put("learning-results/:id")
-  @Roles("admin") @UseGuards(RolesGuard)
+  @RequirePermissions("admission.manage")
   updateLearningResult(@Param("id") id: string, @Body() dto: UpdateLearningResultDto) {
     return this.recognitions.updateLearningResult(id, dto);
   }
 
   @Delete("learning-results/:id")
-  @Roles("admin") @UseGuards(RolesGuard)
+  @RequirePermissions("admission.manage")
   removeLearningResult(@Param("id") id: string) { return this.recognitions.removeLearningResult(id); }
 
   // ===== Công nhận học phần dùng chung cho cả chuyển ngành, tiền thạc sĩ và học trước =====
@@ -160,19 +158,19 @@ export class PlanController {
   recognizedCredits(@Param("id") id: string) { return this.recognitions.recognizedCredits(id); }
 
   @Post("admission-records/:id/subject-recognitions/propose")
-  @Roles("admin") @UseGuards(RolesGuard)
+  @RequirePermissions("admission.manage")
   proposeRecognitions(@Param("id") id: string, @Body() dto: ProposeRecognitionsDto) {
     return this.recognitions.proposeForRecord(id, dto);
   }
 
   @Put("subject-recognitions/:id/decision")
-  @Roles("admin") @UseGuards(RolesGuard)
+  @RequirePermissions("admission.manage")
   decideRecognition(@Param("id") id: string, @Body() dto: DecideRecognitionDto) {
     return this.recognitions.decide(id, dto);
   }
 
   /** Xóa quyết định công nhận để sửa lại; đối chiếu lại sẽ tạo đề xuất mới theo dữ liệu hiện hành. */
   @Delete("subject-recognitions/:id")
-  @Roles("admin") @UseGuards(RolesGuard)
+  @RequirePermissions("admission.manage")
   removeRecognition(@Param("id") id: string) { return this.recognitions.removeRecognition(id); }
 }

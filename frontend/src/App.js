@@ -22,7 +22,6 @@ const ProcedurePage = lazyPage(() => import("./pages/procedurePage"), ["/procedu
 const FormatPage = lazyPage(() => import("./pages/formatPage"), ["/format"]);
 const ProgressReviewPage = lazyPage(() => import("./pages/progressReviewPage"), ["/progressReview"]);
 const AppointmentPage = lazyPage(() => import("./pages/appointmentPage"), ["/appointment"]);
-const AddStaffPage = lazyPage(() => import("./pages/addStaffPage"), ["/addStaff"]);
 const ReviewerDashboard = lazyPage(() => import("./pages/reviewDashboard"), ["/reviewer"]);
 const FileUploader = lazyPage(() => import("./pages/fileUploadPage"), ["/fileUpload"]);
 const ViewLoggedPage = lazyPage(() => import("./pages/viewLogged"), ["/","/viewLogged"]);
@@ -32,7 +31,9 @@ const StudentDashBoardPage = lazyPage(() => import("./pages/studentDashboard"), 
 const UnitInfo = lazyPage(() => import("./pages/system/unitInfo"), ["/system/unit-info"]);
 const License = lazyPage(() => import("./pages/system/license"), ["/system/license"]);
 const ChangePassword = lazyPage(() => import("./pages/system/changePassword"), ["/system/change-password"]);
-const Users = lazyPage(() => import("./pages/system/users"), ["/system/users"]);
+const Accounts = lazyPage(() => import("./pages/system/accounts"), ["/system/accounts"]);
+const Roles = lazyPage(() => import("./pages/system/roles"), ["/system/roles"]);
+const AuditLogs = lazyPage(() => import("./pages/system/auditLogs"), ["/system/audit-logs"]);
 const Ethnicities = lazyPage(() => import("./pages/system/ethnicities"), ["/system/ethnicities"]);
 const Nationalities = lazyPage(() => import("./pages/system/nationalities"), ["/system/nationalities"]);
 const Wards = lazyPage(() => import("./pages/system/wards"), ["/system/wards"]);
@@ -122,7 +123,6 @@ function App() {
               <Route path="format" element={<FormatPage />} />
               <Route path="progressReview" element={<ProgressReviewPage />} />
               <Route path="appointment" element={<AppointmentPage />} />
-              <Route path="addStaff" element={<AddStaffPage />} />
               <Route path="reviewer" element={<ReviewerDashboard />} />
               <Route path="reviewTable" element={<ReviewTable />} />
               <Route path="fileUpload" element={<FileUploader />} />
@@ -132,7 +132,10 @@ function App() {
               <Route path="system/unit-info" element={<UnitInfo />} />
               <Route path="system/license" element={<License />} />
               <Route path="system/change-password" element={<ChangePassword />} />
-              <Route path="system/users" element={<Users />} />
+              <Route path="system/accounts" element={<Accounts />} />
+              <Route path="system/roles" element={<Roles />} />
+              <Route path="system/audit-logs" element={<AuditLogs />} />
+              <Route path="system/users" element={<Navigate to="/system/accounts" replace />} />
               <Route path="system/ethnicities" element={<Ethnicities />} />
               <Route path="system/nationalities" element={<Nationalities />} />
               <Route path="system/wards" element={<Wards />} />

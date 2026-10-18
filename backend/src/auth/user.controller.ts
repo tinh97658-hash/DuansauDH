@@ -2,9 +2,9 @@ import { Body, Controller, Get, HttpCode, Param, Patch, Post, Req, Res, Uploaded
 import { FileInterceptor } from "@nestjs/platform-express";
 import { ConfigService } from "@nestjs/config";
 import type { Request, Response } from "express";
-import { CurrentUser, Roles } from "../common/auth-user.js";
+import { CurrentUser } from "../common/auth-user.js";
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
-import { RolesGuard } from "../common/roles.guard.js";
+import { StudentGuard } from "../common/student.guard.js";
 import { photoUploadOptions, submissionUploadOptions } from "../common/uploads.js";
 import { Staff } from "../database/models/staff.model.js";
 import { StaffService } from "../staff/staff.service.js";
@@ -42,23 +42,20 @@ export class UserController {
   }
 
   @Patch("updatePassword")
-  @Roles("student")
-  @UseGuards(RolesGuard)
+  @UseGuards(StudentGuard)
   updatePassword(@CurrentUser() user: any, @Body() input: UpdatePasswordDto) {
     return this.students.updatePassword(user.id, input);
   }
 
   @Post("submit")
-  @Roles("student")
-  @UseGuards(RolesGuard)
+  @UseGuards(StudentGuard)
   @UseInterceptors(FileInterceptor("submissionFile", submissionUploadOptions))
   submit(@CurrentUser() user: any, @Body() input: SubmissionDto, @UploadedFile() file?: Express.Multer.File) {
     return this.students.submit(user.id, input.submission, file);
   }
 
   @Patch("uploadpp")
-  @Roles("student")
-  @UseGuards(RolesGuard)
+  @UseGuards(StudentGuard)
   @UseInterceptors(FileInterceptor("photo", photoUploadOptions))
   uploadPhoto(@CurrentUser() user: any, @UploadedFile() file?: Express.Multer.File) {
     return this.students.updatePhoto(user.id, file);

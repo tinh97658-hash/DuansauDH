@@ -24,6 +24,8 @@ import { auditActor } from "../plan/membership-history.js";
 import { GradebookWorkflowDto } from "./dto/exam-gradebook.dto.js";
 import { resolveSavedExamGrade } from "./exam-grade-calculation.js";
 import { isDeepStrictEqual } from "node:util";
+import { Staff } from "../database/models/staff.model.js";
+import { RbacService } from "../auth/rbac.service.js";
 
 export const emptyExamGrade = (participantId: string): CourseExamGrade => ({
   participantId, eligible: null, examExempt: false, testScore: null, assignmentScore: null,
@@ -40,6 +42,7 @@ export class ExamGradebookService {
     @InjectModel(CourseExamGradebook) private readonly books: typeof CourseExamGradebook,
     @InjectConnection() private readonly sequelize: Sequelize,
     @Optional() private readonly policies?: GradingPolicyService,
+    @Optional() private readonly rbac?: RbacService,
   ) {}
 
   async options() {
@@ -313,8 +316,21 @@ export class ExamGradebookService {
     });
   }
 
+  /** Quyền nhập/gửi duyệt và duyệt/mở lại bảng điểm, phân giải qua RBAC (fallback theo vai trò cũ). */
+  private async gradebookRights(actor: any): Promise<{ canSubmit: boolean; canApprove: boolean }> {
+    if (this.rbac && actor instanceof Staff) {
+      const access = await this.rbac.effectiveAccess(actor);
+      return {
+        canSubmit: access.superadmin || access.permissions.has("gradebook.submit"),
+        canApprove: access.superadmin || access.permissions.has("gradebook.approve"),
+      };
+    }
+    return { canSubmit: ["admin", "examiner"].includes(actor?.role), canApprove: actor?.role === "admin" };
+  }
+
   async transition(dto: GradebookWorkflowDto, actor: any) {
-    if (!["admin", "examiner"].includes(actor?.role) || (dto.action !== "submit" && actor?.role !== "admin")) {
+    const { canSubmit, canApprove } = await this.gradebookRights(actor);
+    if (!canSubmit || (dto.action !== "submit" && !canApprove)) {
       throw new BadRequestException("Chỉ quản trị viên được duyệt hoặc mở lại bảng điểm.");
     }
     if (!dto.note?.trim()) throw new BadRequestException("Nhập lý do hoặc căn cứ xử lý bảng điểm.");

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import AdminPanelSettingsOutlined from "@mui/icons-material/AdminPanelSettingsOutlined";
 import AccountBalanceOutlined from "@mui/icons-material/AccountBalanceOutlined";
 import AddTaskOutlined from "@mui/icons-material/AddTaskOutlined";
 import CategoryOutlined from "@mui/icons-material/CategoryOutlined";
@@ -14,6 +15,7 @@ import GradingOutlined from "@mui/icons-material/GradingOutlined";
 import GroupAddOutlined from "@mui/icons-material/GroupAddOutlined";
 import GroupsOutlined from "@mui/icons-material/GroupsOutlined";
 import GroupWorkOutlined from "@mui/icons-material/GroupWorkOutlined";
+import HistoryOutlined from "@mui/icons-material/HistoryOutlined";
 import InfoOutlined from "@mui/icons-material/InfoOutlined";
 import LanguageOutlined from "@mui/icons-material/LanguageOutlined";
 import ListAltOutlined from "@mui/icons-material/ListAltOutlined";
@@ -64,11 +66,15 @@ const tabs = [
 
 export const ribbons = {
   system: [
+    group("TÀI KHOẢN & PHÂN QUYỀN", [
+      action("Tài khoản nhân sự", "/system/accounts", SupervisorAccountOutlined, "#168b7c", { permissions: ["account.view"] }),
+      action("Vai trò & phân quyền", "/system/roles", AdminPanelSettingsOutlined, "#7b5fac", { permissions: ["role.view"] }),
+      action("Nhật ký thao tác", "/system/audit-logs", HistoryOutlined, "#397c8d", { permissions: ["audit.view"] }),
+    ]),
     group("THÔNG TIN", [
       action("Thông tin về đơn vị", "/system/unit-info", InfoOutlined, "#168bc2"),
       action("License", "/system/license", VerifiedOutlined, "#4b84b8"),
       action("Đổi mật khẩu", "/system/change-password", ManageAccountsOutlined, "#7b5fac"),
-      action("QL Người dùng", "/system/users", SupervisorAccountOutlined, "#168b7c", { roles: ["admin"] }),
       action("Thoát chương trình", null, LogoutOutlined, "#227aa6", { action: "logout" }),
     ]),
     group("DANH MỤC CHUNG", [
@@ -191,6 +197,13 @@ const RibbonHeader = () => {
   }, [path]);
 
   if (!role) return null;
+  // Quyền hiệu lực nạp từ `GET /accounts/me/permissions`; khi chưa nạp xong, chỉ
+  // vai trò quản trị được xem trước các mục mới để tránh nhấp nháy menu.
+  const access = session?.access;
+  const hasPermission = (permission) => access
+    ? Boolean(access.superadmin) || (access.permissions || []).includes(permission)
+    : role === "admin";
+  const canSee = (item) => (!item.roles || item.roles.includes(role)) && (!item.permissions || item.permissions.every(hasPermission));
   const runAction = (item) => item.action === "logout" ? window.location.assign(`${API_BASE_URL}/user/logout`) : navigate(item.route);
   return (
     <header className={`ribbon-header${commandsCollapsed ? " ribbon-commands-collapsed" : ""}`}>
@@ -217,7 +230,7 @@ const RibbonHeader = () => {
       </nav>
       <div className="ribbon-command-scroll" role="region" aria-label="Tác vụ chức năng"><div className="ribbon-commands">
         {ribbons[activeTab].map((itemGroup) => {
-          const visibleActions = itemGroup.actions.filter((item) => !item.roles || item.roles.includes(role));
+          const visibleActions = itemGroup.actions.filter(canSee);
           if (!visibleActions.length) return null;
           return <section className="ribbon-group" key={itemGroup.label}><div className="ribbon-actions">
             {visibleActions.map((item) => {
