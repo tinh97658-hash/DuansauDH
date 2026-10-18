@@ -16,12 +16,12 @@ const snapshot = {
   week: "2026-10-05", end: "2026-10-11", discipline: "Công nghệ thông tin",
   major: "Khoa học máy tính", year: "2026",
   rows: [[1, "Khoa học máy tính", "CNTT-2026", "Cơ sở dữ liệu", "Nguyễn An",
-    "05/10/2026", "Sáng", "A101", "Ghi chú tiếng Việt"]],
+    "05/10/26", "Sáng", "A101", "Ghi chú tiếng Việt"]],
 };
 const specificHeaders = ["STT", "Chuyên ngành", "Lớp", "Học phần", "Giảng viên", "Ngày học", "Buổi", "Phòng học", "Ghi chú"];
 const specificValues = snapshot.rows[0];
 const documentTitle = "KẾ HOẠCH GIẢNG DẠY VÀ HỌC TẬP";
-const documentRange = "Từ ngày: 05/10/2026 đến ngày 11/10/2026 (Tuần 41 năm 2026)";
+const documentRange = "Từ ngày: 05/10/26 đến ngày 11/10/26 (Tuần 41 năm 2026)";
 const bufferOf = (blob) => new Promise((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve(reader.result);
@@ -101,8 +101,8 @@ it("reports missing or corrupt preview data instead of loading another week", ()
 });
 
 it.each([
-  [10, [1, "05/10/2026", "Sáng", snapshot.discipline, snapshot.major, "Cơ sở dữ liệu", "CNTT-2026", "Nguyễn An", "A101", "Ghi chú tiếng Việt"]],
-  [15, [1, "05/10/2026", "Sáng", "08:00 - 11:00", "00123", "Cơ sở dữ liệu", "SEED_TEST_2026: MERGED",
+  [10, [1, "05/10/26", "Sáng", snapshot.discipline, snapshot.major, "Cơ sở dữ liệu", "CNTT-2026", "Nguyễn An", "A101", "Ghi chú tiếng Việt"]],
+  [15, [1, "05/10/26", "Sáng", "08:00 - 11:00", "00123", "Cơ sở dữ liệu", "SEED_TEST_2026: MERGED",
     "CNTT-2026", snapshot.discipline, snapshot.major, "Nguyễn An", "A101", 30, "Đã xếp", "Ghi chú tiếng Việt"]],
 ])("reloads an older %s-column preview snapshot using the current document columns", (_, row) => {
   const legacy = { ...snapshot, version: 1, rows: [row] };
@@ -122,7 +122,7 @@ it("joins the existing major catalog to every participating class and synchroniz
   const before = JSON.stringify(inputs);
   const data = buildScheduleDocument(inputs);
   expect(data).toMatchObject({ disciplineId: "parent-a", discipline: "Ngành A", major: first.name, majorId: first.id });
-  expect(data.rows).toEqual([[1, `${first.name}, ${second.name}`, "LOP 2026.1, LOP 2026.2", "Học phần ghép", "Nguyễn An", "05/10/2026", "Sáng", "Phòng thực hành", "Ghi chú buổi học"]]);
+  expect(data.rows).toEqual([[1, `${first.name}, ${second.name}`, "LOP 2026.1, LOP 2026.2", "Học phần ghép", "Nguyễn An", "05/10/26", "Sáng", "Phòng thực hành", "Ghi chú buổi học"]]);
   expect(scheduleDocumentColumns(data).map((column) => column.label)).toEqual(specificHeaders);
   expect(JSON.stringify(inputs)).toBe(before);
   expect(JSON.stringify(data.rows)).not.toMatch(/SEED_TEST_2026|07:00|12:00|planned/);
@@ -244,7 +244,7 @@ it("uses every actual ClassGroup and its Major/Discipline without exposing the i
   render(<SchedulePrintTemplate schedule={schedule} />);
   const table = screen.getByRole("table");
   expect(within(table).getAllByRole("cell").map((cell) => cell.textContent)).toEqual([
-    "1", "Khoa học máy tính", "CNTT 2025.1.1, CNTT 2025.2.1", "Cơ sở dữ liệu", "Nguyễn An", "05/10/2026", "Sáng", "A101", "Lịch học ghép",
+    "1", "Khoa học máy tính", "CNTT 2025.1.1, CNTT 2025.2.1", "Cơ sở dữ liệu", "Nguyễn An", "05/10/26", "Sáng", "A101", "Lịch học ghép",
   ]);
   expect(table).not.toHaveTextContent("SEED_TEST_2026: MERGED");
 });

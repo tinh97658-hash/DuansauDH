@@ -16,13 +16,13 @@ const clickAndWait = async (element) => {
 };
 jest.setTimeout(15000);
 
-jest.mock("axios", () => ({
+vi.mock("axios", () => ({ default: {
   get: jest.fn(),
   post: jest.fn(),
   put: jest.fn(),
   delete: jest.fn(),
   defaults: {},
-}));
+} }));
 jest.mock("../../components/FeatureLayout", () => function FeatureLayoutMock({ children }) { return children; });
 jest.mock("react-toastify", () => ({
   toast: { success: jest.fn(), error: jest.fn() },

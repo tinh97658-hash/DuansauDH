@@ -46,6 +46,18 @@ export class SchedulingController {
     return this.scheduling.listCourseOfferings(query);
   }
 
+  @Delete("course-offerings/:id")
+  @UseGuards(CourseOfferingWriteGuard)
+  deleteCourseOffering(@Param("id", ParseUUIDPipe) id: string) {
+    return this.scheduling.deleteCourseOffering(id);
+  }
+
+  @Delete("course-offerings/:id/teaching-sessions")
+  @UseGuards(CourseOfferingWriteGuard)
+  deleteCourseOfferingSchedule(@Param("id", ParseUUIDPipe) id: string) {
+    return this.scheduling.deleteCourseOfferingSchedule(id);
+  }
+
   @Post("course-offerings/participant-preview")
   @UseGuards(CourseOfferingWriteGuard)
   previewCourseOfferingParticipants(@Body() dto: PreviewCourseOfferingParticipantsDto) {

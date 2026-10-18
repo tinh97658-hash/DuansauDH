@@ -570,7 +570,7 @@
 .sl-matrix-col-cards{display:flex;flex-direction:column;gap:6px;padding:7px}
 .sl-matrix-col-cards-four{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));align-items:stretch}
 
-.sl-matrix-card{position:relative;height:104px;display:flex;flex-direction:column;gap:4px;padding:9px 10px;overflow:hidden;border:1px solid #d9e4ec;border-radius:0;background:#fff;transition:border-color .15s ease}
+.sl-matrix-card{position:relative;min-height:104px;display:flex;flex-direction:column;gap:4px;padding:9px 10px;overflow:hidden;border:1px solid #d9e4ec;border-radius:0;background:#fff;transition:border-color .15s ease}
 .sl-matrix-card:hover{border-color:#9ab7c8}
 .sl-matrix-card-detail-trigger,.sl-pivot-card-detail-trigger{position:absolute;inset:0;z-index:1;width:100%;height:100%;padding:0;border:0;border-radius:0;background:transparent;cursor:pointer}
 .sl-matrix-card-detail-trigger:focus-visible,.sl-pivot-card-detail-trigger:focus-visible{outline:2px solid var(--primary);outline-offset:-3px}
@@ -587,8 +587,16 @@
 .sl-matrix-status.status-unscheduled>span{font-size:8px}
 .sl-matrix-status.status-scheduled{color:#0b7f9c}
 .sl-matrix-status.status-completed{color:#24734f}
+.sl-matrix-session-counts{display:inline-flex;flex-direction:column;flex:none;gap:3px;font-size:12px;line-height:1.4;white-space:nowrap}
+.sl-matrix-session-count{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sl-matrix-session-count strong{font-size:inherit;font-weight:600}
+.sl-matrix-session-count.session-held{color:#24734f}
+.sl-matrix-session-count.session-scheduled{padding-top:3px;border-top:1px solid #d9e4ec;color:#0b7f9c}
 .sl-matrix-workspace .sl-matrix-schedule-link{position:relative;z-index:2;flex:none;padding:0;border:0;border-radius:0;background:transparent;color:#0b7f9c;font-size:12px;font-weight:600;line-height:1.4;white-space:nowrap;cursor:pointer}
 .sl-matrix-workspace .sl-matrix-schedule-link:hover{color:#123b63;text-decoration:underline}
+.sl-matrix-delete-link{position:relative;z-index:2;flex:none;padding:0;border:0;background:transparent;color:#b42318;font-size:12px;font-weight:500;line-height:1.4;cursor:pointer;white-space:nowrap}
+.sl-matrix-delete-link:disabled{color:#94a3b8;cursor:not-allowed}
+.sl-matrix-delete-link:not(:disabled):hover{text-decoration:underline}
 .sl-matrix-empty-col{padding:28px 12px;color:var(--text-muted);font-size:11px;text-align:center}
 
 .sl-matrix-pivot{width:100%;height:100%;min-width:0;min-height:0;display:flex;flex-direction:column}

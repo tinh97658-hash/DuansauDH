@@ -113,7 +113,7 @@ export default function CreateOffering({ user }) {
   const openConfirmation = () => {
     if (!preview.data?.participants) return;
     setSaveError("");
-    setRoster(preview.data.participants.map((row) => ({ ...row, note: "" })));
+    setRoster(preview.data.participants.map((row) => ({ ...row, note: row.profileForeignLanguageExempt ? "Miễn thi" : "" })));
   };
   const create = async () => {
     if (saving || !roster || !canEdit) return;

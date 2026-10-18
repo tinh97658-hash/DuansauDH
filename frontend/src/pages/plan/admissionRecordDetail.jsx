@@ -1,4 +1,7 @@
+import { formatDateTime } from "../../utils/dateFormat";
+import DateField from "../../components/DateField";
 import AdmissionEvaluationPanel from "../../features/admission/AdmissionEvaluationPanel";
+import { PROFILE_CATEGORIES, profileCategoryLabel } from "../../features/admission/profileCategories";
 import AdmissionTuitionCheckbox from "../../features/admission/AdmissionTuitionCheckbox";
 import LearnerScorecard from "../../features/learners/LearnerScorecard";
 import LearningTables from "../../features/learners/LearningTables";
@@ -15,19 +18,29 @@ import {
   IconButton, MenuItem, Paper, Select,
   Stack, TextField, Tooltip, Typography, Tabs, Tab,
 } from "@mui/material";
-import {
-  AddPhotoAlternateRounded, ArrowBackRounded, CheckCircleRounded,
-  DeleteRounded, FolderSpecialRounded, PersonRounded,
-  RefreshRounded, SaveRounded, SchoolRounded, WarningAmberRounded, WorkspacePremiumRounded,
-  SwapHorizRounded, HistoryRounded,
-  AddRounded, EditRounded, MenuBookRounded,
-} from "@mui/icons-material";
+import AddPhotoAlternateRounded from "@mui/icons-material/AddPhotoAlternateRounded";
+import ArrowBackRounded from "@mui/icons-material/ArrowBackRounded";
+import CheckCircleRounded from "@mui/icons-material/CheckCircleRounded";
+import DeleteRounded from "@mui/icons-material/DeleteRounded";
+import FolderSpecialRounded from "@mui/icons-material/FolderSpecialRounded";
+import PersonRounded from "@mui/icons-material/PersonRounded";
+import RefreshRounded from "@mui/icons-material/RefreshRounded";
+import SaveRounded from "@mui/icons-material/SaveRounded";
+import SchoolRounded from "@mui/icons-material/SchoolRounded";
+import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
+import WorkspacePremiumRounded from "@mui/icons-material/WorkspacePremiumRounded";
+import SwapHorizRounded from "@mui/icons-material/SwapHorizRounded";
+import HistoryRounded from "@mui/icons-material/HistoryRounded";
+import AddRounded from "@mui/icons-material/AddRounded";
+import EditRounded from "@mui/icons-material/EditRounded";
+import MenuBookRounded from "@mui/icons-material/MenuBookRounded";
 import { API_BASE_URL } from "../../config/http";
 import { getSelectableMajors, normalizeMajorsResponse, selectMajorForLevel } from "../../utils/majors";
 import {
   disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline,
 } from "../../utils/disciplineScope";
 import FeatureLayout from "../../components/FeatureLayout";
+import { useAuthSession } from "../../context/AuthSession";
 import DocumentExportMenu from "../../components/DocumentExportMenu";
 import AdmissionPrintTemplate from "../../features/admission/AdmissionPrintTemplate";
 import { buildAdmissionDocument } from "../../features/admission/admissionDocument";
@@ -112,12 +125,6 @@ const RECEIPT_TYPES = [
   "Đại diện nộp",
 ];
 
-const PROFILE_CATEGORIES = [
-  "Đầy đủ",
-  "Bổ sung sau",
-  "Chờ thẩm định",
-  "Thiếu giấy tờ",
-];
 
 const STUDY_STATUSES = [
   "Nộp hồ sơ đầu vào",
@@ -256,7 +263,7 @@ const mapRecordToFormState = (data, majorList = []) => {
     language: data.language || "Tiếng Việt",
     isExemptForeignLanguage: Boolean(data.isExemptForeignLanguage),
     receiptType: data.receiptType || "Trực tiếp",
-    profileCategory: data.profileCategory || "Đầy đủ",
+    profileCategory: profileCategoryLabel(data.profileCategory),
     studyStatus: data.studyStatus || "Nộp hồ sơ đầu vào",
     admissionDate: data.admissionDate || "",
 
@@ -288,6 +295,7 @@ const mapRecordToFormState = (data, majorList = []) => {
 };
 
 const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
+  const session = useAuthSession();
   const catalogRevision = useSubjectCatalogRevision();
   const gradebookRevision = useGradebookRevision();
   const { id } = useParams();
@@ -296,11 +304,13 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
+  const profileRequest = useRef(0);
   const [saving, setSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [record, setRecord] = useState(null);
+  const showStudyTabs = returnPath === "/masters/admitted-records";
   const requestedTab = searchParams.get("tab");
-  const detailTab = ["learning", "grades", "leave"].includes(requestedTab) || (requestedTab === "admission" && record?.trainingLevel === "Thạc sĩ") ? requestedTab : "profile";
+  const detailTab = (showStudyTabs && ["learning", "grades", "leave"].includes(requestedTab)) || (requestedTab === "admission" && record?.trainingLevel === "Thạc sĩ") ? requestedTab : "profile";
   const changeDetailScope = (key, value) => {
     const params = new URLSearchParams(searchParams);
     params.set(key, value);
@@ -365,6 +375,17 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
   // A prior-learning decision is separate evidence from a regular exam result.
   const visibleStudiedSubjects = studiedSubjects.filter(row => row.sourceType === "regular"
     || !approvalLearningIds.has(row.id));
+  // Approved prior learning also belongs in the completed curriculum summary.
+  for (const recognition of displayedRecognitions) {
+    const learning = recognition.learningResult
+      || learningResults.find(row => row.id === recognition.learningResultId);
+    const subject = recognition.targetSubject;
+    if (recognition.status !== "approved" || !subject?.id
+      || learning?.status !== "completed" || !["passed", "exempt"].includes(learning.result)) continue;
+    if (visibleStudiedSubjects.some(row => (row.subject?.id || row.subjectId) === subject.id)) continue;
+    visibleStudiedSubjects.push({ ...learning, id: `recognition-${recognition.id}`, subject, subjectId: subject.id,
+      sourceType: learning.sourceType || recognition.sourceType });
+  }
   const [recognizedCredits, setRecognizedCredits] = useState(0);
   const [subjects, setSubjects] = useState([]);
   const [bridgeSubjects, setBridgeSubjects] = useState([]);
@@ -372,6 +393,8 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
   const [editingLearning, setEditingLearning] = useState(null);
   const [learningForm, setLearningForm] = useState(null);
   const [learningSaving, setLearningSaving] = useState(false);
+  const [learningLoading, setLearningLoading] = useState(true);
+  const [learningError, setLearningError] = useState('');
 
   const { availableSubjects, availableBridgeSubjects } = useMemo(() => {
     const subjectById = new Map(subjects.map((subject) => [subject.id, subject]));
@@ -436,36 +459,21 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
 
   // Fetch record & majors list
   const fetchData = useCallback(async () => {
+    const request = ++profileRequest.current;
     setLoading(true);
     try {
-      const [resRec, resMajors, resTransfers, resResults, resRecognitions, resCredits, resBridge, resStudied] = await Promise.all([
+      const [resRec, resMajors, resTransfers] = await Promise.all([
         axios.get(`${API_BASE_URL}/plan/admission-records/${id}`, { withCredentials: true }),
         axios.get(`${API_BASE_URL}/system/majors`, { withCredentials: true }),
         axios.get(`${API_BASE_URL}/plan/admission-records/${id}/major-transfers`, { withCredentials: true }),
-        axios.get(`${API_BASE_URL}/plan/admission-records/${id}/learning-results`, { withCredentials: true }),
-        axios.get(`${API_BASE_URL}/plan/admission-records/${id}/subject-recognitions`, { withCredentials: true }),
-        axios.get(`${API_BASE_URL}/plan/admission-records/${id}/recognized-credits`, { withCredentials: true }),
-        axios.get(`${API_BASE_URL}/system/bridge-knowledge`, { withCredentials: true }),
-        axios.get(`${API_BASE_URL}/plan/admission-records/${id}/studied-subjects`, { withCredentials: true }),
       ]);
+      if (request !== profileRequest.current) return;
 
       const data = resRec.data;
       const majorList = normalizeMajorsResponse(resMajors.data);
       setRecord(data);
       setMajors(majorList);
       setTransferHistory(Array.isArray(resTransfers.data) ? resTransfers.data : []);
-      setLearningResults(Array.isArray(resResults.data) ? resResults.data : []);
-      setStudiedSubjects(Array.isArray(resStudied.data) ? resStudied.data : []);
-      setRecognitions(Array.isArray(resRecognitions.data) ? resRecognitions.data : []);
-      setRecognizedCredits(Number(resCredits.data?.credits ?? resCredits.data ?? 0) || 0);
-      setBridgeSubjects(Array.isArray(resBridge.data) ? resBridge.data : []);
-      if (data.majorId) {
-        const { data: subjectRows } = await axios.get(
-          `${API_BASE_URL}/plan/subjects?majorId=${data.majorId}&program=${data.trainingLevel === "Tiến sĩ" ? "doctoral" : "masters"}&includeCommon=true`,
-          { withCredentials: true },
-        );
-        setSubjects(Array.isArray(subjectRows) ? subjectRows : []);
-      }
 
       const mappedState = mapRecordToFormState(data, majorList);
       const selectedMajor = selectMajorForLevel(majorList, mappedState.trainingLevel, mappedState.majorId);
@@ -478,23 +486,25 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
       setFormData(formState);
       setInitialData(JSON.parse(JSON.stringify(formState)));
     } catch (err) {
-      toast.error(err.response?.data?.message || "Không thể tải chi tiết hồ sơ tuyển sinh");
+      if (request === profileRequest.current) toast.error(err.response?.data?.message || "Không thể tải chi tiết hồ sơ tuyển sinh");
     } finally {
-      setLoading(false);
+      if (request === profileRequest.current) setLoading(false);
     }
   }, [id]);
 
   useEffect(() => {
     fetchData();
+    return () => { profileRequest.current += 1; };
   }, [fetchData]);
 
   useEffect(() => {
+    if (session) { setIsAdmin(session.user?.role === "admin"); return; }
     let mounted = true;
     axios.get(`${API_BASE_URL}/auth/session`, { withCredentials: true })
       .then(({ data }) => { if (mounted) setIsAdmin(data.user?.role === "admin"); })
       .catch(() => { if (mounted) setIsAdmin(false); });
     return () => { mounted = false; };
-  }, []);
+  }, [session]);
 
   // Handle Photo Upload
   const handlePhotoUpload = (e) => {
@@ -662,13 +672,15 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
     setLearningOpen(true);
   };
 
-  const reloadRecognitionData = useCallback(async () => {
+  const reloadRecognitionData = useCallback(async (signal) => {
+    const options = { withCredentials: true, ...(signal ? { signal } : {}) };
     const [resResults, resRecognitions, resCredits, resStudied] = await Promise.all([
-      axios.get(`${API_BASE_URL}/plan/admission-records/${id}/learning-results`, { withCredentials: true }),
-      axios.get(`${API_BASE_URL}/plan/admission-records/${id}/subject-recognitions`, { withCredentials: true }),
-      axios.get(`${API_BASE_URL}/plan/admission-records/${id}/recognized-credits`, { withCredentials: true }),
-      axios.get(`${API_BASE_URL}/plan/admission-records/${id}/studied-subjects`, { withCredentials: true }),
+      axios.get(`${API_BASE_URL}/plan/admission-records/${id}/learning-results`, options),
+      axios.get(`${API_BASE_URL}/plan/admission-records/${id}/subject-recognitions`, options),
+      axios.get(`${API_BASE_URL}/plan/admission-records/${id}/recognized-credits`, options),
+      axios.get(`${API_BASE_URL}/plan/admission-records/${id}/studied-subjects`, options),
     ]);
+    if (signal?.aborted) return;
     setLearningResults(Array.isArray(resResults.data) ? resResults.data : []);
     setStudiedSubjects(Array.isArray(resStudied.data) ? resStudied.data : []);
     setRecognitions(Array.isArray(resRecognitions.data) ? resRecognitions.data : []);
@@ -676,9 +688,23 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
   }, [id]);
 
   useEffect(() => {
-    if (!catalogRevision && !gradebookRevision) return;
-    reloadRecognitionData().catch(() => toast.error("Không thể làm mới học phần và tín chỉ đã học."));
-  }, [catalogRevision, gradebookRevision, reloadRecognitionData]);
+    if (detailTab !== 'learning' || record?.id !== id) return;
+    const controller = new AbortController();
+    const options = { withCredentials: true, signal: controller.signal };
+    setLearningLoading(true); setLearningError('');
+    Promise.all([
+      reloadRecognitionData(controller.signal),
+      axios.get(`${API_BASE_URL}/system/bridge-knowledge`, options),
+      record.majorId ? axios.get(`${API_BASE_URL}/plan/subjects?majorId=${record.majorId}&program=${record.trainingLevel === "Tiến sĩ" ? "doctoral" : "masters"}&includeCommon=true`, options) : Promise.resolve({ data: [] }),
+    ]).then(([, bridge, catalog]) => {
+      if (controller.signal.aborted) return;
+      setBridgeSubjects(Array.isArray(bridge.data) ? bridge.data : []);
+      setSubjects(Array.isArray(catalog.data) ? catalog.data : []);
+    }).catch(error => {
+      if (!controller.signal.aborted) setLearningError(error.response?.data?.message || 'Không thể tải dữ liệu học tập. Vui lòng mở lại tab để thử lại.');
+    }).finally(() => { if (!controller.signal.aborted) setLearningLoading(false); });
+    return () => controller.abort();
+  }, [detailTab, id, record?.id, record?.majorId, record?.trainingLevel, catalogRevision, gradebookRevision, reloadRecognitionData]);
 
   const submitLearningResult = async () => {
     if (!learningForm) return;
@@ -978,9 +1004,9 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
             <Tabs value={detailTab} onChange={(_, value) => changeDetailScope("tab", value)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ mb: 2, bgcolor: "white", border: "1px solid #DFE4E8", borderRadius: 1 }}>
               <Tab value="profile" label="Thông tin hồ sơ" />
               {record.trainingLevel === "Thạc sĩ" && <Tab value="admission" label="Xét tuyển" />}
-              <Tab value="learning" label="Học tập" />
-              <Tab value="grades" label="Bảng điểm" />
-              <Tab value="leave" label="Bảo lưu" />
+              {showStudyTabs && <Tab value="learning" label="Học tập" />}
+              {showStudyTabs && <Tab value="grades" label="Bảng điểm" />}
+              {showStudyTabs && <Tab value="leave" label="Bảo lưu" />}
             </Tabs>
             {detailTab === "admission" && <AdmissionEvaluationPanel record={record} isAdmin={isAdmin} disabled={isDirty || saving} onBusyChange={setSaving} onDecided={fetchData} />}
             {detailTab === "grades" && <LearnerScorecard admissionRecordId={id} classGroupId={searchParams.get("classGroupId")} onClassChange={value => changeDetailScope("classGroupId", value)} />}
@@ -1001,7 +1027,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
                       {item.fromMajor?.name || "—"} → {item.toMajor?.name || "—"}
                     </Typography>
                     <Typography sx={{ fontSize: 12, color: "#64748B" }}>
-                      {new Date(item.requestedAt).toLocaleString("vi-VN")} · Mã học viên được giữ nguyên: {record?.code || "—"}
+                      {formatDateTime(item.requestedAt)} · Mã học viên được giữ nguyên: {record?.code || "—"}
                     </Typography>
                     {item.reason && <Typography sx={{ fontSize: 12.5, mt: 0.5 }}>Lý do: {item.reason}</Typography>}
                     {item.toCurriculum && <Typography sx={{ fontSize: 12.5 }}>CTĐT mới: {item.toCurriculum.code} — {item.toCurriculum.name}</Typography>}
@@ -1043,22 +1069,22 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
               </Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap">
                 <Chip size="small" color="success" variant="outlined" label={`Đã tích lũy: ${recognizedCredits} tín chỉ`} />
-                <Button size="small" variant="contained" startIcon={<AddRounded />} onClick={() => openLearningDialog(null)} disabled={learningSaving}>
+                <Button size="small" variant="contained" startIcon={<AddRounded />} onClick={() => openLearningDialog(null)} disabled={learningSaving || learningLoading || !!learningError}>
                   Thêm kết quả học phần
                 </Button>
               </Stack>
             </Stack>
             <Typography sx={{ fontSize: 12, color: "#64748B", mb: 1.5 }}>
               Hiển thị các học phần đã có kết quả trong chương trình đào tạo hiện tại.
-              Quyết định công nhận hiển thị ở bảng bên dưới và không thay thế kết quả học chính khóa của cùng học phần.
+              Học phần đã được duyệt công nhận có kết quả Đạt hoặc Miễn học cũng hiển thị tại đây. Chi tiết quyết định ở bảng bên dưới; kết quả chính khóa của cùng học phần được giữ nguyên.
             </Typography>
 
-            <LearningTables studied={visibleStudiedSubjects} approvals={approvalRows} learningResults={learningResults}
+            {learningLoading ? <Box role="status" sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 3 }}><CircularProgress size={22} />Đang tải dữ liệu học tập...</Box> : learningError ? <Alert severity="error">{learningError}</Alert> : <LearningTables studied={visibleStudiedSubjects} approvals={approvalRows} learningResults={learningResults}
               sourceLabel={value => LEARNING_SOURCES.find(item => item.value === value)?.label || value || "—"}
               statusLabel={value => LEARNING_STATUSES.find(item => item.value === value)?.label || value}
               resultLabel={value => RESULT_LABELS[value] || RESULT_LABELS.pending} subjectLabel={subjectLabel}
               onEdit={openLearningDialog}
-              onSubmitDecision={submitPendingLearning} busy={learningSaving} />
+              onSubmitDecision={submitPendingLearning} busy={learningSaving} />}
           </Paper>
           </Box>
 
@@ -1116,8 +1142,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
 
                 <Box>
                   <Typography sx={fieldLabelSx}>Ngày sinh</Typography>
-                  <TextField
-                    type="date"
+                  <DateField
                     size="small"
                     fullWidth
                     value={formData.dob}
@@ -1442,8 +1467,9 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
               </Box>
 
               <Box>
-                <Typography sx={fieldLabelSx}>Phân loại hồ sơ</Typography>
+                <Typography component="label" id="admission-detail-category-label" sx={fieldLabelSx}>Phân loại hồ sơ</Typography>
                 <Select
+                  labelId="admission-detail-category-label"
                   size="small"
                   fullWidth
                   value={formData.profileCategory}
@@ -1475,9 +1501,20 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
               </Box>
 
               <Box>
-                <Typography sx={fieldLabelSx}>Ngày nộp / Tiếp nhận</Typography>
+                <Typography component="label" htmlFor="admission-detail-year" sx={fieldLabelSx}>Năm nhập học</Typography>
                 <TextField
-                  type="date"
+                  id="admission-detail-year"
+                  size="small"
+                  fullWidth
+                  value={formData.academicYear}
+                  InputProps={{ readOnly: true }}
+                  sx={inputSx}
+                />
+              </Box>
+
+              <Box>
+                <Typography sx={fieldLabelSx}>Ngày nộp / Tiếp nhận</Typography>
+                <DateField
                   size="small"
                   fullWidth
                   value={formData.admissionDate}
@@ -1912,7 +1949,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
                 <TextField id="learning-score" size="small" fullWidth type="number" required value={learningForm.score} onChange={(e) => setLearningForm((p) => ({ ...p, score: e.target.value }))} inputProps={{ min: 0, max: 10, step: 0.25 }} />
               </PopupFormField>
               <PopupFormField label="Ngày hoàn thành" htmlFor="learning-completed-at">
-                <TextField id="learning-completed-at" size="small" fullWidth type="date" disabled={learningForm.status !== "completed"}
+                <DateField id="learning-completed-at" size="small" fullWidth disabled={learningForm.status !== "completed"}
                   required={learningForm.status === "completed"} helperText={learningForm.status === "completed" ? "Bắt buộc nhập ngày hoàn thành học phần." : undefined}
                   value={learningForm.completedAt} onChange={(e) => setLearningForm((p) => ({ ...p, completedAt: e.target.value }))} />
               </PopupFormField>

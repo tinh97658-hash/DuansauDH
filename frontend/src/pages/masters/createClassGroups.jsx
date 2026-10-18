@@ -8,11 +8,13 @@ import {
   MenuItem, Paper, Select, Stack, TableBody, TableCell, TableContainer,
   TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
-import {
-  AddRounded, DeleteRounded, EditRounded, GroupWorkRounded,
-} from "@mui/icons-material";
+import AddRounded from "@mui/icons-material/AddRounded";
+import DeleteRounded from "@mui/icons-material/DeleteRounded";
+import EditRounded from "@mui/icons-material/EditRounded";
+import GroupWorkRounded from "@mui/icons-material/GroupWorkRounded";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
+import { useAuthSession } from "../../context/AuthSession";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import AppDialog from "../../components/AppDialog";
@@ -126,6 +128,7 @@ const CompactField = ({ label, htmlFor, helper, error = false, children, sx }) =
 );
 
 const CreateClassGroups = () => {
+  const session = useAuthSession();
   const navigate = useNavigate();
 
   // Filters
@@ -165,12 +168,13 @@ const CreateClassGroups = () => {
       })
       .catch(() => mounted && setMajors([]));
 
-    axios.get(`${API_BASE_URL}/auth/isStaff`, { withCredentials: true })
+    const role = session ? Promise.resolve({ data: { message: session.user?.role || "student" } }) : axios.get(`${API_BASE_URL}/auth/isStaff`, { withCredentials: true });
+    role
       .then(({ data }) => mounted && setIsAdmin(data.message === "admin"))
       .catch(() => mounted && setIsAdmin(false));
 
     return () => { mounted = false; };
-  }, []);
+  }, [session]);
 
   // Load groups
   const loadGroups = useCallback(async () => {

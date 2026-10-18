@@ -1,3 +1,4 @@
+import { formatDate } from "../../utils/dateFormat";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useSearchParams } from "react-router-dom";
@@ -10,10 +11,10 @@ import {
   Select, Stack, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Tooltip, Typography,
 } from "@mui/material";
-import {
-  ArrowForwardRounded,
-  DeleteOutlineRounded, GroupWorkRounded, PersonRounded,
-} from "@mui/icons-material";
+import ArrowForwardRounded from "@mui/icons-material/ArrowForwardRounded";
+import DeleteOutlineRounded from "@mui/icons-material/DeleteOutlineRounded";
+import GroupWorkRounded from "@mui/icons-material/GroupWorkRounded";
+import PersonRounded from "@mui/icons-material/PersonRounded";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
 import FilterSearchField from "../../components/FilterSearchField";
@@ -95,7 +96,7 @@ const AssignClassGroups = () => {
   }, []);
   const disciplines = useMemo(() => disciplinesFromMajors(majors), [majors]);
   const visibleMajors = useMemo(() => majorsForDiscipline(majors, selectedDiscipline), [majors, selectedDiscipline]);
-  const visibleMajorIds = useMemo(() => new Set(visibleMajors.map((major) => major.id)), [visibleMajors]);
+  const visibleMajorIds = useMemo(() => selectedDiscipline ? new Set(visibleMajors.map((major) => major.id)) : null, [visibleMajors, selectedDiscipline]);
 
   // Load groups
   const loadGroups = useCallback(async () => {
@@ -396,8 +397,8 @@ const AssignClassGroups = () => {
             </Stack>
 
             {/* Selection Status & Action Bar */}
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1, px: 0.5 }}>
-              <Typography variant="body2" color="text.secondary">
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1, mb: 1, px: 0.5 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: "15.5px" }}>
                 {currentTargetGroup ? <>Đã chọn: <strong>{selectedStudentIds.length}</strong> / {remainingCapacity} chỗ còn lại</> : "Chọn lớp mục tiêu để phân lớp"}
                 {` · ${assignableStudents.length} học viên chưa có lớp`}
               </Typography>
@@ -474,7 +475,7 @@ const AssignClassGroups = () => {
                             <Typography variant="body2" className="assignment-name" title={personNameParts(s).familyAndMiddle} sx={{ fontWeight: 600 }}>{personNameParts(s).familyAndMiddle}</Typography>
                           </TableCell>
                           <TableCell sx={{ fontWeight: 600 }}><span className="assignment-name" title={personNameParts(s).givenName}>{personNameParts(s).givenName}</span></TableCell>
-                          <TableCell className="assignment-nowrap">{s.dob || "-"}</TableCell>
+                          <TableCell className="assignment-nowrap">{formatDate(s.dob)}</TableCell>
                           <TableCell>{s.gender || "-"}</TableCell>
                           <TableCell><span className="assignment-wrap" title={majorById.get(s.majorId)?.name || s.majorName || ""}>{majorById.get(s.majorId)?.name || s.majorName || "-"}</span></TableCell>
                           <TableCell><TuitionStatus paid={s.tuitionPaid} /></TableCell>
@@ -629,7 +630,7 @@ const AssignClassGroups = () => {
                         <TableCell sx={{ fontFamily: "inherit", fontWeight: 600 }}><span className="assignment-code" title={m.code || ""}>{m.code || "-"}</span></TableCell>
                         <TableCell sx={{ fontWeight: 600 }}><span className="assignment-name" title={personNameParts(m).familyAndMiddle}>{personNameParts(m).familyAndMiddle}</span></TableCell>
                         <TableCell sx={{ fontWeight: 600 }}><span className="assignment-name" title={personNameParts(m).givenName}>{personNameParts(m).givenName}</span></TableCell>
-                        <TableCell className="assignment-nowrap" sx={{ fontSize: "0.8rem", color: "text.secondary" }}>{m.dob || "-"}</TableCell>
+                        <TableCell className="assignment-nowrap" sx={{ fontSize: "0.8rem", color: "text.secondary" }}>{formatDate(m.dob)}</TableCell>
                         <TableCell><TuitionStatus paid={m.tuitionPaid} /></TableCell>
                         <TableCell align="center" className="assignment-action">
                           <Tooltip title="Bỏ khỏi lớp">

@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, InputAdornment, TextField } from "@mui/material";
-import { SearchRounded } from "@mui/icons-material";
+import SearchRounded from "@mui/icons-material/SearchRounded";
 
 /**
  * Search control shared by page-level filter bars.

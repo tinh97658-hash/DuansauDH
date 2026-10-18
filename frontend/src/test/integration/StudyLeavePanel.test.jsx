@@ -32,7 +32,7 @@ it('shows an overdue extension separately from the unchanged current deadline an
   axios.get.mockResolvedValue({ data: { leaves: [{ ...leave, extensions: [{ status: 'pending', endDate: '2027-06-30', reason: 'Xin gia hạn' }] }], affectedOfferings: [] } });
   render(<StudyLeavePanel record={{ ...record, studyStatus: 'Bảo lưu quá hạn' }} isAdmin />);
   expect(await screen.findByText('Bảo lưu quá hạn')).toBeInTheDocument();
-  expect(screen.getByText(/Hạn hiện tại vẫn là 30\/06\/2026/)).toBeInTheDocument();
+  expect(screen.getByText(/Hạn hiện tại vẫn là 30\/06\/26/)).toBeInTheDocument();
   expect(screen.getByText(/Kiểm tra: 0 · Bài tập: 7/)).toBeInTheDocument();
   expect(screen.getByText('Không đạt do bảo lưu; học lại từ đầu khi trở lại')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Duyệt gia hạn' })).toBeEnabled();
@@ -81,4 +81,30 @@ it('does not enable mutations while the profile has unsaved edits', async () => 
   render(<StudyLeavePanel record={record} isAdmin disabled />);
   expect(await screen.findByRole('button', { name: 'Tạo yêu cầu bảo lưu' })).toBeDisabled();
   expect(screen.getByText(/Lưu hoặc hủy thay đổi hồ sơ/)).toBeInTheDocument();
+});
+
+it('requires the end date to be strictly later and rechecks it after the start date changes', async () => {
+  render(<StudyLeavePanel record={record} isAdmin />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Tạo yêu cầu bảo lưu' }));
+  const dialog = screen.getByRole('dialog');
+  const start = within(dialog).getByLabelText('Ngày bắt đầu bảo lưu');
+  const end = within(dialog).getByLabelText('Ngày kết thúc bảo lưu');
+  const confirm = within(dialog).getByRole('button', { name: 'Xác nhận' });
+  fireEvent.change(within(dialog).getByLabelText(/Lý do \/ thông tin quyết định/), { target: { value: 'Điều trị' } });
+  fireEvent.change(start, { target: { value: '30/12/2099' } });
+  for (const value of ['29/12/2099', '30/12/2099']) {
+    fireEvent.change(end, { target: { value } });
+    expect(end).toHaveAttribute('aria-invalid', 'true');
+    expect(confirm).toBeDisabled();
+    fireEvent.click(confirm);
+    expect(axios.post).not.toHaveBeenCalled();
+  }
+  fireEvent.change(end, { target: { value: '31/12/2099' } });
+  expect(confirm).toBeEnabled();
+  fireEvent.change(start, { target: { value: '31/12/2099' } });
+  expect(end).toHaveAttribute('aria-invalid', 'true');
+  expect(confirm).toBeDisabled();
+  expect(dialog.querySelectorAll('input[type="date"]')[1]).toHaveAttribute('min', '2100-01-01');
+  fireEvent.change(end, { target: { value: '01/01/2100' } });
+  expect(confirm).toBeEnabled();
 });

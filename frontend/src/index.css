@@ -3,19 +3,19 @@
   --canvas-bg: #F5F7F8;
   --surface-bg: #FFFFFF;
   --muted-surface: #F7F9FA;
-  --border-color: #DFE4E8;
-  --border-light: #EDF2F7;
-  --table-border-color: #D7E4EE;
-  --table-row-border-color: #E2EBF2;
-  --table-header-bg: #EDF4FA;
+  --border-color: #718292;
+  --border-light: #B4C0CB;
+  --table-border-color: #687C8E;
+  --table-row-border-color: #718292;
+  --table-header-bg: #DCE7F1;
   --table-radius: 0px;
-  --table-hover-bg: #F5FAFE;
+  --table-hover-bg: #EAF2F8;
   --control-radius: 0px;
-  --text-primary: #172B3A;
-  --text-secondary: #607486;
-  --text-muted: #8A9AAA;
-  --primary: #0788B8;
-  --primary-dark: #056A8F;
+  --text-primary: #102333;
+  --text-secondary: #354959;
+  --text-muted: #526576;
+  --primary: #00658A;
+  --primary-dark: #004D6B;
   --primary-light: #EBF5FB;
   --secondary: #173E75;
   --dialog-title-bg: #b4cae6;
@@ -23,7 +23,7 @@
   --dialog-content-inset: 3mm;
   --success: #137B3B;
   --success-light: #E6F4EA;
-  --warning: #B86216;
+  --warning: #934B0D;
   --warning-light: #FEF7E0;
   --danger: #B52D2D;
   --danger-light: #FCE8E6;
@@ -118,6 +118,10 @@ code, kbd, samp, pre {
 
 #root .table {
   --bs-table-color: var(--text-primary);
+  --bs-table-striped-color: var(--text-primary);
+  --bs-table-hover-color: var(--text-primary);
+  --bs-table-active-color: var(--text-primary);
+  --bs-border-color: var(--table-row-border-color);
 }
 
 #root :where(.MuiOutlinedInput-root, .form-control, .form-select, .ant-input, .ant-input-affix-wrapper, .ant-select-selector) {

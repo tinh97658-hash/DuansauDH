@@ -3,10 +3,12 @@ import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, MenuItem, Pagination, Paper, Stack, TableBody, TableCell, TableContainer, TableRow, TextField, Tooltip, Typography } from "@mui/material";
-import { ListAltRounded, SaveRounded } from "@mui/icons-material";
+import ListAltRounded from "@mui/icons-material/ListAltRounded";
+import SaveRounded from "@mui/icons-material/SaveRounded";
 import SettingsRounded from "@mui/icons-material/SettingsRounded";
 import GradeSettingsDialog from "../../features/exams/GradeSettingsDialog";
 import FeatureLayout from "../../components/FeatureLayout";
+import { useAuthSession } from "../../context/AuthSession";
 import FilterSelectField from "../../components/FilterSelectField";
 import FilterSearchField from "../../components/FilterSearchField";
 import ResizableTable from "../../components/ResizableTable";
@@ -57,6 +59,7 @@ const errorMessage = (error, fallback) => {
 };
 
 export default function ExamLists() {
+  const session = useAuthSession();
   const catalogRevision = useSubjectCatalogRevision();
   const [policyRevision, setPolicyRevision] = useState(0);
   useEffect(() => {
@@ -100,7 +103,7 @@ export default function ExamLists() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([axios.get(`${API_BASE_URL}/masters/exam-lists/options`), axios.get(`${API_BASE_URL}/auth/isStaff`)])
+    Promise.all([axios.get(`${API_BASE_URL}/masters/exam-lists/options`), session ? Promise.resolve({ data: { message: session.user?.role || "student" } }) : axios.get(`${API_BASE_URL}/auth/isStaff`)])
       .then(([options, auth]) => {
         if (!active) return;
         const list = options.data.groups || [];
@@ -114,7 +117,7 @@ export default function ExamLists() {
       .catch((failure) => active && setError(errorMessage(failure, "Không thể tải danh sách lớp. Hãy tải lại trang.")))
       .finally(() => active && setOptionsLoading(false));
     return () => { active = false; };
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     let active = true;

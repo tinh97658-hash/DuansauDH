@@ -6,22 +6,59 @@ import {
   IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
   Menu, MenuItem, Stack, Tooltip, Typography, useMediaQuery, useTheme,
 } from "@mui/material";
-import {
-  AccountBalanceRounded, AccountCircleRounded, AddTaskRounded, AssessmentRounded, CategoryRounded,
-  CheckCircleRounded, ChevronRightRounded, ClassRounded, DashboardRounded,
-  DeleteRounded, EditRounded, EventNoteRounded, EventRounded, ExpandLessRounded,
-  ExpandMoreRounded, FactCheckRounded, FlagRounded, FolderOpenRounded, GavelRounded,
-  GradingRounded, GroupAddRounded, GroupsRounded, GroupWorkRounded, InfoRounded,
-  LanguageRounded, LibraryBooksRounded, ListAltRounded, LocationCityRounded,
-  LockRounded, LogoutRounded, ManageAccountsRounded, MenuBookRounded, MenuRounded,
-  NoteAddRounded, PaymentsRounded, RuleRounded, SchoolRounded, ScoreboardRounded, MeetingRoomRounded,
-  HistoryEduRounded, BusinessRounded,
-  SendRounded, SummarizeRounded, SupervisorAccountRounded, SystemUpdateRounded,
-  TableChartRounded, TrackChangesRounded, UploadFileRounded, VerifiedRounded,
-  WorkspacePremiumRounded,
-} from "@mui/icons-material";
+import AccountBalanceRounded from "@mui/icons-material/AccountBalanceRounded";
+import AccountCircleRounded from "@mui/icons-material/AccountCircleRounded";
+import AddTaskRounded from "@mui/icons-material/AddTaskRounded";
+import AssessmentRounded from "@mui/icons-material/AssessmentRounded";
+import CategoryRounded from "@mui/icons-material/CategoryRounded";
+import CheckCircleRounded from "@mui/icons-material/CheckCircleRounded";
+import ChevronRightRounded from "@mui/icons-material/ChevronRightRounded";
+import ClassRounded from "@mui/icons-material/ClassRounded";
+import DashboardRounded from "@mui/icons-material/DashboardRounded";
+import DeleteRounded from "@mui/icons-material/DeleteRounded";
+import EditRounded from "@mui/icons-material/EditRounded";
+import EventNoteRounded from "@mui/icons-material/EventNoteRounded";
+import EventRounded from "@mui/icons-material/EventRounded";
+import ExpandLessRounded from "@mui/icons-material/ExpandLessRounded";
+import ExpandMoreRounded from "@mui/icons-material/ExpandMoreRounded";
+import FactCheckRounded from "@mui/icons-material/FactCheckRounded";
+import FlagRounded from "@mui/icons-material/FlagRounded";
+import FolderOpenRounded from "@mui/icons-material/FolderOpenRounded";
+import GavelRounded from "@mui/icons-material/GavelRounded";
+import GradingRounded from "@mui/icons-material/GradingRounded";
+import GroupAddRounded from "@mui/icons-material/GroupAddRounded";
+import GroupsRounded from "@mui/icons-material/GroupsRounded";
+import GroupWorkRounded from "@mui/icons-material/GroupWorkRounded";
+import InfoRounded from "@mui/icons-material/InfoRounded";
+import LanguageRounded from "@mui/icons-material/LanguageRounded";
+import LibraryBooksRounded from "@mui/icons-material/LibraryBooksRounded";
+import ListAltRounded from "@mui/icons-material/ListAltRounded";
+import LocationCityRounded from "@mui/icons-material/LocationCityRounded";
+import LockRounded from "@mui/icons-material/LockRounded";
+import LogoutRounded from "@mui/icons-material/LogoutRounded";
+import ManageAccountsRounded from "@mui/icons-material/ManageAccountsRounded";
+import MenuBookRounded from "@mui/icons-material/MenuBookRounded";
+import MenuRounded from "@mui/icons-material/MenuRounded";
+import NoteAddRounded from "@mui/icons-material/NoteAddRounded";
+import PaymentsRounded from "@mui/icons-material/PaymentsRounded";
+import RuleRounded from "@mui/icons-material/RuleRounded";
+import SchoolRounded from "@mui/icons-material/SchoolRounded";
+import ScoreboardRounded from "@mui/icons-material/ScoreboardRounded";
+import MeetingRoomRounded from "@mui/icons-material/MeetingRoomRounded";
+import HistoryEduRounded from "@mui/icons-material/HistoryEduRounded";
+import BusinessRounded from "@mui/icons-material/BusinessRounded";
+import SendRounded from "@mui/icons-material/SendRounded";
+import SummarizeRounded from "@mui/icons-material/SummarizeRounded";
+import SupervisorAccountRounded from "@mui/icons-material/SupervisorAccountRounded";
+import SystemUpdateRounded from "@mui/icons-material/SystemUpdateRounded";
+import TableChartRounded from "@mui/icons-material/TableChartRounded";
+import TrackChangesRounded from "@mui/icons-material/TrackChangesRounded";
+import UploadFileRounded from "@mui/icons-material/UploadFileRounded";
+import VerifiedRounded from "@mui/icons-material/VerifiedRounded";
+import WorkspacePremiumRounded from "@mui/icons-material/WorkspacePremiumRounded";
 import { API_BASE_URL } from "../config/http";
 import { BRAND } from "../config/branding";
+import { useAuthSession } from "../context/AuthSession";
 
 const NAV_GROUPS = [
   {
@@ -126,6 +163,7 @@ const roleLabels = {
 };
 
 const AppLayout = ({ children }) => {
+  const session = useAuthSession();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -140,6 +178,7 @@ const AppLayout = ({ children }) => {
   const [collapsedGroups, setCollapsedGroups] = useState({});
 
   useEffect(() => {
+    if (session) { setCurrentUser(session.user); setRole(session.user?.role || "student"); return; }
     let mounted = true;
     axios.get(`${API_BASE_URL}/auth/session`, { withCredentials: true })
       .then(({ data }) => {
@@ -158,7 +197,7 @@ const AppLayout = ({ children }) => {
       .catch(() => {});
 
     return () => { mounted = false; };
-  }, []);
+  }, [session]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);

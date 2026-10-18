@@ -1,20 +1,50 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import {
-  AccountBalanceOutlined, AddTaskOutlined, CategoryOutlined, CheckCircleOutline,
-  EventOutlined, EventNoteOutlined, FactCheckOutlined, FlagOutlined, FolderOpenOutlined,
-  GavelOutlined, GradingOutlined, GroupAddOutlined, GroupsOutlined, GroupWorkOutlined,
-  InfoOutlined, LanguageOutlined, ListAltOutlined, LocationCityOutlined, LockOutlined, LogoutOutlined,
-  KeyboardArrowDownRounded, KeyboardArrowUpRounded,
-  ManageAccountsOutlined, MenuBookOutlined, NoteAddOutlined, PaymentsOutlined, RuleOutlined,
-  SchoolOutlined, ScoreboardOutlined, SendOutlined, SummarizeOutlined, SupervisorAccountOutlined,
-  MeetingRoomOutlined, BusinessOutlined,
-  SystemUpdateOutlined, TableChartOutlined, TrackChangesOutlined, UploadFileOutlined,
-  VerifiedOutlined, WorkspacePremiumOutlined,
-  HistoryEduOutlined,
-} from "@mui/icons-material";
+import AccountBalanceOutlined from "@mui/icons-material/AccountBalanceOutlined";
+import AddTaskOutlined from "@mui/icons-material/AddTaskOutlined";
+import CategoryOutlined from "@mui/icons-material/CategoryOutlined";
+import CheckCircleOutline from "@mui/icons-material/CheckCircleOutline";
+import EventOutlined from "@mui/icons-material/EventOutlined";
+import EventNoteOutlined from "@mui/icons-material/EventNoteOutlined";
+import FactCheckOutlined from "@mui/icons-material/FactCheckOutlined";
+import FlagOutlined from "@mui/icons-material/FlagOutlined";
+import FolderOpenOutlined from "@mui/icons-material/FolderOpenOutlined";
+import GavelOutlined from "@mui/icons-material/GavelOutlined";
+import GradingOutlined from "@mui/icons-material/GradingOutlined";
+import GroupAddOutlined from "@mui/icons-material/GroupAddOutlined";
+import GroupsOutlined from "@mui/icons-material/GroupsOutlined";
+import GroupWorkOutlined from "@mui/icons-material/GroupWorkOutlined";
+import InfoOutlined from "@mui/icons-material/InfoOutlined";
+import LanguageOutlined from "@mui/icons-material/LanguageOutlined";
+import ListAltOutlined from "@mui/icons-material/ListAltOutlined";
+import LocationCityOutlined from "@mui/icons-material/LocationCityOutlined";
+import LockOutlined from "@mui/icons-material/LockOutlined";
+import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
+import KeyboardArrowDownRounded from "@mui/icons-material/KeyboardArrowDownRounded";
+import KeyboardArrowUpRounded from "@mui/icons-material/KeyboardArrowUpRounded";
+import ManageAccountsOutlined from "@mui/icons-material/ManageAccountsOutlined";
+import MenuBookOutlined from "@mui/icons-material/MenuBookOutlined";
+import NoteAddOutlined from "@mui/icons-material/NoteAddOutlined";
+import PaymentsOutlined from "@mui/icons-material/PaymentsOutlined";
+import RuleOutlined from "@mui/icons-material/RuleOutlined";
+import SchoolOutlined from "@mui/icons-material/SchoolOutlined";
+import ScoreboardOutlined from "@mui/icons-material/ScoreboardOutlined";
+import SendOutlined from "@mui/icons-material/SendOutlined";
+import SummarizeOutlined from "@mui/icons-material/SummarizeOutlined";
+import SupervisorAccountOutlined from "@mui/icons-material/SupervisorAccountOutlined";
+import MeetingRoomOutlined from "@mui/icons-material/MeetingRoomOutlined";
+import BusinessOutlined from "@mui/icons-material/BusinessOutlined";
+import SystemUpdateOutlined from "@mui/icons-material/SystemUpdateOutlined";
+import TableChartOutlined from "@mui/icons-material/TableChartOutlined";
+import TrackChangesOutlined from "@mui/icons-material/TrackChangesOutlined";
+import UploadFileOutlined from "@mui/icons-material/UploadFileOutlined";
+import VerifiedOutlined from "@mui/icons-material/VerifiedOutlined";
+import WorkspacePremiumOutlined from "@mui/icons-material/WorkspacePremiumOutlined";
+import HistoryEduOutlined from "@mui/icons-material/HistoryEduOutlined";
 import { API_BASE_URL } from "../config/http";
 import { BRAND } from "../config/branding";
+import { useAuthSession } from "../context/AuthSession";
+import { preloadPage } from "../utils/lazyPage";
 import "../styles/ribbon-header.css";
 
 const action = (label, route, icon, color, options = {}) => ({ label, route, icon, color, ...options });
@@ -133,27 +163,31 @@ export const ribbons = {
 };
 
 const roleNames = { admin: "Quản trị viên", supervisor: "Giảng viên hướng dẫn", examiner: "Giám khảo", student: "Học viên" };
+const tabForPath = (path) => (tabs.find(([id]) => ribbons[id].some(section => section.actions.some(item => isRibbonRouteActive(path, item.route))))
+  || tabs.find(([id]) => path === `/${id}` || path.startsWith(`/${id}/`)))?.[0] || "system";
 
 const RibbonHeader = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState("system");
+  const session = useAuthSession();
+  const sessionRole = session ? session.user?.role || "student" : null;
+  const [activeTab, setActiveTab] = useState(() => tabForPath(location.pathname));
   const [commandsCollapsed, setCommandsCollapsed] = useState(false);
-  const [role, setRole] = useState();
+  const [fallbackRole, setFallbackRole] = useState();
+  const role = sessionRole || fallbackRole;
   useEffect(() => {
+    if (sessionRole) return;
     let mounted = true;
     fetch(`${API_BASE_URL}/auth/isStaff`, { credentials: "include" })
       .then((response) => { if (!response.ok) throw new Error(); return response.json(); })
-      .then((data) => mounted && setRole(data.message))
+      .then((data) => mounted && setFallbackRole(data.message))
       .catch(() => mounted && navigate("/login", { replace: true }));
     return () => { mounted = false; };
-  }, [navigate]);
+  }, [navigate, sessionRole]);
 
   const path = location.pathname;
   useEffect(() => {
-    const matched = tabs.find(([id]) => ribbons[id].some(section => section.actions.some(item => isRibbonRouteActive(path, item.route))))
-      || tabs.find(([id]) => path === `/${id}` || path.startsWith(`/${id}/`));
-    if (matched) setActiveTab(matched[0]);
+    setActiveTab(tabForPath(path));
   }, [path]);
 
   if (!role) return null;
@@ -190,6 +224,7 @@ const RibbonHeader = () => {
               const Icon = item.icon;
               const isActive = isRibbonRouteActive(path, item.route);
               return <button type="button" className={`ribbon-action${isActive ? " active" : ""}`} key={item.label} onClick={() => runAction(item)}
+                onPointerEnter={() => preloadPage(item.route)} onFocus={() => preloadPage(item.route)} onPointerDown={() => preloadPage(item.route)}
                 style={{ "--ribbon-icon-color": item.color }}
                 aria-current={isActive ? "page" : undefined}>
                 <Icon className="ribbon-action-icon" /><span>{item.label}</span>

@@ -15,12 +15,12 @@ jest.mock("@mui/icons-material", () => ({
   RefreshRounded: () => null,
   SearchRounded: () => null,
 }));
-jest.mock("axios", () => ({
+vi.mock("axios", () => ({ default: {
   get: jest.fn(),
   post: jest.fn(),
   delete: jest.fn(),
   defaults: {},
-}));
+} }));
 jest.mock("react-toastify", () => ({
   toast: { success: jest.fn(), error: jest.fn(), warning: jest.fn() },
   ToastContainer: () => null,

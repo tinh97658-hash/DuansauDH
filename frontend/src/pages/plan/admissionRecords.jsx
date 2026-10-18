@@ -1,6 +1,9 @@
+import DateField from "../../components/DateField";
+import { formatDate } from "../../utils/dateFormat";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { PROFILE_CATEGORIES, profileCategoryLabel } from "../../features/admission/profileCategories";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
@@ -10,13 +13,18 @@ import {
   Pagination, Stack, TableBody, TableCell, TableContainer, TableRow,
   TextField, Tooltip, Typography,
 } from "@mui/material";
-import {
-  AddPhotoAlternateRounded, AddRounded, CheckCircleRounded, CloseRounded,
-  DeleteRounded, EditRounded, PersonRounded,
-  VisibilityRounded,
-} from "@mui/icons-material";
+import AddPhotoAlternateRounded from "@mui/icons-material/AddPhotoAlternateRounded";
+import AddRounded from "@mui/icons-material/AddRounded";
+import CheckCircleRounded from "@mui/icons-material/CheckCircleRounded";
+import CloseRounded from "@mui/icons-material/CloseRounded";
+import DeleteRounded from "@mui/icons-material/DeleteRounded";
+import EditRounded from "@mui/icons-material/EditRounded";
+import PersonRounded from "@mui/icons-material/PersonRounded";
+import VisibilityRounded from "@mui/icons-material/VisibilityRounded";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
+import { useAuthSession } from "../../context/AuthSession";
+import { preloadPage } from "../../utils/lazyPage";
 import ResizableTable from "../../components/ResizableTable";
 import AdmissionTuitionCheckbox from "../../features/admission/AdmissionTuitionCheckbox";
 import FilterSearchField from "../../components/FilterSearchField";
@@ -58,12 +66,6 @@ const RECEIPT_TYPES = [
   "Đại diện nộp",
 ];
 
-const PROFILE_CATEGORIES = [
-  "Đầy đủ",
-  "Bổ sung sau",
-  "Chờ thẩm định",
-  "Thiếu giấy tờ",
-];
 
 const STUDY_STATUSES = [
   "Nộp hồ sơ đầu vào",
@@ -135,7 +137,7 @@ const createEmptyForm = (defaultYear = String(currentYear)) => ({
   email: "",
   pob: "Hải Phòng",
   receiptType: "Trực tiếp",
-  profileCategory: "Đầy đủ",
+  profileCategory: "Bình thường",
   admissionDate: new Date().toISOString().split("T")[0],
   photo: "",
 
@@ -201,6 +203,7 @@ const cellInputSx = {
 };
 
 const AdmissionRecords = ({ mode = "applications" }) => {
+  const session = useAuthSession();
   const navigate = useNavigate();
   const isAdmittedMasters = mode === "admitted-masters";
   const recordDetailBase = isAdmittedMasters ? "/masters/admitted-records" : "/plan/admission-records";
@@ -300,10 +303,11 @@ const AdmissionRecords = ({ mode = "applications" }) => {
     { key: "dob", label: "Ngày sinh", width: 120, align: "center" },
     { key: "gender", label: "Giới tính", width: 90, align: "center" },
     { key: "idCard", label: "Số CMND/CCCD", width: 150 },
+    { key: "academicYear", label: "Năm nhập học", width: 120, align: "center" },
     { key: "trainingLevel", label: "Trình độ", width: 100, align: "center" },
     { key: "major", label: "Ngành", width: 210 },
     { key: "phone", label: "Điện thoại", width: 130 },
-    ...(isAdmittedMasters ? [{ key: "tuition", label: "Đã nộp học phí nhập học", width: 180, align: "center" }] : []),
+    ...(isAdmittedMasters ? [{ key: "tuition", label: "Học phí", width: 180, align: "center" }] : []),
     { key: "status", label: "Trạng thái", width: 160, align: "center" },
     { key: "actions", label: "Thao tác", width: isAdmittedMasters ? 90 : 110, minWidth: 80, align: "center" },
   ];
@@ -322,12 +326,13 @@ const AdmissionRecords = ({ mode = "applications" }) => {
 
   // Auth Check
   useEffect(() => {
+    if (session) { setIsAdmin(session.user?.role === "admin"); return; }
     let mounted = true;
     axios.get(`${API_BASE_URL}/auth/isStaff`, { withCredentials: true })
       .then(({ data }) => mounted && setIsAdmin(data.message === "admin"))
       .catch(() => mounted && setIsAdmin(false));
     return () => { mounted = false; };
-  }, []);
+  }, [session]);
 
   // Load Records
   const loadRecords = useCallback(async (signal) => {
@@ -428,7 +433,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
       email: rec.email || "",
       pob: rec.pob || "Hải Phòng",
       receiptType: rec.receiptType || "Trực tiếp",
-      profileCategory: rec.profileCategory || "Đầy đủ",
+      profileCategory: profileCategoryLabel(rec.profileCategory),
       admissionDate: rec.admissionDate || new Date().toISOString().split("T")[0],
       photo: rec.photo || "",
 
@@ -450,13 +455,13 @@ const AdmissionRecords = ({ mode = "applications" }) => {
 
       documents: {
         docDecision: Boolean(docs.docDecision),
-        docApplication: docs.docApplication !== false,
-        docCurriculumVitae: docs.docCurriculumVitae !== false,
-        docDegree: docs.docDegree !== false,
-        docHealthCert: docs.docHealthCert !== false,
-        docPhoto: docs.docPhoto !== false,
+        docApplication: Boolean(docs.docApplication),
+        docCurriculumVitae: Boolean(docs.docCurriculumVitae),
+        docDegree: Boolean(docs.docDegree),
+        docHealthCert: Boolean(docs.docHealthCert),
+        docPhoto: Boolean(docs.docPhoto),
         docSupplement: Boolean(docs.docSupplement),
-        docTranscript: docs.docTranscript !== false,
+        docTranscript: Boolean(docs.docTranscript),
       },
 
       priorityObject: rec.priorityObject || "",
@@ -757,6 +762,8 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                         variant="body2"
                         component={Link}
                         to={`${recordDetailBase}/${r.id}`}
+                        onPointerEnter={() => preloadPage(`${recordDetailBase}/${r.id}`)}
+                        onFocus={() => preloadPage(`${recordDetailBase}/${r.id}`)}
                         sx={{
                           fontWeight: 700,
                           color: "#173E75",
@@ -774,6 +781,8 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                         variant="body2"
                         component={Link}
                         to={`${recordDetailBase}/${r.id}`}
+                        onPointerEnter={() => preloadPage(`${recordDetailBase}/${r.id}`)}
+                        onFocus={() => preloadPage(`${recordDetailBase}/${r.id}`)}
                         sx={{ fontWeight: 700, color: "#173E75", fontSize: 12.5, textDecoration: "none", "&:hover": { color: "#0788B8", textDecoration: "underline" } }}
                       >
                         {personNameParts(r).givenName}
@@ -782,7 +791,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                     <TableCell sx={{ color: "#607486" }}>{r.email || "—"}</TableCell>
 
                     <TableCell align="center" sx={{ color: "#172B3A" }}>
-                      {r.dob || "—"}
+                      {formatDate(r.dob)}
                     </TableCell>
 
                     <TableCell align="center">
@@ -803,6 +812,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                     <TableCell sx={{ fontFamily: "inherit", color: "#172B3A" }}>
                       {r.idCard || "—"}
                     </TableCell>
+                    <TableCell align="center">{r.academicYear || "—"}</TableCell>
 
                     <TableCell align="center">
                       <Chip
@@ -919,6 +929,8 @@ const AdmissionRecords = ({ mode = "applications" }) => {
       {/* ========================================================================= */}
       <Dialog
         open={isFormOpen}
+        keepMounted
+        transitionDuration={0}
         onClose={() => setIsFormOpen(false)}
         maxWidth={false}
         fullWidth
@@ -1055,9 +1067,8 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                 <Stack direction="row" spacing={1}>
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Ngày sinh</Typography>
-                    <TextField
+                    <DateField
                       size="small"
-                      type="date"
                       value={formData.dob}
                       onChange={(e) => setFormData((p) => ({ ...p, dob: e.target.value }))}
                       fullWidth
@@ -1141,8 +1152,9 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                     </Select>
                   </Box>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Phân loại hồ sơ</Typography>
+                    <Typography component="label" id="admission-profile-category-label" variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Phân loại hồ sơ</Typography>
                     <Select
+                      labelId="admission-profile-category-label"
                       size="small"
                       value={formData.profileCategory}
                       onChange={(e) => setFormData((p) => ({ ...p, profileCategory: e.target.value }))}
@@ -1156,11 +1168,24 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                   </Box>
                 </Stack>
 
+                <Stack direction="row" spacing={1}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography component="label" htmlFor="admission-record-year" variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Năm nhập học</Typography>
+                    <TextField
+                      id="admission-record-year"
+                      size="small"
+                      value={formData.academicYear}
+                      InputProps={{ readOnly: true }}
+                      fullWidth
+                      sx={cellInputSx}
+                    />
+                  </Box>
+                </Stack>
+
                 <Box>
                   <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Ngày nhập học</Typography>
-                  <TextField
+                  <DateField
                     size="small"
-                    type="date"
                     value={formData.admissionDate}
                     onChange={(e) => setFormData((p) => ({ ...p, admissionDate: e.target.value }))}
                     fullWidth

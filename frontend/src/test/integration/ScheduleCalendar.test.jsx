@@ -351,9 +351,9 @@ it("shows all pending confirmations independently of the displayed week and sort
 
   const dialog = screen.getByRole("dialog", { name: "BUỔI CHỜ XÁC NHẬN · 2" });
   const cards = within(dialog).getAllByRole("article");
-  expect(cards[0]).toHaveTextContent("02/09/2026");
+  expect(cards[0]).toHaveTextContent("02/09/26");
   expect(cards[0]).toHaveTextContent("Lớp cũ hơn");
-  expect(cards[1]).toHaveTextContent("12/09/2026");
+  expect(cards[1]).toHaveTextContent("12/09/26");
   expect(cards[1]).toHaveTextContent("Lớp mới hơn");
   expect(within(dialog).getAllByRole("button", { name: "Không diễn ra" })).toHaveLength(2);
   expect(within(dialog).getAllByRole("button", { name: "✓ Đã diễn ra" })).toHaveLength(2);

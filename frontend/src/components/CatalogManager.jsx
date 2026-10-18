@@ -5,10 +5,12 @@ import "react-toastify/dist/ReactToastify.css";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress,
   FormControl, FormControlLabel, IconButton, MenuItem, Paper, Select, Stack,
-  Switch, TableBody, TableCell, TableContainer, TableRow, TextField,
+  Switch, TableBody, TableCell, TableContainer, TablePagination, TableRow, TextField,
   Tooltip, Typography, ListSubheader,
 } from "@mui/material";
-import { AddRounded, DeleteRounded, EditRounded } from "@mui/icons-material";
+import AddRounded from "@mui/icons-material/AddRounded";
+import DeleteRounded from "@mui/icons-material/DeleteRounded";
+import EditRounded from "@mui/icons-material/EditRounded";
 import { API_BASE_URL } from "../config/http";
 import FeatureLayout from "./FeatureLayout";
 import AppDialog from "./AppDialog";
@@ -17,6 +19,7 @@ import { personNameParts } from "../utils/personName";
 import FilterSearchField from "./FilterSearchField";
 import ResizableTable from "./ResizableTable";
 import { alphabeticalOptionGroups } from "../utils/optionGroups";
+import { useAuthSession } from "../context/AuthSession";
 
 const buildEmptyForm = (parent, fields, sortable, activeField = "active") => {
   const form = { code: "", name: "", [activeField]: true };
@@ -101,6 +104,7 @@ const CatalogManager = ({
   showStatusBadge = true,
   addButtonLabel = null,
 }) => {
+  const session = useAuthSession();
   const apiBase = baseEndpoint || endpoint.split("?")[0];
   const [rows, setRows] = useState([]);
   const [options, setOptions] = useState([]);
@@ -109,6 +113,8 @@ const CatalogManager = ({
   const [error, setError] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const pageSize = 25;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(buildEmptyForm(parent, fields, sortable, activeField));
@@ -187,6 +193,11 @@ const CatalogManager = ({
   }, [load]);
 
   useEffect(() => {
+    if (session && ["/auth/session", "/auth/isStaff"].includes(authEndpoint)) {
+      const data = { ...session, message: session.user?.role || "student" };
+      setIsAdmin(typeof authCheck === "function" ? Boolean(authCheck(data)) : data.message === "admin");
+      return;
+    }
     let mounted = true;
     axios.get(`${API_BASE_URL}${authEndpoint}`, { withCredentials: true })
       .then(({ data }) => {
@@ -199,7 +210,7 @@ const CatalogManager = ({
       })
       .catch(() => mounted && setIsAdmin(false));
     return () => { mounted = false; };
-  }, [authEndpoint, authCheck]);
+  }, [authEndpoint, authCheck, session]);
 
   useEffect(() => {
     if (!parent) { setOptions([]); return; }
@@ -249,6 +260,8 @@ const CatalogManager = ({
     ];
     return rows.filter((row) => haystacks(row).some((v) => String(v ?? "").toLowerCase().includes(keyword)));
   }, [rows, search, parent, tableFields, showCode, fieldOptions]);
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(filtered.length / pageSize) - 1));
+  const visibleRows = filtered.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
   const showActions = isAdmin && (showEditAction || showDeleteAction);
   const parentColumn = parent && { key: `parent:${parent.field}`, label: parent.columnLabel || parent.label, width: 220, minWidth: 100 };
@@ -408,7 +421,7 @@ const CatalogManager = ({
           <FilterSearchField
             placeholder={showCode ? `Tìm theo ${codeLabel.toLowerCase()} hoặc tên...` : "Tìm theo tên..."}
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => { setSearch(event.target.value); setPage(0); }}
             sx={{ minWidth: { xs: 0, sm: 280 }, width: { xs: "100%", sm: "auto" }, flexGrow: 1 }}
           />
           {isAdmin && (
@@ -444,11 +457,11 @@ const CatalogManager = ({
               <TableRow><TableCell colSpan={colSpan} align="center" sx={{ py: 4 }}><CircularProgress size={28} /></TableCell></TableRow>
             ) : filtered.length === 0 ? (
               <TableRow><TableCell colSpan={colSpan} align="center" sx={{ py: 4, color: "text.secondary" }}>Chưa có dữ liệu.</TableCell></TableRow>
-            ) : filtered.map((row, index) => (
+            ) : visibleRows.map((row, index) => (
               <TableRow key={row.id} hover onDoubleClick={isAdmin && editOnDoubleClick && !inlineEdit ? () => openEdit(row) : undefined}
                 title={isAdmin && editOnDoubleClick ? "Nhấp đúp để sửa" : undefined}
                 sx={isAdmin && editOnDoubleClick ? { cursor: "pointer" } : undefined}>
-                {showIndex && <TableCell>{index + 1}</TableCell>}
+                {showIndex && <TableCell>{currentPage * pageSize + index + 1}</TableCell>}
                 {showCode && <TableCell>{renderEditableCell(row, "code", codeLabel, <Typography variant="body2" sx={{ fontFamily: "inherit" }}>{row.code}</Typography>)}</TableCell>}
                 {parent && parentBeforeName && <TableCell>{parent.display ? parent.display(row) : row[parent.field]}</TableCell>}
                 {splitPersonName ? <><TableCell>{personNameParts(row).familyAndMiddle}</TableCell><TableCell>{personNameParts(row).givenName}</TableCell></> : <TableCell>{renderEditableCell(row, "name", nameLabel, row.name)}</TableCell>}
@@ -493,6 +506,12 @@ const CatalogManager = ({
           </TableBody>
         </ResizableTable>
       </TableContainer>
+      {filtered.length > pageSize && <TablePagination component="div" count={filtered.length}
+        page={currentPage} rowsPerPage={pageSize} rowsPerPageOptions={[pageSize]}
+        onPageChange={(_, next) => setPage(next)}
+        getItemAriaLabel={type => type === 'next' ? 'Trang sau' : 'Trang trước'}
+        labelDisplayedRows={({ from, to, count }) => `${from}–${to} / ${count}`}
+        sx={{ bgcolor: '#fff', border: '1px solid #D7E4EE', borderTop: 0 }} />}
 
       <AppDialog
         open={dialogOpen}

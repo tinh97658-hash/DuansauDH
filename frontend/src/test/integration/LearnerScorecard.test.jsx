@@ -6,7 +6,7 @@ import ClassScoreSummary from "../../pages/reports/classScoreSummary";
 import LearnerScorecard from "../../features/learners/LearnerScorecard";
 import { notifyGradebookSaved } from "../../utils/gradebookRevision";
 
-jest.mock("axios", () => ({ get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn(), defaults: {} }));
+vi.mock("axios", () => ({ default: { get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn(), defaults: {} } }));
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
 jest.mock("react-toastify", () => ({ ToastContainer: () => null, toast: { success: jest.fn(), error: jest.fn() } }));
 jest.mock("@mui/icons-material", () => ({
@@ -54,7 +54,7 @@ const LocationProbe = () => {
 const mount = (entry = "/masters/admitted-records/ar1") => render(<MemoryRouter initialEntries={[entry]}>
   <LocationProbe /><Routes>
     <Route path="/reports/class-score-summary" element={<ClassScoreSummary />} />
-    <Route path="/masters/admitted-records/:id" element={<AdmissionRecordDetail />} />
+    <Route path="/masters/admitted-records/:id" element={<AdmissionRecordDetail returnPath="/masters/admitted-records" />} />
     <Route path="/plan/admission-records/:id" element={<AdmissionRecordDetail />} />
   </Routes>
 </MemoryRouter>);
@@ -190,7 +190,7 @@ it("keeps the chosen class in the URL and discards a late response from a previo
 it("supports the scorecard tab on a doctoral profile", async () => {
   const originalGet = axios.get.getMockImplementation();
   axios.get.mockImplementation(async (url, config) => url.endsWith("/admission-records/ar1") ? { data: { ...record, trainingLevel: "Tiến sĩ" } } : originalGet(url, config));
-  mount("/plan/admission-records/ar1?tab=grades&classGroupId=g1");
+  mount("/masters/admitted-records/ar1?tab=grades&classGroupId=g1");
   await waitForScorecard();
   expect(screen.getByRole("tab", { name: "Bảng điểm" })).toHaveAttribute("aria-selected", "true");
   expect(screen.queryByRole("tab", { name: "Xét tuyển" })).not.toBeInTheDocument();

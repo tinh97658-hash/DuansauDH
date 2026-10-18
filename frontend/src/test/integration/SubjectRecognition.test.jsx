@@ -16,15 +16,15 @@ jest.mock("@mui/icons-material", () => ({
 }));
 jest.setTimeout(15000);
 
-jest.mock("axios", () => ({
+vi.mock("axios", () => ({ default: {
   get: jest.fn(),
   post: jest.fn(),
   put: jest.fn(),
   delete: jest.fn(),
   defaults: {},
-}));
-jest.mock("react-router-dom", () => ({
-  ...jest.requireActual("react-router-dom"),
+} }));
+vi.mock("react-router-dom", async () => ({
+  ...await vi.importActual("react-router-dom"),
   useParams: () => ({ id: "record-1" }),
   useNavigate: () => jest.fn(),
 }));
@@ -67,7 +67,7 @@ const clickAndWait = async (element) => {
   await act(async () => { fireEvent.click(element); await new Promise((resolve) => setTimeout(resolve, 0)); });
 };
 
-const renderPage = () => render(<MemoryRouter><AdminAdmissionRecordDetail /></MemoryRouter>);
+const renderPage = () => render(<MemoryRouter><AdminAdmissionRecordDetail returnPath="/masters/admitted-records" /></MemoryRouter>);
 const renderLearningPage = async () => {
   renderPage();
   await clickAndWait(await screen.findByRole("tab", { name: "Học tập" }));
@@ -286,7 +286,7 @@ describe("AdmissionRecordDetail shared subject recognition", () => {
     expect(axios.delete).not.toHaveBeenCalled();
   });
 
-  it.each(["pending", "approved", "rejected"])("hides a subject from the upper table when its decision is %s", async status => {
+  it.each(["pending", "approved", "rejected"])("shows prior learning in the upper table only when its decision is approved (%s)", async status => {
     const prior = { id: "lr-prior", sourceType: "pre_masters", subjectId: subject.id, subject, status: "completed", result: "passed" };
     const otherSubject = { ...subject, id: "subject-remaining", codeText: "HPTH", name: "Học phần còn lại" };
     configureReads({ learningResults: [prior], studiedSubjects: [prior,
@@ -295,10 +295,24 @@ describe("AdmissionRecordDetail shared subject recognition", () => {
         learningResult: prior, sourceSubject: subject, targetSubject: subject }] });
     await renderLearningPage();
     const upper = screen.getByRole("table", { name: "Học phần đã học trong chương trình đào tạo" });
-    expect(within(upper).queryByText("CNT101 — Triết học")).not.toBeInTheDocument();
+    if (status === "approved") expect(within(upper).getByText("CNT101 — Triết học")).toBeInTheDocument();
+    else expect(within(upper).queryByText("CNT101 — Triết học")).not.toBeInTheDocument();
     expect(within(upper).getByText("HPTH — Học phần còn lại")).toBeInTheDocument();
-    expect(screen.getByText("Học phần đã học trong chương trình đào tạo (1)")).toBeInTheDocument();
+    expect(screen.getByText(`Học phần đã học trong chương trình đào tạo (${status === "approved" ? 2 : 1})`)).toBeInTheDocument();
     expect(within(screen.getByRole("table", { name: "Phê duyệt công nhận học phần" })).getByText("CNT101 — Triết học")).toBeInTheDocument();
+  });
+
+  it.each(["passed", "exempt"])("includes an approved %s recognition even when the studied endpoint only returns exams", async result => {
+    const target = { ...subject, id: "target-subject", codeText: "TARGET101" };
+    const learning = { id: "lr-approved", sourceType: "pre_masters", subject, status: "completed", result };
+    configureReads({ learningResults: [learning], recognitions: [{ id: "rec-approved", status: "approved",
+      learningResultId: learning.id, sourceType: "pre_masters", targetSubject: target }] });
+    await renderLearningPage();
+    const upper = screen.getByRole("table", { name: "Học phần đã học trong chương trình đào tạo" });
+    expect(within(upper).getByText("TARGET101 — Triết học")).toBeInTheDocument();
+    expect(within(upper).getByText("Tiền thạc sĩ")).toBeInTheDocument();
+    expect(within(upper).getByText(result === "passed" ? "Đạt" : "Miễn thi")).toBeInTheDocument();
+    expect(screen.getByTestId("recognition-rec-approved")).toBeInTheDocument();
   });
 
   it.each(["pending", "approved", "rejected"].flatMap(status => ["passed", "failed", "exempt"].map(result => [status, result])))
@@ -317,6 +331,20 @@ describe("AdmissionRecordDetail shared subject recognition", () => {
     const decision = screen.getByTestId("recognition-rec-prior");
     expect(within(decision).getByText("HPTA — Tiếng Anh")).toBeInTheDocument();
     expect(within(decision).getByText("Chưa có kết quả")).toBeInTheDocument();
+  });
+
+  it("keeps the regular exam result without duplicating an approved recognition of the same subject", async () => {
+    const learning = { id: "lr-approved", sourceType: "pre_masters", subject, status: "completed", result: "passed" };
+    configureReads({ learningResults: [learning], studiedSubjects: [
+      { id: "exam-failed", sourceType: "regular", subject, status: "completed", result: "failed" },
+    ], recognitions: [{ id: "rec-approved", status: "approved", sourceType: "pre_masters",
+      learningResultId: learning.id, learningResult: learning, targetSubject: subject }] });
+    await renderLearningPage();
+    const upper = screen.getByRole("table", { name: "Học phần đã học trong chương trình đào tạo" });
+    expect(within(upper).getAllByText("CNT101 — Triết học")).toHaveLength(1);
+    expect(within(upper).getByText("Chính khóa")).toBeInTheDocument();
+    expect(within(upper).getByText("Không đạt")).toBeInTheDocument();
+    expect(within(screen.getByTestId("recognition-rec-approved")).getByText("Đạt")).toBeInTheDocument();
   });
 
   it("shows studied curriculum subjects without scores and limits recognition cards to prior learning and bridge subjects", async () => {

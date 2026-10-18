@@ -1,3 +1,5 @@
+import { formatDate } from "./dateFormat";
+
 const pad = (value) => String(value).padStart(2, "0");
 
 export const BUSINESS_TIME_ZONE = "Asia/Ho_Chi_Minh";
@@ -77,18 +79,13 @@ export const isSessionEndedInBusinessTimezone = (session, now = new Date()) => {
 };
 export const isSessionPast = isSessionEndedInBusinessTimezone;
 
-export const vietnameseDate = (date) => new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-}).format(parseLocalDate(date));
+export const vietnameseDate = (date) => formatDate(formatDateKey(parseLocalDate(date)));
 
-export const vietnameseDayLabel = (date) => {
+export const vietnameseDayLabel = (date, includeDate = true) => {
   const value = parseLocalDate(date);
-  return `${value.getDay() === 0 ? "Chủ nhật" : `Thứ ${value.getDay() + 1}`} · ${new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-  }).format(value)}`;
+  const weekday = value.getDay() === 0 ? "Chủ nhật" : `Thứ ${value.getDay() + 1}`;
+  if (!includeDate) return weekday;
+  return `${weekday} · ${vietnameseDate(date)}`;
 };
 
 export const vietnameseWeekdayShort = (date) => {
@@ -96,7 +93,4 @@ export const vietnameseWeekdayShort = (date) => {
   return value.getDay() === 0 ? "CN" : `T${value.getDay() + 1}`;
 };
 
-export const vietnameseDayMonth = (date) => new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  month: "2-digit",
-}).format(parseLocalDate(date));
+export const vietnameseDayMonth = vietnameseDate;

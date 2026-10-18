@@ -13,12 +13,12 @@ import { downloadDocumentFile } from "../../utils/documentFiles";
 
 jest.mock("axios");
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
-jest.mock("../../features/learners/learnerTranscriptPdfPreview", () => ({ openLearnerTranscriptPdfPreview: jest.fn(jest.requireActual("../../features/learners/learnerTranscriptPdfPreview").openLearnerTranscriptPdfPreview) }));
+jest.mock("../../features/learners/learnerTranscriptPdfPreview", async (importOriginal) => ({ openLearnerTranscriptPdfPreview: jest.fn((await importOriginal()).openLearnerTranscriptPdfPreview) }));
 jest.mock("../../features/learners/learnerTranscriptWord", () => ({ createLearnerTranscriptWord: jest.fn() }));
 jest.mock("../../features/learners/learnerTranscriptPdf", () => ({ createLearnerTranscriptPdf: jest.fn() }));
-jest.mock("../../features/learners/learnerTranscriptBatch", () => ({ fetchClassTranscripts: jest.fn(), generateTranscriptDocuments: jest.fn(), selectTranscriptScorecards: jest.requireActual("../../features/learners/learnerTranscriptBatch").selectTranscriptScorecards }));
+jest.mock("../../features/learners/learnerTranscriptBatch", async (importOriginal) => ({ fetchClassTranscripts: jest.fn(), generateTranscriptDocuments: jest.fn(), selectTranscriptScorecards: (await importOriginal()).selectTranscriptScorecards }));
 jest.mock("../../features/learners/learnerTranscriptZip", () => ({ packTranscriptZip: jest.fn() }));
-jest.mock("../../utils/documentFiles", () => ({ ...jest.requireActual("../../utils/documentFiles"), downloadDocumentFile: jest.fn() }));
+jest.mock("../../utils/documentFiles", async (importOriginal) => ({ ...await importOriginal(), downloadDocumentFile: jest.fn() }));
 jest.mock("@mui/icons-material", () => ({ SearchRounded: () => null }));
 jest.setTimeout(20000);
 
@@ -31,9 +31,9 @@ const students = Array.from({ length: 40 }, (_, index) => ({
 const roster = { classGroup: group, students };
 const scorecard = { student: { fullName: "Nguyễn An", code: "HV001" }, group, curriculum: { name: "CTĐT" }, subjects: [] };
 let tab;
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks(); localStorage.clear();
-  openLearnerTranscriptPdfPreview.mockImplementation(jest.requireActual("../../features/learners/learnerTranscriptPdfPreview").openLearnerTranscriptPdfPreview);
+  openLearnerTranscriptPdfPreview.mockImplementation((await vi.importActual("../../features/learners/learnerTranscriptPdfPreview")).openLearnerTranscriptPdfPreview);
   URL.createObjectURL = jest.fn(() => "blob:transcript");
   URL.revokeObjectURL = jest.fn();
   tab = { close: jest.fn(), opener: null, closed: false, location: { replace: jest.fn() } };

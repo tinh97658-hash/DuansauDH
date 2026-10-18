@@ -5,7 +5,7 @@ import axios from 'axios';
 import StudyLeaves from '../../pages/masters/studyLeaves';
 
 jest.mock('axios');
-jest.mock('../../components/AppLayout', () => ({ children }) => <div>{children}</div>);
+jest.mock('../../components/FeatureLayout', () => ({ children }) => <div>{children}</div>);
 const row = { id: 'leave', admissionRecordId: 'record', fullName: 'Nguyễn Văn A', code: 'HV001', trainingLevel: 'Thạc sĩ',
   classCode: 'K24', startDate: '2026-01-01', endDate: '2026-06-30', status: 'overdue', overdueDays: 3,
   extensions: [{ status: 'pending' }] };

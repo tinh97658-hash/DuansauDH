@@ -431,7 +431,7 @@ export default function Schedule({ user }) {
       const dateKey = formatDateKey(day);
       const isToday = dateKey === todayKey;
       const count = sessionsOn(dateKey).length;
-      return <button type="button" className={`sl-day ${isToday ? "sl-is-today" : ""}`} key={dateKey} aria-label={`Xem lịch ${vietnameseDate(dateKey)}: ${count} lớp`} onClick={() => setFocusedDate(dateKey)}><strong>{vietnameseWeekdayShort(day)}</strong><span>{vietnameseDayMonth(day).replace("/", "-")}</span><b>{count}</b>{isToday && <i className="sl-today-indicator" aria-label="Hôm nay" title="Hôm nay" />}</button>;
+      return <button type="button" className={`sl-day ${isToday ? "sl-is-today" : ""}`} key={dateKey} aria-label={`Xem lịch ${vietnameseDate(dateKey)}: ${count} lớp`} onClick={() => setFocusedDate(dateKey)}><strong>{vietnameseWeekdayShort(day)}</strong><span>{vietnameseDayMonth(day)}</span><b>{count}</b>{isToday && <i className="sl-today-indicator" aria-label="Hôm nay" title="Hôm nay" />}</button>;
     })}
       {["MORNING", "AFTERNOON"].map((period) => <React.Fragment key={period}><div className="sl-period"><span>{period === "MORNING" ? "SÁNG" : "CHIỀU"}</span></div>{weekDays.map((day) => {
         const slot = slotState(day, period);

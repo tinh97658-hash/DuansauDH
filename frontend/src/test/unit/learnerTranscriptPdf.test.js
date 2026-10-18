@@ -86,8 +86,8 @@ it.each([[officialTranscriptScorecardFixture, 1], [longTranscriptScorecardFixtur
     // Check emitted PDF coordinates against the supplied MPS value starts,
     // independent of the renderer's layout constants.
     const valueStarts = [
-      ["Vũ", 102.72, 0], ["11/09/2002", 102.72, 1], ["2025-2027", 169.56, 2],
-      ["26/03/2025", 131.40, 3], ["Thạc", 140.40, 4],
+      ["Vũ", 102.72, 0], ["11/09/02", 102.72, 1], ["2025-2027", 169.56, 2],
+      ["26/03/25", 131.40, 3], ["Thạc", 140.40, 4],
       ["Hải", 342.00, 0], ["Công", 374.64, 1], ["Ứng", 393.36, 2],
       ["Chính", 384.36, 3], ["02", 384.36, 4], ["Tiếng", 384.36, 5],
     ];

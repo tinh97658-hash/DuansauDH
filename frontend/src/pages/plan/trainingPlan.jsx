@@ -9,13 +9,21 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField,
   Tooltip, Typography,
 } from "@mui/material";
-import {
-  AddRounded, CheckBoxOutlineBlankRounded, CheckBoxRounded, CheckRounded,
-  CloseRounded, DeleteOutlineRounded, DeleteRounded, EditRounded, LibraryBooksRounded,
-  PlaylistAddRounded, SaveRounded, ClassRounded,
-} from "@mui/icons-material";
+import AddRounded from "@mui/icons-material/AddRounded";
+import CheckBoxOutlineBlankRounded from "@mui/icons-material/CheckBoxOutlineBlankRounded";
+import CheckBoxRounded from "@mui/icons-material/CheckBoxRounded";
+import CheckRounded from "@mui/icons-material/CheckRounded";
+import CloseRounded from "@mui/icons-material/CloseRounded";
+import DeleteOutlineRounded from "@mui/icons-material/DeleteOutlineRounded";
+import DeleteRounded from "@mui/icons-material/DeleteRounded";
+import EditRounded from "@mui/icons-material/EditRounded";
+import LibraryBooksRounded from "@mui/icons-material/LibraryBooksRounded";
+import PlaylistAddRounded from "@mui/icons-material/PlaylistAddRounded";
+import SaveRounded from "@mui/icons-material/SaveRounded";
+import ClassRounded from "@mui/icons-material/ClassRounded";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
+import { useAuthSession } from "../../context/AuthSession";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import SubjectSharingCheckbox from "../../components/SubjectSharingCheckbox";
@@ -177,14 +185,17 @@ const TrainingPlan = () => {
   const [selectedCatalogSubjectIds, setSelectedCatalogSubjectIds] = useState([]);
   const [catalogSubjects, setCatalogSubjects] = useState([]);
 
+  const session = useAuthSession();
   // Load Majors
+  const selectedMajorId = useRef(majorId);
+  selectedMajorId.current = majorId;
   const loadMajors = useCallback(async () => {
     try {
       const { data } = await axios.get(`${API_BASE_URL}/plan/training-plan?program=${level}`, { withCredentials: true });
       const list = Array.isArray(data) ? data : data.data || [];
       setMajors(list);
       if (list.length > 0) {
-        const selected = list.find((m) => m.id === majorId) || list[0];
+        const selected = list.find((m) => m.id === selectedMajorId.current) || list[0];
         setDisciplineId(majorDisciplineId(selected));
         setMajorId(selected.id);
       } else {
@@ -199,7 +210,7 @@ const TrainingPlan = () => {
     } catch (err) {
       toast.error(err.response?.data?.message || "Không thể tải danh sách chuyên ngành");
     }
-  }, [majorId, level]);
+  }, [level]);
 
   useEffect(() => {
     loadMajors();
@@ -207,12 +218,13 @@ const TrainingPlan = () => {
 
   // Auth Check
   useEffect(() => {
+    if (session) { setIsAdmin(session.user?.role === "admin"); return; }
     let mounted = true;
     axios.get(`${API_BASE_URL}/auth/isStaff`, { withCredentials: true })
       .then(({ data }) => mounted && setIsAdmin(data.message === "admin"))
       .catch(() => mounted && setIsAdmin(false));
     return () => { mounted = false; };
-  }, []);
+  }, [session]);
 
   // Load each resource independently. A missing curriculum endpoint must not hide
   // a valid subject catalog (the scheduling module consumes that catalog too).

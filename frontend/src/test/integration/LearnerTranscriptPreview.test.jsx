@@ -76,7 +76,7 @@ it("uses the business date and administrative placeholders without deriving GPA 
   const details = transcriptDocumentDetails(document);
   expect(document.summary).toEqual({ gpa: null, gradeScale: null });
   expect(details.gpa.value).toBe("—");
-  expect(details.issueDate).toBe("Hải Phòng, ngày 13 tháng 10 năm 2026");
+  expect(details.issueDate).toBe("Hải Phòng, ngày 13/10/26");
   expect(details.numberLine).toMatch(/^Số:\s+\/Khóa 2025\/SĐH$/);
   expect(document.issuance.number).toBeNull();
   expect(details.signatures.map(signature => signature.name)).toEqual([null, null]);

@@ -25,7 +25,7 @@ const BULK_ADMISSION_COLUMNS = [
   { key: "status", label: "Trạng thái", width: 140, minWidth: 110, align: "center" },
 ];
 
-export default function BulkAdmissionWorkflow({ data, visibleRows, paginationKey, admin, loading = false, thresholdsDirty = false, onRefresh, onDirtyChange, onBusyChange }) {
+export default function BulkAdmissionWorkflow({ data, visibleRows, paginationKey, admin, loading = false, thresholdsDirty = false, onRefresh, onDirtyChange, onBusyChange, recordViewControl }) {
   const navigate = useNavigate();
   const [navTarget, setNavTarget] = useState(null);
   const [page, setPage] = useState(1), [previewPage, setPreviewPage] = useState(1);
@@ -119,12 +119,15 @@ export default function BulkAdmissionWorkflow({ data, visibleRows, paginationKey
       <Stack spacing={1.5}>
         <Typography fontWeight={700}>Nhập điểm hồ sơ và xét tuyển</Typography>
         <Typography variant="body2">Tải file Excel mẫu gồm mã hồ sơ, họ tên, năm sinh, giới tính, chuyên ngành, thông tin liên hệ và điểm của danh sách theo bộ lọc trên tất cả các trang. Điền cột Tổng điểm, lưu file .xlsx rồi import lại để lưu điểm hàng loạt. Có thể nhập trực tiếp trên bảng.</Typography>
-        {admin && <Stack direction="row" gap={1} flexWrap="wrap">
+        {(admin || recordViewControl) && <Stack direction="row" gap={1} flexWrap="wrap" alignItems="center">
+          {admin && <>
           <Button variant="outlined" disabled={busy || dirty || !visibleRows.length} onClick={downloadTemplate} sx={{ borderRadius: "4px" }}>Tải file Excel mẫu</Button>
           <Button variant="outlined" disabled={busy || dirty} onClick={() => fileInput.current?.click()} sx={{ borderRadius: "4px" }}>Import từ file Excel</Button>
           <input ref={fileInput} type="file" accept={`.xlsx,${EXCEL_MIME}`} aria-label="Chọn file Excel nhập điểm" hidden disabled={busy || dirty} onChange={importFile} />
           <Button variant="contained" disabled={busy || !dirty} onClick={save} sx={{ borderRadius: "4px", bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F" } }}>Lưu điểm hàng loạt{dirty ? ` (${Object.keys(drafts).length})` : ""}</Button>
           <Button variant="contained" color="success" disabled={busy || dirty || thresholdsDirty || !(data.round.majorThresholds || []).some((entry) => entry.cutoff != null)} onClick={evaluate} sx={{ borderRadius: "4px" }}>Xét tuyển</Button>
+          </>}
+          {recordViewControl}
         </Stack>}
         {dirty && <Alert severity="warning" sx={{ borderRadius: "4px" }}>Điểm đang sửa chưa được lưu. Lưu điểm hàng loạt trước khi tải mẫu, import Excel hoặc xét tuyển.</Alert>}
       </Stack>

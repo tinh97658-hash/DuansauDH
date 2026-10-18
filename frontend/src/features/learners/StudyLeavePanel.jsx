@@ -1,3 +1,6 @@
+import DateField from "../../components/DateField";
+import { formatDate, formatDateTime } from "../../utils/dateFormat";
+import { addDays, formatDateKey } from "../../utils/schedulingCalendar";
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { Alert, Box, Button, Chip, CircularProgress, Divider, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
@@ -14,7 +17,7 @@ const actionLabels = { requested: 'Tạo yêu cầu', approve: 'Duyệt bảo l�
   reject_extension: 'Từ chối gia hạn', resume: 'Tiếp nhận học lại', withdraw: 'Xác nhận thôi học' };
 const options = { withCredentials: true };
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-export const leaveDate = value => value ? value.slice(0, 10).split('-').reverse().join('/') : '—';
+export const leaveDate = formatDate;
 const errorMessage = error => {
   const message = error.response?.data?.message;
   return Array.isArray(message) ? message.join('. ') : message || 'Không thể xử lý bảo lưu. Vui lòng thử lại.';
@@ -27,7 +30,7 @@ function OfferingTable({ rows, history = false }) {
       const row = item.snapshot || item;
       return <TableRow key={`${row.courseOfferingId}-${index}`}><TableCell>{row.subjectName}</TableCell>
         <TableCell>{row.offeringName || row.classCode || '—'}</TableCell>
-        <TableCell>{row.phase === 'not_started' ? 'Hủy lượt xếp lớp' : 'Không đạt do bảo lưu; học lại từ đầu khi trở lại'}</TableCell>
+        <TableCell>{row.notEnrolled ? 'Chưa tham gia lớp học phần' : 'Không đạt do bảo lưu; học lại từ đầu khi trở lại'}</TableCell>
         {history && <TableCell>{row.grades?.length ? row.grades.map((grade, gradeIndex) => <Typography variant="body2" key={gradeIndex}>
           Kiểm tra: {grade.testScore ?? '—'} · Bài tập: {grade.assignmentScore ?? '—'} · Thi: {grade.examScore ?? '—'} · Tổng: {grade.courseScore ?? '—'}
         </Typography>) : 'Chưa có điểm'}</TableCell>}</TableRow>;
@@ -53,7 +56,7 @@ export default function StudyLeavePanel({ record, isAdmin = false, disabled = fa
     setError(''); setSuccess(''); setForm({ note: '', startDate: today(), endDate: '' }); setDialog({ action, leave });
   };
   const submit = async () => {
-    if (busy || disabled) return;
+    if (busy || disabled || invalid) return;
     setBusy(true); setError(''); setSuccess('');
     try {
       const response = dialog.action === 'request'
@@ -67,14 +70,19 @@ export default function StudyLeavePanel({ record, isAdmin = false, disabled = fa
   const openLeave = data?.leaves?.find(leave => ['pending', 'approved'].includes(leave.status));
   const needsNote = dialog && !['approve', 'approve_extension'].includes(dialog.action);
   const needsEnd = dialog && ['request', 'request_extension'].includes(dialog.action);
+  const minEndDate = dialog?.action === 'request'
+    ? (form.startDate ? formatDateKey(addDays(form.startDate, 1)) : undefined)
+    : dialog?.action === 'request_extension'
+      ? [today(), formatDateKey(addDays(dialog.leave.endDate, 1))].sort().at(-1) : undefined;
+  const invalidEndDate = Boolean(dialog?.action === 'request' && form.startDate && form.endDate && form.endDate <= form.startDate);
   const invalid = !dialog || (needsNote && !form.note.trim()) || (needsEnd && !form.endDate)
-    || (dialog?.action === 'request' && (!form.startDate || form.startDate < today() || form.endDate < form.startDate))
+    || (dialog?.action === 'request' && (!form.startDate || form.startDate < today() || form.endDate <= form.startDate))
     || (dialog?.action === 'request_extension' && (form.endDate <= dialog.leave.endDate || form.endDate < today()));
   return <Stack spacing={2}>
     <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="h6">Bảo lưu và tiếp nhận học lại</Typography>
       {isAdmin && record.studyStatus === 'Đang học' && !openLeave && data && <Button variant="contained" disabled={disabled || busy} onClick={() => open('request')}>Tạo yêu cầu bảo lưu</Button>}
     </Stack>
-    <Alert severity="info">Duyệt bảo lưu sẽ rút học viên khỏi các lớp chưa hoàn thành ngay. Môn đã có lịch buổi đầu hoặc đã có điểm được ghi nhận Không đạt, kể cả buổi học không diễn ra; môn chưa có lịch và chưa có điểm chỉ hủy lượt xếp lớp. Giữ lớp hành chính và kết quả môn đã hoàn thành.</Alert>
+    <Alert severity="info">Duyệt bảo lưu sẽ rút học viên khỏi các lớp học phần chưa hoàn thành ngay và ghi nhận Không đạt cho mọi học phần đã ghép lớp, dù đã xếp lịch hay chưa. Giữ lớp hành chính và kết quả môn đã hoàn thành.</Alert>
     {disabled && <Alert severity="warning">Lưu hoặc hủy thay đổi hồ sơ trước khi xử lý bảo lưu.</Alert>}
     {error && !dialog && <Alert severity="error" action={<Button onClick={load} disabled={loading || busy}>Thử lại</Button>}>{error}</Alert>}{success && <Alert severity="success">{success}</Alert>}
     {loading ? <CircularProgress size={24} aria-label="Đang tải bảo lưu" /> : data?.leaves?.length ? data.leaves.map(leave => {
@@ -101,7 +109,7 @@ export default function StudyLeavePanel({ record, isAdmin = false, disabled = fa
           {leave.status === 'pending' && <><Typography variant="subtitle2">Các lớp dự kiến dừng khi duyệt bảo lưu</Typography><OfferingTable rows={data.affectedOfferings || []} /></>}
           <Divider /><Typography variant="subtitle2">Lịch sử xử lý</Typography>
           {leave.history?.map((event, index) => <Typography variant="body2" key={index}>
-            {new Date(event.at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })} · {actionLabels[event.action] || event.action} · {event.actor}
+            {formatDateTime(event.at)} · {actionLabels[event.action] || event.action} · {event.actor}
             {event.endDate ? ` · Hạn: ${leaveDate(event.endDate)}` : ''}{event.note ? ` · ${event.note}` : ''}
           </Typography>)}
         </Stack>
@@ -114,13 +122,16 @@ export default function StudyLeavePanel({ record, isAdmin = false, disabled = fa
       <Stack spacing={2}>{error && <Alert severity="error">{error}</Alert>}
         {needsEnd && <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           {dialog?.action === 'request' && <PopupFormField label="Ngày bắt đầu bảo lưu" htmlFor="study-leave-start-date">
-            <TextField id="study-leave-start-date" fullWidth size="small" type="date" value={form.startDate} onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} inputProps={{ min: today() }} />
+            <DateField id="study-leave-start-date" fullWidth size="small" value={form.startDate} onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} inputProps={{ min: today() }} />
           </PopupFormField>}
           <PopupFormField label={dialog?.action === 'request' ? 'Ngày kết thúc bảo lưu' : 'Ngày kết thúc mới'} htmlFor="study-leave-end-date">
-            <TextField id="study-leave-end-date" fullWidth size="small" type="date" value={form.endDate} onChange={e => setForm(p => ({ ...p, endDate: e.target.value }))} />
+            <DateField id="study-leave-end-date" fullWidth size="small" value={form.endDate}
+              min={minEndDate} error={invalidEndDate}
+              helperText={dialog?.action === 'request' ? 'Ngày kết thúc phải sau ngày bắt đầu bảo lưu ít nhất 1 ngày.' : 'Hạn mới phải sau hạn bảo lưu hiện tại.'}
+              onChange={e => setForm(p => ({ ...p, endDate: e.target.value }))} />
           </PopupFormField>
         </Stack>}
-        {dialog?.action === 'approve' && <><Alert severity="warning">Rút khỏi danh sách lớp ngay khi duyệt. Môn đã có lịch buổi đầu hoặc đã có điểm sẽ ghi nhận Không đạt, kể cả buổi học không diễn ra. Trạng thái bảo lưu có hiệu lực từ {leaveDate(dialog.leave.startDate)}; khi quay lại phải học từ đầu.</Alert><OfferingTable rows={data?.affectedOfferings || []} /></>}
+        {dialog?.action === 'approve' && <><Alert severity="warning">Rút khỏi danh sách lớp ngay khi duyệt và ghi nhận Không đạt cho mọi học phần đã ghép lớp chưa hoàn thành, dù đã xếp lịch hay chưa. Trạng thái bảo lưu có hiệu lực từ {leaveDate(dialog.leave.startDate)}; khi quay lại phải học từ đầu.</Alert><OfferingTable rows={data?.affectedOfferings || []} /></>}
         {dialog?.action === 'resume' && <Alert severity="info">Tiếp nhận học lại từ hôm nay. Học viên sẽ chờ ghép lớp mới cho các môn đã dừng; các điểm cũ không chuyển sang lần học mới.</Alert>}
         {dialog?.action === 'withdraw' && <Alert severity="warning">Xác nhận quyết định thôi học từ hôm nay. Hồ sơ, lớp hành chính và lịch sử học vẫn được giữ.</Alert>}
         {dialog?.action === 'approve_extension' && <Alert severity="info">Gia hạn đến {leaveDate(dialog.leave.extensions?.find(item => item.status === 'pending')?.endDate)}.</Alert>}

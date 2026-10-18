@@ -5,7 +5,7 @@ import axios from "axios";
 import BulkAdmissionWorkflow from "../../features/admission/BulkAdmissionWorkflow";
 import { createScoreTemplate, parseScoreExcel, readExcelFile } from "../../features/admission/admissionExcel";
 jest.mock("../../features/admission/admissionExcel", () => ({ createScoreTemplate: jest.fn(), parseScoreExcel: jest.fn(), readExcelFile: jest.fn(), EXCEL_MIME: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-jest.mock("axios", () => ({ put: jest.fn(), post: jest.fn(), defaults: {} }));
+vi.mock("axios", () => ({ default: { put: vi.fn(), post: vi.fn(), defaults: {} } }));
 const row = { admissionRecordId: "record-1", code: "HS001", fullName: "Nguyễn Văn An", birthYear: 1996, gender: "Nam", phone: "0900000001", email: "demo@example.com", version: 0, total: null, decision: "pending", stale: false, meetsCutoff: null };
 const data = { round: { id: "round-1", majorThresholds: [{ majorId: "major-1", cutoff: 15 }] }, rows: [row], admittedCount: 0 };
 const mount = (props = {}) => render(<MemoryRouter><BulkAdmissionWorkflow data={data} visibleRows={data.rows} admin onRefresh={jest.fn().mockResolvedValue()} {...props} /></MemoryRouter>);

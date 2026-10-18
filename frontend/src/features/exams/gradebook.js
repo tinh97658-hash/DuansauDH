@@ -1,3 +1,4 @@
+import { formatDate } from "../../utils/dateFormat";
 import { personNameParts } from "../../utils/personName";
 import { calculateExamEligibility, calculatePolicyGrade, DEFAULT_GRADING_POLICY } from "./gradingPolicy";
 
@@ -67,7 +68,7 @@ export const visibleGradeRows = (rows, mode, query) => {
     return !search || `${row.code} ${row.fullName}`.toLocaleLowerCase("vi").includes(search);
   });
 };
-export const displayGradeDate = (date) => /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date.split("-").reverse().join("/") : date || "—";
+export const displayGradeDate = formatDate;
 export const gradebookColumns = (blank = false) => [
   { key: "index", label: "STT", width: 45, minWidth: 40, align: "center" },
   { key: "code", label: "Mã HV", width: 140 }, { key: "lastName", label: "Họ đệm", width: 150 },

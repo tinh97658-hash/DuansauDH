@@ -129,11 +129,11 @@ it.each([3, 25])("does not extend the blue header fill past the last subject for
 it("only formats birth dates for this Excel export and preserves blank marks and literal exemptions", async () => {
   const report = sampleReport(3, 4);
   report.rows[0].dob = "2000-01-01T00:00:00.000Z";
-  report.rows[1].dob = "16/04/1997";
+  report.rows[1].dob = "16/04/97";
   report.rows[2].dob = "Chưa xác định";
   report.rows[3].dob = "2000-02-29";
   const sheet = await loadSheet(report);
-  expect([11, 12, 13, 14].map(row => sheet.getCell(row, 5).value)).toEqual(["01/01/2000", "16/04/1997", "Chưa xác định", "29/02/2000"]);
+  expect([11, 12, 13, 14].map(row => sheet.getCell(row, 5).value)).toEqual(["01/01/00", "16/04/97", "Chưa xác định", "29/02/00"]);
   expect(sheet.getCell("G11").value).toBe(0);
   expect(sheet.getCell("H11").value).toBe("MT");
   expect(sheet.getCell("I11").value).not.toBe(0);

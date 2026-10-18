@@ -32,7 +32,8 @@ export class StudyLeaveService {
   }
 
   private dates(start: string, end: string) {
-    if (!validDate(start) || !validDate(end) || end < start) throw new BadRequestException('Khoảng thời gian bảo lưu không hợp lệ.');
+    if (!validDate(start) || !validDate(end)) throw new BadRequestException('Khoảng thời gian bảo lưu không hợp lệ.');
+    if (end <= start) throw new BadRequestException('Ngày kết thúc bảo lưu phải sau ngày bắt đầu bảo lưu.');
   }
 
   // Runs before relevant HTTP requests. This also catches dates crossed while the server
@@ -70,7 +71,7 @@ export class StudyLeaveService {
     }, transaction);
     const affected = await this.affected(leave.admissionRecordId, transaction, effectiveAt);
     for (const offering of affected) {
-      if (offering.phase === 'studying') Object.assign(offering, { result: 'failed', studyLeaveFailure: true });
+      Object.assign(offering, { result: 'failed', studyLeaveFailure: true });
       await this.write(`INSERT INTO course_offering_withdrawals
         (id, study_leave_id, admission_record_id, course_offering_id, class_group_id, participant_id, effective_date, snapshot)
         VALUES (:id,:leaveId,:recordId,:offeringId,:groupId,:participantId,:date,CAST(:snapshot AS jsonb))
@@ -107,18 +108,14 @@ export class StudyLeaveService {
   }
 
   private async affected(recordId: string, transaction?: Transaction, effectiveAt = new Date().toISOString()) {
+    // Enrollment counts as an attempt on approval, regardless of sessions or marks.
+    // Keep the shared 'studying' phase used by outcomes and retake grouping.
     return this.select(`SELECT DISTINCT ON (offering.id) offering.id AS "courseOfferingId",
       offering.name AS "offeringName", subject.id AS "subjectId", subject.name AS "subjectName",
       link.class_group_id AS "classGroupId", groups.code AS "classCode",
       CASE WHEN record.student_id IS NOT NULL THEN 'student:' || record.student_id::text
         ELSE 'admission:' || record.id::text END AS "participantId",
-      CASE WHEN EXISTS (SELECT 1 FROM teaching_sessions session WHERE session.course_offering_id = offering.id
-        AND session.created_at <= CAST(:effectiveAt AS timestamptz)) OR EXISTS (
-          SELECT 1 FROM course_exam_gradebooks book CROSS JOIN LATERAL jsonb_array_elements(book.grades) grade
-          WHERE book.course_offering_id = offering.id AND (grade->>'participantId' = 'admission:' || record.id::text
-            OR grade->>'participantId' = 'student:' || record.student_id::text)
-            AND (jsonb_typeof(grade->'testScore') = 'number' OR jsonb_typeof(grade->'assignmentScore') = 'number'
-              OR jsonb_typeof(grade->'examScore') = 'number')) THEN 'studying' ELSE 'not_started' END AS phase,
+      'studying' AS phase,
       COALESCE((SELECT jsonb_agg(grade) FROM course_exam_gradebooks book CROSS JOIN LATERAL jsonb_array_elements(book.grades) grade
         WHERE book.course_offering_id = offering.id AND (grade->>'participantId' = 'admission:' || record.id::text
           OR grade->>'participantId' = 'student:' || record.student_id::text)), '[]'::jsonb) AS grades
@@ -213,6 +210,7 @@ export class StudyLeaveService {
       if (['approve', 'reject'].includes(dto.action)) {
         if (state !== 'pending') throw new ConflictException('Yêu cầu đã được xử lý. Hãy tải lại.');
         if (dto.action === 'approve') {
+          this.dates(leave.startDate, leave.endDate);
           if (record.study_status !== 'Đang học') throw new ConflictException('Học viên không còn ở trạng thái đang học.');
           if (leave.startDate < today) throw new ConflictException('Ngày bắt đầu đã qua. Hãy từ chối và tạo yêu cầu với thời gian mới.');
           state = 'approved';

@@ -1,3 +1,4 @@
+import { formatDate } from "../../utils/dateFormat";
 import { groupsOf } from "./shared";
 import { downloadDocumentFile, openDocumentPreview } from "../../utils/documentFiles";
 import { majorDisciplineId } from "../../utils/disciplineScope";
@@ -7,10 +8,7 @@ const PERIOD_LABELS = {
   AFTERNOON: "Chiều",
 };
 
-const displayDate = (value) => {
-  const [year, month, day] = String(value || "").split("-");
-  return year && month && day ? `${day}/${month}/${year}` : value || "";
-};
+const displayDate = (value) => formatDate(value, "");
 
 export const SCHEDULE_EXPORT_HEADERS = [
   "STT", "Chuyên ngành", "Lớp", "Học phần", "Giảng viên", "Ngày học", "Buổi", "Phòng học", "Ghi chú",
