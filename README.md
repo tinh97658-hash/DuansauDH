@@ -27,6 +27,7 @@ thạc sĩ, đào tạo tiến sĩ, báo cáo). Toàn bộ do migration quản l
 | `sessions` | Phiên đăng nhập được lưu bền vững |
 | `roles`, `permissions`, `role_permissions`, `staff_roles` | Phân quyền RBAC: vai trò, quyền, quyền của vai trò và vai trò của nhân sự |
 | `auth_audit_logs` | Nhật ký thao tác tài khoản/vai trò và sự kiện phiên đăng nhập |
+| `db_change_logs` | Nhật ký thay đổi dữ liệu cấp DB (mọi INSERT/UPDATE/DELETE) — ghi tự động bằng trigger |
 | `ethnicities`, `nationalities` | Danh mục dân tộc, quốc tịch |
 | `cities`, `districts`, `wards` | Đơn vị hành chính (thành phố → quận huyện → phường xã) |
 | `training_mode_groups`, `training_modes` | Nhóm & hình thức đào tạo |
@@ -133,6 +134,7 @@ API quản trị (trả envelope `{ message, data }` cho thao tác ghi):
 | Nhóm | Endpoint |
 | --- | --- |
 | Tài khoản | `GET /accounts`, `POST /accounts`, `GET|PUT /accounts/:id`, `PATCH /accounts/:id/status`, `POST /accounts/:id/reset-password`, `POST /accounts/:id/revoke-sessions`, `GET /accounts/audit-logs` |
+| Nhật ký thay đổi | `GET /accounts/change-logs`, `GET /accounts/change-logs/tables` |
 | Tự phục vụ | `GET /accounts/me/permissions`, `PATCH /accounts/me/password` |
 | Vai trò | `GET /roles`, `GET /roles/permissions`, `POST /roles`, `GET|PUT /roles/:id`, `PUT /roles/:id/permissions`, `DELETE /roles/:id` |
 
@@ -143,6 +145,23 @@ cách tăng `staff.session_version`. Giao diện nằm trong nhóm **Tài khoả
 quyền** trên thanh điều hướng: `/system/accounts`, `/system/roles`,
 `/system/audit-logs` và `/system/change-password` (bắt buộc đổi mật khẩu khi còn
 mật khẩu khởi tạo). Xem [kế hoạch chi tiết](KE-HOACH-QUAN-LY-TAI-KHOAN-PHAN-QUYEN.md).
+
+### Nhật ký thay đổi dữ liệu (migration 063)
+
+Migration 063 thêm bảng `db_change_logs` và **trigger PostgreSQL** `audit_capture`
+gắn trên **mọi bảng nghiệp vụ** để ghi lại tất cả thao tác `INSERT`/`UPDATE`/`DELETE`
+(dữ liệu trước/sau dạng JSONB, khóa bản ghi, danh sách cột đổi, thời gian) — bất kể
+luồng code nào thực hiện, kể cả SQL thủ công hay seed. Bảng `db_change_logs`,
+`auth_audit_logs`, `sessions` và `sequelize_meta` được loại trừ.
+
+Người thực hiện được gắn **best-effort**: tầng ứng dụng set biến phiên PostgreSQL
+`app.actor_staff_id`… trong mỗi transaction (`audit/audit-context.ts`), trigger đọc
+lại kèm `request_id`, IP, user-agent. Thao tác ngoài transaction vẫn ghi được thay
+đổi nhưng cột người thực hiện để trống.
+
+Xem nhật ký trong **Nhật ký thao tác** (`/system/audit-logs`) → tab **Thay đổi dữ
+liệu** (lọc theo bảng, hành động, khoảng ngày; quyền `audit.view`). Tab **Thao tác
+quản lý** giữ nguyên nhật ký tài khoản/vai trò (`auth_audit_logs`).
 
 Toàn bộ cấu hình local nằm trong **`.env` ở thư mục gốc**, được Git bỏ qua.
 Docker Compose, backend, migration, seed và frontend đều đọc file này.
@@ -475,7 +494,7 @@ Các lệnh chi tiết cho backend được mô tả trong `backend/Testing.md`.
 ## Tính năng chính
 
 1. Đăng ký và xét duyệt học viên.
-2. Quản lý tài khoản nhân sự và phân quyền RBAC: vai trò tùy chỉnh, ma trận quyền, khóa/mở tài khoản, đặt lại mật khẩu, buộc đăng xuất và nhật ký thao tác.
+2. Quản lý tài khoản nhân sự và phân quyền RBAC: vai trò tùy chỉnh, ma trận quyền, khóa/mở tài khoản, đặt lại mật khẩu, buộc đăng xuất, nhật ký thao tác và nhật ký thay đổi dữ liệu (trigger DB) trong cùng trang Nhật ký thao tác.
 3. Theo dõi hồ sơ học viên tiềm năng và học viên đã đăng ký.
 4. Theo dõi tiến độ học tập, nghiên cứu và các lần nộp báo cáo.
 5. Email/thông báo cho các mốc quan trọng.

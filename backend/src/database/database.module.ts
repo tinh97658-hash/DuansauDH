@@ -12,6 +12,7 @@ import { Permission } from "./models/permission.model.js";
 import { RolePermission } from "./models/role-permission.model.js";
 import { StaffRole } from "./models/staff-role.model.js";
 import { AuthAuditLog } from "./models/auth-audit-log.model.js";
+import { DbChangeLog } from "./models/db-change-log.model.js";
 // Bảng chung (danh mục dùng chung)
 import { Ethnicity } from "./models/common/ethnicity.model.js";
 import { Nationality } from "./models/common/nationality.model.js";
@@ -71,7 +72,7 @@ import { DoctoralReview } from "./models/doctoral/doctoral-review.model.js";
 export const databaseModels = [
   Student, Staff, StaffStudent, Submission,
   // RBAC & quản lý tài khoản
-  Role, Permission, RolePermission, StaffRole, AuthAuditLog,
+  Role, Permission, RolePermission, StaffRole, AuthAuditLog, DbChangeLog,
   // Common
   Ethnicity, Nationality, City, District, Ward, TrainingModeGroup, TrainingMode, TrainingLevel,
   Discipline, Major, StudyStatus, BridgeKnowledgeSubject, Lecturer, Unit, Room, TrainingProgram,

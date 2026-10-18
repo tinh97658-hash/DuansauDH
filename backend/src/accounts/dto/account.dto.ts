@@ -46,3 +46,13 @@ export class AuditLogQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) pageSize?: number;
 }
+
+export class ChangeLogQueryDto {
+  @IsOptional() @IsString() table?: string;
+  @IsOptional() @IsIn(["INSERT", "UPDATE", "DELETE"]) operation?: string;
+  @IsOptional() @IsUUID() actorStaffId?: string;
+  @IsOptional() @IsString() from?: string;
+  @IsOptional() @IsString() to?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) pageSize?: number;
+}

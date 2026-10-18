@@ -33,10 +33,11 @@ const build = () => {
   const staffRoles = { findAll: jest.fn(), count: jest.fn(), bulkCreate: jest.fn(), destroy: jest.fn() };
   const sequelize = { transaction: jest.fn((callback: any) => callback({})) };
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
+  const changeLog = { list: jest.fn(), tables: jest.fn() };
   const rbac = { invalidate: jest.fn() };
 
-  const service = new AccountsService(staff, roles as any, staffRoles as any, sequelize as any, audit as any, rbac as any);
-  return { service, staff, roles, staffRoles, audit, rbac };
+  const service = new AccountsService(staff, roles as any, staffRoles as any, sequelize as any, audit as any, changeLog as any, rbac as any);
+  return { service, staff, roles, staffRoles, audit, changeLog, rbac };
 };
 
 describe("AccountsService", () => {

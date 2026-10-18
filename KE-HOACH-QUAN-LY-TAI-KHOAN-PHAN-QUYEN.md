@@ -1,6 +1,6 @@
 # KẾ HOẠCH: MODULE QUẢN LÝ TÀI KHOẢN & PHÂN QUYỀN (RBAC)
 
-> Trạng thái: **Đã hoàn thành — Phase 1–5 xong (RBAC, API tài khoản/vai trò, chuyển `@Roles`→permission, giao diện, dọn dẹp/test/tài liệu).**
+> Trạng thái: **Đã hoàn thành — Phase 1–6 xong (RBAC, API tài khoản/vai trò, chuyển `@Roles`→permission, giao diện, dọn dẹp/test/tài liệu, nhật ký thay đổi dữ liệu cấp DB).**
 > Ngày lập: 2026-10-18 (cập nhật sau khi chốt).
 > Phạm vi áp dụng: `backend/` (NestJS 11 + Sequelize + Umzug) và `frontend/` (React + MUI).
 
@@ -76,8 +76,30 @@ Vai trò **chính** (đại diện `user.role`) lưu ở cột `staff.role` — 
 | `user_agent` | TEXT |
 | `created_at` | TIMESTAMPTZ |
 
-Hành động: `staff.create`, `staff.update`, `staff.roles.update`, `staff.disable`, `staff.enable`, `staff.password.reset`, `staff.session.revoke`, `role.create`, `role.update`, `role.delete`, `role.permissions.update`.
-Index theo `created_at`, `target_staff_id`.
+Hành động (mã thực tế đã dùng): `account.create`, `account.update`, `account.disable`, `account.enable`, `account.password.reset`, `account.password.change`, `account.sessions.revoke`, `role.create`, `role.update`, `role.permissions.update`, `role.delete`.
+Index theo `created_at`, `target_staff_id`, `action`.
+
+### 1.8 Bảng `db_change_logs` — nhật ký thay đổi dữ liệu (migration `063-db-change-logs.ts`)
+
+Ghi **mọi** thay đổi dữ liệu ở tầng PostgreSQL để truy vết đầy đủ, bất kể luồng code (service, SQL thủ công, seed…).
+
+| Cột | Kiểu |
+| --- | --- |
+| `id` | BIGSERIAL PK |
+| `table_name` | STRING(80) NOT NULL |
+| `operation` | STRING(10) — `INSERT`/`UPDATE`/`DELETE` |
+| `row_pk` | TEXT — khóa chính dạng JSON |
+| `old_data` / `new_data` | JSONB — dòng trước/sau |
+| `changed_columns` | TEXT[] — cột đổi (chỉ UPDATE) |
+| `actor_staff_id` | UUID (người thực hiện, best-effort) |
+| `actor_email` | STRING(150) |
+| `request_id` / `ip` / `user_agent` | ngữ cảnh request |
+| `changed_at` | TIMESTAMPTZ |
+
+- Hàm trigger `audit_capture()` gắn `AFTER INSERT OR UPDATE OR DELETE` cho `FOR EACH ROW` trên toàn bộ bảng nghiệp vụ.
+- Loại trừ: `db_change_logs`, `auth_audit_logs`, `sessions`, `sequelize_meta`.
+- Người thực hiện đọc từ biến phiên `app.actor_staff_id`… do tầng ứng dụng set `LOCAL` trong mỗi transaction (xem §2.10). Ngoài transaction (autocommit) vẫn ghi được thay đổi nhưng actor để trống.
+- Index theo `changed_at`, `table_name`, `operation`, `actor_staff_id`.
 
 ### 1.6 Nâng cấp bảng `staff`
 
@@ -100,7 +122,7 @@ Index theo `created_at`, `target_staff_id`.
 
 ### 2.1 Model mới (`backend/src/database/models/`)
 
-`role.model.ts`, `permission.model.ts`, `role-permission.model.ts`, `staff-role.model.ts`, `auth-audit-log.model.ts` — đăng ký vào `databaseModels` trong `backend/src/database/database.module.ts`.
+`role.model.ts`, `permission.model.ts`, `role-permission.model.ts`, `staff-role.model.ts`, `auth-audit-log.model.ts`, `db-change-log.model.ts` — đăng ký vào `databaseModels` trong `backend/src/database/database.module.ts`.
 
 ### 2.2 Catalog quyền — `backend/src/auth/permissions.ts`
 
@@ -195,6 +217,13 @@ Cơ chế **session version** (không cần đụng bảng `sessions`):
 - `AddStaffDto` / `POST /admin/addStaff` / `staff/add` → thay bằng `POST /accounts` (route cũ trỏ về service mới trong 1 nhịp rồi bỏ).
 - `GET /system/users` (`SystemService.users`) → chuyển sang `AccountsService.list()` và bỏ endpoint cũ khi frontend chuyển xong.
 
+### 2.10 Ngữ cảnh audit & API nhật ký thay đổi
+
+- `audit/audit-context.ts`: `AuditContextService` (AsyncLocalStorage) + `AuditContextMiddleware`. Middleware chạy sau `passport.session()`, gắn `actorStaffId`/`actorEmail` (chỉ khi `request.user instanceof Staff`), `requestId` (header `x-request-id` hoặc UUID), IP, user-agent vào ngữ cảnh request.
+- `AuditContextService.onModuleInit()` bọc `sequelize.transaction` để mỗi transaction `SELECT set_config('app.actor_staff_id', …, true)`… → trigger `audit_capture` đọc được người thực hiện.
+- `audit/change-log.service.ts`: `list()` (lọc theo bảng/hành động/actor/khoảng ngày + phân trang) và `tables()` (danh sách bảng có vết).
+- API: `GET /accounts/change-logs` và `GET /accounts/change-logs/tables` (quyền `audit.view`).
+
 ---
 
 ## 3. Frontend
@@ -225,10 +254,10 @@ Cơ chế **session version** (không cần đụng bảng `sessions`):
 
 Tổ chức theo `backend/test/` và `frontend/src/test/`.
 
-- Unit backend: `PermissionsGuard` (union nhiều vai trò, superadmin, thiếu quyền), session-version invalidation, `AccountsService` (trùng email, khóa, reset MK, sinh MK), ràng buộc 1 vai trò chính.
+- Unit backend: `PermissionsGuard` (union nhiều vai trò, superadmin, thiếu quyền), session-version invalidation, `AccountsService` (trùng email, khóa, reset MK, sinh MK), ràng buộc 1 vai trò chính, `ChangeLogService` (lọc/phân trang/danh sách bảng).
 - Integration backend: `/accounts`, `/roles`, `/roles/:id/permissions` (401/403/200), audit được ghi; **regression toàn bộ API sau khi thay `@Roles`** (ma trận 200/403 theo vai trò).
-- Integration frontend: render accounts/roles, ẩn nút khi thiếu quyền, luồng reset MK + xác nhận, cập nhật ma trận quyền, buộc đổi MK.
-- Cập nhật `frontend/src/test/integration/SystemUsers.test.jsx`.
+- Integration frontend: render accounts/roles, ẩn nút khi thiếu quyền, luồng reset MK + xác nhận, cập nhật ma trận quyền, buộc đổi MK, hai tab nhật ký (`AuditLogs.test.jsx`).
+- Gỡ `SystemUsers.test.jsx` (trang cũ không còn).
 
 Lệnh: `npm test`, `npm run test:coverage` (từ thư mục gốc).
 
@@ -282,6 +311,15 @@ Lệnh: `npm test`, `npm run test:coverage` (từ thư mục gốc).
 5. ✅ `npm --prefix backend run db:migrate` + `db:seed:auth` (idempotent, chạy lại an toàn); build backend + frontend sạch; chạy toàn bộ test backend + frontend.
 6. ✅ Thay nốt kiểm tra `user.role === "admin"` còn sót ở `GET /system/rooms` (`includeInactive`) bằng quyền `catalog.manage` qua `RbacService`; cập nhật `test/unit/system-room.service.spec.ts`.
 
+### Phase 6 — Nhật ký thay đổi dữ liệu cấp DB ✅ (đã xong)
+1. ✅ Migration `063-db-change-logs.ts`: bảng `db_change_logs` + hàm trigger `audit_capture()` + gắn trigger cho mọi bảng nghiệp vụ (loại trừ `db_change_logs`, `auth_audit_logs`, `sessions`, `sequelize_meta`).
+2. ✅ Model `db-change-log.model.ts` (chỉ đọc) + đăng ký `databaseModels`.
+3. ✅ `audit/audit-context.ts`: `AuditContextService` (AsyncLocalStorage) + `AuditContextMiddleware`; bọc `sequelize.transaction` để set biến phiên PostgreSQL `LOCAL` cho người thực hiện/request id/IP/user-agent; gắn middleware sau `passport.session()` trong `app.module.ts`.
+4. ✅ `audit/change-log.service.ts` + API `GET /accounts/change-logs`, `GET /accounts/change-logs/tables` (quyền `audit.view`) qua `AccountsService`.
+5. ✅ Frontend: `pages/system/auditLogs.jsx` chuyển thành 2 tab ("Thao tác quản lý" | "Thay đổi dữ liệu"), lọc theo bảng/hành động/khoảng ngày; bổ sung `listChangeLogs`/`listChangeLogTables` + nhãn bảng/hành động trong `features/accounts`.
+6. ✅ Test: `backend/test/unit/change-log.service.spec.ts` (3 case), `frontend/src/test/integration/AuditLogs.test.jsx` (2 case).
+7. ✅ Kiểm chứng đầu-cuối: cập nhật quyền vai trò (trong transaction) → 23 dòng `role_permissions` kèm đầy đủ actor/request id/IP; đăng nhập (ngoài transaction) → ghi `staff` UPDATE, actor trống. `db:migrate` chạy sạch (063 áp dụng); typecheck/build backend + build frontend sạch; backend 657 test pass.
+
 ---
 
 ## 6. Rủi ro & biện pháp
@@ -292,7 +330,9 @@ Lệnh: `npm test`, `npm run test:coverage` (từ thư mục gốc).
 - **Bảo vệ admin cuối**: chặn khóa/hạ quyền vai trò superadmin cuối cùng và tự khóa mình.
 - **Xóa vai trò đang gán**: chặn ở service + FK RESTRICT.
 - **Ràng buộc "≥1 vai trò"**: không ép được ở DB → validate ở service khi tạo/sửa và khi xóa vai trò.
-- **Audit retention**: thêm job/`DELETE` theo thời hạn cấu hình (hoặc để lại ngoài phạm vi).
+- **Audit retention**: bảng `auth_audit_logs` và `db_change_logs` tăng theo thời gian → thêm job/`DELETE` theo thời hạn cấu hình (để lại ngoài phạm vi đợt này).
+- **Khối lượng nhật ký thay đổi dữ liệu**: bulk operations/seed sinh nhiều dòng → có index theo bảng/thời gian; nên lọc theo khoảng ngày khi xem.
+- **Gắn ngữ cảnh actor**: chỉ đáng tin trong transaction (biến phiên `LOCAL`); thao tác autocommit vẫn ghi được thay đổi nhưng actor trống — chấp nhận (best-effort), vì các thao tác tài khoản/vai trò quan trọng đã có `auth_audit_logs` kèm actor.
 
 ---
 
@@ -301,3 +341,4 @@ Lệnh: `npm test`, `npm run test:coverage` (từ thư mục gốc).
 1. Chuyển **toàn bộ 121 `@Roles`** sang permission ngay trong đợt này.
 2. Mật khẩu ban đầu: **nhập tay hoặc sinh ngẫu nhiên**, luôn `mustChangePassword`.
 3. **Nhiều vai trò / một nhân sự** (bảng `staff_roles`), giữ 1 vai trò chính cho tương thích `user.role`.
+4. **Nhật ký thay đổi dữ liệu dùng trigger DB** (không ghi thủ công ở service) để phủ 100% thay đổi; người thực hiện gắn best-effort qua biến phiên trong transaction. Xem ở **tab trong trang "Nhật ký thao tác"** hiện có.

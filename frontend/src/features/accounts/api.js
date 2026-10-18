@@ -31,4 +31,8 @@ export const changeOwnPassword = (payload) => axios.patch(url("/accounts/me/pass
 
 export const listAuditLogs = (params = {}) => axios.get(url("/accounts/audit-logs"), config({ params })).then(({ data }) => data);
 
+export const listChangeLogs = (params = {}) => axios.get(url("/accounts/change-logs"), config({ params })).then(({ data }) => data);
+
+export const listChangeLogTables = () => axios.get(url("/accounts/change-logs/tables"), config()).then(({ data }) => data);
+
 export const assignScheduling = (staffId) => axios.put(url("/scheduling/assignee"), { staffId }, config()).then(({ data }) => data);

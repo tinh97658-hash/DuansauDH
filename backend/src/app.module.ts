@@ -9,6 +9,7 @@ import session from "express-session";
 import passport from "passport";
 import { Sequelize } from "sequelize-typescript";
 import { AccountsModule } from "./accounts/accounts.module.js";
+import { AuditContextMiddleware } from "./audit/audit-context.js";
 import { AuditModule } from "./audit/audit.module.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { RbacModule } from "./auth/rbac.module.js";
@@ -64,6 +65,9 @@ export class AppModule implements NestModule {
       passport.initialize(),
       passport.session(),
     ).forRoutes({ path: "*", method: RequestMethod.ALL });
+
+    // Gắn ngữ cảnh người thực hiện cho nhật ký thay đổi dữ liệu (chạy sau passport.session).
+    consumer.apply(AuditContextMiddleware).forRoutes({ path: "*", method: RequestMethod.ALL });
 
     consumer.apply(rateLimit({
       windowMs: 15 * 60 * 1000,

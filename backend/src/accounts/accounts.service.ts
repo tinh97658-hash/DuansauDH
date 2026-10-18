@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import { col, fn, Op, where } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { AuditService } from "../audit/audit.service.js";
+import { ChangeLogService } from "../audit/change-log.service.js";
 import { RbacService } from "../auth/rbac.service.js";
 import { Role } from "../database/models/role.model.js";
 import { Staff } from "../database/models/staff.model.js";
@@ -12,6 +13,7 @@ import { StaffRole } from "../database/models/staff-role.model.js";
 import {
   AccountListQueryDto,
   AuditLogQueryDto,
+  ChangeLogQueryDto,
   ChangeOwnPasswordDto,
   CreateAccountDto,
   ResetAccountPasswordDto,
@@ -59,6 +61,7 @@ export class AccountsService {
     @InjectModel(StaffRole) private readonly staffRoles: typeof StaffRole,
     @InjectConnection() private readonly sequelize: Sequelize,
     private readonly audit: AuditService,
+    private readonly changeLogService: ChangeLogService,
     private readonly rbac: RbacService,
   ) {}
 
@@ -292,6 +295,14 @@ export class AccountsService {
 
   async auditLogs(query: AuditLogQueryDto) {
     return this.audit.list(query);
+  }
+
+  async changeLogs(query: ChangeLogQueryDto) {
+    return this.changeLogService.list(query);
+  }
+
+  async changeLogTables() {
+    return this.changeLogService.tables();
   }
 
   async mePermissions(user: unknown) {

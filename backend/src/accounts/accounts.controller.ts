@@ -8,6 +8,7 @@ import { AccountsService, RequestContext } from "./accounts.service.js";
 import {
   AccountListQueryDto,
   AuditLogQueryDto,
+  ChangeLogQueryDto,
   ChangeOwnPasswordDto,
   CreateAccountDto,
   ResetAccountPasswordDto,
@@ -39,6 +40,18 @@ export class AccountsController {
   @RequirePermissions("audit.view")
   auditLogs(@Query() query: AuditLogQueryDto) {
     return this.accounts.auditLogs(query);
+  }
+
+  @Get("change-logs")
+  @RequirePermissions("audit.view")
+  changeLogs(@Query() query: ChangeLogQueryDto) {
+    return this.accounts.changeLogs(query);
+  }
+
+  @Get("change-logs/tables")
+  @RequirePermissions("audit.view")
+  changeLogTables() {
+    return this.accounts.changeLogTables();
   }
 
   @Get()
