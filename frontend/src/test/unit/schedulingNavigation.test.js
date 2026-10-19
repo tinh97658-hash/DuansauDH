@@ -1,3 +1,50 @@
+import { vi } from "vitest";
+
+// Navigation tests exercise labels/routes/focus; avoid loading the entire icon catalog.
+vi.mock(import("@mui/icons-material"), () => ({
+  AccountBalanceOutlined: () => null,
+  AddTaskOutlined: () => null,
+  CategoryOutlined: () => null,
+  CheckCircleOutline: () => null,
+  EventOutlined: () => null,
+  EventNoteOutlined: () => null,
+  FactCheckOutlined: () => null,
+  FlagOutlined: () => null,
+  FolderOpenOutlined: () => null,
+  GavelOutlined: () => null,
+  GradingOutlined: () => null,
+  GroupAddOutlined: () => null,
+  GroupsOutlined: () => null,
+  GroupWorkOutlined: () => null,
+  InfoOutlined: () => null,
+  LanguageOutlined: () => null,
+  ListAltOutlined: () => null,
+  LocationCityOutlined: () => null,
+  LockOutlined: () => null,
+  LogoutOutlined: () => null,
+  KeyboardArrowDownRounded: () => null,
+  KeyboardArrowUpRounded: () => null,
+  ManageAccountsOutlined: () => null,
+  MenuBookOutlined: () => null,
+  NoteAddOutlined: () => null,
+  PaymentsOutlined: () => null,
+  RuleOutlined: () => null,
+  SchoolOutlined: () => null,
+  ScoreboardOutlined: () => null,
+  SendOutlined: () => null,
+  SummarizeOutlined: () => null,
+  SupervisorAccountOutlined: () => null,
+  MeetingRoomOutlined: () => null,
+  BusinessOutlined: () => null,
+  SystemUpdateOutlined: () => null,
+  TableChartOutlined: () => null,
+  TrackChangesOutlined: () => null,
+  UploadFileOutlined: () => null,
+  VerifiedOutlined: () => null,
+  WorkspacePremiumOutlined: () => null,
+  HistoryEduOutlined: () => null,
+}));
+
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import RibbonHeader, { isRibbonRouteActive, ribbons } from "../../components/RibbonHeader";

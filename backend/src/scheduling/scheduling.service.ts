@@ -237,6 +237,8 @@ export class SchedulingService {
         const plannedSessionCount = matchingSessions.filter((session) => session.status === "planned").length;
         const completed = matchingOfferings.some((offering) => offering.status === "completed");
         const status = completed ? "completed" : heldSessionCount > 0 ? "in_progress" : plannedSessionCount > 0 ? "scheduled" : "not_started";
+        const incompleteOffering = matchingOfferings.find((offering) => offering.status === "completed"
+          && (missingGradeCounts.get(`${group.id}:${offering.id}`) || 0) > 0);
         return {
           curriculumSubjectId: entry?.id || null,
           subjectId: subject.id,
@@ -245,8 +247,8 @@ export class SchedulingService {
           code: subject.code || "",
           name: subject.name || "",
           status,
-          needsGradeEntry: completed && matchingOfferings.some((offering) => offering.status === "completed"
-            && (missingGradeCounts.get(`${group.id}:${offering.id}`) || 0) > 0),
+          needsGradeEntry: !!incompleteOffering,
+          incompleteCourseOfferingId: incompleteOffering?.id || null,
           heldSessionCount,
           sessionCount: matchingSessions.length,
           sessions: matchingSessions.map((session) => ({

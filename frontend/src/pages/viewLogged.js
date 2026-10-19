@@ -1,11 +1,11 @@
 import React from "react";
 import FeatureLayout from "../components/FeatureLayout";
-import View from "../components/view";
+import OperationalDashboard from "../features/dashboard/OperationalDashboard";
 
 const ViewLoggedPage = () => {
   return (
     <FeatureLayout hideHeader={true}>
-      <View />
+      <OperationalDashboard />
     </FeatureLayout>
   );
 };

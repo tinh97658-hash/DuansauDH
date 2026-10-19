@@ -1,4 +1,56 @@
 /* Candidate widths are controlled by ResizableTable; member widths remain fixed. */
+.assignment-page{--assignment-navy:#17324d;--assignment-border:var(--table-border-color,#d7e4ee);--assignment-brand:var(--primary-dark,#056a8f);--assignment-slate:var(--text-secondary,#607486);--assignment-teal:#087e86;background:#f5f8fb}
+@layer app-square-corners{
+  .assignment-page .assignment-discipline-card,.assignment-page .assignment-panel,.assignment-page .assignment-filters,.assignment-page .assignment-capacity,.assignment-page .assignment-operational-alert{border-radius:8px!important}
+  .assignment-page .assignment-summary-total,.assignment-page .assignment-summary-count{border-radius:5px!important}
+}
+.assignment-page .assignment-summary{border:0;background:transparent;box-shadow:none;overflow:visible}
+.assignment-summary-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:4px 0 14px}
+.assignment-summary-heading h2.MuiTypography-root{font-weight:700;font-size:18px;color:var(--assignment-navy)}
+#root .assignment-summary-heading h2{color:var(--assignment-navy)}
+.assignment-summary-heading .MuiTypography-caption{font-size:13px;color:var(--assignment-slate)}
+.assignment-summary-total,.assignment-summary-count{font-weight:600;font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.assignment-summary-total{background:var(--primary-light,#ebf5fb);color:var(--assignment-brand);padding:6px 10px}
+.assignment-summary-list{list-style:none;margin:0;padding:0}
+.assignment-summary>.assignment-summary-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.assignment-discipline-card{min-width:0;padding:12px;border:1px solid color-mix(in srgb,var(--assignment-border) 88%,var(--assignment-slate));background:var(--surface-bg,#fff);overflow:hidden;box-shadow:0 1px 3px rgba(23,50,77,.05);transition:border-color .16s ease}
+.assignment-discipline-card:has(.assignment-summary-major:hover),.assignment-discipline-card:focus-within{border-color:var(--assignment-brand)}
+.assignment-summary-discipline{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;color:var(--assignment-navy);font-size:14px;font-weight:700}
+.assignment-summary-discipline>span:first-child{padding-left:9px;border-left:3px solid var(--assignment-teal);overflow-wrap:anywhere}
+.assignment-summary-discipline>.assignment-discipline-total{white-space:nowrap;color:var(--assignment-slate);font-size:12px;font-weight:600}
+.assignment-discipline-card>ul{padding:0}
+.assignment-discipline-card>ul>li+li{border-top:1px solid var(--border-light,#edf2f7)}
+.assignment-summary-major{display:flex;align-items:center;gap:10px;width:100%;min-height:34px;padding:4px;border:0;background:var(--surface-bg,#fff);text-align:left;font:inherit;font-size:13px;color:var(--text-primary,#172b3a);cursor:pointer;transition:background .16s ease}
+.assignment-summary-name{flex:1;min-width:0;overflow-wrap:anywhere}
+.assignment-summary-action{display:inline-flex;align-items:center;gap:6px;flex:none;white-space:nowrap}
+.assignment-summary-count{color:var(--assignment-brand);font-weight:700;transition:color .16s ease}
+.assignment-summary-action>svg{flex-shrink:0;color:var(--text-muted,#8a9aaa);font-size:17px;transition:transform .16s ease,color .16s ease}
+.assignment-summary-major:hover{background:var(--table-hover-bg,#f5fafe)}
+.assignment-summary-major:hover .assignment-summary-count,.assignment-summary-major:focus-visible .assignment-summary-count{color:var(--assignment-teal)}
+.assignment-summary-major:hover .assignment-summary-action>svg{color:var(--assignment-brand);transform:translateX(2px)}
+.assignment-summary-major:focus-visible .assignment-summary-action>svg{color:var(--assignment-brand)}
+.assignment-summary-major:focus-visible{background:var(--primary-light,#ebf5fb);outline:2px solid var(--primary,#0788b8);outline-offset:-2px}
+.assignment-summary-empty{padding:20px 16px;text-align:center;background:#fff;border:1px solid var(--assignment-border)}
+.assignment-summary-empty>svg{width:24px;height:24px;color:var(--success,#137b3b);margin-bottom:6px}
+.assignment-summary-empty .MuiTypography-caption{display:block;margin:4px auto 0;font-size:12px}
+.assignment-page .assignment-panel{min-height:440px;border-color:var(--assignment-border);box-shadow:0 1px 3px rgba(23,50,77,.04)}
+.assignment-selection-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px;min-height:32px}
+.assignment-selection-bar>p{font-size:12px;flex:1;min-width:180px;line-height:1.6}
+.assignment-selection-bar strong{color:var(--assignment-navy)}
+.assignment-overflow{display:inline-flex;align-items:center;gap:4px;color:var(--warning,#b86216);font-weight:600;margin-left:6px}
+.assignment-overflow svg{width:15px;height:15px}
+.assignment-page .assignment-operational-alert{margin-bottom:12px;background:var(--warning-light,#fef7e0);border:1px solid #e8d4ac;padding:8px 12px;color:var(--assignment-slate)}
+.assignment-operational-alert .MuiAlert-icon{color:var(--warning,#b86216);padding-top:2px}
+.assignment-operational-alert .MuiAlert-message{padding:0;min-width:0}
+.assignment-operational-alert .MuiTypography-root{font-size:12px;line-height:1.6}
+.assignment-operational-alert .assignment-alert-title{font-weight:700;color:var(--assignment-navy);font-size:13px}
+.assignment-operational-alert .MuiButton-root{padding:2px 0;margin-top:4px;color:var(--assignment-brand);font-size:12px}
+.assignment-capacity{padding:12px;margin-bottom:12px;border:1px solid var(--assignment-border);background:var(--muted-surface,#f7f9fa)}
+.assignment-capacity>.MuiTypography-caption{display:block;margin-top:5px;color:var(--assignment-slate);font-size:12px}
+.assignment-capacity>.assignment-capacity-full{color:var(--danger,#b52d2d);font-weight:600}
+@media(max-width:760px){.assignment-summary>.assignment-summary-list{grid-template-columns:minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){.assignment-discipline-card,.assignment-summary-major,.assignment-summary-count,.assignment-summary-action>svg{transition:none}.assignment-summary-major:hover .assignment-summary-action>svg{transform:none}}
+.assignment-sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .assignment-table:not(.assignment-resizable).MuiTable-root{width:100%;table-layout:fixed}
 .assignment-members.MuiTable-root{min-width:610px}
 .assignment-table .MuiTableCell-root{padding:8px 6px;vertical-align:top;white-space:normal;font-size:12px;line-height:1.45}
@@ -29,12 +81,10 @@
 .assignment-members tr:hover td.assignment-action{background:#f5fafe}
 .assignment-members .assignment-action .MuiIconButton-root{padding:4px}
 
-.assignment-scroll{container:assignment-table-area / inline-size}
-@container assignment-table-area (max-width:720px){
-  .assignment-candidates .MuiTableCell-root{padding-left:5px;padding-right:5px}
-  .assignment-candidates .assignment-code-col{width:90px}
-  .assignment-candidates .assignment-family-col{width:132px}
-  .assignment-candidates .assignment-name-col{width:64px}
-  .assignment-candidates .assignment-dob-col{width:96px}
-  .assignment-candidates .assignment-gender-col{width:64px}
-}
+/* Five-column candidate layout. Versioned widths keep older layouts' preferences separate. */
+.assignment-candidates .MuiTableCell-root{font-size:13px;line-height:1.5;padding:9px 8px}
+.assignment-candidates .MuiTableCell-paddingCheckbox{padding:4px;vertical-align:middle}
+.assignment-candidates .assignment-learner-cell .assignment-learner-name{font-size:13px;font-weight:600;line-height:1.5;overflow-wrap:anywhere}
+.assignment-candidates .assignment-learner-code-cell .assignment-learner-code{font-size:13px;line-height:1.5;white-space:nowrap;text-overflow:ellipsis}
+.assignment-candidates .assignment-status{height:auto;min-height:24px;font-size:12px}
+.assignment-candidates .assignment-status .MuiChip-label{padding:2px 7px;white-space:normal;overflow-wrap:anywhere}

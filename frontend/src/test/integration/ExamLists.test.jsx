@@ -1,6 +1,9 @@
+import { vi } from "vitest";
 import { act, fireEvent, render as renderUi, screen, waitFor, within } from "@testing-library/react";
 import { createTheme, ThemeProvider } from "@mui/material";
 import axios from "axios";
+import { MemoryRouter } from "react-router-dom";
+import { toast } from "react-toastify";
 import ExcelJS from "exceljs";
 import ExamLists from "../../pages/masters/examLists";
 import { draftOf, isExamCandidate } from "../../features/exams/gradebook";
@@ -9,14 +12,14 @@ import { notifySubjectCatalogChanged } from "../../utils/subjectCatalog";
 
 jest.mock("axios");
 jest.setTimeout(60000);
-jest.mock("@mui/icons-material", () => ({
+vi.mock(import("@mui/icons-material"), () => ({
   DownloadRounded: () => null, ListAltRounded: () => null,
   SaveRounded: () => null, SearchRounded: () => null,
 }));
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
 // Animation timers are unrelated to grade entry/export and slow down large page fixtures.
 const testTheme = createTheme({ components: { MuiButtonBase: { defaultProps: { disableRipple: true } } } });
-const render = ui => renderUi(<ThemeProvider theme={testTheme}>{ui}</ThemeProvider>);
+const render = (ui, url = "/") => renderUi(<MemoryRouter initialEntries={[url]}><ThemeProvider theme={testTheme}>{ui}</ThemeProvider></MemoryRouter>);
 const savedRow = { participantId: "student:one", code: "HV001", fullName: "Nguyễn Văn An", dob: "1990-01-02", gender: "Nam", eligible: null, examExempt: false, testScore: null, assignmentScore: null, examScore: null, courseScore: null, grade4: null, letterGrade: "", attemptScores: [], result: "pending" };
 const data = { revision: 0, rows: [savedRow], total: 1, totalRows: 1, unassessedRows: 1, page: 1, pageSize: 15 };
 const paged = (gradeRows, params = {}) => {
@@ -38,6 +41,29 @@ const setup = (role = "admin", gradeRows = data.rows) => {
   } : url.endsWith("/isStaff") ? { message: role } : paged(gradeRows, config?.params) }));
 };
 beforeEach(() => { jest.clearAllMocks(); localStorage.clear(); setup(); });
+afterEach(async () => {
+  // Toast delivery/dismissal is asynchronous; drain it before the next page mounts.
+  await act(async () => {
+    toast.dismiss(); toast.clearWaitingQueue();
+    await new Promise(resolve => setTimeout(resolve, 0));
+  });
+});
+
+it("opens the exact dashboard gradebook scope instead of the first available class", async () => {
+  const defaultGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation(async (url, config) => {
+    const response = await defaultGet(url, config);
+    if (url.endsWith("/options")) {
+      response.data.groups.unshift({ id: "old-group", code: "OLD", name: "Khóa cũ", majorId: "m2", academicYear: "2025" });
+      response.data.courseOfferings.unshift({ id: "old-offering", status: "completed", subject: { id: "old-subject" }, groupLinks: [{ classGroupId: "old-group" }] });
+    }
+    return response;
+  });
+  render(<ExamLists />, "/masters/exam-lists?year=2026&majorId=m1&groupId=g1&offeringId=o1");
+  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/masters/exam-lists"), expect.objectContaining({
+    params: expect.objectContaining({ classGroupId: "g1", courseOfferingId: "o1" }),
+  })), { timeout: 5000 });
+});
 
 it.each([
   { result: "passed", examScore: 8, courseScore: 8 },
@@ -518,7 +544,14 @@ it("shows blank exam sheets without clearing drafts and keeps supervisors read-o
 
 it("shows an unsaved passed student in DS thi and saves notes included in the print table", async () => {
   const passedRow = { ...savedRow, testScore: 6, assignmentScore: 6, examScore: 6, courseScore: 6, result: "passed", notes: "Ghi chú học viên" };
-  axios.put.mockResolvedValue({ data: { ...data, unassessedRows: 0, revision: 1, rows: [passedRow] } });
+  const defaultGet = axios.get.getMockImplementation();
+  let persisted = false;
+  axios.get.mockImplementation((url, config) => persisted && url.endsWith("/exam-lists")
+    ? Promise.resolve({ data: { ...data, unassessedRows: 0, revision: 1, rows: [passedRow] } }) : defaultGet(url, config));
+  axios.put.mockImplementation(async () => {
+    persisted = true;
+    return { data: { ...data, unassessedRows: 0, revision: 1, rows: [passedRow] } };
+  });
   render(<ExamLists />);
   await screen.findByLabelText("Điểm kiểm tra HV001");
   for (const label of ["Điểm kiểm tra", "Điểm BTL/TL/KT", "Điểm thi hết môn"]) {
@@ -532,14 +565,14 @@ it("shows an unsaved passed student in DS thi and saves notes included in the pr
   expect(screen.getByLabelText("Tư cách thi HV001")).toBeDisabled();
   const headers = screen.getAllByRole("columnheader").map(cell => cell.textContent);
   expect(headers.slice(-2)).toEqual(["Miễn thi", "Ghi chú"]);
+  await waitFor(() => expect(screen.getByLabelText("Ghi chú HV001")).toBeEnabled());
   const notes = screen.getByLabelText("Ghi chú HV001");
-  expect(notes).toBeEnabled();
   fireEvent.change(notes, { target: { value: passedRow.notes } });
   expect(screen.getByRole("button", { name: "Xuất file" })).toBeDisabled();
   fireEvent.click(screen.getByRole("button", { name: "Cập nhật cả bảng" }));
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ rows: [expect.objectContaining({ result: "passed", notes: passedRow.notes })] })));
   expect(await screen.findByText("Đã cập nhật bảng điểm cho 1 học viên.")).toBeInTheDocument();
-  expect(screen.getByLabelText("Ghi chú HV001")).toHaveValue(passedRow.notes);
+  expect(await screen.findByLabelText("Ghi chú HV001")).toHaveValue(passedRow.notes);
   expect(within(screen.getByTestId("exam-print-table")).getByText(passedRow.notes)).toBeInTheDocument();
 });
 

@@ -16,7 +16,7 @@ export default function ResizableSplit({ left, right }) {
     if (rect.width) setRatio(clamp((event.clientX - rect.left) / rect.width * 100));
   };
   return <div ref={root} className={`resizable-split ${dragging ? "is-dragging" : ""}`} style={{ "--split-left": `${ratio}fr`, "--split-right": `${100 - ratio}fr` }}>
-    <section className="resizable-split-panel" aria-label="Học viên chưa phân lớp">{left}</section>
+    <section className="resizable-split-panel" aria-label="Học viên chưa phân nhóm">{left}</section>
     {/* Focusable separators expose their current position; the project's older aria-query omits this property. */}
     {/* eslint-disable-next-line jsx-a11y/role-supports-aria-props */}
     <div className="resizable-split-divider" role="separator" tabIndex={0} aria-label="Điều chỉnh độ rộng hai bảng"
@@ -30,6 +30,6 @@ export default function ResizableSplit({ left, right }) {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
         event.preventDefault(); setRatio((value) => clamp(event.key === "Home" ? 0 : event.key === "End" ? 100 : value + (event.key === "ArrowRight" ? 2 : -2)));
       }} />
-    <section className="resizable-split-panel" aria-label="Lớp mục tiêu">{right}</section>
+    <section className="resizable-split-panel" aria-label="Nhóm mục tiêu">{right}</section>
   </div>;
 }

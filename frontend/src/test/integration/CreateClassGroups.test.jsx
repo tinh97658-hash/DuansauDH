@@ -1,17 +1,15 @@
+import { vi } from "vitest";
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import axios from "axios";
 import CreateClassGroups from "../../pages/masters/createClassGroups";
 
 jest.mock("axios");
 jest.mock("../../components/FeatureLayout", () => ({ children }) => <div>{children}</div>);
-jest.mock("@mui/icons-material", () => ({
-  AddRounded: require("@mui/icons-material/AddRounded").default,
-  DeleteRounded: require("@mui/icons-material/DeleteRounded").default,
-  EditRounded: require("@mui/icons-material/EditRounded").default,
-  GroupWorkRounded: require("@mui/icons-material/GroupWorkRounded").default,
-  SearchRounded: require("@mui/icons-material/SearchRounded").default,
+vi.mock(import("@mui/icons-material"), () => ({
+  AddRounded: () => null, DeleteRounded: () => null, EditRounded: () => null,
+  GroupWorkRounded: () => null, SearchRounded: () => null,
 }));
 
 const year = String(new Date().getFullYear());
@@ -49,6 +47,37 @@ test("does not expose automatic student assignment while creating groups", async
   await openCreateDialog();
   expect(screen.queryByRole("checkbox", { name: /Phân học viên tự động/ })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Cân bằng sĩ số" })).not.toBeInTheDocument();
+});
+
+const ReturnLocation = () => {
+  const location = useLocation();
+  return <output data-testid="returned-url">{location.pathname}{location.search}</output>;
+};
+
+test.each([true, false])("quick-create prefills scope and returns to assignment (created ID: %s)", async (withId) => {
+  const scopedMajor = { ...major, disciplineId: "d1", discipline: { id: "d1", name: "Ngành CNTT" } };
+  const defaultGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation(async (url) => url.includes("/system/majors")
+    ? { data: [scopedMajor] } : defaultGet(url));
+  axios.post.mockResolvedValue({ data: withId ? { groups: [{
+    id: "new-group", majorId: major.id, academicYear: year, status: "open",
+  }] } : { success: true } });
+  render(<MemoryRouter initialEntries={[`/masters/create-class-groups?quickCreate=1&program=masters&year=${year}&disciplineId=d1&majorId=${major.id}&returnTo=https://example.com`]}>
+    <Routes>
+      <Route path="/masters/create-class-groups" element={<CreateClassGroups />} />
+      <Route path="/masters/assign-class-groups" element={<ReturnLocation />} />
+    </Routes>
+  </MemoryRouter>);
+  expect(await screen.findByRole("dialog")).toHaveTextContent("Ngành CNTT");
+  const create = screen.getByRole("button", { name: "Tạo 1 nhóm" });
+  await waitFor(() => expect(create).toBeEnabled());
+  fireEvent.click(create);
+  expect(await screen.findByTestId("returned-url")).toHaveTextContent(
+    `/masters/assign-class-groups?year=${year}&disciplineId=d1&majorId=${major.id}${withId ? "&groupId=new-group" : ""}`,
+  );
+  expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/masters/class-groups/batch"),
+    expect.objectContaining({ majorId: major.id, academicYear: year, maxStudents: 40, count: 1 }),
+    { withCredentials: true });
 });
 
 test("changing group count refreshes names and keeps a create-only action", async () => {

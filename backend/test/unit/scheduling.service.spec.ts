@@ -920,7 +920,8 @@ describe("SchedulingService persisted reads", () => {
       { classGroupId: second.id, courseOfferingId: "completed", missingGradeCount: 0 },
     ]);
     const data = await mocks.service.getClassCurriculumProgress({ majorId: "major-1", academicYear: "2026" });
-    expect(data.classes[0].subjects[0]).toMatchObject({ status: "completed", needsGradeEntry: missingGradeCount > 0 });
+    expect(data.classes[0].subjects[0]).toMatchObject({ status: "completed", needsGradeEntry: missingGradeCount > 0,
+      incompleteCourseOfferingId: missingGradeCount > 0 ? "completed" : null });
     expect(data.classes[1].subjects[0]).toMatchObject({ status: "completed", needsGradeEntry: false });
     expect(mocks.sequelize.query).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
       replacements: { groupIds: [first.id, second.id], completedOfferingIds: ["completed"] },

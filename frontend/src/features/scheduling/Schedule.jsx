@@ -17,6 +17,7 @@ import { buildScheduleDocument, clearScheduleReturnView, createScheduleExcel, cr
 import SchedulePrintTemplate from "./SchedulePrintTemplate";
 import DocumentExportMenu from "../../components/DocumentExportMenu";
 import { sortOfferingsByHeldSessions } from "./offeringSessionSort";
+import { dashboardScheduleQueue, matchesDashboardScheduleQueue } from "../dashboard/navigation";
 
 const subjectLabel = (offering) => offering?.subject?.name || "Học phần";
 
@@ -243,7 +244,8 @@ function WeekOverflowPreview({ date, dayLabel, period, hiddenSessions, onOpenDay
 }
 
 export default function Schedule({ user }) {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const dashboardQueue = dashboardScheduleQueue(params.get("queue"));
   const requested = params.get("offeringId") || "";
   const todayKey = getBusinessTodayKey();
   const currentWeek = formatDateKey(mondayOf(todayKey));
@@ -251,9 +253,9 @@ export default function Schedule({ user }) {
   const [previewReturn] = useState(readScheduleReturnView);
   useEffect(() => { if (previewReturn) clearScheduleReturnView(); }, [previewReturn]);
   const appliedRequest = useRef(previewReturn ? requested : "");
-  const [majorId, setMajor] = useState(previewReturn?.majorId || "");
-  const [disciplineId, setDiscipline] = useState(previewReturn?.disciplineId || "");
-  const [year, setYear] = useState(previewReturn?.year || "");
+  const [majorId, setMajor] = useState(previewReturn?.majorId || params.get("majorId") || "");
+  const [disciplineId, setDiscipline] = useState(previewReturn?.disciplineId || params.get("disciplineId") || "");
+  const [year, setYear] = useState(previewReturn?.year || params.get("year") || "");
   const [status, setStatus] = useState(previewReturn?.status || "active");
   const [query, setQuery] = useState(previewReturn?.query || "");
   const [sessionSort, setSessionSort] = useState("default");
@@ -262,7 +264,7 @@ export default function Schedule({ user }) {
   const [selectedId, setSelected] = useState(previewReturn?.selectedId ?? requested);
   const [editor, setEditor] = useState(null);
   const [details, setDetails] = useState(null);
-  const [pendingOpen, setPendingOpen] = useState(false);
+  const [pendingOpen, setPendingOpen] = useState(dashboardQueue === "pending-confirmation" && user.canManageScheduling === true);
   const [focusedDate, setFocusedDate] = useState(previewReturn?.focusedDate || "");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(previewReturn?.sidebarCollapsed || false);
   const [saving, setSaving] = useState(false);
@@ -283,7 +285,7 @@ export default function Schedule({ user }) {
     const offering = offerings.data.find((item) => item.id === requested);
     if (offering) {
       appliedRequest.current = requested;
-      setSelected(requested); setStatus(offering.status); setMajor(""); setYear(""); setQuery("");
+      setSelected(requested); setStatus(offering.status); setMajor(params.get("majorId") || ""); setYear(params.get("year") || ""); setQuery("");
       const timer = setTimeout(() => document.getElementById(`offering-${requested}`)?.scrollIntoView?.({ behavior: "smooth", block: "center" }), 50);
       return () => clearTimeout(timer);
     }
@@ -297,7 +299,10 @@ export default function Schedule({ user }) {
       && (!year || group.academicYear === year);
   });
   const scoped = all.filter(inScope);
-  const listed = sortOfferingsByHeldSessions(scoped.filter((offering) => offering.status === status && normalize(`${offering.subject?.code} ${offering.subject?.name} ${labelOf(offering)}`).includes(normalize(query))), sessionSort);
+  const listed = sortOfferingsByHeldSessions(scoped.filter((offering) => offering.status === status && matchesDashboardScheduleQueue(offering, dashboardQueue) && normalize(`${offering.subject?.code} ${offering.subject?.name} ${labelOf(offering)}`).includes(normalize(query))), sessionSort);
+  const pendingRows = dashboardQueue === "pending-confirmation"
+    ? (pending.data || []).filter((session) => inScope(session.courseOffering) && (!requested || session.courseOfferingId === requested || session.courseOffering?.id === requested))
+    : pending.data || [];
   const visibleSessions = (sessions.data || []).filter((session) => inScope(session.courseOffering));
   const weekDays = weekDaysFrom(week);
   const selectedDays = selected?.allowedWeekdays || intersectDays(groupsOf(selected));
@@ -383,6 +388,7 @@ export default function Schedule({ user }) {
       <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>3</b>KHÓA / NĂM HỌC</div><select className={`sl-select sl-year-select${year ? "" : " sl-placeholder"}`} aria-label="Khóa / Năm" value={year} onChange={(event) => changeScope(() => setYear(event.target.value))}><option value="">Tất cả</option>{unique(all.flatMap(groupsOf).filter((group) => (!disciplineId || visibleMajorIds.has(group.majorId || group.major?.id)) && (!majorId || (group.majorId || group.major?.id) === majorId)).map((group) => group.academicYear)).sort((a, b) => b.localeCompare(a, "vi", { numeric: true })).map((value) => <option key={value}>{value}</option>)}</select></div>
     </div>
     {!canEdit && <div className="sl-attention">Quyền chỉ xem · Quản trị viên phân công người phụ trách tại Hệ thống → QL Người dùng.</div>}
+    {dashboardQueue && <div className="sl-attention">{dashboardQueue === "unscheduled" ? "Đang xem lớp chưa có buổi học" : "Đang xem lớp có buổi chờ xác nhận"}<button type="button" className="sl-btn" onClick={() => { const next = new URLSearchParams(params); next.delete("queue"); setParams(next); }}>Bỏ lọc công việc</button></div>}
     {majors.error && <Notice error={majors.error} />}
   </div><div className="sl-worklist"><div className="sl-search-wrap"><span>⌕</span><input className="sl-search" aria-label="Tìm môn / lớp" placeholder="Tìm lớp học phần..." value={query} onChange={(event) => setQuery(event.target.value)} /></div><div className="sl-card-scroll">{offerings.loading ? <Notice>Đang tải lớp học phần...</Notice> : offerings.error ? <Notice error={offerings.error} /> : <section className="sl-section"><h2><span>LỚP HỌC PHẦN</span><span className="sl-offering-sort-actions">
       <Tooltip title={sessionSortLabel} arrow placement="top">
@@ -459,13 +465,13 @@ export default function Schedule({ user }) {
   </section>
   {editor && <SessionEditor key={editor.session?.id || `${editor.date}-${editor.period}`} {...editor} user={user} onClose={() => setEditor(null)} onSaved={saved} onViewOffering={(offering) => { setEditor(null); setDetails(offering); }} />}
   {details && <OfferingDetails offering={details} user={user} onClose={() => setDetails(null)} onSaved={saved} onOpenSession={openSession} onSelect={select} />}
-  {pendingOpen && <Modal wide className="sl-pending-drawer" bodyClassName="sl-pending-body" title={`BUỔI CHỜ XÁC NHẬN · ${pending.data?.length ?? 0}`} busy={saving} onClose={() => setPendingOpen(false)}>{pending.loading ? <Notice>Đang tải...</Notice> : pending.error ? <Notice error={pending.error} /> : <>{error && <Notice error={error} />}{[...(pending.data || [])].sort((left, right) => `${left.sessionDate} ${left.period}`.localeCompare(`${right.sessionDate} ${right.period}`)).map((session) => {
+  {pendingOpen && <Modal wide className="sl-pending-drawer" bodyClassName="sl-pending-body" title={`BUỔI CHỜ XÁC NHẬN · ${pendingRows.length ?? 0}`} busy={saving} onClose={() => setPendingOpen(false)}>{pending.loading ? <Notice>Đang tải...</Notice> : pending.error ? <Notice error={pending.error} /> : <>{error && <Notice error={error} />}{[...pendingRows].sort((left, right) => `${left.sessionDate} ${left.period}`.localeCompare(`${right.sessionDate} ${right.period}`)).map((session) => {
     const title = offeringTitle(session.courseOffering);
     return <article className="sl-pending-card" key={session.id}>
       <div className="sl-pending-date"><strong>{vietnameseDate(session.sessionDate)}</strong><span>{session.period === "MORNING" ? "SÁNG" : "CHIỀU"}</span></div>
       <div className="sl-pending-copy"><h3 title={title}>{title}</h3><span>{subjectLabel(session.courseOffering)}</span></div>
       <div className="sl-pending-side"><small>{session.lecturer?.name || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><div className="sl-pending-actions"><button className="sl-btn" disabled={saving} onClick={() => confirmation(session, "not_held")}>Không diễn ra</button><button className="sl-btn sl-btn-primary" disabled={saving} onClick={() => confirmation(session, "held")}>✓ Đã diễn ra</button></div></div>
     </article>;
-  })}{!pending.data?.length && <Notice>Không có buổi chờ xác nhận.</Notice>}</>}</Modal>}
+  })}{!pendingRows.length && <Notice>Không có buổi chờ xác nhận.</Notice>}</>}</Modal>}
   </section>;
 }

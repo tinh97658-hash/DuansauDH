@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
+import { useSearchParams } from "react-router-dom";
+import { dashboardGradeScope } from "../../features/dashboard/navigation";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, MenuItem, Pagination, Paper, Stack, TableBody, TableCell, TableContainer, TableRow, TextField, Tooltip, Typography } from "@mui/material";
@@ -57,6 +59,7 @@ const errorMessage = (error, fallback) => {
 };
 
 export default function ExamLists() {
+  const [entryParams] = useSearchParams();
   const catalogRevision = useSubjectCatalogRevision();
   const [policyRevision, setPolicyRevision] = useState(0);
   useEffect(() => {
@@ -106,8 +109,8 @@ export default function ExamLists() {
         const list = options.data.groups || [];
         const offerings = options.data.courseOfferings || [];
         setGroups(list); setSubjects(offerings); setRole(auth.data.message || "");
-        const first = list[0];
-        const offering = offerings.find((item) => item.groupLinks?.some((link) => link.classGroupId === first?.id));
+        const { group: first, offering, year } = dashboardGradeScope(entryParams, list, offerings);
+        setYearFilter(year);
         setMajorId(first?.majorId || "");
         setGroupId(offering ? first.id : ""); setOfferingId(offering?.id || "");
       })

@@ -32,7 +32,11 @@
     "db:seed:bulk:preview": "npm run db:seed:bulk -- --preview",
     "db:test:bulk": "npm run db:seed:bulk -- --rollback",
     "db:seed:realistic-test": "npm run build && node dist/database/seeds/seed-realistic-test.js",
-    "db:seed:realistic-test:preview": "npm run db:seed:realistic-test -- --preview"
+    "db:seed:realistic-test:preview": "npm run db:seed:realistic-test -- --preview",
+    "dev:data:preview": "npm run build && node dist/database/seeds/dev-postgraduate-data.js preview",
+    "dev:data:reset": "npm run build && node dist/database/seeds/dev-postgraduate-data.js reset",
+    "dev:data:seed": "npm run build && node dist/database/seeds/dev-postgraduate-data.js seed",
+    "dev:data:reseed": "npm run build && node dist/database/seeds/dev-postgraduate-data.js reseed"
   },
   "author": "Jeewantha Udeshika Ariyawansha",
   "license": "ISC",
