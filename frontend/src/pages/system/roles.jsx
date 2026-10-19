@@ -10,6 +10,7 @@ import EditRounded from "@mui/icons-material/EditRounded";
 import SaveRounded from "@mui/icons-material/SaveRounded";
 import FeatureLayout from "../../components/FeatureLayout";
 import AppDialog from "../../components/AppDialog";
+import PopupFormField from "../../components/PopupFormField";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { usePermissions } from "../../features/accounts/usePermissions";
 import { createRole, deleteRole, listPermissionCatalog, listRoles, setRolePermissions, updateRole } from "../../features/accounts/rolesApi";
@@ -286,12 +287,25 @@ const Roles = () => {
         onConfirm={submitRole}
         saving={saving}
         maxWidth="sm"
+        sx={{
+          "&& input:focus-visible, && textarea:focus-visible": { outline: "none" },
+        }}
       >
         <Stack spacing={2}>
           {roleFormError && <Alert severity="error">{roleFormError}</Alert>}
-          <TextField label="Mã vai trò" value={roleForm.code} onChange={(event) => setRoleForm((previous) => ({ ...previous, code: event.target.value }))} fullWidth size="small" disabled={saving || Boolean(editingRole)} helperText={editingRole ? "Không thể đổi mã vai trò." : "Ví dụ: thu_ky_khoa"} />
-          <TextField label="Tên vai trò" value={roleForm.name} onChange={(event) => setRoleForm((previous) => ({ ...previous, name: event.target.value }))} fullWidth size="small" disabled={saving} />
-          <TextField label="Mô tả" value={roleForm.description} onChange={(event) => setRoleForm((previous) => ({ ...previous, description: event.target.value }))} fullWidth size="small" multiline minRows={2} disabled={saving} />
+          <Box sx={{ p: 1.75, border: "1px solid #d7e1e8", borderRadius: "6px", bgcolor: "#fbfcfd" }}>
+            <Stack spacing={1.75}>
+              <PopupFormField label="Mã vai trò" htmlFor="role-code">
+                <TextField id="role-code" autoComplete="off" inputProps={{ "aria-label": "Mã vai trò" }} value={roleForm.code} onChange={(event) => setRoleForm((previous) => ({ ...previous, code: event.target.value }))} fullWidth size="small" disabled={saving || Boolean(editingRole)} helperText={editingRole ? "Không thể đổi mã vai trò." : "Ví dụ: thu_ky_khoa"} />
+              </PopupFormField>
+              <PopupFormField label="Tên vai trò" htmlFor="role-name">
+                <TextField id="role-name" autoComplete="off" inputProps={{ "aria-label": "Tên vai trò" }} value={roleForm.name} onChange={(event) => setRoleForm((previous) => ({ ...previous, name: event.target.value }))} fullWidth size="small" disabled={saving} />
+              </PopupFormField>
+              <PopupFormField label="Mô tả" htmlFor="role-description">
+                <TextField id="role-description" autoComplete="off" inputProps={{ "aria-label": "Mô tả" }} value={roleForm.description} onChange={(event) => setRoleForm((previous) => ({ ...previous, description: event.target.value }))} fullWidth size="small" multiline minRows={2} disabled={saving} />
+              </PopupFormField>
+            </Stack>
+          </Box>
           {editingRole?.isSystem && <Alert severity="info" sx={{ fontSize: 12.5 }}>Đây là vai trò hệ thống; có thể đổi tên/mô tả và ma trận quyền nhưng không thể xóa hay đổi mã. Tên vai trò chính hiển thị trong hệ thống vẫn dùng nhãn mặc định nếu chưa đổi.</Alert>}
           {!editingRole && <Alert severity="info" sx={{ fontSize: 12.5 }}>Sau khi tạo, chọn vai trò vừa tạo và tick quyền ở ma trận bên phải.</Alert>}
         </Stack>

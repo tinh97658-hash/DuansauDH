@@ -162,7 +162,7 @@
 
 /* 3. Commands Bar */
 .ribbon-command-scroll {
-  overflow-x: hidden;
+  overflow-x: auto;
   background: #FAFBFC;
   border-bottom: 1px solid var(--border-color, #DFE4E8);
   scrollbar-width: thin;
@@ -170,10 +170,10 @@
 
 .ribbon-commands {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: stretch;
   justify-content: flex-start;
-  width: 100%;
+  width: max-content;
   min-width: 100%;
   min-height: 108px;
   height: auto;
@@ -184,6 +184,7 @@
 .ribbon-group {
   position: relative;
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   min-width: 130px;
   min-height: 100px;
@@ -365,16 +366,6 @@
 }
 
 @media (max-width: 760px) {
-  .ribbon-command-scroll {
-    overflow-x: auto;
-  }
-
-  .ribbon-commands {
-    width: max-content;
-    min-height: 108px;
-    flex-wrap: nowrap;
-  }
-
   .ribbon-titlebar {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: 48px;

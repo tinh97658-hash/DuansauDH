@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert, Box, Button, CircularProgress, MenuItem, Paper, Stack, TableBody, TableCell,
-  TableContainer, TablePagination, TableRow, Tab, Tabs, TextField, Tooltip, Typography,
+  Alert, Box, CircularProgress, MenuItem, Paper, TableBody, TableCell,
+  TableContainer, TablePagination, TableRow, Tab, Tabs, Tooltip, Typography,
 } from "@mui/material";
-import RefreshRounded from "@mui/icons-material/RefreshRounded";
 import FeatureLayout from "../../components/FeatureLayout";
 import FilterSelectField from "../../components/FilterSelectField";
+import FilterSearchField from "../../components/FilterSearchField";
 import ResizableTable from "../../components/ResizableTable";
 import { listAuditLogs, listChangeLogs, listChangeLogTables } from "../../features/accounts/api";
 import { AUDIT_ACTION_LABELS, auditActionLabel, changeOperationLabel, tableLabel } from "../../features/accounts/constants";
@@ -56,6 +56,17 @@ const filterPaperSx = {
   borderRadius: "10px", boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
 };
 
+const DateFilter = ({ label, value, onChange }) => (
+  <FilterSearchField
+    label={label}
+    type="date"
+    value={value}
+    onChange={onChange}
+    InputProps={{ startAdornment: false }}
+    sx={{ width: { xs: "100%", md: 180 } }}
+  />
+);
+
 const ManagementLogs = () => {
   const [logs, setLogs] = useState([]);
   const [total, setTotal] = useState(0);
@@ -86,15 +97,14 @@ const ManagementLogs = () => {
   return (
     <>
       <Paper variant="outlined" sx={filterPaperSx}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems="flex-end">
+        <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 1.5, alignItems: "flex-end", flexWrap: "wrap" }}>
           <FilterSelectField label="Hành động" value={action} onChange={(event) => { setAction(event.target.value); setPage(0); }} sx={{ width: { xs: "100%", md: 240 } }}>
             <MenuItem value="">Tất cả hành động</MenuItem>
             {Object.entries(AUDIT_ACTION_LABELS).map(([code, label]) => <MenuItem key={code} value={code}>{label}</MenuItem>)}
           </FilterSelectField>
-          <TextField label="Từ ngày" type="date" value={from} onChange={(event) => { setFrom(event.target.value); setPage(0); }} size="small" InputLabelProps={{ shrink: true }} sx={{ width: { xs: "100%", md: 180 } }} />
-          <TextField label="Đến ngày" type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(0); }} size="small" InputLabelProps={{ shrink: true }} sx={{ width: { xs: "100%", md: 180 } }} />
-          <Button onClick={load} disabled={loading} startIcon={<RefreshRounded />} sx={{ height: 38, textTransform: "none", fontWeight: 600 }}>Tải lại</Button>
-        </Stack>
+          <DateFilter label="Từ ngày" value={from} onChange={(event) => { setFrom(event.target.value); setPage(0); }} />
+          <DateFilter label="Đến ngày" value={to} onChange={(event) => { setTo(event.target.value); setPage(0); }} />
+        </Box>
       </Paper>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -175,7 +185,7 @@ const DataChangeLogs = () => {
   return (
     <>
       <Paper variant="outlined" sx={filterPaperSx}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems="flex-end" flexWrap="wrap">
+        <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 1.5, alignItems: "flex-end", flexWrap: "wrap" }}>
           <FilterSelectField label="Bảng dữ liệu" value={table} onChange={(event) => { setTable(event.target.value); setPage(0); }} sx={{ width: { xs: "100%", md: 240 } }}>
             <MenuItem value="">Tất cả bảng</MenuItem>
             {tables.map((name) => <MenuItem key={name} value={name}>{tableLabel(name)}</MenuItem>)}
@@ -186,10 +196,9 @@ const DataChangeLogs = () => {
             <MenuItem value="UPDATE">Cập nhật</MenuItem>
             <MenuItem value="DELETE">Xóa</MenuItem>
           </FilterSelectField>
-          <TextField label="Từ ngày" type="date" value={from} onChange={(event) => { setFrom(event.target.value); setPage(0); }} size="small" InputLabelProps={{ shrink: true }} sx={{ width: { xs: "100%", md: 170 } }} />
-          <TextField label="Đến ngày" type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(0); }} size="small" InputLabelProps={{ shrink: true }} sx={{ width: { xs: "100%", md: 170 } }} />
-          <Button onClick={load} disabled={loading} startIcon={<RefreshRounded />} sx={{ height: 38, textTransform: "none", fontWeight: 600 }}>Tải lại</Button>
-        </Stack>
+          <DateFilter label="Từ ngày" value={from} onChange={(event) => { setFrom(event.target.value); setPage(0); }} />
+          <DateFilter label="Đến ngày" value={to} onChange={(event) => { setTo(event.target.value); setPage(0); }} />
+        </Box>
       </Paper>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}

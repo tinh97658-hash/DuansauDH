@@ -413,10 +413,16 @@ export const theme = createTheme({
     },
     MuiAlert: {
       styleOverrides: {
-        root: {
+        root: ({ ownerState, theme }) => ({
           borderRadius: 0,
           fontSize: "12.5px",
-        },
+          "& .MuiAlert-icon": {
+            color: theme.palette[ownerState.color || ownerState.severity || "info"][
+              ownerState.variant === "filled" ? "contrastText" : "main"
+            ],
+            opacity: 1,
+          },
+        }),
       },
     },
   },
