@@ -256,7 +256,7 @@ Cơ chế **session version** (không cần đụng bảng `sessions`):
 Tổ chức theo `backend/test/` và `frontend/src/test/`.
 
 - Unit backend: `PermissionsGuard` (union nhiều vai trò, superadmin, thiếu quyền), session-version invalidation, `AccountsService` (trùng email, khóa, reset MK, sinh MK), ràng buộc 1 vai trò chính, `ChangeLogService` (lọc/phân trang/danh sách bảng).
-- Integration backend: `/accounts`, `/roles`, `/roles/:id/permissions` (401/403/200), audit được ghi; **regression toàn bộ API sau khi thay `@Roles`** (ma trận 200/403 theo vai trò).
+- Integration backend: `/accounts`, `/roles` (401/403/200, ma trận quyền) — phủ bằng unit test guard + smoke HTTP thực tế, và **spec chạm DB thật** `test/integration/accounts-roles-postgres.spec.ts` (bật bằng `RUN_POSTGRES_ACCOUNT_TESTS=true`) kiểm chứng tạo tài khoản/vai trò, đổi quyền, audit `auth_audit_logs` + trigger `db_change_logs`; **regression toàn bộ API sau khi thay `@Roles`** (ma trận 200/403 theo vai trò).
 - Integration frontend: render accounts/roles, ẩn nút khi thiếu quyền, luồng reset MK + xác nhận, cập nhật ma trận quyền, buộc đổi MK, hai tab nhật ký (`AuditLogs.test.jsx`).
 - Gỡ `SystemUsers.test.jsx` (trang cũ không còn).
 
