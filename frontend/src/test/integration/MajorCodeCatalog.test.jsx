@@ -1,7 +1,10 @@
+import { renderWithPermissions } from "../renderWithPermissions";
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import axios from "axios";
 import Majors from "../../pages/system/majors";
+
+const render = (ui, options) => renderWithPermissions(ui, ["catalog.manage"], options);
 
 jest.mock("axios");
 jest.mock("../../components/FeatureLayout", () => ({ children }) => <div>{children}</div>);

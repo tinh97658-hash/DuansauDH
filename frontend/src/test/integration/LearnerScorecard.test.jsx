@@ -1,10 +1,13 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { renderWithPermissions } from "../renderWithPermissions";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import AdmissionRecordDetail from "../../pages/plan/admissionRecordDetail";
 import ClassScoreSummary from "../../pages/reports/classScoreSummary";
 import LearnerScorecard from "../../features/learners/LearnerScorecard";
 import { notifyGradebookSaved } from "../../utils/gradebookRevision";
+
+const render = (ui, options) => renderWithPermissions(ui, ["reports.export", "admission.manage"], options);
 
 vi.mock("axios", () => ({ default: { get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn(), defaults: {} } }));
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });

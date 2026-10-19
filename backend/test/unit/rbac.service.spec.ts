@@ -1,8 +1,8 @@
 import { RbacService } from "../../src/auth/rbac.service.js";
 
-const role = (code: string, permissionCodes: string[], isSuperadmin = false) => ({
+const role = (code: string, permissionCodes: string[], active = true) => ({
   code,
-  isSuperadmin,
+  active,
   permissions: permissionCodes.map((permissionCode) => ({ code: permissionCode })),
 });
 
@@ -23,18 +23,33 @@ describe("RbacService", () => {
 
     const access = await service.effectiveAccess({ id: "s1", role: "supervisor" });
 
-    expect(access.superadmin).toBe(false);
     expect([...access.permissions].sort()).toEqual(["catalog.view", "gradebook.approve", "gradebook.view"]);
     expect(access.roleCodes).toEqual(["supervisor", "examiner"]);
   });
 
-  it("đánh dấu superadmin khi có vai trò quản trị", async () => {
+  it("admin chỉ nhận quyền đã gán trong ma trận", async () => {
     const { service, staffRoles } = build();
-    staffRoles.findAll.mockResolvedValue([{ role: role("admin", [], true) }]);
-
+    staffRoles.findAll.mockResolvedValue([{ role: role("admin", ["catalog.view"]) }]);
     const access = await service.effectiveAccess({ id: "s1", role: "admin" });
+    expect([...access.permissions]).toEqual(["catalog.view"]);
+    expect(access.permissions.has("role.manage")).toBe(false);
+  });
 
-    expect(access.superadmin).toBe(true);
+  it("không cấp quyền từ vai trò bị tắt, kể cả admin", async () => {
+    const { service, staffRoles } = build();
+    staffRoles.findAll.mockResolvedValue([
+      { role: role("admin", ["role.manage"], false) },
+      { role: role("custom", ["catalog.view"]) },
+    ]);
+    const access = await service.effectiveAccess({ id: "s1", role: "admin" });
+    expect([...access.permissions]).toEqual(["catalog.view"]);
+    expect(access.roleCodes).toEqual(["custom"]);
+  });
+
+  it("fallback cũng không cấp quyền từ vai trò bị tắt", async () => {
+    const { service, roles } = build();
+    roles.findOne.mockResolvedValue(role("admin", ["role.manage"], false));
+    expect([...(await service.effectiveAccess({ id: "s1", role: "admin" })).permissions]).toEqual([]);
   });
 
   it("dùng vai trò chính làm fallback khi chưa có bản ghi staff_roles", async () => {
@@ -60,4 +75,13 @@ describe("RbacService", () => {
     await service.effectiveAccess({ id: "s1", role: "supervisor" });
     expect(staffRoles.findAll).toHaveBeenCalledTimes(2);
   });
+  it("không tái dùng cache quyền khi session version đã đổi", async () => {
+    const { service, staffRoles } = build();
+    staffRoles.findAll.mockResolvedValueOnce([{ role: role("admin", ["role.manage"]) }]).mockResolvedValueOnce([{ role: role("custom", ["catalog.view"]) }]);
+    await service.effectiveAccess({ id: "s1", sessionVersion: 0 });
+    const access = await service.effectiveAccess({ id: "s1", sessionVersion: 1 });
+    expect([...access.permissions]).toEqual(["catalog.view"]);
+    expect(staffRoles.findAll).toHaveBeenCalledTimes(2);
+  });
+
 });

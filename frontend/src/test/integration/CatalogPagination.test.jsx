@@ -12,7 +12,7 @@ vi.mock('../../components/FeatureLayout', () => ({ default: ({ children }) => <d
 it('limits catalog rendering, navigates to later rows, searches the entire catalog and reuses the verified role', async () => {
   const rows = Array.from({ length: 30 }, (_, index) => ({ id: `unit-${index}`, code: `DV${index + 1}`, name: `Đơn vị ${index + 1}`, active: true }));
   axios.get.mockResolvedValue({ data: rows });
-  render(<ThemeProvider theme={theme}><CssBaseline /><AuthSessionContext.Provider value={{ authenticated: true, user: { role: 'admin' } }}><Units /></AuthSessionContext.Provider></ThemeProvider>);
+  render(<ThemeProvider theme={theme}><CssBaseline /><AuthSessionContext.Provider value={{ authenticated: true, user: { role: 'custom' }, access: { permissions: ['catalog.manage'] } }}><Units /></AuthSessionContext.Provider></ThemeProvider>);
   const table = await screen.findByRole('table', { name: 'Đơn vị' });
   await screen.findByRole('button', { name: 'Sửa mã đơn vị DV1' });
   expect(within(table).getAllByRole('row')).toHaveLength(26);

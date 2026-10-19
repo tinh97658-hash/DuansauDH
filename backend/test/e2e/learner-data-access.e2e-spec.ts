@@ -20,7 +20,10 @@ import { ReportsService } from "../../src/reports/reports.service.js";
 import { ClassScoreSummaryService } from "../../src/reports/class-score-summary.service.js";
 import { RbacService } from "../../src/auth/rbac.service.js";
 
+import { PERMISSION_CODES } from "../../src/auth/permissions.js";
+
 const ROLE_PERMISSIONS: Record<string, string[]> = {
+  admin: PERMISSION_CODES,
   supervisor: ["catalog.view", "plan.view", "admission.view", "masters.view", "doctoral.view", "scheduling.view", "gradebook.view", "reports.view"],
   examiner: ["catalog.view", "plan.view", "admission.view", "masters.view", "doctoral.view", "scheduling.view", "gradebook.view", "reports.view"],
 };

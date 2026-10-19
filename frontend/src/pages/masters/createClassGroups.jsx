@@ -14,7 +14,7 @@ import EditRounded from "@mui/icons-material/EditRounded";
 import GroupWorkRounded from "@mui/icons-material/GroupWorkRounded";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
-import { useAuthSession } from "../../context/AuthSession";
+import { usePermissions } from "../../features/accounts/usePermissions";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import AppDialog from "../../components/AppDialog";
@@ -128,11 +128,12 @@ const CompactField = ({ label, htmlFor, helper, error = false, children, sx }) =
 );
 
 const CreateClassGroups = () => {
-  const session = useAuthSession();
+  const { can } = usePermissions();
   const navigate = useNavigate();
 
   // Filters
   const [majors, setMajors] = useState([]);
+  const [majorsLoading, setMajorsLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [selectedMajor, setSelectedMajor] = useState("ALL");
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
@@ -144,7 +145,7 @@ const CreateClassGroups = () => {
   const [curriculums, setCurriculums] = useState([]);
   const [curriculumsLoading, setCurriculumsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const isAdmin = can("masters.manage");
   const [error, setError] = useState("");
 
   // Dialogs
@@ -166,15 +167,11 @@ const CreateClassGroups = () => {
         if (!mounted) return;
         setMajors(Array.isArray(data) ? data : data.data || []);
       })
-      .catch(() => mounted && setMajors([]));
-
-    const role = session ? Promise.resolve({ data: { message: session.user?.role || "student" } }) : axios.get(`${API_BASE_URL}/auth/isStaff`, { withCredentials: true });
-    role
-      .then(({ data }) => mounted && setIsAdmin(data.message === "admin"))
-      .catch(() => mounted && setIsAdmin(false));
+      .catch(() => mounted && setMajors([]))
+      .finally(() => mounted && setMajorsLoading(false));
 
     return () => { mounted = false; };
-  }, [session]);
+  }, []);
 
   // Load groups
   const loadGroups = useCallback(async () => {
@@ -483,6 +480,7 @@ const CreateClassGroups = () => {
               variant="contained"
               startIcon={<AddRounded />}
               onClick={openAdd}
+              disabled={majorsLoading || loading}
               sx={{ height: 40, px: 2, bgcolor: "#0788B8", borderRadius: "4px", boxShadow: "none", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}
             >
               Thêm nhóm mới

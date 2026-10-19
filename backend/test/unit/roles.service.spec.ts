@@ -28,12 +28,13 @@ const build = () => {
   const sequelize = { transaction: jest.fn((callback: any) => callback({})) };
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const rbac = { invalidate: jest.fn() };
+  const administrationSafety = { lock: jest.fn(), assertRetained: jest.fn() };
 
   const service = new RolesService(
     roles as any, permissions as any, rolePermissions as any, staffRoles as any,
-    sequelize as any, audit as any, rbac as any,
+    sequelize as any, audit as any, rbac as any, administrationSafety as any,
   );
-  return { service, roles, permissions, rolePermissions, staffRoles, audit, rbac };
+  return { service, roles, permissions, rolePermissions, staffRoles, audit, rbac, administrationSafety };
 };
 
 describe("RolesService", () => {
@@ -89,4 +90,20 @@ describe("RolesService", () => {
     );
     expect(rbac.invalidate).toHaveBeenCalled();
   });
+  it("không cho gỡ quyền quản trị cuối qua ma trận admin", async () => {
+    const { service, roles, administrationSafety } = build();
+    roles.findByPk.mockResolvedValue(roleRecord({ code: "admin", isSystem: true }));
+    administrationSafety.assertRetained.mockRejectedValue(new ConflictException());
+    await expect(service.setPermissions("actor", "r1", { permissionIds: [] } as any, {})).rejects.toThrow(ConflictException);
+    expect(administrationSafety.lock).toHaveBeenCalledWith({});
+  });
+  it("cho phép tắt admin khi vẫn còn nhân sự có đủ quyền quản trị", async () => {
+    const { service, roles, administrationSafety } = build();
+    const record = roleRecord({ code: "admin", isSystem: true });
+    roles.findByPk.mockResolvedValue(record);
+    await service.update("actor", "r1", { active: false } as any, {});
+    expect(record.update).toHaveBeenCalledWith({ active: false }, { transaction: {} });
+    expect(administrationSafety.assertRetained).toHaveBeenCalledWith({});
+  });
+
 });

@@ -28,9 +28,9 @@ describe("PermissionsGuard", () => {
     expect(rbac.effectiveAccess).not.toHaveBeenCalled();
   });
 
-  it("cho qua khi vai trò là superadmin", async () => {
+  it("không dùng cờ superadmin cũ để bỏ qua quyền", async () => {
     const { guard } = build(["role.manage"], { superadmin: true, permissions: [] });
-    await expect(guard.canActivate(contextFor({ isAuthenticated: () => true, user: staffUser() }))).resolves.toBe(true);
+    await expect(guard.canActivate(contextFor({ isAuthenticated: () => true, user: staffUser() }))).rejects.toThrow(ForbiddenException);
   });
 
   it("cho qua khi có đủ quyền", async () => {

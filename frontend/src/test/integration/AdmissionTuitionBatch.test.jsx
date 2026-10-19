@@ -1,8 +1,11 @@
+import { renderWithPermissions } from "../renderWithPermissions";
 import React from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import axios from "axios";
 import AdmissionRecords from "../../pages/plan/admissionRecords";
+const render = (ui, options) => renderWithPermissions(ui, ["admission.manage"], options);
+
 jest.mock("axios", () => ({ get: jest.fn(), put: jest.fn(), isCancel: jest.fn(() => false), defaults: {} }));
 jest.mock("@mui/icons-material", () => ({
   AddPhotoAlternateRounded: () => null, AddRounded: () => null, CheckCircleRounded: () => null,

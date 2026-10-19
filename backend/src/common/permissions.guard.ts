@@ -19,7 +19,6 @@ export class PermissionsGuard implements CanActivate {
     if (!(user instanceof Staff)) throw new ForbiddenException("Bạn không có quyền thực hiện thao tác này");
 
     const access = await this.rbac.effectiveAccess(user);
-    if (access.superadmin) return true;
     if (!required.every((permission) => access.permissions.has(permission))) {
       throw new ForbiddenException("Bạn không có quyền thực hiện thao tác này");
     }

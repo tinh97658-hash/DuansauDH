@@ -1,9 +1,12 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { renderWithPermissions } from "../renderWithPermissions";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import axios from "axios";
 import TrainingPlan from "../../pages/plan/trainingPlan";
 import { toast } from "react-toastify";
 
 // Decorative icons are not the identity contract under test; avoid importing the full icon catalog.
+const render = (ui, options) => renderWithPermissions(ui, ["plan.manage"], options);
+
 jest.mock("@mui/icons-material", () => ({
   AddRounded: () => null, CheckBoxOutlineBlankRounded: () => null, CheckBoxRounded: () => null,
   CheckRounded: () => null, CloseRounded: () => null, DeleteOutlineRounded: () => null, DeleteRounded: () => null,

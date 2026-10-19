@@ -195,7 +195,7 @@ describe("AssignClassGroups", () => {
     expect(table.querySelector("col.assignment-code-col")).toHaveStyle({ width: `${initialWidth + 10}px` });
     expect(JSON.parse(localStorage.getItem("masters-assignment-candidate-column-widths"))).toMatchObject({ code: initialWidth + 10 });
     expect((await within(table).findByText("Nguyễn Văn")).closest("td")).toHaveTextContent(/^Nguyễn Văn$/);
-    expect(within(table).getByText("1999-01-02")).toBeInTheDocument();
+    expect(within(table).getByText("02/01/99")).toBeInTheDocument();
     expect(within(table).getByText("Nam")).toBeInTheDocument();
     expect(within(table).queryByText("Ghi chú tuyển sinh")).not.toBeInTheDocument();
     expect(within(table).getByText("Đã nộp")).toBeInTheDocument();

@@ -8,6 +8,7 @@ import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { AccountsService } from "../../src/accounts/accounts.service.js";
 import { AppModule } from "../../src/app.module.js";
+import { AdministrationSafetyService } from "../../src/auth/administration-safety.service.js";
 import { RbacService } from "../../src/auth/rbac.service.js";
 import { Staff } from "../../src/database/models/staff.model.js";
 import { StaffRole } from "../../src/database/models/staff-role.model.js";
@@ -200,4 +201,46 @@ describeDb("Staff account and role administration PostgreSQL integration", () =>
     const systemRole = await select("SELECT id FROM roles WHERE is_system = true LIMIT 1");
     await expect(roles.remove(actor.id, systemRole[0].id, context)).rejects.toThrow("hệ thống");
   });
+  it("quyền admin phụ thuộc ma trận, không phụ thuộc tên vai trò", async () => {
+    const [admin] = await select("SELECT id FROM roles WHERE code = 'admin'");
+    await db.query("DELETE FROM role_permissions WHERE role_id = :id", { replacements: { id: admin.id } });
+    rbac.invalidate();
+    expect([...(await rbac.effectiveAccess(actor)).permissions]).toEqual([]);
+  });
+
+  it("bảo vệ hợp quyền quản trị từ nhiều vai trò tùy chỉnh và bỏ qua vai trò bị tắt", async () => {
+    // All changes in this spec, including existing staff status, are rolled back.
+    await db.query("UPDATE staff SET status = 'disabled'");
+    const perms = await select("SELECT id, code FROM permissions WHERE code IN ('account.view', 'account.manage', 'role.view', 'role.manage')");
+    const accountRole = await createCustomRole("accounts", perms.filter(p => p.code.startsWith("account.")).map(p => p.id));
+    const roleRole = await createCustomRole("roles", perms.filter(p => p.code.startsWith("role.")).map(p => p.id));
+    const member = await Staff.create({ name: "Quản trị qua hợp quyền", email: `${prefix}.union@example.invalid`, role: "examiner", status: "active" });
+    await StaffRole.bulkCreate([{ staffId: member.id, roleId: accountRole }, { staffId: member.id, roleId: roleRole }]);
+    const safety = app.get(AdministrationSafetyService);
+    await safety.lock(tx);
+    await expect(safety.assertRetained(tx)).resolves.toBeUndefined();
+    rbac.invalidate();
+    expect((await rbac.effectiveAccess(member)).permissions.size).toBe(4);
+    await db.query("UPDATE roles SET active = false WHERE id = :id", { replacements: { id: roleRole } });
+    rbac.invalidate();
+    expect((await rbac.effectiveAccess(member)).permissions.has("role.manage")).toBe(false);
+    await expect(safety.assertRetained(tx)).rejects.toThrow("Phải giữ ít nhất một nhân sự");
+  });
+
+  it("đổi vai trò thu hồi phiên nhưng sửa tên với cùng vai trò giữ nguyên version", async () => {
+    const accountRole = await createCustomRole("before");
+    const nextRole = await createCustomRole("after");
+    const created = await accounts.create(actor.id, { name: "Đổi vai trò", email: `${prefix}.version@example.invalid`, roleIds: [accountRole] } as any, context);
+    const member = await Staff.findByPk(created.data.id);
+    const initialVersion = member!.sessionVersion;
+    await accounts.update(actor.id, member!.id, { roleIds: [nextRole] } as any, context);
+    await member!.reload();
+    expect(member!.sessionVersion).toBe(initialVersion + 1);
+    expect(member!.role).toBe(`${prefix}-after`);
+    await accounts.update(actor.id, member!.id, { name: "Tên đã sửa", roleIds: [nextRole] } as any, context);
+    await member!.reload();
+    expect(member!.sessionVersion).toBe(initialVersion + 1);
+    expect(member!.name).toBe("Tên đã sửa");
+  });
+
 });

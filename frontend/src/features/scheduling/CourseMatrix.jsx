@@ -1,3 +1,4 @@
+import { usePermissions } from "../accounts/usePermissions";
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CalendarMonthRounded from "@mui/icons-material/CalendarMonthRounded";
@@ -54,6 +55,7 @@ export function sortCourseOfferings(offerings, todayKey = getBusinessTodayKey())
 }
 
 export default function CourseMatrix({ user }) {
+  const { can } = usePermissions();
   const navigate = useNavigate();
   const [majorId, setMajor] = useState("");
   const [disciplineId, setDiscipline] = useState("");
@@ -64,7 +66,7 @@ export default function CourseMatrix({ user }) {
   const [detailOffering, setDetailOffering] = useState(null);
 
   const canEdit = user.canManageScheduling === true;
-  const canDelete = canEdit || user.role === "admin";
+  const canDelete = canEdit || can("scheduling.organize");
   const offerings = useLoad(async () => rows(await api.get("/scheduling/course-offerings?program=masters")), []);
   const majors = useLoad(async () => rows(await api.get("/system/majors?program=masters")), []);
   const disciplines = useMemo(() => disciplinesFromMajors(majors.data || []), [majors.data]);

@@ -1,3 +1,4 @@
+import { usePermissions } from "../accounts/usePermissions";
 import React, { useState } from "react";
 import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
 import { api, groupsOf, message, Modal, Notice, offeringTitle, rows, subjectLabel, useLoad } from "./shared";
@@ -6,6 +7,7 @@ import { personNameParts } from "../../utils/personName";
 import OfferingDeleteButton from "./OfferingDeleteButton";
 
 export default function OfferingDetails({ offering, user, onClose, onSaved, onOpenSession, onSelect }) {
+  const { can } = usePermissions();
   const detail = useLoad(() => api.get(`/scheduling/course-offerings/${offering.id}`), [offering.id]);
   const roster = useLoad(() => api.get(`/scheduling/course-offerings/${offering.id}/roster`), [offering.id]);
   const sessions = useLoad(async () => rows(await api.get(`/scheduling/course-offerings/${offering.id}/teaching-sessions`)), [offering.id]);
@@ -19,7 +21,7 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
   const [success, setSuccess] = useState("");
   const value = detail.data || offering;
   const canManage = user?.canManageScheduling === true;
-  const canNotes = canManage || user?.role === "admin";
+  const canNotes = canManage || can("scheduling.organize");
   const summary = value.sessionSummary || {};
   const allSessions = sessions.data || [];
 

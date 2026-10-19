@@ -1,4 +1,4 @@
-import { useAuthSession } from "../../context/AuthSession";
+import { usePermissions } from "../accounts/usePermissions";
 import { openLearnerTranscript } from "./learnerTranscript";
 import React, { useEffect, useState } from "react";
 import axios from "axios";
@@ -25,7 +25,7 @@ const columns = [
 ];
 
 export default function LearnerScorecard({ admissionRecordId, classGroupId, onClassChange }) {
-  const session = useAuthSession();
+  const { can } = usePermissions();
   const [issuing, setIssuing] = useState(false);
   const [issueId, setIssueId] = useState("");
   const [issuedItems, setIssuedItems] = useState(null);
@@ -71,7 +71,7 @@ export default function LearnerScorecard({ admissionRecordId, classGroupId, onCl
         <div>{report.progress.earnedCredits} tín chỉ đã đạt và được chốt. Việc xét tốt nghiệp được xử lý riêng.</div>
         {report.progress.blockers?.length > 0 && <details><summary>Điều kiện còn thiếu</summary><ul>{report.progress.blockers.map((item, index) => <li key={index}>{item.message}</li>)}</ul></details>}
       </Alert>}
-      {session?.user?.role === "admin" && <Button disabled={!report.progress?.completed || issuing} onClick={async () => {
+      {can("reports.export") && <Button disabled={!report.progress?.completed || issuing} onClick={async () => {
         const preview = window.open("about:blank", "_blank");
         setIssuing(true); setError("");
         try { const { data } = await axios.post(`${API_BASE_URL}/reports/learner-scorecard/${admissionRecordId}/issue`, { classGroupId: report.group.id });

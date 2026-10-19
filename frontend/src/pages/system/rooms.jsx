@@ -9,8 +9,6 @@ const Rooms = () => (
     desc="Quản lý danh mục phòng dùng chung cho xếp lịch."
     endpoint="/system/rooms?includeInactive=true"
     baseEndpoint="/system/rooms"
-    authEndpoint="/auth/session"
-    authCheck={(data) => data?.user?.role === "admin"}
     itemName="phòng"
     codeLabel="Mã phòng"
     nameLabel="Tên phòng"

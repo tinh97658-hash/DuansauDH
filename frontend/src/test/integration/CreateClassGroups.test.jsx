@@ -1,8 +1,11 @@
+import { renderWithPermissions } from "../renderWithPermissions";
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import axios from "axios";
 import CreateClassGroups from "../../pages/masters/createClassGroups";
+
+const render = (ui, options) => renderWithPermissions(ui, ["masters.manage"], options);
 
 jest.mock("axios");
 jest.mock("../../components/FeatureLayout", () => ({ children }) => <div>{children}</div>);
@@ -36,7 +39,9 @@ const renderPage = () => render(
 
 const openCreateDialog = async () => {
   renderPage();
-  fireEvent.click(await screen.findByRole("button", { name: "Thêm nhóm mới" }));
+  const add = await screen.findByRole("button", { name: "Thêm nhóm mới" });
+  await waitFor(() => expect(add).toBeEnabled());
+  fireEvent.click(add);
   return screen.getByRole("dialog");
 };
 

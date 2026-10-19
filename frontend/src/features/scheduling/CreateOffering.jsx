@@ -1,3 +1,4 @@
+import { usePermissions } from "../accounts/usePermissions";
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import successCircle from "../../assets/create-offering-success.svg";
@@ -16,8 +17,9 @@ const readDraft = key => {
 };
 
 export default function CreateOffering({ user }) {
+  const { can } = usePermissions();
   const navigate = useNavigate();
-  const canEdit = user.role === "admin" || user.canManageScheduling === true;
+  const canEdit = can("scheduling.organize") || user.canManageScheduling === true;
   const draftKey = `scheduling:create-offering:${user.id || user.email || "current"}`;
   const [initialDraft] = useState(() => readDraft(draftKey));
   const draftText = field => typeof initialDraft[field] === "string" ? initialDraft[field] : "";

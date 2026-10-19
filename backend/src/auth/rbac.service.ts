@@ -5,7 +5,6 @@ import { Role } from "../database/models/role.model.js";
 import { StaffRole } from "../database/models/staff-role.model.js";
 
 export interface EffectiveAccess {
-  superadmin: boolean;
   permissions: Set<string>;
   roleCodes: string[];
 }
@@ -26,15 +25,18 @@ export class RbacService {
   ) {}
 
   invalidate(staffId?: string) {
-    if (staffId) this.cache.delete(staffId);
+    if (staffId) {
+      for (const key of this.cache.keys()) if (key.startsWith(`${staffId}:`)) this.cache.delete(key);
+    }
     else this.cache.clear();
   }
 
-  async effectiveAccess(staff: { id: string; role?: string }): Promise<EffectiveAccess> {
-    const cached = this.cache.get(staff.id);
+  async effectiveAccess(staff: { id: string; role?: string; sessionVersion?: number }): Promise<EffectiveAccess> {
+    const key = `${staff.id}:${staff.sessionVersion ?? 0}`;
+    const cached = this.cache.get(key);
     if (cached && cached.expiresAt > Date.now()) return cached.access;
     const access = await this.compute(staff);
-    this.cache.set(staff.id, { expiresAt: Date.now() + CACHE_TTL_MS, access });
+    this.cache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, access });
     return access;
   }
 
@@ -52,12 +54,11 @@ export class RbacService {
       if (fallback) roleModels = [fallback];
     }
 
+    roleModels = roleModels.filter((role) => role.active === true);
     const permissions = new Set<string>();
-    let superadmin = false;
     for (const role of roleModels) {
-      if (role.isSuperadmin) superadmin = true;
       for (const permission of role.permissions ?? []) permissions.add(permission.code);
     }
-    return { superadmin, permissions, roleCodes: roleModels.map((role) => role.code) };
+    return { permissions, roleCodes: roleModels.map((role) => role.code) };
   }
 }

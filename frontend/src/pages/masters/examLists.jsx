@@ -1,3 +1,4 @@
+import { usePermissions } from "../../features/accounts/usePermissions";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
@@ -8,7 +9,6 @@ import SaveRounded from "@mui/icons-material/SaveRounded";
 import SettingsRounded from "@mui/icons-material/SettingsRounded";
 import GradeSettingsDialog from "../../features/exams/GradeSettingsDialog";
 import FeatureLayout from "../../components/FeatureLayout";
-import { useAuthSession } from "../../context/AuthSession";
 import FilterSelectField from "../../components/FilterSelectField";
 import FilterSearchField from "../../components/FilterSearchField";
 import ResizableTable from "../../components/ResizableTable";
@@ -59,7 +59,7 @@ const errorMessage = (error, fallback) => {
 };
 
 export default function ExamLists() {
-  const session = useAuthSession();
+  const { can } = usePermissions();
   const catalogRevision = useSubjectCatalogRevision();
   const [policyRevision, setPolicyRevision] = useState(0);
   useEffect(() => {
@@ -100,19 +100,19 @@ export default function ExamLists() {
   const includeIds = Object.values(dirty).filter(isExamCandidate).map(row => row.participantId).join(",");
   const excludeIds = Object.values(dirty).filter(row => !isExamCandidate(row)).map(row => row.participantId).join(",");
   const examIncludeIds = mode === "exam" ? includeIds : "", examExcludeIds = mode === "exam" ? excludeIds : "";
-  const [role, setRole] = useState(""), [optionsLoading, setOptionsLoading] = useState(true), [loading, setLoading] = useState(false), [saving, setSaving] = useState(false);
+  const [optionsLoading, setOptionsLoading] = useState(true), [loading, setLoading] = useState(false), [saving, setSaving] = useState(false);
   const [error, setError] = useState(""), [success, setSuccess] = useState(""), [pendingChange, setPendingChange] = useState(null);
-  const canEdit = role === "admin" || role === "examiner";
+  const canEdit = can("gradebook.submit");
   const dirtyCount = Object.keys(dirty).length;
 
   useEffect(() => {
     let active = true;
-    Promise.all([axios.get(`${API_BASE_URL}/masters/exam-lists/options`), session ? Promise.resolve({ data: { message: session.user?.role || "student" } }) : axios.get(`${API_BASE_URL}/auth/isStaff`)])
-      .then(([options, auth]) => {
+    axios.get(`${API_BASE_URL}/masters/exam-lists/options`)
+      .then((options) => {
         if (!active) return;
         const list = options.data.groups || [];
         const offerings = options.data.courseOfferings || [];
-        setGroups(list); setSubjects(offerings); setRole(auth.data.message || "");
+        setGroups(list); setSubjects(offerings);
         const first = list[0];
         const offering = offerings.find((item) => item.groupLinks?.some((link) => link.classGroupId === first?.id));
         setMajorId(first?.majorId || "");
@@ -121,7 +121,7 @@ export default function ExamLists() {
       .catch((failure) => active && setError(errorMessage(failure, "Không thể tải danh sách lớp. Hãy tải lại trang.")))
       .finally(() => active && setOptionsLoading(false));
     return () => { active = false; };
-  }, [session]);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -358,8 +358,8 @@ export default function ExamLists() {
       <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mb: 1.5 }} className="exam-no-print">
         <Chip label={{ draft: "Điểm nháp", submitted: "Chờ duyệt", approved: "Đã duyệt và khóa" }[workflow.status]} />
         {canEdit && workflow.status === "draft" && <Button disabled={busy || saving || dirtyCount > 0 || !teachingCompleted || !offeringId} onClick={() => setWorkflowAction("submit")}>Gửi duyệt điểm</Button>}
-        {role === "admin" && workflow.status === "submitted" && <Button disabled={busy || saving || dirtyCount > 0} onClick={() => setWorkflowAction("approve")}>Duyệt và khóa điểm</Button>}
-        {role === "admin" && workflow.status !== "draft" && <Button disabled={busy || saving} onClick={() => setWorkflowAction("reopen")}>Mở lại để sửa</Button>}
+        {can("gradebook.approve") && workflow.status === "submitted" && <Button disabled={busy || saving || dirtyCount > 0} onClick={() => setWorkflowAction("approve")}>Duyệt và khóa điểm</Button>}
+        {can("gradebook.approve") && workflow.status !== "draft" && <Button disabled={busy || saving} onClick={() => setWorkflowAction("reopen")}>Mở lại để sửa</Button>}
         <Button disabled={!offeringId || saving} onClick={loadHistory}>Lịch sử điểm</Button>
       </Stack>
       <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} sx={{ mb: 1.5 }} className="exam-no-print">

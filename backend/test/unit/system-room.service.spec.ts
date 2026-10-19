@@ -49,9 +49,9 @@ describe("SystemService Room catalog", () => {
     await controller.rooms({ id: "staff-2", role: "clerk" }, "true");
     expect(listRooms).toHaveBeenLastCalledWith(true);
 
-    rbac.effectiveAccess.mockResolvedValue({ superadmin: true, permissions: new Set<string>(), roleCodes: ["admin"] });
+    rbac.effectiveAccess.mockResolvedValue({ permissions: new Set<string>(), roleCodes: ["admin"] });
     await controller.rooms({ id: "staff-3", role: "admin" }, "true");
-    expect(listRooms).toHaveBeenLastCalledWith(true);
+    expect(listRooms).toHaveBeenLastCalledWith(false);
 
     listRooms.mockClear();
     rbac.effectiveAccess.mockClear();

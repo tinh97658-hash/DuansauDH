@@ -1,3 +1,4 @@
+import { usePermissions } from "../../features/accounts/usePermissions";
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { Alert, Box, Button, Chip, CircularProgress, FormControlLabel, MenuItem, Paper, Stack, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
@@ -7,7 +8,6 @@ import InfoOutlined from "@mui/icons-material/InfoOutlined";
 import RefreshRounded from "@mui/icons-material/RefreshRounded";
 import BulkAdmissionWorkflow from "../../features/admission/BulkAdmissionWorkflow";
 import FeatureLayout from "../../components/FeatureLayout";
-import { useAuthSession } from "../../context/AuthSession";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import AppDialog from "../../components/AppDialog";
@@ -45,10 +45,11 @@ const compactControlSx = {
   },
 };
 export default function AdmissionScores() {
-  const session = useAuthSession();
+  const { can } = usePermissions();
+  const admin = can("admission.manage");
   const [scoresDirty, setScoresDirty] = useState(false), [workflowBusy, setWorkflowBusy] = useState(false);
   const [rounds, setRounds] = useState([]), [majors, setMajors] = useState([]);
-  const [admin, setAdmin] = useState(false), [roundId, setRoundId] = useState("");
+  const [roundId, setRoundId] = useState("");
   const [data, setData] = useState(null), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [saving, setSaving] = useState(false), [form, setForm] = useState(null);
   const [search, setSearch] = useState(""), [filter, setFilter] = useState("all"), [majorFilter, setMajorFilter] = useState("all");
@@ -57,13 +58,13 @@ export default function AdmissionScores() {
   const [showEligible, setShowEligible] = useState(false);
   const thresholdsDirty = Object.keys(thresholdDrafts).length > 0;
   const loadRounds = useCallback(async () => {
-    const [config, catalog, sessionResponse] = await Promise.all([
-      axios.get(`${API_BASE_URL}/plan/admission-rounds`, options), axios.get(`${API_BASE_URL}/system/majors`, options), session ? Promise.resolve({ data: session }) : axios.get(`${API_BASE_URL}/auth/session`, options),
+    const [config, catalog] = await Promise.all([
+      axios.get(`${API_BASE_URL}/plan/admission-rounds`, options), axios.get(`${API_BASE_URL}/system/majors`, options),
     ]);
     setRounds(config.data.rows || []);
     setMajors(normalizeMajorsResponse(catalog.data).filter((major) => major.program === "masters" && major.active !== false));
-    setAdmin(sessionResponse.data.user?.role === "admin"); return config.data.rows || [];
-  }, [session]);
+    return config.data.rows || [];
+  }, []);
   useEffect(() => {
     loadRounds().then((rows) => { if (rows.length) setRoundId(rows[0].id); else setLoading(false); })
       .catch((err) => { setError(err.response?.data?.message || "Không tải được đợt xét tuyển."); setLoading(false); });

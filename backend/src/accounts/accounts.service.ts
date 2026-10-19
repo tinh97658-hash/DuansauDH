@@ -6,6 +6,7 @@ import { col, fn, Op, where } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { AuditService } from "../audit/audit.service.js";
 import { ChangeLogService } from "../audit/change-log.service.js";
+import { AdministrationSafetyService } from "../auth/administration-safety.service.js";
 import { RbacService } from "../auth/rbac.service.js";
 import { Role } from "../database/models/role.model.js";
 import { Staff } from "../database/models/staff.model.js";
@@ -27,7 +28,7 @@ export interface RequestContext {
 }
 
 const ROLE_INCLUDE = { model: Role, as: "roles", through: { attributes: [] } };
-const ROLE_ATTRIBUTES = ["id", "code", "name", "isSuperadmin"];
+const ROLE_ATTRIBUTES = ["id", "code", "name"];
 
 const generatePassword = () => randomBytes(9).toString("base64url");
 
@@ -48,7 +49,6 @@ const serializeAccount = (staff: Staff) => {
       id: role.id,
       code: role.code,
       name: role.name,
-      isSuperadmin: role.isSuperadmin,
     })),
   };
 };
@@ -63,6 +63,7 @@ export class AccountsService {
     private readonly audit: AuditService,
     private readonly changeLogService: ChangeLogService,
     private readonly rbac: RbacService,
+    private readonly administrationSafety: AdministrationSafetyService,
   ) {}
 
   async list(query: AccountListQueryDto) {
@@ -161,24 +162,32 @@ export class AccountsService {
       const roleIds = [...new Set(dto.roleIds)];
       const roles = await this.resolveRoles(roleIds);
       const primaryRole = this.pickPrimaryRole(roles, dto.primaryRoleId);
-      await this.assertSuperadminRetained(id, roleIds);
       nextRoleIds = roleIds;
       primaryCode = primaryRole.code;
     }
 
     await this.sequelize.transaction(async (transaction) => {
+      let rolesChanged = false;
+      if (nextRoleIds) {
+        await this.administrationSafety.lock(transaction);
+        const memberships = await this.staffRoles.findAll({ where: { staffId: id }, attributes: ["roleId"], transaction });
+        const previousRoleIds = new Set(memberships.map((membership) => membership.roleId));
+        rolesChanged = primaryCode !== staff.role || previousRoleIds.size !== nextRoleIds.length || nextRoleIds.some((roleId) => !previousRoleIds.has(roleId));
+      }
       const changes: Record<string, unknown> = {};
       if (dto.name !== undefined) changes.name = dto.name.trim();
       if (email !== undefined) changes.email = email;
       if (primaryCode !== undefined) changes.role = primaryCode;
       if (Object.keys(changes).length) await staff.update(changes, { transaction });
 
-      if (nextRoleIds) {
+      if (rolesChanged && nextRoleIds) {
         await this.staffRoles.destroy({ where: { staffId: id }, transaction });
         await this.staffRoles.bulkCreate(
           nextRoleIds.map((roleId) => ({ staffId: id, roleId })),
           { transaction },
         );
+        await staff.increment("sessionVersion", { transaction });
+        await this.administrationSafety.assertRetained(transaction);
       }
     });
 
@@ -200,14 +209,15 @@ export class AccountsService {
 
     if (dto.status === "disabled") {
       if (id === actorId) throw new ConflictException("Không thể tự khóa tài khoản đang đăng nhập.");
-      if ((await this.isSuperadmin(id)) && (await this.activeSuperadminCount()) <= 1) {
-        throw new ConflictException("Không thể khóa quản trị viên cuối cùng của hệ thống.");
-      }
     }
 
-    await staff.update({
-      status: dto.status,
-      sessionVersion: dto.status === "disabled" ? staff.sessionVersion + 1 : staff.sessionVersion,
+    await this.sequelize.transaction(async (transaction) => {
+      await this.administrationSafety.lock(transaction);
+      await staff.update({ status: dto.status }, { transaction });
+      if (dto.status === "disabled") {
+        await staff.increment("sessionVersion", { transaction });
+        await this.administrationSafety.assertRetained(transaction);
+      }
     });
 
     this.rbac.invalidate(id);
@@ -306,9 +316,9 @@ export class AccountsService {
   }
 
   async mePermissions(user: unknown) {
-    if (!(user instanceof Staff)) return { superadmin: false, permissions: [] as string[], roles: [] as string[] };
+    if (!(user instanceof Staff)) return { permissions: [] as string[], roles: [] as string[] };
     const access = await this.rbac.effectiveAccess(user);
-    return { superadmin: access.superadmin, permissions: [...access.permissions], roles: access.roleCodes };
+    return { permissions: [...access.permissions], roles: access.roleCodes };
   }
 
   // ===== Helpers =====
@@ -330,33 +340,4 @@ export class AccountsService {
     return primary;
   }
 
-  private async isSuperadmin(staffId: string) {
-    const count = await this.staffRoles.count({
-      where: { staffId },
-      include: [{ model: Role, as: "role", where: { isSuperadmin: true }, attributes: [], required: true }],
-    });
-    return count > 0;
-  }
-
-  private async activeSuperadminCount() {
-    const superadmins = await this.staff.findAll({
-      where: { status: "active" },
-      attributes: ["id"],
-      include: [{ model: Role, as: "roles", where: { isSuperadmin: true }, required: true, through: { attributes: [] } }],
-    });
-    return new Set(superadmins.map((staff) => staff.id)).size;
-  }
-
-  private async assertSuperadminRetained(targetId: string, nextRoleIds: string[]) {
-    if (!(await this.isSuperadmin(targetId))) return;
-
-    const stillSuperadmin = nextRoleIds.length
-      ? (await this.roles.count({ where: { id: { [Op.in]: nextRoleIds }, isSuperadmin: true } })) > 0
-      : false;
-    if (stillSuperadmin) return;
-
-    if ((await this.activeSuperadminCount()) <= 1) {
-      throw new ConflictException("Không thể gỡ vai trò quản trị cuối cùng của hệ thống.");
-    }
-  }
 }

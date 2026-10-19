@@ -1,3 +1,4 @@
+import { usePermissions } from "../../features/accounts/usePermissions";
 import DateField from "../../components/DateField";
 import { formatDate } from "../../utils/dateFormat";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -23,7 +24,6 @@ import PersonRounded from "@mui/icons-material/PersonRounded";
 import VisibilityRounded from "@mui/icons-material/VisibilityRounded";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
-import { useAuthSession } from "../../context/AuthSession";
 import { preloadPage } from "../../utils/lazyPage";
 import ResizableTable from "../../components/ResizableTable";
 import AdmissionTuitionCheckbox from "../../features/admission/AdmissionTuitionCheckbox";
@@ -203,7 +203,6 @@ const cellInputSx = {
 };
 
 const AdmissionRecords = ({ mode = "applications" }) => {
-  const session = useAuthSession();
   const navigate = useNavigate();
   const isAdmittedMasters = mode === "admitted-masters";
   const recordDetailBase = isAdmittedMasters ? "/masters/admitted-records" : "/plan/admission-records";
@@ -225,7 +224,8 @@ const AdmissionRecords = ({ mode = "applications" }) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedTuition, setSelectedTuition] = useState([]);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { can } = usePermissions();
+  const isAdmin = can("admission.manage");
 
   // Dialog State
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -325,14 +325,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
   }, []);
 
   // Auth Check
-  useEffect(() => {
-    if (session) { setIsAdmin(session.user?.role === "admin"); return; }
-    let mounted = true;
-    axios.get(`${API_BASE_URL}/auth/isStaff`, { withCredentials: true })
-      .then(({ data }) => mounted && setIsAdmin(data.message === "admin"))
-      .catch(() => mounted && setIsAdmin(false));
-    return () => { mounted = false; };
-  }, [session]);
+
 
   // Load Records
   const loadRecords = useCallback(async (signal) => {

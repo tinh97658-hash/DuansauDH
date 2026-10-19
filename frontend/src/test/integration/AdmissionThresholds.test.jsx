@@ -22,7 +22,7 @@ function configure(rounds = [round]) {
     return Promise.reject(new Error(url));
   });
 }
-const mount = (session = null) => render(<ThemeProvider theme={theme}><CssBaseline /><AuthSessionContext.Provider value={session}><MemoryRouter><AdmissionScores /></MemoryRouter></AuthSessionContext.Provider></ThemeProvider>);
+const mount = (session = null) => render(<ThemeProvider theme={theme}><CssBaseline /><AuthSessionContext.Provider value={{ ...session, access: { permissions: ["admission.manage"] } }}><MemoryRouter><AdmissionScores /></MemoryRouter></AuthSessionContext.Provider></ThemeProvider>);
 beforeEach(() => { jest.clearAllMocks(); configure(); });
 it("switches between pending applications and eligible applications without changing decisions", async () => {
   const originalGet = axios.get.getMockImplementation();

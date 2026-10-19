@@ -1,7 +1,8 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import axios from "axios";
+import { API_BASE_URL } from "../../config/http";
 import Schedule from "../../pages/masters/schedule";
 import ScheduleView from "../../features/scheduling/Schedule";
 import SessionEditor from "../../features/scheduling/SessionEditor";
@@ -118,7 +119,7 @@ it("warns before closing a class with planned sessions and cancels without chang
 });
 
 it("shows the seven-day calendar and selects a persisted offering for scheduling", async () => {
-  render(<MemoryRouter><Schedule /></MemoryRouter>);
+  await act(async () => { render(<MemoryRouter><Schedule /></MemoryRouter>); });
   fireEvent.click(await screen.findByRole("button", { name: "Xếp lịch" }));
   expect(screen.getByText("ĐANG XẾP")).toBeInTheDocument();
   expect(screen.getByRole("table", { name: "Lịch học theo tuần" })).toBeInTheDocument();
@@ -357,7 +358,7 @@ it("shows all pending confirmations independently of the displayed week and sort
   expect(cards[1]).toHaveTextContent("Lớp mới hơn");
   expect(within(dialog).getAllByRole("button", { name: "Không diễn ra" })).toHaveLength(2);
   expect(within(dialog).getAllByRole("button", { name: "✓ Đã diễn ra" })).toHaveLength(2);
-  expect(axios.get).toHaveBeenCalledWith("/api/scheduling/pending-teaching-sessions", { withCredentials: true });
+  expect(axios.get).toHaveBeenCalledWith(`${API_BASE_URL}/scheduling/pending-teaching-sessions`, { withCredentials: true });
 });
 it("loads institute availability and excludes busy and undersized rooms before saving", async () => {
   const saved = jest.fn();
@@ -604,8 +605,9 @@ it("suppresses occupied date-period slots from complete week data while preservi
   fireEvent.change(screen.getByLabelText("Khóa / Năm"), { target: { value: "2026" } });
   await waitFor(() => expect(screen.queryByText("Lớp ngoài phạm vi")).not.toBeInTheDocument());
   fireEvent.click(screen.getByRole("button", { name: "Xếp lịch" }));
-  fireEvent.click(screen.getByRole("button", { name: "Tuần sau" }));
-  await waitFor(() => expect(screen.getAllByRole("button", { name: /Lớp đã chọn.*(ĐÃ XẾP|KHÔNG DIỄN RA)/ })).toHaveLength(3));
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tuần sau" })); });
+  const calendar = within(screen.getByRole("table", { name: "Lịch học theo tuần" }));
+  await waitFor(() => expect(calendar.getAllByRole("button", { name: /Lớp đã chọn.*(ĐÃ XẾP|KHÔNG DIỄN RA)/ })).toHaveLength(3));
 
   expect(screen.queryByText("Lớp ngoài phạm vi")).not.toBeInTheDocument();
   await waitFor(() => {
@@ -621,7 +623,7 @@ it("suppresses occupied date-period slots from complete week data while preservi
   expect(dialog).toHaveTextContent("XẾP BUỔI");
   fireEvent.click(within(dialog).getByRole("button", { name: "Đóng chi tiết buổi học" }));
 
-  fireEvent.click(screen.getAllByRole("button", { name: /Lớp đã chọn.*ĐÃ XẾP/ })[0]);
+  fireEvent.click(calendar.getAllByRole("button", { name: /Lớp đã chọn.*ĐÃ XẾP/ })[0]);
   dialog = screen.getByRole("dialog");
   expect(dialog).toHaveTextContent("CHI TIẾT BUỔI HỌC");
 });
@@ -710,13 +712,13 @@ it("switches course-class tabs without refetching or losing a learner note", asy
   expect(await screen.findByText("LỊCH HỌC ĐÃ XẾP")).toBeInTheDocument();
   expect(await screen.findByText("Chưa có buổi học nào được xếp lịch cho lớp học phần này.")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /Đã xếp sắp tới/ })).not.toBeInTheDocument();
-  expect(screen.queryByText("LỚP / NHÓM THAM GIA")).not.toBeInTheDocument();
+  expect(screen.queryByText("LỚP THAM GIA")).not.toBeInTheDocument();
   await waitFor(() => expect(axios.get).toHaveBeenCalledTimes(4));
   const requestCount = axios.get.mock.calls.length;
 
   fireEvent.click(peopleTab);
   expect(peopleTab).toHaveAttribute("aria-selected", "true");
-  expect(screen.getByText("LỚP / NHÓM THAM GIA")).toBeInTheDocument();
+  expect(screen.getByText("LỚP THAM GIA")).toBeInTheDocument();
   expect(screen.getByText("DANH SÁCH HỌC VIÊN")).toBeInTheDocument();
   expect(screen.getAllByText(/^KTHH2026\.0[1-4]$/)).toHaveLength(4);
   expect(screen.queryByRole("button", { name: /^Tất cả/ })).not.toBeInTheDocument();

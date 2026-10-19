@@ -1,3 +1,4 @@
+import { useAuthSession } from "../../context/AuthSession";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress, Divider, FormControlLabel,
@@ -16,6 +17,7 @@ import { createRole, deleteRole, listPermissionCatalog, listRoles, setRolePermis
 const emptyRoleForm = () => ({ code: "", name: "", description: "" });
 
 const Roles = () => {
+  const session = useAuthSession();
   const { can } = usePermissions();
   const canManage = can("role.manage");
 
@@ -84,6 +86,7 @@ const Roles = () => {
       const result = await setRolePermissions(selectedRole.id, ids);
       setNotice({ type: "success", message: result.message || "Cập nhật quyền cho vai trò thành công." });
       await load();
+      await session?.refresh?.();
     } catch (failure) {
       setError(failure.response?.data?.message || "Không thể cập nhật quyền.");
     } finally {
@@ -121,6 +124,7 @@ const Roles = () => {
       }
       setRoleDialogOpen(false);
       await load();
+      await session?.refresh?.();
     } catch (failure) {
       setRoleFormError(failure.response?.data?.message || "Không thể lưu vai trò.");
     } finally {
@@ -137,6 +141,7 @@ const Roles = () => {
       setDeleteTarget(null);
       if (selectedId === deleteTarget.id) setSelectedId(null);
       await load();
+      await session?.refresh?.();
     } catch (failure) {
       setError(failure.response?.data?.message || "Không thể xóa vai trò.");
     } finally {
@@ -145,12 +150,12 @@ const Roles = () => {
   };
 
   const toggleActive = async (role) => {
-    if (role.isSystem) return;
     setSaving(true);
     setError("");
     try {
       await updateRole(role.id, { active: role.active === false });
       await load();
+      await session?.refresh?.();
     } catch (failure) {
       setError(failure.response?.data?.message || "Không thể cập nhật trạng thái vai trò.");
     } finally {
@@ -188,7 +193,6 @@ const Roles = () => {
                   <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
                     <Typography sx={{ fontWeight: 600, fontSize: 13.5, color: "#1c2936" }}>{role.name}</Typography>
                     {role.isSystem && <Chip size="small" label="Hệ thống" color="primary" variant="outlined" sx={{ height: 18, fontSize: 10.5 }} />}
-                    {role.isSuperadmin && <Chip size="small" label="Toàn quyền" color="success" variant="outlined" sx={{ height: 18, fontSize: 10.5 }} />}
                     {role.active === false && <Chip size="small" label="Tạm ẩn" sx={{ height: 18, fontSize: 10.5 }} />}
                   </Stack>
                   <Typography sx={{ fontSize: 11.5, color: "#607486", mt: 0.25 }}>
@@ -213,10 +217,10 @@ const Roles = () => {
                   {canManage && (
                     <Stack direction="row" spacing={1}>
                       <Button size="small" variant="outlined" startIcon={<EditRounded />} onClick={openEditRole} disabled={saving} sx={{ textTransform: "none", fontWeight: 600 }}>Sửa</Button>
-                      {selectedRole.active !== false && !selectedRole.isSystem && (
+                      {selectedRole.active !== false && (
                         <Button size="small" variant="outlined" color="warning" onClick={() => toggleActive(selectedRole)} disabled={saving} sx={{ textTransform: "none", fontWeight: 600 }}>Tạm ẩn</Button>
                       )}
-                      {selectedRole.active === false && !selectedRole.isSystem && (
+                      {selectedRole.active === false && (
                         <Button size="small" variant="outlined" color="success" onClick={() => toggleActive(selectedRole)} disabled={saving} sx={{ textTransform: "none", fontWeight: 600 }}>Kích hoạt</Button>
                       )}
                       {!selectedRole.isSystem && (
@@ -226,9 +230,7 @@ const Roles = () => {
                   )}
                 </Stack>
 
-                {selectedRole.isSuperadmin ? (
-                  <Alert severity="info">Vai trò quản trị có toàn quyền trên hệ thống; không cần cấu hình ma trận quyền.</Alert>
-                ) : (
+                {(
                   <>
                     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 1.5 }}>
                       {catalog.map((group) => {

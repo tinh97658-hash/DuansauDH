@@ -7,6 +7,7 @@ import { Permission } from "../database/models/permission.model.js";
 import { Role } from "../database/models/role.model.js";
 import { RolePermission } from "../database/models/role-permission.model.js";
 import { StaffRole } from "../database/models/staff-role.model.js";
+import { AdministrationSafetyService } from "../auth/administration-safety.service.js";
 import { RbacService } from "../auth/rbac.service.js";
 import { CreateRoleDto, SetRolePermissionsDto, UpdateRoleDto } from "./dto/role.dto.js";
 
@@ -31,7 +32,6 @@ const serializeRole = (role: Role) => {
     name: value.name,
     description: value.description,
     isSystem: value.isSystem,
-    isSuperadmin: value.isSuperadmin,
     active: value.active,
     sortOrder: value.sortOrder,
     permissions: (value.permissions ?? []).map((permission: any) => ({
@@ -53,6 +53,7 @@ export class RolesService {
     @InjectConnection() private readonly sequelize: Sequelize,
     private readonly audit: AuditService,
     private readonly rbac: RbacService,
+    private readonly administrationSafety: AdministrationSafetyService,
   ) {}
 
   async list() {
@@ -101,7 +102,6 @@ export class RolesService {
         name: dto.name.trim(),
         description: dto.description?.trim() ?? null,
         isSystem: false,
-        isSuperadmin: false,
         active: true,
         sortOrder: 100,
       } as any, { transaction });
@@ -131,7 +131,6 @@ export class RolesService {
     if (dto.name !== undefined) changes.name = dto.name.trim();
     if (dto.description !== undefined) changes.description = dto.description?.trim() ?? null;
     if (dto.active !== undefined) {
-      if (role.isSystem && !dto.active) throw new ConflictException("Không thể vô hiệu hóa vai trò hệ thống.");
       changes.active = dto.active;
     }
 
@@ -142,6 +141,7 @@ export class RolesService {
     }
 
     await this.sequelize.transaction(async (transaction) => {
+      await this.administrationSafety.lock(transaction);
       if (Object.keys(changes).length) await role.update(changes, { transaction });
       if (permissionIds) {
         await this.rolePermissions.destroy({ where: { roleId: id }, transaction });
@@ -152,6 +152,7 @@ export class RolesService {
           );
         }
       }
+      await this.administrationSafety.assertRetained(transaction);
     });
 
     this.rbac.invalidate();
@@ -172,6 +173,7 @@ export class RolesService {
     if (permissionIds.length) await this.assertPermissionsExist(permissionIds);
 
     await this.sequelize.transaction(async (transaction) => {
+      await this.administrationSafety.lock(transaction);
       await this.rolePermissions.destroy({ where: { roleId: id }, transaction });
       if (permissionIds.length) {
         await this.rolePermissions.bulkCreate(
@@ -179,6 +181,7 @@ export class RolesService {
           { transaction },
         );
       }
+      await this.administrationSafety.assertRetained(transaction);
     });
 
     this.rbac.invalidate();
@@ -200,8 +203,10 @@ export class RolesService {
     if (assigned > 0) throw new ConflictException("Vai trò đang được gán cho nhân sự, không thể xóa.");
 
     await this.sequelize.transaction(async (transaction) => {
+      await this.administrationSafety.lock(transaction);
       await this.rolePermissions.destroy({ where: { roleId: id }, transaction });
       await role.destroy({ transaction });
+      await this.administrationSafety.assertRetained(transaction);
     });
 
     this.rbac.invalidate();

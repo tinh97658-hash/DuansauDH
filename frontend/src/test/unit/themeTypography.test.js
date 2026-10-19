@@ -13,8 +13,8 @@ describe("shared application typography", () => {
     expect(theme.typography.body1.fontSize).toBe("12.5px");
     expect(theme.typography.body2.fontSize).toBe("12.5px");
     expect(theme.typography.button.fontSize).toBe("12.5px");
-    expect(theme.palette.text.primary).toBe("#172B3A");
-    expect(theme.palette.text.secondary).toBe("#607486");
+    expect(theme.palette.text.primary).toBe("#102333");
+    expect(theme.palette.text.secondary).toBe("#354959");
   });
 
   it("propagates the shared font and size to common MUI controls", () => {

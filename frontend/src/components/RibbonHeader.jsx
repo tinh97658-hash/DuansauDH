@@ -84,9 +84,9 @@ export const ribbons = {
       action("Thành phố", "/system/cities", LocationCityOutlined, "#a04f86"),
     ]),
     group("DANH MỤC ĐÀO TẠO", [
-      action("Giảng viên", "/system/lecturers", SchoolOutlined, "#3f8cc3", { roles: ["admin"] }),
-      action("Đơn vị", "/system/units", BusinessOutlined, "#168b7c", { roles: ["admin"] }),
-      action("Phòng học", "/system/rooms", MeetingRoomOutlined, "#168b7c", { roles: ["admin"] }),
+      action("Giảng viên", "/system/lecturers", SchoolOutlined, "#3f8cc3", { permissions: ["catalog.manage"] }),
+      action("Đơn vị", "/system/units", BusinessOutlined, "#168b7c", { permissions: ["catalog.manage"] }),
+      action("Phòng học", "/system/rooms", MeetingRoomOutlined, "#168b7c", { permissions: ["catalog.manage"] }),
       action("Nhóm hình thức đào tạo", "/system/training-mode-groups", CategoryOutlined, "#168bc2"),
       action("Hình thức đào tạo", "/system/training-modes", FactCheckOutlined, "#81952c"),
       action("Ngành đào tạo", "/system/disciplines", AccountBalanceOutlined, "#397c8d"),
@@ -201,8 +201,8 @@ const RibbonHeader = () => {
   // vai trò quản trị được xem trước các mục mới để tránh nhấp nháy menu.
   const access = session?.access;
   const hasPermission = (permission) => access
-    ? Boolean(access.superadmin) || (access.permissions || []).includes(permission)
-    : role === "admin";
+    ? (access.permissions || []).includes(permission)
+    : false;
   const canSee = (item) => (!item.roles || item.roles.includes(role)) && (!item.permissions || item.permissions.every(hasPermission));
   const runAction = (item) => item.action === "logout" ? window.location.assign(`${API_BASE_URL}/user/logout`) : navigate(item.route);
   return (

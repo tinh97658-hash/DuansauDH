@@ -64,7 +64,7 @@ export class SystemController {
   ) {
     if (includeInactive !== "true") return this.system.listRooms(false);
     const access = await this.rbac.effectiveAccess(user);
-    const canManageCatalog = access.superadmin || access.permissions.has("catalog.manage");
+    const canManageCatalog = access.permissions.has("catalog.manage");
     return this.system.listRooms(canManageCatalog);
   }
   @Post("rooms") @RequirePermissions("catalog.manage") createRoom(@Body() dto: CreateRoomDto) { return this.system.createRoom(dto); }

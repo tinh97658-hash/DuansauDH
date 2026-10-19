@@ -47,13 +47,14 @@ describe("SchedulingWriteGuard", () => {
     }
   });
 
-  it("allows administrators to organize classes without granting scheduling writes", async () => {
+  it("uses scheduling.organize for any staff role without granting scheduling writes", async () => {
     const rbac = {
-      effectiveAccess: async (user: any) => ({ superadmin: user?.role === "admin", permissions: new Set<string>(), roleCodes: user?.role ? [user.role] : [] }),
+      effectiveAccess: async (user: any) => ({ superadmin: user?.role === "admin", permissions: new Set<string>(user?.permissions || []), roleCodes: user?.role ? [user.role] : [] }),
     } as unknown as RbacService;
-    const admin = Object.assign(staffUser(false), { role: "admin" });
+    const admin = Object.assign(staffUser(false), { role: "custom", permissions: ["scheduling.organize"] });
     expect(await new CourseOfferingWriteGuard(rbac).canActivate(contextFor(admin))).toBe(true);
     expect(() => guard.canActivate(contextFor(admin))).toThrow(ForbiddenException);
+    await expect(new CourseOfferingWriteGuard(rbac).canActivate(contextFor(Object.assign(staffUser(false), { role: "admin" })))).rejects.toThrow(ForbiddenException);
     await expect(new CourseOfferingWriteGuard(rbac).canActivate(contextFor(Object.assign(staffUser(false), { role: "examiner" })))).rejects.toThrow(ForbiddenException);
   });
 

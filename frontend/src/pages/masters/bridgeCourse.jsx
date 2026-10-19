@@ -13,7 +13,7 @@ import DeleteRounded from "@mui/icons-material/DeleteRounded";
 import EditRounded from "@mui/icons-material/EditRounded";
 import RefreshRounded from "@mui/icons-material/RefreshRounded";
 import FeatureLayout from "../../components/FeatureLayout";
-import { useAuthSession } from "../../context/AuthSession";
+import { usePermissions } from "../../features/accounts/usePermissions";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import AppDialog from "../../components/AppDialog";
@@ -82,22 +82,22 @@ const CompactField = ({ label, htmlFor, helper, error = false, children, sx }) =
 );
 
 export default function BridgeCourse() {
-  const session = useAuthSession();
+  const { can } = usePermissions();
+  const admin = can("masters.manage");
   const [rows, setRows] = useState([]), [subjects, setSubjects] = useState([]), [majors, setMajors] = useState([]), [candidates, setCandidates] = useState([]);
   const [summary, setSummary] = useState({}), [year, setYear] = useState(String(now)), [status, setStatus] = useState("ALL"), [major, setMajor] = useState("ALL"), [search, setSearch] = useState("");
   const [disciplineId, setDisciplineId] = useState("");
-  const [loading, setLoading] = useState(true), [error, setError] = useState(""), [admin, setAdmin] = useState(false);
+  const [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [open, setOpen] = useState(false), [editing, setEditing] = useState(null), [form, setForm] = useState(blank(String(now))), [saving, setSaving] = useState(false), [deleting, setDeleting] = useState(null);
 
   useEffect(() => {
     Promise.all([
-      axios.get(`${API_BASE_URL}/system/bridge-knowledge`), axios.get(`${API_BASE_URL}/system/majors?program=masters`), session ? Promise.resolve({ data: { message: session.user?.role || "student" } }) : axios.get(`${API_BASE_URL}/auth/isStaff`),
-    ]).then(([s, m, a]) => {
+      axios.get(`${API_BASE_URL}/system/bridge-knowledge`), axios.get(`${API_BASE_URL}/system/majors?program=masters`),
+    ]).then(([s, m]) => {
       setSubjects((Array.isArray(s.data) ? s.data : s.data?.data || []).filter((x) => x.active !== false));
       setMajors((Array.isArray(m.data) ? m.data : m.data?.data || []).filter((x) => x.active !== false));
-      setAdmin(a.data?.message === "admin");
     }).catch(() => setError("Không thể tải danh mục học bổ sung kiến thức."));
-  }, [session]);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);

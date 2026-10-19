@@ -1,5 +1,6 @@
+import { renderWithPermissions } from "../renderWithPermissions";
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { TextEncoder } from "util";
 import JSZip from "jszip";
@@ -11,6 +12,8 @@ import AdmissionPreview from "../../features/admission/AdmissionPreview";
 import AdmissionPrintTemplate from "../../features/admission/AdmissionPrintTemplate";
 import { buildAdmissionDocument } from "../../features/admission/admissionDocument";
 import { createAdmissionWord, openAdmissionPreview, readAdmissionPreview } from "../../features/admission/admissionDocumentExport";
+
+const render = (ui, options) => renderWithPermissions(ui, ["admission.manage"], options);
 
 vi.mock("axios", () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), isCancel: vi.fn(() => false), defaults: {} } }));
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });

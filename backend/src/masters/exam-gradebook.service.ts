@@ -316,16 +316,16 @@ export class ExamGradebookService {
     });
   }
 
-  /** Quyền nhập/gửi duyệt và duyệt/mở lại bảng điểm, phân giải qua RBAC (fallback theo vai trò cũ). */
+  /** Quyền nhập/gửi duyệt và duyệt/mở lại bảng điểm, phân giải qua RBAC. */
   private async gradebookRights(actor: any): Promise<{ canSubmit: boolean; canApprove: boolean }> {
     if (this.rbac && actor instanceof Staff) {
       const access = await this.rbac.effectiveAccess(actor);
       return {
-        canSubmit: access.superadmin || access.permissions.has("gradebook.submit"),
-        canApprove: access.superadmin || access.permissions.has("gradebook.approve"),
+        canSubmit: access.permissions.has("gradebook.submit"),
+        canApprove: access.permissions.has("gradebook.approve"),
       };
     }
-    return { canSubmit: ["admin", "examiner"].includes(actor?.role), canApprove: actor?.role === "admin" };
+    return { canSubmit: false, canApprove: false };
   }
 
   async transition(dto: GradebookWorkflowDto, actor: any) {

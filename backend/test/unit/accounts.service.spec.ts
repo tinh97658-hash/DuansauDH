@@ -14,6 +14,7 @@ const staffRecord = (overrides: any = {}) => {
     canManageScheduling: false,
     createdAt: new Date(),
     roles: [],
+    increment: jest.fn(),
     update: jest.fn(async function (this: any, changes: any) { Object.assign(this, changes); return this; }),
     ...overrides,
   };
@@ -30,14 +31,15 @@ const build = () => {
   };
   staff.scope = jest.fn(() => ({ findByPk: staff.findByPk, findAll: staff.findAll }));
   const roles = { findAll: jest.fn(), count: jest.fn() };
-  const staffRoles = { findAll: jest.fn(), count: jest.fn(), bulkCreate: jest.fn(), destroy: jest.fn() };
+  const staffRoles = { findAll: jest.fn().mockResolvedValue([]), count: jest.fn(), bulkCreate: jest.fn(), destroy: jest.fn() };
   const sequelize = { transaction: jest.fn((callback: any) => callback({})) };
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const changeLog = { list: jest.fn(), tables: jest.fn() };
   const rbac = { invalidate: jest.fn() };
+  const administrationSafety = { lock: jest.fn(), assertRetained: jest.fn() };
 
-  const service = new AccountsService(staff, roles as any, staffRoles as any, sequelize as any, audit as any, changeLog as any, rbac as any);
-  return { service, staff, roles, staffRoles, audit, changeLog, rbac };
+  const service = new AccountsService(staff, roles as any, staffRoles as any, sequelize as any, audit as any, changeLog as any, rbac as any, administrationSafety as any);
+  return { service, staff, roles, staffRoles, audit, changeLog, rbac, administrationSafety };
 };
 
 describe("AccountsService", () => {
@@ -77,12 +79,10 @@ describe("AccountsService", () => {
   });
 
   it("chặn gỡ vai trò quản trị cuối cùng", async () => {
-    const { service, staff, roles, staffRoles } = build();
+    const { service, staff, roles, staffRoles, administrationSafety } = build();
     staff.findByPk.mockResolvedValue(staffRecord());
     roles.findAll.mockResolvedValue([{ id: "r-supervisor", code: "supervisor" }]);
-    staffRoles.count.mockResolvedValue(1); // đang là superadmin
-    roles.count.mockResolvedValue(0); // vai trò mới không phải superadmin
-    staff.findAll.mockResolvedValue([{ id: "s1" }]); // chỉ còn 1 superadmin
+    administrationSafety.assertRetained.mockRejectedValue(new ConflictException());
 
     await expect(service.update("actor", "s1", { roleIds: ["r-supervisor"] } as any, {})).rejects.toThrow(ConflictException);
   });
@@ -113,7 +113,30 @@ describe("AccountsService", () => {
 
     await service.updateStatus("actor", "s2", { status: "disabled" } as any, {});
 
-    expect(record.update).toHaveBeenCalledWith(expect.objectContaining({ status: "disabled", sessionVersion: 2 }));
+    expect(record.update).toHaveBeenCalledWith({ status: "disabled" }, { transaction: {} });
+    expect(record.increment).toHaveBeenCalledWith("sessionVersion", { transaction: {} });
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: "account.disable" }));
   });
+  it("đổi vai trò tăng version và kiểm tra quyền quản trị trong cùng transaction", async () => {
+    const { service, staff, roles, administrationSafety } = build();
+    const record = staffRecord();
+    staff.findByPk.mockResolvedValue(record);
+    roles.findAll.mockResolvedValue([{ id: "r-custom", code: "custom" }]);
+    await service.update("actor", "s1", { roleIds: ["r-custom"] } as any, {});
+    expect(administrationSafety.lock).toHaveBeenCalledWith({});
+    expect(record.increment).toHaveBeenCalledWith("sessionVersion", { transaction: {} });
+    expect(administrationSafety.assertRetained).toHaveBeenCalledWith({});
+  });
+
+  it("sửa tên và gửi lại cùng vai trò không thu hồi phiên", async () => {
+    const { service, staff, roles, staffRoles } = build();
+    const record = staffRecord({ role: "custom" });
+    staff.findByPk.mockResolvedValue(record);
+    roles.findAll.mockResolvedValue([{ id: "r-custom", code: "custom" }]);
+    staffRoles.findAll.mockResolvedValue([{ roleId: "r-custom" }]);
+    await service.update("actor", "s1", { name: "Tên mới", roleIds: ["r-custom"] } as any, {});
+    expect(record.increment).not.toHaveBeenCalled();
+    expect(staffRoles.destroy).not.toHaveBeenCalled();
+  });
+
 });

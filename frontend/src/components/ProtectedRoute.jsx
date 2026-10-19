@@ -3,7 +3,7 @@ import axios from "axios";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { AuthSessionContext } from "../context/AuthSession";
 
-const EMPTY_ACCESS = { superadmin: false, permissions: [], roles: [] };
+const EMPTY_ACCESS = { permissions: [], roles: [] };
 const CHANGE_PASSWORD_PATH = "/system/change-password";
 
 const ProtectedRoute = () => {

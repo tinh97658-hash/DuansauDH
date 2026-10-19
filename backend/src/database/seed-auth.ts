@@ -9,7 +9,7 @@ import { DEFAULT_ROLE_PERMISSIONS, PERMISSIONS, SYSTEM_ROLES } from "../auth/per
  * Đồng bộ catalog quyền (idempotent):
  * - Tạo/cập nhật `permissions` theo `src/auth/permissions.ts`.
  * - Đảm bảo 3 vai trò hệ thống tồn tại.
- * - Cấp thêm các quyền mặc định còn thiếu cho vai trò hệ thống (không gỡ quyền đã tùy chỉnh).
+ * - Chỉ cấp quyền mặc định khi tạo vai trò mới; không khôi phục quyền đã được gỡ.
  */
 async function run() {
   const app = await NestFactory.createApplicationContext(AppModule, { logger: false });
@@ -30,17 +30,19 @@ async function run() {
     }
 
     let createdRoles = 0;
+    const newRoleCodes = new Set<string>();
     for (const [index, definition] of SYSTEM_ROLES.entries()) {
       const [record, created] = await Role.findOrCreate({
         where: { code: definition.code },
         defaults: { ...definition, isSystem: true, sortOrder: index },
       });
-      if (created) createdRoles++;
-      else await record.update({ name: definition.name, description: definition.description ?? null, isSuperadmin: Boolean(definition.isSuperadmin) });
+      if (created) { createdRoles++; newRoleCodes.add(definition.code); }
+      else await record.update({ name: definition.name, description: definition.description ?? null });
     }
 
     let granted = 0;
     for (const [roleCode, permissionCodes] of Object.entries(DEFAULT_ROLE_PERMISSIONS)) {
+      if (!newRoleCodes.has(roleCode)) continue;
       const role = await Role.findOne({ where: { code: roleCode } });
       if (!role) continue;
       for (const code of permissionCodes) {

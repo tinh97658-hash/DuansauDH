@@ -4,6 +4,7 @@ import { PermissionsGuard } from "../common/permissions.guard.js";
 import { Permission } from "../database/models/permission.model.js";
 import { Role } from "../database/models/role.model.js";
 import { StaffRole } from "../database/models/staff-role.model.js";
+import { AdministrationSafetyService } from "./administration-safety.service.js";
 import { RbacService } from "./rbac.service.js";
 
 /**
@@ -13,7 +14,7 @@ import { RbacService } from "./rbac.service.js";
 @Global()
 @Module({
   imports: [SequelizeModule.forFeature([Role, Permission, StaffRole])],
-  providers: [RbacService, PermissionsGuard],
-  exports: [RbacService, PermissionsGuard],
+  providers: [RbacService, PermissionsGuard, AdministrationSafetyService],
+  exports: [RbacService, PermissionsGuard, AdministrationSafetyService],
 })
 export class RbacModule {}

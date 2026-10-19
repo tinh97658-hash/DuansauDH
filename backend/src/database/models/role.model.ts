@@ -23,10 +23,6 @@ export class Role extends Model {
   @Column({ type: DataType.BOOLEAN, allowNull: false })
   declare isSystem: boolean;
 
-  @Default(false)
-  @Column({ type: DataType.BOOLEAN, allowNull: false })
-  declare isSuperadmin: boolean;
-
   @Default(0)
   @Column(DataType.INTEGER)
   declare sortOrder: number;

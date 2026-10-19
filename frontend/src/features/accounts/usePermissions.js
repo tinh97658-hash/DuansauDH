@@ -11,10 +11,9 @@ export const usePermissions = () => {
   const can = useCallback(
     (permission) => {
       if (!access) return false;
-      if (access.superadmin) return true;
       return (access.permissions || []).includes(permission);
     },
     [access],
   );
-  return { access, can, superadmin: Boolean(access?.superadmin) };
+  return { access, can };
 };

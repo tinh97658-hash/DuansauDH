@@ -121,7 +121,7 @@ export async function up({ context: qi }: any) {
       name: role.name,
       description: role.description ?? null,
       is_system: true,
-      is_superadmin: Boolean(role.isSuperadmin),
+      is_superadmin: role.code === "admin",
       sort_order: index,
       active: true,
       created_at: now,

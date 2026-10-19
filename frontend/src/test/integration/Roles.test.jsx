@@ -51,12 +51,17 @@ beforeEach(() => {
   });
 });
 
-it("hiển thị vai trò hệ thống toàn quyền mà không cần ma trận", async () => {
+it("hiển thị và lưu ma trận quyền admin như mọi vai trò khác", async () => {
   mount(["role.view", "role.manage"]);
-
-  expect(await screen.findByText(/Vai trò quản trị có toàn quyền trên hệ thống/)).toBeInTheDocument();
-  expect(screen.getByText("Giảng viên hướng dẫn")).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Lưu quyền" })).not.toBeInTheDocument();
+  const manage = await screen.findByRole("checkbox", { name: "Quản lý tài khoản" });
+  await waitFor(() => expect(manage).toBeChecked());
+  fireEvent.click(manage);
+  axios.put.mockResolvedValue({ data: { message: "Đã lưu" } });
+  fireEvent.click(screen.getByRole("button", { name: "Lưu quyền" }));
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(
+    expect.stringContaining("/roles/role-admin/permissions"),
+    { permissionIds: ["perm-view"] }, { withCredentials: true },
+  ));
 });
 
 it("tick chọn quyền trong ma trận và lưu thay đổi theo mã quyền", async () => {

@@ -1,3 +1,4 @@
+import { usePermissions } from "../../features/accounts/usePermissions";
 import { formatDateTime } from "../../utils/dateFormat";
 import DateField from "../../components/DateField";
 import AdmissionEvaluationPanel from "../../features/admission/AdmissionEvaluationPanel";
@@ -40,7 +41,6 @@ import {
   disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline,
 } from "../../utils/disciplineScope";
 import FeatureLayout from "../../components/FeatureLayout";
-import { useAuthSession } from "../../context/AuthSession";
 import DocumentExportMenu from "../../components/DocumentExportMenu";
 import AdmissionPrintTemplate from "../../features/admission/AdmissionPrintTemplate";
 import { buildAdmissionDocument } from "../../features/admission/admissionDocument";
@@ -295,7 +295,6 @@ const mapRecordToFormState = (data, majorList = []) => {
 };
 
 const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
-  const session = useAuthSession();
   const catalogRevision = useSubjectCatalogRevision();
   const gradebookRevision = useGradebookRevision();
   const { id } = useParams();
@@ -306,7 +305,8 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
   const [loading, setLoading] = useState(true);
   const profileRequest = useRef(0);
   const [saving, setSaving] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { can } = usePermissions();
+  const isAdmin = can("admission.manage");
   const [record, setRecord] = useState(null);
   const showStudyTabs = returnPath === "/masters/admitted-records";
   const requestedTab = searchParams.get("tab");
@@ -497,14 +497,7 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
     return () => { profileRequest.current += 1; };
   }, [fetchData]);
 
-  useEffect(() => {
-    if (session) { setIsAdmin(session.user?.role === "admin"); return; }
-    let mounted = true;
-    axios.get(`${API_BASE_URL}/auth/session`, { withCredentials: true })
-      .then(({ data }) => { if (mounted) setIsAdmin(data.user?.role === "admin"); })
-      .catch(() => { if (mounted) setIsAdmin(false); });
-    return () => { mounted = false; };
-  }, [session]);
+
 
   // Handle Photo Upload
   const handlePhotoUpload = (e) => {

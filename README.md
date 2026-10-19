@@ -501,3 +501,13 @@ Các lệnh chi tiết cho backend được mô tả trong `backend/Testing.md`.
 4. Theo dõi tiến độ học tập, nghiên cứu và các lần nộp báo cáo.
 5. Email/thông báo cho các mốc quan trọng.
 6. Quản lý luận văn, công bố và tài liệu liên quan.
+
+### Cập nhật RBAC thống nhất (migration 064, 2026-10-19)
+
+Nhân sự (`Staff`) là tác nhân; `admin` là vai trò mặc định và chỉ có những permission được gán trong `role_permissions`. Không còn `is_superadmin` hoặc nhánh bỏ qua kiểm tra quyền. Có thể chỉnh ma trận và tắt vai trò admin sau khi chuyển quyền quản trị sang nhân sự khác.
+
+Migration 064 chuyển đặc quyền cũ thành permission tường minh trước khi bỏ cột. Quyền hiệu lực là hợp quyền của các vai trò đang active. `scheduling.organize` cho phép tổ chức lớp học phần; chỉ định phụ trách xếp lịch vẫn được giữ theo nghiệp vụ.
+
+Hệ thống chặn thay đổi làm mất nhân sự active cuối cùng có đủ `account.view`, `account.manage`, `role.view`, `role.manage`, kể cả khi các quyền đến từ nhiều vai trò. Đổi vai trò nhân sự thu hồi phiên đăng nhập. Cache quyền trên instance khác có TTL tối đa 30 giây.
+
+`npm --prefix backend run db:seed:auth` đồng bộ catalog và cấp quyền mặc định cho vai trò mới; chạy lại không khôi phục quyền đã gỡ khỏi vai trò hiện hữu. Quyền mới phải được gán có chủ đích bằng ma trận hoặc migration.

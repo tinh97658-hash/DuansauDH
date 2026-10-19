@@ -1,10 +1,13 @@
+import { renderWithPermissions } from "../renderWithPermissions";
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import axios from "axios";
 import AdmissionRecords from "../../pages/plan/admissionRecords";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import theme from "../../theme";
+
+const render = (ui, options) => renderWithPermissions(ui, ["admission.manage"], options);
 
 vi.mock("axios");
 vi.mock("@mui/icons-material", () => ({

@@ -1,3 +1,4 @@
+import { usePermissions } from "../../features/accounts/usePermissions";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
@@ -23,7 +24,6 @@ import SaveRounded from "@mui/icons-material/SaveRounded";
 import ClassRounded from "@mui/icons-material/ClassRounded";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
-import { useAuthSession } from "../../context/AuthSession";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import SubjectSharingCheckbox from "../../components/SubjectSharingCheckbox";
@@ -110,7 +110,8 @@ const TrainingPlan = () => {
   const [disciplineId, setDisciplineId] = useState("");
   const [majorId, setMajorId] = useState("");
   const [tab, setTab] = useState(0); // 0: Học phần chuyên ngành, 1: Lớp học & Chương trình đào tạo
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { can } = usePermissions();
+  const isAdmin = can("plan.manage");
   const [loading, setLoading] = useState(false);
 
   // Data
@@ -185,7 +186,6 @@ const TrainingPlan = () => {
   const [selectedCatalogSubjectIds, setSelectedCatalogSubjectIds] = useState([]);
   const [catalogSubjects, setCatalogSubjects] = useState([]);
 
-  const session = useAuthSession();
   // Load Majors
   const selectedMajorId = useRef(majorId);
   selectedMajorId.current = majorId;
@@ -217,14 +217,7 @@ const TrainingPlan = () => {
   }, [loadMajors]);
 
   // Auth Check
-  useEffect(() => {
-    if (session) { setIsAdmin(session.user?.role === "admin"); return; }
-    let mounted = true;
-    axios.get(`${API_BASE_URL}/auth/isStaff`, { withCredentials: true })
-      .then(({ data }) => mounted && setIsAdmin(data.message === "admin"))
-      .catch(() => mounted && setIsAdmin(false));
-    return () => { mounted = false; };
-  }, [session]);
+
 
   // Load each resource independently. A missing curriculum endpoint must not hide
   // a valid subject catalog (the scheduling module consumes that catalog too).

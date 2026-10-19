@@ -19,7 +19,6 @@ export interface RoleDefinition {
   code: string;
   name: string;
   description?: string;
-  isSuperadmin?: boolean;
 }
 
 export const SYSTEM_ROLES: RoleDefinition[] = [
@@ -27,7 +26,6 @@ export const SYSTEM_ROLES: RoleDefinition[] = [
     code: "admin",
     name: "Quản trị hệ thống",
     description: "Toàn quyền hệ thống, quản lý tài khoản và phân quyền.",
-    isSuperadmin: true,
   },
   {
     code: "supervisor",
@@ -72,6 +70,7 @@ export const PERMISSIONS: PermissionDefinition[] = [
 
   // ===== Lớp học phần & xếp lịch =====
   { code: "scheduling.view", group: "Lớp học phần & xếp lịch", name: "Xem lớp học phần, lịch học" },
+  { code: "scheduling.organize", group: "Lớp học phần & xếp lịch", name: "Tổ chức lớp học phần" },
   { code: "scheduling.write", group: "Lớp học phần & xếp lịch", name: "Tạo lớp, xếp và sửa lịch" },
   { code: "scheduling.assign", group: "Lớp học phần & xếp lịch", name: "Phân công người quản lý lịch đào tạo" },
 

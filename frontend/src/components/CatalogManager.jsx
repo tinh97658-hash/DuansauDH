@@ -1,3 +1,4 @@
+import { usePermissions } from "../features/accounts/usePermissions";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
@@ -19,7 +20,6 @@ import { personNameParts } from "../utils/personName";
 import FilterSearchField from "./FilterSearchField";
 import ResizableTable from "./ResizableTable";
 import { alphabeticalOptionGroups } from "../utils/optionGroups";
-import { useAuthSession } from "../context/AuthSession";
 
 const buildEmptyForm = (parent, fields, sortable, activeField = "active") => {
   const form = { code: "", name: "", [activeField]: true };
@@ -96,22 +96,20 @@ const CatalogManager = ({
   inlineEdit = false,
   activeField = "active",
   baseEndpoint = null,
-  authEndpoint = "/auth/isStaff",
-  authCheck = null,
   validate = null,
   activeSwitchAriaLabel = null,
   activeStatusLabel = null,
   showStatusBadge = true,
   addButtonLabel = null,
 }) => {
-  const session = useAuthSession();
   const apiBase = baseEndpoint || endpoint.split("?")[0];
   const [rows, setRows] = useState([]);
   const [options, setOptions] = useState([]);
   const [fieldOptions, setFieldOptions] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { can } = usePermissions();
+  const isAdmin = can("catalog.manage");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const pageSize = 25;
@@ -192,25 +190,6 @@ const CatalogManager = ({
     load();
   }, [load]);
 
-  useEffect(() => {
-    if (session && ["/auth/session", "/auth/isStaff"].includes(authEndpoint)) {
-      const data = { ...session, message: session.user?.role || "student" };
-      setIsAdmin(typeof authCheck === "function" ? Boolean(authCheck(data)) : data.message === "admin");
-      return;
-    }
-    let mounted = true;
-    axios.get(`${API_BASE_URL}${authEndpoint}`, { withCredentials: true })
-      .then(({ data }) => {
-        if (!mounted) return;
-        if (typeof authCheck === "function") {
-          setIsAdmin(Boolean(authCheck(data)));
-        } else {
-          setIsAdmin(data.message === "admin" || data.user?.role === "admin");
-        }
-      })
-      .catch(() => mounted && setIsAdmin(false));
-    return () => { mounted = false; };
-  }, [authEndpoint, authCheck, session]);
 
   useEffect(() => {
     if (!parent) { setOptions([]); return; }

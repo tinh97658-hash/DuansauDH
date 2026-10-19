@@ -1,3 +1,4 @@
+import { AuthSessionContext } from "../../context/AuthSession";
 import { act, fireEvent, render as renderUi, screen, waitFor, within } from "@testing-library/react";
 import { createTheme, ThemeProvider } from "@mui/material";
 import axios from "axios";
@@ -16,7 +17,8 @@ jest.mock("@mui/icons-material", () => ({
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
 // Animation timers are unrelated to grade entry/export and slow down large page fixtures.
 const testTheme = createTheme({ components: { MuiButtonBase: { defaultProps: { disableRipple: true } } } });
-const render = ui => renderUi(<ThemeProvider theme={testTheme}>{ui}</ThemeProvider>);
+let testPermissions = [];
+const render = ui => renderUi(<AuthSessionContext.Provider value={{ access: { permissions: testPermissions } }}><ThemeProvider theme={testTheme}>{ui}</ThemeProvider></AuthSessionContext.Provider>);
 const savedRow = { participantId: "student:one", code: "HV001", fullName: "Nguyễn Văn An", dob: "1990-01-02", gender: "Nam", eligible: null, examExempt: false, testScore: null, assignmentScore: null, examScore: null, courseScore: null, grade4: null, letterGrade: "", attemptScores: [], result: "pending" };
 const data = { revision: 0, rows: [savedRow], total: 1, totalRows: 1, unassessedRows: 1, page: 1, pageSize: 15 };
 const paged = (gradeRows, params = {}) => {
@@ -28,6 +30,7 @@ const paged = (gradeRows, params = {}) => {
   return { revision: 0, rows: found.slice((page - 1) * 15, page * 15), total: found.length, totalRows: gradeRows.length, unassessedRows: assessed.filter(row => row.eligible === null).length, page, pageSize: 15 };
 };
 const setup = (role = "admin", gradeRows = data.rows) => {
+  testPermissions = role === "admin" ? ["gradebook.submit", "gradebook.approve"] : role === "examiner" ? ["gradebook.submit"] : [];
   // A save must not mutate the shared baseline used by subsequent tests.
   gradeRows = gradeRows.map(row => row === savedRow ? { ...row, attemptScores: [...(row.attemptScores || [])] } : row);
   axios.put.mockImplementation(async (_, payload) => {
