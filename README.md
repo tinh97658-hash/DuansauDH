@@ -161,7 +161,9 @@ lại kèm `request_id`, IP, user-agent. Thao tác ngoài transaction vẫn ghi 
 
 Xem nhật ký trong **Nhật ký thao tác** (`/system/audit-logs`) → tab **Thay đổi dữ
 liệu** (lọc theo bảng, hành động, khoảng ngày; quyền `audit.view`). Tab **Thao tác
-quản lý** giữ nguyên nhật ký tài khoản/vai trò (`auth_audit_logs`).
+quản lý** giữ nguyên nhật ký tài khoản/vai trò (`auth_audit_logs`) và bổ sung các
+lần **đăng nhập / đăng xuất / đăng nhập thất bại** của nhân sự. Ngay dưới thanh tab
+có một dòng mô tả vai trò của từng tab để người dùng phân biệt rõ hai loại nhật ký.
 
 Toàn bộ cấu hình local nằm trong **`.env` ở thư mục gốc**, được Git bỏ qua.
 Docker Compose, backend, migration, seed và frontend đều đọc file này.
@@ -494,7 +496,7 @@ Các lệnh chi tiết cho backend được mô tả trong `backend/Testing.md`.
 ## Tính năng chính
 
 1. Đăng ký và xét duyệt học viên.
-2. Quản lý tài khoản nhân sự và phân quyền RBAC: vai trò tùy chỉnh, ma trận quyền, khóa/mở tài khoản, đặt lại mật khẩu, buộc đăng xuất, nhật ký thao tác và nhật ký thay đổi dữ liệu (trigger DB) trong cùng trang Nhật ký thao tác.
+2. Quản lý tài khoản nhân sự và phân quyền RBAC: vai trò tùy chỉnh, ma trận quyền, khóa/mở tài khoản, đặt lại mật khẩu, buộc đăng xuất, nhật ký thao tác (kèm đăng nhập/đăng xuất) và nhật ký thay đổi dữ liệu (trigger DB) trong cùng trang Nhật ký thao tác.
 3. Theo dõi hồ sơ học viên tiềm năng và học viên đã đăng ký.
 4. Theo dõi tiến độ học tập, nghiên cứu và các lần nộp báo cáo.
 5. Email/thông báo cho các mốc quan trọng.

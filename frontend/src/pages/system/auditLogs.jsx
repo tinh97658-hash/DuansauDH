@@ -233,6 +233,11 @@ const DataChangeLogs = () => {
   );
 };
 
+const TAB_DESCRIPTIONS = [
+  "Nhật ký thao tác quản lý: các thao tác tài khoản & phân quyền (tạo/sửa/khóa/mở tài khoản, đặt lại mật khẩu, đổi quyền vai trò) cùng các lần đăng nhập/đăng xuất của nhân sự.",
+  "Nhật ký thay đổi dữ liệu: mọi thay đổi ở tầng cơ sở dữ liệu (thêm/sửa/xóa bản ghi trên toàn bộ bảng nghiệp vụ, kể cả SQL thủ công); cột người thực hiện được gắn khi thao tác nằm trong một giao dịch.",
+];
+
 const AuditLogs = () => {
   const [tab, setTab] = useState(0);
 
@@ -244,6 +249,7 @@ const AuditLogs = () => {
           <Tab label="Thay đổi dữ liệu" sx={{ textTransform: "none", fontWeight: 600 }} />
         </Tabs>
       </Box>
+      <Typography sx={{ fontSize: 12.5, color: "#526A82", mb: 1.5, lineHeight: 1.5 }}>{TAB_DESCRIPTIONS[tab]}</Typography>
       {tab === 0 ? <ManagementLogs /> : <DataChangeLogs />}
     </FeatureLayout>
   );

@@ -1,6 +1,6 @@
 # KẾ HOẠCH: MODULE QUẢN LÝ TÀI KHOẢN & PHÂN QUYỀN (RBAC)
 
-> Trạng thái: **Đã hoàn thành — Phase 1–6 xong (RBAC, API tài khoản/vai trò, chuyển `@Roles`→permission, giao diện, dọn dẹp/test/tài liệu, nhật ký thay đổi dữ liệu cấp DB).**
+> Trạng thái: **Đã hoàn thành — Phase 1–7 xong (RBAC, API tài khoản/vai trò, chuyển `@Roles`→permission, giao diện, dọn dẹp/test/tài liệu, nhật ký thay đổi dữ liệu cấp DB, ghi nhận đăng nhập/đăng xuất).**
 > Ngày lập: 2026-10-18 (cập nhật sau khi chốt).
 > Phạm vi áp dụng: `backend/` (NestJS 11 + Sequelize + Umzug) và `frontend/` (React + MUI).
 
@@ -76,7 +76,7 @@ Vai trò **chính** (đại diện `user.role`) lưu ở cột `staff.role` — 
 | `user_agent` | TEXT |
 | `created_at` | TIMESTAMPTZ |
 
-Hành động (mã thực tế đã dùng): `account.create`, `account.update`, `account.disable`, `account.enable`, `account.password.reset`, `account.password.change`, `account.sessions.revoke`, `role.create`, `role.update`, `role.permissions.update`, `role.delete`.
+Hành động (mã thực tế đã dùng): `account.create`, `account.update`, `account.disable`, `account.enable`, `account.password.reset`, `account.password.change`, `account.sessions.revoke`, `account.login`, `account.logout`, `account.login.failed`, `role.create`, `role.update`, `role.permissions.update`, `role.delete`.
 Index theo `created_at`, `target_staff_id`, `action`.
 
 ### 1.8 Bảng `db_change_logs` — nhật ký thay đổi dữ liệu (migration `063-db-change-logs.ts`)
@@ -210,6 +210,7 @@ Cơ chế **session version** (không cần đụng bảng `sessions`):
 - `AuthService.validateLocal`: chặn nếu `status !== 'active'` ("Tài khoản đã bị khóa").
 - Nếu `mustChangePassword` → cho đăng nhập nhưng frontend buộc đổi MK trước khi dùng tính năng (endpoint đổi MK bắt buộc).
 - Cập nhật `lastLoginAt` khi đăng nhập thành công.
+- Ghi `auth_audit_logs`: `account.login` (kèm provider local/google), `account.logout`, `account.login.failed` (kèm lý do: `bad_password`/`disabled`/`password_required`, chỉ với tài khoản nhân sự). Ghi best-effort qua `AuthService` + ngữ cảnh request (không chặn đăng nhập nếu ghi lỗi).
 - `auth.controller.isStaff` trả `role` code (vai trò chính) như cũ.
 
 ### 2.9 Dọn dẹp
@@ -319,6 +320,12 @@ Lệnh: `npm test`, `npm run test:coverage` (từ thư mục gốc).
 5. ✅ Frontend: `pages/system/auditLogs.jsx` chuyển thành 2 tab ("Thao tác quản lý" | "Thay đổi dữ liệu"), lọc theo bảng/hành động/khoảng ngày; bổ sung `listChangeLogs`/`listChangeLogTables` + nhãn bảng/hành động trong `features/accounts`.
 6. ✅ Test: `backend/test/unit/change-log.service.spec.ts` (3 case), `frontend/src/test/integration/AuditLogs.test.jsx` (2 case).
 7. ✅ Kiểm chứng đầu-cuối: cập nhật quyền vai trò (trong transaction) → 23 dòng `role_permissions` kèm đầy đủ actor/request id/IP; đăng nhập (ngoài transaction) → ghi `staff` UPDATE, actor trống. `db:migrate` chạy sạch (063 áp dụng); typecheck/build backend + build frontend sạch; backend 657 test pass.
+
+### Phase 7 — Ghi nhận đăng nhập/đăng xuất & mô tả tab ✅ (đã xong)
+1. ✅ `AuthService`: ghi `account.login` (provider `local`/`google`), `account.logout`, `account.login.failed` (lý do `bad_password`/`disabled`/`password_required`; chỉ với nhân sự) vào `auth_audit_logs`, kèm IP/user-agent/request id từ ngữ cảnh; ghi best-effort (không chặn đăng nhập nếu ghi lỗi).
+2. ✅ `UserController.logout` gọi `AuthService.recordLogout` cho nhân sự trước khi hủy phiên.
+3. ✅ Frontend: thêm nhãn "Đăng nhập"/"Đăng xuất"/"Đăng nhập thất bại" vào bộ lọc tab "Thao tác quản lý"; thêm **dòng mô tả vai trò của từng tab** ngay dưới thanh tab.
+4. ✅ Kiểm chứng: đăng nhập sai → `account.login.failed` (401); đăng nhập đúng → `account.login` (200, có actor); đăng xuất → `account.logout` (302, có actor); lọc API `action=account.login.failed` trả đúng kèm `target`. Backend 657 test pass; build frontend + test `AuditLogs.test.jsx` (2 case) pass.
 
 ---
 

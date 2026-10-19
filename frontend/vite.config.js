@@ -40,11 +40,6 @@ export default defineConfig(({ mode }) => {
         /(?:jest|vi)\.mock\(\s*["'][^"']*components\/FeatureLayout["'][\s\S]*?\);/g,
         'vi.mock("../../components/FeatureLayout", () => ({ default: ({ children }) => <div>{children}</div> }));'
       );
-      // Normalize AppLayout mocks
-      transformed = transformed.replace(
-        /(?:jest|vi)\.mock\(\s*["'][^"']*components\/AppLayout["'][\s\S]*?\);/g,
-        'vi.mock("../../components/AppLayout", () => ({ default: ({ children }) => <div>{children}</div> }));'
-      );
       // Normalize function component mock factories: () => function Name(...) { ... }
       transformed = transformed.replace(
         /(?:jest|vi)\.mock\(\s*(["'][^"']+["']),\s*\(\)\s*=>\s*function\s+([A-Za-z0-9_]+)\s*\(([^)]*)\)\s*\{([\s\S]*?)\}\s*\);/g,

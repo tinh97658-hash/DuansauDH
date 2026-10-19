@@ -11,11 +11,17 @@ import { StaffService } from "../staff/staff.service.js";
 import { ForgotPasswordDto, ResetPasswordDto, UpdatePasswordDto } from "../students/dto/password.dto.js";
 import { SubmissionDto } from "../students/dto/submission.dto.js";
 import { StudentsService } from "../students/students.service.js";
+import { AuthService } from "./auth.service.js";
 import { LocalAuthGuard } from "./auth.guards.js";
 
 @Controller("user")
 export class UserController {
-  constructor(private readonly students: StudentsService, private readonly staff: StaffService, private readonly config: ConfigService) {}
+  constructor(
+    private readonly students: StudentsService,
+    private readonly staff: StaffService,
+    private readonly auth: AuthService,
+    private readonly config: ConfigService,
+  ) {}
 
   @Get()
   index() { return { message: "Đăng nhập thành công" }; }
@@ -63,9 +69,16 @@ export class UserController {
 
   @Get("logout")
   logout(@Req() request: any, @Res() response: Response) {
-    request.logout((error: Error) => {
+    const user = request.user;
+    const finish = () => request.logout((error: Error) => {
       if (error) return response.status(500).json({ message: "Lỗi máy chủ nội bộ" });
       return response.redirect(`${String(this.config.get("FRONTEND_URL")).replace(/\/$/, "")}/login`);
     });
+
+    if (user instanceof Staff) {
+      this.auth.recordLogout(user).finally(finish);
+      return;
+    }
+    finish();
   }
 }
