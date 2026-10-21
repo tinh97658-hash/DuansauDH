@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { lockTrainingStructure } from "./training-structure-integrity.js";
+import { archiveMembership } from "./membership-history.js";
 import { AdmissionEvaluationService } from "./admission-evaluation.service.js";
 import { InjectModel } from "@nestjs/sequelize";
 import { Op, QueryTypes } from "sequelize";
@@ -64,6 +65,7 @@ export class MajorTransferService {
 
   async request(admissionRecordId: string, dto: RequestMajorTransferDto) {
     return this.sequelize.transaction(async (transaction) => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
       await lockTrainingStructure(this.sequelize, transaction);
       const record = await this.records.findByPk(admissionRecordId, { transaction, lock: transaction.LOCK.UPDATE });
       if (!record) throw new NotFoundException("Không tìm thấy hồ sơ học viên.");
@@ -121,6 +123,7 @@ export class MajorTransferService {
 
   async decide(id: string, dto: DecideMajorTransferDto, actor?: any) {
     return this.sequelize.transaction(async (transaction) => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
       await lockTrainingStructure(this.sequelize, transaction);
       const transfer = await this.transfers.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!transfer) throw new NotFoundException("Không tìm thấy yêu cầu chuyển chuyên ngành.");
@@ -200,6 +203,8 @@ export class MajorTransferService {
             );
           }
         }
+        const oldMembers = await this.memberships.findAll({ where: membershipWhere as never, transaction, lock: transaction.LOCK.UPDATE });
+        for (const member of oldMembers) await archiveMembership(this.sequelize, member.id, actor, "Chuyển chuyên ngành đã được duyệt", transaction);
         await this.memberships.destroy({ where: membershipWhere as never, transaction });
         await transfer.update({ toCurriculumId: curriculum.id } as never, { transaction });
       }

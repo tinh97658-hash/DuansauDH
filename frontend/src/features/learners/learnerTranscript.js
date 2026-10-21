@@ -32,7 +32,7 @@ export function normalizeLearnerTranscript(scorecard, { now = new Date() } = {})
     // There is no canonical postgraduate GPA, issue-number or transcript signer
     // source in the current API. Never reuse undergraduate GPA or the login user.
     summary: { gpa: null, gradeScale: null },
-    issuance: { number: null, date: getBusinessTodayKey(now) },
+    issuance: { number: null, date: getBusinessTodayKey(scorecard.issuedAt ? new Date(scorecard.issuedAt) : now) },
     signers: { specialistName: null, instituteDirectorName: null },
     form: { code: TRANSCRIPT_FORM.code, publishedOn: TRANSCRIPT_FORM.publishedOn, revision: TRANSCRIPT_FORM.revision },
     subjects: (scorecard.subjects || []).map((subject, index) => {
@@ -64,11 +64,10 @@ export const transcriptSubjectValues = (subject) => [subject.index, subject.name
 export const transcriptClassLabel = (transcript) => transcript.classGroup.code || transcript.classGroup.name || "";
 
 export function transcriptDocumentDetails(transcript) {
-  const [year, month, day] = transcript.issuance.date.split("-");
   return {
     numberLine: `Số:${"\u00a0".repeat(12)}${transcript.issuance.number || ""}/Khóa ${transcript.training.academicYear || ".".repeat(19)}/SĐH`,
     gpa: { label: TRANSCRIPT_FORM.gpaLabel, value: display(transcript.summary.gpa) },
-    issueDate: `Hải Phòng, ngày ${day} tháng ${month} năm ${year}`,
+    issueDate: `Hải Phòng, ngày ${displayGradeDate(transcript.issuance.date)}`,
     signatures: TRANSCRIPT_FORM.signatureRoles.map((roles, index) => ({ roles,
       name: index === 0 ? transcript.signers.specialistName : transcript.signers.instituteDirectorName })),
     footer: [`NBH:${transcript.form.publishedOn}-REV:${transcript.form.revision}`, transcript.form.code],

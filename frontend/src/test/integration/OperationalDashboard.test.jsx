@@ -48,7 +48,7 @@ it("hides inaccessible widgets, previews, warnings and management overview", asy
   await open();
   expect(screen.getAllByRole("article")).toHaveLength(1);
   expect(screen.queryByText("Học viên chưa phân nhóm")).not.toBeInTheDocument();
-  expect(screen.queryByText("CẢNH BÁO")).not.toBeInTheDocument();
+  expect(screen.getByRole('complementary', {name:'CẢNH BÁO'})).toHaveTextContent('Không có cảnh báo');
   expect(screen.queryByText("TÌNH HÌNH ĐÀO TẠO")).not.toBeInTheDocument();
   expect(screen.queryByRole("link", { name: /Xếp lịch/ })).not.toBeInTheDocument();
   expect(screen.queryByRole("region", { name: "Phân bổ học viên chờ xử lý" })).not.toBeInTheDocument();
@@ -90,12 +90,12 @@ it("keeps other widgets usable when grades fail and retries only that source", a
   axios.get.mockResolvedValue({ data });
   await open();
   expect(screen.getByRole("link", { name: "Phân nhóm" })).toBeInTheDocument();
-  const grades = screen.getByRole("article", { name: "Lớp chưa nhập đủ điểm" });
+  const grades = screen.getByRole("article", { name: "Chờ nhập điểm thành phần" });
   expect(within(grades).getByRole("alert")).toHaveTextContent("Chưa tải được dữ liệu.");
   axios.get.mockResolvedValue({ data: { year: "2026", permissions, sources: { grades: fixture().sources.grades } } });
   await act(async () => fireEvent.click(within(grades).getByRole("button", { name: "Thử lại" })));
   expect(axios.get).toHaveBeenLastCalledWith(expect.stringContaining("/dashboard/operational"), expect.objectContaining({ params: { year: "2026", section: "grades" } }));
-  expect(within(grades).getByText("Không có lớp chờ bổ sung điểm")).toBeInTheDocument();
+  expect(within(grades).getByText("Không có lớp chờ nhập điểm thành phần")).toBeInTheDocument();
 });
 
 it("never reports a healthy warning panel when its source failed", async () => {
@@ -139,7 +139,7 @@ it("keeps multiple actionable queues without a duplicate distribution panel or c
   const inbox = screen.getByRole("region", { name: "VIỆC CẦN XỬ LÝ" });
   expect(within(inbox).getByRole("region", { name: "Học viên chưa phân nhóm" })).toHaveTextContent("Hiển thị 2/6 mục");
   expect(within(inbox).getByRole("region", { name: "Lớp chưa xếp lịch" })).toHaveTextContent("CNTT 2026.1.1");
-  expect(within(inbox).queryByRole("region", { name: "Lớp chưa nhập đủ điểm" })).not.toBeInTheDocument();
+  expect(within(inbox).queryByRole("region", { name: "Chờ nhập điểm thành phần" })).not.toBeInTheDocument();
   expect(within(screen.getByRole("article", { name: "Học viên chưa phân nhóm" })).getByText("12")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: /Hệ thống thông tin.*3 HV.*Phân nhóm/ })).toHaveAttribute("href", data.sources.grouping.data.items[1].href);
 });
@@ -157,24 +157,62 @@ it("keeps a failed grouping queue actionable without an empty warning column or 
   expect(document.querySelector(".od-main")).toHaveClass("od-main-single");
 });
 
-it.each([5, 12])("shows only the first three prioritized warnings out of %s and links to the existing full queue", async (total) => {
+it.each([5, 12])("shows every scoped teaching warning and counts the displayed %s classes", async (total) => {
   const data = fixture();
   const detail = "Một mô tả cảnh báo dài cần được giữ đầy đủ khi truy cập bằng bàn phím hoặc công nghệ hỗ trợ. ".repeat(7);
-  data.sources.teaching.data.progress = { count: total, itemCount: total, href: "/masters/schedule?year=2026&queue=pending-confirmation", items: Array.from({ length: 5 }, (_, index) => ({
+  data.sources.teaching.data.progress = { count: total, itemCount: total, href: "/masters/schedule?year=2026&queue=pending-confirmation", items: Array.from({ length: total }, (_, index) => ({
     id: `warning-${index}`, title: `Lớp cảnh báo ${index + 1}`, detail,
     href: `/masters/schedule?year=2026&offeringId=o${index}&queue=pending-confirmation`,
   })) };
   axios.get.mockResolvedValue({ data });
   await open();
   const warnings = screen.getByRole("complementary", { name: "CẢNH BÁO" });
-  expect(within(warnings).getAllByRole("listitem")).toHaveLength(3);
-  expect(within(warnings).getAllByRole("listitem").map((li) => li.querySelector("strong").textContent)).toEqual(["Lớp cảnh báo 1", "Lớp cảnh báo 2", "Lớp cảnh báo 3"]);
-  expect(within(warnings).queryByText("Lớp cảnh báo 4")).not.toBeInTheDocument();
-  expect(within(warnings).getAllByTitle(detail.trim())).toHaveLength(3);
-  const all = within(warnings).getByRole("link", { name: `Xem tất cả ${total} lớp` });
+  expect(within(warnings).getAllByRole("listitem")).toHaveLength(total);
+  expect(within(warnings).getAllByRole("listitem").map((li) => li.querySelector("strong").textContent)).toEqual(Array.from({length:total},(_,i)=>`Lớp cảnh báo ${i+1}`));
+  expect(within(warnings).getByText(`${total} lớp`)).toBeInTheDocument();
+  expect(within(warnings).getAllByTitle(detail.trim())).toHaveLength(total);
+  const all = within(warnings).getByRole("link", { name: 'Xem tất cả' });
   expect(all).toHaveAttribute("href", data.sources.teaching.data.progress.href);
   const first = within(warnings).getByRole("link", { name: `Lớp cảnh báo 1. ${detail}`.trim() });
   expect(first).toHaveAttribute("aria-label", `Lớp cảnh báo 1. ${detail}`);
   fireEvent.click(first);
   expect(screen.getByTestId("location")).toHaveTextContent("/masters/schedule?year=2026&offeringId=o0&queue=pending-confirmation");
+});
+it('moves component entry to left-hand work and excludes it from the right-hand warning groups and badge',async()=>{
+ const data=fixture();data.sources.teaching.data.progress.items=[{id:'teaching',title:'Triết học · KT 2026.1.1',detail:'4 buổi đã qua giờ, chưa xác nhận',href:'/masters/schedule?year=2026&offeringId=teaching&queue=pending-confirmation'}];
+ data.sources.teaching.data.progress.count=1;
+ data.sources.grades.data.warningGroups=[
+  {key:'components',title:'CHỜ NHẬP ĐIỂM THÀNH PHẦN',items:[{id:'a',title:'Quản trị vận hành · QTKD 2026.1.12',detail:'Hoàn thành môn học 12 ngày trước',href:'/masters/exam-lists?year=2026&offeringId=a&groupId=g1'}]},
+  {key:'exam',title:'CHỜ TỔ CHỨC THI',items:[{id:'b',title:'Quản trị nguồn nhân lực · QTKD 2026.1.11',detail:'Điểm thành phần được duyệt 9 ngày trước',href:'/masters/exam-schedule?year=2026&offeringId=b&groupId=g1'}]},
+  {key:'examGrades',title:'CHỜ NHẬP ĐIỂM THI',items:[{id:'c',title:'Nghiên cứu KD · QTKD 2026.1.8',detail:'Thi xong 7 ngày trước',href:'/masters/exam-lists?year=2026&offeringId=c&groupId=g1'}]},
+ ];
+ const component=data.sources.grades.data.warningGroups[0].items[0];
+ data.sources.grades.data={...data.sources.grades.data,count:1,itemCount:1,items:[component],href:component.href};
+ axios.get.mockResolvedValue({data});await open();
+ const work=within(screen.getByRole('region',{name:'VIỆC CẦN XỬ LÝ'})).getByRole('region',{name:'Chờ nhập điểm thành phần'});
+ expect(work).toHaveTextContent('CHỜ NHẬP ĐIỂM THÀNH PHẦN');expect(work).toHaveTextContent('1 lớp');expect(work).toHaveTextContent('Hoàn thành môn học 12 ngày trước');
+ expect(work).not.toHaveTextContent(/chưa nhập đủ|6\/10|0\/10|học phần chưa/);expect(within(work).getByRole('link',{name:/Quản trị vận hành.*Nhập điểm/})).toHaveAttribute('href',component.href);
+ const panel=screen.getByRole('complementary',{name:'CẢNH BÁO'});expect(within(panel).getAllByRole('listitem')).toHaveLength(3);expect(within(panel).getByText('3 lớp')).toBeInTheDocument();
+ expect(within(panel).queryByText('CHỜ NHẬP ĐIỂM THÀNH PHẦN')).not.toBeInTheDocument();expect(panel).not.toHaveTextContent(component.title);expect(panel).not.toHaveTextContent(component.detail);
+ for(const group of data.sources.grades.data.warningGroups.slice(1)){const region=within(panel).getByRole('region',{name:group.title});expect(region).toHaveTextContent(group.items[0].detail);expect(region).not.toHaveTextContent(/chưa nhập đủ|6\/10|chờ duyệt/);}
+ const exam=within(panel).getByRole('region',{name:'CHỜ TỔ CHỨC THI'});expect(exam).not.toHaveTextContent('Hoàn thành môn học');
+ const expectedHrefs=['/masters/schedule?year=2026&queue=pending-confirmation','/masters/exam-schedule?year=2026','/masters/exam-lists?year=2026'];
+ const regions=within(panel).getAllByRole('region');expect(regions).toHaveLength(3);
+ regions.forEach((region,index)=>expect(within(region).getByRole('link',{name:'Xem tất cả'})).toHaveAttribute('href',expectedHrefs[index]));
+ expect(panel.querySelector(':scope > .od-category-footer')).toBeNull();expect(within(panel).queryByText('Xem buổi chờ xác nhận')).not.toBeInTheDocument();
+ fireEvent.click(within(exam).getByRole('link',{name:/Quản trị nguồn nhân lực/}));expect(screen.getByTestId('location')).toHaveTextContent('/masters/exam-schedule?year=2026&offeringId=b&groupId=g1');
+});
+it('keeps component work actionable when it is the only outstanding work, with a healthy warning panel',async()=>{
+ const data=fixture(0);data.sources.teaching.data.scheduling={...data.sources.teaching.data.scheduling,count:0,items:[]};
+ data.sources.grades.data={count:1,itemCount:1,href:'/masters/exam-lists?year=2026&offeringId=a',items:[{id:'a',title:'QTKD 2026.1.12',detail:'Hoàn thành môn học 1 ngày trước',href:'/masters/exam-lists?year=2026&offeringId=a'}],warningGroups:[]};
+ axios.get.mockResolvedValue({data});await open();
+ const work=screen.getByRole('region',{name:'VIỆC CẦN XỬ LÝ'});expect(work).toHaveTextContent('Hoàn thành môn học 1 ngày trước');expect(work).not.toHaveTextContent('Không có mục chờ xử lý');
+ const panel=screen.getByRole('complementary',{name:'CẢNH BÁO'});expect(panel).toHaveTextContent('Không có cảnh báo');expect(within(panel).queryByText('1 lớp')).not.toBeInTheDocument();
+});
+it('counts a class only once across warning groups and keeps each group CTA scoped to the selected year',async()=>{
+ const data=fixture();const shared={id:'same-class',title:'Lớp có nhiều cảnh báo',detail:'Thi xong 1 ngày trước',href:'/masters/exam-lists?year=2026&offeringId=same-class'};
+ data.sources.teaching.data.progress={count:1,items:[{...shared,detail:'1 buổi đã qua giờ, chưa xác nhận'}],href:'/masters/schedule?year=2026&queue=pending-confirmation'};
+ data.sources.grades.data.warningGroups=[{key:'examGrades',title:'CHỜ NHẬP ĐIỂM THI',items:[shared]}];axios.get.mockResolvedValue({data});await open();
+ const panel=screen.getByRole('complementary',{name:'CẢNH BÁO'});expect(within(panel).getByText('1 lớp')).toBeInTheDocument();expect(within(panel).getAllByRole('listitem')).toHaveLength(2);
+ const exam=within(panel).getByRole('region',{name:'CHỜ NHẬP ĐIỂM THI'});fireEvent.click(within(exam).getByRole('link',{name:'Xem tất cả'}));expect(screen.getByTestId('location')).toHaveTextContent('/masters/exam-lists?year=2026');
 });

@@ -13,11 +13,10 @@ import { API_BASE_URL } from "../../config/http";
 import "./operationalDashboard.css";
 
 const currentYear = new Date().getFullYear();
-const WARNING_PREVIEW_LIMIT = 3;
 const definitions = [
   { key: "grouping", source: "grouping", title: "Học viên chưa phân nhóm", healthyTitle: "Phân nhóm học viên", action: "Phân nhóm", healthy: "Không còn học viên chờ phân nhóm", unit: "học viên", Icon: GroupsOutlined, tone: "teal" },
   { key: "scheduling", source: "teaching", title: "Lớp chưa xếp lịch", healthyTitle: "Xếp lịch học", action: "Xếp lịch", healthy: "Không còn lớp chờ xếp lịch", unit: "lớp học phần", Icon: CalendarMonthOutlined, tone: "blue" },
-  { key: "grades", source: "grades", title: "Lớp chưa nhập đủ điểm", healthyTitle: "Nhập điểm học phần", action: "Nhập điểm", healthy: "Không có lớp chờ bổ sung điểm", unit: "nhóm học viên", Icon: AssignmentOutlined, tone: "violet" },
+  { key: "grades", source: "grades", title: "Chờ nhập điểm thành phần", healthyTitle: "Nhập điểm thành phần", action: "Nhập điểm", healthy: "Không có lớp chờ nhập điểm thành phần", unit: "lớp", Icon: AssignmentOutlined, tone: "violet" },
   { key: "progress", source: "teaching", title: "Tiến độ cần kiểm tra", healthyTitle: "Kiểm tra tiến độ", action: "Kiểm tra", healthy: "Không có buổi học chờ xác nhận", unit: "lớp có buổi chờ xác nhận", Icon: PendingActionsOutlined, tone: "amber" },
 ];
 const metricOf = (source, key) => source?.data?.[key] || source?.data;
@@ -54,7 +53,7 @@ function WorkCategory({ definition, source, onRetry }) {
   const grouping = definition.key === "grouping";
   if (metric?.count === 0) return null;
   return <section className={`od-work-category od-tone-${definition.tone}`} aria-label={definition.title}>
-    <div className="od-category-heading"><h3><definition.Icon />{grouping ? "Học viên chờ phân nhóm" : definition.title}</h3>
+    <div className="od-category-heading"><h3><definition.Icon />{grouping ? "Học viên chờ phân nhóm" : definition.key === 'grades' ? 'CHỜ NHẬP ĐIỂM THÀNH PHẦN' : definition.title}</h3>
       {metric && <span className="od-category-count">{metric.count} {definition.unit}</span>}
     </div>
     {!metric ? <SourceState source={source} onRetry={onRetry} /> : <>
@@ -73,21 +72,34 @@ function WorkCategory({ definition, source, onRetry }) {
   </section>;
 }
 
-function WarningPanel({ source, onRetry }) {
-  const progress = source?.status === "ready" ? source.data.progress : null;
-  // Preserve the API's existing priority order; only limit the Home preview.
-  const warnings = progress?.items.slice(0, WARNING_PREVIEW_LIMIT) || [];
+function WarningPanel({ teachingSource, gradesSource, permissions, year, onRetry }) {
+  const progress = permissions.progress && teachingSource?.status === "ready" ? teachingSource.data.progress : null;
+  const groups = [
+    ...(progress ? [{ key: 'teaching', title: 'BUỔI HỌC CHƯA XÁC NHẬN', items: progress.items }] : []),
+    ...(permissions.grades && gradesSource?.status === 'ready' ? (gradesSource.data.warningGroups || []).filter(group => ['exam', 'examGrades'].includes(group.key)) : []),
+  ];
+  const count = new Set(groups.flatMap(group => group.items.map(item => item.id))).size;
+  const groupHrefs = {
+    teaching: progress?.href,
+    exam: `/masters/exam-schedule?${new URLSearchParams({ year })}`,
+    examGrades: `/masters/exam-lists?${new URLSearchParams({ year })}`,
+  };
+  const ready = (!permissions.progress || teachingSource?.status === 'ready') && (!permissions.grades || gradesSource?.status === 'ready');
   return <aside className="od-panel od-warnings" aria-labelledby="od-warning-title">
-    <div className="od-panel-heading"><h2 id="od-warning-title"><WarningAmberOutlined aria-hidden="true" />CẢNH BÁO</h2>{progress?.count > 0 && <span className="od-warning-badge">{progress.count} lớp</span>}</div>
-    <div className="od-warning-content">{!progress ? <SourceState source={source} onRetry={onRetry} /> : progress.count === 0
+    <div className="od-panel-heading"><h2 id="od-warning-title"><WarningAmberOutlined aria-hidden="true" />CẢNH BÁO</h2>{count > 0 && <span className="od-warning-badge">{count} lớp</span>}</div>
+    <div className="od-warning-content">
+      {permissions.progress && teachingSource?.status !== 'ready' && <SourceState source={teachingSource} onRetry={() => onRetry('teaching')} />}
+      {permissions.grades && gradesSource?.status !== 'ready' && <SourceState source={gradesSource} onRetry={() => onRetry('grades')} />}
+      {ready && count === 0
       ? <div className="od-warning-healthy"><CheckCircleOutline aria-hidden="true" /><div><strong>Không có cảnh báo</strong><p>Chưa phát hiện vấn đề cần xử lý.</p></div></div>
-      : <><p className="od-panel-description">Buổi học đã qua giờ, chưa xác nhận kết quả.</p>
-        <ul className="od-warning-list">{warnings.map((item) => <li key={item.id}><Link to={item.href} aria-label={[item.title, item.detail].filter(Boolean).join(". ")}>
+      : groups.filter(group => group.items.length > 0).map(group => <section className="od-warning-group" key={group.key} aria-label={group.title}>
+        <h3>{group.title}<span>{group.items.length}</span></h3>
+        <ul className="od-warning-list">{group.items.map((item) => <li key={item.id}><Link to={item.href} aria-label={[item.title, item.detail].filter(Boolean).join(". ")}>
           <span className="od-warning-icon"><WarningAmberOutlined aria-hidden="true" /></span>
           <span className="od-item-copy"><strong title={item.title}>{item.title}</strong><small title={item.detail}>{item.detail}</small></span><ArrowForwardOutlined aria-hidden="true" />
         </Link></li>)}</ul>
-      </>}</div>
-    {progress?.count > 0 && <div className="od-category-footer"><Link to={progress.href}>{progress.count > warnings.length ? `Xem tất cả ${progress.count} lớp` : "Xem buổi chờ xác nhận"}<ArrowForwardOutlined /></Link></div>}
+        {groupHrefs[group.key] && <div className="od-category-footer od-warning-group-footer"><Link to={groupHrefs[group.key]}>Xem tất cả<ArrowForwardOutlined /></Link></div>}
+      </section>)}</div>
   </aside>;
 }
 
@@ -127,6 +139,7 @@ export default function OperationalDashboard() {
   const work = permitted.filter((definition) => definition.key !== "progress");
   const workHealthy = work.length > 0 && work.every((definition) => state.sources[definition.source]?.status === "ready" && metricOf(state.sources[definition.source], definition.key)?.count === 0);
   const overviewSource = state.sources.teaching;
+  const showWarnings = permissions?.progress || permissions?.grades;
   const overview = overviewSource?.status === "ready" ? overviewSource.data.overview : null;
   const years = [...new Set([year, ...Array.from({ length: 6 }, (_, index) => String(currentYear - 3 + index))])].sort().reverse();
 
@@ -142,12 +155,12 @@ export default function OperationalDashboard() {
           {permitted.length > 0 && <section className="od-cards" aria-label="Công việc theo quyền truy cập" style={{ "--od-columns": Math.min(4, permitted.length), "--od-small-columns": Math.min(2, permitted.length) }}>{permitted.map((definition) => <ActionCard key={definition.key} definition={definition}
             source={state.sources[definition.source]} onRetry={() => retry(definition.source)} />)}</section>}
           {!permitted.length && <div className="od-panel od-no-access"><AssignmentOutlined /><div><h2>Chưa có tác vụ được giao</h2><p>Tài khoản hiện chưa có quyền xử lý các hàng đợi công việc này.</p></div></div>}
-          {(work.length > 0 || permissions?.progress) && <div className={`od-main${permissions?.progress && work.length ? "" : " od-main-single"}`}>
+          {(work.length > 0 || showWarnings) && <div className={`od-main${showWarnings && work.length ? "" : " od-main-single"}`}>
             {work.length > 0 && <section className="od-panel" aria-labelledby="od-work-title"><div className="od-panel-heading"><h2 id="od-work-title"><AssignmentOutlined aria-hidden="true" />VIỆC CẦN XỬ LÝ</h2><span>Thạc sĩ · {year}</span></div>
               {workHealthy ? <div className="od-empty"><CheckCircleOutline /><strong>Không có mục chờ xử lý</strong><span>Mọi đầu việc trong phạm vi hiện tại đã hoàn thành.</span></div>
                 : work.map((definition) => <WorkCategory key={definition.key} definition={definition} source={state.sources[definition.source]} onRetry={() => retry(definition.source)} />)}
             </section>}
-            {permissions?.progress && <WarningPanel source={state.sources.teaching} onRetry={() => retry("teaching")} />}
+            {showWarnings && <WarningPanel teachingSource={state.sources.teaching} gradesSource={state.sources.grades} permissions={permissions} year={year} onRetry={retry} />}
           </div>}
           {permissions?.overview && <section className="od-panel od-overview" aria-labelledby="od-overview-title"><div className="od-panel-heading"><h2 id="od-overview-title">TÌNH HÌNH ĐÀO TẠO</h2><span>Lớp học phần thạc sĩ · {year}</span></div>
             {overview ? <dl>{[["Lớp đang mở", overview.active], ["Đang giảng dạy", overview.inProgress], ["Chưa xếp buổi học", overview.unscheduled], ["Đã hoàn thành", overview.completed]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>

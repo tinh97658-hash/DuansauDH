@@ -34,6 +34,7 @@ describeDb("Learning attempt ordering across reports, credits and retakes", () =
     const fixture = (sql: string) => query(sql, { replacements: ids });
     await fixture(`
       CREATE TEMP TABLE class_group_members (id uuid, class_group_id uuid, admission_record_id uuid, student_id uuid) ON COMMIT DROP;
+      CREATE TEMP VIEW academic_class_members AS SELECT * FROM class_group_members;
       CREATE TEMP TABLE admission_records (id uuid, student_id uuid, code text, full_name text, last_name text DEFAULT '', first_name text DEFAULT '',
         dob text DEFAULT '', gender text DEFAULT '', academic_year text DEFAULT '2026', created_at timestamptz DEFAULT NOW(),
         is_exempt_foreign_language boolean DEFAULT false, training_level text DEFAULT 'Thạc sĩ', status text DEFAULT 'approved',
@@ -43,7 +44,7 @@ describeDb("Learning attempt ordering across reports, credits and retakes", () =
         canonical_subject_id uuid, is_required boolean DEFAULT true, subject_type text DEFAULT 'KC', program text DEFAULT 'masters',
         allow_cross_major boolean DEFAULT false, shared_major_ids uuid[] DEFAULT '{}') ON COMMIT DROP;
       CREATE TEMP TABLE curriculum_blocks (id uuid, name text, sort_order int, curriculum_id uuid, code text) ON COMMIT DROP;
-      CREATE TEMP TABLE curriculum_subjects (curriculum_id uuid, subject_id uuid, block_id uuid, sort_order int DEFAULT 0) ON COMMIT DROP;
+      CREATE TEMP TABLE curriculum_subjects (curriculum_id uuid, subject_id uuid, block_id uuid, elective_group_id uuid, sort_order int DEFAULT 0) ON COMMIT DROP;
       CREATE TEMP TABLE course_offerings (id uuid, subject_id uuid, created_at timestamptz, status text DEFAULT 'completed') ON COMMIT DROP;
       CREATE TEMP TABLE course_offering_class_groups (course_offering_id uuid, class_group_id uuid, participant_ids text[]) ON COMMIT DROP;
       CREATE TEMP TABLE course_exam_gradebooks (id uuid, class_group_id uuid, course_offering_id uuid, updated_at timestamptz, grades jsonb) ON COMMIT DROP;

@@ -1,11 +1,11 @@
 import { createTheme } from "@mui/material/styles";
 
 export const APP_FONT_FAMILY = '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif';
-export const TABLE_BORDER_COLOR = "#D7E4EE";
-export const TABLE_ROW_BORDER_COLOR = "#E2EBF2";
-export const TABLE_HEADER_BACKGROUND = "#EDF4FA";
+export const TABLE_BORDER_COLOR = "#687C8E";
+export const TABLE_ROW_BORDER_COLOR = "#718292";
+export const TABLE_HEADER_BACKGROUND = "#DCE7F1";
 export const TABLE_BORDER_RADIUS = 0;
-export const TABLE_HOVER_BACKGROUND = "#F5FAFE";
+export const TABLE_HOVER_BACKGROUND = "#EAF2F8";
 export const CONTROL_BORDER_RADIUS = 0;
 
 /**
@@ -15,9 +15,9 @@ export const CONTROL_BORDER_RADIUS = 0;
 export const theme = createTheme({
   palette: {
     primary: {
-      main: "#0788B8",
+      main: "#00658A",
       light: "#EBF5FB",
-      dark: "#056A8F",
+      dark: "#004D6B",
       contrastText: "#FFFFFF",
     },
     secondary: {
@@ -31,11 +31,11 @@ export const theme = createTheme({
       paper: "#FFFFFF",
     },
     text: {
-      primary: "#172B3A",
-      secondary: "#607486",
-      disabled: "#8A9AAA",
+      primary: "#102333",
+      secondary: "#354959",
+      disabled: "#526576",
     },
-    divider: "#DFE4E8",
+    divider: "#718292",
     success: {
       main: "#137B3B",
       light: "#E6F4EA",
@@ -43,7 +43,7 @@ export const theme = createTheme({
       contrastText: "#FFFFFF",
     },
     warning: {
-      main: "#B86216",
+      main: "#934B0D",
       light: "#FEF7E0",
       dark: "#8F4B10",
       contrastText: "#FFFFFF",
@@ -55,9 +55,9 @@ export const theme = createTheme({
       contrastText: "#FFFFFF",
     },
     info: {
-      main: "#0788B8",
+      main: "#00658A",
       light: "#EBF5FB",
-      dark: "#056A8F",
+      dark: "#004D6B",
       contrastText: "#FFFFFF",
     },
   },
@@ -73,23 +73,35 @@ export const theme = createTheme({
     h4: { fontSize: "16px", fontWeight: 700, color: "#173E75" },
     h5: { fontSize: "15px", fontWeight: 700, color: "#173E75" },
     h6: { fontSize: "14px", fontWeight: 700, color: "#173E75" },
-    subtitle1: { fontSize: "13px", fontWeight: 600, color: "#172B3A" },
-    subtitle2: { fontSize: "12.5px", fontWeight: 600, color: "#172B3A" },
-    body1: { fontSize: "12.5px", color: "#172B3A", lineHeight: 1.5 },
-    body2: { fontSize: "12.5px", color: "#172B3A", lineHeight: 1.45 },
-    caption: { fontSize: "11px", color: "#607486" },
+    subtitle1: { fontSize: "13px", fontWeight: 600, color: "#102333" },
+    subtitle2: { fontSize: "12.5px", fontWeight: 600, color: "#102333" },
+    body1: { fontSize: "12.5px", color: "#102333", lineHeight: 1.5 },
+    body2: { fontSize: "12.5px", color: "#102333", lineHeight: 1.45 },
+    caption: { fontSize: "11px", color: "#354959" },
     button: { textTransform: "none", fontWeight: 600, fontSize: "12.5px" },
   },
   components: {
     MuiCssBaseline: {
       styleOverrides: {
+        // InputBase normally inserts these global rules for every input mount.
+        // Keep one copy for the application, including browser autofill support.
+        "@keyframes mui-auto-fill": { from: { display: "block" } },
+        "@keyframes mui-auto-fill-cancel": { from: { display: "block" } },
         body: {
           backgroundColor: "#F5F7F8",
-          color: "#172B3A",
+          color: "#102333",
           fontFamily: APP_FONT_FAMILY,
           fontSize: "12.5px",
           lineHeight: 1.5,
           margin: 0,
+        },
+      },
+    },
+    MuiInputBase: {
+      defaultProps: { disableInjectingGlobalStyles: true },
+      styleOverrides: {
+        input: {
+          "&::placeholder": { color: "#526576", opacity: 1 },
         },
       },
     },
@@ -108,9 +120,9 @@ export const theme = createTheme({
           },
         },
         containedPrimary: {
-          backgroundColor: "#0788B8",
+          backgroundColor: "#00658A",
           "&:hover": {
-            backgroundColor: "#056A8F",
+            backgroundColor: "#004D6B",
           },
         },
         containedSecondary: {
@@ -132,10 +144,10 @@ export const theme = createTheme({
           },
         },
         outlined: {
-          borderColor: "#DFE4E8",
-          color: "#172B3A",
+          borderColor: "#718292",
+          color: "#102333",
           "&:hover": {
-            borderColor: "#0788B8",
+            borderColor: "#00658A",
             backgroundColor: "#EBF5FB",
           },
         },
@@ -164,13 +176,13 @@ export const theme = createTheme({
           backgroundImage: "none",
         },
         outlined: {
-          borderColor: "#DFE4E8",
+          borderColor: "#718292",
           borderRadius: 0,
           boxShadow: "none",
         },
         elevation1: {
           boxShadow: "none",
-          border: "1px solid #DFE4E8",
+          border: "1px solid #718292",
           borderRadius: 0,
         },
       },
@@ -178,7 +190,7 @@ export const theme = createTheme({
     MuiCard: {
       styleOverrides: {
         root: {
-          border: "1px solid #DFE4E8",
+          border: "1px solid #718292",
           borderRadius: 0,
           boxShadow: "none",
         },
@@ -190,9 +202,9 @@ export const theme = createTheme({
           borderRadius: CONTROL_BORDER_RADIUS,
           backgroundColor: "#FFFFFF",
           fontSize: 13,
-          color: "#172B3A",
+          color: "#102333",
           "& .MuiOutlinedInput-notchedOutline": {
-            borderColor: "#DFE4E8",
+            borderColor: "#718292",
             top: 0,
           },
           "& .MuiOutlinedInput-notchedOutline legend": {
@@ -202,7 +214,7 @@ export const theme = createTheme({
             borderColor: "#A0AEC0",
           },
           "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-            borderColor: "#0788B8",
+            borderColor: "#00658A",
             borderWidth: 1.5,
           },
         },
@@ -233,17 +245,17 @@ export const theme = createTheme({
     MuiInputLabel: {
       styleOverrides: {
         root: {
-          color: "#607486",
+          color: "#354959",
           fontSize: "13px",
           fontFamily: "inherit",
-          "&.Mui-focused": { color: "#0788B8" },
+          "&.Mui-focused": { color: "#00658A" },
         },
       },
     },
     MuiFormControlLabel: {
       styleOverrides: {
         label: {
-          color: "#172B3A",
+          color: "#102333",
           fontSize: "12.5px",
           fontFamily: "inherit",
         },
@@ -252,7 +264,7 @@ export const theme = createTheme({
     MuiMenuItem: {
       styleOverrides: {
         root: {
-          color: "#172B3A",
+          color: "#102333",
           fontSize: "12.5px",
           fontFamily: "inherit",
         },
@@ -282,10 +294,10 @@ export const theme = createTheme({
           backgroundColor: TABLE_HEADER_BACKGROUND,
           "& .MuiTableCell-root": {
             backgroundColor: TABLE_HEADER_BACKGROUND,
-            color: "#172B3A",
+            color: "#102333",
             fontWeight: 700,
             fontSize: "12px",
-            borderBottom: `1px solid ${TABLE_BORDER_COLOR}`,
+            borderBottom: `2px solid ${TABLE_BORDER_COLOR}`,
             padding: "9px 16px 9px 8px",
           },
         },
@@ -296,6 +308,8 @@ export const theme = createTheme({
         root: {
           borderColor: TABLE_ROW_BORDER_COLOR,
           borderRight: `1px solid ${TABLE_ROW_BORDER_COLOR}`,
+          color: "#102333",
+          fontWeight: 500,
           padding: "7px 10px",
           fontSize: "12.5px",
           fontFamily: "inherit",
@@ -327,7 +341,7 @@ export const theme = createTheme({
           height: "22px",
         },
         outlined: {
-          borderColor: "#DFE4E8",
+          borderColor: "#718292",
         },
       },
     },
@@ -335,7 +349,7 @@ export const theme = createTheme({
       styleOverrides: {
         paper: {
           borderRadius: 0,
-          border: "1px solid #DFE4E8",
+          border: "1px solid #718292",
           boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
         },
       },
@@ -346,7 +360,7 @@ export const theme = createTheme({
           fontSize: "15px",
           fontWeight: 700,
           color: "var(--dialog-title-text, #000000)",
-          borderBottom: "1px solid #DFE4E8",
+          borderBottom: "1px solid #718292",
           padding: "12px 18px",
           background: "var(--dialog-title-bg, #b4cae6)",
           "& .MuiTypography-root, & .MuiIconButton-root": { color: "inherit" },
@@ -364,7 +378,7 @@ export const theme = createTheme({
     MuiDialogActions: {
       styleOverrides: {
         root: {
-          borderTop: "1px solid #DFE4E8",
+          borderTop: "1px solid #718292",
           padding: "10px 18px",
           backgroundColor: "#FAFBFC",
         },
@@ -376,7 +390,7 @@ export const theme = createTheme({
           minHeight: 38,
         },
         indicator: {
-          backgroundColor: "#0788B8",
+          backgroundColor: "#00658A",
           height: 3,
         },
       },
@@ -389,9 +403,9 @@ export const theme = createTheme({
           fontSize: "13px",
           fontWeight: 600,
           textTransform: "none",
-          color: "#607486",
+          color: "#354959",
           "&.Mui-selected": {
-            color: "#0788B8",
+            color: "#00658A",
             fontWeight: 700,
           },
         },
@@ -399,10 +413,16 @@ export const theme = createTheme({
     },
     MuiAlert: {
       styleOverrides: {
-        root: {
+        root: ({ ownerState, theme }) => ({
           borderRadius: 0,
           fontSize: "12.5px",
-        },
+          "& .MuiAlert-icon": {
+            color: theme.palette[ownerState.color || ownerState.severity || "info"][
+              ownerState.variant === "filled" ? "contrastText" : "main"
+            ],
+            opacity: 1,
+          },
+        }),
       },
     },
   },

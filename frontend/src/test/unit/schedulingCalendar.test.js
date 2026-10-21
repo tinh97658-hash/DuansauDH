@@ -1,6 +1,24 @@
 import {
+  isSessionStartedInBusinessTimezone, periodTimes,
   addDays, formatDateKey, getBusinessTodayKey, getBusinessWallTime, isPeriodTimeConsistent, normalizeTimeInput, getRoomFloor, isSessionPast, mondayOf, parseLocalDate, timesOverlap, validTimeRange, weekDaysFrom,
 } from "../../utils/schedulingCalendar";
+
+describe("new scheduling start cutoff", () => {
+  it.each([
+    ["2026-10-19", "13:00", true],
+    ["2026-10-20", "12:59:59", true],
+    ["2026-10-20", "13:00", true],
+    ["2026-10-20", "13:00:01", false],
+    ["2026-10-21", "07:00", false],
+  ])("checks %s %s using Vietnam time", (sessionDate, startTime, expected) => {
+    expect(isSessionStartedInBusinessTimezone({ sessionDate, startTime }, new Date("2026-10-20T06:00:00Z"))).toBe(expected);
+  });
+  it("uses the existing editor defaults and handles Vietnam midnight", () => {
+    expect(periodTimes("MORNING").startTime).toBe("07:00");
+    expect(periodTimes("AFTERNOON").startTime).toBe("13:00");
+    expect(isSessionStartedInBusinessTimezone({ sessionDate: "2026-10-21", startTime: "00:00" }, new Date("2026-10-20T17:00:00Z"))).toBe(true);
+  });
+});
 
 describe("scheduling calendar date and overlap rules", () => {
   it("starts a normal week on Monday", () => {

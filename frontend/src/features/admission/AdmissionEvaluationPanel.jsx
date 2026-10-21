@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "../../utils/dateFormat";
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { Alert, Box, Button, Chip, CircularProgress, Paper, Stack, TextField, Typography } from "@mui/material";
@@ -89,13 +90,13 @@ export default function AdmissionEvaluationPanel({ record, isAdmin = false, disa
       {history.map((entry) => {
         const snapshot = entry.snapshot || {};
         return <Box key={entry.id} sx={{ py: 1.5, borderBottom: "1px solid #e2e8f0" }}>
-          <Typography variant="body2" fontWeight={700}>{decisionLabels[entry.action] || entry.action} · {new Date(entry.createdAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}</Typography>
+          <Typography variant="body2" fontWeight={700}>{decisionLabels[entry.action] || entry.action} · {formatDateTime(entry.createdAt)}</Typography>
           {snapshot.tuitionPayment ? <Typography variant="body2">Học phí nhập học: {snapshot.tuitionPayment.paid ? "Đã nộp" : "Chưa xác nhận"} · Trạng thái: {snapshot.record?.studyStatus || "—"}</Typography> : <>
           <Typography variant="body2">Năm: {snapshot.round?.academicYear || snapshot.record?.academicYear || "—"} · Đợt: {snapshot.round?.name || "—"} · Ngành: {snapshot.record?.majorName || "Chưa lưu tên ngành"}</Typography>
           <Typography variant="body2">Điểm hồ sơ: {snapshot.result?.total ?? "—"} · Điểm ngưỡng ngành: {snapshot.result?.cutoff ?? "—"} · Kết quả: {decisionLabels[snapshot.evaluation?.decision] || "—"}</Typography>
           </>}
           <Typography variant="caption" display="block">Người thực hiện: {entry.actor || "—"}</Typography>
-          {(snapshot.decisionNo || snapshot.decisionDate) && <Typography variant="body2">Quyết định: {snapshot.decisionNo || "—"} · {snapshot.decisionDate || "—"}</Typography>}
+          {(snapshot.decisionNo || snapshot.decisionDate) && <Typography variant="body2">Quyết định: {snapshot.decisionNo || "—"} · {formatDate(snapshot.decisionDate)}</Typography>}
           {snapshot.note && <Typography variant="body2">{snapshot.note}</Typography>}
         </Box>;
       })}

@@ -25,6 +25,20 @@ beforeEach(() => {
   }));
 });
 
+it("keeps policy information visible but disables writes without policy access", async () => {
+  render(<GradeSettingsDialog canEdit={false} initialMajorId="m1" initialYear="2026" onClose={jest.fn()} />);
+  expect(await screen.findByLabelText("Tỷ trọng điểm kiểm tra TH01")).toBeDisabled();
+  expect(screen.getByText("Triết học")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^Lưu cấu hình/ })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Điều kiện đạt" }));
+  const panel = document.getElementById("grading-policy-panel");
+  expect(panel).toBeInTheDocument();
+  const inputs = panel.querySelectorAll("input");
+  expect(inputs.length).toBeGreaterThan(0);
+  inputs.forEach(input => expect(input).toBeDisabled());
+  expect(axios.put).not.toHaveBeenCalled();
+});
+
 it("edits independent percentages from 0 to 100 and formats them when leaving the cell", async () => {
   render(<GradeSettingsDialog initialMajorId="m1" initialYear="2026" onClose={jest.fn()} />);
   const test = await screen.findByLabelText("Tỷ trọng điểm kiểm tra TH01");
@@ -93,7 +107,7 @@ it("shows every catalog subject of one major regardless of year or curriculum me
   await choose("Năm", "Tất cả năm");
   expect(await screen.findByText("Triết học")).toBeInTheDocument();
   expect(screen.getByText("Mạng máy tính")).toBeInTheDocument();
-  expect(screen.getByText("2 học phần", { selector: ".MuiChip-label" })).toBeInTheDocument();
+  expect(await screen.findByText("2 học phần", { selector: ".MuiChip-label" })).toBeInTheDocument();
   fireEvent.change(screen.getByPlaceholderText("Tìm theo mã, tên học phần..."), { target: { value: "mang may tinh" } });
   const row = screen.getByRole("row", { name: /^1 MMT01 Mạng máy tính 4/ });
   expect(within(row).getAllByRole("cell").slice(0, 4).map((cell) => cell.textContent)).toEqual(["1", "MMT01", "Mạng máy tính", "4"]);
@@ -159,7 +173,7 @@ it("shares minimums and conversion across all subjects, years and majors, then r
   fireEvent.click(conditions);
   expect(screen.getByPlaceholderText("Tìm theo mã, tên học phần...")).toBeInTheDocument();
   expect(screen.getByText("Danh sách học phần")).toBeInTheDocument();
-  expect(screen.getByText("2 học phần", { selector: ".MuiChip-label" })).toBeInTheDocument();
+  expect(await screen.findByText("2 học phần", { selector: ".MuiChip-label" })).toBeInTheDocument();
   expect(screen.queryByRole("table", { name: "Học phần theo chuyên ngành" })).not.toBeInTheDocument();
   expect(screen.queryByRole("region", { name: "Quy đổi điểm của môn" })).not.toBeInTheDocument();
   expect(screen.queryByLabelText("Học phần cấu hình")).not.toBeInTheDocument();

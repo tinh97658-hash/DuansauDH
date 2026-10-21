@@ -1,9 +1,12 @@
+import { renderWithPermissions } from "../renderWithPermissions";
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import axios from "axios";
 import Lecturers from "../../pages/system/lecturers";
 import { lecturerGroupsForOffering, lecturerUnitOf, recommendedUnitForOffering } from "../../utils/lecturerQualification";
 import { alphabeticalOptionGroups } from "../../utils/optionGroups";
+
+const render = (ui, options) => renderWithPermissions(ui, ["catalog.manage"], options);
 
 jest.mock("axios", () => ({ get: jest.fn(), put: jest.fn(), post: jest.fn(), defaults: {} }));
 jest.mock("@mui/icons-material", () => new Proxy({}, { get: () => () => null }));
@@ -43,8 +46,8 @@ it.each([false, true])("preserves legacy data while editing (link unit: %s)", as
   rows = [legacy]; render(<Lecturers />);
   const code = await screen.findByText("GV01");
   await screen.findByRole("button", { name: "Thêm mới" });
-  expect(screen.getByRole("columnheader", { name: "Đơn vị" })).toBeInTheDocument();
-  expect(screen.queryByRole("columnheader", { name: "Ngành" })).not.toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: /^Đơn vị(?:\s+\d+)?$/ })).toBeInTheDocument();
+  expect(screen.queryByRole("columnheader", { name: /^Ngành(?:\s+\d+)?$/ })).not.toBeInTheDocument();
   fireEvent.doubleClick(code.closest("tr"));
   const dialog = screen.getByRole("dialog");
   expect(within(dialog).getByText("Tên đơn vị được lấy từ danh mục Đơn vị.")).toBeInTheDocument();

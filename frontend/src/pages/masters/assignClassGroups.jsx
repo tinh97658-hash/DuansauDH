@@ -10,10 +10,13 @@ import {
   Select, Stack, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Tooltip, Typography,
 } from "@mui/material";
-import {
-  ArrowBackRounded, ArrowForwardRounded, CheckCircleOutlineRounded, WarningAmberRounded,
-  DeleteOutlineRounded, GroupWorkRounded, PersonRounded,
-} from "@mui/icons-material";
+import ArrowBackRounded from "@mui/icons-material/ArrowBackRounded";
+import ArrowForwardRounded from "@mui/icons-material/ArrowForwardRounded";
+import CheckCircleOutlineRounded from "@mui/icons-material/CheckCircleOutlineRounded";
+import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
+import DeleteOutlineRounded from "@mui/icons-material/DeleteOutlineRounded";
+import GroupWorkRounded from "@mui/icons-material/GroupWorkRounded";
+import PersonRounded from "@mui/icons-material/PersonRounded";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
 import FilterSearchField from "../../components/FilterSearchField";

@@ -1,17 +1,17 @@
+import { usePermissions } from "../accounts/usePermissions";
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  CalendarMonthRounded,
-  GridViewRounded,
-  LayersRounded,
-  PendingActionsRounded,
-  SearchRounded,
-  TableChartRounded,
-  ViewColumnRounded,
-} from "@mui/icons-material";
+import CalendarMonthRounded from "@mui/icons-material/CalendarMonthRounded";
+import GridViewRounded from "@mui/icons-material/GridViewRounded";
+import LayersRounded from "@mui/icons-material/LayersRounded";
+import PendingActionsRounded from "@mui/icons-material/PendingActionsRounded";
+import SearchRounded from "@mui/icons-material/SearchRounded";
+import TableChartRounded from "@mui/icons-material/TableChartRounded";
+import ViewColumnRounded from "@mui/icons-material/ViewColumnRounded";
 import { api, groupsOf, labelOf, Notice, offeringTitle, rows, subjectLabel, unique, useLoad } from "./shared";
 import { getBusinessTodayKey } from "../../utils/schedulingCalendar";
 import OfferingDetails from "./OfferingDetails";
+import OfferingDeleteButton from "./OfferingDeleteButton";
 import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 
 const vietnameseNameCollator = new Intl.Collator("vi", { sensitivity: "base", numeric: true });
@@ -55,6 +55,7 @@ export function sortCourseOfferings(offerings, todayKey = getBusinessTodayKey())
 }
 
 export default function CourseMatrix({ user }) {
+  const { can } = usePermissions();
   const navigate = useNavigate();
   const [majorId, setMajor] = useState("");
   const [disciplineId, setDiscipline] = useState("");
@@ -65,6 +66,7 @@ export default function CourseMatrix({ user }) {
   const [detailOffering, setDetailOffering] = useState(null);
 
   const canEdit = user.canManageScheduling === true;
+  const canDelete = canEdit || can("scheduling.organize");
   const offerings = useLoad(async () => rows(await api.get("/scheduling/course-offerings?program=masters")), []);
   const majors = useLoad(async () => rows(await api.get("/system/majors?program=masters")), []);
   const disciplines = useMemo(() => disciplinesFromMajors(majors.data || []), [majors.data]);
@@ -267,6 +269,8 @@ export default function CourseMatrix({ user }) {
                     subtitle={`${cohortOfferings.length} lớp học phần`}
                     offerings={cohortOfferings}
                     canEdit={canEdit}
+                    canDelete={canDelete}
+                    onChanged={refresh}
                     fourColumns={Boolean(year)}
                     onSelectOffering={openSchedule}
                     onViewDetails={setDetailOffering}
@@ -281,6 +285,8 @@ export default function CourseMatrix({ user }) {
               cohorts={allCohorts}
               selectedYear={year}
               canEdit={canEdit}
+              canDelete={canDelete}
+              onChanged={refresh}
               onSelectOffering={openSchedule}
               onViewDetails={setDetailOffering}
             />
@@ -303,7 +309,7 @@ export default function CourseMatrix({ user }) {
 }
 
 // Sub-component: Column for a single Cohort
-function CohortColumn({ title, subtitle, offerings, canEdit, fourColumns, onSelectOffering, onViewDetails }) {
+function CohortColumn({ title, subtitle, offerings, canEdit, canDelete, onChanged, fourColumns, onSelectOffering, onViewDetails }) {
   const orderedOfferings = sortCourseOfferings(offerings);
   return (
     <div className="sl-matrix-col" role="region" aria-label={title}>
@@ -324,6 +330,8 @@ function CohortColumn({ title, subtitle, offerings, canEdit, fourColumns, onSele
               key={offering.id}
               offering={offering}
               canEdit={canEdit}
+              canDelete={canDelete}
+              onChanged={onChanged}
               onSelectOffering={onSelectOffering}
               onViewDetails={onViewDetails}
             />
@@ -335,7 +343,7 @@ function CohortColumn({ title, subtitle, offerings, canEdit, fourColumns, onSele
 }
 
 // Sub-component: Card for an offering in the matrix
-function OfferingCard({ offering, canEdit, onSelectOffering, onViewDetails }) {
+function OfferingCard({ offering, canEdit, canDelete, onChanged, onSelectOffering, onViewDetails }) {
   const groups = groupsOf(offering);
   const cohorts = unique(groups.map((g) => g.academicYear).filter(Boolean));
 
@@ -367,6 +375,8 @@ function OfferingCard({ offering, canEdit, onSelectOffering, onViewDetails }) {
       )}
       <div className="sl-matrix-card-meta">
         <span>{groups.length} lớp/nhóm · {offering.participantCount ?? 0} HV</span>
+        {canDelete && <OfferingDeleteButton offering={offering} className="sl-matrix-delete-link"
+          onDeleted={onChanged} onScheduleDeleted={onChanged} />}
         {canEdit && offering.status === "active" && (
           <button
             type="button"
@@ -383,11 +393,21 @@ function OfferingCard({ offering, canEdit, onSelectOffering, onViewDetails }) {
 
 function OfferingStatus({ offering }) {
   const category = scheduleCategory(offering);
+  const summary = offering.sessionSummary || {};
+  const remainingCount = Math.max(0, (summary.totalCount || 0) - (summary.heldCount || 0) - (summary.notHeldCount || 0));
+  if (category === "scheduled") {
+    return (
+      <span className="sl-matrix-session-counts"
+        title={`Tổng: ${summary.totalCount || 0} buổi · Chờ xác nhận: ${summary.pendingCount || 0} · Không diễn ra: ${summary.notHeldCount || 0}`}>
+        <span className="sl-matrix-session-count session-held"><span>Đã diễn ra</span><strong>{summary.heldCount || 0} buổi</strong></span>
+        <span className="sl-matrix-session-count session-scheduled"><span>Sắp tới</span><strong>{remainingCount} buổi</strong></span>
+      </span>
+    );
+  }
   return (
     <span className={`sl-matrix-status status-${category}`}>
       {category === "completed" ? <><span aria-hidden="true">✓</span> Hoàn thành</>
-        : category === "unscheduled" ? <><span aria-hidden="true">●</span> Chưa xếp lịch</>
-          : `${offering.sessionSummary.totalCount} buổi`}
+        : <><span aria-hidden="true">●</span> Chưa xếp lịch</>}
     </span>
   );
 }
@@ -399,7 +419,7 @@ function CrossCohortBadge({ cohorts }) {
 }
 
 // Sub-component: Pivot Matrix View (Subjects x Cohorts)
-function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, onSelectOffering, onViewDetails }) {
+function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, canDelete, onChanged, onSelectOffering, onViewDetails }) {
   // Page through real cohorts only; missing years must not become empty columns.
   // Reset only when the source cohorts or explicit year selection change.
   const [windowStart, setWindowStart] = useState(0);
@@ -532,6 +552,8 @@ function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, onSelectOf
                                 <CrossCohortBadge cohorts={linkedCohorts} />
                                 <div className="sl-pivot-card-stats">
                                   <OfferingStatus offering={offering} />
+                                  {canDelete && <OfferingDeleteButton offering={offering} className="sl-matrix-delete-link"
+                                    onDeleted={onChanged} onScheduleDeleted={onChanged} />}
                                   {canEdit && offering.status === "active" && (
                                     <button
                                       type="button"

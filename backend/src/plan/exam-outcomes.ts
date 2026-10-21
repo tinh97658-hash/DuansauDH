@@ -19,7 +19,7 @@ export function studyLeaveFailureOutcomesSql() {
       'participantId', CASE WHEN record.student_id IS NOT NULL THEN 'student:' || record.student_id::text ELSE 'admission:' || record.id::text END,
       'studyLeaveFailure', true, 'result', 'failed', 'courseScore', NULL, 'grade4', NULL,
       'letterGrade', '', 'examExempt', false, 'eligible', false,
-      'notes', 'Không đạt do bảo lưu khi học phần đã có lịch hoặc đã có điểm; phải học lại từ đầu.') grade
+      'notes', 'Không đạt do bảo lưu khi đã ghép lớp học phần; phải học lại từ đầu.') grade
     FROM course_offering_withdrawals withdrawal
     JOIN admission_records record ON record.id = withdrawal.admission_record_id
     JOIN course_offerings offering ON offering.id = withdrawal.course_offering_id

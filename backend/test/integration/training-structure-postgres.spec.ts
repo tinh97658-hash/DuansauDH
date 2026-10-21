@@ -24,6 +24,7 @@ describeDb("Training structure PostgreSQL protections", () => {
     await write(`
       CREATE TEMP TABLE class_groups (id uuid, curriculum_id uuid) ON COMMIT DROP;
       CREATE TEMP TABLE class_group_members (class_group_id uuid) ON COMMIT DROP;
+      CREATE TEMP TABLE class_membership_history (class_group_id uuid) ON COMMIT DROP;
       CREATE TEMP TABLE course_offering_class_groups (class_group_id uuid) ON COMMIT DROP;
       CREATE TEMP TABLE course_exam_gradebooks (class_group_id uuid) ON COMMIT DROP;
       CREATE TEMP TABLE course_offering_withdrawals (class_group_id uuid) ON COMMIT DROP;

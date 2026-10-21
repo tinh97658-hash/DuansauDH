@@ -11,10 +11,31 @@ import { SubjectRecognitionService } from "../../src/plan/subject-recognition.se
 import { StudyLeaveController } from "../../src/plan/study-leave.controller.js";
 import { StudyLeaveService } from "../../src/plan/study-leave.service.js";
 import { MastersController } from "../../src/masters/masters.controller.js";
+import { ExamScheduleService } from '../../src/masters/exam-schedule.service.js';
 import { MastersService } from "../../src/masters/masters.service.js";
 import { ExamGradebookService } from "../../src/masters/exam-gradebook.service.js";
 import { GradingPolicyService } from "../../src/masters/grading-policy.service.js";
 import { AdmissionEvaluationService } from "../../src/plan/admission-evaluation.service.js";
+import { ReportsController } from "../../src/reports/reports.controller.js";
+import { ReportsService } from "../../src/reports/reports.service.js";
+import { ClassScoreSummaryService } from "../../src/reports/class-score-summary.service.js";
+import { RbacService } from "../../src/auth/rbac.service.js";
+
+import { PERMISSION_CODES } from "../../src/auth/permissions.js";
+
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  admin: PERMISSION_CODES,
+  supervisor: ["catalog.view", "plan.view", "admission.view", "masters.view", "doctoral.view", "scheduling.view", "gradebook.view", "reports.view"],
+  examiner: ["catalog.view", "plan.view", "admission.view", "masters.view", "doctoral.view", "scheduling.view", "gradebook.view", "reports.view"],
+};
+const fakeRbac = {
+  effectiveAccess: async (staff: any) => ({
+    superadmin: staff?.role === "admin",
+    permissions: new Set(ROLE_PERMISSIONS[staff?.role] ?? []),
+    roleCodes: staff?.role ? [staff.role] : [],
+  }),
+  invalidate: () => undefined,
+};
 
 describe("Learner data access over HTTP", () => {
   let app: INestApplication;
@@ -34,11 +55,15 @@ describe("Learner data access over HTTP", () => {
     "/masters/class-groups",
     "/masters/class-groups/eligible-students",
     `/masters/class-groups/${id}`,
+    `/masters/exam-lists/history?classGroupId=${id}&courseOfferingId=${id}`,
+    `/reports/learner-scorecard/${id}`,
+    `/reports/learner-scorecard/${id}/issues`,
+    `/reports/transcript-issues/${id}`,
   ];
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
-      controllers: [PlanController, StudyLeaveController, MastersController],
+      controllers: [PlanController, StudyLeaveController, MastersController, ReportsController],
       providers: [
         { provide: PlanService, useValue: { listAdmissionRecords: read, getAdmissionRecord: read, createAdmissionRecord: write } },
         { provide: CurriculumService, useValue: {} },
@@ -48,9 +73,13 @@ describe("Learner data access over HTTP", () => {
         } },
         { provide: StudyLeaveService, useValue: { list: read, detail: read } },
         { provide: MastersService, useValue: { listClassGroups: read, getClassGroup: read, listEligibleStudents: read } },
-        { provide: ExamGradebookService, useValue: {} },
+        { provide: ExamGradebookService, useValue: { history: read, transition: write } },
+        { provide: ReportsService, useValue: {} },
+        { provide: ClassScoreSummaryService, useValue: { learnerScorecard: read, issuesForRecord: read, issued: read, issue: write } },
         { provide: GradingPolicyService, useValue: {} },
+        { provide: ExamScheduleService, useValue: {list:read} },
         { provide: AdmissionEvaluationService, useValue: {} },
+        { provide: RbacService, useValue: fakeRbac },
       ],
     }).compile();
     app = module.createNestApplication();
@@ -79,7 +108,7 @@ describe("Learner data access over HTTP", () => {
   });
 
   it.each(routes)("rejects a student before reading %s", async route => {
-    await request(app.getHttpServer()).get(route).set("x-test-role", "student").expect(401);
+    await request(app.getHttpServer()).get(route).set("x-test-role", "student").expect(403);
     expect(read).not.toHaveBeenCalled();
   });
 
@@ -92,12 +121,12 @@ describe("Learner data access over HTTP", () => {
   });
 
   it.each(["unknown", "spoofed-admin"])("rejects an untrusted identity %s", async role => {
-    for (const route of routes) await request(app.getHttpServer()).get(route).set("x-test-role", role).expect(401);
+    for (const route of routes) await request(app.getHttpServer()).get(route).set("x-test-role", role).expect(403);
     expect(read).not.toHaveBeenCalled();
   });
 
   it.each(["student", "supervisor", "examiner"])("keeps admission writes admin-only for %s", async role => {
-    await request(app.getHttpServer()).post("/plan/admission-records").set("x-test-role", role).send({}).expect(401);
+    await request(app.getHttpServer()).post("/plan/admission-records").set("x-test-role", role).send({}).expect(403);
     expect(write).not.toHaveBeenCalled();
   });
 
@@ -105,5 +134,23 @@ describe("Learner data access over HTTP", () => {
     await request(app.getHttpServer()).post("/plan/admission-records").set("x-test-role", "admin")
       .send({ fullName: "Applicant" }).expect(201).expect({ created: true });
     expect(write).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["student", "supervisor", "examiner"])("keeps issued transcript creation admin-only for %s", async role => {
+    await request(app.getHttpServer()).post(`/reports/learner-scorecard/${id}/issue`)
+      .set("x-test-role", role).send({ classGroupId: id }).expect(403);
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("allows an admin to create an issued transcript", async () => {
+    await request(app.getHttpServer()).post(`/reports/learner-scorecard/${id}/issue`)
+      .set("x-test-role", "admin").send({ classGroupId: id }).expect(201);
+    expect(write).toHaveBeenCalledWith(id, id, expect.anything());
+  });
+
+  it.each(["student", "supervisor"])("rejects gradebook workflow writes for %s", async role => {
+    await request(app.getHttpServer()).post("/masters/exam-lists/workflow")
+      .set("x-test-role", role).send({ action: "approve" }).expect(403);
+    expect(write).not.toHaveBeenCalled();
   });
 });

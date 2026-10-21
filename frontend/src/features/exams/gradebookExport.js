@@ -1,5 +1,5 @@
 import { BRAND } from "../../config/branding";
-import { BUSINESS_TIME_ZONE } from "../../utils/schedulingCalendar";
+import { formatDateTime } from "../../utils/dateFormat";
 import { openDocumentPreview } from "../../utils/documentFiles";
 import { draftOf, gradebookColumns, gradebookRowValues, visibleGradeRows } from "./gradebook";
 import { gradebookDocumentColumns } from "./gradebookLayout";
@@ -24,22 +24,19 @@ export async function fetchAllGradebookRows(fetchPage, params, getDirty = () => 
     revision = data.revision;
     total = data.total;
     if (data.page !== page) throw new Error("Danh sách đã thay đổi trong lúc xuất. Vui lòng xuất lại.");
-    exported.push(...data.rows.map(row => row.profileForeignLanguageExempt || row.studyLeaveFailure ? draftOf(row) : getDirty()[row.participantId] || draftOf(row)));
+    exported.push(...data.rows.map(row => row.finalized || (data.workflow && data.workflow.status !== "draft") || row.profileForeignLanguageExempt || row.studyLeaveFailure ? draftOf(row) : getDirty()[row.participantId] || draftOf(row)));
     page++;
   } while ((page - 1) * 15 < total);
   return visibleGradeRows(exported, params.mode, params.search);
 }
 
 export function buildGradebookDocument(group, offering, rows, now = new Date()) {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat("vi-VN", {
-    timeZone: BUSINESS_TIME_ZONE, day: "numeric", month: "numeric", year: "numeric",
-  }).formatToParts(now).map(part => [part.type, part.value]));
   return {
     university: BRAND.university.toLocaleUpperCase("vi"), institute: BRAND.institute.toLocaleUpperCase("vi"),
     title: "BẢNG ĐIỂM MÔN HỌC", group: group?.name || group?.code || "",
     subject: offering?.subject?.name || "", headers: gradebookColumns().map(column => column.label),
     rows: rows.map((row, index) => gradebookRowValues(row, index)),
-    signingDate: `Hải Phòng, ngày ${parts.day} tháng ${parts.month} năm ${parts.year}`,
+    signingDate: `Hải Phòng, ngày ${formatDateTime(now).split(" ")[0]}`,
   };
 }
 

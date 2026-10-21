@@ -6,14 +6,17 @@ export const roundExamScore = (score?: number | null): number | null => score ==
 // Read projections must resolve component scores exactly as the entry screen does.
 // Older imported rows can contain only a final score and must retain that evidence.
 export function resolveSavedExamGrade(grade: Partial<CourseExamGrade>, eligibilityPolicy?: GradingPolicy | null) {
+  if (grade.finalized) return { courseScore: grade.courseScore ?? null, grade4: grade.grade4 ?? null,
+    letterGrade: grade.letterGrade || "", result: grade.result || "pending" };
   if (grade.studyLeaveFailure) return { courseScore: null, grade4: null, letterGrade: "", result: "failed" as const };
   if (grade.profileForeignLanguageExempt) return { courseScore: null, grade4: null, letterGrade: "", result: "passed" as const };
+  if(grade.workflowPhase==='components'||(grade.eligibilityFrozen&&grade.eligible===false))return {courseScore:null,grade4:null,letterGrade:'',result:grade.examExempt?'exempt' as const:'pending' as const};
   if (!grade.examExempt && !COMPONENT_KEYS.some(key => Object.prototype.hasOwnProperty.call(grade, key))) {
     return { courseScore: grade.courseScore ?? null, grade4: grade.grade4 ?? null,
       letterGrade: grade.letterGrade || "", result: grade.result || "pending" };
   }
   return calculateExamGrade({ testScore: null, assignmentScore: null, examScore: null, examExempt: false, ...grade },
-    grade.gradingPolicy || LEGACY_GRADING_POLICY, eligibilityPolicy || LEGACY_GRADING_POLICY);
+    grade.gradingPolicy || LEGACY_GRADING_POLICY, (grade.eligibilityFrozen?grade.eligibilityPolicy:eligibilityPolicy) || LEGACY_GRADING_POLICY);
 }
 
 export function calculateExamGrade(row: Pick<CourseExamGrade, "testScore" | "assignmentScore" | "examScore" | "examExempt" | "profileForeignLanguageExempt" | "studyLeaveFailure">, policy: GradingPolicy = LEGACY_GRADING_POLICY, eligibilityPolicy: GradingPolicy = policy): Pick<CourseExamGrade, "courseScore" | "grade4" | "letterGrade" | "result"> {

@@ -1,4 +1,4 @@
-import { isSessionEndedInBusinessTimezone } from "./scheduling-time.js";
+import { isSessionEndedInBusinessTimezone, isSessionStartedInBusinessTimezone } from "./scheduling-time.js";
 import { randomUUID } from "node:crypto";
 import { QueryTypes } from "sequelize";
 import { excludeRecognizedExamParticipant } from "../masters/recognized-exam-participant.js";
@@ -622,7 +622,7 @@ export class SchedulingService {
       attributes: ["admissionRecordId", "targetSubjectId"],
     }) : [];
     const recognizedSet = new Set(recognized.map((row) => `${row.admissionRecordId}:${row.targetSubjectId}`));
-    const participants = new Map<string, { id: string; code: string; fullName: string; note: string }>();
+    const participants = new Map<string, { id: string; code: string; fullName: string; note: string; profileForeignLanguageExempt?: boolean }>();
     for (const member of [...members, ...individuals.map((record) => ({ admissionRecordId: record.id, admissionRecord: record, studentId: record.studentId, student: null }))]) {
       const groupId = (member as any).classGroupId;
       if (withdrawn.has(`${savedOfferingId}:${this.memberIdentity(member)}`)) continue;
@@ -642,6 +642,22 @@ export class SchedulingService {
       participants.set(row.participantId, { id: row.participantId, code: row.code, fullName: row.fullName, note: "" });
     }
     const rows = [...participants.values()].sort((a, b) => a.fullName.localeCompare(b.fullName, "vi") || a.code.localeCompare(b.code, "vi", { numeric: true }));
+    if (subject && rows.length) {
+      const exempt = await this.sequelize.query<{ id: string }>(`
+        SELECT exemption_participant.id
+        FROM jsonb_array_elements_text(CAST(:participantIds AS jsonb)) AS exemption_participant(id)
+        WHERE ${profileForeignLanguageExemptSql('exemption_participant.id', ':subjectId', ':academicYear')}
+      `, { type: QueryTypes.SELECT, replacements: {
+        participantIds: JSON.stringify(rows.map(row => row.id)), subjectId: subject.id, academicYear: dto.academicYear || "",
+      } });
+      const exemptIds = new Set(exempt.map(row => row.id));
+      for (const row of rows) {
+        if (exemptIds.has(row.id)) {
+          row.profileForeignLanguageExempt = true;
+          row.note = "Miễn thi";
+        }
+      }
+    }
     return { participants: rows, participantCount: rows.length };
   }
 
@@ -1231,6 +1247,12 @@ export class SchedulingService {
     }
   }
 
+  private assertTargetSessionNotStarted(sessionDate: string, startTime: string) {
+    if (isSessionStartedInBusinessTimezone({ sessionDate, startTime })) {
+      throw new ConflictException({ code: "SESSION_TIME_IN_PAST", message: "Không thể xếp lịch vào buổi học đã bắt đầu." });
+    }
+  }
+
   private assertTargetSessionNotEnded(sessionDate: string, startTime: string, endTime: string) {
     if (this.sessionHasEnded({ sessionDate, endTime })) {
       throw new ConflictException({
@@ -1555,7 +1577,7 @@ export class SchedulingService {
     const endTime = this.normalizeTime(dto.endTime);
     this.validateTimeRange(startTime, endTime);
     this.assertPeriodTimeConsistency(dto.period, startTime, endTime);
-    this.assertTargetSessionNotEnded(dto.sessionDate, startTime, endTime);
+    this.assertTargetSessionNotStarted(dto.sessionDate, startTime);
     return this.sequelize.transaction(async (transaction) => {
       await this.sequelize.query("SELECT pg_advisory_xact_lock(21025)", { transaction });
       await this.assertOfferingLecturer(dto.courseOfferingId, dto.lecturerId, transaction);
@@ -1584,6 +1606,8 @@ export class SchedulingService {
         status: "planned" as const,
       };
       await this.assertNoSessionConflict({ ...values, classGroupIds }, transaction);
+      // Recheck after resource/transaction waits, immediately before the write.
+      this.assertTargetSessionNotStarted(dto.sessionDate, startTime);
       const created = await this.teachingSessions.create(values, { transaction });
       return this.findTeachingSessionById(created.id, transaction);
     });
@@ -1609,7 +1633,10 @@ export class SchedulingService {
       const roomId = dto.roomId ?? session.roomId;
       this.validateTimeRange(startTime, endTime);
       this.assertPeriodTimeConsistency(dto.period ?? session.period, startTime, endTime);
-      this.assertTargetSessionNotEnded(sessionDate, startTime, endTime);
+      const movingSlot = sessionDate !== session.sessionDate || startTime !== this.normalizeTime(session.startTime) ||
+        (dto.period ?? session.period) !== session.period;
+      if (movingSlot) this.assertTargetSessionNotStarted(sessionDate, startTime);
+      else this.assertTargetSessionNotEnded(sessionDate, startTime, endTime);
       await this.assertOfferingLecturer(session.courseOfferingId, lecturerId, transaction, session.id);
       const classGroupIds = await this.offeringGroupIds(session.courseOfferingId, transaction);
       const resources = await this.lockAndValidateSessionResources(
@@ -1626,6 +1653,7 @@ export class SchedulingService {
       }
       const values = { sessionDate, startTime, endTime, period: dto.period ?? session.period, lecturerId, roomId };
       await this.assertNoSessionConflict({ ...values, classGroupIds, courseOfferingId: session.courseOfferingId }, transaction, session.id);
+      if (movingSlot) this.assertTargetSessionNotStarted(sessionDate, startTime);
       await session.update({
         ...values,
         ...(Object.prototype.hasOwnProperty.call(dto, "note") ? { note: dto.note || null } : {}),
@@ -1657,6 +1685,50 @@ export class SchedulingService {
         confirmedByStaffId: staffId,
       }, { transaction });
       return this.findTeachingSessionById(session.id, transaction);
+    });
+  }
+
+  private async lockOfferingForDeletion(id: string, transaction: Transaction) {
+    // Serialize against timetable creation, edits and class completion.
+    await this.sequelize.query("SELECT pg_advisory_xact_lock(21025)", { transaction });
+    const offering = await this.courseOfferings.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+    if (!offering) throw new NotFoundException("Không tìm thấy lớp học phần.");
+    await this.requireEnabledOfferingSubject(offering, transaction);
+    const sessions = await this.teachingSessions.findAll({
+      where: { courseOfferingId: id }, transaction, lock: transaction.LOCK.UPDATE,
+    });
+    if (offering.status === "completed" || sessions.some(session => session.status === "held")) {
+      throw new ConflictException({ code: "OFFERING_HAS_HELD_SESSIONS",
+        message: "Không thể xóa lớp học phần đã có buổi xác nhận diễn ra." });
+    }
+    return { offering, sessions };
+  }
+
+  async deleteCourseOfferingSchedule(id: string) {
+    return this.sequelize.transaction(async transaction => {
+      await this.lockOfferingForDeletion(id, transaction);
+      const deletedCount = await this.teachingSessions.destroy({ where: { courseOfferingId: id }, transaction });
+      return { id, deletedCount };
+    });
+  }
+
+  async deleteCourseOffering(id: string) {
+    return this.sequelize.transaction(async transaction => {
+      const { offering, sessions } = await this.lockOfferingForDeletion(id, transaction);
+      if (sessions.length) {
+        throw new ConflictException({ code: "OFFERING_HAS_SCHEDULE",
+          message: "Vui lòng xóa lịch học trước khi xóa lớp học phần" });
+      }
+      // Release retake assignments and enrollment snapshots with the deleted class.
+      await this.sequelize.query(`UPDATE scheduling_retakes SET assigned_course_offering_id = NULL
+        WHERE assigned_course_offering_id = :id`, { replacements: { id }, transaction });
+      await this.sequelize.query(`DELETE FROM scheduling_retakes WHERE source_course_offering_id = :id`,
+        { replacements: { id }, transaction });
+      await this.sequelize.query(`DELETE FROM course_offering_withdrawals WHERE course_offering_id = :id`,
+        { replacements: { id }, transaction });
+      // Group links, individual enrollments and gradebooks cascade in the database.
+      await offering.destroy({ transaction });
+      return { id, deleted: true };
     });
   }
 

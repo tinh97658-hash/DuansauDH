@@ -1,3 +1,4 @@
+import { formatDateTime } from "../../utils/dateFormat";
 import React, { useState } from "react";
 import axios from "axios";
 import { Checkbox, FormControlLabel, Stack, Typography } from "@mui/material";
@@ -23,6 +24,6 @@ export default function AdmissionTuitionCheckbox({ record, disabled = false, sho
   return <Stack spacing={0.5}>
     <FormControlLabel control={checkbox} label="Đã nộp học phí nhập học" />
     <Typography variant="caption">Trạng thái Đang học được cập nhật khi học viên được phân lớp. Bỏ tích để sửa xác nhận học phí nhầm.</Typography>
-    {payment?.updatedAt && <Typography variant="caption">Cập nhật: {new Date(payment.updatedAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })} · {payment.updatedBy || "—"}</Typography>}
+    {payment?.updatedAt && <Typography variant="caption">Cập nhật: {formatDateTime(payment.updatedAt)} · {payment.updatedBy || "—"}</Typography>}
   </Stack>;
 }

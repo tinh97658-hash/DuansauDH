@@ -1,5 +1,6 @@
+import { renderWithPermissions } from "../renderWithPermissions";
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { TextEncoder } from "util";
 import JSZip from "jszip";
@@ -12,7 +13,9 @@ import AdmissionPrintTemplate from "../../features/admission/AdmissionPrintTempl
 import { buildAdmissionDocument } from "../../features/admission/admissionDocument";
 import { createAdmissionWord, openAdmissionPreview, readAdmissionPreview } from "../../features/admission/admissionDocumentExport";
 
-jest.mock("axios", () => ({ get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn(), isCancel: jest.fn(() => false), defaults: {} }));
+const render = (ui, options) => renderWithPermissions(ui, ["admission.manage"], options);
+
+vi.mock("axios", () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), isCancel: vi.fn(() => false), defaults: {} } }));
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
 jest.mock("react-toastify", () => ({ ToastContainer: () => null, toast: { success: jest.fn(), error: jest.fn() } }));
 jest.mock("@mui/icons-material", () => ({

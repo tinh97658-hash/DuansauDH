@@ -94,7 +94,7 @@ export async function readRetakeResults(db: Sequelize, groupIds: string[], subje
       COALESCE(ar.code, '') AS code, ar.full_name AS "fullName",
       COALESCE(grade->>'result', 'pending') AS result, offering.status::text AS "sourceStatus",
       book.updated_at AS "recordedAt", offering.created_at AS "attemptedAt", book.id AS "bookId", offering.id AS "sourceCourseOfferingId",
-      CASE WHEN ar.is_exempt_foreign_language AND ${foreignLanguageSubjectSql('offering.subject_id')}
+      CASE WHEN ar.is_exempt_foreign_language AND COALESCE(grade->>'finalized','false') <> 'true' AND ${foreignLanguageSubjectSql('offering.subject_id')}
         THEN CAST(:foreignLanguageGrade AS jsonb) ELSE grade END AS "savedGrade",
       (SELECT policy FROM shared_grading_rules ORDER BY version DESC LIMIT 1) AS "eligibilityPolicy"
     FROM course_exam_gradebooks book

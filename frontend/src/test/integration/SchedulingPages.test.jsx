@@ -1,3 +1,5 @@
+const accessFixture = vi.hoisted(() => ({ permissions: ["scheduling.organize"] }));
+vi.mock("../../features/accounts/usePermissions", () => ({ usePermissions: () => ({ can: permission => accessFixture.permissions.includes(permission) }) }));
 import React from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -20,7 +22,8 @@ const major = { id: "major", name: "Khai thác hàng hải", code: "KTHH", activ
 const group = { id: "group", code: "KTHH-2026", name: "Nhóm 1", majorId: "major", academicYear: "2026", allowedWeekdays: [1, 3, 5], memberCount: 2 };
 const subject = { id: "subject", code: "HP01", name: "Khai thác cảng" };
 const participant = { id: "student:one", code: "HV001", fullName: "Nguyễn An", note: "Ghi chú nhóm không được tự điền" };
-const mocks = (user = { role: "admin" }) => {
+const mocks = (user = { role: "admin" }, permissions = ["scheduling.organize"]) => {
+  accessFixture.permissions = permissions;
   axios.get.mockImplementation(async (url) => ({ data: url.endsWith("/auth/session") ? { user } : url.includes("/system/majors") ? [major] : url.includes("/masters/class-groups") ? [group] : url.includes("/course-offering-candidates") ? { subjects: [{ subject, eligibleClassGroups: [group] }] } : url.includes("/retakes?") ? [] : [] }));
   axios.post.mockImplementation(async (url) => ({ data: url.endsWith("/roster-preview") ? { participants: [participant], participantCount: 1 } : { id: "offering", subject, participantCount: 1 } }));
 };
@@ -31,9 +34,9 @@ const reach = async () => {
   fireEvent.change(screen.getByRole("combobox", { name: "Khóa / Năm học" }), { target: { value: "2026" } });
   fireEvent.click(await screen.findByRole("button", { name: /HP01.*Khai thác cảng/ }));
 };
-beforeEach(() => { jest.clearAllMocks(); sessionStorage.clear(); });
+beforeEach(() => { accessFixture.permissions = ["scheduling.organize"]; jest.clearAllMocks(); sessionStorage.clear(); });
 
-it("keeps the confirmation and entered note mounted while focus rechecks the session", async () => {
+it("keeps the confirmation and entered note mounted when the tab becomes visible and rechecks the session", async () => {
   mocks();
   render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
   await reach();
@@ -47,12 +50,17 @@ it("keeps the confirmation and entered note mounted while focus rechecks the ses
   let resolveSession;
   axios.get.mockImplementation(url => url.endsWith("/auth/session")
     ? new Promise(resolve => { resolveSession = resolve; }) : originalGet(url));
-  fireEvent.focus(window);
-  await waitFor(() => expect(resolveSession).toBeDefined());
-  expect(screen.getByRole("dialog", { name: "Xem trước danh sách lớp" })).toBeInTheDocument();
-  expect(note).toHaveValue("Giữ nguyên khi chụp màn hình");
-  await act(async () => resolveSession({ data: { user: { role: "admin" } } }));
-  expect(screen.getByRole("textbox", { name: "Ghi chú HV001" })).toBe(note);
+  const visibility = jest.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+  try {
+    fireEvent(document, new Event("visibilitychange"));
+    await waitFor(() => expect(resolveSession).toBeDefined());
+    expect(screen.getByRole("dialog", { name: "Xem trước danh sách lớp" })).toBeInTheDocument();
+    expect(note).toHaveValue("Giữ nguyên khi chụp màn hình");
+    await act(async () => resolveSession({ data: { user: { role: "admin" } } }));
+    expect(screen.getByRole("textbox", { name: "Ghi chú HV001" })).toBe(note);
+  } finally {
+    visibility.mockRestore();
+  }
 });
 
 it("restores the scope, course, class and custom name after leaving and reopening the page", async () => {
@@ -180,8 +188,29 @@ it("creates a real API draft with blank editable notes and opens scheduling afte
   await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringMatching(/course-offerings$/), expect.objectContaining({ subjectId: "subject", classGroupIds: ["group"], majorId: "major", academicYear: "2026", participantNotes: [{ participantId: "student:one", note: "Miễn TA" }] }), { withCredentials: true }));
   expect(await screen.findByRole("button", { name: "Sang Xếp lịch" })).toBeInTheDocument();
 });
+it("prefills and saves the exam exemption note supplied by the roster preview", async () => {
+  mocks();
+  const exempt = { ...participant, profileForeignLanguageExempt: true, note: "Miễn thi" };
+  const ordinary = { id: "admission:two", code: "HV002", fullName: "Trần Bình", note: "" };
+  axios.post.mockImplementation(async url => ({ data: url.endsWith("/roster-preview")
+    ? { participants: [exempt, ordinary], participantCount: 2 } : { id: "offering", subject, participantCount: 2 } }));
+  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  await reach();
+  fireEvent.click(screen.getByRole("button", { name: /KTHH-2026 · Nhóm 1/ }));
+  const create = screen.getByRole("button", { name: "Tạo lớp học phần" });
+  await waitFor(() => expect(create).toBeEnabled());
+  fireEvent.click(create);
+  const dialog = within(await screen.findByRole("dialog", { name: "Xem trước danh sách lớp" }));
+  expect(dialog.getByRole("textbox", { name: "Ghi chú HV001" })).toHaveValue("Miễn thi");
+  expect(dialog.getByRole("textbox", { name: "Ghi chú HV002" })).toHaveValue("");
+  fireEvent.click(dialog.getByRole("button", { name: "Xác nhận tạo lớp" }));
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringMatching(/course-offerings$/),
+    expect.objectContaining({ participantNotes: [{ participantId: participant.id, note: "Miễn thi" }] }),
+    { withCredentials: true }));
+});
+
 it("uses session permissions and never exposes the demo role switch", async () => {
-  mocks({ role: "supervisor", canManageScheduling: false });
+  mocks({ role: "supervisor", canManageScheduling: false }, []);
   render(<MemoryRouter><CourseOfferings /></MemoryRouter>); await reach();
   expect(screen.getByRole("button", { name: /KTHH-2026 · Nhóm 1/ })).toBeDisabled();
   expect(screen.queryByRole("combobox", { name: "Vai trò" })).not.toBeInTheDocument();

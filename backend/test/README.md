@@ -26,3 +26,12 @@ npm test -- --runTestsByPath test/integration/exam-attempt-order-postgres.spec.t
 ```
 
 These suites create connection-local temporary tables and roll back their fixtures. The attempt-order suite requires an explicit `TEST_DATABASE_URL`; the report suite also accepts it instead of local `.env` settings.
+
+To check account and role administration (RBAC) against a database already migrated to 062/063, use a disposable PostgreSQL instance with the application schema:
+
+```powershell
+$env:RUN_POSTGRES_ACCOUNT_TESTS = 'true'
+npm test -- --runTestsByPath test/integration/accounts-roles-postgres.spec.ts
+```
+
+This suite boots a real Nest application context (using `.env` settings), forces every query into a single rolled-back transaction and asserts the `auth_audit_logs` entries plus, when the `db_change_logs` table from migration 063 exists, the trigger-captured changes.

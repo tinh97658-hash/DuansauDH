@@ -1,7 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithPermissions } from "../renderWithPermissions";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import axios from "axios";
 import { MemoryRouter } from "react-router-dom";
 import Rooms from "../../pages/system/rooms";
+
+const render = (ui, options) => renderWithPermissions(ui, ["catalog.manage"], options);
 
 jest.mock("@mui/icons-material", () => ({
   AddRounded: () => null, EditRounded: () => null, SearchRounded: () => null,
@@ -41,7 +44,7 @@ describe("Room admin catalog", () => {
     expect(screen.getByRole("checkbox", { name: "Kích hoạt phòng 301" })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Vô hiệu hóa phòng 302" })).toBeChecked();
     expect(screen.getByRole("columnheader", { name: /Thao tác/ })).toHaveStyle({ textAlign: "center" });
-    screen.getAllByRole("button", { name: "Sửa" }).forEach(button => expect(button.closest("td")).toHaveStyle({ textAlign: "center" }));
+   screen.getAllByRole("button", { name: "Sửa" }).forEach(button => expect(button.closest("td")).toHaveStyle({ textAlign: "center" }));
     expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/system/rooms?includeInactive=true"), { withCredentials: true });
     expect(screen.queryByRole("button", { name: /xóa/i })).not.toBeInTheDocument();
   });
@@ -54,6 +57,17 @@ describe("Room admin catalog", () => {
     fireEvent.change(screen.getByLabelText("Sức chứa"), { target: { value: "45" } });
     await clickAndWait(screen.getByRole("button", { name: "Lưu" }));
     await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/system/rooms"), { code: "302", name: "Phòng 302", capacity: 45, isActive: true }, { withCredentials: true }));
+  });
+
+  it("uses the shared ordinary read for catalog.view without exposing write controls", async () => {
+    axios.get.mockResolvedValue({ data: [{ ...room, isActive: true }] });
+    await act(async () => { renderWithPermissions(<MemoryRouter><Rooms /></MemoryRouter>, ["catalog.view"]); });
+    expect(await screen.findByText("301")).toBeInTheDocument();
+    expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/system\/rooms$/), { withCredentials: true });
+    expect(axios.get.mock.calls.some(([url]) => url.includes("includeInactive"))).toBe(false);
+    expect(screen.queryByRole("button", { name: "Thêm phòng" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sửa" })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox")).toBeDisabled();
   });
 
   it("reactivates without deleting the persisted room", async () => {

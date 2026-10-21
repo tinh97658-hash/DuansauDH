@@ -29,6 +29,7 @@ describePostgres("Class reports PostgreSQL queries", () => {
     const query = (sql: string) => db.query(sql, { transaction });
     await query(`
       CREATE TEMP TABLE class_group_members (id int, class_group_id text, admission_record_id text, student_id text) ON COMMIT DROP;
+      CREATE TEMP VIEW academic_class_members AS SELECT * FROM class_group_members;
       CREATE TEMP TABLE course_offering_withdrawals (id text, admission_record_id text, course_offering_id text, participant_id text,
         class_group_id text, created_at timestamp, snapshot jsonb) ON COMMIT DROP;
       CREATE TYPE pg_temp.test_group_program AS ENUM ('masters', 'doctoral');
@@ -43,7 +44,7 @@ describePostgres("Class reports PostgreSQL queries", () => {
         code_text text, credits int DEFAULT 5, is_required boolean DEFAULT true, subject_type text,
         program text DEFAULT 'masters', allow_cross_major boolean DEFAULT false, shared_major_ids text[] DEFAULT '{}') ON COMMIT DROP;
       CREATE TEMP TABLE curriculum_blocks (id text, name text, sort_order int, curriculum_id text, code text) ON COMMIT DROP;
-      CREATE TEMP TABLE curriculum_subjects (curriculum_id text, subject_id text, block_id text, credits int, is_required boolean, sort_order int) ON COMMIT DROP;
+      CREATE TEMP TABLE curriculum_subjects (curriculum_id text, subject_id text, block_id text, elective_group_id text, credits int, is_required boolean, sort_order int) ON COMMIT DROP;
       CREATE TEMP TABLE course_offerings (id text, subject_id text, created_at timestamp NOT NULL DEFAULT '2026-01-01') ON COMMIT DROP;
       CREATE TEMP TABLE course_offering_class_groups (course_offering_id text, class_group_id text) ON COMMIT DROP;
       CREATE TEMP TABLE course_exam_gradebooks (id text, class_group_id text, course_offering_id text, updated_at timestamp, grades jsonb) ON COMMIT DROP;
@@ -64,7 +65,7 @@ describePostgres("Class reports PostgreSQL queries", () => {
         ('hp3','HP03','Ungraded',3,NULL),('hp4','HP04','Latest result',4,NULL),('alias','OTHER','Alias',5,'hp4'),
         ('external','EXT','External',6,NULL),('hp5','HP05','Recognition',7,NULL);
       INSERT INTO curriculum_blocks (id,name,sort_order) VALUES ('b1','Block',0);
-      INSERT INTO curriculum_subjects SELECT 'c1',id,'b1',5,true,sort_order FROM subjects WHERE id LIKE 'hp%';
+      INSERT INTO curriculum_subjects (curriculum_id,subject_id,block_id,credits,is_required,sort_order) SELECT 'c1',id,'b1',5,true,sort_order FROM subjects WHERE id LIKE 'hp%';
       INSERT INTO course_offerings VALUES ('o1','hp1'),('o2','hp2'),('o3','hp3'),('o4','alias');
       INSERT INTO course_offering_class_groups SELECT id,'g1' FROM course_offerings;
       INSERT INTO course_exam_gradebooks VALUES

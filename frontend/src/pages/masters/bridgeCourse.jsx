@@ -1,3 +1,4 @@
+import DateField from "../../components/DateField";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
@@ -7,8 +8,12 @@ import {
   FormControl, IconButton, MenuItem, Paper, Select, Stack, TableBody,
   TableCell, TableContainer, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
-import { AddRounded, DeleteRounded, EditRounded, RefreshRounded } from "@mui/icons-material";
+import AddRounded from "@mui/icons-material/AddRounded";
+import DeleteRounded from "@mui/icons-material/DeleteRounded";
+import EditRounded from "@mui/icons-material/EditRounded";
+import RefreshRounded from "@mui/icons-material/RefreshRounded";
 import FeatureLayout from "../../components/FeatureLayout";
+import { usePermissions } from "../../features/accounts/usePermissions";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import AppDialog from "../../components/AppDialog";
@@ -77,19 +82,20 @@ const CompactField = ({ label, htmlFor, helper, error = false, children, sx }) =
 );
 
 export default function BridgeCourse() {
+  const { can } = usePermissions();
+  const admin = can("masters.manage");
   const [rows, setRows] = useState([]), [subjects, setSubjects] = useState([]), [majors, setMajors] = useState([]), [candidates, setCandidates] = useState([]);
   const [summary, setSummary] = useState({}), [year, setYear] = useState(String(now)), [status, setStatus] = useState("ALL"), [major, setMajor] = useState("ALL"), [search, setSearch] = useState("");
   const [disciplineId, setDisciplineId] = useState("");
-  const [loading, setLoading] = useState(true), [error, setError] = useState(""), [admin, setAdmin] = useState(false);
+  const [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [open, setOpen] = useState(false), [editing, setEditing] = useState(null), [form, setForm] = useState(blank(String(now))), [saving, setSaving] = useState(false), [deleting, setDeleting] = useState(null);
 
   useEffect(() => {
     Promise.all([
-      axios.get(`${API_BASE_URL}/system/bridge-knowledge`), axios.get(`${API_BASE_URL}/system/majors?program=masters`), axios.get(`${API_BASE_URL}/auth/isStaff`),
-    ]).then(([s, m, a]) => {
+      axios.get(`${API_BASE_URL}/system/bridge-knowledge`), axios.get(`${API_BASE_URL}/system/majors?program=masters`),
+    ]).then(([s, m]) => {
       setSubjects((Array.isArray(s.data) ? s.data : s.data?.data || []).filter((x) => x.active !== false));
       setMajors((Array.isArray(m.data) ? m.data : m.data?.data || []).filter((x) => x.active !== false));
-      setAdmin(a.data?.message === "admin");
     }).catch(() => setError("Không thể tải danh mục học bổ sung kiến thức."));
   }, []);
 
@@ -316,9 +322,8 @@ export default function BridgeCourse() {
                 />
               </CompactField>
               <CompactField label="NGÀY HOÀN THÀNH" htmlFor="bridge-completed-at">
-                <TextField
+                <DateField
                   id="bridge-completed-at"
-                  type="date"
                   value={form.completedAt}
                   InputLabelProps={{ shrink: true }}
                   onChange={(e) => setForm({ ...form, completedAt: e.target.value })}

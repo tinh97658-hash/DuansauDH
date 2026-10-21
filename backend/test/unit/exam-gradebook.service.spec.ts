@@ -26,7 +26,7 @@ const build = () => {
       revision: 0, total: 2, totalRows: 2, page: 1,
       rows: [{ participantId: "student:s1", code: "HV001", fullName: "Nguyễn Văn An", grade: {} },
         { participantId: "admission:a2", code: "HV002", fullName: "Trần Bình", grade: {} }],
-    }] : options.replacements.ids.filter((id: string) => ["student:s1", "admission:a2"].includes(id)).map((participantId: string) => ({ participantId }))),
+    }] : (options.replacements?.ids || []).filter((id: string) => ["student:s1", "admission:a2"].includes(id)).map((participantId: string) => ({ participantId }))),
   };
   const policies = { latest: jest.fn<any>().mockResolvedValue(LEGACY_GRADING_POLICY) };
   const service = new ExamGradebookService(groups as never, members as never, offerings as never, links as never, books as never, sequelize as never, policies as never);
@@ -51,7 +51,7 @@ it.each(["group", "offering"] as const)("blocks grade writes before teaching com
   expect(books.create).not.toHaveBeenCalled();
   expect(books.findOne).not.toHaveBeenCalled();
   expect(books.findAll).not.toHaveBeenCalled();
-  expect(sequelize.query).not.toHaveBeenCalled();
+  expect(sequelize.query.mock.calls.every(([sql]) => String(sql).includes("pg_advisory_xact_lock"))).toBe(true);
   expect((await service.get(query)).rows).toHaveLength(2);
 });
 
@@ -76,7 +76,7 @@ it("loads all linked groups and individual learners in one deduplicated paginate
   expect(sql).toContain('DISTINCT ON ("participantId")');
   expect(sql).toContain('SUM(revision)');
   expect(sql).toContain('cm.class_group_id IN (:groupIds)');
-  expect(policies.latest).toHaveBeenCalledWith("s2", "2026");
+  expect(policies.latest).toHaveBeenCalledWith("s2", "2026", undefined);
   expect(result.eligibilityPolicies).toHaveProperty("g3");
 });
 
@@ -154,7 +154,7 @@ it("returns frozen policies with saved grades and the current policy with unente
   const result = await service.get(query);
   expect(result.rows[0]).toMatchObject({ courseScore: 7, result: "passed", gradingPolicy: { version: 0, courseMinimum: 5.5 } });
   expect(result.rows[1]).toMatchObject({ courseScore: null, result: "pending", gradingPolicy: latest });
-  expect(policies.latest).toHaveBeenCalledWith("subject-1", "2026");
+  expect(policies.latest).toHaveBeenCalledWith("subject-1", "2026", undefined);
 });
 
 it("preserves existing policy snapshots when editing old grades and applies the latest policy only to new rows", async () => {
@@ -210,6 +210,7 @@ it("provides majors and linked course classes for gradebook filters", async () =
   offerings.findAll.mockResolvedValue([offering]);
 
   expect(await service.options()).toEqual({ groups: [group], courseOfferings: [{ ...offering,
+    examGradesComplete: false,
     groupLinks: [{ classGroupId: "g1", subject: offering.subject }],
   }] });
   expect(groups.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { program: "masters" }, attributes: expect.arrayContaining(["majorId"]), include: expect.arrayContaining([expect.objectContaining({ as: "major", attributes: ["id", "name"] })]) }));

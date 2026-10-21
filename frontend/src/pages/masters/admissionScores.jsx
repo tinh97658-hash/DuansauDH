@@ -1,7 +1,11 @@
+import { usePermissions } from "../../features/accounts/usePermissions";
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
-import { Alert, Box, Button, Chip, CircularProgress, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
-import { AddRounded, EditRounded, InfoOutlined, RefreshRounded } from "@mui/icons-material";
+import { Alert, Box, Button, Chip, CircularProgress, FormControlLabel, MenuItem, Paper, Stack, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import AddRounded from "@mui/icons-material/AddRounded";
+import EditRounded from "@mui/icons-material/EditRounded";
+import InfoOutlined from "@mui/icons-material/InfoOutlined";
+import RefreshRounded from "@mui/icons-material/RefreshRounded";
 import BulkAdmissionWorkflow from "../../features/admission/BulkAdmissionWorkflow";
 import FeatureLayout from "../../components/FeatureLayout";
 import FilterSearchField from "../../components/FilterSearchField";
@@ -41,22 +45,25 @@ const compactControlSx = {
   },
 };
 export default function AdmissionScores() {
+  const { can } = usePermissions();
+  const admin = can("admission.manage");
   const [scoresDirty, setScoresDirty] = useState(false), [workflowBusy, setWorkflowBusy] = useState(false);
   const [rounds, setRounds] = useState([]), [majors, setMajors] = useState([]);
-  const [admin, setAdmin] = useState(false), [roundId, setRoundId] = useState("");
+  const [roundId, setRoundId] = useState("");
   const [data, setData] = useState(null), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [saving, setSaving] = useState(false), [form, setForm] = useState(null);
   const [search, setSearch] = useState(""), [filter, setFilter] = useState("all"), [majorFilter, setMajorFilter] = useState("all");
   const [thresholdDrafts, setThresholdDrafts] = useState({});
   const [discardAction, setDiscardAction] = useState(null);
+  const [showEligible, setShowEligible] = useState(false);
   const thresholdsDirty = Object.keys(thresholdDrafts).length > 0;
   const loadRounds = useCallback(async () => {
-    const [config, catalog, session] = await Promise.all([
-      axios.get(`${API_BASE_URL}/plan/admission-rounds`, options), axios.get(`${API_BASE_URL}/system/majors`, options), axios.get(`${API_BASE_URL}/auth/session`, options),
+    const [config, catalog] = await Promise.all([
+      axios.get(`${API_BASE_URL}/plan/admission-rounds`, options), axios.get(`${API_BASE_URL}/system/majors`, options),
     ]);
     setRounds(config.data.rows || []);
     setMajors(normalizeMajorsResponse(catalog.data).filter((major) => major.program === "masters" && major.active !== false));
-    setAdmin(session.data.user?.role === "admin"); return config.data.rows || [];
+    return config.data.rows || [];
   }, []);
   useEffect(() => {
     loadRounds().then((rows) => { if (rows.length) setRoundId(rows[0].id); else setLoading(false); })
@@ -119,8 +126,11 @@ export default function AdmissionScores() {
     finally { setSaving(false); }
   };
   const rows = (data?.rows || []).filter((row) => {
+    const matchesView = showEligible
+      ? !row.stale && row.meetsCutoff === true && row.decision !== "rejected"
+      : row.decision === "pending";
     const matches = `${row.fullName} ${row.code || ""}`.toLocaleLowerCase("vi").includes(search.toLocaleLowerCase("vi"));
-    return matches && (majorFilter === "all" || row.majorId === majorFilter) && (filter === "all" || (filter === "eligible" ? !row.stale && row.meetsCutoff === true
+    return matchesView && matches && (majorFilter === "all" || row.majorId === majorFilter) && (filter === "all" || (filter === "eligible" ? !row.stale && row.meetsCutoff === true
       : filter === "below" ? row.meetsCutoff === false : filter === "unscored" ? row.total == null : row.decision === filter));
   });
   return <FeatureLayout title="Điểm xét tuyển thạc sĩ" group="Thủ tục đầu vào" hideHeader={false} desc="Chọn đợt xét tuyển toàn viện, nhập điểm ngưỡng từng ngành và điểm hồ sơ để lọc danh sách đạt ngưỡng.">
@@ -173,7 +183,14 @@ export default function AdmissionScores() {
             {[["all", "Tất cả"], ["eligible", "Đạt ngưỡng"], ["below", "Dưới ngưỡng"], ["unscored", "Chưa nhập điểm"], ["pending", "Chưa duyệt"], ["admitted", "Đã trúng tuyển"]].map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
           </FilterSelectField>
         </Stack>
-        <BulkAdmissionWorkflow data={data} visibleRows={rows} paginationKey={`${roundId}:${search}:${filter}:${majorFilter}`} admin={admin} loading={loading || saving} thresholdsDirty={thresholdsDirty} onRefresh={loadRanking} onDirtyChange={setScoresDirty} onBusyChange={setWorkflowBusy} />
+        <BulkAdmissionWorkflow data={data} visibleRows={rows} paginationKey={`${roundId}:${search}:${filter}:${majorFilter}:${showEligible}`} admin={admin} loading={loading || saving} thresholdsDirty={thresholdsDirty} onRefresh={loadRanking} onDirtyChange={setScoresDirty} onBusyChange={setWorkflowBusy}
+          recordViewControl={<FormControlLabel sx={{ m: 0, "& .MuiFormControlLabel-label": { fontSize: 12 } }}
+            label={showEligible ? "Hồ sơ đủ điều kiện" : "Hồ sơ chờ xét tuyển"}
+            control={<Switch checked={showEligible} disabled={loading || saving || workflowBusy}
+              onChange={(event) => setShowEligible(event.target.checked)} inputProps={{ role: "switch", "aria-label": "Hiển thị hồ sơ đủ điều kiện" }}
+              sx={{ "& .MuiSwitch-switchBase": { color: "#c62828" }, "& .MuiSwitch-track": { backgroundColor: "#c62828", opacity: 0.45 },
+                "& .MuiSwitch-switchBase.Mui-checked": { color: "#16803c" },
+                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: "#16803c", opacity: 0.5 } }} />} />} />
       </>}
     </Stack>
     <AppDialog

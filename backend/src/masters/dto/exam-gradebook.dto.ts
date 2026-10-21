@@ -37,3 +37,10 @@ export class SaveExamGradebookDto extends ExamGradebookQueryDto {
   @IsInt() @Min(0) revision!: number;
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(1000) @ValidateNested({ each: true }) @Type(() => ExamGradeRowDto) rows!: ExamGradeRowDto[];
 }
+
+export class GradebookWorkflowDto extends ExamGradebookQueryDto {
+  @IsIn(["submit", "approve", "reopen"]) action!: "submit" | "approve" | "reopen";
+  @IsInt() @Min(0) revision!: number;
+  @IsInt() @Min(0) version!: number;
+  @IsString() @MaxLength(2000) note!: string;
+}

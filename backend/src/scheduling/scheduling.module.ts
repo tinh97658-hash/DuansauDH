@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
 import { SequelizeModule } from "@nestjs/sequelize";
-import { RolesGuard } from "../common/roles.guard.js";
+import { PermissionsGuard } from "../common/permissions.guard.js";
 import { SchedulingWriteGuard } from "../common/scheduling-write.guard.js";
 import { CourseOfferingWriteGuard } from "../common/course-offering-write.guard.js";
 import { CourseOfferingStudent } from "../database/models/training/course-offering-student.model.js";
@@ -41,7 +41,7 @@ import { SchedulingService } from "./scheduling.service.js";
     SubjectRecognition,
   ])],
   controllers: [SchedulingController],
-  providers: [SchedulingService, SchedulingWriteGuard, CourseOfferingWriteGuard, RolesGuard],
+  providers: [SchedulingService, SchedulingWriteGuard, CourseOfferingWriteGuard, PermissionsGuard],
   exports: [SchedulingService],
 })
 export class SchedulingModule {}

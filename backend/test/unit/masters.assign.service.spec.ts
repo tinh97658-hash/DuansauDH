@@ -15,6 +15,7 @@ const buildService = () => {
   const students = { findAll: jest.fn() };
   const majors = { findByPk: jest.fn() };
   const sequelize = {
+    query: jest.fn().mockResolvedValue([]),
     transaction: jest.fn((cb: (tx: unknown) => Promise<unknown>) => cb({ LOCK: { UPDATE: "UPDATE" } })),
   };
   const classGroupsService = { create: jest.fn() };

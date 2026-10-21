@@ -26,7 +26,7 @@ const excelBirthDate = (value) => {
   if (iso) {
     const [, year, month, day] = iso;
     const date = new Date(`${year}-${month}-${day}T00:00:00Z`);
-    if (Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === `${year}-${month}-${day}`) return `${day}/${month}/${year}`;
+    if (Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === `${year}-${month}-${day}`) return displayGradeDate(`${year}-${month}-${day}`);
   }
   return displayGradeDate(value);
 };

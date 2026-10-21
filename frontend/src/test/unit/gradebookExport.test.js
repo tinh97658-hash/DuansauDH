@@ -90,7 +90,7 @@ it.each([4, 40])("writes an actual single-sheet workbook with %i students and bo
   expect(sheet.getRow(9).values.slice(1)).toEqual(gradebookColumns().map(column => column.label));
   expect(sheet.rowCount).toBe(GRADEBOOK_HEADER_ROW + count);
   expect(sheet.getCell(`B${9 + count}`).value).toBe(`HV${count}`);
-  expect(sheet.getCell("E10").value).toBe("02/01/1990");
+  expect(sheet.getCell("E10").value).toBe("02/01/90");
   expect(sheet.getCell("I10").value).toBe("0.0"); expect(sheet.getCell("L10").value).toBe("8.5");
   expect(sheet.getCell("O10").value).toBe("8.0");
   for (let column = 1; column <= 16; column++) {
@@ -133,7 +133,7 @@ it("sizes content within limits, wraps headers and keeps long codes on one line"
 });
 
 it("uses the business timezone and sanitizes filename components", () => {
-  expect(buildGradebookDocument(group, offering, [], new Date("2026-10-09T18:00:00Z")).signingDate).toBe("Hải Phòng, ngày 10 tháng 10 năm 2026");
+  expect(buildGradebookDocument(group, offering, [], new Date("2026-10-09T18:00:00Z")).signingDate).toBe("Hải Phòng, ngày 10/10/26");
   expect(gradebookFilename(group, offering)).toBe("Bang-diem-mon-hoc-CNTT-2026-HP-01.xlsx");
   expect(gradebookFilename(group, offering, "DS-thi")).toBe("DS-thi-CNTT-2026-HP-01.xlsx");
 });
@@ -158,7 +158,7 @@ it("prints nine exam columns including notes without the final outcome column", 
   expect(sheet.rowCount).toBe(EXAM_LIST_HEADER_ROW + rows.length);
   expect(sheet.getCell("B5").value).toBe(rows[0].code);
   expect(sheet.getCell("B5").type).toBe(ExcelJS.ValueType.String);
-  expect(sheet.getCell("E5").value).toBe("02/01/1990");
+  expect(sheet.getCell("E5").value).toBe("02/01/90");
   expect(sheet.getCell("G5").value).toBe("Đủ tư cách");
   expect(sheet.getCell("H6").value).toBe("Không");
   expect(sheet.getCell("I5").value).toBe(rows[0].notes);

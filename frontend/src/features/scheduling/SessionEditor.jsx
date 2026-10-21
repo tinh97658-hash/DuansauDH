@@ -1,12 +1,9 @@
+import DateField from "../../components/DateField";
 import React, { useEffect, useRef, useState } from "react";
 import { api, groupsOf, message, Modal, normalize, Notice, offeringTitle, rows, SearchSelect, subjectLabel, useLoad } from "./shared";
-import { getBusinessTodayKey, getRoomFloor, isPeriodTimeConsistent, isSessionPast, vietnameseDate } from "../../utils/schedulingCalendar";
+import { getBusinessTodayKey, getRoomFloor, isPeriodTimeConsistent, isSessionPast, isSessionStartedInBusinessTimezone, periodTimes, vietnameseDate } from "../../utils/schedulingCalendar";
 import { shouldSuggestClosing } from "./sessionWarning";
 import { lecturerGroupsForOffering, lecturerUnitOf, recommendedUnitForOffering } from "../../utils/lecturerQualification";
-
-const periodTimes = (period) => period === "AFTERNOON"
-  ? { startTime: "13:00", endTime: "17:00" }
-  : { startTime: "07:00", endTime: "12:00" };
 
 const ROOM_CAPACITY_DEFICIT_LIMIT = 10;
 const lecturerSearchText = (value) => normalize(String(value || "").toLocaleLowerCase("vi"));
@@ -118,7 +115,10 @@ export default function SessionEditor({ session, offering, date, period, user, o
     if (!editable || saving) return;
     if (!validTime) return setError("Khung giờ của buổi học không hợp lệ. Vui lòng chọn lại buổi.");
     if (!form.lecturerId || !form.roomId) return setError("Vui lòng chọn giảng viên và phòng học.");
-    if (isSessionPast(form)) return setError("Không thể xếp lịch vào buổi học đã kết thúc.");
+    const movingSlot = !session || form.sessionDate !== session.sessionDate || form.period !== session.period ||
+      form.startTime.slice(0, 5) !== (session.startTime || periodTimes(session.period).startTime).slice(0, 5);
+    if (movingSlot && isSessionStartedInBusinessTimezone(form)) return setError("Không thể xếp lịch vào buổi học đã bắt đầu.");
+    if (!movingSlot && isSessionPast(form)) return setError("Không thể xếp lịch vào buổi học đã kết thúc.");
     if (classConflict) return setError("Lớp / nhóm đã có lịch trong khoảng thời gian này.");
     const room = rooms.find((item) => item.id === form.roomId);
     if (!room || roomReason(room)) return setError("Phòng đã chọn không còn phù hợp.");
@@ -143,7 +143,7 @@ export default function SessionEditor({ session, offering, date, period, user, o
     <header className="sl-editor-hero"><div><div className="sl-eyebrow">{!session ? "XẾP BUỔI" : editing ? "CHỈNH SỬA LỊCH" : "CHI TIẾT BUỔI HỌC"} · {vietnameseDate(form.sessionDate)} · {periodLabel}</div><h2>{offeringTitle(currentOffering)}</h2><p>{subjectLabel(currentOffering)} · {groupsOf(currentOffering).length} lớp/nhóm · {currentOffering.participantCount ?? "…"} học viên</p></div><div className="sl-editor-hero-actions"><span>Đã diễn ra {currentOffering.sessionSummary?.heldCount || 0} buổi</span><button className="sl-drawer-close" aria-label="Đóng chi tiết buổi học" disabled={saving} onClick={onClose}>×</button></div></header>
     <div className="sl-editor-notices">{error && <Notice error={error} />}{catalog.error && <Notice error={catalog.error} />}{availability.error && <Notice error={availability.error} />}{suggestClosing && <Notice>Đã học được {currentOffering.sessionSummary.heldCount} buổi, bạn có muốn đóng lớp không?</Notice>}{pending && <div className="sl-attention">Buổi học đã kết thúc · Chờ xác nhận kết quả diễn ra.</div>}</div>
     <div className="v20-composer"><div className="sl-editor-info"><h4>THÔNG TIN BUỔI HỌC</h4><strong className="sl-editor-date">{vietnameseDate(form.sessionDate)} · {periodLabel}</strong>
-      <div className="sl-editor-hidden-controls"><label>Ngày học<input aria-label="Ngày học" type="date" min={getBusinessTodayKey()} value={form.sessionDate} disabled={!editable || saving} onChange={(event) => { if (event.target.value) setField("sessionDate", event.target.value); }} /></label><label>Buổi<select aria-label="Buổi" value={form.period} disabled={!editable || saving} onChange={(event) => setField("period", event.target.value)}><option value="MORNING">Sáng</option><option value="AFTERNOON">Chiều</option></select></label></div>
+      <div className="sl-editor-hidden-controls"><label>Ngày học<DateField size="small" inputProps={{ "aria-label": "Ngày học", min: getBusinessTodayKey() }} value={form.sessionDate} disabled={!editable || saving} onChange={(event) => { setField("sessionDate", event.target.value); }} /></label><label>Buổi<select aria-label="Buổi" value={form.period} disabled={!editable || saving} onChange={(event) => setField("period", event.target.value)}><option value="MORNING">Sáng</option><option value="AFTERNOON">Chiều</option></select></label></div>
       <label className="v20-field sl-unit-field">Đơn vị<SearchSelect label="Đơn vị" value={selectedUnitId} options={[{ id: "", name: "Tất cả đơn vị" }, ...units]} placeholder="Nhập để tìm đơn vị..." disabled={!editable || lecturerLocked || catalog.loading || !!catalog.error || saving} onChange={selectUnit} /></label>
       <label className="v20-field">Giảng viên<LecturerPicker key={selectedUnitId} value={form.lecturerId} lecturers={filteredLecturers} offering={currentOffering} conflicts={conflicts} locked={lecturerLocked} disabled={!editable || catalog.loading || !!catalog.error || saving} onChange={selectLecturer} />{recommendedUnit?.name && <small className="sl-teaching-unit-hint">Ngành đề xuất: {recommendedUnit.name}</small>}</label>
       {!catalog.loading && !catalog.error && !lecturers.some((row) => row.active !== false) && <Notice>Chưa có giảng viên đang hoạt động. Khai báo tại Hệ thống → Giảng viên.</Notice>}

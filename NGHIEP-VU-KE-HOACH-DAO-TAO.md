@@ -1,5 +1,7 @@
 # Kế hoạch đào tạo & "gói học phần" — Phân tích và luồng nghiệp vụ chuẩn
 
+> Cập nhật 18/10/2026: tài liệu này giữ phân tích mô hình gói học phần cũ. Kế hoạch xử lý vòng đời học viên và trạng thái triển khai F01–F08 được theo dõi tại [mục 7 của báo cáo vòng đời học viên](BAO-CAO-LOGIC-VONG-DOI-HOC-VIEN.md#7-kế-hoạch-thực-hiện--cập-nhật-18102026). Đã bổ sung khóa CTĐT đã dùng, lịch sử lớp, duyệt/khóa điểm và kiểm tra hoàn thành học phần; triển khai cần migration 061. Hoàn thành học phần chưa phải quyết định tốt nghiệp.
+
 Tài liệu này phân tích nghiệp vụ hiện có trong hệ thống quản lý đào tạo sau đại học
 (Viện Đào tạo Sau đại học — Trường Đại học Hàng hải Việt Nam), chỉ ra các điểm
 **chưa đúng với nghiệp vụ thực tế**, và đề xuất luồng nghiệp vụ chuẩn khớp với mô

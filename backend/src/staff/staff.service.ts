@@ -1,7 +1,5 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import bcrypt from "bcrypt";
-import { NotificationService } from "../notifications/notification.service.js";
-import { AddStaffDto } from "./dto/staff.dto.js";
 import { StaffRepository } from "./staff.repository.js";
 import { serializeStaff } from "./staff.serializer.js";
 
@@ -9,15 +7,7 @@ import { serializeStaff } from "./staff.serializer.js";
 export class StaffService {
   constructor(
     private readonly repository: StaffRepository,
-    private readonly notifications: NotificationService,
   ) {}
-
-  async add(input: AddStaffDto) {
-    if (await this.repository.findByEmail(input.email)) throw new ConflictException("Người dùng đã tồn tại");
-    const staff = await this.repository.create(input);
-    this.notifications.notify([staff.email], "staffAdd", "Administrator");
-    return { message: "Thêm nhân sự thành công", data: serializeStaff(staff) };
-  }
 
   async profile(id: string) {
     const staff = await this.repository.findById(id);

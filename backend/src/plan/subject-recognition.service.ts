@@ -132,7 +132,7 @@ export class SubjectRecognitionService {
           AND ${foreignLanguageSubjectSql('subject.id')}
           AND NOT EXISTS (SELECT 1 FROM (${examOutcomesSql()}) interrupted
             JOIN subjects interrupted_subject ON interrupted_subject.id = interrupted.subject_id
-            WHERE interrupted.participant_id IN (:participantIds) AND interrupted.grade->>'studyLeaveFailure' = 'true'
+            WHERE interrupted.participant_id IN (:participantIds) AND (interrupted.grade->>'studyLeaveFailure' = 'true' OR interrupted.grade->>'finalized' = 'true' OR interrupted.grade->>'eligibilityFrozen' = 'true')
               AND ${matchesExamSubjectSql('interrupted_subject', 'subject', 'interrupted.course_offering_id', 'interrupted.class_group_id')})
       ), ranked AS (
         SELECT outcome.id, target.id subject_id, target.code_text, target.code_number, target.name,
@@ -163,6 +163,7 @@ export class SubjectRecognitionService {
 
   async createLearningResult(admissionRecordId: string, dto: CreateLearningResultDto) {
     return this.sequelize.transaction(async (transaction) => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
       await this.requireRecord(admissionRecordId, transaction);
       const payload = await this.buildLearningPayload(dto, transaction);
       const created = await this.results.create({
@@ -181,6 +182,7 @@ export class SubjectRecognitionService {
 
   async updateLearningResult(id: string, dto: UpdateLearningResultDto) {
     return this.sequelize.transaction(async (transaction) => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
       const row = await this.results.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!row) throw new NotFoundException("Không tìm thấy kết quả học phần cá nhân.");
       const decisions = await this.recognitions.findAll({ where: { learningResultId: id }, transaction, lock: transaction.LOCK.UPDATE });
@@ -204,6 +206,7 @@ export class SubjectRecognitionService {
 
   async removeLearningResult(id: string) {
     return this.sequelize.transaction(async transaction => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
       const row = await this.results.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!row) throw new NotFoundException("Không tìm thấy kết quả học phần cá nhân.");
       const decisions = await this.recognitions.findAll({ where: { learningResultId: id }, transaction, lock: transaction.LOCK.UPDATE });
@@ -307,6 +310,7 @@ export class SubjectRecognitionService {
    */
   async proposeForRecord(admissionRecordId: string, dto: ProposeRecognitionsDto, outerTransaction?: Transaction) {
     const run = async (transaction: Transaction) => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
       const record = await this.records.findByPk(admissionRecordId, { transaction, lock: transaction.LOCK.UPDATE });
       if (!record) throw new NotFoundException("Không tìm thấy hồ sơ học viên.");
       await this.syncRegularResults(admissionRecordId, transaction);
@@ -529,6 +533,7 @@ export class SubjectRecognitionService {
 
   async decide(id: string, dto: DecideRecognitionDto) {
     return this.sequelize.transaction(async (transaction) => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
       const row = await this.recognitions.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!row) throw new NotFoundException("Không tìm thấy quyết định công nhận học phần.");
       if (row.status === "approved" || row.status === "rejected") {
@@ -572,6 +577,7 @@ export class SubjectRecognitionService {
   /** Only undecided proposals can be removed. Final decisions are immutable. */
   async removeRecognition(id: string) {
     return this.sequelize.transaction(async transaction => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
       const row = await this.recognitions.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!row) throw new NotFoundException("Không tìm thấy quyết định công nhận học phần.");
       if (row.status === "approved" || row.status === "rejected") throw new ConflictException("Quyết định đã được chốt, không thể hủy.");

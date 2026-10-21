@@ -675,9 +675,11 @@ export class PlanService {
       throw new BadRequestException("Họ và tên không được để trống");
     }
 
-    const major = await this.requireAdmissionMajor(dto.majorId, dto.trainingLevel);
+    const trainingLevel = dto.trainingLevel || "Thạc sĩ";
+    const major = await this.requireAdmissionMajor(dto.majorId, trainingLevel);
     const payload = {
       ...dto,
+      trainingLevel,
       fullName,
       email: dto.email || `candidate_${Date.now()}@vmu.edu.vn`,
       majorName: major.name,
@@ -691,6 +693,7 @@ export class PlanService {
 
   async updateAdmissionRecord(id: string, dto: UpdateAdmissionRecordDto) {
     return this.sequelize.transaction(async (transaction) => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
       const record = await this.admissionRecordsModel.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!record) throw new NotFoundException("Không tìm thấy hồ sơ tuyển sinh");
 
@@ -717,7 +720,7 @@ export class PlanService {
       // Học viên vừa vào CTĐT chính thức: tự đối chiếu kết quả tiền thạc sĩ/học trước để đề xuất công nhận.
       if (payload.status === "approved" && record.status !== "approved" && this.recognitions) {
         try {
-          await this.recognitions.proposeForRecord(id, {});
+          await this.recognitions.proposeForRecord(id, {}, transaction);
         } catch {
           // Chưa có CTĐT phù hợp hoặc chưa có kết quả học phần: bỏ qua, không chặn việc lưu hồ sơ.
         }
@@ -730,9 +733,24 @@ export class PlanService {
   }
 
   async removeAdmissionRecord(id: string) {
-    const record = await this.admissionRecordsModel.findByPk(id);
-    if (!record) throw new NotFoundException("Không tìm thấy hồ sơ tuyển sinh");
-    await record.destroy();
-    return { success: true, message: "Đã xóa hồ sơ tuyển sinh." };
+    return this.sequelize.transaction(async transaction => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
+      const record = await this.admissionRecordsModel.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!record) throw new NotFoundException("Không tìm thấy hồ sơ tuyển sinh");
+      const [usage] = await this.sequelize.query<{ used: boolean }>(`SELECT (
+        EXISTS (SELECT 1 FROM class_group_members WHERE admission_record_id = :id
+          OR (CAST(:studentId AS uuid) IS NOT NULL AND student_id = CAST(:studentId AS uuid)))
+        OR EXISTS (SELECT 1 FROM class_membership_history WHERE admission_record_id = :id
+          OR (CAST(:studentId AS uuid) IS NOT NULL AND student_id = CAST(:studentId AS uuid)))
+        OR EXISTS (SELECT 1 FROM course_offering_students WHERE admission_record_id = :id)
+        OR EXISTS (SELECT 1 FROM learner_transcript_issues WHERE admission_record_id = :id)
+        OR EXISTS (SELECT 1 FROM learner_subject_results WHERE admission_record_id = :id)
+        OR EXISTS (SELECT 1 FROM major_transfers WHERE admission_record_id = :id)
+        OR EXISTS (SELECT 1 FROM admission_evaluation_history WHERE admission_record_id = :id)
+      ) AS used`, { type: "SELECT" as any, transaction, replacements: { id, studentId: record.studentId || null } });
+      if (usage?.used) throw new ConflictException("Hồ sơ đã có lịch sử đào tạo hoặc quyết định. Không thể xóa hồ sơ có dữ liệu cần lưu trữ.");
+      await record.destroy({ transaction });
+      return { success: true, message: "Đã xóa hồ sơ tuyển sinh." };
+    });
   }
 }

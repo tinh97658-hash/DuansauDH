@@ -17,7 +17,7 @@ jest.mock("@mui/icons-material", () => ({
   DeleteOutlineRounded: () => null, EditRounded: () => null, FactCheckRounded: () => null,
   MenuBookRounded: () => null, RuleRounded: () => null,
 }));
-jest.mock("axios", () => ({ get: jest.fn(), post: jest.fn(), put: jest.fn(), defaults: {} }));
+vi.mock("axios", () => ({ default: { get: jest.fn(), post: jest.fn(), put: jest.fn(), defaults: {} } }));
 jest.mock("react-router-dom", () => ({
   useParams: () => ({ id: "record-1" }), useNavigate: () => jest.fn(),
   useSearchParams: () => [new URLSearchParams(), jest.fn()],

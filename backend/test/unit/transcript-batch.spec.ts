@@ -1,6 +1,6 @@
 import { ClassScoreSummaryService } from "../../src/reports/class-score-summary.service.js";
 import { ReportsController } from "../../src/reports/reports.controller.js";
-import { ROLES_KEY } from "../../src/common/auth-user.js";
+import { PERMISSIONS_KEY } from "../../src/common/permissions.decorator.js";
 
 const setup = (rows = [
   { admissionRecordId: "ar1", participantId: "student:one", scores: { hp1: { score: 0, result: "failed" } } },
@@ -35,7 +35,7 @@ it("returns an empty class without running a profile query", async () => {
   expect(await service.transcripts("g1")).toEqual({ classGroup: { id: "g1" }, scorecards: [] });
   expect(sequelize.query).not.toHaveBeenCalled();
 });
-it("retains the existing report role guard on the new route", () => {
-  expect(Reflect.getMetadata(ROLES_KEY, ReportsController.prototype.classTranscripts)).toEqual(["admin", "supervisor", "examiner"]);
-  expect(Reflect.getMetadata("__guards__", ReportsController.prototype.classTranscripts)).toHaveLength(2);
+it("retains the report view permission on the new route", () => {
+  expect(Reflect.getMetadata(PERMISSIONS_KEY, ReportsController)).toEqual(["reports.view"]);
+  expect(Reflect.getMetadata("__guards__", ReportsController)).toHaveLength(2);
 });

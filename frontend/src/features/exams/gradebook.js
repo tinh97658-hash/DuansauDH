@@ -1,7 +1,8 @@
+import { formatDate } from "../../utils/dateFormat";
 import { personNameParts } from "../../utils/personName";
 import { calculateExamEligibility, calculatePolicyGrade, DEFAULT_GRADING_POLICY } from "./gradingPolicy";
 
-export const isExamCandidate = row => calculateExamEligibility(row) === true && !row.examExempt;
+export const isExamCandidate = row => (row.eligibilityFrozen?row.eligible:calculateExamEligibility(row)) === true && !row.examExempt;
 
 export const SCORE_FIELDS = [
   ["testScore", "Điểm kiểm tra", 10], ["assignmentScore", "Điểm BTL/TL/KT", 10],
@@ -20,15 +21,17 @@ export const formatAttemptScores = value => {
   return scores.map(score => formatScore(score)).filter(Boolean).join(", ");
 };
 export const calculateGrade = (row) => {
+  if(row.workflowPhase==='components'||(row.eligibilityFrozen&&row.eligible===false))return {courseScore:null,grade4:null,letterGrade:'',result:row.studyLeaveFailure?'failed':row.profileForeignLanguageExempt?'passed':row.examExempt?'exempt':'pending'};
   return calculatePolicyGrade(row, row.gradingPolicy || DEFAULT_GRADING_POLICY);
 };
 export const updateGradeDraft = (row) => {
   const grade = calculateGrade(row);
-  const eligible = calculateExamEligibility(row);
-  return { ...row, ...grade, eligible, attemptScores: !row.studyLeaveFailure && !row.examExempt && eligible === false ? "0.0" : formatScore(row.examScore), courseScore: formatScore(grade.courseScore), grade4: formatScore(grade.grade4, 4) };
+  const eligible = row.eligibilityFrozen?row.eligible:calculateExamEligibility(row);
+  return { ...row, ...grade, eligible, attemptScores: !row.workflowPhase && !row.studyLeaveFailure && !row.examExempt && eligible === false ? "0.0" : formatScore(row.examScore), courseScore: formatScore(grade.courseScore), grade4: formatScore(grade.grade4, 4) };
 };
 export const attemptScores = (value) => String(value ?? "").trim() === "" ? [] : String(value).split(";").map(numericScore);
 export const draftOf = (row) => {
+  if(row.workflowPhase)return updateGradeDraft({...row,...Object.fromEntries(SCORE_FIELDS.map(([key,,max])=>[key,formatScore(row[key],max)])),notes:row.notes||''});
   const eligible = calculateExamEligibility(row);
   const draft = {
     ...row, eligible, result: !row.examExempt && eligible === false ? "failed" : row.result,
@@ -51,9 +54,9 @@ export const rowError = (row) => {
 export const gradePayload = (row) => {
   const scores = Object.fromEntries(SCORE_FIELDS.map(([key, , max]) => [key, numericScore(formatScore(row[key], max))]));
   return {
-    participantId: row.participantId, eligible: calculateExamEligibility({ ...row, ...scores }), examExempt: row.examExempt,
-    ...(row.gradingPolicy ? { policyVersion: row.gradingPolicy.version } : {}),
-    ...(row.gradingPolicy?.rulesVersion !== undefined ? { policyRulesVersion: row.gradingPolicy.rulesVersion } : {}),
+    participantId: row.participantId, eligible: row.eligibilityFrozen?row.eligible:calculateExamEligibility({ ...row, ...scores }), examExempt: row.examExempt,
+    ...((row.workflowPhase==='components'?row.eligibilityPolicy:row.gradingPolicy) ? { policyVersion: (row.workflowPhase==='components'?row.eligibilityPolicy:row.gradingPolicy).version } : {}),
+    ...((row.workflowPhase==='components'?row.eligibilityPolicy:row.gradingPolicy)?.rulesVersion !== undefined ? { policyRulesVersion: (row.workflowPhase==='components'?row.eligibilityPolicy:row.gradingPolicy).rulesVersion } : {}),
     notes: row.notes || "",
     ...scores,
     letterGrade: row.letterGrade.trim(), attemptScores: scores.examScore === null ? [] : [scores.examScore], result: row.result,
@@ -67,7 +70,7 @@ export const visibleGradeRows = (rows, mode, query) => {
     return !search || `${row.code} ${row.fullName}`.toLocaleLowerCase("vi").includes(search);
   });
 };
-export const displayGradeDate = (date) => /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date.split("-").reverse().join("/") : date || "—";
+export const displayGradeDate = formatDate;
 export const gradebookColumns = (blank = false) => [
   { key: "index", label: "STT", width: 45, minWidth: 40, align: "center" },
   { key: "code", label: "Mã HV", width: 140 }, { key: "lastName", label: "Họ đệm", width: 150 },
@@ -84,7 +87,7 @@ export const gradebookColumns = (blank = false) => [
 ];
 export const gradebookRowValues = (row, index, blank = false) => {
   row = draftOf(row);
-  const ineligible = !row.studyLeaveFailure && !row.examExempt && row.eligible === false;
+  const ineligible = !row.workflowPhase && !row.studyLeaveFailure && !row.examExempt && row.eligible === false;
   const name = personNameParts(row);
   return [index + 1, row.code || "—", name.familyAndMiddle, name.givenName, displayGradeDate(row.dob), row.gender || "—",
     row.eligible == null ? "Chưa xét" : row.eligible ? "Đủ tư cách" : "Không đủ tư cách", row.examExempt ? "Có" : "Không",

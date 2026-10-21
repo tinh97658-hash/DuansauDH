@@ -1,7 +1,8 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import axios from "axios";
+import { API_BASE_URL } from "../../config/http";
 import Schedule from "../../pages/masters/schedule";
 import ScheduleView from "../../features/scheduling/Schedule";
 import SessionEditor from "../../features/scheduling/SessionEditor";
@@ -19,6 +20,37 @@ beforeEach(() => {
   jest.clearAllMocks();
   axios.get.mockImplementation(async (url) => ({ data: url.endsWith("/auth/session") ? { user: { canManageScheduling: true } } : url.includes("/course-offerings?") ? [offering] : url.endsWith("/course-offerings/offering") ? offering : url.includes("/lecturers") ? lecturers : url.includes("/rooms") ? rooms : url.endsWith("/roster") ? { participants: [{ id: "student:one", code: "HV001", fullName: "Nguyễn An", note: "" }] } : [] }));
   axios.post.mockResolvedValue({ data: {} }); axios.put.mockResolvedValue({ data: {} }); axios.delete.mockResolvedValue({ data: {} });
+});
+it.each([
+  ["2026-10-19T23:59:59Z", true, true],
+  ["2026-10-20T00:00:00Z", false, true],
+  ["2026-10-20T05:59:59Z", false, true],
+  ["2026-10-20T06:00:00Z", false, false],
+  ["2026-10-20T09:55:00Z", false, false],
+])("offers today's slots only before their start (%s)", async (now, morning, afternoon) => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(now));
+  try {
+    render(<MemoryRouter><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole("button", { name: "Xếp lịch" }));
+    const table = screen.getByRole("table", { name: "Lịch học theo tuần" });
+    expect(Boolean(within(table).queryByRole("button", { name: "Xếp Sáng 2026-10-20" }))).toBe(morning);
+    expect(Boolean(within(table).queryByRole("button", { name: "Xếp Chiều 2026-10-20" }))).toBe(afternoon);
+    expect(within(table).getByRole("button", { name: "Xếp Sáng 2026-10-21" })).toBeEnabled();
+  } finally { vi.useRealTimers(); }
+});
+it("removes the new-slot action as its start arrives without reloading session data", async () => {
+  vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+  vi.setSystemTime(new Date("2026-10-20T05:59:59Z"));
+  try {
+    await act(async () => { render(<MemoryRouter initialEntries={["/?offeringId=offering"]}><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>); });
+    expect(screen.getByRole("button", { name: "Xếp Chiều 2026-10-20" })).toBeEnabled();
+    const requests = axios.get.mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(screen.queryByRole("button", { name: "Xếp Chiều 2026-10-20" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Xếp Sáng 2026-10-21" })).toBeEnabled();
+    expect(axios.get.mock.calls).toHaveLength(requests);
+  } finally { vi.useRealTimers(); }
 });
 it.each([[1, 4], [2, 4], [2, 5], [3, 4], [3, 6], [5, 4]])("suggests closing a %i-credit offering at %i held sessions on hover", async (credits, heldCount) => {
   const fullOffering = { ...offering, subject: { ...offering.subject, credits }, sessionSummary: { heldCount, plannedCount: 0 } };
@@ -118,7 +150,7 @@ it("warns before closing a class with planned sessions and cancels without chang
 });
 
 it("shows the seven-day calendar and selects a persisted offering for scheduling", async () => {
-  render(<MemoryRouter><Schedule /></MemoryRouter>);
+  await act(async () => { render(<MemoryRouter><Schedule /></MemoryRouter>); });
   fireEvent.click(await screen.findByRole("button", { name: "Xếp lịch" }));
   expect(screen.getByText("ĐANG XẾP")).toBeInTheDocument();
   expect(screen.getByRole("table", { name: "Lịch học theo tuần" })).toBeInTheDocument();
@@ -349,15 +381,32 @@ it("shows all pending confirmations independently of the displayed week and sort
   render(<MemoryRouter><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>);
   fireEvent.click(await screen.findByRole("button", { name: "2 chờ xác nhận" }));
 
-  const dialog = screen.getByRole("dialog", { name: "BUỔI CHỜ XÁC NHẬN · 2" });
+  const dialog = screen.getByRole("dialog", { name: /BUỔI CHỜ XÁC NHẬN/ });
   const cards = within(dialog).getAllByRole("article");
-  expect(cards[0]).toHaveTextContent("02/09/2026");
+  expect(within(dialog).queryByRole("table")).not.toBeInTheDocument();
+  expect(dialog).toHaveClass("sl-pending-drawer", "v20-wide");
+  expect(cards[0]).toHaveClass("sl-pending-card");
+  expect(cards[0]).toHaveTextContent("02/09/26");
   expect(cards[0]).toHaveTextContent("Lớp cũ hơn");
-  expect(cards[1]).toHaveTextContent("12/09/2026");
+  expect(cards[1]).toHaveTextContent("12/09/26");
   expect(cards[1]).toHaveTextContent("Lớp mới hơn");
   expect(within(dialog).getAllByRole("button", { name: "Không diễn ra" })).toHaveLength(2);
   expect(within(dialog).getAllByRole("button", { name: "✓ Đã diễn ra" })).toHaveLength(2);
-  expect(axios.get).toHaveBeenCalledWith("/api/scheduling/pending-teaching-sessions", { withCredentials: true });
+  expect(axios.get).toHaveBeenCalledWith(`${API_BASE_URL}/scheduling/pending-teaching-sessions`, { withCredentials: true });
+  fireEvent.click(within(dialog).getAllByRole("button", { name: "Không diễn ra" })[0]);
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(`${API_BASE_URL}/scheduling/teaching-sessions/older/confirmation`, { status: "not_held" }, { withCredentials: true }));
+  await waitFor(() => expect(within(dialog).getAllByRole("button", { name: "✓ Đã diễn ra" })[1]).toBeEnabled());
+  fireEvent.click(within(dialog).getAllByRole("button", { name: "✓ Đã diễn ra" })[1]);
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(`${API_BASE_URL}/scheduling/teaching-sessions/newer/confirmation`, { status: "held" }, { withCredentials: true }));
+});
+it("preserves editing for API session projections without clock fields", async () => {
+  const saved = jest.fn();
+  render(<SessionEditor session={{ id: "existing", sessionDate: "2099-01-05", period: "MORNING", status: "planned", lecturerId: "l", roomId: "r" }} offering={offering} user={{ canManageScheduling: true }} onClose={jest.fn()} onSaved={saved} />);
+  fireEvent.click(screen.getByRole("button", { name: "Chỉnh sửa" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Lưu buổi học" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "Lưu buổi học" }));
+  await waitFor(() => expect(saved).toHaveBeenCalled());
+  expect(axios.put).toHaveBeenCalledWith(expect.stringContaining("/teaching-sessions/existing"), expect.objectContaining({ sessionDate: "2099-01-05", startTime: "07:00", endTime: "12:00" }), { withCredentials: true });
 });
 it("loads institute availability and excludes busy and undersized rooms before saving", async () => {
   const saved = jest.fn();
@@ -604,8 +653,9 @@ it("suppresses occupied date-period slots from complete week data while preservi
   fireEvent.change(screen.getByLabelText("Khóa / Năm"), { target: { value: "2026" } });
   await waitFor(() => expect(screen.queryByText("Lớp ngoài phạm vi")).not.toBeInTheDocument());
   fireEvent.click(screen.getByRole("button", { name: "Xếp lịch" }));
-  fireEvent.click(screen.getByRole("button", { name: "Tuần sau" }));
-  await waitFor(() => expect(screen.getAllByRole("button", { name: /Lớp đã chọn.*(ĐÃ XẾP|KHÔNG DIỄN RA)/ })).toHaveLength(3));
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tuần sau" })); });
+  const calendar = within(screen.getByRole("table", { name: "Lịch học theo tuần" }));
+  await waitFor(() => expect(calendar.getAllByRole("button", { name: /Lớp đã chọn.*(ĐÃ XẾP|KHÔNG DIỄN RA)/ })).toHaveLength(3));
 
   expect(screen.queryByText("Lớp ngoài phạm vi")).not.toBeInTheDocument();
   await waitFor(() => {
@@ -621,7 +671,7 @@ it("suppresses occupied date-period slots from complete week data while preservi
   expect(dialog).toHaveTextContent("XẾP BUỔI");
   fireEvent.click(within(dialog).getByRole("button", { name: "Đóng chi tiết buổi học" }));
 
-  fireEvent.click(screen.getAllByRole("button", { name: /Lớp đã chọn.*ĐÃ XẾP/ })[0]);
+  fireEvent.click(calendar.getAllByRole("button", { name: /Lớp đã chọn.*ĐÃ XẾP/ })[0]);
   dialog = screen.getByRole("dialog");
   expect(dialog).toHaveTextContent("CHI TIẾT BUỔI HỌC");
 });
@@ -710,13 +760,13 @@ it("switches course-class tabs without refetching or losing a learner note", asy
   expect(await screen.findByText("LỊCH HỌC ĐÃ XẾP")).toBeInTheDocument();
   expect(await screen.findByText("Chưa có buổi học nào được xếp lịch cho lớp học phần này.")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /Đã xếp sắp tới/ })).not.toBeInTheDocument();
-  expect(screen.queryByText("LỚP / NHÓM THAM GIA")).not.toBeInTheDocument();
+  expect(screen.queryByText("LỚP THAM GIA")).not.toBeInTheDocument();
   await waitFor(() => expect(axios.get).toHaveBeenCalledTimes(4));
   const requestCount = axios.get.mock.calls.length;
 
   fireEvent.click(peopleTab);
   expect(peopleTab).toHaveAttribute("aria-selected", "true");
-  expect(screen.getByText("LỚP / NHÓM THAM GIA")).toBeInTheDocument();
+  expect(screen.getByText("LỚP THAM GIA")).toBeInTheDocument();
   expect(screen.getByText("DANH SÁCH HỌC VIÊN")).toBeInTheDocument();
   expect(screen.getAllByText(/^KTHH2026\.0[1-4]$/)).toHaveLength(4);
   expect(screen.queryByRole("button", { name: /^Tất cả/ })).not.toBeInTheDocument();

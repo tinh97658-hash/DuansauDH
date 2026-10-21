@@ -1,3 +1,5 @@
+import { formatDate } from "./dateFormat";
+
 const pad = (value) => String(value).padStart(2, "0");
 
 export const BUSINESS_TIME_ZONE = "Asia/Ho_Chi_Minh";
@@ -28,6 +30,17 @@ export const isPeriodTimeConsistent = (period, startTime, endTime) => {
 };
 
 export const SESSION_PERIODS = ["MORNING", "AFTERNOON"];
+
+// Existing SessionEditor defaults, shared with new-slot calendar availability.
+export const periodTimes = (period) => period === "AFTERNOON"
+  ? { startTime: "13:00", endTime: "17:00" }
+  : { startTime: "07:00", endTime: "12:00" };
+
+export const isSessionStartedInBusinessTimezone = (session, now = new Date()) => {
+  if (!session?.sessionDate || !session?.startTime) return false;
+  const startTime = session.startTime.length === 5 ? `${session.startTime}:00` : session.startTime;
+  return `${session.sessionDate} ${startTime}` <= getBusinessWallTime(now);
+};
 
 export const getRoomFloor = (roomCode) => {
   const match = String(roomCode || "").trim().match(/^(\d)/);
@@ -77,18 +90,13 @@ export const isSessionEndedInBusinessTimezone = (session, now = new Date()) => {
 };
 export const isSessionPast = isSessionEndedInBusinessTimezone;
 
-export const vietnameseDate = (date) => new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-}).format(parseLocalDate(date));
+export const vietnameseDate = (date) => formatDate(formatDateKey(parseLocalDate(date)));
 
-export const vietnameseDayLabel = (date) => {
+export const vietnameseDayLabel = (date, includeDate = true) => {
   const value = parseLocalDate(date);
-  return `${value.getDay() === 0 ? "Chủ nhật" : `Thứ ${value.getDay() + 1}`} · ${new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-  }).format(value)}`;
+  const weekday = value.getDay() === 0 ? "Chủ nhật" : `Thứ ${value.getDay() + 1}`;
+  if (!includeDate) return weekday;
+  return `${weekday} · ${vietnameseDate(date)}`;
 };
 
 export const vietnameseWeekdayShort = (date) => {
@@ -96,7 +104,4 @@ export const vietnameseWeekdayShort = (date) => {
   return value.getDay() === 0 ? "CN" : `T${value.getDay() + 1}`;
 };
 
-export const vietnameseDayMonth = (date) => new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  month: "2-digit",
-}).format(parseLocalDate(date));
+export const vietnameseDayMonth = vietnameseDate;

@@ -1,27 +1,21 @@
 import { Injectable } from "@nestjs/common";
-import { InjectModel } from "@nestjs/sequelize";
-import { ROLES_KEY } from "../common/auth-user.js";
+import { RbacService } from "../auth/rbac.service.js";
 import { canWriteScheduling } from "../common/scheduling-write.guard.js";
 import { Staff } from "../database/models/staff.model.js";
-import { ClassGroup } from "../database/models/training/class-group.model.js";
-import { MastersController } from "../masters/masters.controller.js";
 import { MastersService } from "../masters/masters.service.js";
-import { SchedulingController } from "../scheduling/scheduling.controller.js";
 import { SchedulingService } from "../scheduling/scheduling.service.js";
 import { SystemService } from "../system/system.service.js";
+import { ExamGradebookService } from "../masters/exam-gradebook.service.js";
+import { businessCalendarDaysSince } from "../scheduling/scheduling-time.js";
 
-export const operationalPermissions = (user: unknown) => {
-  const allowed = (controller: any, handler?: any) => {
-    const roles: string[] = Reflect.getMetadata(ROLES_KEY, handler || controller) || Reflect.getMetadata(ROLES_KEY, controller) || [];
-    return user instanceof Staff && roles.includes(user.role);
-  };
+export const operationalPermissions = (user: unknown, permissions: Set<string>) => {
+  const can = (...required: string[]) => user instanceof Staff && required.every((permission) => permissions.has(permission));
   return {
-    // Read the same role metadata that RolesGuard uses on the existing write endpoints.
-    grouping: allowed(MastersController, MastersController.prototype.assignMembers),
-    grades: allowed(MastersController, MastersController.prototype.saveExamLists),
-    scheduling: allowed(SchedulingController) && canWriteScheduling(user),
-    progress: allowed(SchedulingController) && canWriteScheduling(user),
-    overview: user instanceof Staff && user.role === "admin",
+    grouping: can("masters.view", "masters.manage"),
+    grades: can("gradebook.view", "gradebook.submit"),
+    scheduling: can("scheduling.view", "scheduling.write") && canWriteScheduling(user),
+    progress: can("scheduling.view", "scheduling.write") && canWriteScheduling(user),
+    overview: can("scheduling.view"),
   };
 };
 
@@ -37,7 +31,8 @@ export class DashboardService {
     private readonly masters: MastersService,
     private readonly scheduling: SchedulingService,
     private readonly system: SystemService,
-    @InjectModel(ClassGroup) private readonly groups: typeof ClassGroup,
+    private readonly rbac: RbacService,
+    private readonly gradebooks: ExamGradebookService,
   ) {}
 
   private async grouping(year: string, majorsPromise: Promise<any[]>) {
@@ -73,7 +68,7 @@ export class DashboardService {
         href: href("/masters/schedule", { year, queue: "unscheduled" }), items: unscheduled.slice(0, 5).map(item) } } : {}),
       ...(permissions.progress ? { progress: { count: pending.length, itemCount: pending.length,
         href: href("/masters/schedule", { year, queue: "pending-confirmation" }),
-        items: pending.slice(0, 5).map((offering) => ({ ...item(offering),
+        items: pending.map((offering) => ({ ...item(offering),
           count: Number(offering.sessionSummary.pendingCount), unit: "buổi",
           detail: `${offering.sessionSummary.pendingCount} buổi đã qua giờ, chưa xác nhận`,
           href: href("/masters/schedule", { year, offeringId: offering.id, queue: "pending-confirmation" }),
@@ -87,45 +82,45 @@ export class DashboardService {
     };
   }
 
-  private async grades(year: string, majorsPromise: Promise<any[]>) {
-    const [majors, groups] = await Promise.all([majorsPromise, this.groups.findAll({
-      where: { program: "masters", academicYear: year, groupType: "ADMINISTRATIVE" },
-      attributes: ["id", "majorId"], raw: true,
-    })]);
-    const majorIds = new Set(groups.map((group: any) => group.majorId));
-    // Let the domain service reject an unsupported/inactive scope; never silently omit it and report a healthy zero.
-    const scopes = majors.filter((major) => majorIds.has(major.id));
-    const items: any[] = [];
-    // Bound service-query concurrency. No grade formula or participant eligibility is reimplemented here.
-    for (let index = 0; index < scopes.length; index += 2) {
-      const reports = await Promise.all(scopes.slice(index, index + 2).map(async (major) => ({
-        major, report: await this.scheduling.getClassCurriculumProgress({ majorId: major.id, academicYear: year }),
-      })));
-      for (const { major, report } of reports) for (const group of report.classes) {
-        const missing = group.subjects.filter((subject) => subject.needsGradeEntry === true);
-        if (!missing.length) continue;
-        items.push({ id: group.id, title: group.code, detail: `${missing.length} học phần chưa nhập đủ điểm`,
-          count: missing.length, unit: "HP",
-          // Progress already marks the exact incomplete subject. ExamLists resolves its completed offering.
-          href: href("/masters/exam-lists", { year, majorId: major.id, groupId: group.id,
-            ...(missing[0].incompleteCourseOfferingId ? { offeringId: missing[0].incompleteCourseOfferingId } : {}),
-            subjectId: missing[0].subjectId, logicalSubjectId: missing[0].logicalSubjectId || missing[0].subjectId }),
-        });
-      }
+  private async grades(year: string) {
+    const offerings = (await this.scheduling.listCourseOfferings({ program: 'masters', academicYear: year })).map(plain);
+    const tracking = await this.gradebooks.tracking(offerings, true);
+    const warningGroups = [
+      { key: 'components', title: 'CHỜ NHẬP ĐIỂM THÀNH PHẦN', items: [] as any[] },
+      { key: 'exam', title: 'CHỜ TỔ CHỨC THI', items: [] as any[] },
+      { key: 'examGrades', title: 'CHỜ NHẬP ĐIỂM THI', items: [] as any[] },
+    ];
+    for (const offering of offerings) {
+      const state = tracking.get(offering.id);
+      if (!state || state.legacy) continue;
+      let index: number, at: string | Date | null, milestone: string;
+      if (!state.componentsEntered) { index = 0; at = state.completedTeachingAt; milestone = 'Hoàn thành môn học'; }
+      else if (state.componentsApproved && state.candidateCount > 0 && !state.examCompleted) { index = 1; at = state.componentScoreApprovedAt; milestone = 'Điểm thành phần được duyệt'; }
+      else if (state.examCompleted && !state.examGradesComplete) { index = 2; at = state.examCompletedAt; milestone = 'Thi xong'; }
+      else continue;
+      const group = scopeGroup(offering, year);
+      const days = businessCalendarDaysSince(at);
+      const params = { year, offeringId: offering.id, ...(group?.id ? { groupId: group.id } : {}), ...(group?.majorId ? { majorId: group.majorId } : {}) };
+      warningGroups[index].items.push({ id: offering.id,
+        title: [offering.subject?.name, offering.name || group?.code].filter(Boolean).join(' · '),
+        detail: days === null ? milestone : `${milestone} ${days} ngày trước`,
+        elapsedDays: days, href: href(index === 1 ? '/masters/exam-schedule' : '/masters/exam-lists', params) });
     }
-    items.sort((a, b) => b.count - a.count || a.title.localeCompare(b.title, "vi"));
-    return { count: items.length, itemCount: items.length, items: items.slice(0, 5),
+    for (const group of warningGroups) group.items.sort((a, b) => (b.elapsedDays ?? -1) - (a.elapsedDays ?? -1) || a.title.localeCompare(b.title, 'vi'));
+    const items = warningGroups[0].items;
+    return { count: items.length, itemCount: items.length, items: items.slice(0, 5), warningGroups: warningGroups.slice(1),
       href: items[0]?.href || href("/masters/exam-lists", { year }) };
   }
 
   async operational(user: unknown, year: string, section?: DashboardSection) {
-    const permissions = operationalPermissions(user);
+    const access = user instanceof Staff ? await this.rbac.effectiveAccess(user) : { permissions: new Set<string>() };
+    const permissions = operationalPermissions(user, access.permissions);
     let majorsPromise: Promise<any[]> | undefined;
     const majors = () => majorsPromise ||= this.system.listMajors("masters").then((rows) => rows.map(plain));
     const loaders: Partial<Record<DashboardSection, () => Promise<any>>> = {
       ...(permissions.grouping ? { grouping: () => this.grouping(year, majors()) } : {}),
       ...(permissions.scheduling || permissions.progress || permissions.overview ? { teaching: () => this.teaching(year, permissions) } : {}),
-      ...(permissions.grades ? { grades: () => this.grades(year, majors()) } : {}),
+      ...(permissions.grades ? { grades: () => this.grades(year) } : {}),
     };
     const entries = Object.entries(loaders).filter(([key]) => !section || section === key);
     const results = await Promise.allSettled(entries.map(([, loader]) => loader()));

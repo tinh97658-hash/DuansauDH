@@ -8,7 +8,7 @@ import ArrowUpwardRounded from "@mui/icons-material/ArrowUpwardRounded";
 import ArrowDownwardRounded from "@mui/icons-material/ArrowDownwardRounded";
 import { api, groupsOf, intersectDays, labelOf, message, Modal, normalize, Notice, offeringTitle, rows, SearchSelect, unique, useLoad } from "./shared";
 
-import { addDays, formatDateKey, getBusinessTodayKey, isSessionPast, mondayOf, vietnameseDate, vietnameseDayMonth, vietnameseWeekdayShort, weekDaysFrom } from "../../utils/schedulingCalendar";
+import { addDays, formatDateKey, getBusinessTodayKey, getBusinessWallTime, isSessionPast, isSessionStartedInBusinessTimezone, periodTimes, mondayOf, vietnameseDate, vietnameseDayMonth, vietnameseWeekdayShort, weekDaysFrom } from "../../utils/schedulingCalendar";
 import SessionEditor from "./SessionEditor";
 import { shouldSuggestClosing } from "./sessionWarning";
 import OfferingDetails from "./OfferingDetails";
@@ -244,6 +244,15 @@ function WeekOverflowPreview({ date, dayLabel, period, hiddenSessions, onOpenDay
 }
 
 export default function Schedule({ user }) {
+  const [clock, setClock] = useState(() => new Date());
+  useEffect(() => {
+    const seconds = (time) => time.split(":").reduce((total, value) => total * 60 + Number(value), 0);
+    const current = seconds(getBusinessWallTime(clock).slice(11));
+    const starts = ["MORNING", "AFTERNOON"].map((period) => seconds(`${periodTimes(period).startTime}:00`));
+    const next = Math.min(...[...starts, 86400].filter((start) => start > current));
+    const timer = setTimeout(() => setClock(new Date()), (next - current) * 1000 - clock.getUTCMilliseconds());
+    return () => clearTimeout(timer);
+  }, [clock]);
   const [params, setParams] = useSearchParams();
   const dashboardQueue = dashboardScheduleQueue(params.get("queue"));
   const requested = params.get("offeringId") || "";
@@ -360,17 +369,19 @@ export default function Schedule({ user }) {
     return {
       date,
       past: isSessionPast({ sessionDate: date, endTime: period === "MORNING" ? "12:00" : "23:59" }),
+      started: isSessionStartedInBusinessTimezone({ sessionDate: date, startTime: periodTimes(period).startTime }, clock),
       incompatible: selecting && !selectedDays.includes(day.getDay()),
       items: sessionsOn(date, period),
       occupied: selecting && (sessions.data || []).some((session) => session.status !== "not_held" && session.sessionDate === date && session.period === period && (session.courseOfferingId === selected.id || groupsOf(session.courseOffering).some((group) => selectedGroupIds.has(group.id)))),
     };
   };
-  const schedulingAvailability = ({ past, incompatible, occupied }) => {
-    const visible = selecting && !past && !incompatible && !occupied;
+  const schedulingAvailability = ({ past, started, incompatible, occupied }) => {
+    const visible = selecting && !past && !started && !incompatible && !occupied;
     return { visible, enabled: visible && !sessions.loading && !sessions.error };
   };
   const openSlotScheduler = (slot, period) => {
     if (!schedulingAvailability(slot).enabled) return;
+    if (isSessionStartedInBusinessTimezone({ sessionDate: slot.date, startTime: periodTimes(period).startTime })) return;
     setEditor({ offering: selected, date: slot.date, period });
   };
   const addSessionButton = (day, period, existingSlot) => {
@@ -437,7 +448,7 @@ export default function Schedule({ user }) {
       const dateKey = formatDateKey(day);
       const isToday = dateKey === todayKey;
       const count = sessionsOn(dateKey).length;
-      return <button type="button" className={`sl-day ${isToday ? "sl-is-today" : ""}`} key={dateKey} aria-label={`Xem lịch ${vietnameseDate(dateKey)}: ${count} lớp`} onClick={() => setFocusedDate(dateKey)}><strong>{vietnameseWeekdayShort(day)}</strong><span>{vietnameseDayMonth(day).replace("/", "-")}</span><b>{count}</b>{isToday && <i className="sl-today-indicator" aria-label="Hôm nay" title="Hôm nay" />}</button>;
+      return <button type="button" className={`sl-day ${isToday ? "sl-is-today" : ""}`} key={dateKey} aria-label={`Xem lịch ${vietnameseDate(dateKey)}: ${count} lớp`} onClick={() => setFocusedDate(dateKey)}><strong>{vietnameseWeekdayShort(day)}</strong><span>{vietnameseDayMonth(day)}</span><b>{count}</b>{isToday && <i className="sl-today-indicator" aria-label="Hôm nay" title="Hôm nay" />}</button>;
     })}
       {["MORNING", "AFTERNOON"].map((period) => <React.Fragment key={period}><div className="sl-period"><span>{period === "MORNING" ? "SÁNG" : "CHIỀU"}</span></div>{weekDays.map((day) => {
         const slot = slotState(day, period);
@@ -465,13 +476,18 @@ export default function Schedule({ user }) {
   </section>
   {editor && <SessionEditor key={editor.session?.id || `${editor.date}-${editor.period}`} {...editor} user={user} onClose={() => setEditor(null)} onSaved={saved} onViewOffering={(offering) => { setEditor(null); setDetails(offering); }} />}
   {details && <OfferingDetails offering={details} user={user} onClose={() => setDetails(null)} onSaved={saved} onOpenSession={openSession} onSelect={select} />}
-  {pendingOpen && <Modal wide className="sl-pending-drawer" bodyClassName="sl-pending-body" title={`BUỔI CHỜ XÁC NHẬN · ${pendingRows.length ?? 0}`} busy={saving} onClose={() => setPendingOpen(false)}>{pending.loading ? <Notice>Đang tải...</Notice> : pending.error ? <Notice error={pending.error} /> : <>{error && <Notice error={error} />}{[...pendingRows].sort((left, right) => `${left.sessionDate} ${left.period}`.localeCompare(`${right.sessionDate} ${right.period}`)).map((session) => {
-    const title = offeringTitle(session.courseOffering);
-    return <article className="sl-pending-card" key={session.id}>
-      <div className="sl-pending-date"><strong>{vietnameseDate(session.sessionDate)}</strong><span>{session.period === "MORNING" ? "SÁNG" : "CHIỀU"}</span></div>
-      <div className="sl-pending-copy"><h3 title={title}>{title}</h3><span>{subjectLabel(session.courseOffering)}</span></div>
-      <div className="sl-pending-side"><small>{session.lecturer?.name || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><div className="sl-pending-actions"><button className="sl-btn" disabled={saving} onClick={() => confirmation(session, "not_held")}>Không diễn ra</button><button className="sl-btn sl-btn-primary" disabled={saving} onClick={() => confirmation(session, "held")}>✓ Đã diễn ra</button></div></div>
-    </article>;
-  })}{!pendingRows.length && <Notice>Không có buổi chờ xác nhận.</Notice>}</>}</Modal>}
+  {pendingOpen && <Modal wide className="sl-pending-drawer" bodyClassName="sl-pending-body" title={`BUỔI CHỜ XÁC NHẬN · ${pendingRows.length}`} busy={saving} onClose={() => setPendingOpen(false)}>
+    {pending.loading ? <Notice>Đang tải...</Notice> : pending.error ? <Notice error={pending.error} /> : <>
+      {error && <Notice error={error} />}
+      {pendingRows.length ? [...pendingRows].sort((left, right) => `${left.sessionDate} ${left.period}`.localeCompare(`${right.sessionDate} ${right.period}`)).map((session) => {
+          const title = offeringTitle(session.courseOffering);
+          return <article className="sl-pending-card" key={session.id}>
+            <div className="sl-pending-date"><strong>{vietnameseDate(session.sessionDate)}</strong><span>{session.period === "MORNING" ? "SÁNG" : "CHIỀU"}</span></div>
+            <div className="sl-pending-copy"><h3 title={title}>{title}</h3><span>{subjectLabel(session.courseOffering)}</span></div>
+            <div className="sl-pending-side"><small>{session.lecturer?.name || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><div className="sl-pending-actions"><button className="sl-btn" disabled={saving} onClick={() => confirmation(session, "not_held")}>Không diễn ra</button><button className="sl-btn sl-btn-primary" disabled={saving} onClick={() => confirmation(session, "held")}>✓ Đã diễn ra</button></div></div>
+          </article>;
+        }) : <Notice>Không có buổi chờ xác nhận.</Notice>}
+    </>}
+  </Modal>}
   </section>;
 }

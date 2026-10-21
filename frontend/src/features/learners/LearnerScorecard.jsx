@@ -1,3 +1,5 @@
+import { usePermissions } from "../accounts/usePermissions";
+import { openLearnerTranscript } from "./learnerTranscript";
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Alert, Button, Chip, CircularProgress, MenuItem, Paper, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
@@ -23,12 +25,18 @@ const columns = [
 ];
 
 export default function LearnerScorecard({ admissionRecordId, classGroupId, onClassChange }) {
+  const { can } = usePermissions();
+  const [issuing, setIssuing] = useState(false);
+  const [issueId, setIssueId] = useState("");
+  const [issuedItems, setIssuedItems] = useState(null);
   const catalogRevision = useSubjectCatalogRevision();
   const gradebookRevision = useGradebookRevision();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
+
+  useEffect(() => { setIssuedItems(null); setIssueId(""); }, [admissionRecordId]);
 
   useEffect(() => {
     let active = true;
@@ -45,7 +53,7 @@ export default function LearnerScorecard({ admissionRecordId, classGroupId, onCl
 
   const subjects = (report?.subjects || []).map(subject => {
     const details = subject.grade?.details;
-    if (!details || subject.grade.studyLeaveFailure || details.studyLeaveFailure || details.source === "recognition" || details.examExempt || calculateExamEligibility(details) !== false) return subject;
+    if (!details || details.finalized || subject.grade.studyLeaveFailure || details.studyLeaveFailure || details.source === "recognition" || details.examExempt || calculateExamEligibility(details) !== false) return subject;
     return { ...subject, grade: { ...subject.grade, score: 0, result: "failed",
       details: { ...details, examScore: 0, courseScore: 0, grade4: 0, letterGrade: "F", attemptScores: [0] } } };
   });
@@ -58,6 +66,29 @@ export default function LearnerScorecard({ admissionRecordId, classGroupId, onCl
     {loading && <div className="lsc-empty" role="status"><CircularProgress size={24} /><span>Đang tải bảng điểm...</span></div>}
     {error && <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => setReload(value => value + 1)}>Thử lại</Button>}>{error}</Alert>}
     {!loading && report && <>
+      {report.progress && <Alert severity={report.progress.completed ? "success" : "info"}>
+        {report.progress.completed ? "Đã hoàn thành các học phần và chốt điểm của CTĐT." : `Chưa hoàn thành học phần: ${report.progress.completedSubjects}/${report.progress.totalSubjects} môn đã đạt và được chốt.`}
+        <div>{report.progress.earnedCredits} tín chỉ đã đạt và được chốt. Việc xét tốt nghiệp được xử lý riêng.</div>
+        {report.progress.blockers?.length > 0 && <details><summary>Điều kiện còn thiếu</summary><ul>{report.progress.blockers.map((item, index) => <li key={index}>{item.message}</li>)}</ul></details>}
+      </Alert>}
+      {can("reports.export") && <Button disabled={!report.progress?.completed || issuing} onClick={async () => {
+        const preview = window.open("about:blank", "_blank");
+        setIssuing(true); setError("");
+        try { const { data } = await axios.post(`${API_BASE_URL}/reports/learner-scorecard/${admissionRecordId}/issue`, { classGroupId: report.group.id });
+          setIssueId(data.id); openLearnerTranscript(data.snapshot, preview);
+        } catch (failure) { preview?.close(); setError(failure.response?.data?.message || "Không thể lưu bản kết quả đã chốt."); }
+        finally { setIssuing(false); }
+      }}>Lưu bản kết quả đã chốt</Button>}
+      {issueId && <Alert severity="success">Đã lưu bản kết quả: {issueId}</Alert>}
+      <Button onClick={async () => {
+        try { const { data } = await axios.get(`${API_BASE_URL}/reports/learner-scorecard/${admissionRecordId}/issues`); setIssuedItems(data); }
+        catch (failure) { setError(failure.response?.data?.message || "Không tải được các bản đã chốt."); }
+      }}>Các bản kết quả đã chốt</Button>
+      {issuedItems && <div>{!issuedItems.length && <p>Chưa có bản kết quả đã chốt.</p>}{issuedItems.map(item => <Button key={item.id} onClick={async () => {
+        const preview = window.open("about:blank", "_blank");
+        try { const { data } = await axios.get(`${API_BASE_URL}/reports/transcript-issues/${item.id}`); openLearnerTranscript(data.snapshot, preview); }
+        catch (failure) { preview?.close(); setError(failure.response?.data?.message || "Không tải được bản kết quả."); }
+      }}>{item.createdAt} · {item.actor?.name}</Button>)}</div>}
       {!report.group ? <Alert severity="info">Học viên chưa được phân vào lớp. Hãy phân lớp để xem bảng điểm theo chương trình đào tạo.</Alert> : <>
         <div className="lsc-scope">
           <FilterSelectField label="Lớp học viên" value={report.group.id} disabled={report.groups.length < 2} onChange={event => onClassChange(event.target.value)}>

@@ -1,3 +1,4 @@
+import { usePermissions } from "../../features/accounts/usePermissions";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
@@ -9,11 +10,18 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField,
   Tooltip, Typography,
 } from "@mui/material";
-import {
-  AddRounded, CheckBoxOutlineBlankRounded, CheckBoxRounded, CheckRounded,
-  CloseRounded, DeleteOutlineRounded, DeleteRounded, EditRounded, LibraryBooksRounded,
-  PlaylistAddRounded, SaveRounded, ClassRounded,
-} from "@mui/icons-material";
+import AddRounded from "@mui/icons-material/AddRounded";
+import CheckBoxOutlineBlankRounded from "@mui/icons-material/CheckBoxOutlineBlankRounded";
+import CheckBoxRounded from "@mui/icons-material/CheckBoxRounded";
+import CheckRounded from "@mui/icons-material/CheckRounded";
+import CloseRounded from "@mui/icons-material/CloseRounded";
+import DeleteOutlineRounded from "@mui/icons-material/DeleteOutlineRounded";
+import DeleteRounded from "@mui/icons-material/DeleteRounded";
+import EditRounded from "@mui/icons-material/EditRounded";
+import LibraryBooksRounded from "@mui/icons-material/LibraryBooksRounded";
+import PlaylistAddRounded from "@mui/icons-material/PlaylistAddRounded";
+import SaveRounded from "@mui/icons-material/SaveRounded";
+import ClassRounded from "@mui/icons-material/ClassRounded";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
 import FilterSearchField from "../../components/FilterSearchField";
@@ -102,7 +110,8 @@ const TrainingPlan = () => {
   const [disciplineId, setDisciplineId] = useState("");
   const [majorId, setMajorId] = useState("");
   const [tab, setTab] = useState(0); // 0: Học phần chuyên ngành, 1: Lớp học & Chương trình đào tạo
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { can } = usePermissions();
+  const isAdmin = can("plan.manage");
   const [loading, setLoading] = useState(false);
 
   // Data
@@ -178,13 +187,15 @@ const TrainingPlan = () => {
   const [catalogSubjects, setCatalogSubjects] = useState([]);
 
   // Load Majors
+  const selectedMajorId = useRef(majorId);
+  selectedMajorId.current = majorId;
   const loadMajors = useCallback(async () => {
     try {
       const { data } = await axios.get(`${API_BASE_URL}/plan/training-plan?program=${level}`, { withCredentials: true });
       const list = Array.isArray(data) ? data : data.data || [];
       setMajors(list);
       if (list.length > 0) {
-        const selected = list.find((m) => m.id === majorId) || list[0];
+        const selected = list.find((m) => m.id === selectedMajorId.current) || list[0];
         setDisciplineId(majorDisciplineId(selected));
         setMajorId(selected.id);
       } else {
@@ -199,20 +210,14 @@ const TrainingPlan = () => {
     } catch (err) {
       toast.error(err.response?.data?.message || "Không thể tải danh sách chuyên ngành");
     }
-  }, [majorId, level]);
+  }, [level]);
 
   useEffect(() => {
     loadMajors();
   }, [loadMajors]);
 
   // Auth Check
-  useEffect(() => {
-    let mounted = true;
-    axios.get(`${API_BASE_URL}/auth/isStaff`, { withCredentials: true })
-      .then(({ data }) => mounted && setIsAdmin(data.message === "admin"))
-      .catch(() => mounted && setIsAdmin(false));
-    return () => { mounted = false; };
-  }, []);
+
 
   // Load each resource independently. A missing curriculum endpoint must not hide
   // a valid subject catalog (the scheduling module consumes that catalog too).

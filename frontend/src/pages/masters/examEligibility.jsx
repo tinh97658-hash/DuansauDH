@@ -1,7 +1,9 @@
 import React from "react";
-import FeatureLayout from "../../components/FeatureLayout";
+import { Navigate, useLocation } from "react-router-dom";
 
-const ExamEligibility = () => (
-  <FeatureLayout title="Xét tư cách thi hết môn" group="Quá trình học tập" desc="Xét điều kiện dự thi hết môn cho học viên thạc sĩ." />
-);
+// Preserve bookmarked scopes while routing to the current eligibility workflow.
+const ExamEligibility = () => {
+  const { search } = useLocation();
+  return <Navigate replace to={{ pathname: "/masters/exam-lists", search }} />;
+};
 export default ExamEligibility;

@@ -22,6 +22,7 @@
     "db:migrate:undo": "npm run build && node dist/database/migrate.js down",
     "db:migrate:status": "npm run build && node dist/database/migrate.js status",
     "db:seed:admin": "npm run build && node dist/database/seed-admin.js",
+    "db:seed:auth": "npm run build && node dist/database/seed-auth.js",
     "db:seed:common": "npm run build && node dist/database/seed-common.js",
     "db:seed:demo": "npm run build && node dist/database/seed-demo.js",
     "db:seed:scheduling-test": "npm run build && node dist/database/seeds/seed-scheduling-test.js",
@@ -33,10 +34,7 @@
     "db:test:bulk": "npm run db:seed:bulk -- --rollback",
     "db:seed:realistic-test": "npm run build && node dist/database/seeds/seed-realistic-test.js",
     "db:seed:realistic-test:preview": "npm run db:seed:realistic-test -- --preview",
-    "dev:data:preview": "npm run build && node dist/database/seeds/dev-postgraduate-data.js preview",
-    "dev:data:reset": "npm run build && node dist/database/seeds/dev-postgraduate-data.js reset",
-    "dev:data:seed": "npm run build && node dist/database/seeds/dev-postgraduate-data.js seed",
-    "dev:data:reseed": "npm run build && node dist/database/seeds/dev-postgraduate-data.js reseed"
+    "db:seed:vmu": "npm run build && node dist/database/seeds/seed-vmu-sample.js"
   },
   "author": "Jeewantha Udeshika Ariyawansha",
   "license": "ISC",

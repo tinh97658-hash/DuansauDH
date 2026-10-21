@@ -1,10 +1,13 @@
+import { usePermissions } from "../accounts/usePermissions";
 import React, { useState } from "react";
 import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
 import { api, groupsOf, message, Modal, Notice, offeringTitle, rows, subjectLabel, useLoad } from "./shared";
 import { vietnameseDate, vietnameseDayLabel, isSessionPast } from "../../utils/schedulingCalendar";
 import { personNameParts } from "../../utils/personName";
+import OfferingDeleteButton from "./OfferingDeleteButton";
 
 export default function OfferingDetails({ offering, user, onClose, onSaved, onOpenSession, onSelect }) {
+  const { can } = usePermissions();
   const detail = useLoad(() => api.get(`/scheduling/course-offerings/${offering.id}`), [offering.id]);
   const roster = useLoad(() => api.get(`/scheduling/course-offerings/${offering.id}/roster`), [offering.id]);
   const sessions = useLoad(async () => rows(await api.get(`/scheduling/course-offerings/${offering.id}/teaching-sessions`)), [offering.id]);
@@ -18,7 +21,7 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
   const [success, setSuccess] = useState("");
   const value = detail.data || offering;
   const canManage = user?.canManageScheduling === true;
-  const canNotes = canManage || user?.role === "admin";
+  const canNotes = canManage || can("scheduling.organize");
   const summary = value.sessionSummary || {};
   const allSessions = sessions.data || [];
 
@@ -54,9 +57,11 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
   const saveNotes = () => mutate(() => api.put(`/scheduling/course-offerings/${offering.id}/roster-notes`, {
     participantNotes: (roster.data?.participants || []).map((row) => ({ participantId: row.id, note: (notes[row.id] !== undefined ? notes[row.id] : row.note || "").trim() })).filter((row) => row.note),
   }), () => { setSuccess("Đã lưu ghi chú."); roster.reload(); setNotes({}); });
-  return <Modal wide hideHeader className="sl-offering-drawer" bodyClassName="sl-offering-body" title="CHI TIẾT LỚP HỌC PHẦN" busy={saving} onClose={onClose} actions={canManage && value.status === "active" && onSelect ? <>
-    <button className="sl-btn" onClick={() => onSelect(value)}>Xếp lịch / Xếp thêm</button><button className="sl-btn sl-btn-primary" disabled={saving || detail.loading || unresolved.loading || !!unresolved.error || !summary.heldCount} onClick={() => { setError(""); unresolved.reload(); setCompleting(true); }}>Xác nhận hoàn thành giảng dạy</button>
-  </> : null}>
+  return <Modal wide hideHeader className="sl-offering-drawer" bodyClassName="sl-offering-body" title="CHI TIẾT LỚP HỌC PHẦN" busy={saving} onClose={onClose} actions={<>
+    {canNotes && <OfferingDeleteButton offering={value} disabled={saving || detail.loading || sessions.loading || !!detail.error || !!sessions.error}
+      onDeleted={() => { onSaved?.(); onClose(); }} onScheduleDeleted={() => { detail.reload(); sessions.reload(); unresolved.reload(); onSaved?.(); }} />}
+    {canManage && value.status === "active" && onSelect && <><button className="sl-btn" onClick={() => onSelect(value)}>Xếp lịch / Xếp thêm</button><button className="sl-btn sl-btn-primary" disabled={saving || detail.loading || unresolved.loading || !!unresolved.error || !summary.heldCount} onClick={() => { setError(""); unresolved.reload(); setCompleting(true); }}>Xác nhận hoàn thành giảng dạy</button></>}
+  </>}>
     <header className="sl-offering-hero"><div><div className="sl-eyebrow">LỚP HỌC PHẦN</div><h2>{offeringTitle(value)}</h2><strong>{subjectLabel(value)}</strong><p>{groupsOf(value).length} lớp/nhóm · {value.participantCount ?? 0} học viên</p></div><div className="sl-offering-hero-actions"><button className="sl-drawer-close" aria-label="Đóng" disabled={saving} onClick={onClose}>×</button><span className={`sl-state ${value.status === "completed" ? "sl-complete" : "sl-progress"}`}>{value.status === "completed" ? "HOÀN THÀNH" : "ĐANG DẠY"}</span></div></header>
     <div className={`sl-offering-content ${activeTab === "people" ? "sl-offering-content-people" : ""}`}>{detail.error && <Notice error={detail.error} />}{error && <Notice error={error} />}{success && <Notice>{success}</Notice>}
       {value.status === "completed" && <p>Học viên có kết quả Không đạt được tự động tổng hợp thành nhóm Học lại theo lớp gốc tại Tạo lớp học phần.</p>}
@@ -155,7 +160,7 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
             <thead>
               <tr>
                 <th style={{ width: 44, textAlign: "center" }}>STT</th>
-                <th style={{ width: 145 }}>NGÀY HỌC</th>
+                <th className="sl-session-centered" style={{ width: 145 }}>NGÀY HỌC</th>
                 <th className="sl-session-centered" style={{ width: 105 }}>CA HỌC</th>
                 <th className="sl-session-centered">PHÒNG HỌC</th>
                 <th className="sl-session-centered">GIẢNG VIÊN</th>
@@ -174,8 +179,8 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
                     onClick={() => onOpenSession && onOpenSession(session)}
                   >
                     <td style={{ textAlign: "center", fontWeight: 600, color: "#64748b" }}>{index + 1}</td>
-                    <td>
-                      <strong style={{ color: "#173e75" }}>{vietnameseDayLabel(session.sessionDate)}</strong>
+                    <td className="sl-session-centered">
+                      <strong style={{ color: "#173e75" }}>{vietnameseDayLabel(session.sessionDate, false)}</strong>
                       <div style={{ fontSize: "11.5px", color: "#64748b" }}>{vietnameseDate(session.sessionDate)}</div>
                     </td>
                     <td className="sl-session-centered">
@@ -239,7 +244,7 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
         role="tabpanel"
         aria-labelledby="sl-offering-tab-people"
       >
-      <h3 className="sl-offering-groups-title">LỚP / NHÓM THAM GIA</h3>
+      <h3 className="sl-offering-groups-title">LỚP THAM GIA</h3>
       <div className="sl-offering-groups">{groupsOf(value).map((group) => <div key={group.id}><strong>{group.name || group.code}</strong><span>{group.major?.name || value.subject?.major?.name || "Chưa có chuyên ngành"} · {group.memberCount ?? 0} học viên</span></div>)}</div>
       <h3 className="sl-offering-groups-title" style={{ marginTop: 14 }}>DANH SÁCH HỌC VIÊN</h3>
       {roster.loading ? <Notice>Đang tải danh sách...</Notice> : roster.error ? <Notice error={roster.error} /> : (

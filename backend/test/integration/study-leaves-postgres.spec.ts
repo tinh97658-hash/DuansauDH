@@ -31,6 +31,7 @@ import { TeachingSession } from '../../src/database/models/training/teaching-ses
 import { Lecturer } from '../../src/database/models/common/lecturer.model.js';
 import { Room } from '../../src/database/models/common/room.model.js';
 import { up as backfillFailures, down as undoBackfillFailures } from '../../src/database/migrations/059-study-leave-scheduled-attempts.js';
+import { up as backfillEnrolledFailures, down as undoEnrolledFailures } from '../../src/database/migrations/061-study-leave-enrolled-attempts.js';
 
 const describeDb = process.env.RUN_POSTGRES_SCHEDULING_TESTS === 'true' ? describe : describe.skip;
 const dateAfter = (days: number) => businessDate(new Date(Date.now() + days * 86400000));
@@ -103,7 +104,7 @@ describeDb('Study leave lifecycle with real PostgreSQL and merged classes', () =
     expect(exam.rows.find((row: any) => row.participantId === participant())).toMatchObject({
       studyLeaveFailure: true, result: 'failed', eligible: false, testScore: 7, assignmentScore: 8, courseScore: null, grade4: null });
     expect((await exams.get({ classGroupId: group.id, courseOfferingId: offerings[2].id })).rows.map((row: any) => row.participantId))
-      .toEqual([`admission:${other.id}`]);
+      .toEqual(expect.arrayContaining([participant(), `admission:${other.id}`]));
     expect((await exams.get({ classGroupId: group.id, courseOfferingId: offerings[1].id, mode: 'exam', includeIds: participant() })).rows)
       .not.toEqual(expect.arrayContaining([expect.objectContaining({ participantId: participant() })]));
     const book = await CourseExamGradebook.findOne({ where: { courseOfferingId: offerings[1].id } });
@@ -111,7 +112,7 @@ describeDb('Study leave lifecycle with real PostgreSQL and merged classes', () =
     const report = await app.get(ClassScoreSummaryService).learnerScorecard(learner.id, group.id);
     expect(report.subjects.find(row => row.id === subjects[0].id)?.grade).toMatchObject({ score: 7.8, result: 'passed' });
     expect(report.subjects.find(row => row.id === subjects[1].id)?.grade).toMatchObject({ score: null, result: 'failed', studyLeaveFailure: true });
-    expect(report.subjects.find(row => row.id === subjects[2].id)?.grade).toBeNull();
+    expect(report.subjects.find(row => row.id === subjects[2].id)?.grade).toMatchObject({ score: null, result: 'failed', studyLeaveFailure: true });
     const learning = app.get(SubjectRecognitionService);
     expect(await learning.listStudiedSubjects(learner.id)).toEqual(expect.arrayContaining([
       expect.objectContaining({ subject: expect.objectContaining({ id: subjects[1].id }), result: 'failed', studyLeaveFailure: true }),
@@ -163,6 +164,8 @@ describeDb('Study leave lifecycle with real PostgreSQL and merged classes', () =
     const book = await CourseExamGradebook.findOne({ where: { courseOfferingId: offerings[0].id } });
     const grade = { ...book!.grades[0], testScore: outcome.testScore, examScore: outcome.examScore, result: outcome.result };
     await book!.update({ grades: [grade] });
+    // Historical single-stage marks are preserved by migration, not converted into new component drafts.
+    await db.query(`INSERT INTO course_exam_workflows(course_offering_id,mode) VALUES(:id,'legacy_preserved') ON CONFLICT(course_offering_id) DO UPDATE SET mode='legacy_preserved'`,{replacements:{id:offerings[0].id}});
     const baseQuery = { classGroupId: group.id, courseOfferingId: offerings[0].id, search: learner.code! };
     const before = await exams.get({ ...baseQuery, rosterScope: 'offering' });
     expect(before.rows[0].result).toBe(outcome.result);
@@ -190,8 +193,8 @@ describeDb('Study leave lifecycle with real PostgreSQL and merged classes', () =
       const query = { classGroupId: group.id, courseOfferingId: offerings[1].id, rosterScope };
       const data = await exams.get(query);
       expect(data.rows.find((row: any) => row.participantId === participant())).toMatchObject({ result: 'failed', studyLeaveFailure: true });
-      await expect(exams.save({ ...query, revision: data.revision, rows: [{ participantId: participant(), testScore: 8 }] } as any))
-        .rejects.toThrow('ngoài lớp');
+      await expect(exams.save({ ...query, revision: data.revision, rows: [{ participantId: participant(), testScore: 8 }] } as any,actor))
+        .rejects.toThrow('Trạng thái đặc biệt');
     }
     const book = await CourseExamGradebook.findOne({ where: { courseOfferingId: offerings[1].id } });
     expect(book!.grades[0]).toMatchObject({ participantId: participant(), testScore: 7 });
@@ -225,15 +228,17 @@ describeDb('Study leave lifecycle with real PostgreSQL and merged classes', () =
     expect((await exams.get(query)).rows).toHaveLength(0);
   });
 
-  it('withdraws immediately even for a future start date, without failing an unscheduled course or repeating withdrawal', async () => {
+  it('fails unscheduled enrolled courses immediately even for a future leave start date without repeating withdrawal', async () => {
     const leave = await request(dateAfter(5), dateAfter(60));
     await leaves.action(leave.id, { action: 'approve' }, actor);
     const approved = (await leaves.detail(learner.id)).leaves[0];
     expect(approved.effectiveStatus).toBe('scheduled');
     expect(approved.withdrawals).toHaveLength(2);
-    expect(approved.withdrawals.find(row => row.snapshot.courseOfferingId === offerings[2].id)?.snapshot.phase).toBe('not_started');
+    expect(approved.withdrawals.find(row => row.snapshot.courseOfferingId === offerings[2].id)?.snapshot)
+      .toMatchObject({ phase: 'studying', result: 'failed', studyLeaveFailure: true });
     expect((await scheduling.getCourseOfferingRoster(offerings[2].id)).participants.map(row => row.id)).toEqual([`admission:${other.id}`]);
-    expect((await exams.get({ classGroupId: group.id, courseOfferingId: offerings[2].id, search: learner.code! })).rows).toHaveLength(0);
+    expect((await exams.get({ classGroupId: group.id, courseOfferingId: offerings[2].id, search: learner.code! })).rows)
+      .toMatchObject([{ participantId: participant(), result: 'failed', studyLeaveFailure: true, courseScore: null }]);
     const newClass = await scheduling.createCourseOffering({ subjectId: subjects[3].id, classGroupIds: [group.id], academicYear: '2026' });
     expect((await scheduling.getCourseOfferingRoster(newClass.id)).participants.map(row => row.id)).toEqual([`admission:${other.id}`]);
     await leaves.synchronize(); await leaves.synchronize();
@@ -248,7 +253,7 @@ describeDb('Study leave lifecycle with real PostgreSQL and merged classes', () =
     expect(updated.history.filter((event: any) => event.action === 'activated')).toHaveLength(1);
   });
 
-  it('does not fail an unscheduled withdrawal when its former class is scheduled after approval', async () => {
+  it('keeps the failure recorded on approval when its former class is scheduled later', async () => {
     const leave = await approve();
     const lecturer = await Lecturer.create({ code: prefix, name: prefix });
     const room = await Room.create({ code: prefix, name: prefix });
@@ -258,9 +263,27 @@ describeDb('Study leave lifecycle with real PostgreSQL and merged classes', () =
     await backfillFailures({ context: { sequelize: db } });
     await leaves.synchronize();
     const detail = (await leaves.detail(learner.id)).leaves.find(row => row.id === leave.id)!;
-    expect(detail.withdrawals.find(row => row.snapshot.courseOfferingId === offerings[2].id)?.snapshot.phase).toBe('not_started');
+    expect(detail.withdrawals.find(row => row.snapshot.courseOfferingId === offerings[2].id)?.snapshot.phase).toBe('studying');
     const report = await app.get(ClassScoreSummaryService).learnerScorecard(learner.id, group.id);
-    expect(report.subjects.find(row => row.id === subjects[2].id)?.grade).toBeNull();
+    expect(report.subjects.find(row => row.id === subjects[2].id)?.grade).toMatchObject({ result: 'failed', studyLeaveFailure: true });
+  });
+
+  it('backfills unscheduled enrolled withdrawals while excluding classes opened during leave and supports rollback', async () => {
+    await approve();
+    const duringLeave = await scheduling.createCourseOffering({ subjectId: subjects[3].id, classGroupIds: [group.id], academicYear: '2026' });
+    await db.query(`UPDATE course_offering_withdrawals
+      SET snapshot = (snapshot - 'result' - 'studyLeaveFailure') || '{"phase":"not_started"}'::jsonb
+      WHERE admission_record_id = :id AND course_offering_id = :offering`,
+    { replacements: { id: learner.id, offering: offerings[2].id } });
+    const query = { classGroupId: group.id, courseOfferingId: offerings[2].id, search: learner.code! };
+    expect((await exams.get(query)).rows).toHaveLength(0);
+    await backfillEnrolledFailures({ context: { sequelize: db } });
+    await backfillEnrolledFailures({ context: { sequelize: db } });
+    expect((await exams.get(query)).rows).toMatchObject([{ participantId: participant(), result: 'failed',
+      studyLeaveFailure: true, testScore: null, assignmentScore: null, examScore: null, courseScore: null }]);
+    expect((await exams.get({ ...query, courseOfferingId: duringLeave.id })).rows).toHaveLength(0);
+    await undoEnrolledFailures({ context: { sequelize: db } });
+    expect((await exams.get(query)).rows).toHaveLength(0);
   });
 
   it('marks overdue without returning or withdrawing, leaves extensions pending until approved, and supports rejection', async () => {

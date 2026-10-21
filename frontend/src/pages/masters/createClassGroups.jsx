@@ -8,11 +8,13 @@ import {
   MenuItem, Paper, Stack, TableBody, TableCell, TableContainer,
   TableRow, Tooltip, Typography,
 } from "@mui/material";
-import {
-  AddRounded, DeleteRounded, EditRounded, GroupWorkRounded,
-} from "@mui/icons-material";
+import AddRounded from "@mui/icons-material/AddRounded";
+import DeleteRounded from "@mui/icons-material/DeleteRounded";
+import EditRounded from "@mui/icons-material/EditRounded";
+import GroupWorkRounded from "@mui/icons-material/GroupWorkRounded";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
+import { usePermissions } from "../../features/accounts/usePermissions";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import ClassGroupCreateDialog, { initialClassGroupForm as initialForm } from "./ClassGroupCreateDialog";
@@ -34,6 +36,7 @@ const CLASS_GROUP_COLUMNS = [
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
 const CreateClassGroups = () => {
+  const { can } = usePermissions();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const quickCreateOpened = useRef(false);
@@ -45,6 +48,7 @@ const CreateClassGroups = () => {
     && majors.some((major) => major.id === searchParams.get("majorId")
       && majorDisciplineId(major) === searchParams.get("disciplineId"));
 
+  const [majorsLoading, setMajorsLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [selectedMajor, setSelectedMajor] = useState("ALL");
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
@@ -54,7 +58,7 @@ const CreateClassGroups = () => {
   // Data & loading
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const isAdmin = can("masters.manage");
   const [error, setError] = useState("");
 
   // Dialogs
@@ -87,11 +91,8 @@ const CreateClassGroups = () => {
         if (!mounted) return;
         setMajors(Array.isArray(data) ? data : data.data || []);
       })
-      .catch(() => mounted && setMajors([]));
-
-    axios.get(`${API_BASE_URL}/auth/isStaff`, { withCredentials: true })
-      .then(({ data }) => mounted && setIsAdmin(data.message === "admin"))
-      .catch(() => mounted && setIsAdmin(false));
+      .catch(() => mounted && setMajors([]))
+      .finally(() => mounted && setMajorsLoading(false));
 
     return () => { mounted = false; };
   }, []);
@@ -268,6 +269,7 @@ const CreateClassGroups = () => {
               variant="contained"
               startIcon={<AddRounded />}
               onClick={openAdd}
+              disabled={majorsLoading || loading}
               sx={{ height: 40, px: 2, bgcolor: "#0788B8", borderRadius: "4px", boxShadow: "none", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}
             >
               Thêm nhóm mới

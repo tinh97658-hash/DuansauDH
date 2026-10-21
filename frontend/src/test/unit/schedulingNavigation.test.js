@@ -47,16 +47,20 @@ vi.mock(import("@mui/icons-material"), () => ({
 
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { AuthSessionContext } from "../../context/AuthSession";
 import RibbonHeader, { isRibbonRouteActive, ribbons } from "../../components/RibbonHeader";
 
 
+
+const authorizedSession = { user: { role: "custom" }, access: { permissions: [...new Set(Object.values(ribbons).flatMap(sections => sections.flatMap(section => section.actions.flatMap(item => item.permissions || []))))] } };
+const AuthorizedRibbon = () => <AuthSessionContext.Provider value={authorizedSession}><RibbonHeader /></AuthSessionContext.Provider>;
 
 describe("Masters scheduling ribbon", () => {
   it("keeps section navigation outside the collapsible action rail and supports action focus", async () => {
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ message: "admin" }) });
     try {
-      render(<MemoryRouter initialEntries={["/masters/class-course-history"]}><RibbonHeader /></MemoryRouter>);
+      render(<MemoryRouter initialEntries={["/masters/class-course-history"]}><AuthorizedRibbon /></MemoryRouter>);
       const sectionNavigation = await screen.findByRole("navigation", { name: "Nhóm chức năng" });
       const actionRail = screen.getByRole("region", { name: "Tác vụ chức năng" });
       const action = within(actionRail).getByRole("button", { name: "Thống kê tiến độ" });
@@ -74,7 +78,7 @@ describe("Masters scheduling ribbon", () => {
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ message: "admin" }) });
     try {
-      const { container } = render(<MemoryRouter initialEntries={["/system/majors"]}><RibbonHeader /></MemoryRouter>);
+      const { container } = render(<MemoryRouter initialEntries={["/system/majors"]}><AuthorizedRibbon /></MemoryRouter>);
       const collapse = await screen.findByRole("button", { name: "Thu gọn menu tác vụ" });
       const header = container.querySelector(".ribbon-header");
 
@@ -96,8 +100,8 @@ describe("Masters scheduling ribbon", () => {
     const gradeGroup = ribbons.masters.find((section) => section.label === "QUẢN LÝ ĐIỂM");
     expect(learningGroup.actions).toHaveLength(3);
     expect(gradeGroup.actions.map(({ label, route }) => ({ label, route }))).toEqual([
-      { label: "Xét tư cách thi hết môn", route: "/masters/exam-eligibility" },
       { label: "Danh sách thi, điểm thi", route: "/masters/exam-lists" },
+      { label: "Xếp lịch thi", route: "/masters/exam-schedule" },
       { label: "Tổng hợp điểm của lớp", route: "/reports/class-score-summary" },
     ]);
     expect(ribbons.reports.flatMap(section => section.actions).map(item => item.route)).not.toContain("/reports/class-score-summary");
@@ -137,7 +141,7 @@ describe("Masters scheduling ribbon", () => {
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ message: "admin" }) });
     try {
-      render(<MemoryRouter initialEntries={[path]}><RibbonHeader /></MemoryRouter>);
+      render(<MemoryRouter initialEntries={[path]}><AuthorizedRibbon /></MemoryRouter>);
       const active = await screen.findByRole("button", { name: activeLabel });
       const other = screen.getByRole("button", { name: otherLabel });
       expect(active).toHaveAttribute("aria-current", "page");

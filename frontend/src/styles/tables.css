@@ -24,7 +24,7 @@
 
   body :is(#root, .MuiDialog-root, .scheduling-v20) table > thead > tr > th {
     padding: 9px 16px 9px 8px !important;
-    border-bottom: 1px solid var(--table-border-color) !important;
+    border-bottom: 2px solid var(--table-border-color) !important;
     border-right: 1px solid var(--table-row-border-color) !important;
     border-radius: 0 !important;
     background: var(--table-header-bg) !important;
@@ -41,7 +41,14 @@
     border-bottom: 1px solid var(--table-row-border-color) !important;
     border-right: 1px solid var(--table-row-border-color) !important;
     font-size: 12.5px !important;
+    color: var(--text-primary);
+    font-weight: 500;
     line-height: 1.5;
+  }
+
+  /* Outlined status labels retain their meaning without faint default borders. */
+  body :is(#root, .MuiDialog-root) table .MuiChip-outlined {
+    border-color: currentColor;
   }
 
   /* Preserve the larger loading/empty-state cells and their action buttons. */

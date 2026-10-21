@@ -1,0 +1,5 @@
+.account-editor-field>label,.account-editor-fields .account-editor-label{display:block;margin:0 0 6px;color:#435b72;font-size:13px;font-weight:700;line-height:1.5}
+body .app-popup .account-editor-fields .account-editor-label{font-size:13px!important}
+.account-editor-fields .account-editor-label{text-transform:uppercase}
+.account-editor-fields .MuiOutlinedInput-root{min-height:36px;border-radius:0;font-size:13px}
+.account-editor-fields .MuiFormHelperText-root{margin:5px 0 0;font-size:12px}

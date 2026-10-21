@@ -8,7 +8,7 @@ export class SessionSerializer extends PassportSerializer {
   constructor(private readonly auth: AuthService) { super(); }
 
   serializeUser(user: any, done: (error: Error | null, key?: string) => void) {
-    done(null, `${user instanceof Staff ? "staff" : "student"}:${user.id}`);
+    done(null, user instanceof Staff ? `staff:${user.id}:${user.sessionVersion ?? 0}` : `student:${user.id}`);
   }
 
   async deserializeUser(key: string, done: (error: Error | null, user?: any) => void) {

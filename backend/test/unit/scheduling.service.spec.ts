@@ -89,6 +89,25 @@ const officialPackage = (classGroupId: string, entries = [{ subjectId: subject.i
 });
 
 describe("SchedulingService participant preview", () => {
+  it.each([true, false])("marks only participants exempt for the selected language subject: %s", async exempt => {
+    const mocks = buildService();
+    mocks.classGroups.findAll.mockResolvedValue([group("group-a")]);
+    mocks.subjects.findByPk.mockResolvedValue({ ...subject, code: "HPTA", name: "Tiếng Anh" });
+    mocks.classGroupMembers.findAll.mockResolvedValue([{
+      id: "member", classGroupId: "group-a", admissionRecordId: "record-1", studentId: null,
+      admissionRecord: { id: "record-1", code: "HV01", fullName: "Nguyễn An" },
+    }]);
+    mocks.sequelize.query.mockImplementation(async (sql: unknown) => String(sql).includes("AS exemption_participant")
+      ? exempt ? [{ id: "admission:record-1" }] : [] : []);
+    const preview = await mocks.service.previewCourseOfferingRoster({ subjectId: subject.id, classGroupIds: ["group-a"], academicYear: "2026" });
+    expect(preview.participants).toEqual([{
+      id: "admission:record-1", code: "HV01", fullName: "Nguyễn An", note: exempt ? "Miễn thi" : "",
+      ...(exempt ? { profileForeignLanguageExempt: true } : {}),
+    }]);
+    expect(mocks.sequelize.query).toHaveBeenCalledWith(expect.stringContaining("is_exempt_foreign_language"),
+      expect.objectContaining({ replacements: { participantIds: '["admission:record-1"]', subjectId: subject.id, academicYear: "2026" } }));
+  });
+
   it("does not schedule a transferred learner for an approved equivalent subject", async () => {
     const mocks = buildService();
     mocks.classGroups.findAll.mockResolvedValue([group("group-a")]);

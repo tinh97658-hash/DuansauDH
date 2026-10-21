@@ -1,16 +1,17 @@
 import React from "react";
 import CatalogManager from "../../components/CatalogManager";
+import { usePermissions } from "../../features/accounts/usePermissions";
 import { getRoomFloor } from "../../utils/schedulingCalendar";
 
-const Rooms = () => (
+const Rooms = () => {
+  const { can } = usePermissions();
+  return (
   <CatalogManager
     title="Phòng học"
     group="Danh mục đào tạo"
     desc="Quản lý danh mục phòng dùng chung cho xếp lịch."
-    endpoint="/system/rooms?includeInactive=true"
+    endpoint={can("catalog.manage") ? "/system/rooms?includeInactive=true" : "/system/rooms"}
     baseEndpoint="/system/rooms"
-    authEndpoint="/auth/session"
-    authCheck={(data) => data?.user?.role === "admin"}
     itemName="phòng"
     codeLabel="Mã phòng"
     nameLabel="Tên phòng"
@@ -50,6 +51,7 @@ const Rooms = () => (
       },
     ]}
   />
-);
+  );
+};
 
 export default Rooms;

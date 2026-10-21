@@ -24,6 +24,11 @@ import { CourseOfferingClassGroup } from "../../src/database/models/training/cou
 import { CourseExamGradebook } from "../../src/database/models/training/course-exam-gradebook.model.js";
 import { Staff } from "../../src/database/models/staff.model.js";
 import { SubjectRecognition } from "../../src/database/models/training/subject-recognition.model.js";
+import { MastersService } from "../../src/masters/masters.service.js";
+import { PlanService } from "../../src/plan/plan.service.js";
+import { LEGACY_GRADING_POLICY } from "../../src/masters/grading-policy.js";
+import { ExamScheduleService } from '../../src/masters/exam-schedule.service.js';
+import { Room } from '../../src/database/models/common/room.model.js';
 
 const describeDb = process.env.RUN_POSTGRES_SCHEDULING_TESTS === "true" ? describe : describe.skip;
 // Every read and write uses one rolled-back transaction, including service-created transactions.
@@ -72,10 +77,84 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
     await CourseExamGradebook.create({ classGroupId: original.id, courseOfferingId: source.id, revision: 1,
       grades: learners.slice(0, 3).map((learner, index) => ({ participantId: `admission:${learner.id}`,
         result: ["passed", "failed", "pending"][index], courseScore: [8, 3.5, null][index] })) });
+    await db.query(`INSERT INTO course_exam_workflows(course_offering_id,mode) VALUES(:id,'legacy_preserved')`,{replacements:{id:source.id}});
   });
   afterEach(async () => {
     jest.restoreAllMocks();
     try { await tx?.rollback(); } finally { await app?.close(); }
+  });
+
+  async function freshGradeSource(){
+    source=await CourseOffering.create({subjectId:subject.id,status:'completed',completedAt:new Date(),completedByStaffId:staff.id});
+    await CourseOfferingClassGroup.create({courseOfferingId:source.id,classGroupId:original.id});
+  }
+  async function fillAndApprove() {
+    await freshGradeSource();
+    const scope = { classGroupId: original.id, courseOfferingId: source.id, rosterScope: "offering" as const };
+    const before = await exams.get(scope);
+    const saved = await exams.save({ ...scope, revision: before.revision, rows: learners.slice(0, 3).map(learner => ({
+      participantId: `admission:${learner.id}`, testScore: 8, assignmentScore: 8, examScore: null,
+      examExempt: false, letterGrade: "", attemptScores: [], result: "pending" as const,
+    })) }, staff);
+    const submitted = await exams.transition({ ...scope, action: "submit", note: "Submit all rows", revision: saved.revision, version: 0 }, staff,'eligibility');
+    await expect(exams.save({ ...scope, revision: submitted.revision, rows: [
+      { participantId: `admission:${learners[0].id}`, testScore: 1 } as any,
+    ] },staff)).rejects.toThrow("đã khóa");
+    const eligible=await exams.transition({ ...scope, action: "approve", note: "Approved eligibility", revision: submitted.revision, version: 1 },staff,'eligibility');
+    const room=await Room.create({code:prefix,name:prefix,capacity:10,isActive:true});
+    const examSchedule=app.get(ExamScheduleService),state=eligible.workflow as any;
+    const session=await examSchedule.schedule({courseOfferingId:source.id,snapshotId:state.eligibility.snapshotId,eligibilityVersion:state.eligibility.version,examDate:'2099-01-01',startTime:'08:00',endTime:'10:00',roomId:room.id},staff);
+    await db.query("UPDATE course_exam_sessions SET exam_date='2000-01-01' WHERE id=:id",{replacements:{id:session.id}});
+    await examSchedule.confirm(session.id,{version:0,status:'held',note:'Held test exam'},staff);
+    const final=await exams.save({...scope,revision:eligible.revision,rows:eligible.rows.map((row:any)=>({...row,examScore:8}))},staff);
+    const finalSubmitted=await exams.transition({...scope,action:'submit',note:'Final submission',revision:final.revision,version:0},staff,'final');
+    return exams.transition({...scope,action:'approve',note:'Final approval',revision:finalSubmitted.revision,version:1},staff,'final');
+  }
+
+  it("archives a removed member, fixes the stored study status and preserves the old scorecard", async () => {
+    await expect(app.get(PlanService).removeAdmissionRecord(learners[0].id)).rejects.toThrow("lịch sử đào tạo");
+    const member = await ClassGroupMember.findOne({ where: { admissionRecordId: learners[0].id } });
+    await app.get(MastersService).removeMember(original.id, member!.id, { id: staff.id, role: "admin" });
+    await expect(app.get(PlanService).removeAdmissionRecord(learners[0].id)).rejects.toThrow("lịch sử đào tạo");
+    await learners[0].reload();
+    expect(learners[0].studyStatus).toBe("Đã trúng tuyển");
+    expect(await ClassGroupMember.count({ where: { admissionRecordId: learners[0].id } })).toBe(0);
+    const reports = app.get(ClassScoreSummaryService);
+    const historical = await reports.learnerScorecard(learners[0].id, original.id);
+    expect(historical.subjects[0].grade).toMatchObject({ score: 8, result: "passed" });
+    expect((await reports.roster(original.id)).students.some(row => row.admissionRecordId === learners[0].id)).toBe(true);
+    await app.get(MastersService).assignMembers(next.id, { admissionRecordIds: [learners[0].id] });
+    expect((await reports.learnerScorecard(learners[0].id)).group!.id).toBe(next.id);
+    expect((await reports.learnerScorecard(learners[0].id, original.id)).subjects[0].grade?.score).toBe(8);
+  });
+
+  it("requires complete rows, an administrator and a reason before locking or reopening grades", async () => {
+    const scope = { classGroupId: original.id, courseOfferingId: source.id, rosterScope: "offering" as const };
+    await freshGradeSource();
+    await expect(exams.transition({ ...scope,courseOfferingId:source.id, action: "submit", revision: 0, version: 0, note: "Incomplete" },staff,'eligibility')).rejects.toThrow("đủ điểm thành phần");
+    const approved = await fillAndApprove();
+    expect(approved.workflow.status).toBe("approved");
+    expect(approved.rows.every(row => row.finalized)).toBe(true);
+    await expect(exams.transition({ ...scope,courseOfferingId:source.id, action: "reopen", revision: approved.revision, version: 2, note: "Correction" }, { role: "examiner" },'final')).rejects.toThrow("quyền");
+    await expect(exams.transition({ ...scope,courseOfferingId:source.id, action: "reopen", revision: approved.revision, version: 2, note: " " },staff,'final')).rejects.toThrow("lý do");
+    expect((await exams.history({...scope,courseOfferingId:source.id})).map((event: any) => event.action)).toEqual(expect.arrayContaining(["eligibility.save", "eligibility.submit", "final.approve"]));
+  });
+
+  it("freezes confirmed marks and published snapshots while allowing an audited reopening", async () => {
+    const approved = await fillAndApprove();
+    const reports = app.get(ClassScoreSummaryService);
+    const card = await reports.learnerScorecard(learners[0].id, original.id);
+    expect((card as any).progress).toMatchObject({ completed: true, earnedCredits: 2 });
+    const issue = await reports.issue(learners[0].id, original.id, { id: staff.id, role: "admin" });
+    await db.query("INSERT INTO shared_grading_rules (version,policy,created_at) VALUES (1,CAST(:policy AS jsonb),NOW())", {
+      replacements: { policy: JSON.stringify({ ...LEGACY_GRADING_POLICY, version: 1, minimums: { testScore: 9, assignmentScore: 9, examScore: 9 } }) },
+    });
+    expect((await reports.learnerScorecard(learners[0].id, original.id)).subjects[0].grade).toMatchObject({ score: 8, result: "passed" });
+    const scope = { classGroupId: original.id, courseOfferingId: source.id, rosterScope: "offering" as const };
+    await exams.transition({ ...scope, action: "reopen", revision: approved.revision, version: 2, note: "Apply correction" },staff,'final');
+    expect((await reports.learnerScorecard(learners[0].id, original.id)).subjects[0].grade?.result).toBe("passed");
+    expect((await reports.issued(issue.id)).snapshot.subjects[0].grade).toMatchObject({ score: 8, result: "passed" });
+    await expect(reports.issue(learners[0].id, original.id, { id: staff.id, role: "admin" })).rejects.toThrow("Chưa hoàn thành");
   });
 
   it("offers only failures from a closed class, merges the group, and preserves old grades and administrative membership", async () => {
@@ -94,7 +173,7 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
     expect(exam.rows.map((row: any) => row.participantId).sort()).toEqual(expectedIds);
     for (const rosterScope of [undefined, "offering"]) {
       await expect(exams.save({ classGroupId: original.id, courseOfferingId: offering.id, rosterScope, revision: 0,
-        rows: [{ participantId: `admission:${learners[0].id}` }] } as any)).rejects.toThrow("hoàn thành giảng dạy");
+        rows: [{ participantId: `admission:${learners[0].id}` }] } as any,staff)).rejects.toThrow("hoàn thành giảng dạy");
     }
     await expect(scheduling.createCourseOffering(dto)).rejects.toThrow("đang hoạt động");
     const afterAssignment = await scheduling.listCourseOfferingCandidates({ program: "masters", majorId: major.id, academicYear: "2026" });
@@ -122,13 +201,15 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
     expect(await CourseOffering.count({ where: { subjectId: subject.id } })).toBe(1);
   });
 
-  it("reflects each saved exam edit immediately in class reports, individual scorecards and studied subjects", async () => {
+  it("reflects component drafts and supported exemptions without manufacturing final marks", async () => {
+    await freshGradeSource();
     const reports = app.get(ClassScoreSummaryService);
     const learning = app.get(SubjectRecognitionService);
     const participantId = `admission:${learners[2].id}`;
     const scope = { classGroupId: original.id, courseOfferingId: source.id, rosterScope: "offering" as const };
+    let hasRecordedLearningResult=false;
     for (const scores of [
-      { testScore: 10, assignmentScore: 10, examScore: 10, examExempt: false },
+      { testScore: 10, assignmentScore: 10, examScore: null, examExempt: false },
       { testScore: 0, assignmentScore: 0, examScore: null, examExempt: false },
       { testScore: null, assignmentScore: null, examScore: null, examExempt: true },
       { testScore: 10, assignmentScore: 10, examScore: null, examExempt: false },
@@ -136,7 +217,7 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
       const before = await exams.get(scope);
       const saved = await exams.save({ ...scope, revision: before.revision, rows: [
         { participantId, ...scores, letterGrade: "", attemptScores: [], result: "pending" },
-      ] });
+      ] },staff);
       const grade = saved.rows.find((row: any) => row.participantId === participantId)!;
       const report = await reports.get({ classGroupId: original.id }, true);
       const summary = report.rows.find(row => row.participantId === participantId)!.scores[subject.id];
@@ -148,7 +229,9 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
           courseScore: grade.courseScore, grade4: grade.grade4, letterGrade: grade.letterGrade } });
       await learning.syncRegularResults(learners[2].id, tx);
       const learningResults = await learning.listLearningResults(learners[2].id);
-      expect(learningResults).toMatchObject([{ result: grade.result, score: grade.courseScore }]);
+      if(grade.result==='pending'&&!hasRecordedLearningResult)expect(learningResults).toEqual([]);
+      else expect(learningResults).toMatchObject([{ result: grade.result, score: grade.courseScore }]);
+      if(grade.result!=='pending')hasRecordedLearningResult=true;
       const studied = await learning.listStudiedSubjects(learners[2].id);
       if (grade.result === "pending") expect(studied).toEqual([]);
       else expect(studied).toMatchObject([{ result: grade.result, subject: { id: subject.id } }]);
@@ -175,7 +258,7 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
       expect(examList.rows.some((row: any) => row.participantId === participantId)).toBe(false);
       await expect(exams.save({ ...scope, rosterScope, revision: gradebook.revision,
         rows: [{ participantId, testScore: 0, assignmentScore: 0, examScore: 0, examExempt: false }],
-      } as any)).rejects.toThrow("miễn thi ngoại ngữ theo hồ sơ");
+      } as any,staff)).rejects.toThrow("bảo toàn");
     }
     for (const learner of learners.slice(1)) {
       const report = await reports.learnerScorecard(learner.id);
@@ -217,7 +300,7 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
       await expect(exams.save({ ...scope, rosterScope, revision: before.revision, rows: [
         { participantId: `admission:${learners[2].id}`, testScore: 10, assignmentScore: 10, examScore: 10,
           examExempt: false, letterGrade: "", attemptScores: [], result: "pending" },
-      ] })).rejects.toMatchObject({ response: { code: "TEACHING_NOT_COMPLETED" } });
+      ] },staff)).rejects.toMatchObject({ response: { code: "TEACHING_NOT_COMPLETED" } });
     }
     await book!.reload();
     expect(book!.grades).toEqual(originalGrades);

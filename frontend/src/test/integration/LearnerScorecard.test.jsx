@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { renderWithPermissions } from "../renderWithPermissions";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import AdmissionRecordDetail from "../../pages/plan/admissionRecordDetail";
@@ -6,7 +7,9 @@ import ClassScoreSummary from "../../pages/reports/classScoreSummary";
 import LearnerScorecard from "../../features/learners/LearnerScorecard";
 import { notifyGradebookSaved } from "../../utils/gradebookRevision";
 
-jest.mock("axios", () => ({ get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn(), defaults: {} }));
+const render = (ui, options) => renderWithPermissions(ui, ["reports.export", "admission.manage"], options);
+
+vi.mock("axios", () => ({ default: { get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn(), defaults: {} } }));
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
 jest.mock("react-toastify", () => ({ ToastContainer: () => null, toast: { success: jest.fn(), error: jest.fn() } }));
 jest.mock("@mui/icons-material", () => ({
@@ -19,6 +22,15 @@ jest.mock("@mui/icons-material", () => ({
   RuleRounded: () => null, VisibilityRounded: () => null, SearchRounded: () => null, DownloadRounded: () => null,
 }));
 jest.setTimeout(20000);
+
+it("explains missing coursework without making a graduation decision", async () => {
+  axios.get.mockResolvedValue({ data: { student: { fullName: "Learner" }, groups: [], group: null, subjects: [],
+    progress: { completed: false, earnedCredits: 3, completedSubjects: 1, totalSubjects: 2,
+      blockers: [{ code: "REQUIRED_SUBJECT", message: "Còn thiếu học phần bắt buộc." }] } } });
+  render(<LearnerScorecard admissionRecordId="ar1" onClassChange={() => {}} />);
+  expect(await screen.findByText("Còn thiếu học phần bắt buộc.")).toBeInTheDocument();
+  expect(screen.getByText(/Việc xét tốt nghiệp được xử lý riêng/)).toBeInTheDocument();
+});
 
 const major = { id: "m1", name: "Công nghệ thông tin", program: "masters", disciplineId: "d1", discipline: { id: "d1", name: "Công nghệ thông tin" } };
 const groups = [
@@ -54,7 +66,7 @@ const LocationProbe = () => {
 const mount = (entry = "/masters/admitted-records/ar1") => render(<MemoryRouter initialEntries={[entry]}>
   <LocationProbe /><Routes>
     <Route path="/reports/class-score-summary" element={<ClassScoreSummary />} />
-    <Route path="/masters/admitted-records/:id" element={<AdmissionRecordDetail />} />
+    <Route path="/masters/admitted-records/:id" element={<AdmissionRecordDetail returnPath="/masters/admitted-records" />} />
     <Route path="/plan/admission-records/:id" element={<AdmissionRecordDetail />} />
   </Routes>
 </MemoryRouter>);
@@ -190,7 +202,7 @@ it("keeps the chosen class in the URL and discards a late response from a previo
 it("supports the scorecard tab on a doctoral profile", async () => {
   const originalGet = axios.get.getMockImplementation();
   axios.get.mockImplementation(async (url, config) => url.endsWith("/admission-records/ar1") ? { data: { ...record, trainingLevel: "Tiến sĩ" } } : originalGet(url, config));
-  mount("/plan/admission-records/ar1?tab=grades&classGroupId=g1");
+  mount("/masters/admitted-records/ar1?tab=grades&classGroupId=g1");
   await waitForScorecard();
   expect(screen.getByRole("tab", { name: "Bảng điểm" })).toHaveAttribute("aria-selected", "true");
   expect(screen.queryByRole("tab", { name: "Xét tuyển" })).not.toBeInTheDocument();

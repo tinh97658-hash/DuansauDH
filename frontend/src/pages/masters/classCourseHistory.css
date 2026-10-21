@@ -52,6 +52,7 @@
 .tp-table tbody tr:hover .tp-sticky { background:#eaf4f9; }
 .tp-sticky-code { left:0; width:145px; min-width:145px; }
 .tp-sticky-name { left:145px; width:310px; min-width:310px; }
+.tp-table .tp-sticky-name { text-align:left; }
 .tp-sticky-credits { left:455px; width:88px; min-width:88px; border-right:1px solid #b9cad7; box-shadow:none; }
 .tp-class-heading { width:var(--tp-class-width); min-width:var(--tp-class-width); color:#173e75 !important; }
 .tp-table .tp-centered { text-align:center; }

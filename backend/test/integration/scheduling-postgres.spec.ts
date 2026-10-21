@@ -15,6 +15,7 @@ import { CourseOfferingClassGroup } from "../../src/database/models/training/cou
 import { CourseOffering } from "../../src/database/models/training/course-offering.model.js";
 import { TeachingSession } from "../../src/database/models/training/teaching-session.model.js";
 import { SchedulingService } from "../../src/scheduling/scheduling.service.js";
+import { Staff } from "../../src/database/models/staff.model.js";
 
 const describePostgres = process.env.RUN_POSTGRES_SCHEDULING_TESTS === "true" ? describe : describe.skip;
 
@@ -93,6 +94,57 @@ describePostgres("Scheduling PostgreSQL locking", () => {
     }
   });
 
+  describe("Deleting merged course offerings", () => {
+    let target: CourseOffering;
+    let actor: Staff;
+    beforeEach(async () => {
+      actor = await Staff.create({ name: prefix, email: `${randomUUID()}@example.invalid`, role: "admin" });
+      target = await CourseOffering.create({ subjectId: ids.subject, status: "active" });
+      await CourseOfferingClassGroup.create({ courseOfferingId: target.id, classGroupId: ids.group1 });
+    });
+    afterEach(async () => {
+      await TeachingSession.destroy({ where: { courseOfferingId: target.id } });
+      await CourseOffering.destroy({ where: { id: target.id } });
+      await Staff.destroy({ where: { id: actor.id } });
+    });
+    const addSession = (status: "planned" | "held" | "not_held", sessionDate = "2020-09-12") => TeachingSession.create({
+      courseOfferingId: target.id, sessionDate, startTime: "08:00", endTime: "10:00", period: "MORNING",
+      lecturerId: ids.lecturer1, roomId: ids.room1, status,
+      ...(status !== "planned" ? { confirmedAt: new Date(), confirmedByStaffId: actor.id } : {}),
+    });
+    it("deletes an unscheduled class and its group links while keeping the administrative class", async () => {
+      await expect(service.deleteCourseOffering(target.id)).resolves.toMatchObject({ deleted: true });
+      expect(await CourseOffering.findByPk(target.id)).toBeNull();
+      expect(await CourseOfferingClassGroup.count({ where: { courseOfferingId: target.id } })).toBe(0);
+      expect(await ClassGroup.findByPk(ids.group1)).not.toBeNull();
+    });
+    it.each(["future", "pending", "not_held"])("requires deleting the %s timetable before deleting the class", async category => {
+      await addSession(category === "not_held" ? "not_held" : "planned", category === "future" ? "2098-09-12" : "2020-09-12");
+      await expect(service.deleteCourseOffering(target.id)).rejects.toThrow("Vui lòng xóa lịch học trước khi xóa lớp học phần");
+      expect(await TeachingSession.count({ where: { courseOfferingId: target.id } })).toBe(1);
+      await expect(service.deleteCourseOfferingSchedule(target.id)).resolves.toMatchObject({ deletedCount: 1 });
+      expect(await CourseOffering.findByPk(target.id)).not.toBeNull();
+      await expect(service.deleteCourseOffering(target.id)).resolves.toMatchObject({ deleted: true });
+    });
+    it("rejects deleting the schedule or the class after one confirmed held session", async () => {
+      await addSession("held");
+      await expect(service.deleteCourseOffering(target.id)).rejects.toThrow("đã có buổi xác nhận diễn ra");
+      await expect(service.deleteCourseOfferingSchedule(target.id)).rejects.toThrow("đã có buổi xác nhận diễn ra");
+      expect(await TeachingSession.count({ where: { courseOfferingId: target.id } })).toBe(1);
+      expect(await CourseOffering.findByPk(target.id)).not.toBeNull();
+    });
+    it("serializes schedule creation against class deletion", async () => {
+      const results = await Promise.allSettled([
+        service.deleteCourseOffering(target.id),
+        service.createTeachingSession({ courseOfferingId: target.id, sessionDate: "2098-09-15",
+          startTime: "08:00", endTime: "10:00", period: "MORNING", lecturerId: ids.lecturer1, roomId: ids.room1 }),
+      ]);
+      expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
+      const exists = await CourseOffering.findByPk(target.id);
+      expect(await TeachingSession.count({ where: { courseOfferingId: target.id } })).toBe(exists ? 1 : 0);
+    });
+  });
+
   it("persists and reloads a real TeachingSession", async () => {
     const created = await service.createTeachingSession({
       courseOfferingId: ids.offering1,
@@ -108,7 +160,8 @@ describePostgres("Scheduling PostgreSQL locking", () => {
     const listed = await service.listTeachingSessions({ from: "2098-09-12", to: "2098-09-12" });
 
     expect(reloaded.id).toBe(created.id);
-    expect(reloaded.startTime).toBe("08:00:00");
+    expect(reloaded.startTime).toBeUndefined();
+    expect((await TeachingSession.findByPk(created.id))!.startTime).toBe("08:00:00");
     expect(listed.map((item) => item.id)).toContain(created.id);
   });
 

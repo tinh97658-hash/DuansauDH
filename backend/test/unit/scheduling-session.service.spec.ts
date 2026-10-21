@@ -184,7 +184,7 @@ describe("SchedulingService TeachingSession", () => {
   beforeEach(() => { jest.useFakeTimers({ now: new Date("2026-09-04T05:00:00Z") }); });
   afterEach(() => { jest.useRealTimers(); });
 
-  it("rejects an ended create target before locks or insert with normalized time details", async () => {
+  it("rejects a started create target before locks or insert without exposing timestamps", async () => {
     const mocks = buildService();
     arrangeValid(mocks);
     const dto = createDto({ sessionDate: "2026-09-04", startTime: "10:00", endTime: "11:59:59" });
@@ -196,8 +196,7 @@ describe("SchedulingService TeachingSession", () => {
       expect((error as ConflictException).getStatus()).toBe(409);
       expect((error as ConflictException).getResponse()).toEqual({
         code: "SESSION_TIME_IN_PAST",
-        message: "Không thể xếp lịch vào một buổi học đã kết thúc.",
-        details: { sessionDate: "2026-09-04", startTime: "10:00:00", endTime: "11:59:59" },
+        message: "Không thể xếp lịch vào buổi học đã bắt đầu.",
       });
     }
     expect(mocks.sequelize.transaction).not.toHaveBeenCalled();
@@ -220,12 +219,52 @@ describe("SchedulingService TeachingSession", () => {
     expect(mocks.teachingSessions.findAll).not.toHaveBeenCalled();
   });
 
-  it.each(["11:00:00", "11:00:01", "12:00:00"])("allows an already-started target whose end is not before now: %s", async (endTime) => {
+  it.each(["11:00:00", "11:00:01", "12:00:00"])("rejects an already-started target even when its end is not before now: %s", async (endTime) => {
     const mocks = buildService();
     arrangeValid(mocks);
     jest.setSystemTime(new Date("2026-09-04T04:00:00Z"));
-    await expect(mocks.service.createTeachingSession(createDto({ sessionDate: "2026-09-04", startTime: "10:00", endTime }))).resolves.toBeDefined();
-    expect(mocks.teachingSessions.create).toHaveBeenCalled();
+    await expectConflictCode(mocks.service.createTeachingSession(createDto({ sessionDate: "2026-09-04", startTime: "10:00", endTime })), "SESSION_TIME_IN_PAST");
+    expect(mocks.teachingSessions.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["2026-09-03", "06:00:00Z", false], ["2026-09-04", "05:59:59Z", true],
+    ["2026-09-04", "06:00:00Z", false], ["2026-09-04", "06:00:01Z", false], ["2026-09-05", "06:00:00Z", true],
+  ])("server-clock create boundary date=%s at=%s allowed=%s", async (date, time, allowed) => {
+    const mocks = buildService();arrangeValid(mocks);jest.setSystemTime(new Date("2026-09-04T" + time));
+    const operation = mocks.service.createTeachingSession(createDto({ sessionDate: date, period: "AFTERNOON", startTime: "13:00", endTime: "17:00" }));
+    if (allowed) await expect(operation).resolves.toBeDefined();else await expectConflictCode(operation, "SESSION_TIME_IN_PAST");
+    expect(mocks.teachingSessions.create).toHaveBeenCalledTimes(allowed ? 1 : 0);
+  });
+  it("rechecks the target after waiting for locks", async () => {
+    const mocks = buildService();arrangeValid(mocks);jest.setSystemTime(new Date("2026-09-04T05:59:59Z"));
+    mocks.rooms.findAll.mockImplementation(async (options: any) => { jest.setSystemTime(new Date("2026-09-04T06:00:00Z"));return [room()].filter(r => idsFrom(options).includes(r.id)); });
+    await expectConflictCode(mocks.service.createTeachingSession(createDto({ sessionDate: "2026-09-04", period: "AFTERNOON", startTime: "13:00", endTime: "17:00" })), "SESSION_TIME_IN_PAST");
+    expect(mocks.teachingSessions.create).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["2026-09-03", "06:00:00Z", false], ["2026-09-04", "05:59:59Z", true],
+    ["2026-09-04", "06:00:00Z", false], ["2026-09-04", "06:00:01Z", false], ["2026-09-05", "06:00:00Z", true],
+  ])("server-clock move boundary date=%s at=%s allowed=%s", async (date, time, allowed) => {
+    const mocks = buildService();arrangeValid(mocks);jest.setSystemTime(new Date("2026-09-04T" + time));
+    const current = session();mocks.teachingSessions.findByPk.mockResolvedValue(current);
+    const operation = mocks.service.updateTeachingSession(current.id, { sessionDate: date, period: "AFTERNOON", startTime: "13:00", endTime: "17:00" });
+    if (allowed) await expect(operation).resolves.toBeDefined();else await expectConflictCode(operation, "SESSION_TIME_IN_PAST");
+    expect(current.update).toHaveBeenCalledTimes(allowed ? 1 : 0);
+  });
+  it("rechecks a move after waiting for resource locks", async () => {
+    const mocks = buildService();arrangeValid(mocks);jest.setSystemTime(new Date("2026-09-04T05:59:59Z"));
+    const current = session();mocks.teachingSessions.findByPk.mockResolvedValue(current);
+    mocks.rooms.findAll.mockImplementation(async (options: any) => { jest.setSystemTime(new Date("2026-09-04T06:00:00Z"));return [room()].filter(r => idsFrom(options).includes(r.id)); });
+    await expectConflictCode(mocks.service.updateTeachingSession(current.id, { sessionDate: "2026-09-04", period: "AFTERNOON", startTime: "13:00", endTime: "17:00" }), "SESSION_TIME_IN_PAST");
+    expect(current.update).not.toHaveBeenCalled();
+  });
+  it("keeps an existing started session editable in its unchanged slot before the existing end cutoff", async () => {
+    const mocks = buildService();arrangeValid(mocks);jest.setSystemTime(new Date("2026-09-04T06:30:00Z"));
+    const current = session({ sessionDate: "2026-09-04", period: "AFTERNOON", startTime: "13:00:00", endTime: "17:00:00" });
+    mocks.teachingSessions.findByPk.mockResolvedValue(current);
+    await expect(mocks.service.updateTeachingSession(current.id, { note: "existing workflow" })).resolves.toBeDefined();
+    expect(current.update).toHaveBeenCalled();
   });
 
   it.each(["planned", "held", "not_held"].flatMap((status) => ["ROOM_CONFLICT", "LECTURER_CONFLICT", "CLASS_GROUP_CONFLICT"].map((code) => [status, code])))
@@ -768,12 +807,11 @@ describe("Vietnam clock and period consistency", () => {
   beforeEach(() => jest.useFakeTimers({ now: new Date("2026-09-05T03:30:00Z") }));
   afterEach(() => jest.useRealTimers());
 
-  it.each([["10:20", true], ["10:45", false]])("compares end %s to Vietnam 10:30 from an absolute UTC instant", async (endTime, ended) => {
+  it.each(["10:20", "10:45"])("rejects an already-started target independently of end %s", async (endTime) => {
     const mocks = buildService();
     arrangeValid(mocks);
     const request = mocks.service.createTeachingSession(createDto({ sessionDate: "2026-09-05", startTime: "10:00", endTime }));
-    if (ended) await expectConflictCode(request, "SESSION_TIME_IN_PAST");
-    else await expect(request).resolves.toBeDefined();
+    await expectConflictCode(request, "SESSION_TIME_IN_PAST");
   });
 
   it.each([

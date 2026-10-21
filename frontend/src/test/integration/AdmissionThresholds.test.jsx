@@ -3,7 +3,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import axios from "axios";
 import AdmissionScores from "../../pages/masters/admissionScores";
-jest.mock("axios", () => ({ get: jest.fn(), put: jest.fn(), post: jest.fn(), defaults: {} }));
+import { CssBaseline, ThemeProvider } from "@mui/material";
+import theme from "../../theme";
+import { AuthSessionContext } from "../../context/AuthSession";
+vi.mock("axios", () => ({ default: { get: vi.fn(), put: vi.fn(), post: vi.fn(), defaults: {} } }));
 jest.mock("@mui/icons-material", () => new Proxy({}, { get: () => () => null }));
 jest.mock("../../components/FeatureLayout", () => ({ children }) => <div>{children}</div>);
 const round = { id: "round-1", name: "Đợt 2/2026", academicYear: "2026", majorThresholds: [{ majorId: "major-1", cutoff: 15 }, { majorId: "major-2", cutoff: 17 }] };
@@ -19,8 +22,46 @@ function configure(rounds = [round]) {
     return Promise.reject(new Error(url));
   });
 }
-const mount = () => render(<MemoryRouter><AdmissionScores /></MemoryRouter>);
+const mount = (session = null) => render(<ThemeProvider theme={theme}><CssBaseline /><AuthSessionContext.Provider value={{ ...session, access: { permissions: ["admission.manage"] } }}><MemoryRouter><AdmissionScores /></MemoryRouter></AuthSessionContext.Provider></ThemeProvider>);
 beforeEach(() => { jest.clearAllMocks(); configure(); });
+it("switches between pending applications and eligible applications without changing decisions", async () => {
+  const originalGet = axios.get.getMockImplementation();
+  const rows = [record, ranking.rows[1],
+    { ...record, admissionRecordId: "admitted", code: "HS003", fullName: "Đã duyệt", decision: "admitted" },
+    { ...record, admissionRecordId: "stale", code: "HS004", fullName: "Cần xác minh", stale: true },
+    { ...record, admissionRecordId: "rejected", code: "HS005", fullName: "Từ chối", decision: "rejected" },
+    { ...record, admissionRecordId: "unscored", code: "HS006", fullName: "Chưa điểm", total: null, meetsCutoff: null }];
+  axios.get.mockImplementation(url => url.endsWith("/ranking")
+    ? Promise.resolve({ data: { ...ranking, rows, admittedCount: 1 } }) : originalGet(url));
+  mount();
+  await screen.findByText("HS001");
+  const toggle = screen.getByRole("switch", { name: "Hiển thị hồ sơ đủ điều kiện" });
+  expect(toggle).not.toBeChecked();
+  expect(screen.getByText("HS002")).toBeInTheDocument();
+  expect(screen.getByText("HS004")).toBeInTheDocument();
+  expect(screen.getByText("HS006")).toBeInTheDocument();
+  expect(screen.queryByText("HS003")).not.toBeInTheDocument();
+  expect(screen.queryByText("HS005")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Điểm HS002"), { target: { value: "14" } });
+  fireEvent.click(toggle);
+  expect(toggle).toBeChecked();
+  expect(screen.getByText("HS001")).toBeInTheDocument();
+  expect(screen.getByText("HS003")).toBeInTheDocument();
+  for (const code of ["HS002", "HS004", "HS005", "HS006"]) expect(screen.queryByText(code)).not.toBeInTheDocument();
+  fireEvent.click(toggle);
+  expect(screen.getByText("HS002")).toBeInTheDocument();
+  expect(screen.getByLabelText("Điểm HS002")).toHaveValue(14);
+  expect(screen.queryByText("HS003")).not.toBeInTheDocument();
+  expect(axios.post).not.toHaveBeenCalled();
+  expect(axios.put).not.toHaveBeenCalled();
+});
+it("loads rounds and ranking from a verified session without requesting auth again", async () => {
+  mount({ authenticated: true, user: { role: "admin" } });
+  expect(await screen.findByText("HS001")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Tạo đợt xét tuyển" })).toBeEnabled();
+  expect(screen.queryByText("Không tải được đợt xét tuyển.")).not.toBeInTheDocument();
+  expect(axios.get.mock.calls.some(([url]) => url.includes("/auth/session"))).toBe(false);
+});
 it("một đợt hiển thị nhiều ngành và lọc theo đúng ngưỡng từng ngành", async () => {
   mount(); await screen.findByText("HS001");
   expect(screen.getByText("HS002")).toBeInTheDocument();

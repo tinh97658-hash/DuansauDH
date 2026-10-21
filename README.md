@@ -25,6 +25,9 @@ thạc sĩ, đào tạo tiến sĩ, báo cáo). Toàn bộ do migration quản l
 | --- | --- |
 | `students`, `staff`, `staff_students`, `submissions` | Học viên, nhân sự, quan hệ và nộp hồ sơ |
 | `sessions` | Phiên đăng nhập được lưu bền vững |
+| `roles`, `permissions`, `role_permissions`, `staff_roles` | Phân quyền RBAC: vai trò, quyền, quyền của vai trò và vai trò của nhân sự |
+| `auth_audit_logs` | Nhật ký thao tác tài khoản/vai trò và sự kiện phiên đăng nhập |
+| `db_change_logs` | Nhật ký thay đổi dữ liệu cấp DB (mọi INSERT/UPDATE/DELETE) — ghi tự động bằng trigger |
 | `ethnicities`, `nationalities` | Danh mục dân tộc, quốc tịch |
 | `cities`, `districts`, `wards` | Đơn vị hành chính (thành phố → quận huyện → phường xã) |
 | `training_mode_groups`, `training_modes` | Nhóm & hình thức đào tạo |
@@ -90,6 +93,77 @@ npm run db:seed:common
 ```
 
 ## Cấu hình môi trường
+
+### Cập nhật vòng đời học viên (migration 061)
+
+Sao lưu database trước khi cập nhật, chạy từ thư mục gốc:
+
+```powershell
+npm --prefix backend run db:migrate
+```
+
+Khởi động lại backend/frontend sau migration. Migration 061 thêm lịch sử thành viên lớp, trạng thái duyệt điểm, nhật ký thay đổi và bản kết quả học tập đã chốt; đối soát trạng thái học theo phân lớp hiện tại. Điểm cũ giữ trạng thái nháp và phải được gửi/duyệt để tính vào hoàn thành học phần. Migration không hỗ trợ tự động xóa lịch sử bằng `down`; rollback dùng bản sao lưu đã kiểm chứng.
+
+Sau khi hoàn thành giảng dạy: lưu đủ điểm → gửi duyệt → admin duyệt và khóa. Admin muốn sửa phải mở lại với lý do. Bảng điểm cá nhân hiển thị điều kiện học phần còn thiếu và cho admin lưu bản kết quả khi đủ điều kiện; các bản cũ vẫn mở lại được sau điều chỉnh. Hoàn thành học phần được tách riêng với xét tốt nghiệp/GPA. Xem [kế hoạch và báo cáo vòng đời học viên](BAO-CAO-LOGIC-VONG-DOI-HOC-VIEN.md).
+
+### Quản lý tài khoản & phân quyền (migration 062)
+
+Sao lưu database trước khi cập nhật, chạy từ thư mục gốc:
+
+```powershell
+npm --prefix backend run db:migrate
+npm --prefix backend run db:seed:auth
+```
+
+Migration 062 tạo mô hình **RBAC đầy đủ** cho tài khoản nhân sự: các bảng
+`roles`, `permissions`, `role_permissions`, `staff_roles` và `auth_audit_logs`;
+thêm vào `staff` các cột `status`, `session_version`, `must_change_password`,
+`last_login_at`, `password_changed_at`; đổi `staff.role` từ ENUM sang
+VARCHAR(50) để giữ tương thích mã vai trò chính (`admin`/`supervisor`/`examiner`)
+mà API `/auth/session` vẫn trả về. Migration seed sẵn ba vai trò hệ thống cùng
+ma trận quyền mặc định và backfill `staff_roles` từ cột `staff.role`.
+
+Quyền hiệu lực của một nhân sự là **hợp quyền của mọi vai trò** được gán; nhân sự
+vẫn có **một vai trò chính** (`staff.role`) để tương thích ngược. Backend thay
+toàn bộ `@Roles`/`RolesGuard` cũ bằng `@RequirePermissions` + `PermissionsGuard`
+(ví dụ `account.manage`, `role.manage`, `gradebook.approve`, `scheduling.write`).
+Luồng học viên nằm ngoài RBAC và dùng `StudentGuard`.
+
+API quản trị (trả envelope `{ message, data }` cho thao tác ghi):
+
+| Nhóm | Endpoint |
+| --- | --- |
+| Tài khoản | `GET /accounts`, `POST /accounts`, `GET|PUT /accounts/:id`, `PATCH /accounts/:id/status`, `POST /accounts/:id/reset-password`, `POST /accounts/:id/revoke-sessions`, `GET /accounts/audit-logs` |
+| Nhật ký thay đổi | `GET /accounts/change-logs`, `GET /accounts/change-logs/tables` |
+| Tự phục vụ | `GET /accounts/me/permissions`, `PATCH /accounts/me/password` |
+| Vai trò | `GET /roles`, `GET /roles/permissions`, `POST /roles`, `GET|PUT /roles/:id`, `PUT /roles/:id/permissions`, `DELETE /roles/:id` |
+
+Vòng đời tài khoản: tạo kèm mật khẩu ban đầu (nhập tay hoặc sinh ngẫu nhiên), luôn
+bật `mustChangePassword` cho lần đăng nhập đầu; khóa/mở khóa; admin đặt lại mật
+khẩu (buộc đăng xuất và đổi mật khẩu lần kế tiếp); buộc đăng xuất mọi phiên bằng
+cách tăng `staff.session_version`. Giao diện nằm trong nhóm **Tài khoản & phân
+quyền** trên thanh điều hướng: `/system/accounts`, `/system/roles`,
+`/system/audit-logs` và `/system/change-password` (bắt buộc đổi mật khẩu khi còn
+mật khẩu khởi tạo). Xem [kế hoạch chi tiết](KE-HOACH-QUAN-LY-TAI-KHOAN-PHAN-QUYEN.md).
+
+### Nhật ký thay đổi dữ liệu (migration 063)
+
+Migration 063 thêm bảng `db_change_logs` và **trigger PostgreSQL** `audit_capture`
+gắn trên **mọi bảng nghiệp vụ** để ghi lại tất cả thao tác `INSERT`/`UPDATE`/`DELETE`
+(dữ liệu trước/sau dạng JSONB, khóa bản ghi, danh sách cột đổi, thời gian) — bất kể
+luồng code nào thực hiện, kể cả SQL thủ công hay seed. Bảng `db_change_logs`,
+`auth_audit_logs`, `sessions` và `sequelize_meta` được loại trừ.
+
+Người thực hiện được gắn **best-effort**: tầng ứng dụng set biến phiên PostgreSQL
+`app.actor_staff_id`… trong mỗi transaction (`audit/audit-context.ts`), trigger đọc
+lại kèm `request_id`, IP, user-agent. Thao tác ngoài transaction vẫn ghi được thay
+đổi nhưng cột người thực hiện để trống.
+
+Xem nhật ký trong **Nhật ký thao tác** (`/system/audit-logs`) → tab **Thay đổi dữ
+liệu** (lọc theo bảng, hành động, khoảng ngày; quyền `audit.view`). Tab **Thao tác
+quản lý** giữ nguyên nhật ký tài khoản/vai trò (`auth_audit_logs`) và bổ sung các
+lần **đăng nhập / đăng xuất / đăng nhập thất bại** của nhân sự. Ngay dưới thanh tab
+có một dòng mô tả vai trò của từng tab để người dùng phân biệt rõ hai loại nhật ký.
 
 Toàn bộ cấu hình local nằm trong **`.env` ở thư mục gốc**, được Git bỏ qua.
 Docker Compose, backend, migration, seed và frontend đều đọc file này.
@@ -306,9 +380,10 @@ npm run db:migrate
 
 Dữ liệu PostgreSQL LOCAL không đi theo Git; mỗi môi trường có database riêng.
 
-Backend **đã có phân quyền scheduling** qua `Staff.canManageScheduling` và
-`SchedulingWriteGuard`, không phải trạng thái “chưa làm phân quyền”. Hiện chỉ chưa
-có UI quản trị để chọn/gán người phụ trách scheduling. Admin có operation
+Backend **đã có phân quyền scheduling** qua cờ `Staff.canManageScheduling` và
+`SchedulingWriteGuard`, kết hợp quyền RBAC `scheduling.write`. Giao diện
+**Tài khoản & phân quyền** (`/system/accounts`) cho phép admin/gười có quyền
+`scheduling.assign` gán người phụ trách scheduling. Admin có operation
 `PUT /scheduling/assignee`; body JSON chứa `staffId` của Staff thuộc chính database
 của môi trường triển khai. Không hard-code UUID/Staff ID từ database của máy khác.
 
@@ -421,8 +496,18 @@ Các lệnh chi tiết cho backend được mô tả trong `backend/Testing.md`.
 ## Tính năng chính
 
 1. Đăng ký và xét duyệt học viên.
-2. Phân quyền quản trị viên, giảng viên hướng dẫn và giám khảo.
+2. Quản lý tài khoản nhân sự và phân quyền RBAC: vai trò tùy chỉnh, ma trận quyền, khóa/mở tài khoản, đặt lại mật khẩu, buộc đăng xuất, nhật ký thao tác (kèm đăng nhập/đăng xuất) và nhật ký thay đổi dữ liệu (trigger DB) trong cùng trang Nhật ký thao tác.
 3. Theo dõi hồ sơ học viên tiềm năng và học viên đã đăng ký.
 4. Theo dõi tiến độ học tập, nghiên cứu và các lần nộp báo cáo.
 5. Email/thông báo cho các mốc quan trọng.
 6. Quản lý luận văn, công bố và tài liệu liên quan.
+
+### Cập nhật RBAC thống nhất (migration 064, 2026-10-19)
+
+Nhân sự (`Staff`) là tác nhân; `admin` là vai trò mặc định và chỉ có những permission được gán trong `role_permissions`. Không còn `is_superadmin` hoặc nhánh bỏ qua kiểm tra quyền. Có thể chỉnh ma trận và tắt vai trò admin sau khi chuyển quyền quản trị sang nhân sự khác.
+
+Migration 064 chuyển đặc quyền cũ thành permission tường minh trước khi bỏ cột. Quyền hiệu lực là hợp quyền của các vai trò đang active. `scheduling.organize` cho phép tổ chức lớp học phần; chỉ định phụ trách xếp lịch vẫn được giữ theo nghiệp vụ.
+
+Hệ thống chặn thay đổi làm mất nhân sự active cuối cùng có đủ `account.view`, `account.manage`, `role.view`, `role.manage`, kể cả khi các quyền đến từ nhiều vai trò. Đổi vai trò nhân sự thu hồi phiên đăng nhập. Cache quyền trên instance khác có TTL tối đa 30 giây.
+
+`npm --prefix backend run db:seed:auth` đồng bộ catalog và cấp quyền mặc định cho vai trò mới; chạy lại không khôi phục quyền đã gỡ khỏi vai trò hiện hữu. Quyền mới phải được gán có chủ đích bằng ma trận hoặc migration.

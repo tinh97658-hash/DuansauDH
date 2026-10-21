@@ -131,7 +131,7 @@ it("exports the screen's column order and date format for each tab", () => {
     const lines = csv.split("\r\n");
     expect(lines[0]).toBe(gradebookColumns(exam).map(({ label }) => `"${label}"`).join(","));
     expect(gradebookRowValues(input, 0, exam)).toHaveLength(gradebookColumns(exam).length);
-    expect(lines[1]).toContain('"02/01/1990"');
+    expect(lines[1]).toContain('"02/01/90"');
     expect(lines[1]).toContain('"Đủ tư cách"');
   }
   expect(gradebookCsv([input])).toContain('"8.5"');

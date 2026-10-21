@@ -343,7 +343,7 @@
 .sl-focus-empty{display:block;padding:22px 8px;color:#788893;text-align:center;font-size:12px}
 
 /* Scheduling overlays use the large centered modal from the reference screen. */
-.scheduling-v20.v20-dialog:is(.sl-session-editor-dialog,.sl-offering-drawer,.sl-pending-drawer){width:min(1400px,calc(100vw - 48px));max-width:calc(100vw - 48px);height:calc(100dvh - 40px);max-height:calc(100dvh - 40px);margin:20px;font-size:16.5px}
+.scheduling-v20.v20-dialog:is(.sl-session-editor-dialog,.sl-offering-drawer){width:min(1400px,calc(100vw - 48px));max-width:calc(100vw - 48px);height:calc(100dvh - 40px);max-height:calc(100dvh - 40px);margin:20px;font-size:16.5px}
 .scheduling-v20.v20-dialog.sl-session-editor-dialog{width:min(1180px,calc(100vw - 64px));max-width:calc(100vw - 64px);height:min(760px,calc(100dvh - 48px));max-height:calc(100dvh - 48px);margin:24px;border:1px solid #d9e4ec;border-radius:12px;box-shadow:0 18px 48px rgba(18,59,99,.16);font-size:14px}
 .scheduling-v20.v20-dialog.sl-offering-drawer{width:min(1180px,calc(100vw - 64px));max-width:calc(100vw - 64px);height:min(780px,calc(100dvh - 48px));max-height:calc(100dvh - 48px);margin:24px;border:1px solid #d9e4ec;border-radius:12px;box-shadow:0 18px 48px rgba(18,59,99,.16);font-size:14px}
 .sl-session-editor-body{display:flex!important;flex-direction:column;padding:0!important;overflow:hidden!important}
@@ -469,6 +469,8 @@
 .sl-offering-drawer .v20-dialog-foot{min-height:58px;display:flex;flex-wrap:wrap;gap:8px;padding:10px 20px;border-top:1px solid #d9e4ec;background:#fff}
 .sl-offering-drawer .v20-dialog-foot .sl-btn{min-width:128px;height:36px;min-height:36px;border-radius:8px;font-size:12.5px}
 .sl-offering-drawer .v20-dialog-foot .sl-btn-primary{min-width:218px;border-color:#0b7f9c;background:#0b7f9c;color:#fff}
+/* Restore only the vt5 pending-dialog presentation for Teaching and Exams. */
+.scheduling-v20.v20-dialog.sl-pending-drawer{width:min(1400px,calc(100vw - 48px));max-width:calc(100vw - 48px);height:calc(100dvh - 40px);max-height:calc(100dvh - 40px);margin:20px;font-size:16.5px}
 .sl-pending-drawer .v20-dialog-head{min-height:56px;padding:11px 18px;background:#fff}
 .sl-pending-drawer .v20-dialog-head h2{color:#173e75;font-size:17px;font-weight:700}
 .sl-pending-drawer .v20-dialog-head .sl-btn{width:32px;min-width:32px;height:32px;min-height:32px;padding:0;border:0;background:transparent;color:#607486;font-size:22px}
@@ -493,12 +495,13 @@
   .sl-schedule-view.sl-sidebar-collapsed>.sl-left{width:480px;min-width:480px;max-width:480px}
   .sl-schedule-view.sl-sidebar-collapsed .sl-sidebar-content{display:flex}
   .sl-schedule-view .sl-sidebar-toggle{display:none}
-  .scheduling-v20.v20-dialog:is(.sl-session-editor-dialog,.sl-offering-drawer,.sl-pending-drawer){width:calc(100vw - 24px);max-width:calc(100vw - 24px);height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);margin:12px}
+  .scheduling-v20.v20-dialog:is(.sl-session-editor-dialog,.sl-offering-drawer){width:calc(100vw - 24px);max-width:calc(100vw - 24px);height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);margin:12px}
   .sl-session-editor-dialog .v20-composer{display:block;overflow:auto}
   .sl-editor-info,.sl-editor-rooms{overflow:visible}
   .sl-editor-info{border-right:0;border-bottom:1px solid #e2e8f0}
   .sl-session-editor-dialog .v20-room-grid{grid-template-columns:repeat(2,minmax(120px,1fr))}
   .sl-pending-card{grid-template-columns:minmax(105px,auto) minmax(0,1fr);align-items:start}
+  .scheduling-v20.v20-dialog.sl-pending-drawer{width:calc(100vw - 24px);max-width:calc(100vw - 24px);height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);margin:12px}
   .sl-pending-side{grid-column:1/-1;padding-top:8px;border-top:1px solid #e2e8f0}
 }
 
@@ -570,7 +573,7 @@
 .sl-matrix-col-cards{display:flex;flex-direction:column;gap:6px;padding:7px}
 .sl-matrix-col-cards-four{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));align-items:stretch}
 
-.sl-matrix-card{position:relative;height:104px;display:flex;flex-direction:column;gap:4px;padding:9px 10px;overflow:hidden;border:1px solid #d9e4ec;border-radius:0;background:#fff;transition:border-color .15s ease}
+.sl-matrix-card{position:relative;min-height:104px;display:flex;flex-direction:column;gap:4px;padding:9px 10px;overflow:hidden;border:1px solid #d9e4ec;border-radius:0;background:#fff;transition:border-color .15s ease}
 .sl-matrix-card:hover{border-color:#9ab7c8}
 .sl-matrix-card-detail-trigger,.sl-pivot-card-detail-trigger{position:absolute;inset:0;z-index:1;width:100%;height:100%;padding:0;border:0;border-radius:0;background:transparent;cursor:pointer}
 .sl-matrix-card-detail-trigger:focus-visible,.sl-pivot-card-detail-trigger:focus-visible{outline:2px solid var(--primary);outline-offset:-3px}
@@ -587,8 +590,16 @@
 .sl-matrix-status.status-unscheduled>span{font-size:8px}
 .sl-matrix-status.status-scheduled{color:#0b7f9c}
 .sl-matrix-status.status-completed{color:#24734f}
+.sl-matrix-session-counts{display:inline-flex;flex-direction:column;flex:none;gap:3px;font-size:12px;line-height:1.4;white-space:nowrap}
+.sl-matrix-session-count{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sl-matrix-session-count strong{font-size:inherit;font-weight:600}
+.sl-matrix-session-count.session-held{color:#24734f}
+.sl-matrix-session-count.session-scheduled{padding-top:3px;border-top:1px solid #d9e4ec;color:#0b7f9c}
 .sl-matrix-workspace .sl-matrix-schedule-link{position:relative;z-index:2;flex:none;padding:0;border:0;border-radius:0;background:transparent;color:#0b7f9c;font-size:12px;font-weight:600;line-height:1.4;white-space:nowrap;cursor:pointer}
 .sl-matrix-workspace .sl-matrix-schedule-link:hover{color:#123b63;text-decoration:underline}
+.sl-matrix-delete-link{position:relative;z-index:2;flex:none;padding:0;border:0;background:transparent;color:#b42318;font-size:12px;font-weight:500;line-height:1.4;cursor:pointer;white-space:nowrap}
+.sl-matrix-delete-link:disabled{color:#94a3b8;cursor:not-allowed}
+.sl-matrix-delete-link:not(:disabled):hover{text-decoration:underline}
 .sl-matrix-empty-col{padding:28px 12px;color:var(--text-muted);font-size:11px;text-align:center}
 
 .sl-matrix-pivot{width:100%;height:100%;min-width:0;min-height:0;display:flex;flex-direction:column}
@@ -691,27 +702,27 @@
 
 /* Course matrix toolbar: match the supplied visual reference without changing data views. */
 .scheduling-v20 .sl-matrix-workspace{gap:12px;background:#f4f8fb}
-.sl-matrix-toolbar{padding:12px;border:1px solid #d9e6ef;border-radius:0;background:#fff;box-shadow:0 2px 10px rgba(16,58,92,.04);flex-shrink:0}
+.sl-matrix-toolbar{padding:12px;border:1px solid #d9e6ef;border-radius:0;background:#fff;box-shadow:none;flex-shrink:0}
 .sl-matrix-toolbar-head{min-height:0;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:0;margin-bottom:12px;border:0}
 .sl-matrix-toolbar-head>.sl-matrix-kpi-bar{display:grid;align-items:stretch;grid-template-columns:repeat(4,max-content);gap:10px;flex:none;min-width:0;overflow:visible;border:0;background:transparent;border-radius:0}
-.sl-matrix-kpi{position:relative;min-width:0;min-height:50px;display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e9f1f6;border-radius:0;background:#fff;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
-.sl-matrix-kpi:last-child{border-right:1px solid #e9f1f6}
-.sl-matrix-kpi:hover,.sl-matrix-kpi:focus-visible{transform:translateY(-1px);border-color:#b8d6e7;box-shadow:0 8px 20px rgba(17,103,145,.08)}
+.sl-matrix-kpi{position:relative;min-width:0;min-height:50px;display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #d9e6ef;border-radius:0;background:#fff}
+.sl-matrix-kpi:last-child{border-right:1px solid #d9e6ef}
+.sl-matrix-kpi:hover,.sl-matrix-kpi:focus-visible{transform:none;border-color:#b8cbd9;box-shadow:none}
 .sl-matrix-kpi:focus-visible{outline:2px solid #1187b6;outline-offset:2px}
 .sl-matrix-kpi-icon{width:18px;height:18px;display:grid;place-items:center;flex:none;border:0;border-radius:0;background:transparent;color:#5f748c}
 .sl-matrix-kpi-icon svg{width:18px;height:18px}
 .sl-matrix-kpi>div{min-width:0;display:flex;align-items:center;gap:8px}
 .sl-matrix-kpi strong{display:block;color:#113d61;font-size:16px;font-weight:800;line-height:1}
 .sl-matrix-kpi>div>span{display:block;margin:0;color:#607689;font-size:12px;font-weight:700;line-height:1.2;white-space:normal}
-.sl-matrix-kpi.kpi-info .sl-matrix-kpi-icon{background:transparent;border:0;color:#5f748c}
+.sl-matrix-kpi.kpi-info .sl-matrix-kpi-icon{background:transparent;border:0;color:#173e75}
 .sl-matrix-kpi.kpi-warn .sl-matrix-kpi-icon{background:transparent;border:0;color:#93621e}
-.sl-matrix-kpi.kpi-warn strong,.sl-matrix-kpi.kpi-warn>div>span{color:#c87913}
+.sl-matrix-kpi.kpi-warn strong{color:#c87913}
 .sl-matrix-kpi.kpi-progress .sl-matrix-kpi-icon{background:transparent;border:0;color:#0b7f9c}
-.sl-matrix-kpi.kpi-progress strong{color:#178b67}
+.sl-matrix-kpi.kpi-progress strong{color:#0b7f9c}
 .sl-matrix-kpi.kpi-cross .sl-matrix-kpi-icon{background:transparent;border:0;color:#526a82}
 .sl-matrix-view-toggle{display:flex;flex:none;border:1px solid #d9e6ef;border-radius:0;overflow:hidden;background:#fff}
-.sl-matrix-view-toggle button{height:40px;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 14px;border:0;background:#fff;color:#587084;font-size:13px;font-weight:700;cursor:pointer}
-.sl-matrix-view-toggle button.active{background:#eaf7fc;color:#0a7aa6}
+.sl-matrix-view-toggle button{height:40px;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 14px;border:0;border-right:1px solid #d9e6ef;background:#fff;color:#587084;font-size:13px;font-weight:700;cursor:pointer}
+.sl-matrix-view-toggle button.active{outline:1px solid #0b7f9c;outline-offset:-1px;background:#edf6f8;color:#0b7f9c}
 .sl-matrix-view-toggle button:hover:not(.active){background:#f6fbfe;color:#0a7aa6}
 .sl-matrix-view-toggle svg{width:16px;height:16px}
 .sl-matrix-filters{display:grid;grid-template-columns:minmax(180px,1.5fr) minmax(140px,1fr) minmax(140px,1fr) minmax(125px,.9fr) minmax(140px,.9fr);gap:8px;padding:0;background:#fff;border-radius:0}

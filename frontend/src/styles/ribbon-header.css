@@ -122,7 +122,7 @@
   padding: 0 16px;
   overflow-x: auto;
   background: #F8FAFC;
-  border-bottom: 1px solid var(--border-color, #DFE4E8);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color, #DFE4E8) 55%, transparent);
   scrollbar-width: none;
 }
 
@@ -162,18 +162,22 @@
 
 /* 3. Commands Bar */
 .ribbon-command-scroll {
-  overflow-x: hidden;
+  overflow-x: auto;
   background: #FAFBFC;
-  border-bottom: 1px solid var(--border-color, #DFE4E8);
-  scrollbar-width: thin;
+  border-bottom: 1px solid transparent;
+  scrollbar-width: none;
+}
+
+.ribbon-command-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .ribbon-commands {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: stretch;
   justify-content: flex-start;
-  width: 100%;
+  width: max-content;
   min-width: 100%;
   min-height: 108px;
   height: auto;
@@ -184,12 +188,13 @@
 .ribbon-group {
   position: relative;
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
-  min-width: 130px;
+  min-width: 0;
   min-height: 100px;
-  padding: 0 5px 21px;
+  padding: 0 4px 3px;
   box-sizing: border-box;
-  border-right: 1px solid var(--border-color, #DFE4E8);
+  border-right: 1px solid color-mix(in srgb, var(--border-color, #DFE4E8) 45%, transparent);
 }
 
 .ribbon-group:last-child {
@@ -207,8 +212,8 @@
 .ribbon-action {
   --ribbon-icon-color: #176B8A;
   display: flex;
-  flex: 0 0 68px;
-  width: 68px;
+  flex: 0 0 64px;
+  width: 64px;
   height: 82px;
   align-items: center;
   flex-direction: column;
@@ -300,14 +305,14 @@
 }
 
 .ribbon-group-label {
-  position: absolute;
-  right: 4px;
-  bottom: 3px;
-  left: 4px;
+  /* Captions participate in intrinsic sizing, including single-action groups. */
+  flex: 0 0 auto;
+  margin-top: auto;
   overflow: hidden;
   color: var(--text-secondary, #607486);
   font-size: 10px;
   font-weight: 700;
+  line-height: 18px;
   letter-spacing: 0.4px;
   text-transform: uppercase;
   text-align: center;
@@ -365,16 +370,6 @@
 }
 
 @media (max-width: 760px) {
-  .ribbon-command-scroll {
-    overflow-x: auto;
-  }
-
-  .ribbon-commands {
-    width: max-content;
-    min-height: 108px;
-    flex-wrap: nowrap;
-  }
-
   .ribbon-titlebar {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: 48px;
