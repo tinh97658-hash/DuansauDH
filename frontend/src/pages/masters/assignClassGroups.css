@@ -1,8 +1,8 @@
 /* Candidate widths are controlled by ResizableTable; member widths remain fixed. */
 .assignment-page{--assignment-navy:#17324d;--assignment-border:var(--table-border-color,#d7e4ee);--assignment-brand:var(--primary-dark,#056a8f);--assignment-slate:var(--text-secondary,#607486);--assignment-teal:#087e86;background:#f5f8fb}
 @layer app-square-corners{
-  .assignment-page .assignment-discipline-card,.assignment-page .assignment-panel,.assignment-page .assignment-filters,.assignment-page .assignment-capacity,.assignment-page .assignment-operational-alert{border-radius:8px!important}
-  .assignment-page .assignment-summary-total,.assignment-page .assignment-summary-count{border-radius:5px!important}
+  .assignment-page .assignment-discipline-card,.assignment-page .assignment-panel,.assignment-page .assignment-filters,.assignment-page .assignment-capacity,.assignment-page .assignment-operational-alert{border-radius:0!important}
+  .assignment-page .assignment-summary-total,.assignment-page .assignment-summary-count{border-radius:0!important}
 }
 .assignment-page .assignment-summary{border:0;background:transparent;box-shadow:none;overflow:visible}
 .assignment-summary-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:4px 0 14px}

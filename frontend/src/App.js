@@ -55,7 +55,7 @@ const TrainingPlan = lazyPage(() => import("./pages/plan/trainingPlan"), ["/plan
 const AdmissionTargets = lazyPage(() => import("./pages/plan/admissionTargets"), ["/plan/admission-targets"]);
 const AnnualFees = lazyPage(() => import("./pages/plan/annualFees"), ["/plan/annual-fees"]);
 const AdmissionRecords = lazyPage(() => import("./pages/plan/admissionRecords"), ["/plan/admission-records"]);
-const AdmissionRecordDetail = lazyPage(() => import("./pages/plan/admissionRecordDetail"), ["/plan/admission-records/:id","/plan/admission-records/detail/:id","/masters/admitted-records/:id"]);
+const AdmissionRecordDetail = lazyPage(() => import("./pages/plan/admissionRecordDetail"), ["/plan/admission-records/:id","/plan/admission-records/detail/:id","/masters/admitted-records/:id","/masters/study-leaves/:id"]);
 const AdmissionPreview = lazyPage(() => import("./features/admission/AdmissionPreview"), ["/plan/admission-records/preview"]);
 
 // ===== ĐÀO TẠO THẠC SĨ =====
@@ -165,6 +165,7 @@ function App() {
               {/* ĐÀO TẠO THẠC SĨ */}
               <Route path="masters/admitted-records" element={<MastersAdmittedRecords />} />
               <Route path="masters/study-leaves" element={<StudyLeaves />} />
+              <Route path="masters/study-leaves/:id" element={<AdmissionRecordDetail returnPath="/masters/study-leaves" />} />
               <Route path="masters/admitted-records/:id" element={<AdmissionRecordDetail returnPath="/masters/admitted-records" />} />
               <Route path="masters/bridge-course" element={<MastersBridgeCourse />} />
               <Route path="masters/admission-scores" element={<MastersAdmissionScores />} />

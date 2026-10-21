@@ -294,7 +294,7 @@ const mapRecordToFormState = (data, majorList = []) => {
   };
 };
 
-const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
+const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admission-records" }) => {
   const catalogRevision = useSubjectCatalogRevision();
   const gradebookRevision = useGradebookRevision();
   const { id } = useParams();
@@ -302,13 +302,16 @@ const AdmissionRecordDetail = ({ returnPath = "/plan/admission-records" }) => {
   const fileInputRef = useRef(null);
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const fromStudyManagement = defaultReturnPath === "/masters/study-leaves";
+  const returnPath = fromStudyManagement && searchParams.get("returnView") === "records"
+    ? "/masters/study-leaves?view=records" : defaultReturnPath;
   const [loading, setLoading] = useState(true);
   const profileRequest = useRef(0);
   const [saving, setSaving] = useState(false);
   const { can } = usePermissions();
   const isAdmin = can("admission.manage");
   const [record, setRecord] = useState(null);
-  const showStudyTabs = returnPath === "/masters/admitted-records";
+  const showStudyTabs = returnPath === "/masters/admitted-records" || fromStudyManagement;
   const requestedTab = searchParams.get("tab");
   const detailTab = (showStudyTabs && ["learning", "grades", "leave"].includes(requestedTab)) || (requestedTab === "admission" && record?.trainingLevel === "Thạc sĩ") ? requestedTab : "profile";
   const changeDetailScope = (key, value) => {

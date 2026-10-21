@@ -18,10 +18,27 @@ const renderPage=(permissions=['gradebook.view','scheduling.write'])=>renderWith
 const queueButton=()=>within(screen.getByRole('complementary',{name:'Chưa xếp lịch'})).getByRole('button',{name:/Lớp QT/});
 const open=async()=>{fireEvent.click(await within(screen.getByRole('complementary',{name:'Chưa xếp lịch'})).findByRole('button',{name:/Lớp QT/}));fireEvent.click(screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'}));await screen.findByRole('dialog',{name:'XẾP LỊCH THI'});await waitFor(()=>expect(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/})).toBeEnabled());};
 const chooseScope=(label,name)=>{fireEvent.focus(screen.getByRole('combobox',{name:label}));fireEvent.click(screen.getByRole('option',{name}));};
-const selectRoom=()=>fireEvent.click(screen.getByRole('button',{name:/301 2 chỗ/}));
-function session(extra={}){return {id:'session',courseOfferingId:offering.id,snapshotId:'snapshot',version:3,name:offering.name,subjectId:offering.subjectId,subjectName:offering.subjectName,groups:offering.groups,candidateCount:2,candidateIds:offering.candidateIds,examDate:date,startTime:'08:00',endTime:'10:00',roomId:room.id,roomCode:room.code,status:'scheduled',canEdit:true,...extra};}
-beforeEach(()=>{vi.clearAllMocks();data={queue:[offering],approvedOfferings:[offering],sessions:[],rooms:[room,{...room,id:'small',code:'201',capacity:1}]};axios.get.mockImplementation(async()=>({data}));axios.post.mockResolvedValue({data:{id:'new'}});axios.put.mockResolvedValue({data:{}});});
+const chooseUnit=id=>chooseScope('Đơn vị',data.units.find(unit=>unit.id===id).name);
+const lecturerButton=()=>screen.getByRole('button',{name:'Giảng viên',exact:true});
+const openLecturers=()=>{if(lecturerButton().getAttribute('aria-expanded')!=='true')fireEvent.click(lecturerButton());};
+const chooseLecturer=id=>{openLecturers();fireEvent.click(screen.getByRole('option',{name:data.lecturers.find(l=>l.id===id).name,exact:true}));};
+const selectRoom=()=>{fireEvent.click(screen.getByRole('button',{name:/301 2 chỗ/}));if(lecturerButton().textContent.includes('Chọn giảng viên')){chooseUnit('unit-1');chooseLecturer('lecturer');}};
+function session(extra={}){return {id:'session',courseOfferingId:offering.id,snapshotId:'snapshot',version:3,name:offering.name,subjectId:offering.subjectId,subjectName:offering.subjectName,groups:offering.groups,candidateCount:2,candidateIds:offering.candidateIds,examDate:date,startTime:'08:00',endTime:'10:00',roomId:room.id,roomCode:room.code,lecturerId:'lecturer-2',lecturerName:'Trần Bình',status:'scheduled',canEdit:true,...extra};}
+beforeEach(()=>{vi.clearAllMocks();data={queue:[offering],approvedOfferings:[offering],sessions:[],rooms:[room,{...room,id:'small',code:'201',capacity:1}],units:[{id:'unit-1',name:'Viện Đào tạo SĐH',active:true},{id:'unit-2',name:'Viện Đào tạo Sau đại học',active:true},{id:'other-unit',name:'Khoa Công nghệ thông tin',active:true}],lecturers:[{id:'lecturer',code:'GV01',name:'Nguyễn An',unitId:'unit-1',active:true},{id:'lecturer-2',code:'GV02',name:'Trần Bình',unitId:'unit-2',active:true},{id:'inactive',name:'Giảng viên cũ',unitId:'unit-1',active:false}]};axios.get.mockImplementation(async()=>({data}));axios.post.mockResolvedValue({data:{id:'new'}});axios.put.mockResolvedValue({data:{}});});
 it('fails closed without view permission',()=>{renderPage([]);expect(screen.getByRole('alert')).toHaveTextContent('không có quyền');expect(axios.get).not.toHaveBeenCalled();});
+it('marks today with the shared Teaching indicator and blocks past calendar dates',async()=>{
+ renderPage();await screen.findByRole('button',{name:/Lớp QT/});
+ expect(screen.getByLabelText('Hôm nay')).toHaveClass('sl-today-indicator');
+ expect(screen.getByLabelText('Hôm nay').closest('.sl-day')).toHaveAttribute('aria-current','date');
+ fireEvent.click(queueButton());
+ expect(screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'})).toBeEnabled();
+ fireEvent.click(screen.getByRole('button',{name:'Tuần trước'}));
+ await waitFor(()=>expect(axios.get).toHaveBeenLastCalledWith(expect.any(String),expect.objectContaining({params:{from:'2026-10-12',to:'2026-10-18'}})));
+ for(const button of screen.getAllByRole('button',{name:/^Chọn /}))expect(button).toBeDisabled();
+ for(const button of screen.getAllByRole('button',{name:'Ngày đã qua'}))expect(button).toBeDisabled();
+ fireEvent.click(screen.getByRole('button',{name:'Chọn 18/10/2026 Chiều'}));
+ expect(screen.queryByRole('dialog')).toBeNull();
+});
 it('reuses the Teaching page shell with exactly three scope selectors above search and queue',async()=>{
  renderPage();await screen.findByRole('button',{name:/Lớp QT/});for(const name of ['Ngành','Chuyên ngành','Khóa / năm học'])expect(screen.getByRole('combobox',{name})).toBeInTheDocument();
  const shell=document.querySelector('.sl-workspace.sl-schedule-view'),left=shell.querySelector(':scope > .sl-left'),right=shell.querySelector(':scope > .sl-right');expect(shell.children).toHaveLength(2);expect(left).toHaveTextContent('PHẠM VI LÀM VIỆC');expect(left.querySelector('.sl-schedule-scope-fields').children).toHaveLength(3);expect(left).toContainElement(screen.getByLabelText('Tìm kiếm'));expect(right.querySelector('.sl-schedule-head')).toHaveTextContent('XẾP LỊCH THI');
@@ -36,15 +53,15 @@ it('reuses the Teaching scope collapse/expand interaction',async()=>{renderPage(
 it('searches course/subject context from the scope panel without extra dropdowns',async()=>{renderPage();await screen.findByRole('button',{name:/Lớp QT/});fireEvent.change(screen.getByLabelText('Tìm kiếm'),{target:{value:'QT'}});expect(queueButton()).toBeInTheDocument();fireEvent.change(screen.getByLabelText('Tìm kiếm'),{target:{value:'Không tìm thấy'}});expect(screen.queryByRole('button',{name:/Lớp QT/})).toBeNull();});
 it('navigates weeks, displays daytime and Vietnamese dates',async()=>{renderPage();await screen.findByRole('button',{name:/Lớp QT/});expect(screen.getByText('SÁNG')).toBeInTheDocument();expect(screen.getByText('CHIỀU')).toBeInTheDocument();expect(screen.queryByText('07:00')).toBeNull();expect(screen.queryByText('19:00')).toBeNull();expect(document.querySelectorAll('.ep-period-slot')).toHaveLength(14);expect(screen.queryByText('06:00')).toBeNull();expect(screen.queryByText(/UTC/)).toBeNull();fireEvent.click(screen.getByRole('button',{name:'Tuần sau'}));await waitFor(()=>expect(axios.get).toHaveBeenLastCalledWith(expect.any(String),expect.objectContaining({params:{from:'2026-10-26',to:'2026-11-01'}})));});
 it('creates from a slot using immutable approved snapshot and shared floor-grouped room cards',async()=>{
- renderPage();await open();expect(screen.queryByLabelText('Phòng thi')).toBeNull();expect(screen.getByText('TẦNG 2')).toBeInTheDocument();expect(screen.getByText('TẦNG 3')).toBeInTheDocument();expect(screen.getByLabelText('Bắt đầu')).toHaveAttribute('type','time');expect(screen.getByRole('button',{name:/201 1 chỗ KHÔNG ĐỦ CHỖ/})).toBeDisabled();
- selectRoom();expect(screen.getByRole('button',{name:/301 2 chỗ ĐANG CHỌN/})).toHaveAttribute('aria-pressed','true');fireEvent.click(screen.getByRole('button',{name:'Xếp lịch'}));await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/masters/exam-sessions'),expect.objectContaining({courseOfferingId:'offering',snapshotId:'snapshot',eligibilityVersion:2,roomId:'room',examDate:date,startTime:'08:00',endTime:'09:00'}),{withCredentials:true}));
+ renderPage();await open();expect(screen.queryByLabelText('Phòng thi')).toBeNull();expect(screen.getByText('TẦNG 2')).toBeInTheDocument();expect(screen.getByText('TẦNG 3')).toBeInTheDocument();expect(screen.queryByLabelText('Bắt đầu')).toBeNull();expect(screen.queryByLabelText('Kết thúc')).toBeNull();expect(screen.getByRole('button',{name:/201 1 chỗ KHÔNG ĐỦ CHỖ/})).toBeDisabled();
+ selectRoom();expect(screen.getByRole('button',{name:/301 2 chỗ ĐANG CHỌN/})).toHaveAttribute('aria-pressed','true');fireEvent.click(screen.getByRole('button',{name:'Xếp lịch'}));await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/masters/exam-sessions'),expect.objectContaining({courseOfferingId:'offering',snapshotId:'snapshot',eligibilityVersion:2,roomId:'room',lecturerId:'lecturer',examDate:date,startTime:'08:00',endTime:'09:00'}),{withCredentials:true}));
 });
-it('recalculates occupied rooms on time change and fetches a changed date',async()=>{
+it('recalculates occupied rooms when another calendar date is selected',async()=>{
  data.sessions=[session({id:'busy',courseOfferingId:'other',candidateIds:['other']})];renderPage();fireEvent.click(await screen.findByRole('button',{name:/Lớp QT 2026 2 TS/}));fireEvent.click(screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'}));
- expect(await screen.findByRole('button',{name:/301 2 chỗ ĐÃ CÓ LỊCH/})).toBeDisabled();fireEvent.change(screen.getByLabelText('Bắt đầu'),{target:{value:'11:00'}});fireEvent.change(screen.getByLabelText('Kết thúc'),{target:{value:'12:00'}});await waitFor(()=>expect(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/})).toBeEnabled());fireEvent.change(screen.getByLabelText('Ngày thi'),{target:{value:'20/10/2026'}});await waitFor(()=>expect(axios.get).toHaveBeenLastCalledWith(expect.any(String),expect.objectContaining({params:{from:'2026-10-20',to:'2026-10-20'}})));
+ expect(await screen.findByRole('button',{name:/301 2 chỗ ĐÃ CÓ LỊCH/})).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'Đóng',exact:true}));fireEvent.click(screen.getByRole('button',{name:'Chọn 20/10/2026 Sáng'}));await waitFor(()=>expect(axios.get).toHaveBeenLastCalledWith(expect.any(String),expect.objectContaining({params:{from:'2026-10-20',to:'2026-10-20'}})));await waitFor(()=>expect(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/})).toBeEnabled());
 });
 it('blocks candidate conflict and keeps authoritative server error/form on failure',async()=>{
- axios.post.mockRejectedValue({response:{status:409,data:{message:'Thí sinh trùng ca thi trên máy chủ'}}});renderPage();await open();selectRoom();fireEvent.click(screen.getByRole('button',{name:'Xếp lịch'}));expect(await screen.findByRole('alert')).toHaveTextContent('máy chủ');expect(screen.getByLabelText('Ngày thi')).toHaveValue('19/10/2026');
+ axios.post.mockRejectedValue({response:{status:409,data:{message:'Thí sinh trùng ca thi trên máy chủ'}}});renderPage();await open();selectRoom();fireEvent.click(screen.getByRole('button',{name:'Xếp lịch'}));expect(await screen.findByRole('alert')).toHaveTextContent('máy chủ');expect(screen.getByRole('dialog',{name:'XẾP LỊCH THI'})).toBeInTheDocument();expect(lecturerButton()).toHaveTextContent('Nguyễn An');
 });
 it('keeps read-only calendar controls disabled',async()=>{renderPage(['gradebook.view']);await screen.findByRole('button',{name:/Lớp QT/});fireEvent.click(queueButton());expect(screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'})).toBeDisabled();expect(screen.queryByRole('dialog')).toBeNull();});
 it('shows two direct full-width cards, then +N with hover preview and full-list drilldown',async()=>{
@@ -52,7 +69,7 @@ it('shows two direct full-width cards, then +N with hover preview and full-list 
 });
 it.each([1,2])('renders %i overlapping exams directly without a summary',async(count)=>{data.sessions=Array.from({length:count},(_,i)=>session({id:String(i)}));renderPage();await waitFor(()=>expect(document.querySelectorAll('.ep-event')).toHaveLength(count));expect(screen.queryByText(/ca khác/)).toBeNull();});
 it('opens edit with same room grid and saves session version',async()=>{
- data.sessions=[session()];data.queue=[];renderPage();fireEvent.click(await screen.findByRole('button',{name:/19\/10\/2026 08:00 Đã xếp lịch/}));fireEvent.click(screen.getByRole('button',{name:'Sửa lịch'}));await waitFor(()=>expect(screen.getByRole('button',{name:'Lưu lịch'})).toBeEnabled());fireEvent.change(screen.getByLabelText('Kết thúc'),{target:{value:'11:00'}});fireEvent.click(screen.getByRole('button',{name:'Lưu lịch'}));await waitFor(()=>expect(axios.put).toHaveBeenCalledWith(expect.stringContaining('/session'),expect.objectContaining({version:3,endTime:'11:00'}),{withCredentials:true}));
+ data.sessions=[session()];data.queue=[];renderPage();fireEvent.click(await screen.findByRole('button',{name:/19\/10\/2026 08:00 Đã xếp lịch/}));expect(screen.getByRole('dialog',{name:'LỊCH THI'})).toHaveTextContent('Trần Bình');fireEvent.click(screen.getByRole('button',{name:'Sửa lịch'}));await waitFor(()=>expect(screen.getByRole('button',{name:'Lưu lịch'})).toBeEnabled());expect(screen.getByRole('combobox',{name:'Đơn vị'})).toHaveValue('Viện Đào tạo Sau đại học');expect(lecturerButton()).toHaveTextContent('Trần Bình');chooseUnit('unit-1');expect(lecturerButton()).toHaveTextContent('Chọn giảng viên');chooseLecturer('lecturer');fireEvent.click(screen.getByRole('button',{name:'Lưu lịch'}));await waitFor(()=>expect(axios.put).toHaveBeenCalledWith(expect.stringContaining('/session'),expect.objectContaining({version:3,lecturerId:'lecturer',startTime:'08:00',endTime:'10:00'}),{withCredentials:true}));
 });
 it('requires a dedicated cancellation reason dialog',async()=>{
  data.sessions=[session()];renderPage();fireEvent.click(await screen.findByRole('button',{name:/19\/10\/2026 08:00 Đã xếp lịch/}));fireEvent.click(screen.getByRole('button',{name:'Hủy lịch'}));const dialog=screen.getByRole('dialog',{name:'HỦY LỊCH THI'}),button=within(dialog).getByRole('button',{name:'Hủy lịch'});expect(button).toBeDisabled();fireEvent.change(within(dialog).getByLabelText('Lý do hủy'),{target:{value:'Đổi kế hoạch'}});fireEvent.click(button);await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/session/cancel'),{version:3,note:'Đổi kế hoạch'},{withCredentials:true}));
@@ -96,16 +113,45 @@ it('keeps long academic names out of queue identifiers, calendar cards and activ
  const card=document.querySelector('.ep-event');expect(card).toHaveTextContent('QTKD 2026.1.11');expect(card).toHaveTextContent('301 · 2 TS');expect(card).toHaveTextContent('CHỜ XÁC NHẬN');expect(card.textContent).not.toContain(item.subjectName);expect(card.textContent).not.toContain('08:00');
  fireEvent.mouseOver(card);const tooltip=await screen.findByRole('tooltip');expect(tooltip).toHaveTextContent(item.subjectName);expect(tooltip).toHaveTextContent('19/10/2026 · 08:00–10:00');expect(tooltip).toHaveTextContent('Phòng 301 · 2 thí sinh');
 });
-it('prefills the clicked afternoon date/period, keeps 24-hour exact times and rejects night/reversed times',async()=>{
+it('uses the clicked afternoon without editable start/end times and requires an active lecturer',async()=>{
  renderPage();fireEvent.click(await within(screen.getByRole('complementary',{name:'Chưa xếp lịch'})).findByRole('button',{name:/Lớp QT/}));fireEvent.click(screen.getByRole('button',{name:'Chọn 19/10/2026 Chiều'}));
- expect(screen.getByLabelText('Ngày thi')).toHaveValue('19/10/2026');expect(screen.getByText('Chiều')).toBeInTheDocument();expect(screen.getByLabelText('Bắt đầu')).toHaveValue('13:00');expect(screen.getByLabelText('Kết thúc')).toHaveValue('14:00');await waitFor(()=>expect(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/})).toBeEnabled());selectRoom();
- expect(screen.queryByText(/Sức chứa phù hợp|Không trùng thí sinh trong lịch đã tải/)).toBeNull();
- fireEvent.change(screen.getByLabelText('Bắt đầu'),{target:{value:'01:00'}});expect(screen.getByRole('button',{name:'Xếp lịch'})).toBeDisabled();expect(screen.getByRole('alert')).toHaveTextContent('07:00–19:00');
- fireEvent.change(screen.getByLabelText('Bắt đầu'),{target:{value:'15:30'}});expect(screen.getByRole('alert')).toHaveTextContent('Giờ kết thúc phải sau');fireEvent.change(screen.getByLabelText('Kết thúc'),{target:{value:'16:30'}});expect(screen.getByRole('button',{name:'Xếp lịch'})).toBeEnabled();
+ expect(screen.queryByLabelText('Ngày thi')).toBeNull();expect(screen.getByText('Chiều')).toBeInTheDocument();expect(screen.queryByLabelText('Bắt đầu')).toBeNull();expect(screen.queryByLabelText('Kết thúc')).toBeNull();await waitFor(()=>expect(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/})).toBeEnabled());
+ fireEvent.click(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/}));expect(screen.getByRole('button',{name:'Xếp lịch'})).toBeDisabled();expect(screen.queryByRole('option',{name:'Giảng viên cũ'})).toBeNull();
+ chooseUnit('unit-1');chooseLecturer('lecturer');fireEvent.click(screen.getByRole('button',{name:'Xếp lịch'}));await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({examDate:date,startTime:'13:00',endTime:'14:00',lecturerId:'lecturer'}),expect.any(Object)));
 });
-it('allows the same candidates/room at a different exact time within the same morning',async()=>{
- data.sessions=[session({id:'existing',courseOfferingId:'other'})];renderPage();fireEvent.click(await within(screen.getByRole('complementary',{name:'Chưa xếp lịch'})).findByRole('button',{name:/Lớp QT/}));fireEvent.click(screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'}));
- await waitFor(()=>expect(screen.getByRole('button',{name:/301 2 chỗ ĐÃ CÓ LỊCH/})).toBeDisabled());fireEvent.change(screen.getByLabelText('Bắt đầu'),{target:{value:'10:00'}});fireEvent.change(screen.getByLabelText('Kết thúc'),{target:{value:'11:00'}});selectRoom();expect(screen.getByRole('button',{name:'Xếp lịch'})).toBeEnabled();expect(screen.queryByText(/thí sinh đang có lịch/)).toBeNull();
+it('disables lecturers already assigned to an overlapping exam even when the room is free',async()=>{
+ data.sessions=[session({id:'existing',courseOfferingId:'other',roomId:'other-room',candidateIds:['other']})];renderPage();await open();
+ chooseUnit('unit-2');openLecturers();expect(screen.getByRole('option',{name:/Trần Bình.*Đang bận/})).toBeDisabled();selectRoom();expect(screen.getByRole('button',{name:'Xếp lịch'})).toBeEnabled();
+});
+it('requires a unit first, filters its lecturers and clears the lecturer when the unit changes',async()=>{
+ renderPage();await open();
+ expect(lecturerButton()).toBeDisabled();
+ expect(screen.queryByRole('option',{name:/Nguyễn An/})).toBeNull();
+ chooseUnit('unit-1');openLecturers();
+ expect(lecturerButton()).toBeEnabled();
+ expect(screen.getByRole('option',{name:/Nguyễn An/})).toBeInTheDocument();expect(screen.queryByRole('option',{name:/Trần Bình/})).toBeNull();
+ selectRoom();expect(screen.getByRole('button',{name:'Xếp lịch'})).toBeEnabled();
+ chooseUnit('unit-2');openLecturers();
+ expect(lecturerButton()).toHaveTextContent('Chọn giảng viên');expect(screen.getByRole('button',{name:'Xếp lịch'})).toBeDisabled();
+ expect(screen.queryByRole('option',{name:/Nguyễn An/})).toBeNull();expect(screen.getByRole('option',{name:/Trần Bình/})).toBeInTheDocument();
+});
+it('only offers the two postgraduate institutes and excludes other or unassigned units from search',async()=>{
+ data.lecturers.push({id:'unassigned-lecturer',name:'Giảng viên chưa phân đơn vị',active:true});renderPage();await open();
+ const input=screen.getByRole('combobox',{name:'Đơn vị'});fireEvent.focus(input);
+ expect(screen.getAllByRole('option').map(option=>option.textContent)).toEqual(expect.arrayContaining(['Viện Đào tạo SĐH','Viện Đào tạo Sau đại học']));expect(screen.getAllByRole('option')).toHaveLength(2);
+ expect(screen.queryByRole('option',{name:'Chưa có đơn vị'})).toBeNull();expect(screen.queryByRole('option',{name:'Khoa Công nghệ thông tin'})).toBeNull();
+ fireEvent.change(input,{target:{value:'cong nghe'}});expect(screen.queryAllByRole('option')).toHaveLength(0);expect(lecturerButton()).toBeDisabled();
+});
+it('searches units and lecturers by typed text without changing a saved selection until an option is chosen',async()=>{
+ renderPage();await open();
+ const unit=screen.getByRole('combobox',{name:'Đơn vị'});fireEvent.focus(unit);fireEvent.change(unit,{target:{value:'sdh'}});
+ expect(screen.getByRole('option',{name:'Viện Đào tạo SĐH'})).toBeInTheDocument();expect(screen.queryByRole('option',{name:'Viện Đào tạo Sau đại học'})).toBeNull();
+ expect(lecturerButton()).toBeDisabled();fireEvent.click(screen.getByRole('option',{name:'Viện Đào tạo SĐH'}));
+ openLecturers();const search=screen.getByRole('textbox',{name:'Tìm giảng viên'});
+ fireEvent.change(search,{target:{value:'nguyen an'}});expect(screen.getByRole('option',{name:'Nguyễn An'})).toBeInTheDocument();
+ fireEvent.change(search,{target:{value:'GV01'}});fireEvent.click(screen.getByRole('option',{name:'Nguyễn An'}));expect(lecturerButton()).toHaveTextContent('Nguyễn An');
+ openLecturers();fireEvent.change(screen.getByRole('textbox',{name:'Tìm giảng viên'}),{target:{value:'khong co'}});
+ expect(screen.getByText('Không tìm thấy giảng viên phù hợp.')).toBeInTheDocument();expect(lecturerButton()).toHaveTextContent('Nguyễn An');
 });
 it('opens all different-time exams in the morning by clicking the cell background',async()=>{
  data.sessions=[session(),session({id:'later',startTime:'11:00',endTime:'12:00'})];renderPage();fireEvent.click(await screen.findByRole('button',{name:'Xem ca thi 19/10/2026 Sáng'}));const list=screen.getByRole('dialog',{name:/CÁC CA THI.*SÁNG/});expect(within(list).getAllByRole('row')).toHaveLength(3);expect(list).toHaveTextContent('08:00–10:00');expect(list).toHaveTextContent('11:00–12:00');

@@ -88,6 +88,38 @@ describeDb('Study leave lifecycle with real PostgreSQL and merged classes', () =
   };
   const approve = async () => { const leave = await request(); await leaves.action(leave.id, { action: 'approve' }, actor); return leave; };
 
+  it('routes every managed status to leave management even without approved admission or a leave, with independent filters and totals', async () => {
+    const plan = app.get(PlanService);
+    const statuses = ['Bảo lưu', 'Đang bảo lưu', 'Bảo lưu quá hạn', 'Thôi học', 'Đã thôi học', 'Tạm hoãn', 'Từ chối'];
+    const profiles = [];
+    for (const [index, studyStatus] of statuses.entries()) profiles.push(await AdmissionRecord.create({
+      code: `${prefix}M${index}`, fullName: `${prefix} Managed ${index}`, majorId: major.id,
+      trainingLevel: 'Thạc sĩ', academicYear: '2020', studyStatus, status: index === 6 ? 'rejected' : 'pending',
+    }));
+    const doctoral = await AdmissionRecord.create({ code: `${prefix}DOC`, fullName: `${prefix} Doctoral`, majorId: major.id,
+      trainingLevel: 'Tiến sĩ', academicYear: '2020', studyStatus: 'Tạm hoãn', status: 'pending' });
+    const rows = async (stage: string, status?: string, year?: string, search = prefix, page = '1', pageSize = '20') => plan.listAdmissionRecords(
+      undefined, undefined, year, status, undefined, search, page, pageSize, undefined, true, stage,
+    );
+    const managed = await rows('study-management');
+    expect(managed.pagination.total).toBe(7);
+    expect(new Set(managed.data.map((row: any) => row.id))).toEqual(new Set(profiles.map(profile => profile.id)));
+    expect(managed.data.every((row: any) => !row.assignedGroup)).toBe(true);
+    expect((await rows('learners')).data.some((row: any) => profiles.some(profile => profile.id === row.id))).toBe(false);
+    const applications = await rows('applications');
+    expect(applications.data.some((row: any) => profiles.some(profile => profile.id === row.id))).toBe(false);
+    expect(applications.data.some((row: any) => row.id === doctoral.id)).toBe(true);
+    expect((await rows('study-management', 'Thôi học')).pagination.total).toBe(2);
+    expect((await rows('study-management', 'Tạm hoãn', '2020')).pagination.total).toBe(1);
+    expect((await rows('study-management', undefined, '2026')).pagination.total).toBe(0);
+    expect((await rows('study-management', undefined, undefined, profiles[6].code)).data[0].id).toBe(profiles[6].id);
+    const secondPage = await rows('study-management', undefined, undefined, prefix, '2', '3');
+    expect(secondPage.data).toHaveLength(3);expect(secondPage.pagination.total).toBe(7);
+    await profiles[0].update({ studyStatus: 'Đã trúng tuyển', status: 'approved' });
+    expect((await rows('study-management')).pagination.total).toBe(6);
+    expect((await rows('learners')).data.some((row: any) => row.id === profiles[0].id)).toBe(true);
+  });
+
   it('keeps pending learners in class, withdraws only unfinished offerings on approval, preserves grades and administrative membership', async () => {
     const leave = await request();
     expect((await scheduling.getCourseOfferingRoster(offerings[1].id)).participantCount).toBe(2);
@@ -123,7 +155,9 @@ describeDb('Study leave lifecycle with real PostgreSQL and merged classes', () =
       expect.objectContaining({ subjectId: subjects[1].id, status: 'completed', result: 'failed', studyLeaveFailure: true, score: null }),
     ]));
     const learners = await app.get(PlanService).listAdmissionRecords(undefined, 'Thạc sĩ', undefined, undefined, undefined, prefix, '1', '20', undefined, true, 'learners');
-    expect(learners.data.some((row: any) => row.id === learner.id)).toBe(true);
+    expect(learners.data.some((row: any) => row.id === learner.id)).toBe(false);
+    const managed = await app.get(PlanService).listAdmissionRecords(undefined, 'Thạc sĩ', undefined, undefined, undefined, prefix, '1', '20', undefined, true, 'study-management');
+    expect(managed.data.some((row: any) => row.id === learner.id)).toBe(true);
   });
 
   it('returns to a waiting group while the former class is active and starts a separate empty gradebook', async () => {

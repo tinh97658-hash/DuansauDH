@@ -16,6 +16,7 @@ import FilterSearchField from "../../components/FilterSearchField";
 import ResizableTable from "../../components/ResizableTable";
 import DocumentExportMenu from "../../components/DocumentExportMenu";
 import ConfirmDialog from "../../components/ConfirmDialog";
+import AppDialog from "../../components/AppDialog";
 import { downloadDocumentFile } from "../../utils/documentFiles";
 import { buildGradebookDocument, createGradebookExcel, fetchAllGradebookRows, gradebookFilename, openGradebookPreview } from "../../features/exams/gradebookExport";
 import { buildExamListDocument, createExamListExcel } from "../../features/exams/examListExport";
@@ -487,11 +488,26 @@ export default function ExamLists() {
       </details>
       {dirtyCount > 0 && !blank && <Alert severity="warning" sx={{ mt: 1 }} className="exam-no-print">Bạn có điểm chưa lưu. Bảng điểm Excel và PDF sử dụng các điểm vừa nhập.</Alert>}
       {settingsOpen && <GradeSettingsDialog canEdit={canEditPolicy} initialMajorId={majorId} initialYear={year} groups={groups} onClose={() => setSettingsOpen(false)} />}
-      <Dialog open={!!workflowAction} onClose={() => !saving && setWorkflowAction("")} fullWidth maxWidth="sm">
-        <DialogTitle>{`${{submit:'Gửi duyệt',approve:'Duyệt',reopen:'Mở lại'}[workflowAction]} ${workflowPhase==='eligibility'?'tư cách thi':'kết quả cuối'}`}</DialogTitle>
-        <DialogContent><TextField autoFocus fullWidth multiline minRows={3} label="Lý do hoặc căn cứ" value={workflowNote} onChange={event => setWorkflowNote(event.target.value)} sx={{ mt: 1 }} /></DialogContent>
-        <DialogActions><Button disabled={saving} onClick={() => setWorkflowAction("")}>Hủy</Button><Button disabled={saving || !workflowNote.trim()} onClick={runWorkflow}>Xác nhận</Button></DialogActions>
-      </Dialog>
+      <AppDialog
+        open={!!workflowAction}
+        onClose={() => setWorkflowAction("")}
+        title={`${{submit:'Gửi duyệt',approve:'Duyệt',reopen:'Mở lại'}[workflowAction]} ${workflowPhase==='eligibility'?'tư cách thi':'kết quả cuối'}`}
+        saving={saving}
+        onConfirm={runWorkflow}
+        confirmText="Xác nhận"
+        confirmDisabled={!workflowNote.trim()}
+      >
+        <Typography component="label" htmlFor="exam-workflow-note" sx={{ display: "block", mb: "6px", color: "#435b72", fontSize: "13px", fontWeight: 700, lineHeight: 1.5, textTransform: "uppercase" }}>
+          Lý do hoặc căn cứ
+        </Typography>
+        <TextField
+          id="exam-workflow-note" autoFocus fullWidth multiline minRows={3}
+          placeholder="Nhập lý do hoặc căn cứ..."
+          inputProps={{ "aria-label": "Lý do hoặc căn cứ" }}
+          value={workflowNote} disabled={saving} onChange={event => setWorkflowNote(event.target.value)}
+          sx={{ "& .MuiInputBase-input:focus-visible": { outline: "none" } }}
+        />
+      </AppDialog>
       <Dialog open={auditRows !== null} onClose={() => setAuditRows(null)} fullWidth maxWidth="md">
         <DialogTitle>Lịch sử bảng điểm</DialogTitle><DialogContent>{(auditRows || []).map(event => <Box key={event.id} sx={{ mb: 2 }}>
           <Typography>{event.createdAt} · {event.actor?.name} · {{ save: "Lưu điểm", submit: "Gửi duyệt", approve: "Duyệt và khóa", reopen: "Mở lại" }[event.action]}</Typography><Typography>{event.note}</Typography>

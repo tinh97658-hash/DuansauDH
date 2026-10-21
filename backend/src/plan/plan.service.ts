@@ -2,6 +2,7 @@ import { Optional } from "@nestjs/common";
 import { isDeepStrictEqual } from "node:util";
 import { assertSubjectStructureEditable, lockTrainingStructure } from "./training-structure-integrity.js";
 import { admissionLearnerWhere } from "./admission-learner-policy.js";
+import { STUDY_MANAGEMENT_STATUSES } from "./admission-values.js";
 import { AdmissionEvaluationService } from "./admission-evaluation.service.js";
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
@@ -556,16 +557,27 @@ export class PlanService {
     if (trainingLevel) where.trainingLevel = trainingLevel;
     if (academicYear) where.academicYear = academicYear;
     if (admissionStage === "learners") {
-      where[Op.and] = [admissionLearnerWhere()];
+      where[Op.and] = [admissionLearnerWhere(), {
+        [Op.or]: [{ studyStatus: { [Op.notIn]: STUDY_MANAGEMENT_STATUSES } }, { studyStatus: { [Op.is]: null } }],
+      }];
+    } else if (admissionStage === "study-management") {
+      where.trainingLevel = "Thạc sĩ";
+      where[Op.and] = [{ studyStatus: { [Op.in]: STUDY_MANAGEMENT_STATUSES } }];
     } else if (admissionStage === "applications") {
       where[Op.and] = [
         { status: { [Op.ne]: "approved" } },
         { [Op.or]: [{ studyStatus: { [Op.notIn]: ["Đã trúng tuyển", "Đang học"] } }, { studyStatus: { [Op.is]: null } }] },
+        { [Op.or]: [
+          { trainingLevel: { [Op.ne]: "Thạc sĩ" } },
+          { studyStatus: { [Op.notIn]: STUDY_MANAGEMENT_STATUSES } },
+          { studyStatus: { [Op.is]: null } },
+        ] },
       ];
     }
 
     const effectiveStatus = literal(learnerStudyStatusSql('"AdmissionRecord"'));
-    if (status && status !== "ALL") where[Op.and] = [...(where[Op.and] || []), sqlWhere(effectiveStatus, status)];
+    if (status && status !== "ALL") where[Op.and] = [...(where[Op.and] || []), sqlWhere(effectiveStatus,
+      admissionStage === "study-management" && status === "Thôi học" ? { [Op.in]: ["Thôi học", "Đã thôi học"] } : status)];
     else if (excludeStatus) where[Op.and] = [...(where[Op.and] || []), sqlWhere(effectiveStatus, { [Op.ne]: excludeStatus })];
     const keyword = search?.trim().slice(0, 100);
     if (keyword) {

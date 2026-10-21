@@ -14,6 +14,7 @@ export class ScheduleExamDto {
   @Matches(/^(?:[01]\d|2[0-3]):[0-5]\d$/) startTime!:string;
   @Matches(/^(?:[01]\d|2[0-3]):[0-5]\d$/) endTime!:string;
   @IsUUID() roomId!:string;
+  @IsUUID() lecturerId!:string;
   @IsOptional() @IsString() @MaxLength(2000) note?:string;
 }
 export class RescheduleExamDto extends ScheduleExamDto {

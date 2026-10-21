@@ -8,6 +8,7 @@ import {ExamWorkflowService} from '../../src/masters/exam-workflow.service.js';
 import {ExamScheduleService} from '../../src/masters/exam-schedule.service.js';
 import {AuditContextService} from '../../src/audit/audit-context.js';
 import {up,down} from '../../src/database/migrations/066-masters-exam-workflow.js';
+import {up as addLecturer} from '../../src/database/migrations/067-exam-session-lecturer.js';
 import {LEGACY_GRADING_POLICY} from '../../src/masters/grading-policy.js';
 import {ClassScoreSummaryService} from '../../src/reports/class-score-summary.service.js';
 import {ExamScheduleQueryDto} from '../../src/masters/dto/exam-schedule.dto.js';
@@ -33,7 +34,8 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
   const offering=await m.CourseOffering.create({subjectId:subject.id,name:code,status:'completed',completedAt:new Date(),completedByStaffId:actor.id});
   await m.CourseOfferingClassGroup.create({courseOfferingId:offering.id,classGroupId:group.id});
   const room=await m.Room.create({code,name:code,capacity:2,isActive:true});
-  return {actor,subject,group,people,offering,room,scope:{classGroupId:group.id,courseOfferingId:offering.id,rosterScope:'offering' as const}};
+  const lecturer=await m.Lecturer.create({code,name:code,active:true});
+  return {actor,subject,group,people,offering,room,lecturer,scope:{classGroupId:group.id,courseOfferingId:offering.id,rosterScope:'offering' as const}};
  }
  async function read(){const first=await grades.get({...f.scope,page:1,pageSize:15});const rows=[...first.rows];for(let page=2;rows.length<first.total;page++)rows.push(...(await grades.get({...f.scope,page,pageSize:15})).rows);return {...first,rows};}
  async function save(overrides:any={}){
@@ -47,7 +49,7 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
  async function exam(overrides:any={}){
   const state=(await read()).workflow as any;
   return schedule.schedule({courseOfferingId:f.offering.id,snapshotId:state.eligibility.snapshotId,eligibilityVersion:state.eligibility.version,
-   examDate:'2099-05-04',startTime:'08:00',endTime:'10:00',roomId:f.room.id,...overrides},f.actor);
+   examDate:'2099-05-04',startTime:'08:00',endTime:'10:00',roomId:f.room.id,lecturerId:f.lecturer.id,...overrides},f.actor);
  }
  async function ended(id:string){await db.query(`UPDATE course_exam_sessions SET exam_date='2000-01-01' WHERE id=:id`,{replacements:{id}});}
  async function held(){const e=await exam();await ended(e.id);await schedule.confirm(e.id,{version:0,note:'QA held',status:'held'},f.actor);return e;}
@@ -69,9 +71,36 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
   await up({context:db.getQueryInterface()});
   await down({context:db.getQueryInterface()});
   await up({context:db.getQueryInterface()});
+  await addLecturer({context:db.getQueryInterface()});
  },60000);
  beforeEach(async()=>{f=await fixture();});
  afterAll(async()=>{await app?.close();});
+
+ it('persists and reloads the assigned exam lecturer and supports reassignment',async()=>{
+  await save();await transition('eligibility','submit');await transition('eligibility','approve');
+  const e=await exam();
+  const find=async()=> (await schedule.list({from:'2099-05-04',to:'2099-05-05'})).sessions.find(s=>s.id===e.id);
+  expect(await find()).toMatchObject({lecturerId:f.lecturer.id,lecturerName:f.lecturer.name});
+  const peer=await fixture(),state=(await read()).workflow as any;
+  await schedule.reschedule(e.id,{courseOfferingId:f.offering.id,snapshotId:state.eligibility.snapshotId,eligibilityVersion:state.eligibility.version,version:0,examDate:'2099-05-04',startTime:'08:00',endTime:'10:00',roomId:f.room.id,lecturerId:peer.lecturer.id},f.actor);
+  expect(await find()).toMatchObject({lecturerId:peer.lecturer.id,lecturerName:peer.lecturer.name});
+ });
+ it('rejects missing and inactive lecturers without creating an exam',async()=>{
+  await save();await transition('eligibility','submit');await transition('eligibility','approve');
+  await expect(exam({lecturerId:undefined})).rejects.toThrow('chọn giảng viên');
+  await f.lecturer.update({active:false});
+  await expect(exam()).rejects.toThrow('giảng viên đang hoạt động');
+  expect(await sql('SELECT id FROM course_exam_sessions WHERE course_offering_id=:id',{id:f.offering.id})).toHaveLength(0);
+ });
+ it('serializes overlapping exam bookings for one lecturer across different rooms and rosters',async()=>{
+  await save();await transition('eligibility','submit');await transition('eligibility','approve');const first=f;
+  f=await fixture();await save();await transition('eligibility','submit');await transition('eligibility','approve');const second=f;
+  const payload=async(x:any)=>{const w=(await grades.get(x.scope)).workflow as any;return {courseOfferingId:x.offering.id,snapshotId:w.eligibility.snapshotId,eligibilityVersion:w.eligibility.version,examDate:'2099-08-01',startTime:'08:00',endTime:'10:00',roomId:x.room.id,lecturerId:first.lecturer.id};};
+  const a=await payload(first),b=await payload(second),results=await Promise.allSettled([schedule.schedule(a,first.actor),schedule.schedule(b,second.actor)]);
+  expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);
+  const failure=results.find(r=>r.status==='rejected') as PromiseRejectedResult;
+  expect(failure.reason.response.code).toBe('EXAM_LECTURER_CONFLICT');
+ });
 
  it('maps ambiguous old states conservatively and never rewrites legacy grades during up/down',async()=>{
   for(let i=0;i<legacy.length;i++){
@@ -210,7 +239,7 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
  });
  it('reschedules future sessions with optimistic versions and retains snapshot/candidates',async()=>{
   const b=await approve(),e=await exam(),w=b.workflow as any;
-  await schedule.reschedule(e.id,{courseOfferingId:f.offering.id,snapshotId:w.eligibility.snapshotId,eligibilityVersion:w.eligibility.version,version:0,examDate:'2099-05-05',startTime:'09:00',endTime:'10:00',roomId:f.room.id},f.actor);
+  await schedule.reschedule(e.id,{courseOfferingId:f.offering.id,snapshotId:w.eligibility.snapshotId,eligibilityVersion:w.eligibility.version,version:0,examDate:'2099-05-05',startTime:'09:00',endTime:'10:00',roomId:f.room.id,lecturerId:f.lecturer.id},f.actor);
   await expect(schedule.cancel(e.id,{version:0,note:'QA stale'},f.actor)).rejects.toThrow('đã thay đổi');
   expect((await sql('SELECT * FROM course_exam_session_candidates WHERE session_id=:id',{id:e.id}))).toHaveLength(2);
  });
@@ -245,7 +274,7 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
    second={...first,offering,scope:{...first.scope,courseOfferingId:offering.id}};
   }else second=await fixture();
   f=second;await approve();f=first;
-  const payload=async(x:any)=>{const w=(await grades.get(x.scope)).workflow as any;return {courseOfferingId:x.offering.id,snapshotId:w.eligibility.snapshotId,eligibilityVersion:w.eligibility.version,examDate:'2099-07-01',startTime:'08:00',endTime:'10:00',roomId:sharedCandidates?x.room.id:first.room.id};};
+  const payload=async(x:any)=>{const w=(await grades.get(x.scope)).workflow as any;return {courseOfferingId:x.offering.id,snapshotId:w.eligibility.snapshotId,eligibilityVersion:w.eligibility.version,examDate:'2099-07-01',startTime:'08:00',endTime:'10:00',roomId:sharedCandidates?x.room.id:first.room.id,lecturerId:x.lecturer.id};};
   const a=await payload(first),b=await payload(second);
   const results=await Promise.allSettled([schedule.schedule(a,first.actor),schedule.schedule(b,second.actor)]);
   expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);
@@ -259,7 +288,7 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
   await approve();const offering=await m.CourseOffering.create({subjectId:f.subject.id,name:'QA peer candidate',status:'completed',completedAt:new Date(),completedByStaffId:f.actor.id});
   await m.CourseOfferingClassGroup.create({courseOfferingId:offering.id,classGroupId:f.group.id});
   f={...original,offering,room,scope:{...original.scope,courseOfferingId:offering.id}};await approve();const second=f;f=original;
-  const payload=async(x:any)=>{const w=(await grades.get(x.scope)).workflow as any;return {courseOfferingId:x.offering.id,snapshotId:w.eligibility.snapshotId,eligibilityVersion:w.eligibility.version,examDate:'2099-07-02',startTime:'08:00',endTime:'10:00',roomId:x.room.id};};
+  const payload=async(x:any)=>{const w=(await grades.get(x.scope)).workflow as any;return {courseOfferingId:x.offering.id,snapshotId:w.eligibility.snapshotId,eligibilityVersion:w.eligibility.version,examDate:'2099-07-02',startTime:'08:00',endTime:'10:00',roomId:x.room.id,lecturerId:x.lecturer.id};};
   const a=await payload(original),b=await payload(second);const results=await Promise.allSettled([schedule.schedule(a,original.actor),schedule.schedule(b,second.actor)]);
   expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);expect((results.find(r=>r.status==='rejected') as PromiseRejectedResult).reason.response.code).toBe('EXAM_CANDIDATE_CONFLICT');
  });
@@ -378,7 +407,7 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
  it('serializes a reschedule against a competing room booking',async()=>{
   const original=f;await approve();const e=await exam();const state=(await read()).workflow as any;const peer=await fixture();f=peer;await approve();
   const peerState=(await read()).workflow as any;
-  const results=await Promise.allSettled([schedule.reschedule(e.id,{courseOfferingId:original.offering.id,snapshotId:state.eligibility.snapshotId,eligibilityVersion:state.eligibility.version,version:0,examDate:'2099-05-05',startTime:'08:00',endTime:'10:00',roomId:original.room.id},original.actor),schedule.schedule({courseOfferingId:peer.offering.id,snapshotId:peerState.eligibility.snapshotId,eligibilityVersion:peerState.eligibility.version,examDate:'2099-05-05',startTime:'08:00',endTime:'10:00',roomId:original.room.id},peer.actor)]);
+  const results=await Promise.allSettled([schedule.reschedule(e.id,{courseOfferingId:original.offering.id,snapshotId:state.eligibility.snapshotId,eligibilityVersion:state.eligibility.version,version:0,examDate:'2099-05-05',startTime:'08:00',endTime:'10:00',roomId:original.room.id,lecturerId:original.lecturer.id},original.actor),schedule.schedule({courseOfferingId:peer.offering.id,snapshotId:peerState.eligibility.snapshotId,eligibilityVersion:peerState.eligibility.version,examDate:'2099-05-05',startTime:'08:00',endTime:'10:00',roomId:original.room.id,lecturerId:peer.lecturer.id},peer.actor)]);
   expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);expect(await sql("SELECT id FROM course_exam_sessions WHERE exam_date='2099-05-05' AND room_id=:id",{id:original.room.id})).toHaveLength(1);
  });
  it.each([1,10,40])('handles a representative %s-person approved set with exact room capacity',async(size)=>{

@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { CssBaseline, ThemeProvider } from '@mui/material';
 import axios from 'axios';
 import theme from '../../theme';
@@ -13,10 +13,13 @@ vi.mock('react-toastify', () => ({ ToastContainer: () => null, toast: { error: v
 
 const record = { id: 'record', fullName: 'Nguyễn Văn A', code: 'HV001', majorId: 'major', trainingLevel: 'Thạc sĩ', documents: {} };
 const session = { authenticated: true, user: { role: 'admin' } };
+const StudyManagementReturn = () => <p>Danh sách quản lý bảo lưu {useLocation().search}</p>;
 const mount = (entry = '/plan/admission-records/record') => render(<ThemeProvider theme={theme}><CssBaseline /><AuthSessionContext.Provider value={session}>
   <MemoryRouter initialEntries={[entry]}><Routes>
     <Route path='/plan/admission-records/:id' element={<AdmissionRecordDetail />} />
     <Route path='/masters/admitted-records/:id' element={<AdmissionRecordDetail returnPath="/masters/admitted-records" />} />
+    <Route path='/masters/study-leaves/:id' element={<AdmissionRecordDetail returnPath="/masters/study-leaves" />} />
+    <Route path='/masters/study-leaves' element={<StudyManagementReturn />} />
   </Routes></MemoryRouter>
 </AuthSessionContext.Provider></ThemeProvider>);
 
@@ -24,8 +27,16 @@ beforeEach(() => {
   axios.get.mockImplementation(async url => {
     if (url.endsWith('/admission-records/record')) return { data: record };
     if (url.includes('/system/majors')) return { data: [{ id: 'major', name: 'CNTT', program: 'masters' }] };
+    if (url.endsWith('/study-leaves')) return { data: { leaves: [], affectedOfferings: [] } };
     return { data: [] };
   });
+});
+it('opens the leave tab from management and returns to the managed-profile list', async () => {
+  mount('/masters/study-leaves/record?tab=leave&returnView=records');
+  await waitFor(() => expect(screen.getByRole('tab', { name: 'Bảo lưu' })).toHaveAttribute('aria-selected', 'true'));
+  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringContaining('/admission-records/record/study-leaves'), expect.objectContaining({ withCredentials: true })));
+  fireEvent.click(screen.getByRole('button', { name: 'Quay lại danh sách' }));
+  expect(await screen.findByText('Danh sách quản lý bảo lưu ?view=records')).toBeInTheDocument();
 });
 it('keeps the disabled reload tooltip free of MUI console warnings while loading', async () => {
   const errors=vi.spyOn(console,'error').mockImplementation(()=>{});

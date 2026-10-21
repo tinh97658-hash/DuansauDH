@@ -39,10 +39,11 @@ const mount = mode => render(<ThemeProvider theme={theme}><CssBaseline /><Memory
     <Route path="/" element={<AdmissionRecords mode={mode} />} />
     <Route path="/plan/admission-records/:id" element={<p>Trang chi tiết học viên</p>} />
     <Route path="/masters/admitted-records/:id" element={<p>Trang chi tiết học viên</p>} />
+    <Route path="/masters/study-leaves/:id" element={<p>Trang chi tiết học viên</p>} />
   </Routes>
 </MemoryRouter></ThemeProvider>);
 
-describe.each(["applications", "admitted-masters"])("Student record interactions: %s", mode => {
+describe.each(["applications", "admitted-masters", "study-management"])("Student record interactions: %s", mode => {
   it.each(["HV001", "an@example.test", "Nam"])("opens the populated profile on double click of %s", async text => {
     mount(mode);
     const cell = await screen.findByRole("cell", { name: text, exact: true });
@@ -102,6 +103,15 @@ it("creates a profile with the year selected in the filter", async () => {
     expect.objectContaining({ academicYear: selectedYear, fullName: "Trần Văn Bình", profileCategory: "Dự thính" }),
     { withCredentials: true },
   ));
+});
+
+it('keeps only admitted and studying statuses in the admitted-records filter', async () => {
+  mount('admitted-masters');
+  await screen.findByRole('cell', { name: 'HV001' });
+  fireEvent.mouseDown(screen.getByLabelText('Trạng thái'));
+  expect(screen.getByRole('option', { name: 'Đã trúng tuyển' })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: 'Đang học' })).toBeInTheDocument();
+  for (const status of ['Bảo lưu', 'Đang bảo lưu', 'Bảo lưu quá hạn', 'Thôi học', 'Tạm hoãn', 'Từ chối']) expect(screen.queryByRole('option', { name: status })).toBeNull();
 });
 
 it("does not mark missing documents as submitted when editing an admitted profile", async () => {

@@ -90,11 +90,23 @@ describe("PlanService admission record pagination", () => {
       { status: "approved" }, { studyStatus: { [Op.in]: ["Đã trúng tuyển", "Đang học"] } },
     ]);
     expect(learnerWhere[Op.or]).toContainEqual({ fullName: { [Op.iLike]: "%An%" } });
+    expect(learnerWhere[Op.and][1][Op.or][0].studyStatus[Op.notIn]).toEqual(expect.arrayContaining(["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Đã thôi học", "Tạm hoãn", "Từ chối"]));
     await service.listAdmissionRecords(undefined, undefined, "2026", undefined, undefined, undefined, "1", "15", undefined, false, "applications");
     const applicationWhere = (records.findAndCountAll.mock.calls[1][0] as any).where;
     expect(applicationWhere[Op.and][0].status[Op.ne]).toBe("approved");
     expect(applicationWhere[Op.and][1][Op.or][0].studyStatus[Op.notIn]).toEqual(["Đã trúng tuyển", "Đang học"]);
     expect(applicationWhere[Op.and][1][Op.or][1].studyStatus[Op.is]).toBeNull();
+  });
+  it("includes every managed study status independently of approval or a leave record and keeps pagination/search", async () => {
+    const records = { findAndCountAll: jest.fn().mockResolvedValue({ rows: [], count: 0 }), count: jest.fn().mockResolvedValue(0) };
+    const service = new PlanService({} as never, {} as never, {} as never, {} as never, records as never, {} as never, {} as never, {} as never, {} as never, {} as never);
+    await service.listAdmissionRecords(undefined, "Tiến sĩ", undefined, "Thôi học", undefined, "HV001", "2", "20", undefined, false, "study-management");
+    const query = records.findAndCountAll.mock.calls[0][0] as any;
+    expect(query.where.trainingLevel).toBe("Thạc sĩ");
+    expect(query.where[Op.and][0].studyStatus[Op.in]).toEqual(expect.arrayContaining(["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Đã thôi học", "Tạm hoãn", "Từ chối"]));
+    expect(query.where[Op.and][1].logic[Op.in]).toEqual(["Thôi học", "Đã thôi học"]);
+    expect(query.where[Op.or]).toContainEqual({ code: { [Op.iLike]: "%HV001%" } });
+    expect(query).toMatchObject({ limit: 20, offset: 20 });
   });
   it("loads only the requested 20-record page and returns filtered totals", async () => {
     const admissionRecords = {

@@ -90,7 +90,7 @@ describe("Batch A API contracts with real guards and ValidationPipe", () => {
   });
 
   describe('Exam schedule API permissions and validation',()=>{
-    const valid={courseOfferingId:randomUUID(),snapshotId:randomUUID(),eligibilityVersion:2,examDate:'2099-05-04',startTime:'08:00',endTime:'10:00',roomId:randomUUID()};
+    const valid={courseOfferingId:randomUUID(),snapshotId:randomUUID(),eligibilityVersion:2,examDate:'2099-05-04',startTime:'08:00',endTime:'10:00',roomId:randomUUID(),lecturerId:randomUUID()};
     it.each(['gradebook.view','scheduling.write','gradebook.submit','gradebook.approve'])('read with %s is independent of mutation ownership',async permission=>{
       permissions=new Set([permission]);await request(app.getHttpServer()).get('/masters/exam-schedule?from=2099-05-01&to=2099-05-07').expect(permission==='gradebook.view'?200:403);
     });
@@ -101,7 +101,7 @@ describe("Batch A API contracts with real guards and ValidationPipe", () => {
       await request(app.getHttpServer()).post(`/masters/exam-sessions/${id}/cancel`).send({version:0,note:'QA'}).expect(allowed?201:403);
       await request(app.getHttpServer()).post(`/masters/exam-sessions/${id}/confirm`).send({version:0,note:'QA',status:'held'}).expect(allowed?201:403);
     });
-    it.each([{examDate:'2026-02-30'},{examDate:'0000-01-01'},{startTime:'24:00'},{endTime:'10:70'},{snapshotId:'wrong'},{eligibilityVersion:-1}])('rejects invalid scheduling fields %p before service',async patch=>{
+    it.each([{examDate:'2026-02-30'},{examDate:'0000-01-01'},{startTime:'24:00'},{endTime:'10:70'},{snapshotId:'wrong'},{eligibilityVersion:-1},{lecturerId:undefined},{lecturerId:'wrong'}])('rejects invalid scheduling fields %p before service',async patch=>{
       permissions=new Set(['scheduling.write']);await request(app.getHttpServer()).post('/masters/exam-sessions').send({...valid,...patch}).expect(400);expect(examSchedule.schedule).not.toHaveBeenCalled();
     });
     it('rejects invalid confirmation decisions and IDs',async()=>{

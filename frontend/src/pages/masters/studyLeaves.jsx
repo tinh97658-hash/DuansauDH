@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { Alert, Button, Chip, MenuItem, Paper, Stack, TableBody, TableCell, TableContainer, TablePagination, TableRow, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, MenuItem, Paper, Stack, Tab, Tabs, TableBody, TableCell, TableContainer, TablePagination, TableRow, Typography } from '@mui/material';
 import FeatureLayout from '../../components/FeatureLayout';
 import FilterSearchField from '../../components/FilterSearchField';
 import FilterSelectField from '../../components/FilterSelectField';
@@ -9,6 +9,7 @@ import ResizableTable from '../../components/ResizableTable';
 import { preloadPage } from '../../utils/lazyPage';
 import { API_BASE_URL } from '../../config/http';
 import { leaveDate, leaveStatusLabels } from '../../features/learners/StudyLeavePanel';
+import StudyManagementRecords from '../../features/learners/StudyManagementRecords';
 
 const COLUMNS = [
   { key: 'learner', label: 'Học viên', width: 280, minWidth: 220 },
@@ -20,6 +21,21 @@ const COLUMNS = [
 ];
 
 export default function StudyLeaves() {
+  const [params, setParams] = useSearchParams();
+  const view = params.get('view') === 'records' ? 'records' : 'leaves';
+  const viewTabs = <Tabs value={view} onChange={(_, value) => setParams({ view: value })} aria-label="Phạm vi quản lý bảo lưu" sx={{ mb: 1.5, minHeight: 40, flexShrink: 0, '& .MuiTab-root': { minHeight: 40, px: 2 } }}>
+      <Tab value="leaves" id="study-leaves-tab" aria-controls="study-leaves-panel" label="Các đợt bảo lưu" />
+      <Tab value="records" id="study-records-tab" aria-controls="study-records-panel" label="Hồ sơ bảo lưu" />
+    </Tabs>;
+  return <FeatureLayout title="Quản lý bảo lưu" group="Đào tạo Thạc sĩ">
+    {viewTabs}
+    <Box role="tabpanel" id={view === 'leaves' ? 'study-leaves-panel' : 'study-records-panel'} aria-labelledby={view === 'leaves' ? 'study-leaves-tab' : 'study-records-tab'}>
+      {view === 'leaves' ? <StudyLeaveList /> : <StudyManagementRecords />}
+    </Box>
+  </FeatureLayout>;
+}
+
+function StudyLeaveList() {
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -44,7 +60,7 @@ export default function StudyLeaves() {
     load();
     return () => { cancelled = true; };
   }, [status, debouncedSearch, page]);
-  return <FeatureLayout title="Quản lý bảo lưu" group="Đào tạo Thạc sĩ">
+  return <>
     <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5, bgcolor: '#FFF', borderColor: '#C6D5E1', borderRadius: '10px', boxShadow: '0 2px 6px rgba(18, 59, 98, 0.07)' }}>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'flex-end' }}>
       <FilterSearchField label="Tìm kiếm" inputLabel="Tìm mã hoặc tên học viên" placeholder="Tìm mã hoặc tên học viên..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} sx={{ flex: '2 1 320px', minWidth: 0, width: '100%', '@media (max-width:599px)': { flex: 'none' } }} />
@@ -64,10 +80,10 @@ export default function StudyLeaves() {
         <TableCell align="center"><Chip size="small" color={row.status === 'overdue' ? 'error' : row.status === 'expiring' ? 'warning' : 'default'} label={leaveStatusLabels[row.status] || row.status} />
           {row.extensions?.some(extension => extension.status === 'pending') && <Typography variant="caption" display="block">Có gia hạn chờ duyệt</Typography>}</TableCell>
         <TableCell align="center">{row.status === 'overdue' ? `${row.overdueDays} ngày` : '—'}</TableCell>
-        <TableCell align="center"><Button size="small" component={Link} to={`/plan/admission-records/${row.admissionRecordId}?tab=leave`} onPointerEnter={() => preloadPage(`/plan/admission-records/${row.admissionRecordId}`)} onFocus={() => preloadPage(`/plan/admission-records/${row.admissionRecordId}`)}>Mở hồ sơ</Button></TableCell>
+        <TableCell align="center"><Button size="small" component={Link} to={`/masters/study-leaves/${row.admissionRecordId}?tab=leave`} onPointerEnter={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)} onFocus={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)}>Mở hồ sơ</Button></TableCell>
       </TableRow>)}{!result.rows.length && <TableRow><TableCell colSpan={6} align="center" sx={{ py: 5, color: 'text.secondary' }}>{loading ? 'Đang tải…' : 'Không có hồ sơ bảo lưu phù hợp.'}</TableCell></TableRow>}</TableBody></ResizableTable>
       </TableContainer>
       <TablePagination component="div" count={result.total} page={page} rowsPerPage={20} rowsPerPageOptions={[20]} onPageChange={(_, next) => setPage(next)} labelDisplayedRows={({ from, to, count }) => `${from}–${to} / ${count}`} />
     </Paper>
-  </FeatureLayout>;
+  </>;
 }

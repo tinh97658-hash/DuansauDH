@@ -376,7 +376,7 @@ const AssignClassGroups = () => {
         mb: 1.5,
         bgcolor: "#FFF",
         borderColor: "#C6D5E1",
-        borderRadius: "6px",
+        borderRadius: 0,
         boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
       }}>
         <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="flex-end">
@@ -456,7 +456,7 @@ const AssignClassGroups = () => {
             display: "flex",
             flexDirection: "column",
             borderColor: "#D8E5EF",
-            borderRadius: "12px",
+            borderRadius: 0,
             bgcolor: "#FFFFFF",
             boxShadow: "0 5px 18px rgba(23, 62, 117, 0.05)",
           }}>
@@ -496,14 +496,14 @@ const AssignClassGroups = () => {
                 onClick={handleAssignSelected}
                 aria-describedby="assignment-selection-status"
                 disabled={selectedStudentIds.length === 0 || !currentTargetGroup || loading || groupsLoading || !!error || actionLoading || overCapacity}
-                sx={{ borderRadius: "8px", boxShadow: "none", bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}
+                sx={{ borderRadius: 0, boxShadow: "none", bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}
               >
                 {actionLoading ? "Đang xử lý..." : selectedStudentIds.length ? `Gán ${selectedStudentIds.length}` : "Gán"}
               </Button>
             </Box>
 
             {/* Student Table */}
-            <TableContainer className="assignment-scroll" sx={{ flexGrow: 1, maxHeight: 520, border: "1px solid #D8E5EF", borderRadius: "10px", overflow: "auto" }}>
+            <TableContainer className="assignment-scroll" sx={{ flexGrow: 1, maxHeight: 520, border: "1px solid #D8E5EF", borderRadius: 0, overflow: "auto" }}>
               <ResizableTable columns={candidateColumns} storageKey="masters-assignment-candidate-compact-v2-column-widths"
                 freezeThrough="learner"
                 aria-label="Học viên chưa phân nhóm" className="assignment-table assignment-candidates assignment-resizable"
@@ -581,7 +581,7 @@ const AssignClassGroups = () => {
             display: "flex",
             flexDirection: "column",
             borderColor: "#D8E5EF",
-            borderRadius: "12px",
+            borderRadius: 0,
             bgcolor: "#FFFFFF",
             boxShadow: "0 5px 18px rgba(23, 62, 117, 0.05)",
           }}>
@@ -618,14 +618,14 @@ const AssignClassGroups = () => {
                 displayEmpty
                 MenuProps={{
                   PaperProps: {
-                    sx: { maxHeight: 320, mt: 0.5, borderRadius: "8px" },
+                    sx: { maxHeight: 320, mt: 0.5, borderRadius: 0 },
                   },
                   MenuListProps: { dense: true },
                 }}
                 sx={{
                   height: 40,
                   bgcolor: "#F7FAFD",
-                  borderRadius: "8px",
+                  borderRadius: 0,
                   "& fieldset": { borderColor: "#D8E5EF" },
                 }}
               >
@@ -665,7 +665,7 @@ const AssignClassGroups = () => {
                   variant="determinate"
                   value={maximumStudents > 0 ? Math.min(100, Math.round((currentMemberCount / maximumStudents) * 100)) : 100}
                   color={targetIsFull ? "error" : "primary"}
-                  sx={{ height: 7, borderRadius: 4, bgcolor: "#CBE7F0" }}
+                  sx={{ height: 7, borderRadius: 0, bgcolor: "#CBE7F0" }}
                 />
                 <Typography variant="caption" className={targetIsFull ? "assignment-capacity-full" : ""}>{targetIsFull ? "Đã đủ sĩ số · Còn 0 chỗ" : `Còn ${remainingCapacity} chỗ`}</Typography>
               </Box>
@@ -687,7 +687,7 @@ const AssignClassGroups = () => {
               flexGrow: 1,
               maxHeight: groupMembers.length > 25 ? 460 : "none",
               border: "1px solid #D8E5EF",
-              borderRadius: "6px",
+              borderRadius: 0,
               overflowY: groupMembers.length > 25 ? "auto" : "visible",
               overflowX: "auto",
             }}>

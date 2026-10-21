@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { PROFILE_CATEGORIES, profileCategoryLabel } from "../../features/admission/profileCategories";
+import { isStudyManagementStatus, studyManagementStatuses, studyManagementStatusLabel } from "../../features/admission/studyManagement";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
@@ -77,6 +78,7 @@ const STUDY_STATUSES = [
   "Đang bảo lưu",
   "Bảo lưu quá hạn",
   "Thôi học",
+  "Đã thôi học",
   "Tạm hoãn",
   "Từ chối",
 ];
@@ -202,13 +204,18 @@ const cellInputSx = {
   },
 };
 
-const AdmissionRecords = ({ mode = "applications" }) => {
+const EmbeddedList = ({ children }) => <>{children}</>;
+
+const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
   const navigate = useNavigate();
-  const isAdmittedMasters = mode === "admitted-masters";
-  const recordDetailBase = isAdmittedMasters ? "/masters/admitted-records" : "/plan/admission-records";
+  const isStudyManagement = mode === "study-management";
+  const isMastersList = mode === "admitted-masters" || isStudyManagement;
+  const ListLayout = embedded ? EmbeddedList : FeatureLayout;
+  const recordDetailBase = isStudyManagement ? "/masters/study-leaves" : isMastersList ? "/masters/admitted-records" : "/plan/admission-records";
+  const recordDetailUrl = id => `${recordDetailBase}/${id}${isStudyManagement ? "?returnView=records" : ""}`;
   // Global Filter State
-  const [year, setYear] = useState(String(currentYear));
-  const [levelFilter, setLevelFilter] = useState(isAdmittedMasters ? "Thạc sĩ" : "ALL");
+  const [year, setYear] = useState(isStudyManagement ? "" : String(currentYear));
+  const [levelFilter, setLevelFilter] = useState(isMastersList ? "Thạc sĩ" : "ALL");
   const [disciplineFilter, setDisciplineFilter] = useState("");
   const [majorFilter, setMajorFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -261,7 +268,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
     && record.extraData?.tuitionPayment?.paid !== true && record.updatedAt);
   const selectedTuitionIds = new Set(selectedTuition.map((row) => row.admissionRecordId));
   const selectedOnPage = selectableTuitionRows.filter((row) => selectedTuitionIds.has(row.id)).length;
-  useEffect(() => { setSelectedTuition([]); }, [year, levelFilter, disciplineFilter, majorFilter, statusFilter, search, isAdmittedMasters]);
+  useEffect(() => { setSelectedTuition([]); }, [year, levelFilter, disciplineFilter, majorFilter, statusFilter, search, isMastersList]);
   const selectTuitionPage = (checked) => {
     const idsOnPage = new Set(selectableTuitionRows.map((row) => row.id));
     setSelectedTuition((previous) => [
@@ -284,7 +291,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
   };
 
   const columns = [
-    ...(isAdmittedMasters && isAdmin ? [{
+    ...(isMastersList && isAdmin ? [{
       key: "selectTuition", label: "Chọn học viên", width: 64, minWidth: 64, align: "center",
       header: <Checkbox size="small" inputProps={{ "aria-label": "Chọn tất cả học viên chưa nộp học phí trên trang này" }}
         disabled={saving || loading || !selectableTuitionRows.length}
@@ -294,7 +301,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
     }] : []),
     { key: "index", label: "STT", width: 50, minWidth: 40, align: "center" },
     { key: "code", label: "Mã HV", width: 140 },
-    ...(isAdmittedMasters ? [
+    ...(isMastersList ? [
       { key: "groupCode", label: "Mã nhóm", width: 140 },
     ] : []),
     { key: "lastName", label: "Họ đệm", width: 160 },
@@ -307,9 +314,9 @@ const AdmissionRecords = ({ mode = "applications" }) => {
     { key: "trainingLevel", label: "Trình độ", width: 100, align: "center" },
     { key: "major", label: "Ngành", width: 210 },
     { key: "phone", label: "Điện thoại", width: 130 },
-    ...(isAdmittedMasters ? [{ key: "tuition", label: "Học phí", width: 180, align: "center" }] : []),
+    ...(isMastersList ? [{ key: "tuition", label: "Học phí", width: 180, align: "center" }] : []),
     { key: "status", label: "Trạng thái", width: 160, align: "center" },
-    { key: "actions", label: "Thao tác", width: isAdmittedMasters ? 90 : 110, minWidth: 80, align: "center" },
+    { key: "actions", label: "Thao tác", width: isMastersList ? 90 : 110, minWidth: 80, align: "center" },
   ];
 
   // Load Majors
@@ -336,8 +343,8 @@ const AdmissionRecords = ({ mode = "applications" }) => {
       if (levelFilter !== "ALL") params.append("trainingLevel", levelFilter);
       if (majorFilter !== "ALL") params.append("majorId", majorFilter);
       if (statusFilter !== "ALL") params.append("status", statusFilter);
-      params.append("admissionStage", isAdmittedMasters ? "learners" : "applications");
-      if (isAdmittedMasters) params.append("includeGroup", "true");
+      params.append("admissionStage", isStudyManagement ? "study-management" : isMastersList ? "learners" : "applications");
+      if (isMastersList) params.append("includeGroup", "true");
       if (disciplineFilter) params.append("disciplineId", disciplineFilter);
       if (debouncedSearch) params.append("search", debouncedSearch);
       params.append("page", String(page));
@@ -356,7 +363,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, [year, levelFilter, majorFilter, statusFilter, disciplineFilter, debouncedSearch, page, isAdmittedMasters]);
+  }, [year, levelFilter, majorFilter, statusFilter, disciplineFilter, debouncedSearch, page, isMastersList, isStudyManagement]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -543,10 +550,10 @@ const AdmissionRecords = ({ mode = "applications" }) => {
 
 
   return (
-    <FeatureLayout
-      title={isAdmittedMasters ? "Danh sách học viên" : "Nhập hồ sơ tuyển sinh"}
-      group={isAdmittedMasters ? "Thủ tục đầu vào" : "Kế hoạch khóa mới"}
-      desc={isAdmittedMasters
+    <ListLayout
+      title={isStudyManagement ? "Hồ sơ bảo lưu" : isMastersList ? "Danh sách học viên" : "Nhập hồ sơ tuyển sinh"}
+      group={isMastersList ? "Thủ tục đầu vào" : "Kế hoạch khóa mới"}
+      desc={isMastersList
         ? "Quản lý hồ sơ học viên Thạc sĩ đã trúng tuyển và thực hiện các thủ tục đầu vào."
         : "Quản lý hồ sơ thí sinh đang dự tuyển, nhập liệu theo form A4 và xuất phiếu hồ sơ chi tiết."}
       maxWidth={1880}
@@ -568,6 +575,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
         <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems="flex-end" justifyContent="space-between">
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="flex-end" sx={{ width: { xs: "100%", md: "auto" }, flexGrow: 1 }} flexWrap="wrap">
             <FilterSelectField disabled={saving} label="Năm" value={year} onChange={(e) => setYear(e.target.value)} sx={{ flex: "1 1 108px", minWidth: 108 }}>
+                {isStudyManagement && <MenuItem value="">Tất cả năm</MenuItem>}
                 {YEARS.map((y) => (
                   <MenuItem key={y} value={y} sx={{ fontSize: 12 }}>
                     {y}
@@ -575,7 +583,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                 ))}
             </FilterSelectField>
 
-            {!isAdmittedMasters && <FilterSelectField disabled={saving} label="Trình độ" sx={{ flex: "1 1 150px", minWidth: 150 }}
+            {!isMastersList && <FilterSelectField disabled={saving} label="Trình độ" sx={{ flex: "1 1 150px", minWidth: 150 }}
                 value={levelFilter}
                 onChange={(e) => {
                   setLevelFilter(e.target.value);
@@ -613,12 +621,12 @@ const AdmissionRecords = ({ mode = "applications" }) => {
 
             <FilterSelectField disabled={saving} label="Trạng thái" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} sx={{ flex: "1 1 150px", minWidth: 150 }}>
                 <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả trạng thái</MenuItem>
-                {STUDY_STATUSES.filter((s) => isAdmittedMasters ? ["Đã trúng tuyển", "Đang học", "Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Tạm hoãn", "Từ chối"].includes(s) : !["Đã trúng tuyển", "Đang học"].includes(s)).map((s) => (
+                {(isStudyManagement ? studyManagementStatuses : STUDY_STATUSES.filter((s) => isMastersList ? ["Đã trúng tuyển", "Đang học"].includes(s) : !["Đã trúng tuyển", "Đang học"].includes(s) && (levelFilter === "Tiến sĩ" || !isStudyManagementStatus(s)))).map((s) => (
                   <MenuItem key={s} value={s} sx={{ fontSize: 12 }}>{s}</MenuItem>
                 ))}
             </FilterSelectField>
 
-            {!isAdmittedMasters && (
+            {!isMastersList && (
               <FilterSearchField disabled={saving}
                 placeholder="Tìm theo họ tên, mã HV, CCCD, điện thoại, email..."
                 value={search}
@@ -630,7 +638,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
               />
             )}
 
-            {isAdmittedMasters && (
+            {isMastersList && (
               <FilterSearchField disabled={saving}
                 placeholder="Tìm theo họ tên, mã HV, CCCD, điện thoại, email..."
                 value={search}
@@ -643,8 +651,8 @@ const AdmissionRecords = ({ mode = "applications" }) => {
             )}
           </Stack>
 
-          <Stack direction="row" spacing={1} alignItems="flex-end">
-            {isAdmin && !isAdmittedMasters && (
+          <Stack direction="row" spacing={1} alignItems="flex-end" sx={{ flexShrink: 0, maxWidth: '100%' }}>
+            {isAdmin && !isMastersList && (
               <Button
                 variant="contained"
                 size="small"
@@ -669,7 +677,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
       </Paper>
 
       {/* 3. MAIN TABLE GRID */}
-      {isAdmittedMasters && isAdmin && <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5 }}>
+      {isMastersList && isAdmin && <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5 }}>
         <Stack direction="row" gap={1.5} alignItems="center" flexWrap="wrap">
           <Typography variant="body2">Đã chọn {selectedTuition.length} học viên</Typography>
           <Button variant="contained" disabled={saving || loading || !selectedTuition.length || selectedTuition.length > 500} onClick={confirmSelectedTuition}>Xác nhận đã nộp học phí ({selectedTuition.length})</Button>
@@ -693,14 +701,14 @@ const AdmissionRecords = ({ mode = "applications" }) => {
             boxShadow: "0 5px 18px rgba(23, 62, 117, 0.06)",
           }}
         >
-          <ResizableTable key={mode} columns={columns} storageKey={`admission-records-columns:${mode}`} freezeThrough="firstName">
+          <ResizableTable key={mode} columns={columns} storageKey={`admission-records-columns:${mode}`} freezeThrough="firstName" aria-label={isStudyManagement ? "Hồ sơ bảo lưu" : isMastersList ? "Hồ sơ trúng tuyển" : "Hồ sơ tuyển sinh"}>
 
             <TableBody>
               {records.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={columns.length} align="center" sx={{ py: 6, color: "#607486", fontSize: 13 }}>
                     Chưa có hồ sơ tuyển sinh nào theo điều kiện lọc.
-                    {isAdmin && !isAdmittedMasters && (
+                    {isAdmin && !isMastersList && (
                       <Box sx={{ mt: 1.5 }}>
                         <Button size="small" variant="outlined" startIcon={<AddRounded />} onClick={handleOpenAdd}>
                           Nhập hồ sơ mới ngay
@@ -728,7 +736,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                       },
                     }}
                   >
-                    {isAdmittedMasters && isAdmin && <TableCell align="center">
+                    {isMastersList && isAdmin && <TableCell align="center">
                       <Checkbox size="small" checked={selectedTuitionIds.has(r.id)}
                         disabled={saving || loading || !selectableTuitionRows.some((row) => row.id === r.id)}
                         inputProps={{ "aria-label": `Chọn xác nhận học phí ${r.code || r.fullName}` }}
@@ -744,7 +752,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                       {r.code || "—"}
                     </TableCell>
 
-                    {isAdmittedMasters && (
+                    {isMastersList && (
                       <TableCell sx={{ color: r.assignedGroup ? "#172B3A" : "#8A9AAA", fontWeight: 700 }}>
                         {r.assignedGroup?.code || "—"}
                       </TableCell>
@@ -754,9 +762,9 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                       <Typography
                         variant="body2"
                         component={Link}
-                        to={`${recordDetailBase}/${r.id}`}
-                        onPointerEnter={() => preloadPage(`${recordDetailBase}/${r.id}`)}
-                        onFocus={() => preloadPage(`${recordDetailBase}/${r.id}`)}
+                        to={recordDetailUrl(r.id)}
+                        onPointerEnter={() => preloadPage(recordDetailUrl(r.id))}
+                        onFocus={() => preloadPage(recordDetailUrl(r.id))}
                         sx={{
                           fontWeight: 700,
                           color: "#173E75",
@@ -773,9 +781,9 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                       <Typography
                         variant="body2"
                         component={Link}
-                        to={`${recordDetailBase}/${r.id}`}
-                        onPointerEnter={() => preloadPage(`${recordDetailBase}/${r.id}`)}
-                        onFocus={() => preloadPage(`${recordDetailBase}/${r.id}`)}
+                        to={recordDetailUrl(r.id)}
+                        onPointerEnter={() => preloadPage(recordDetailUrl(r.id))}
+                        onFocus={() => preloadPage(recordDetailUrl(r.id))}
                         sx={{ fontWeight: 700, color: "#173E75", fontSize: 12.5, textDecoration: "none", "&:hover": { color: "#0788B8", textDecoration: "underline" } }}
                       >
                         {personNameParts(r).givenName}
@@ -831,7 +839,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                       {r.phone || "—"}
                     </TableCell>
 
-                    {isAdmittedMasters && <TableCell align="center">
+                    {isMastersList && <TableCell align="center">
                       <AdmissionTuitionCheckbox record={r} disabled={!isAdmin || saving || loading} onBusyChange={setSaving} onSaved={(updated) => {
                         setSelectedTuition((previous) => previous.filter((row) => row.admissionRecordId !== updated.id));
                         setRecords((previous) => previous.map((item) => item.id === updated.id ? updated : item));
@@ -842,7 +850,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                     <TableCell align="center">
                       <Chip
                         size="small"
-                        label={r.studyStatus || "Nộp hồ sơ"}
+                        label={(isStudyManagement ? studyManagementStatusLabel(r.studyStatus) : r.studyStatus) || "Nộp hồ sơ"}
                         sx={{
                           height: 20,
                           fontSize: 10.5,
@@ -874,7 +882,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
                           </Tooltip>
                         )}
 
-                        {isAdmin && !isAdmittedMasters && (
+                        {isAdmin && !isMastersList && (
                           <Tooltip title="Xóa hồ sơ">
                             <IconButton size="small" color="error" onClick={() => setDeletingRecord(r)}>
                               <DeleteRounded sx={{ fontSize: 17, color: "#B52D2D" }} />
@@ -1529,7 +1537,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
               startIcon={<VisibilityRounded />}
               onClick={() => {
                 setIsFormOpen(false);
-                navigate(`${recordDetailBase}/${formData.id}`);
+                navigate(recordDetailUrl(formData.id));
               }}
               sx={{
                 height: 36,
@@ -1584,7 +1592,7 @@ const AdmissionRecords = ({ mode = "applications" }) => {
         cancelLabel="Hủy"
         confirmColor="error"
       />
-    </FeatureLayout>
+    </ListLayout>
   );
 };
 

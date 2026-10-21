@@ -23,7 +23,7 @@ export default function ExamSchedule(){
  const [filters,setFilters]=useState({discipline:'',major:'',year:'',search:''});
  const [sidebarCollapsed,setSidebarCollapsed]=useState(false);
  const [offeringId,setOfferingId]=useState(params.get('offeringId')||''),[detail,setDetail]=useState(null),[editor,setEditor]=useState(null),[aggregate,setAggregate]=useState(null),[reason,setReason]=useState(null),[pendingOpen,setPendingOpen]=useState(false);
- const last=formatDateKey(addDays(week,6));
+ const last=formatDateKey(addDays(week,6)),today=getBusinessTodayKey();
  useEffect(()=>{if(!canView)return;const refresh=()=>{if(document.visibilityState!=='hidden')setRevision(n=>n+1);};
   const timer=setInterval(refresh,60000);window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);
   return()=>{clearInterval(timer);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};
@@ -55,7 +55,7 @@ export default function ExamSchedule(){
   }catch(e){setError(errorText(e));refreshAvailability?.();}finally{setSaving(false);}
  };
  const close=setter=>()=>{if(!saving){setter(null);setError('');}};
- const openEditor=(session,slot)=>{const offering=offerings.find(o=>o.id===(session?.courseOfferingId||offeringId));if(!offering||!canWrite)return;setDetail(null);setError('');setEditor({session,slot,offering});};
+ const openEditor=(session,slot)=>{const offering=offerings.find(o=>o.id===(session?.courseOfferingId||offeringId));if(!offering||!canWrite||(session?.examDate||slot?.date)<getBusinessTodayKey())return;setDetail(null);setError('');setEditor({session,slot,offering});};
  if(!canView)return <FeatureLayout title="Xếp lịch thi"><div role="alert">Bạn không có quyền xem lịch thi.</div></FeatureLayout>;
  return <FeatureLayout title="Xếp lịch thi" maxWidth={1920} hideHeader workspaceMode><div className="scheduling-v20 v20-workspace v20-schedule-workspace">
   <section className={`sl-workspace sl-schedule-view exam-planner${sidebarCollapsed?' sl-sidebar-collapsed':''}`} aria-label="Không gian xếp lịch thi">
@@ -77,15 +77,15 @@ export default function ExamSchedule(){
     {selected&&<div className="sl-selected-strip"><span className="sl-selected-tag">ĐANG XẾP</span><strong className="sl-selected-offering" title={selected.name}>{examOfferingLabel(selected)}</strong><span className="sl-selected-meta">{selected.candidateCount} TS</span><button className="sl-btn sl-selected-clear" onClick={()=>setOfferingId('')}>Bỏ chọn</button></div>}
     {error&&!editor&&!reason&&<div role="alert" className="v20-error">{error}</div>}{!canWrite&&<div className="v20-hint">Chế độ chỉ xem — cần quyền xếp lịch để thay đổi ca thi.</div>}
     <div className="sl-calendar-wrap ep-calendar-scroll"><div className="sl-calendar ep-period-calendar" role="table" aria-label="Lịch thi theo tuần"><div className="sl-corner">BUỔI</div>
-     {Array.from({length:7},(_,i)=>{const date=formatDateKey(addDays(week,i));return <div className="sl-day" key={date}><strong>{['T2','T3','T4','T5','T6','T7','CN'][i]}</strong><span>{formatExamDate(date,true)}</span></div>;})}
+     {Array.from({length:7},(_,i)=>{const date=formatDateKey(addDays(week,i)),isToday=date===today;return <div className={`sl-day${isToday?' sl-is-today':''}`} key={date} aria-current={isToday?'date':undefined}><strong>{['T2','T3','T4','T5','T6','T7','CN'][i]}</strong><span>{formatExamDate(date,true)}</span>{isToday&&<i className="sl-today-indicator" aria-label="Hôm nay" title="Hôm nay"/>}</div>;})}
      {examPeriods.map(period=><React.Fragment key={period.id}><div className="sl-period"><span>{period.label}</span></div>{Array.from({length:7},(_,i)=>{
-      const date=formatDateKey(addDays(week,i)),items=examSessionsForPeriod(sessions,date,period.id);
+      const date=formatDateKey(addDays(week,i)),past=date<today,items=examSessionsForPeriod(sessions,date,period.id);
       const showList=()=>setAggregate({date,periodLabel:period.label,sessions:items});
       return <div className="sl-slot ep-period-slot" key={date}>
-       <button className="ep-period-target" aria-label={`${selected?'Chọn':'Xem ca thi'} ${formatExamDate(date)} ${period.label==='SÁNG'?'Sáng':'Chiều'}`} disabled={saving||(!selected&&!items.length)||!!selected&&!canWrite} onClick={()=>selected?openEditor(null,{date,start:period.start,end:period.end,period:period.id}):showList()}/>
+       <button className="ep-period-target" aria-label={`${selected?'Chọn':'Xem ca thi'} ${formatExamDate(date)} ${period.label==='SÁNG'?'Sáng':'Chiều'}`} disabled={saving||(!selected&&!items.length)||!!selected&&(!canWrite||past)} onClick={()=>selected?openEditor(null,{date,start:period.start,end:period.end,period:period.id}):showList()}/>
        <div className="ep-period-items">{items.slice(0,3).map(s=><Tooltip key={s.id} arrow placement="right" title={<div className="ep-exam-preview"><strong>{s.subjectName}</strong><span>{formatExamDate(s.examDate)} · {s.startTime.slice(0,5)}–{s.endTime.slice(0,5)}</span><span>Phòng {s.roomCode} · {s.candidateCount} thí sinh</span><small>{examCardStatus(s)}</small></div>}><button className={`ep-event ep-${s.pendingConfirmation?'pending':s.status}`} aria-label={`${s.name} ${s.subjectName} ${formatExamDate(s.examDate)} ${s.startTime.slice(0,5)} ${examStatus(s)}`} onClick={()=>openDetail(s)}><strong>{examOfferingLabel(s)}</strong><span className="ep-event-location">{s.roomCode} · {s.candidateCount} TS</span>{(s.pendingConfirmation||['held','not_held','cancelled'].includes(s.status))&&<small>{examCardStatus(s)}</small>}</button></Tooltip>)}
        {items.length>3&&<Tooltip arrow placement="right" title={<div className="ep-overflow-preview"><strong>{items.length-3} CA KHÁC</strong>{items.slice(3).map(s=><p key={s.id}>{examOfferingLabel(s)} · {s.roomCode} · {s.candidateCount} TS</p>)}</div>}><button className="ep-more" onClick={showList}>+{items.length-3} ca khác</button></Tooltip>}
-       {selected&&<button className="v20-add-slot" onClick={()=>openEditor(null,{date,start:period.start,end:period.end,period:period.id})} disabled={!canWrite||saving}>+ Xếp lịch</button>}
+       {selected&&<button className="v20-add-slot" title={past?'Không thể xếp lịch thi vào ngày đã qua':undefined} onClick={()=>openEditor(null,{date,start:period.start,end:period.end,period:period.id})} disabled={!canWrite||saving||past}>{past?'Ngày đã qua':'+ Xếp lịch'}</button>}
        </div>
       </div>;
      })}</React.Fragment>)}
@@ -93,7 +93,7 @@ export default function ExamSchedule(){
     </div>
    </section>
   </section>
-  {editor&&<ExamEditor session={editor.session} offering={editor.offering} slot={editor.slot} rooms={data.rooms} canWrite={canWrite} saving={saving} error={error} onClose={close(setEditor)} onSave={(form,refresh)=>mutate('save',editor.session,'',form,refresh)}/>}
+  {editor&&<ExamEditor session={editor.session} offering={editor.offering} slot={editor.slot} rooms={data.rooms} lecturers={data.lecturers} units={data.units} canWrite={canWrite} saving={saving} error={error} onClose={close(setEditor)} onSave={(form,refresh)=>mutate('save',editor.session,'',form,refresh)}/>}
   {detail&&<ExamDetail session={detail} canWrite={canWrite} saving={saving} onClose={close(setDetail)} onEdit={()=>openEditor(detail)} onCancel={()=>{setError('');setReason({action:'cancel',session:detail});}} onPending={()=>{setDetail(null);setPendingOpen(true);}}/>}
   {aggregate&&<Modal wide className="ep-list-dialog" title={`CÁC CA THI · ${formatExamDate(aggregate.date)} · ${aggregate.periodLabel}`} onClose={close(setAggregate)} actions={<button className="sl-btn" onClick={close(setAggregate)}>Đóng</button>}><ExamListTable sessions={aggregate.sessions} onSelect={openDetail}/></Modal>}
   {pendingOpen&&<Modal wide className="sl-pending-drawer ep-pending-dialog" bodyClassName="sl-pending-body" title={`CA THI CHỜ XÁC NHẬN · ${pending.length}`} busy={saving} onClose={()=>{if(!saving)setPendingOpen(false);}}>

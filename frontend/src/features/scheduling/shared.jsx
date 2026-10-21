@@ -19,7 +19,7 @@ export const rows = (value) => {
   throw new Error("Dữ liệu trả về không hợp lệ.");
 };
 export const unique = (items) => [...new Set(items.filter(Boolean))];
-export const normalize = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").toLowerCase();
+export const normalize = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[đĐ]/g, "d").toLowerCase();
 export const groupsOf = (offering) => (offering?.groupLinks || []).map((link) => {
   const group = link.classGroup;
   return group && Array.isArray(link.participantIds)
