@@ -169,7 +169,7 @@ async function run() {
         trainingLevelId: m.level.id,
         program: m.program,
         durationYears: m.level.durationYears || 2,
-        maxOvertimeYears: 2,
+        maxOvertimeYears: 4,
         active: true,
       },
     });
@@ -755,7 +755,7 @@ async function run() {
       const isPaid = i < 5; // 5/6 người đã nộp học phí
       const isEnrolled = i < 4; // 4/6 người đã phân lớp, 1 người trúng tuyển đã nộp hp nhưng chưa phân lớp, 1 người trúng tuyển chưa nộp hp
 
-      const studyStatus = isEnrolled ? "Đang học" : "Đã trúng tuyển";
+      const studyStatus = isPaid ? "Đang học" : "Đã trúng tuyển";
       const paymentData = isPaid
         ? { paid: true, updatedAt: new Date().toISOString(), updatedBy: "PGS.TS. Nguyễn Kim Phương", updatedById: null }
         : { paid: false };

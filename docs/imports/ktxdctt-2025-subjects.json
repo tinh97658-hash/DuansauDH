@@ -1,0 +1,395 @@
+{
+  "applied": true,
+  "major": {
+    "id": "6f963fef-abba-4b44-b50a-8d203d6453a6",
+    "name": "Kỹ thuật xây dựng công trình thủy"
+  },
+  "sourceRows": 32,
+  "uniqueSourceSubjects": 28,
+  "duplicatesRemoved": [
+    "Lý thuyết Dẻo và Từ biến",
+    "Tin học ứng dụng",
+    "Công trình thủy công",
+    "Phương pháp thực nghiệm công trình"
+  ],
+  "sourceCodeConflicts": [],
+  "existingPreserved": [
+    {
+      "id": "3f41451a-ac53-4f2c-8d68-93e416c1f330",
+      "name": "Triết học"
+    },
+    {
+      "id": "0422b680-903a-4b73-99a7-c43284ab93a4",
+      "name": "Tiếng anh"
+    },
+    {
+      "id": "3ad35b0c-0c5c-4dda-8ca9-b4a4cca7d7da",
+      "name": "Phương pháp nghiên cứu khoa học"
+    }
+  ],
+  "inserted": [
+    {
+      "id": "a5704e93-f2c0-4f77-83f5-84fea23ba65b",
+      "name": "Phương pháp PTHH trong tính toán kết cấu công trình"
+    },
+    {
+      "id": "cc2d6f04-5510-438d-9bbf-067974ca7971",
+      "name": "Lý thuyết sóng"
+    },
+    {
+      "id": "49094c1e-476a-485f-931b-f8b5d7c6a5cc",
+      "name": "Xác suất thống kê"
+    },
+    {
+      "id": "8d5d3ad2-d9e7-444d-a315-69b1b7322868",
+      "name": "Quản lý dự án xây dựng"
+    },
+    {
+      "id": "a49f9998-ff8c-4992-af9f-30fdc2ad5382",
+      "name": "Phương pháp tính"
+    },
+    {
+      "id": "c949a90e-b80a-49f8-96e9-3b57e2a04d98",
+      "name": "Phương pháp PTHH trong tính toán động lực học công trình"
+    },
+    {
+      "id": "66c017b1-842a-40cf-9800-6a73dd7f267e",
+      "name": "Lý thuyết Dẻo và Từ biến"
+    },
+    {
+      "id": "aa35b9f9-89b4-4f51-aa5a-3584a1dd092b",
+      "name": "Tin học ứng dụng"
+    },
+    {
+      "id": "c70c4008-a7f2-4153-a299-9237f798c9c5",
+      "name": "Cơ sở lý thuyết Độ tin cậy công trình"
+    },
+    {
+      "id": "91ab4dd1-fe56-415c-9183-55a554276f9b",
+      "name": "Kết cấu tấm và vỏ móng"
+    },
+    {
+      "id": "5f19d845-9a05-4990-9ca4-ca67fd6b9308",
+      "name": "Khai thác kỹ thuật các Công trình cảng"
+    },
+    {
+      "id": "01a9d886-286e-465b-9643-2d5208959bdb",
+      "name": "Công trình đường thủy"
+    },
+    {
+      "id": "d8150501-9507-4b11-94c9-ed93da345926",
+      "name": "Công trình biển cố định"
+    },
+    {
+      "id": "53d7f74e-a289-4523-a89f-ac53ad985507",
+      "name": "Quản lý chất lượng công trình"
+    },
+    {
+      "id": "ecf18c55-2a5e-4e90-90f6-22fa2765b518",
+      "name": "Động đất và lý thuyết tính toán các công trình chịu động đất"
+    },
+    {
+      "id": "22b79e75-ecc7-41d7-b7c8-4c27438b7438",
+      "name": "Nền và Móng các công trình thủy"
+    },
+    {
+      "id": "fd525009-fee8-4330-a450-28a65b3599e5",
+      "name": "Công trình thủy công"
+    },
+    {
+      "id": "80a7cad7-2187-4bb6-9e83-0ca8faa3a0b4",
+      "name": "Phương pháp thực nghiệm công trình"
+    },
+    {
+      "id": "34b6fa92-386f-4484-b423-957c9f756219",
+      "name": "Độ tin cậy của các Công trình bến cảng biển"
+    },
+    {
+      "id": "5e89b018-d195-4640-9453-729eae093232",
+      "name": "Công trình bảo vệ bờ biển và hải đảo"
+    },
+    {
+      "id": "168b5749-1e19-4af7-8a04-96d8d47840f6",
+      "name": "Xử lý nền đất yếu"
+    },
+    {
+      "id": "236ea55d-960e-45a9-8c0f-2c5fd8ab47e5",
+      "name": "Công trình biển di động"
+    },
+    {
+      "id": "e14981d4-3f73-4451-b57a-283247bcc725",
+      "name": "Hải văn"
+    },
+    {
+      "id": "94deaa06-1171-472d-895e-d3839996f309",
+      "name": "Thực tập chuyên ngành"
+    },
+    {
+      "id": "dd04d1cb-6f8c-4304-93f0-e7d0b6aedc9a",
+      "name": "Đề án tốt nghiệp"
+    }
+  ],
+  "finalCatalogCount": 28,
+  "sharing": {
+    "groups": [
+      {
+        "name": "Triết học",
+        "credits": 3,
+        "otherMajors": [
+          "Quản lý cảng và an toàn hàng hải",
+          "Cơ khí thông minh và Robot",
+          "Quản lý môi trường",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Kỹ thuật môi trường",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý hàng hải",
+          "Công nghệ thông tin",
+          "Quản trị kinh doanh",
+          "Quản lý kinh tế",
+          "Quản lý vận tải và Logistics",
+          "Quản lý tài chính",
+          "Quản lý kỹ thuật",
+          "Quản lý năng lượng",
+          "Quản lý sản xuất công nghiệp",
+          "Kỹ thuật tàu thủy"
+        ]
+      },
+      {
+        "name": "Tiếng anh",
+        "credits": 3,
+        "otherMajors": [
+          "Quản lý cảng và an toàn hàng hải",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý hàng hải",
+          "Quản lý sản xuất công nghiệp",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Quản lý vận tải và Logistics",
+          "Quản trị kinh doanh",
+          "Quản lý kinh tế",
+          "Quản lý tài chính",
+          "Kỹ thuật môi trường",
+          "Quản lý năng lượng",
+          "Cơ khí thông minh và Robot",
+          "Công nghệ thông tin",
+          "Quản lý môi trường",
+          "Quản lý kỹ thuật",
+          "Kỹ thuật tàu thủy"
+        ]
+      },
+      {
+        "name": "Phương pháp nghiên cứu khoa học",
+        "credits": 2,
+        "otherMajors": [
+          "Cơ khí thông minh và Robot",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật môi trường",
+          "Kỹ thuật tàu thủy",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Quản lý cảng và an toàn hàng hải",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý hàng hải",
+          "Quản lý kinh tế",
+          "Quản lý kỹ thuật",
+          "Quản lý môi trường",
+          "Quản lý năng lượng",
+          "Quản lý sản xuất công nghiệp",
+          "Quản lý tài chính",
+          "Quản lý vận tải và Logistics",
+          "Công nghệ thông tin"
+        ]
+      },
+      {
+        "name": "Quản lý dự án xây dựng",
+        "credits": 2,
+        "otherMajors": [
+          "Kỹ thuật xây dựng dân dụng và công nghiệp"
+        ]
+      },
+      {
+        "name": "Phương pháp tính",
+        "credits": 2,
+        "otherMajors": [
+          "Kỹ thuật tàu thủy",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp"
+        ]
+      },
+      {
+        "name": "Tin học ứng dụng",
+        "credits": 2,
+        "otherMajors": [
+          "Quản lý kỹ thuật"
+        ]
+      },
+      {
+        "name": "Công trình đường thủy",
+        "credits": 2,
+        "otherMajors": [
+          "Quản lý cảng và an toàn hàng hải"
+        ]
+      },
+      {
+        "name": "Phương pháp thực nghiệm công trình",
+        "credits": 2,
+        "otherMajors": [
+          "Kỹ thuật xây dựng dân dụng và công nghiệp"
+        ]
+      },
+      {
+        "name": "Xử lý nền đất yếu",
+        "credits": 2,
+        "otherMajors": [
+          "Kỹ thuật xây dựng dân dụng và công nghiệp"
+        ]
+      }
+    ],
+    "updates": [
+      {
+        "id": "8d5d3ad2-d9e7-444d-a315-69b1b7322868",
+        "name": "Quản lý dự án xây dựng",
+        "major": "Kỹ thuật xây dựng công trình thủy",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "134a9461-58da-4fad-9ff8-83253dc736e6"
+        ]
+      },
+      {
+        "id": "d9cf602d-6a05-45e0-8616-af2362b6acb9",
+        "name": "Quản lý dự án xây dựng",
+        "major": "Kỹ thuật xây dựng dân dụng và công nghiệp",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "6f963fef-abba-4b44-b50a-8d203d6453a6"
+        ]
+      },
+      {
+        "id": "92cbb0b8-298c-44b8-be31-ff1593c99aab",
+        "name": "Phương pháp tính",
+        "major": "Kỹ thuật tàu thủy",
+        "previousAllowCrossMajor": true,
+        "previousSharedMajorIds": [
+          "134a9461-58da-4fad-9ff8-83253dc736e6"
+        ],
+        "sharedMajorIds": [
+          "134a9461-58da-4fad-9ff8-83253dc736e6",
+          "6f963fef-abba-4b44-b50a-8d203d6453a6"
+        ]
+      },
+      {
+        "id": "a49f9998-ff8c-4992-af9f-30fdc2ad5382",
+        "name": "Phương pháp tính",
+        "major": "Kỹ thuật xây dựng công trình thủy",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "e8cbb3e8-a600-444c-bcda-af49a90e81b9",
+          "134a9461-58da-4fad-9ff8-83253dc736e6"
+        ]
+      },
+      {
+        "id": "f036919d-37bc-46f8-a2b7-c44a7f310894",
+        "name": "Phương pháp tính",
+        "major": "Kỹ thuật xây dựng dân dụng và công nghiệp",
+        "previousAllowCrossMajor": true,
+        "previousSharedMajorIds": [
+          "e8cbb3e8-a600-444c-bcda-af49a90e81b9"
+        ],
+        "sharedMajorIds": [
+          "e8cbb3e8-a600-444c-bcda-af49a90e81b9",
+          "6f963fef-abba-4b44-b50a-8d203d6453a6"
+        ]
+      },
+      {
+        "id": "1d31aca3-d1a7-4cf4-ad1a-3ba4611ac47a",
+        "name": "Tin học ứng dụng",
+        "major": "Quản lý kỹ thuật",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "6f963fef-abba-4b44-b50a-8d203d6453a6"
+        ]
+      },
+      {
+        "id": "aa35b9f9-89b4-4f51-aa5a-3584a1dd092b",
+        "name": "Tin học ứng dụng",
+        "major": "Kỹ thuật xây dựng công trình thủy",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "6e75a117-9abb-4c09-9996-1bc7ced5392d"
+        ]
+      },
+      {
+        "id": "7b4a2d19-0efd-497e-a800-079b67b4c549",
+        "name": "Công trình đường thủy",
+        "major": "Quản lý cảng và an toàn hàng hải",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "6f963fef-abba-4b44-b50a-8d203d6453a6"
+        ]
+      },
+      {
+        "id": "01a9d886-286e-465b-9643-2d5208959bdb",
+        "name": "Công trình đường thủy",
+        "major": "Kỹ thuật xây dựng công trình thủy",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "a4ff7d2b-ff49-4591-821b-5a8a1df994c1"
+        ]
+      },
+      {
+        "id": "80a7cad7-2187-4bb6-9e83-0ca8faa3a0b4",
+        "name": "Phương pháp thực nghiệm công trình",
+        "major": "Kỹ thuật xây dựng công trình thủy",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "134a9461-58da-4fad-9ff8-83253dc736e6"
+        ]
+      },
+      {
+        "id": "1e35c5be-b025-428b-a3d5-5395a1dc1bfd",
+        "name": "Phương pháp thực nghiệm công trình",
+        "major": "Kỹ thuật xây dựng dân dụng và công nghiệp",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "6f963fef-abba-4b44-b50a-8d203d6453a6"
+        ]
+      },
+      {
+        "id": "168b5749-1e19-4af7-8a04-96d8d47840f6",
+        "name": "Xử lý nền đất yếu",
+        "major": "Kỹ thuật xây dựng công trình thủy",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "134a9461-58da-4fad-9ff8-83253dc736e6"
+        ]
+      },
+      {
+        "id": "ac7678da-b411-4137-bc92-4cd76f2e8050",
+        "name": "Xử lý nền đất yếu",
+        "major": "Kỹ thuật xây dựng dân dụng và công nghiệp",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "6f963fef-abba-4b44-b50a-8d203d6453a6"
+        ]
+      }
+    ],
+    "differentCredits": [],
+    "excludedCourses": [
+      "Thực tập chuyên ngành",
+      "Đề án tốt nghiệp"
+    ]
+  }
+}

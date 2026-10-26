@@ -1,0 +1,292 @@
+{
+  "applied": true,
+  "major": {
+    "id": "84997685-6a85-469d-8434-d6e75fb892dd",
+    "name": "Quản lý dự án đầu tư và xây dựng"
+  },
+  "sourceRows": 32,
+  "uniqueSourceSubjects": 29,
+  "duplicatesRemoved": [
+    "Quản lý an toàn lao động và môi trường trong xây dựng",
+    "Kiểm toán dự án xây dựng",
+    "Bảo hiểm dự án xây dựng"
+  ],
+  "sourceCodeConflicts": [
+    {
+      "name": "Kỹ thuật giám sát thi công xây dựng",
+      "retainedCatalogCodeText": "QLXD",
+      "retainedCatalogCodeNumber": 526,
+      "semesterEntries": [
+        {
+          "codeText": "QLGS",
+          "codeNumber": 526
+        }
+      ],
+      "reason": "Table 7.2 is the catalog source; the semester plan has inconsistent codes."
+    },
+    {
+      "name": "Phương pháp nghiên cứu khoa học",
+      "sourceCodeText": "TĐKH",
+      "retainedExistingCodeText": "TDKH",
+      "codeNumber": 503,
+      "reason": "Preserve existing same-name, same-credit course and sharing links instead of creating a duplicate or changing its code."
+    }
+  ],
+  "existingPreserved": [
+    {
+      "id": "7d6710de-f38c-4e5f-b3bb-450d5d91bd0f",
+      "name": "Triết học"
+    },
+    {
+      "id": "cf332c8a-3459-44bd-8f40-bac9255c230f",
+      "name": "Tiếng anh"
+    },
+    {
+      "id": "3458dafe-3083-47ff-b529-cf386635ab2d",
+      "name": "Phương pháp nghiên cứu khoa học"
+    }
+  ],
+  "inserted": [
+    {
+      "id": "cf72fd88-bf4a-4f29-83f8-7c83d430b09f",
+      "name": "Tổ chức kế hoạch hóa sản xuất xây dựng"
+    },
+    {
+      "id": "4dcc45af-d0fd-485f-a96d-e0fdb6518662",
+      "name": "Thống kê ứng dụng trong quản lý xây dựng"
+    },
+    {
+      "id": "e245e938-6838-47f4-ab71-d362feef3e81",
+      "name": "Pháp luật và quản lý chính sách trong xây dựng"
+    },
+    {
+      "id": "0b5ac2f4-dc97-4f02-8a49-599248b18565",
+      "name": "Quản lý dự án đầu tư xây dựng nâng cao"
+    },
+    {
+      "id": "1cf82f15-83a7-46a5-8062-ff8e5feb892b",
+      "name": "Vật liệu mới trong XDDD& CN"
+    },
+    {
+      "id": "e5c2b7e3-0872-4f15-88cb-174c3a1f2f7f",
+      "name": "Công nghệ thi công hiện đại"
+    },
+    {
+      "id": "9d5bb5b0-0a8e-467d-aed3-52d4417932a1",
+      "name": "Quản lý công trình XDDD& CN"
+    },
+    {
+      "id": "6d2c1b6b-9d12-4e49-81aa-d57b03f281b6",
+      "name": "Quản lý an toàn lao động và môi trường trong xây dựng"
+    },
+    {
+      "id": "034ff711-3f1e-4919-92e4-8db3f43f1f1c",
+      "name": "Vật liệu hiệu quả trong xây dựng"
+    },
+    {
+      "id": "f18632b1-c40b-4c7d-95bf-4b0770011f27",
+      "name": "Kỹ thuật thi công công trình hạ tầng kỹ thuật"
+    },
+    {
+      "id": "2acfec34-4409-47e7-9b24-94743d616be3",
+      "name": "Quản lý hạ tầng kỹ thuật đô thị"
+    },
+    {
+      "id": "4cfdabe3-2902-4f3b-aa1c-adb1b5b3ccd7",
+      "name": "Quản lý đấu thầu và hợp đồng nâng cao"
+    },
+    {
+      "id": "a6ed5c24-ae95-4879-9bef-48d6d8e0a740",
+      "name": "Quản lý chất lượng và tiến độ dự án"
+    },
+    {
+      "id": "b218d9d7-1b1c-4b5e-933e-ad52e423a1df",
+      "name": "Thẩm định dự án xây dựng"
+    },
+    {
+      "id": "052396fb-158b-4906-8e3d-1db54365f77f",
+      "name": "Quản lý tài chính trong doanh nghiệp xây dựng"
+    },
+    {
+      "id": "2ccacadf-d317-45b9-9a64-f61b5310a003",
+      "name": "Quản lý chi phí đầu tư xây dựng"
+    },
+    {
+      "id": "c2e0280f-0ab7-40ef-875c-a6f2ef81e151",
+      "name": "Kiểm toán dự án xây dựng"
+    },
+    {
+      "id": "4374dec3-30f8-4797-ae90-9aa5a59b5863",
+      "name": "Bảo hiểm dự án xây dựng"
+    },
+    {
+      "id": "c8bd2d74-6411-48ec-a5ac-fa49f0acec36",
+      "name": "Tin học ứng dụng trong quản lý xây dựng"
+    },
+    {
+      "id": "9f2b565a-d6f0-48da-8823-793fa8fa28db",
+      "name": "Kỹ thuật giám sát thi công xây dựng"
+    },
+    {
+      "id": "a55af442-ce25-4439-92a6-9868e427d88d",
+      "name": "Quản lý thông tin CTXD"
+    },
+    {
+      "id": "ea2af360-8a65-436b-a3be-486d8e1a32f9",
+      "name": "Kinh tế đầu tư xây dựng nâng cao"
+    },
+    {
+      "id": "05fd9914-832a-469e-9c35-e7e352ca082e",
+      "name": "Định giá trong xây dựng"
+    },
+    {
+      "id": "814acc0e-6536-4067-8458-82a538190332",
+      "name": "Quản lý rủi ro dự án đầu tư xây dựng"
+    },
+    {
+      "id": "e945eb91-886c-4d8d-b298-952ab6f6e956",
+      "name": "Thực tập chuyên ngành"
+    },
+    {
+      "id": "b6703602-16c9-46f8-a4fd-911232bb8d4d",
+      "name": "Đề án tốt nghiệp"
+    }
+  ],
+  "finalCatalogCount": 29,
+  "sharing": {
+    "groups": [
+      {
+        "name": "Triết học",
+        "credits": 3,
+        "otherMajors": [
+          "Kỹ thuật xây dựng công trình thủy",
+          "Quản lý cảng và an toàn hàng hải",
+          "Cơ khí thông minh và Robot",
+          "Quản lý môi trường",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Kỹ thuật môi trường",
+          "Quản lý hàng hải",
+          "Công nghệ thông tin",
+          "Quản trị kinh doanh",
+          "Quản lý kinh tế",
+          "Quản lý vận tải và Logistics",
+          "Quản lý tài chính",
+          "Quản lý kỹ thuật",
+          "Quản lý năng lượng",
+          "Quản lý sản xuất công nghiệp",
+          "Kỹ thuật tàu thủy"
+        ]
+      },
+      {
+        "name": "Tiếng anh",
+        "credits": 3,
+        "otherMajors": [
+          "Kỹ thuật xây dựng công trình thủy",
+          "Quản lý cảng và an toàn hàng hải",
+          "Quản lý hàng hải",
+          "Quản lý sản xuất công nghiệp",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Quản lý vận tải và Logistics",
+          "Quản trị kinh doanh",
+          "Quản lý kinh tế",
+          "Quản lý tài chính",
+          "Kỹ thuật môi trường",
+          "Quản lý năng lượng",
+          "Cơ khí thông minh và Robot",
+          "Công nghệ thông tin",
+          "Quản lý môi trường",
+          "Quản lý kỹ thuật",
+          "Kỹ thuật tàu thủy"
+        ]
+      },
+      {
+        "name": "Phương pháp nghiên cứu khoa học",
+        "credits": 2,
+        "otherMajors": [
+          "Cơ khí thông minh và Robot",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật môi trường",
+          "Kỹ thuật tàu thủy",
+          "Kỹ thuật xây dựng công trình thủy",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Quản lý cảng và an toàn hàng hải",
+          "Quản lý hàng hải",
+          "Quản lý kinh tế",
+          "Quản lý kỹ thuật",
+          "Quản lý môi trường",
+          "Quản lý năng lượng",
+          "Quản lý sản xuất công nghiệp",
+          "Quản lý tài chính",
+          "Quản lý vận tải và Logistics",
+          "Công nghệ thông tin"
+        ]
+      },
+      {
+        "name": "Pháp luật và quản lý chính sách trong xây dựng",
+        "credits": 2,
+        "otherMajors": [
+          "Kỹ thuật xây dựng dân dụng và công nghiệp"
+        ]
+      },
+      {
+        "name": "Công nghệ thi công hiện đại",
+        "credits": 2,
+        "otherMajors": [
+          "Kỹ thuật xây dựng dân dụng và công nghiệp"
+        ]
+      }
+    ],
+    "updates": [
+      {
+        "id": "76b65159-3461-4f40-99b0-3153a2af7d10",
+        "name": "Pháp luật và quản lý chính sách trong xây dựng",
+        "major": "Kỹ thuật xây dựng dân dụng và công nghiệp",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "84997685-6a85-469d-8434-d6e75fb892dd"
+        ]
+      },
+      {
+        "id": "e245e938-6838-47f4-ab71-d362feef3e81",
+        "name": "Pháp luật và quản lý chính sách trong xây dựng",
+        "major": "Quản lý dự án đầu tư và xây dựng",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "134a9461-58da-4fad-9ff8-83253dc736e6"
+        ]
+      },
+      {
+        "id": "f3993b1d-1f44-4dd3-9e95-9ac84ffae7c5",
+        "name": "Công nghệ thi công hiện đại",
+        "major": "Kỹ thuật xây dựng dân dụng và công nghiệp",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "84997685-6a85-469d-8434-d6e75fb892dd"
+        ]
+      },
+      {
+        "id": "e5c2b7e3-0872-4f15-88cb-174c3a1f2f7f",
+        "name": "Công nghệ thi công hiện đại",
+        "major": "Quản lý dự án đầu tư và xây dựng",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "134a9461-58da-4fad-9ff8-83253dc736e6"
+        ]
+      }
+    ],
+    "differentCredits": [],
+    "excludedCourses": [
+      "Thực tập chuyên ngành",
+      "Đề án tốt nghiệp"
+    ]
+  }
+}

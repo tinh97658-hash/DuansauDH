@@ -1,0 +1,334 @@
+{
+  "source": "2. Chương trình khung CTĐT ThS QLC và ATHH.doc",
+  "sourceTable": "7.2",
+  "majorCode": "QLCVATHH",
+  "program": "masters",
+  "sourceRows": 32,
+  "duplicatesRemoved": [
+    "Công nghệ viễn thám và GIS trong quản lý hạ tầng giao thông hàng hải",
+    "Quản lý khai thác bền vững hạ tầng giao thông hàng hải",
+    "Phân tích hiệu quả đầu tư dự án hàng hải",
+    "Quản lý dự án hàng hải"
+  ],
+  "sourceCodeConflicts": [
+    {
+      "name": "Khoa học quản lý và quản lý hàng hải",
+      "retainedCatalogCodeText": "QHQL",
+      "retainedCatalogCodeNumber": 506,
+      "semesterEntries": [
+        {
+          "codeText": "QHPL",
+          "codeNumber": 506
+        }
+      ],
+      "reason": "Table 7.2 is the catalog source; the semester plan has inconsistent codes."
+    },
+    {
+      "name": "Công trình cảng biển",
+      "retainedCatalogCodeText": "BĐCB",
+      "retainedCatalogCodeNumber": 521,
+      "semesterEntries": [
+        {
+          "codeText": "BĐBV",
+          "codeNumber": 521
+        }
+      ],
+      "reason": "Table 7.2 is the catalog source; the semester plan has inconsistent codes."
+    },
+    {
+      "name": "Đề án tốt nghiệp",
+      "retainedCatalogCodeText": "BĐTN",
+      "retainedCatalogCodeNumber": 532,
+      "semesterEntries": [
+        {
+          "codeText": "BĐĐA",
+          "codeNumber": 532
+        }
+      ],
+      "reason": "Table 7.2 is the catalog source; the semester plan has inconsistent codes."
+    }
+  ],
+  "enableSharedLearning": true,
+  "subjects": [
+    {
+      "sourceOrder": 1,
+      "codeText": "HPTH",
+      "codeNumber": 501,
+      "name": "Triết học",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 2,
+      "codeText": "HPTA",
+      "codeNumber": 502,
+      "name": "Tiếng Anh",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 3,
+      "codeText": "BĐNC",
+      "codeNumber": 503,
+      "name": "Phương pháp nghiên cứu khoa học",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 4,
+      "codeText": "BĐTC",
+      "codeNumber": 504,
+      "name": "Lý thuyết độ tin cậy trong bảo đảm an toàn hàng hải",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 5,
+      "codeText": "BĐPS",
+      "codeNumber": 505,
+      "name": "Phương pháp số",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 6,
+      "codeText": "QHQL",
+      "codeNumber": 506,
+      "name": "Khoa học quản lý và quản lý hàng hải",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 7,
+      "codeText": "BĐRR",
+      "codeNumber": 507,
+      "name": "Phân tích rủi ro giao thông hàng hải",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 8,
+      "codeText": "BĐAN",
+      "codeNumber": 508,
+      "name": "Quản lý môi trường và an ninh cảng biển",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 9,
+      "codeText": "BĐMP",
+      "codeNumber": 509,
+      "name": "Mô phỏng an toàn hàng hải và kỹ thuật tối ưu hóa",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 10,
+      "codeText": "BĐGI",
+      "codeNumber": 510,
+      "name": "Công nghệ viễn thám và GIS trong quản lý hạ tầng giao thông hàng hải",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 11,
+      "codeText": "BĐBV",
+      "codeNumber": 511,
+      "name": "Quản lý khai thác bền vững hạ tầng giao thông hàng hải",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 12,
+      "codeText": "QHPL",
+      "codeNumber": 512,
+      "name": "Pháp luật vận tải biển",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 13,
+      "codeText": "QHKH",
+      "codeNumber": 513,
+      "name": "Kinh tế hàng hải",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 16,
+      "codeText": "BĐBT",
+      "codeNumber": 516,
+      "name": "Quản lý bảo trì kết cấu hạ tầng cảng biển và an toàn hàng hải",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 17,
+      "codeText": "BĐNV",
+      "codeNumber": 517,
+      "name": "Nạo vét xây dựng công trình cảng biển và an toàn hàng hải",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 18,
+      "codeText": "BĐKS",
+      "codeNumber": 518,
+      "name": "Khảo sát xây dựng công trình cảng biển và an toàn hàng hải",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 19,
+      "codeText": "BĐHĐ",
+      "codeNumber": 519,
+      "name": "Kỹ thuật thành lập hải đồ điện tử",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 20,
+      "codeText": "BĐAT",
+      "codeNumber": 520,
+      "name": "Kỹ thuật an toàn hàng hải trong vùng nước hạn chế",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 21,
+      "codeText": "BĐCB",
+      "codeNumber": 521,
+      "name": "Công trình cảng biển",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 22,
+      "codeText": "CTĐT",
+      "codeNumber": 515,
+      "name": "Công trình đường thủy",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 23,
+      "codeText": "BĐLT",
+      "codeNumber": 523,
+      "name": "Công trình luồng hàng hải và khu nước cảng biển",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 24,
+      "codeText": "BĐHQ",
+      "codeNumber": 524,
+      "name": "Phân tích hiệu quả đầu tư dự án hàng hải",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 25,
+      "codeText": "BĐDA",
+      "codeNumber": 525,
+      "name": "Quản lý dự án hàng hải",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 26,
+      "codeText": "BĐTB",
+      "codeNumber": 526,
+      "name": "Thiết bị bảo đảm an toàn hàng hải",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 27,
+      "codeText": "BĐHT",
+      "codeNumber": 527,
+      "name": "Hệ thống bảo đảm an toàn giao thông hàng hải",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 28,
+      "codeText": "QHĐN",
+      "codeNumber": 528,
+      "name": "Các hệ thống đánh giá nguy cơ tai nạn hàng hải",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 31,
+      "codeText": "BĐTT",
+      "codeNumber": 531,
+      "name": "Thực tập chuyên ngành",
+      "credits": 7,
+      "subjectType": "TT",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 32,
+      "codeText": "BĐTN",
+      "codeNumber": 532,
+      "name": "Đề án tốt nghiệp",
+      "credits": 9,
+      "subjectType": "TN",
+      "isRequired": true,
+      "majorAssignment": true
+    }
+  ]
+}

@@ -116,6 +116,7 @@ describe("Approved major transfer and admission cycles", () => {
 
   it("rejecting keeps A admitted and its existing class and evaluation", async () => {
     const s = await setup();
+    s.record.extraData = { ...s.record.extraData, tuitionPayment: { paid: true } };
     s.record.studyStatus = "Đang học";
     await s.request(); const before = s.record.toJSON();
     await s.service.decide("transfer", { decision: "rejected", note: "Không đồng ý" }, s.actor);
@@ -123,6 +124,16 @@ describe("Approved major transfer and admission cycles", () => {
     expect(s.memberships.destroy).not.toHaveBeenCalled(); expect(s.memberships.create).not.toHaveBeenCalled();
     expect(s.oldEvaluation.destroy).not.toHaveBeenCalled(); expect(s.history.create).not.toHaveBeenCalled();
     expect(s.recognitions.proposeForRecord).not.toHaveBeenCalled();
+  });
+
+  it("does not restore a legacy studying status for an unpaid learner when a transfer is rejected", async () => {
+    const s = await setup();
+    s.record.studyStatus = "Đang học";
+    await s.request();
+    await s.service.decide("transfer", { decision: "rejected", note: "Không đồng ý" }, s.actor);
+    expect(s.record).toMatchObject({ majorId: "A", status: "approved", studyStatus: "Đã trúng tuyển" });
+    expect(s.memberships.destroy).not.toHaveBeenCalled();
+    expect(s.oldEvaluation.destroy).not.toHaveBeenCalled();
   });
 
   it("preserves completed offerings, proposes recognition, and detaches membership in the approval transaction", async () => {

@@ -1,4 +1,16 @@
 // SQL aliases are supplied by application code, never by request parameters.
+export function hasPaidAdmissionTuition(record: { extraData?: any }): boolean {
+  return record.extraData?.tuitionPayment?.paid === true;
+}
+
+export function tuitionPaidSql(alias: string): string {
+  return `COALESCE(${alias}.extra_data->'tuitionPayment'->>'paid', 'false') = 'true'`;
+}
+
+export function paidLearnerStatusSql(alias: string): string {
+  return `CASE WHEN ${tuitionPaidSql(alias)} THEN 'Đang học' ELSE 'Đã trúng tuyển' END`;
+}
+
 export function assignedLearnerSql(alias: string): string {
   return `EXISTS (SELECT 1 FROM class_group_members member
     JOIN class_groups learner_group ON learner_group.id = member.class_group_id
@@ -9,6 +21,7 @@ export function assignedLearnerSql(alias: string): string {
 
 export function learnerStudyStatusSql(alias: string): string {
   return `CASE WHEN ${alias}.study_status IN ('Đã trúng tuyển', 'Đang học') THEN
-    CASE WHEN ${assignedLearnerSql(alias)} THEN 'Đang học' ELSE 'Đã trúng tuyển' END
+    CASE WHEN ${alias}.training_level = 'Thạc sĩ' THEN ${paidLearnerStatusSql(alias)}
+      WHEN ${assignedLearnerSql(alias)} THEN 'Đang học' ELSE 'Đã trúng tuyển' END
     ELSE ${alias}.study_status END`;
 }

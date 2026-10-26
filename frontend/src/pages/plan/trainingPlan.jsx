@@ -38,14 +38,15 @@ import {
 } from "./trainingPlan.logic";
 
 const SUBJECT_TYPES = [
-  { value: "KC", label: "Khối kiến thức chung", color: "#173E75" },
-  { value: "CS", label: "Khối kiến thức cơ sở", color: "#0788B8" },
-  { value: "CN", label: "Khối kiến thức chuyên ngành", color: "#137B3B" },
-  { value: "TC", label: "Khối kiến thức tự chọn", color: "#B86216" },
-  { value: "CH", label: "Khối chuyên đề", color: "#607486" },
+  { value: "KC", label: "Kiến thức chung", color: "#173E75" },
+  { value: "CS", label: "Kiến thức ngành", color: "#0788B8" },
+  { value: "CN", label: "Kiến thức chuyên ngành", color: "#137B3B" },
+  { value: "TT", label: "Thực tập", color: "#B86216" },
+  { value: "TN", label: "Tốt nghiệp", color: "#607486" },
 ];
 
 const currentYear = new Date().getFullYear();
+const subjectNameCollator = new Intl.Collator('vi', { sensitivity: 'base', numeric: true });
 // Used by the curriculum creation dialog; the top-level year filter is intentionally hidden.
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
 const LEVELS = [
@@ -58,7 +59,7 @@ const initialSubjectDraft = (nextSortOrder = 1, isCommon = false) => ({
   codeText: "",
   name: "",
   credits: 3,
-  majorAssignment: false,
+  majorAssignment: true,
   subjectType: isCommon ? "KC" : "CN",
   isRequired: true,
   sortOrder: nextSortOrder,
@@ -142,6 +143,8 @@ const TrainingPlan = () => {
   const [sharingPromptKeepOpen, setSharingPromptKeepOpen] = useState(false);
   const [sharedExistingSubjectIds, setSharedExistingSubjectIds] = useState(null);
   const firstDraftInputRef = useRef(null);
+  const draftRowRef = useRef(null);
+  const lastDraftInputRef = useRef(null);
   const [confirmState, setConfirmState] = useState({
     open: false,
     title: "",
@@ -308,12 +311,52 @@ const TrainingPlan = () => {
       .catch(() => toast.error("Không thể làm mới tổng tín chỉ chương trình đào tạo."));
   };
 
+  // Drafts belong to the current training scope, not the next selected major.
+  useEffect(() => {
+    setIsAddingSubject(false);
+    lastDraftInputRef.current = null;
+    setSubjectDraft(initialSubjectDraft(1));
+    setEditingSubjectId(null);
+    setEditingSubjectForm(null);
+    setSharedCodesOpen(false);
+    setSharedCodes([]);
+    setSharedExistingSubjectIds(null);
+    setSharingPromptOpen(false);
+    setSharingPromptSelecting(false);
+    setSharingPromptMajorIds([]);
+  }, [level, disciplineId, majorId]);
+
   // Auto focus first input when adding draft row
   useEffect(() => {
     if (isAddingSubject && firstDraftInputRef.current) {
       firstDraftInputRef.current.focus();
     }
   }, [isAddingSubject]);
+
+  // Returning from another browser tab should reveal the unfinished entry.
+  useEffect(() => {
+    if (!isAddingSubject || tab !== 0) return;
+    let frame;
+    const restoreDraftPosition = () => {
+      if (document.visibilityState === "hidden") return;
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const row = draftRowRef.current;
+        if (!row || document.querySelector('[role="dialog"]')) return;
+        const input = row.contains(lastDraftInputRef.current)
+          ? lastDraftInputRef.current : firstDraftInputRef.current;
+        input?.focus({ preventScroll: true });
+        row.scrollIntoView?.({ block: "center", inline: "nearest", behavior: "instant" });
+      });
+    };
+    window.addEventListener("focus", restoreDraftPosition);
+    document.addEventListener("visibilitychange", restoreDraftPosition);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("focus", restoreDraftPosition);
+      document.removeEventListener("visibilitychange", restoreDraftPosition);
+    };
+  }, [isAddingSubject, tab]);
 
   const selectedMajor = useMemo(() => majors.find((m) => m.id === majorId), [majors, majorId]);
   const disciplines = useMemo(() => disciplinesFromMajors(majors), [majors]);
@@ -407,14 +450,17 @@ const TrainingPlan = () => {
   // Filtered Subjects
   const filteredSubjects = useMemo(() => {
     const q = subjectSearch.trim().toLowerCase();
-    return subjects.filter((s) => {
+    const filtered = subjects.filter((s) => {
       const matchQuery = !q || (s.name || "").toLowerCase().includes(q) ||
         (s.codeText || "").toLowerCase().includes(q) ||
         String(s.codeNumber || "").includes(q);
       const matchType = subjectTypeFilter === "ALL" || s.subjectType === subjectTypeFilter;
       return matchQuery && matchType;
     });
-  }, [subjects, subjectSearch, subjectTypeFilter]);
+    if (selectedMajor?.code?.trim().toUpperCase() !== 'CNTT') return filtered;
+    return filtered.sort((a, b) => subjectNameCollator.compare((a.name || '').trim(), (b.name || '').trim())
+      || subjectNameCollator.compare(a.codeText || a.code || '', b.codeText || b.code || ''));
+  }, [subjects, subjectSearch, subjectTypeFilter, selectedMajor]);
 
   // Subject Stats
   const subjectStats = useMemo(() => {
@@ -458,6 +504,8 @@ const TrainingPlan = () => {
     }
 
     if (!skipSharingPrompt
+      && !["TT", "TN"].includes(subjectDraft.subjectType)
+      && !/^(?:thuc tap\b|de an tot nghiep\b)/.test(normalizeSubjectName(subjectDraft.name))
       && existingSubjectIds.length === 0
       && (subjectDraft.sharedMajorIds || []).length === 0
       && shareableExistingSubjects.length > 0) {
@@ -468,13 +516,8 @@ const TrainingPlan = () => {
       return;
     }
 
-    if ((subjectDraft.sharedMajorIds || []).length > 0 && counterpartCodes === null) {
-      setSharedCodes((subjectDraft.sharedMajorIds || []).map((targetMajorId) => ({
-        majorId: targetMajorId, codeNumber: "", codeText: "",
-      })));
-      setSharedKeepOpen(keepOpenForNext);
-      setSharedCodesOpen(true);
-      return;
+    if ((subjectDraft.sharedMajorIds || []).length > 0 && counterpartCodes === null && !combineExisting) {
+      return prepareSharedSubjects(subjectDraft.sharedMajorIds, keepOpenForNext);
     }
 
     const payload = {
@@ -649,7 +692,7 @@ const TrainingPlan = () => {
     }
   };
 
-  // Loại học phần được chỉnh ngay tại Danh mục, không tải lại trang.
+  // Nhóm kiến thức được chỉnh ngay tại Danh mục, không tải lại trang.
   const handleSubjectTypeChange = async (subject, subjectType) => {
     if (!isAdmin || subjectType === subject.subjectType || updatingSubjectTypeId) return;
     const previousType = subject.subjectType;
@@ -677,7 +720,7 @@ const TrainingPlan = () => {
       setCatalogSubjects((current) => current.map((item) => (
         item.id === subject.id ? { ...item, subjectType: previousType } : item
       )));
-      toast.error(err.response?.data?.message || "Không thể cập nhật loại học phần");
+      toast.error(err.response?.data?.message || "Không thể cập nhật nhóm kiến thức");
     } finally {
       setUpdatingSubjectTypeId(null);
     }
@@ -688,37 +731,50 @@ const TrainingPlan = () => {
       toast.error("Vui lòng nhập đủ mã số và mã chữ cho tất cả chuyên ngành");
       return;
     }
-    handleSaveSubjectDraft(sharedKeepOpen, sharedCodes, sharedExistingSubjectIds === null ? undefined : {
+    handleSaveSubjectDraft(sharedKeepOpen, sharedCodes, {
       skipSharingPrompt: true,
-      existingSubjectIds: sharedExistingSubjectIds,
-      combineExisting: true,
+      existingSubjectIds: sharedExistingSubjectIds || [],
+      combineExisting: sharedExistingSubjectIds !== null,
     });
   };
 
-  const handleConfirmSuggestedSharing = () => {
+  const prepareSharedSubjects = (targetMajorIds, keepOpenForNext) => {
+    const selectedMajorIds = targetMajorIds.filter((id) => sharingCandidateMajorIds.has(id));
     const existingByMajorId = new Map(shareableExistingSubjects.map((subject) => [subject.majorId, subject]));
-    const existingSubjectIds = sharingPromptMajorIds
+    const incompatibleSubject = programSubjects.find((subject) => (
+      selectedMajorIds.includes(subject.majorId)
+      && !existingByMajorId.has(subject.majorId)
+      && normalizeSubjectName(subject.name) === normalizeSubjectName(subjectDraft.name)
+    ));
+    if (incompatibleSubject) {
+      const targetMajor = majors.find((major) => major.id === incompatibleSubject.majorId);
+      toast.error(`Chuyên ngành ${targetMajor?.name || "đã chọn"} đã có học phần cùng tên nhưng khác số tín chỉ (${incompatibleSubject.credits} TC). Vui lòng kiểm tra lại trước khi cho học chung.`);
+      return;
+    }
+    const existingSubjectIds = selectedMajorIds
       .map((targetMajorId) => existingByMajorId.get(targetMajorId)?.id)
       .filter(Boolean);
-    const missingMajorIds = sharingPromptMajorIds.filter((targetMajorId) => !existingByMajorId.has(targetMajorId));
+    const missingMajorIds = selectedMajorIds.filter((targetMajorId) => !existingByMajorId.has(targetMajorId));
 
     if (missingMajorIds.length > 0) {
       setSharedCodes(missingMajorIds.map((targetMajorId) => ({
         majorId: targetMajorId, codeNumber: "", codeText: "",
       })));
-      setSharedExistingSubjectIds(existingSubjectIds);
-      setSharedKeepOpen(sharingPromptKeepOpen);
+      setSharedExistingSubjectIds(existingSubjectIds.length > 0 ? existingSubjectIds : null);
+      setSharedKeepOpen(keepOpenForNext);
       setSharingPromptOpen(false);
       setSharedCodesOpen(true);
       return;
     }
 
-    handleSaveSubjectDraft(sharingPromptKeepOpen, null, {
+    return handleSaveSubjectDraft(keepOpenForNext, null, {
       skipSharingPrompt: true,
       existingSubjectIds,
       combineExisting: true,
     });
   };
+
+  const handleConfirmSuggestedSharing = () => prepareSharedSubjects(sharingPromptMajorIds, sharingPromptKeepOpen);
 
   const handleSubjectSharingChange = async (subject, identity) => {
     const { data: updated } = await axios.put(
@@ -1104,11 +1160,11 @@ const TrainingPlan = () => {
                 sx={{ width: { xs: "100%", sm: 260 } }}
               />
 
-              <FilterSelectField label="Loại học phần" sx={{ minWidth: 150 }}
+              <FilterSelectField label="Nhóm kiến thức" sx={{ minWidth: 190 }}
                   value={subjectTypeFilter}
                   onChange={(e) => setSubjectTypeFilter(e.target.value)}
                 >
-                  <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả loại HP</MenuItem>
+                  <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả nhóm kiến thức</MenuItem>
                   {SUBJECT_TYPES.map((t) => (
                     <MenuItem key={t.value} value={t.value} sx={{ fontSize: 12 }}>
                       {t.label}
@@ -1165,8 +1221,8 @@ const TrainingPlan = () => {
                   <TableCell sx={{ width: 95 }}>Mã số</TableCell>
                   <TableCell sx={{ width: 95 }}>Mã chữ</TableCell>
                   <TableCell sx={{ width: "24%" }}>Tên môn học</TableCell>
-                  <TableCell sx={{ width: 48, textAlign: "center", px: 0 }}>Số TC</TableCell>
-                  <TableCell sx={{ width: 270, textAlign: "center", whiteSpace: "nowrap" }}>Loại học phần</TableCell>
+                  <TableCell sx={{ width: 88, textAlign: "center", px: 1, whiteSpace: "nowrap" }}>Số TC</TableCell>
+                  <TableCell sx={{ width: 270, textAlign: "center", whiteSpace: "nowrap" }}>Nhóm kiến thức</TableCell>
                   <TableCell sx={{ width: 120, textAlign: "center" }}>Học chung</TableCell>
                   <TableCell sx={{ width: 95, textAlign: "center" }}>Bài tập lớn</TableCell>
                   <TableCell sx={{ width: 90, textAlign: "center" }}>Bắt buộc</TableCell>
@@ -1240,7 +1296,7 @@ const TrainingPlan = () => {
                               type="number"
                               value={editingSubjectForm.credits}
                               onChange={(e) => setEditingSubjectForm((p) => ({ ...p, credits: e.target.value }))}
-                              sx={{ ...cellInputSx, width: 55 }}
+                              sx={{ ...cellInputSx, width: "100%", minWidth: 0, maxWidth: "100%" }}
                               inputProps={{ min: 0 }}
                             />
                           </TableCell>
@@ -1473,6 +1529,8 @@ const TrainingPlan = () => {
                 {/* DRAFT ROW (INLINE ADD ROW FOR EXCEL-LIKE FAST ENTRY) */}
                 {isAddingSubject && (
                   <TableRow
+                    ref={draftRowRef}
+                    onFocusCapture={(event) => { lastDraftInputRef.current = event.target; }}
                     sx={{
                       bgcolor: "#EBF5FB",
                       border: "2px solid #0788B8",
@@ -1522,7 +1580,7 @@ const TrainingPlan = () => {
                         type="number"
                         value={subjectDraft.credits}
                         onChange={(e) => setSubjectDraft((p) => ({ ...p, credits: e.target.value }))}
-                        sx={{ ...cellInputSx, width: 55 }}
+                        sx={{ ...cellInputSx, width: "100%", minWidth: 0, maxWidth: "100%" }}
                         inputProps={{ min: 0 }}
                       />
                     </TableCell>
@@ -1535,7 +1593,7 @@ const TrainingPlan = () => {
                       >
                         {SUBJECT_TYPES.map((t) => (
                           <MenuItem key={t.value} value={t.value} sx={{ fontSize: 12 }}>
-                            {t.value}
+                            {t.label}
                           </MenuItem>
                         ))}
                       </Select>
@@ -1979,7 +2037,7 @@ const TrainingPlan = () => {
                           <TableCell sx={{ width: 80 }}>Mã HP</TableCell>
                           <TableCell sx={{ width: "42%" }}>Tên học phần</TableCell>
                           <TableCell sx={{ width: 48, px: 0, textAlign: "center" }}>TC</TableCell>
-                          <TableCell sx={{ width: 230, whiteSpace: "nowrap" }}>Khối kiến thức</TableCell>
+                          <TableCell sx={{ width: 230, whiteSpace: "nowrap" }}>Nhóm kiến thức</TableCell>
                           <TableCell sx={{ width: 95, textAlign: "center" }}>Loại</TableCell>
                           {isAdmin && <TableCell sx={{ width: 45, textAlign: "center" }}>Xóa</TableCell>}
                         </TableRow>
@@ -2203,24 +2261,29 @@ const TrainingPlan = () => {
         }
       >
         <Alert severity="info" sx={{ mb: 2, borderRadius: "4px" }}>
-          Thông tin tên môn, số tín chỉ và loại học phần được dùng chung; mỗi chuyên ngành phải có mã học phần riêng.
+          Thông tin tên môn, số tín chỉ và nhóm kiến thức được dùng chung; mỗi chuyên ngành phải có mã học phần riêng.
         </Alert>
         <Stack spacing={1.25}>
           <Stack direction="row" spacing={1.5} alignItems="center">
+            <Box sx={{ flex: 1 }} />
+            <Typography sx={{ width: 120, fontWeight: 700 }}>Mã số</Typography>
+            <Typography sx={{ width: 180, fontWeight: 700 }}>Mã chữ</Typography>
+          </Stack>
+          <Stack direction="row" spacing={1.5} alignItems="center">
             <Typography sx={{ flex: 1, fontWeight: 700 }}>{selectedMajor?.code} — {selectedMajor?.name}</Typography>
-            <TextField size="small" label="Mã số" value={subjectDraft.codeNumber} disabled sx={{ width: 120 }} />
-            <TextField size="small" label="Mã chữ" value={subjectDraft.codeText} disabled sx={{ width: 180 }} />
+            <TextField size="small" inputProps={{ 'aria-label': 'Mã số' }} value={subjectDraft.codeNumber} disabled sx={{ width: 120 }} />
+            <TextField size="small" inputProps={{ 'aria-label': 'Mã chữ' }} value={subjectDraft.codeText} disabled sx={{ width: 180 }} />
           </Stack>
           {sharedCodes.map((item, index) => {
             const targetMajor = majors.find((major) => major.id === item.majorId);
             return (
               <Stack key={item.majorId} direction="row" spacing={1.5} alignItems="center">
                 <Typography sx={{ flex: 1, fontWeight: 600 }}>{targetMajor?.code} — {targetMajor?.name}</Typography>
-                <TextField size="small" type="number" label="Mã số" value={item.codeNumber}
-                  inputProps={{ min: 1 }} sx={{ width: 120 }}
+                <TextField size="small" type="number" value={item.codeNumber}
+                  inputProps={{ min: 1, 'aria-label': 'Mã số' }} sx={{ width: 120 }}
                   onChange={(event) => setSharedCodes((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, codeNumber: event.target.value } : row))} />
-                <TextField size="small" label="Mã chữ" value={item.codeText} sx={{ width: 180 }}
-                  inputProps={{ maxLength: 20 }}
+                <TextField size="small" value={item.codeText} sx={{ width: 180 }}
+                  inputProps={{ maxLength: 20, 'aria-label': 'Mã chữ' }}
                   onChange={(event) => setSharedCodes((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, codeText: event.target.value.toUpperCase() } : row))} />
               </Stack>
             );
@@ -2291,11 +2354,11 @@ const TrainingPlan = () => {
               onChange={(e) => setAddSubjectSearch(e.target.value)}
               sx={{ flexGrow: 1, width: { xs: "100%", sm: "auto" } }}
             />
-            <FilterSelectField label="Khối học phần" sx={{ minWidth: 150, width: { xs: "100%", sm: "auto" } }}
+            <FilterSelectField label="Nhóm kiến thức" sx={{ minWidth: 190, width: { xs: "100%", sm: "auto" } }}
                 value={addSubjectTypeFilter}
                 onChange={(e) => setAddSubjectTypeFilter(e.target.value)}
               >
-                <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả khối HP</MenuItem>
+                <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả nhóm kiến thức</MenuItem>
                 {SUBJECT_TYPES.map((t) => (
                   <MenuItem key={t.value} value={t.value} sx={{ fontSize: 12 }}>
                     {t.label}
@@ -2332,7 +2395,7 @@ const TrainingPlan = () => {
                     <TableCell sx={{ width: 90 }}>Mã HP</TableCell>
                     <TableCell>Tên học phần</TableCell>
                     <TableCell sx={{ width: 50, textAlign: "center" }}>TC</TableCell>
-                    <TableCell sx={{ width: 130 }}>Khối kiến thức</TableCell>
+                    <TableCell sx={{ width: 190, whiteSpace: "nowrap" }}>Nhóm kiến thức</TableCell>
                     <TableCell sx={{ width: 110, textAlign: "center" }}>Phân loại</TableCell>
                   </TableRow>
                 </TableHead>

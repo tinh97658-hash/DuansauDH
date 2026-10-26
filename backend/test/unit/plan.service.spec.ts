@@ -86,6 +86,12 @@ describe("PlanService admission record pagination", () => {
     const service = new PlanService({} as never, {} as never, {} as never, {} as never, records as never, {} as never, {} as never, {} as never, {} as never, {} as never);
     await service.listAdmissionRecords(undefined, "Thạc sĩ", "2026", undefined, undefined, "An", "1", "15", undefined, false, "learners");
     const learnerWhere = (records.findAndCountAll.mock.calls[0][0] as any).where;
+    const learnerOrder = (records.findAndCountAll.mock.calls[0][0] as any).order;
+    expect(learnerOrder[0][0].val).toContain('"major_name"');
+    expect(learnerOrder[0][0].val).toContain('COLLATE "vi-x-icu"');
+    expect(learnerOrder[1][0].val).toContain('"first_name"');
+    expect(learnerOrder[1][0].val).toContain('"full_name"');
+    expect(learnerOrder.slice(-2)).toEqual([["code", "ASC"], ["id", "ASC"]]);
     expect(learnerWhere[Op.and][0][Op.or]).toEqual([
       { status: "approved" }, { studyStatus: { [Op.in]: ["Đã trúng tuyển", "Đang học"] } },
     ]);
@@ -93,6 +99,7 @@ describe("PlanService admission record pagination", () => {
     expect(learnerWhere[Op.and][1][Op.or][0].studyStatus[Op.notIn]).toEqual(expect.arrayContaining(["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Đã thôi học", "Tạm hoãn", "Từ chối"]));
     await service.listAdmissionRecords(undefined, undefined, "2026", undefined, undefined, undefined, "1", "15", undefined, false, "applications");
     const applicationWhere = (records.findAndCountAll.mock.calls[1][0] as any).where;
+    expect((records.findAndCountAll.mock.calls[1][0] as any).order).toEqual([["createdAt", "DESC"]]);
     expect(applicationWhere[Op.and][0].status[Op.ne]).toBe("approved");
     expect(applicationWhere[Op.and][1][Op.or][0].studyStatus[Op.notIn]).toEqual(["Đã trúng tuyển", "Đang học"]);
     expect(applicationWhere[Op.and][1][Op.or][1].studyStatus[Op.is]).toBeNull();

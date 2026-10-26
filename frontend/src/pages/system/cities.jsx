@@ -3,6 +3,7 @@ import CatalogManager from "../../components/CatalogManager";
 
 const Cities = () => (
   <CatalogManager
+    editOnDoubleClick
     title="Thành phố"
     group="Danh mục chung"
     desc="Danh mục tỉnh, thành phố theo đơn vị hành chính."
@@ -10,6 +11,7 @@ const Cities = () => (
     itemName="thành phố"
     codeLabel="Mã thành phố"
     nameLabel="Tên thành phố"
+    sortable={false}
   />
 );
 export default Cities;

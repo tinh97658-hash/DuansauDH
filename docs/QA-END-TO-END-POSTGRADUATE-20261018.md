@@ -65,18 +65,9 @@ Evidence và action journal: `.tmp/qa-20261018/`. Click vào menu/form, nhập/c
 
 ## Rủi ro cần quyết định nghiệp vụ
 
-### RISK-TUI-001 — Chưa nộp học phí vẫn được phân nhóm và chuyển “Đang học”
+### RISK-TUI-001 — Đã thay thế bằng quy tắc học phí ngày 25/10/2026
 
-- Area: Post-admission / Grouping. Type: **BUSINESS LOGIC RISK**, không kết luận vi phạm quy tắc khi chưa được xác nhận. Severity: **S3**, impact nhiều học viên.
-- Preconditions: 10 học viên QTKD chưa có nhóm, gồm 6 đã xác nhận học phí và 4 chưa xác nhận.
-- Steps: (1) Xem trạng thái học phí ở Assignment. (2) Chọn cả 10. (3) Gán vào QTKD 2026.1.2. (4) Mở Hồ sơ trúng tuyển, tìm `hoso.2026.049`.
-- Expected: nếu học phí là điều kiện bắt đầu học thì cần chặn/cảnh báo; nếu không phải thì phải giải thích rõ hai trạng thái độc lập. Đây là câu hỏi cần chủ nghiệp vụ trả lời.
-- Actual: gán cả 10 thành công; Đinh Thanh Tùng thuộc QTKD 2026.1.2, checkbox học phí chưa chọn, trạng thái **Đang học**. Cả người đã/chưa nộp xuất hiện ở roster học phần.
-- Evidence: [RISK-001-unpaid-grouped-studying.png](../.tmp/qa-20261018/RISK-001-unpaid-grouped-studying.png), GROUP-004; `db-after.json` xác nhận membership/study_status.
-- Business impact: có thể hiểu nhầm đã đủ điều kiện tài chính; chưa chứng minh có sai thu/chi hay thu trùng.
-- User impact: phải tự nhớ ý nghĩa “Đang học” không đồng nghĩa đã đóng học phí.
-- Frequency: 4 học viên chưa nộp trong lô 10 đều được gán; tác động theo cohort.
-- Workaround: kiểm tra cột học phí riêng trước khi chọn. Suggested direction: thống nhất và công bố quy tắc học phí/studyStatus trước khi thay đổi logic. **Không sửa trong audit.**
+Đã bỏ mô tả/quy tắc cũ về việc phân nhóm tự chuyển người chưa đóng tiền sang Đang học. Quy tắc hiện tại: **đã đóng tiền → Đang học → được bảo lưu**; **chưa đóng tiền và xin nghỉ → rút lớp → Nộp hồ sơ đầu vào**. Xem [quy tắc học phí](TUITION-ENROLLMENT-POLICY.md). Các ảnh QA ngày 18/10 chỉ là bằng chứng của phiên bản cũ.
 
 ### RISK-ADM-002 — Giá trị mẫu ngày sinh/điểm TB trở thành dữ liệu thật khi thêm hồ sơ
 
@@ -188,7 +179,7 @@ Các effort dưới đây tính thao tác thực ở đường đi đã thử; k
 |---|---|---|
 | A — Hồ sơ | Search tên/code/email; năm 2024/2025/2026; lọc trình độ Thạc sĩ/Tiến sĩ; majors; page 2; edit required/email; save/cancel; thêm/xóa một hồ sơ tạm | List 2024 = 50, 2025 = 70. 2026 applications 81 đầu lượt → 75 sau duyệt thêm 6. Page 2 hiển thị 16–30/75. Tạo/xóa có confirmation và cancel hoạt động. Hai lỗi validation; default data risk. |
 | B — Xét tuyển | 1 hồ sơ rồi 5 hồ sơ; điểm 21/20; bulk save; modal preview/select; hủy/reopen/duyệt; refresh và qua danh sách trúng tuyển | 21 bị chặn giới hạn 0–20, giữ điểm chưa lưu và khóa xét tuyển. 20 lưu được. Duyệt +1 rồi +5; tổng duyệt 9→10→15, không thấy bản sao. 5 evaluation mới + single tạo tổng evaluations 15→21. |
-| C — Học phí | Quan sát unpaid; checkbox xác nhận riêng QA-2026-01; chọn đúng 5 và xác nhận hàng loạt; refresh | 6 checkbox paid giữ sau refresh. Trạng thái trúng tuyển không tự đổi thành Đang học ngay khi xác nhận học phí; chuyển sau grouping. Không thử bỏ xác nhận học phí đã lưu, không suy diễn nghiệp vụ thu tiền thực. |
+| C — Học phí | Ghi nhận QA ngày 18/10; quy tắc trạng thái đã thay thế ngày 25/10 | Hiện tại, xác nhận đã nộp học phí chuyển sang Đang học; phân nhóm không tự quyết định trạng thái. Người chưa đóng tiền xin nghỉ trở về hồ sơ đầu vào. |
 | D — Grouping | Summary 14 HV/3 majors; năm 2025 empty; QTKD 10; Back/Forward/refresh; target full; quick-create; multiple targets; select all 10; search khi đã chọn; Gán; remove cancel/confirm; gán lại 1 | Tạo 2 nhóm cap10, tự chọn nhóm .2, giữ URL context. Full target .1 hiện vượt10, Gán disabled. Search còn 1 dòng nhưng hiển thị rõ đã chọn10, selection được giữ. Gán10 thành công. Bỏ QA rồi gán lại thành công; refresh giữ membership. |
 | E — CourseOffering | Chọn major/year/subject; chọn ClassGroup và xem roster10; thiếu group nút Tiếp tục disabled; review/create; create another; sang scheduling | Tạo 3 offering, phân biệt rõ ClassGroup quản lý HV và CourseOffering dạy một môn. Sau tạo KTQL Nhóm2, group .2 không còn ở danh sách tạo KTQL tiếp → có prevention trên đường UI này. Chưa thử race/duplicate API. |
 | F — Scheduling | Tuần/date focus; chọn offering; lecturer/room; tạo 2 session tồn tại ở 2 ngày; thử đồng thời cùng ca; edit phòng/note; cancel delete, confirm delete rồi tạo lại; refresh | Room P1 bận disabled, lecturer Đỗ Hải Đăng “Đang bận” disabled. Cùng ClassGroup ca đã bận không có add affordance; khác group vẫn mở được. Lưu đồng thời hai lớp khác group/phòng/GV cùng sáng 19/10 thành công trước khi xóa một lịch thử. Có lỗi cutoff chiều. |

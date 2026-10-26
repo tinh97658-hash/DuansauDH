@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter, useLocation } from "react-router-dom";
 import axios from "axios";
 import ClassCourseHistory from "../../pages/masters/classCourseHistory";
+import { AuthSessionContext } from "../../context/AuthSession";
 
 vi.mock("axios");
 jest.mock("@mui/icons-material", () => ({
@@ -13,8 +14,8 @@ jest.mock("@mui/icons-material", () => ({
 }));
 jest.mock("../../components/FeatureLayout", () => ({ default: function Layout({ children }) { return <div>{children}</div>; } }));
 jest.mock("../../features/scheduling/OfferingDetails", () => ({
-  default: function Details({ offering, onClose }) {
-    return <div role="dialog" aria-label="Chi tiết lớp học phần"><span>{offering.name}</span><button onClick={onClose}>Đóng</button></div>;
+  default: function Details({ offering, onClose, user, onSaved }) {
+    return <div role="dialog" aria-label="Chi tiết lớp học phần"><span>{offering.name}</span><button onClick={onClose}>Đóng</button>{user?.canManageScheduling && <button onClick={onSaved}>Xác nhận hoàn thành giảng dạy</button>}</div>;
   }
 }));
 
@@ -49,8 +50,8 @@ function mockData({ classes = makeClasses(), catalog = classes, offerings = [off
 function CurrentLocation() {
   return <output data-testid="location">{useLocation().search}</output>;
 }
-function mount(query = "") {
-  return render(<MemoryRouter initialEntries={[`/masters/class-course-history${query}`]}><ClassCourseHistory /><CurrentLocation /></MemoryRouter>);
+function mount(query = "", session = null) {
+  return render(<AuthSessionContext.Provider value={session}><MemoryRouter initialEntries={[`/masters/class-course-history${query}`]}><ClassCourseHistory /><CurrentLocation /></MemoryRouter></AuthSessionContext.Provider>);
 }
 
 async function chooseScope({ expectTable = true } = {}) {
@@ -62,6 +63,16 @@ async function chooseScope({ expectTable = true } = {}) {
 }
 
 beforeEach(() => { jest.clearAllMocks(); mockData(); });
+
+it("passes scheduling authority to details and refreshes progress after completion", async () => {
+  mount("", { user: { canManageScheduling: true } });
+  const table = await chooseScope();
+  fireEvent.click(within(table).getByRole("button", { name: "Xem chi tiết: Đang học" }));
+  const before = axios.get.mock.calls.filter(([url]) => url.includes("/class-curriculum-progress")).length;
+  fireEvent.click(screen.getByRole("button", { name: "Xác nhận hoàn thành giảng dạy" }));
+  await waitFor(() => expect(axios.get.mock.calls.filter(([url]) => url.includes("/class-curriculum-progress")).length).toBeGreaterThan(before));
+  await chooseScope();
+});
 
 it("shows a yellow grade reminder only for a completed class with missing grades, and reveals its text on hover", async () => {
   const classes = makeClasses();

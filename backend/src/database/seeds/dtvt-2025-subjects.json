@@ -1,0 +1,286 @@
+{
+  "source": "11. Chương trình khung CTĐT ThS DTVT 2025.2.doc",
+  "sourceTable": "7.2",
+  "majorCode": "DTVT",
+  "program": "masters",
+  "sourceRows": 32,
+  "duplicatesRemoved": [
+    "Hệ thống thông tin vệ tinh",
+    "Nguyên lý và thiết kế mạch siêu cao tần",
+    "Quản lý và quy hoạch hệ thống thông tin hàng hải",
+    "Quản lý tần số vô tuyến điện",
+    "Truyền hình số"
+  ],
+  "subjects": [
+    {
+      "sourceOrder": 1,
+      "codeText": "HPTH",
+      "codeNumber": 501,
+      "name": "Triết học",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 2,
+      "codeText": "HPTA",
+      "codeNumber": 502,
+      "name": "Tiếng Anh",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 3,
+      "codeText": "ĐTKH",
+      "codeNumber": 507,
+      "name": "Phương pháp nghiên cứu khoa học",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 4,
+      "codeText": "ĐTMH",
+      "codeNumber": 503,
+      "name": "Lý thuyết thông tin và mã hóa",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 5,
+      "codeText": "ĐTXL",
+      "codeNumber": 505,
+      "name": "Xử lý số tín hiệu nâng cao",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 6,
+      "codeText": "ĐTVV",
+      "codeNumber": 509,
+      "name": "Công nghệ Internet vạn vật",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 7,
+      "codeText": "ĐTNT",
+      "codeNumber": 517,
+      "name": "Trí tuệ nhân tạo và ứng dụng",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 8,
+      "codeText": "HPTH",
+      "codeNumber": 510,
+      "name": "Cấu trúc và ứng dụng bộ vi xử lý",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 9,
+      "codeText": "ĐTĐA",
+      "codeNumber": 526,
+      "name": "Đồ án thiết kế mạch sử dụng FPGA",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 10,
+      "codeText": "ĐTVE",
+      "codeNumber": 521,
+      "name": "Hệ thống thông tin vệ tinh",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 11,
+      "codeText": "ĐTNL",
+      "codeNumber": 525,
+      "name": "Nguyên lý và thiết kế mạch siêu cao tần",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 12,
+      "codeText": "ĐTĐL",
+      "codeNumber": 511,
+      "name": "Đo lường và điều khiển dùng máy tính",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 13,
+      "codeText": "ĐTAN",
+      "codeNumber": 518,
+      "name": "Xử lý ảnh",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 16,
+      "codeText": "ĐTAT",
+      "codeNumber": 504,
+      "name": "Anten và truyền sóng nâng cao",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 17,
+      "codeText": "ĐTSO",
+      "codeNumber": 512,
+      "name": "Kỹ thuật thông tin số nâng cao",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 18,
+      "codeText": "ĐTVT",
+      "codeNumber": 513,
+      "name": "Phân tích và thiết kế HT thông tin vô tuyến",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 19,
+      "codeText": "ĐTMP",
+      "codeNumber": 528,
+      "name": "Mô hình hoá hệ thống số và các phương pháp mô phỏng số",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 20,
+      "codeText": "ĐTĐV",
+      "codeNumber": 516,
+      "name": "Hệ thống định vị và dẫn đường hàng hải",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 21,
+      "codeText": "ĐTQQ",
+      "codeNumber": 534,
+      "name": "Quản lý và quy hoạch hệ thống thông tin hàng hải",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 22,
+      "codeText": "ĐTTS",
+      "codeNumber": 535,
+      "name": "Quản lý tần số vô tuyến điện",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 23,
+      "codeText": "ĐTMT",
+      "codeNumber": 522,
+      "name": "Mạch tích hợp cỡ lớn và ứng dụng",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 24,
+      "codeText": "ĐTDĐ",
+      "codeNumber": 533,
+      "name": "Thông tin di động thế hệ mới",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 25,
+      "codeText": "HPTH",
+      "codeNumber": 538,
+      "name": "Truyền hình số",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 28,
+      "codeText": "ĐTTV",
+      "codeNumber": 532,
+      "name": "Thiết kế vi mạch cỡ lớn",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 29,
+      "codeText": "ĐTQU",
+      "codeNumber": 523,
+      "name": "Mạng thông tin quang tiên tiến",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 31,
+      "codeText": "ĐTTT",
+      "codeNumber": 536,
+      "name": "Thực tập chuyên ngành",
+      "credits": 7,
+      "subjectType": "TT",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 32,
+      "codeText": "ĐTDA",
+      "codeNumber": 537,
+      "name": "Đề án tốt nghiệp",
+      "credits": 9,
+      "subjectType": "TN",
+      "isRequired": true,
+      "majorAssignment": true
+    }
+  ]
+}

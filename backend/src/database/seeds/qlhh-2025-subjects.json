@@ -1,0 +1,326 @@
+{
+  "source": "1. Chương trình khung CTĐT THS QLHH 2025.2.doc",
+  "sourceTable": "7.2",
+  "majorCode": "QLHH",
+  "program": "masters",
+  "sourceRows": 32,
+  "duplicatesRemoved": [
+    "Kiểm soát công tác dẫn tàu",
+    "Công nghệ Hàng hải",
+    "Bảo vệ môi trường biển",
+    "An ninh Hàng hải và bến cảng",
+    "Thương vụ vận tải biển"
+  ],
+  "sourceCodeConflicts": [],
+  "sourceNameVariants": [
+    {
+      "codeText": "QHNL",
+      "codeNumber": 523,
+      "retainedCatalogName": "Quản lý hiệu quả năng lượng hàng hải",
+      "semesterNames": [
+        "Quản lý sử dụng hiệu quả năng lượng tàu biển"
+      ],
+      "reason": "Use the name in Table 7.2 as the catalog source."
+    }
+  ],
+  "enableSharedLearning": true,
+  "subjects": [
+    {
+      "sourceOrder": 1,
+      "codeText": "HPTH",
+      "codeNumber": 501,
+      "name": "Triết học",
+      "sourceName": "Triết học (Philosophy)",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 2,
+      "codeText": "HPTA",
+      "codeNumber": 502,
+      "name": "Tiếng Anh",
+      "sourceName": "Tiếng Anh (English)",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 3,
+      "codeText": "QHNC",
+      "codeNumber": 503,
+      "name": "Phương pháp nghiên cứu khoa học",
+      "sourceName": "Phương pháp nghiên cứu khoa học (Science Research Method)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 4,
+      "codeText": "QHPL",
+      "codeNumber": 504,
+      "name": "Pháp luật vận tải biển",
+      "sourceName": "Pháp luật vận tải biển (Sea Transport Law)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 5,
+      "codeText": "QHQL",
+      "codeNumber": 505,
+      "name": "Khoa học quản lý và quản lý Hàng hải",
+      "sourceName": "Khoa học quản lý và quản lý Hàng hải (Management Science and Maritime Management)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 6,
+      "codeText": "QHNL",
+      "codeNumber": 506,
+      "name": "Quản lý nguồn nhân lực hàng hải",
+      "sourceName": "Quản lý nguồn nhân lực hàng hải (Maritime Human Resource Management)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 7,
+      "codeText": "QHKH",
+      "codeNumber": 507,
+      "name": "Kinh tế Hàng hải",
+      "sourceName": "Kinh tế Hàng hải (Maritime Economic)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 8,
+      "codeText": "QHKD",
+      "codeNumber": 508,
+      "name": "Kiểm soát công tác dẫn tàu",
+      "sourceName": "Kiểm soát công tác dẫn tàu (Ship Navigation Control)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 9,
+      "codeText": "QHCN",
+      "codeNumber": 509,
+      "name": "Công nghệ Hàng hải",
+      "sourceName": "Công nghệ Hàng hải (Maritime Technology)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 10,
+      "codeText": "QHBV",
+      "codeNumber": 510,
+      "name": "Bảo vệ môi trường biển",
+      "sourceName": "Bảo vệ môi trường biển (Sea Environment Protection)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 11,
+      "codeText": "QHRR",
+      "codeNumber": 511,
+      "name": "Quản lý rủi ro hàng hải",
+      "sourceName": "Quản lý rủi ro hàng hải (Maritime Risk Management)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 15,
+      "codeText": "QHAH",
+      "codeNumber": 512,
+      "name": "An toàn Hàng hải",
+      "sourceName": "An toàn Hàng hải (Maritime Safe)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 16,
+      "codeText": "QHBH",
+      "codeNumber": 513,
+      "name": "Bảo hiểm hàng hải và khiếu nại hàng hải",
+      "sourceName": "Bảo hiểm hàng hải và khiếu nại hàng hải (Maritime Insurance and Complaint)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 17,
+      "codeText": "QHGĐ",
+      "codeNumber": 514,
+      "name": "Giám định Hàng hải",
+      "sourceName": "Giám định Hàng hải (Maritime Inspection)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 18,
+      "codeText": "QHTT",
+      "codeNumber": 515,
+      "name": "Hệ thống thông tin hàng hải",
+      "sourceName": "Hệ thống thông tin hàng hải (Martime Information System)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 19,
+      "codeText": "QHLB",
+      "codeNumber": 516,
+      "name": "Luật biển và các vấn đề liên quan",
+      "sourceName": "Luật biển và các vấn đề liên quan (Sea Law and Relevant Issues)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 20,
+      "codeText": "QHMĐ",
+      "codeNumber": 517,
+      "name": "Điều khiển mô hình chuyển động tàu",
+      "sourceName": "Điều khiển mô hình chuyển động tàu (Ship motion control model)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 21,
+      "codeText": "QHAN",
+      "codeNumber": 518,
+      "name": "An ninh Hàng hải và bến cảng",
+      "sourceName": "An ninh Hàng hải và bến cảng (Maritime and Port Security)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 22,
+      "codeText": "QHGT",
+      "codeNumber": 519,
+      "name": "Hệ thống VTS và kỹ thuật giao thông Hàng hải",
+      "sourceName": "Hệ thống VTS và kỹ thuật giao thông Hàng hải (VTS and Maritime Traffic Technique)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 23,
+      "codeText": "QHTV",
+      "codeNumber": 520,
+      "name": "Thương vụ vận tải biển",
+      "sourceName": "Thương vụ vận tải biển (Ship Operation)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 24,
+      "codeText": "QHKT",
+      "codeNumber": 521,
+      "name": "Mô phỏng thực tế ảo trong hàng hải",
+      "sourceName": "Mô phỏng thực tế ảo trong hàng hải (Virtual Reality Simulation in Maritime)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 25,
+      "codeText": "QHCN",
+      "codeNumber": 522,
+      "name": "Quản lý công tác tìm kiếm cứu nạn",
+      "sourceName": "Quản lý công tác tìm kiếm cứu nạn (Maritime Search and Rescue Management)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 28,
+      "codeText": "QHNL",
+      "codeNumber": 523,
+      "name": "Quản lý hiệu quả năng lượng hàng hải",
+      "sourceName": "Quản lý hiệu quả năng lượng hàng hải (Ship Energy Effective Use and Management)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 29,
+      "codeText": "QHĐN",
+      "codeNumber": 524,
+      "name": "Các hệ thống đánh giá nguy cơ tai nạn hàng hải",
+      "sourceName": "Các hệ thống đánh giá nguy cơ tai nạn hàng hải (Maritime Risk Assessment System)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 30,
+      "codeText": "QHKM",
+      "codeNumber": 525,
+      "name": "Kiểm soát ô nhiễm môi trường biển trong hàng hải",
+      "sourceName": "Kiểm soát ô nhiễm môi trường biển trong hàng hải (Sea Environment Pollution Control in Maritime)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 31,
+      "codeText": "QHTT",
+      "codeNumber": 526,
+      "name": "Thực tập chuyên ngành",
+      "sourceName": "Thực tập chuyên ngành",
+      "credits": 7,
+      "subjectType": "TT",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 32,
+      "codeText": "QHĐA",
+      "codeNumber": 527,
+      "name": "Đề án tốt nghiệp",
+      "sourceName": "Đề án tốt nghiệp",
+      "credits": 9,
+      "subjectType": "TN",
+      "isRequired": true,
+      "majorAssignment": true
+    }
+  ]
+}

@@ -72,7 +72,7 @@ it('restores the managed tab from its URL and filters/paginates on the server', 
   setupManaged(45);
   render(<MemoryRouter initialEntries={['/masters/study-leaves?view=records']}><StudyLeaves /></MemoryRouter>);
   await screen.findByText('HV0');
-  fireEvent.click(screen.getByRole('button', { name: 'Go to next page' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }));
   await waitFor(() => expect(axios.get).toHaveBeenLastCalledWith(expect.stringContaining('page=2'), expect.any(Object)));
   fireEvent.change(screen.getByLabelText('Tìm kiếm'), { target: { value: 'HV001' } });
   fireEvent.mouseDown(screen.getByLabelText('Trạng thái'));
@@ -85,15 +85,20 @@ it('restores the managed tab from its URL and filters/paginates on the server', 
   });
 });
 
-it('uses the admitted-records columns and edit actions in the retained-profile tab', async () => {
+it('keeps the profile columns and edit actions without bulk tuition selection in the retained-profile tab', async () => {
   setupManaged();
   const admitted = render(<MemoryRouter><AdmissionRecords mode="admitted-masters" /></MemoryRouter>);
   const source = await screen.findByRole('table', { name: 'Hồ sơ trúng tuyển' });
-  const headers = within(source).getAllByRole('columnheader').map(cell => cell.textContent);
+  expect(within(source).getByRole('checkbox', { name: 'Chọn tất cả học viên chưa nộp học phí trên trang này' })).toBeInTheDocument();
+  const headers = within(source).getAllByRole('columnheader').slice(1).map(cell => cell.textContent);
   admitted.unmount();
   render(<MemoryRouter initialEntries={['/masters/study-leaves?view=records']}><StudyLeaves /></MemoryRouter>);
   const retained = await screen.findByRole('table', { name: 'Hồ sơ bảo lưu' });
   expect(within(retained).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(headers);
+  expect(within(retained).queryByRole('checkbox', { name: /Chọn.*học phí/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Xác nhận đã nộp học phí/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Bỏ chọn tất cả' })).not.toBeInTheDocument();
+  expect(screen.queryByText(/Đã chọn \d+ học viên/)).not.toBeInTheDocument();
   expect(screen.getByRole('tab', { name: 'Hồ sơ bảo lưu' })).toHaveAttribute('aria-selected', 'true');
   expect(screen.queryByRole('tab', { name: 'Hồ sơ theo trạng thái' })).toBeNull();
   expect(within(retained).getByText('an0@example.test')).toBeInTheDocument();

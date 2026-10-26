@@ -6,8 +6,8 @@ const transaction = { LOCK: { UPDATE: "UPDATE" } };
 const blockRows = [
   { id: "block-cs", code: "CS", sortOrder: 1 },
   { id: "block-cn", code: "CN", sortOrder: 2 },
-  { id: "block-tc", code: "TC", sortOrder: 3 },
-  { id: "block-ch", code: "CH", sortOrder: 4 },
+  { id: "block-tt", code: "TT", sortOrder: 3 },
+  { id: "block-tn", code: "TN", sortOrder: 4 },
 ];
 
 const buildService = () => {
@@ -150,7 +150,7 @@ describe("CurriculumService.assignToClassGroup", () => {
     mocks.blocks.create.mockImplementation(async (payload: any) => ({ id: `created-${payload.code}`, ...payload }));
     mocks.subjects.findAll.mockResolvedValue([
       { id: "subject-1", majorId: "major-1", program: "masters", subjectType: "CN", isRequired: true, credits: 3, sortOrder: 0, codeNumber: 1, active: true },
-      { id: "subject-2", majorId: "major-1", program: "masters", subjectType: "TC", isRequired: false, credits: 2, sortOrder: 1, codeNumber: 2, active: true },
+      { id: "subject-2", majorId: "major-1", program: "masters", subjectType: "TT", isRequired: false, credits: 2, sortOrder: 1, codeNumber: 2, active: true },
     ]);
     mocks.entries.findAll.mockResolvedValue([
       { id: "entry-1", subjectId: "subject-1", isRequired: true, credits: 3, update: jest.fn().mockResolvedValue(undefined) },
@@ -170,7 +170,7 @@ describe("CurriculumService.assignToClassGroup", () => {
       expect.anything(),
     );
     expect((existingEntries[1] as any).update).toHaveBeenCalledWith(
-      expect.objectContaining({ subjectId: "subject-2", isRequired: false, blockId: "block-tc" }),
+      expect.objectContaining({ subjectId: "subject-2", isRequired: false, blockId: "block-tt" }),
       expect.anything(),
     );
     // Đồng bộ theo hiệu số: dòng đã có không bị xoá/tạo lại (tránh mất lựa chọn tự chọn của lớp).

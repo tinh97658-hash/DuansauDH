@@ -1,0 +1,320 @@
+{
+  "applied": true,
+  "major": {
+    "id": "5b359158-efda-40c6-968a-3a62145ea0b6",
+    "name": "Quản lý hàng hải"
+  },
+  "sourceRows": 32,
+  "uniqueSourceSubjects": 27,
+  "duplicatesRemoved": [
+    "Kiểm soát công tác dẫn tàu",
+    "Công nghệ Hàng hải",
+    "Bảo vệ môi trường biển",
+    "An ninh Hàng hải và bến cảng",
+    "Thương vụ vận tải biển"
+  ],
+  "sourceCodeConflicts": [],
+  "existingPreserved": [
+    {
+      "id": "3bd7059c-c660-4248-96c7-cf757d7d3e18",
+      "name": "Triết học"
+    },
+    {
+      "id": "e524188f-751a-4dbc-979b-5c67e8656162",
+      "name": "Tiếng anh"
+    },
+    {
+      "id": "e895024c-3c15-4a9f-95d8-2b66a64642c9",
+      "name": "Phương pháp nghiên cứu khoa học"
+    }
+  ],
+  "inserted": [
+    {
+      "id": "c6919b58-3245-4191-ba58-676a3346dfd2",
+      "name": "Pháp luật vận tải biển"
+    },
+    {
+      "id": "7c68ec0f-da41-49c7-af1b-0d435a7aba01",
+      "name": "Khoa học quản lý và quản lý Hàng hải"
+    },
+    {
+      "id": "15e6c596-9473-4dee-a68b-c36227585ace",
+      "name": "Quản lý nguồn nhân lực hàng hải"
+    },
+    {
+      "id": "f3222738-d169-4c86-bb74-58fe240773e4",
+      "name": "Kinh tế Hàng hải"
+    },
+    {
+      "id": "415af7c6-1c1b-499a-be36-f0660a50601c",
+      "name": "Kiểm soát công tác dẫn tàu"
+    },
+    {
+      "id": "2d1276ae-7330-48a0-a0f6-af50e7a8864a",
+      "name": "Công nghệ Hàng hải"
+    },
+    {
+      "id": "dae7fee7-6ed5-4a87-848e-f7d0099739b3",
+      "name": "Bảo vệ môi trường biển"
+    },
+    {
+      "id": "610c8f15-60a6-4474-b5cd-b4c64f103912",
+      "name": "Quản lý rủi ro hàng hải"
+    },
+    {
+      "id": "f1a20641-c1ae-4480-a140-07d50f192bc3",
+      "name": "An toàn Hàng hải"
+    },
+    {
+      "id": "f2ebf53c-3cfb-457a-b909-8bbff32f76b7",
+      "name": "Bảo hiểm hàng hải và khiếu nại hàng hải"
+    },
+    {
+      "id": "411f531f-687b-4a32-abac-f05267ec955c",
+      "name": "Giám định Hàng hải"
+    },
+    {
+      "id": "ef1cb823-b782-4e51-be9d-c4c1e6c4ead4",
+      "name": "Hệ thống thông tin hàng hải"
+    },
+    {
+      "id": "aa81ef47-e666-46c5-9b5d-89eda3a77c7c",
+      "name": "Luật biển và các vấn đề liên quan"
+    },
+    {
+      "id": "33ab1321-9061-4e3d-8bc4-796a9c99436b",
+      "name": "Điều khiển mô hình chuyển động tàu"
+    },
+    {
+      "id": "6a62b2ba-89f6-40c6-bc55-bde83e663953",
+      "name": "An ninh Hàng hải và bến cảng"
+    },
+    {
+      "id": "089f1ca2-6c2c-42ad-87c2-13a0b819601f",
+      "name": "Hệ thống VTS và kỹ thuật giao thông Hàng hải"
+    },
+    {
+      "id": "e4ef6805-295a-4808-8d1d-67b61265575e",
+      "name": "Thương vụ vận tải biển"
+    },
+    {
+      "id": "24540dc5-ba19-4b52-ba57-bb72887db0e6",
+      "name": "Mô phỏng thực tế ảo trong hàng hải"
+    },
+    {
+      "id": "7a0be225-c7ef-4345-9824-95000254338f",
+      "name": "Quản lý công tác tìm kiếm cứu nạn"
+    },
+    {
+      "id": "ce286337-9f7b-4525-bdae-874c5f8524f5",
+      "name": "Quản lý hiệu quả năng lượng hàng hải"
+    },
+    {
+      "id": "22c7966d-5a57-44e3-ba5e-434bc71f2b34",
+      "name": "Các hệ thống đánh giá nguy cơ tai nạn hàng hải"
+    },
+    {
+      "id": "c0d19690-b18d-43af-9586-4e3f95e726d1",
+      "name": "Kiểm soát ô nhiễm môi trường biển trong hàng hải"
+    },
+    {
+      "id": "57bd7ef3-f57e-4613-8c97-ff57b9339a8e",
+      "name": "Thực tập chuyên ngành"
+    },
+    {
+      "id": "b6b93e45-043d-4151-b4b5-67d997fd64d9",
+      "name": "Đề án tốt nghiệp"
+    }
+  ],
+  "finalCatalogCount": 27,
+  "sharing": {
+    "groups": [
+      {
+        "name": "Các hệ thống đánh giá nguy cơ tai nạn hàng hải",
+        "credits": 2,
+        "otherMajors": [
+          "Quản lý cảng và an toàn hàng hải"
+        ]
+      },
+      {
+        "name": "Triết học",
+        "credits": 3,
+        "otherMajors": [
+          "Kỹ thuật xây dựng công trình thủy",
+          "Quản lý cảng và an toàn hàng hải",
+          "Cơ khí thông minh và Robot",
+          "Quản lý môi trường",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Kỹ thuật môi trường",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Công nghệ thông tin",
+          "Quản trị kinh doanh",
+          "Quản lý kinh tế",
+          "Quản lý vận tải và Logistics",
+          "Quản lý tài chính",
+          "Quản lý kỹ thuật",
+          "Quản lý năng lượng",
+          "Quản lý sản xuất công nghiệp",
+          "Kỹ thuật tàu thủy"
+        ]
+      },
+      {
+        "name": "Tiếng anh",
+        "credits": 3,
+        "otherMajors": [
+          "Kỹ thuật xây dựng công trình thủy",
+          "Quản lý cảng và an toàn hàng hải",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý sản xuất công nghiệp",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Quản lý vận tải và Logistics",
+          "Quản trị kinh doanh",
+          "Quản lý kinh tế",
+          "Quản lý tài chính",
+          "Kỹ thuật môi trường",
+          "Quản lý năng lượng",
+          "Cơ khí thông minh và Robot",
+          "Công nghệ thông tin",
+          "Quản lý môi trường",
+          "Quản lý kỹ thuật",
+          "Kỹ thuật tàu thủy"
+        ]
+      },
+      {
+        "name": "Phương pháp nghiên cứu khoa học",
+        "credits": 2,
+        "otherMajors": [
+          "Cơ khí thông minh và Robot",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật môi trường",
+          "Kỹ thuật tàu thủy",
+          "Kỹ thuật xây dựng công trình thủy",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Quản lý cảng và an toàn hàng hải",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý kinh tế",
+          "Quản lý kỹ thuật",
+          "Quản lý môi trường",
+          "Quản lý năng lượng",
+          "Quản lý sản xuất công nghiệp",
+          "Quản lý tài chính",
+          "Quản lý vận tải và Logistics",
+          "Công nghệ thông tin"
+        ]
+      },
+      {
+        "name": "Pháp luật vận tải biển",
+        "credits": 2,
+        "otherMajors": [
+          "Quản lý cảng và an toàn hàng hải"
+        ]
+      },
+      {
+        "name": "Khoa học quản lý và quản lý Hàng hải",
+        "credits": 2,
+        "otherMajors": [
+          "Quản lý cảng và an toàn hàng hải"
+        ]
+      },
+      {
+        "name": "Kinh tế Hàng hải",
+        "credits": 2,
+        "otherMajors": [
+          "Quản lý cảng và an toàn hàng hải"
+        ]
+      }
+    ],
+    "updates": [
+      {
+        "id": "22c7966d-5a57-44e3-ba5e-434bc71f2b34",
+        "name": "Các hệ thống đánh giá nguy cơ tai nạn hàng hải",
+        "major": "Quản lý hàng hải",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "a4ff7d2b-ff49-4591-821b-5a8a1df994c1"
+        ]
+      },
+      {
+        "id": "87335771-0f2e-4eac-a918-03d45d6e333f",
+        "name": "Các hệ thống đánh giá nguy cơ tai nạn hàng hải",
+        "major": "Quản lý cảng và an toàn hàng hải",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "5b359158-efda-40c6-968a-3a62145ea0b6"
+        ]
+      },
+      {
+        "id": "c6919b58-3245-4191-ba58-676a3346dfd2",
+        "name": "Pháp luật vận tải biển",
+        "major": "Quản lý hàng hải",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "a4ff7d2b-ff49-4591-821b-5a8a1df994c1"
+        ]
+      },
+      {
+        "id": "36eddcbe-9c8f-4cb6-9621-e2bfc21f65a6",
+        "name": "Pháp luật vận tải biển",
+        "major": "Quản lý cảng và an toàn hàng hải",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "5b359158-efda-40c6-968a-3a62145ea0b6"
+        ]
+      },
+      {
+        "id": "7c68ec0f-da41-49c7-af1b-0d435a7aba01",
+        "name": "Khoa học quản lý và quản lý Hàng hải",
+        "major": "Quản lý hàng hải",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "a4ff7d2b-ff49-4591-821b-5a8a1df994c1"
+        ]
+      },
+      {
+        "id": "0d9b7402-fd79-4c27-bda1-e142ecf705f4",
+        "name": "Khoa học quản lý và quản lý hàng hải",
+        "major": "Quản lý cảng và an toàn hàng hải",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "5b359158-efda-40c6-968a-3a62145ea0b6"
+        ]
+      },
+      {
+        "id": "fd784fac-3625-42e5-831c-892b5a9b1e34",
+        "name": "Kinh tế hàng hải",
+        "major": "Quản lý cảng và an toàn hàng hải",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "5b359158-efda-40c6-968a-3a62145ea0b6"
+        ]
+      },
+      {
+        "id": "f3222738-d169-4c86-bb74-58fe240773e4",
+        "name": "Kinh tế Hàng hải",
+        "major": "Quản lý hàng hải",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "a4ff7d2b-ff49-4591-821b-5a8a1df994c1"
+        ]
+      }
+    ],
+    "differentCredits": [],
+    "excludedCourses": [
+      "Thực tập chuyên ngành",
+      "Đề án tốt nghiệp"
+    ]
+  }
+}

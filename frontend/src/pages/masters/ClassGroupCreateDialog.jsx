@@ -9,6 +9,7 @@ import { formatGroupName, getAvailableGroupIndexes, validateNameTemplate } from 
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
 const majorShortName = (major) => String(major?.code || "").trim().toUpperCase();
+const DEFAULT_MAX_STUDENTS = 20;
 
 export const initialClassGroupForm = (year = String(currentYear)) => ({
   code: "",
@@ -18,7 +19,7 @@ export const initialClassGroupForm = (year = String(currentYear)) => ({
   curriculumId: "",
   academicYear: year,
   intakeRound: 1,
-  maxStudents: 40,
+  maxStudents: DEFAULT_MAX_STUDENTS,
   status: "open",
   note: "",
 });
@@ -232,7 +233,7 @@ const ClassGroupCreateDialog = ({ majors, initialValues, initialDisciplineId = "
         majorId: form.majorId || null,
         curriculumId: form.curriculumId,
         academicYear: form.academicYear,
-        maxStudents: Number(form.maxStudents || 40),
+        maxStudents: Number(form.maxStudents || DEFAULT_MAX_STUDENTS),
         status: form.status,
         note: form.note?.trim() || null,
       };
@@ -252,7 +253,7 @@ const ClassGroupCreateDialog = ({ majors, initialValues, initialDisciplineId = "
           majorId: form.majorId,
           curriculumId: form.curriculumId,
           academicYear: form.academicYear,
-          maxStudents: Number(form.maxStudents || 40),
+          maxStudents: Number(form.maxStudents || DEFAULT_MAX_STUDENTS),
           status: form.status,
           note: form.note?.trim() || undefined,
         }, { withCredentials: true });

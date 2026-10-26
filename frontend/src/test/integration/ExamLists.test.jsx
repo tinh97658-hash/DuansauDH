@@ -325,8 +325,8 @@ it("selects subject names and local curriculum codes while keeping the entire sh
   fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
   fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /Lớp Tiếng anh/ }));
   await waitFor(() => expect(screen.getByLabelText("Môn")).toHaveTextContent("HPTA - Tiếng anh"));
-  await waitFor(() => expect(screen.getByRole("button", { name: /page 2/i })).toBeEnabled());
-  fireEvent.click(screen.getByRole("button", { name: /page 2/i }));
+  await waitFor(() => expect(screen.getByRole("button", { name: /^Trang 2$/ })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: /^Trang 2$/ }));
   fireEvent.change(await screen.findByLabelText("Điểm kiểm tra HV018"), { target: { value: "8" } });
   fireEvent.click(screen.getByRole("button", { name: "Cập nhật cả bảng" }));
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), expect.objectContaining({
@@ -721,12 +721,12 @@ it("requests only 15 students per page and saves drafts from different pages tog
   expect(initialCalls[0][1].params).toMatchObject({ page: 1, pageSize: 15 });
   expect(initialCalls.some(([, config]) => config.params.page === 2)).toBe(false);
   fireEvent.change(screen.getByLabelText("Điểm kiểm tra HV001"), { target: { value: "7" } });
-  fireEvent.click(screen.getByRole("button", { name: /page 2/i }));
+  fireEvent.click(screen.getByRole("button", { name: /^Trang 2$/ }));
   await screen.findByLabelText("Điểm kiểm tra HV016");
   expect(screen.getAllByRole("textbox", { name: /^Điểm kiểm tra HV/ })).toHaveLength(7);
   expect(screen.getByText("Hiển thị 16–22 trên 22 học viên")).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("Điểm kiểm tra HV016"), { target: { value: "8" } });
-  fireEvent.click(screen.getByRole("button", { name: /page 1/i }));
+  fireEvent.click(screen.getByRole("button", { name: /^Trang 1$/ }));
   expect(await screen.findByLabelText("Điểm kiểm tra HV001")).toHaveValue("7");
   expect(screen.queryByTestId("exam-print-table")).not.toBeInTheDocument();
   expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ page: 2, pageSize: 15 }) });
@@ -744,13 +744,13 @@ it("returns to the first page when searching or changing the list mode", async (
   })), 'waiting');
   render(<ExamLists />);
   await screen.findByLabelText("Điểm kiểm tra HV001");
-  fireEvent.click(screen.getByRole("button", { name: /page 2/i }));
+  fireEvent.click(screen.getByRole("button", { name: /^Trang 2$/ }));
   await screen.findByLabelText("Điểm kiểm tra HV016");
   fireEvent.change(screen.getByRole("textbox", { name: "Tìm kiếm" }), { target: { value: "HV001" } });
   expect(await screen.findByLabelText("Điểm kiểm tra HV001")).toBeInTheDocument();
   expect(screen.getByText("Hiển thị 1–1 trên 1 học viên")).toBeInTheDocument();
   fireEvent.change(screen.getByRole("textbox", { name: "Tìm kiếm" }), { target: { value: "" } });
-  fireEvent.click(await screen.findByRole("button", { name: /page 2/i }));
+  fireEvent.click(await screen.findByRole("button", { name: /^Trang 2$/ }));
   await screen.findByLabelText("Điểm kiểm tra HV016");
   fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
   expect(await screen.findByText("Hiển thị 1–15 trên 22 học viên")).toBeInTheDocument();

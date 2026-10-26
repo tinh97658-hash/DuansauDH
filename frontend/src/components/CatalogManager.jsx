@@ -6,7 +6,7 @@ import "react-toastify/dist/ReactToastify.css";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress,
   FormControl, FormControlLabel, IconButton, MenuItem, Paper, Select, Stack,
-  Switch, TableBody, TableCell, TableContainer, TablePagination, TableRow, TextField,
+  Switch, TableBody, TableCell, TableContainer, TableRow, TextField,
   Tooltip, Typography, ListSubheader,
 } from "@mui/material";
 import AddRounded from "@mui/icons-material/AddRounded";
@@ -19,6 +19,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import { personNameParts } from "../utils/personName";
 import FilterSearchField from "./FilterSearchField";
 import ResizableTable from "./ResizableTable";
+import ListPagination from "./ListPagination";
 import { alphabeticalOptionGroups } from "../utils/optionGroups";
 
 const buildEmptyForm = (parent, fields, sortable, activeField = "active") => {
@@ -91,7 +92,7 @@ const EMPTY_FIELDS = [];
 const CatalogManager = ({
   title, group, desc, endpoint, itemName, nameLabel = "Tên", codeLabel = "Mã",
   sortable = true, parent = null, parentBeforeName = false, fields = EMPTY_FIELDS, editOnDoubleClick = false,
-  showEditAction = true, showDeleteAction = true, showSortColumn = sortable,
+  showEditAction = true, showDeleteAction = false, showSortColumn = sortable,
   showCode = true, showIndex = true, splitPersonName = false,
   inlineEdit = false,
   activeField = "active",
@@ -100,6 +101,7 @@ const CatalogManager = ({
   activeSwitchAriaLabel = null,
   activeStatusLabel = null,
   showStatusBadge = true,
+  showStatus = true,
   addButtonLabel = null,
 }) => {
   const apiBase = baseEndpoint || endpoint.split("?")[0];
@@ -158,6 +160,12 @@ const CatalogManager = ({
     if (inlineCell?.id === row.id && inlineCell.key === key) return <TextField
       autoFocus fullWidth size="small" value={inlineCell.value} disabled={inlineSaving}
       inputProps={{ "aria-label": label }} error={!!inlineCell.error} helperText={inlineCell.error || ""}
+      sx={{
+        "& .MuiOutlinedInput-root": { borderRadius: 0, backgroundColor: "transparent", font: "inherit", color: "inherit" },
+        "& .MuiOutlinedInput-notchedOutline": { border: "0 !important" },
+        "& .MuiOutlinedInput-input": { padding: "0 !important", height: "auto", font: "inherit" },
+        "& .MuiFormHelperText-root": { mx: 0 },
+      }}
       onChange={(event) => { const next = { ...inlineRef.current, value: event.target.value, error: "" }; inlineRef.current = next; setInlineCell(next); }}
       onBlur={saveInlineEdit}
       onKeyDown={(event) => {
@@ -167,7 +175,6 @@ const CatalogManager = ({
     />;
     return <Box component="button" type="button" aria-label={`Sửa ${label.toLowerCase()} ${row.code || row.name}`}
       onDoubleClick={() => startInlineEdit(row, key)} disabled={inlineSaving}
-      title="Nhấp đúp để sửa"
       sx={{ display: "block", width: "100%", border: 0, p: 0, background: "transparent", color: "inherit", font: "inherit", textAlign: "left", cursor: "text" }}>
       {content}
     </Box>;
@@ -255,7 +262,7 @@ const CatalogManager = ({
     ...(parent && !parentBeforeName ? [parentColumn] : []),
     ...tableFields.map(field => ({ key: `field:${field.key}`, label: field.label, align: field.align || "left", width: field.width || 180, minWidth: field.minWidth || 80 })),
     ...(showSortColumn ? [{ key: "sortOrder", label: "Thứ tự", align: "center", width: 90, minWidth: 70 }] : []),
-    { key: "status", label: "Trạng thái", align: "center", width: activeStatusLabel && showStatusBadge ? 200 : 110, minWidth: 100 },
+    ...(showStatus ? [{ key: "status", label: "Trạng thái", align: "center", width: activeStatusLabel && showStatusBadge ? 200 : 110, minWidth: 100 }] : []),
     ...(showActions ? [{ key: "actions", label: "Thao tác", align: "center", width: 110, minWidth: 90 }] : []),
   ];
   const colSpan = columns.length;
@@ -438,7 +445,6 @@ const CatalogManager = ({
               <TableRow><TableCell colSpan={colSpan} align="center" sx={{ py: 4, color: "text.secondary" }}>Chưa có dữ liệu.</TableCell></TableRow>
             ) : visibleRows.map((row, index) => (
               <TableRow key={row.id} hover onDoubleClick={isAdmin && editOnDoubleClick && !inlineEdit ? () => openEdit(row) : undefined}
-                title={isAdmin && editOnDoubleClick ? "Nhấp đúp để sửa" : undefined}
                 sx={isAdmin && editOnDoubleClick ? { cursor: "pointer" } : undefined}>
                 {showIndex && <TableCell>{currentPage * pageSize + index + 1}</TableCell>}
                 {showCode && <TableCell>{renderEditableCell(row, "code", codeLabel, <Typography variant="body2" sx={{ fontFamily: "inherit" }}>{row.code}</Typography>)}</TableCell>}
@@ -447,7 +453,7 @@ const CatalogManager = ({
                 {parent && !parentBeforeName && <TableCell>{parent.display ? parent.display(row) : row[parent.field]}</TableCell>}
                 {tableFields.map((f) => <TableCell key={f.key} align={f.align || "left"}>{renderFieldValue(row, f)}</TableCell>)}
                 {showSortColumn && <TableCell align="center">{row.sortOrder}</TableCell>}
-                <TableCell align="center" onDoubleClick={(event) => event.stopPropagation()}>
+                {showStatus && <TableCell align="center" onDoubleClick={(event) => event.stopPropagation()}>
                   {showStatusBadge && activeStatusLabel && (
                     <Chip
                       size="small"
@@ -473,10 +479,10 @@ const CatalogManager = ({
                   ) : !activeStatusLabel ? (
                     <Chip size="small" label={row[activeField] ? "Hoạt động" : "Ẩn"} color={row[activeField] ? "success" : "default"} variant="outlined" />
                   ) : null}
-                </TableCell>
+                </TableCell>}
                 {showActions && (
                   <TableCell align="center" onDoubleClick={(event) => event.stopPropagation()}>
-                    {showEditAction && <Tooltip title={inlineEdit ? "Nhấp đúp để sửa" : "Sửa"}><IconButton aria-label="Sửa" size="small" color="primary" onClick={inlineEdit ? undefined : () => openEdit(row)} onDoubleClick={inlineEdit ? () => openEdit(row) : undefined}><EditRounded fontSize="small" /></IconButton></Tooltip>}
+                    {showEditAction && <Tooltip title={inlineEdit ? "" : "Sửa"}><IconButton aria-label="Sửa" size="small" color="primary" onClick={inlineEdit ? undefined : () => openEdit(row)} onDoubleClick={inlineEdit ? () => openEdit(row) : undefined}><EditRounded fontSize="small" /></IconButton></Tooltip>}
                     {showDeleteAction && <Tooltip title="Xóa"><IconButton size="small" color="error" onClick={() => setDeleting(row)}><DeleteRounded fontSize="small" /></IconButton></Tooltip>}
                   </TableCell>
                 )}
@@ -485,12 +491,7 @@ const CatalogManager = ({
           </TableBody>
         </ResizableTable>
       </TableContainer>
-      {filtered.length > pageSize && <TablePagination component="div" count={filtered.length}
-        page={currentPage} rowsPerPage={pageSize} rowsPerPageOptions={[pageSize]}
-        onPageChange={(_, next) => setPage(next)}
-        getItemAriaLabel={type => type === 'next' ? 'Trang sau' : 'Trang trước'}
-        labelDisplayedRows={({ from, to, count }) => `${from}–${to} / ${count}`}
-        sx={{ bgcolor: '#fff', border: '1px solid #D7E4EE', borderTop: 0 }} />}
+      <ListPagination count={filtered.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} />
 
       <AppDialog
         open={dialogOpen}
@@ -608,10 +609,10 @@ const CatalogManager = ({
             </Stack>
           </Box>
 
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 0.5 }}>
+          {showStatus && <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 0.5 }}>
             <Typography sx={{ color: "#435b72", fontSize: "12px", fontWeight: 700, textTransform: "uppercase" }}>Trạng thái hoạt động</Typography>
             <Switch checked={Boolean(form[activeField])} onChange={(event) => setForm((prev) => ({ ...prev, [activeField]: event.target.checked }))} />
-          </Box>
+          </Box>}
         </Stack>
       </AppDialog>
 

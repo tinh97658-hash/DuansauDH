@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { Alert, Box, Button, Chip, MenuItem, Paper, Stack, Tab, Tabs, TableBody, TableCell, TableContainer, TablePagination, TableRow, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, MenuItem, Paper, Stack, Tab, Tabs, TableBody, TableCell, TableContainer, TableRow, Typography } from '@mui/material';
 import FeatureLayout from '../../components/FeatureLayout';
 import FilterSearchField from '../../components/FilterSearchField';
 import FilterSelectField from '../../components/FilterSelectField';
+import ListPagination from "../../components/ListPagination";
 import ResizableTable from '../../components/ResizableTable';
 import { preloadPage } from '../../utils/lazyPage';
 import { API_BASE_URL } from '../../config/http';
@@ -83,7 +84,7 @@ function StudyLeaveList() {
         <TableCell align="center"><Button size="small" component={Link} to={`/masters/study-leaves/${row.admissionRecordId}?tab=leave`} onPointerEnter={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)} onFocus={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)}>Mở hồ sơ</Button></TableCell>
       </TableRow>)}{!result.rows.length && <TableRow><TableCell colSpan={6} align="center" sx={{ py: 5, color: 'text.secondary' }}>{loading ? 'Đang tải…' : 'Không có hồ sơ bảo lưu phù hợp.'}</TableCell></TableRow>}</TableBody></ResizableTable>
       </TableContainer>
-      <TablePagination component="div" count={result.total} page={page} rowsPerPage={20} rowsPerPageOptions={[20]} onPageChange={(_, next) => setPage(next)} labelDisplayedRows={({ from, to, count }) => `${from}–${to} / ${count}`} />
+      <ListPagination count={result.total} page={page} pageSize={20} onPageChange={setPage} recordLabel="học viên" />
     </Paper>
   </>;
 }

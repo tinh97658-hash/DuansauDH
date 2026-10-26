@@ -13,7 +13,7 @@ const Lecturers = () => (
     splitPersonName
     sortable={false}
     editOnDoubleClick
-    showEditAction={false}
+    showEditAction
     showDeleteAction={false}
     fields={[
       {

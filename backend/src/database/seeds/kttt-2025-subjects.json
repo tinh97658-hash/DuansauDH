@@ -1,0 +1,296 @@
+{
+  "source": "8. Chương trình khung CTĐT THS KTTT 2025.2.doc",
+  "sourceTable": "7.2",
+  "majorCode": "KTTT",
+  "program": "masters",
+  "sourceRows": 32,
+  "duplicatesRemoved": [
+    "Lý thuyết và ứng dụng CFD trong lĩnh vực đóng tàu",
+    "Quản lý tổ chức sản xuất trong đóng tàu",
+    "Ổn định công trình biển di động",
+    "Công nghệ đấu nối thân tàu trên mặt nước",
+    "Hệ thống thiết bị đẩy tiên tiến"
+  ],
+  "sourceCodeConflicts": [
+    {
+      "name": "Phương pháp nghiên cứu khoa học",
+      "sourceCodeText": "TTKH",
+      "retainedExistingCodeText": "TTNC",
+      "codeNumber": 503,
+      "reason": "Preserve the existing same-name, same-credit course and its sharing links instead of creating a duplicate or changing its code."
+    }
+  ],
+  "subjects": [
+    {
+      "sourceOrder": 1,
+      "codeText": "HPTH",
+      "codeNumber": 501,
+      "name": "Triết học",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 2,
+      "codeText": "HPTA",
+      "codeNumber": 502,
+      "name": "Tiếng Anh",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 3,
+      "codeText": "TTNC",
+      "codeNumber": 503,
+      "name": "Phương pháp nghiên cứu khoa học",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true,
+      "sourceCodeText": "TTKH"
+    },
+    {
+      "sourceOrder": 4,
+      "codeText": "TTPH",
+      "codeNumber": 504,
+      "name": "Phương pháp phần tử hữu hạn",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 5,
+      "codeText": "TTPT",
+      "codeNumber": 505,
+      "name": "Phương pháp tính",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 6,
+      "codeText": "TTTC",
+      "codeNumber": 506,
+      "name": "Cơ sở đánh giá độ tin cậy",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 7,
+      "codeText": "TTDE",
+      "codeNumber": 507,
+      "name": "CAD/CAE trong thiết kế và đóng tàu",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 8,
+      "codeText": "TTCF",
+      "codeNumber": 508,
+      "name": "Lý thuyết và ứng dụng CFD trong lĩnh vực đóng tàu",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 9,
+      "codeText": "TTQS",
+      "codeNumber": 509,
+      "name": "Quản lý tổ chức sản xuất trong đóng tàu",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 10,
+      "codeText": "TTCC",
+      "codeNumber": 510,
+      "name": "CAE trong tính toán động lực học công trình nổi",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 11,
+      "codeText": "TTNG",
+      "codeNumber": 511,
+      "name": "Hệ thống neo giữ công trình biển nổi",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 14,
+      "codeText": "TTLU",
+      "codeNumber": 512,
+      "name": "Lý thuyết tối ưu trong đóng tàu",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 15,
+      "codeText": "TTCA",
+      "codeNumber": 513,
+      "name": "CAE trong phân tích kết cấu tàu và công trình ngoài khơi",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 16,
+      "codeText": "TTTM",
+      "codeNumber": 514,
+      "name": "Thiết kế tàu thân thiện với môi trường",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 17,
+      "codeText": "TTCT",
+      "codeNumber": 515,
+      "name": "Thiết kế tàu cao tốc",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 18,
+      "codeText": "TTCN",
+      "codeNumber": 516,
+      "name": "Công nghệ đóng tàu tiên tiến",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 19,
+      "codeText": "TTBH",
+      "codeNumber": 517,
+      "name": "Độ bền tới hạn của kết cấu thân tàu",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 20,
+      "codeText": "TTDL",
+      "codeNumber": 518,
+      "name": "Động lực học của tàu và công trình biển trên sóng",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 21,
+      "codeText": "TTOC",
+      "codeNumber": 519,
+      "name": "Ổn định công trình biển di động",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 22,
+      "codeText": "TTCĐ",
+      "codeNumber": 520,
+      "name": "Công nghệ đấu nối thân tàu trên mặt nước",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 23,
+      "codeText": "TTHT",
+      "codeNumber": 521,
+      "name": "Hệ thống thiết bị đẩy tiên tiến",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 24,
+      "codeText": "TTĐT",
+      "codeNumber": 522,
+      "name": "Động lực học thiết bị lặn",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 25,
+      "codeText": "TTTU",
+      "codeNumber": 523,
+      "name": "Thiết kế tối ưu tàu và công trình biển di động",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 29,
+      "codeText": "TTTK",
+      "codeNumber": 524,
+      "name": "Thiết kế tối ưu kết cấu tàu thủy",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 30,
+      "codeText": "TTCQ",
+      "codeNumber": 525,
+      "name": "Cơ sở thiết kế quy hoạch trong nhà máy đóng tàu",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 31,
+      "codeText": "TTTT",
+      "codeNumber": 526,
+      "name": "Thực tập chuyên ngành",
+      "credits": 7,
+      "subjectType": "TT",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 32,
+      "codeText": "TTĐA",
+      "codeNumber": 527,
+      "name": "Đề án tốt nghiệp",
+      "credits": 9,
+      "subjectType": "TN",
+      "isRequired": true,
+      "majorAssignment": true
+    }
+  ]
+}

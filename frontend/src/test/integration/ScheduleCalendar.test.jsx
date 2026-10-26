@@ -149,6 +149,31 @@ it("warns before closing a class with planned sessions and cancels without chang
   await waitFor(() => expect(saved).toHaveBeenCalledTimes(1));
 });
 
+it("completes teaching from details without a scheduling navigation callback", async () => {
+  const saved = jest.fn();
+  render(<OfferingDetails offering={offering} user={{ canManageScheduling: true }} onClose={jest.fn()} onSaved={saved} />);
+  const complete = screen.getByRole("button", { name: "Xác nhận hoàn thành giảng dạy" });
+  await waitFor(() => expect(complete).toBeEnabled());
+  expect(screen.queryByRole("button", { name: "Xếp lịch / Xếp thêm" })).not.toBeInTheDocument();
+  fireEvent.click(complete);
+  const dialog = screen.getByRole("dialog", { name: "Hoàn thành giảng dạy" });
+  const confirm = within(dialog).getByRole("button", { name: "Xác nhận đóng lớp" });
+  await waitFor(() => expect(confirm).toBeEnabled());
+  fireEvent.click(confirm);
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(
+    expect.stringContaining("/course-offerings/offering/completion"),
+    { cancelPlannedSessions: false, expectedPlannedSessionIds: [] },
+    { withCredentials: true },
+  ));
+  await waitFor(() => expect(saved).toHaveBeenCalledTimes(1));
+});
+
+it("hides completion from viewers without scheduling authority", async () => {
+  render(<OfferingDetails offering={offering} user={{}} onClose={jest.fn()} />);
+  await screen.findByRole("button", { name: "Đã diễn ra (2)" });
+  expect(screen.queryByRole("button", { name: "Xác nhận hoàn thành giảng dạy" })).not.toBeInTheDocument();
+});
+
 it("shows the seven-day calendar and selects a persisted offering for scheduling", async () => {
   await act(async () => { render(<MemoryRouter><Schedule /></MemoryRouter>); });
   fireEvent.click(await screen.findByRole("button", { name: "Xếp lịch" }));

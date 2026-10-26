@@ -3,6 +3,7 @@ import CatalogManager from "../../components/CatalogManager";
 
 const Wards = () => (
   <CatalogManager
+    editOnDoubleClick
     title="Phường xã"
     group="Danh mục chung"
     desc="Danh mục phường, xã theo đơn vị hành chính."
@@ -10,6 +11,7 @@ const Wards = () => (
     itemName="phường xã"
     codeLabel="Mã phường xã"
     nameLabel="Tên phường xã"
+    sortable={false}
     parent={{
       field: "districtId",
       label: "Quận huyện",

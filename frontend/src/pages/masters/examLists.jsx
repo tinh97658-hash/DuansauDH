@@ -5,7 +5,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { dashboardGradeScope } from "../../features/dashboard/navigation";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, ListSubheader, MenuItem, Pagination, Paper, Stack, TableBody, TableCell, TableContainer, TableRow, TextField, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, ListSubheader, MenuItem, Paper, Stack, TableBody, TableCell, TableContainer, TableRow, TextField, Tooltip, Typography } from "@mui/material";
 import ListAltRounded from "@mui/icons-material/ListAltRounded";
 import SaveRounded from "@mui/icons-material/SaveRounded";
 import SettingsRounded from "@mui/icons-material/SettingsRounded";
@@ -13,6 +13,7 @@ import GradeSettingsDialog from "../../features/exams/GradeSettingsDialog";
 import FeatureLayout from "../../components/FeatureLayout";
 import FilterSelectField from "../../components/FilterSelectField";
 import FilterSearchField from "../../components/FilterSearchField";
+import ListPagination from "../../components/ListPagination";
 import ResizableTable from "../../components/ResizableTable";
 import DocumentExportMenu from "../../components/DocumentExportMenu";
 import ConfirmDialog from "../../components/ConfirmDialog";
@@ -226,7 +227,6 @@ export default function ExamLists() {
   } : selectedEntry?.group;
   const selectedOffering = selectedEntry ? { ...selectedEntry.offering, subject: selectedEntry.subject, subjectId: subjectKey(selectedEntry.subject) } : undefined;
   const visible = visibleGradeRows(rows, mode, "");
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = page;
   const pageStart = (currentPage - 1) * PAGE_SIZE;
   const pageRows = visible;
@@ -463,16 +463,9 @@ export default function ExamLists() {
             })}</TableBody>
           </ResizableTable>
         </TableContainer>}
-        {!busy && visible.length > 0 && <Box className="exam-no-print" sx={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 1, minHeight: 48, px: 1.5, py: 0.75, borderTop: "1px solid #D7E4EE" }}>
-          <Typography variant="caption" sx={{ color: "#607486", fontWeight: 600, position: { xs: "static", md: "absolute" }, left: 16 }}>
-            Hiển thị {pageStart + 1}–{pageStart + pageRows.length} trên {total} học viên
-          </Typography>
-          {totalPages > 1 && <Pagination
-            page={currentPage} count={totalPages} disabled={saving || exporting} onChange={(_event, value) => setPage(value)}
-            color="primary" size="medium" showFirstButton showLastButton
-            sx={{ "& .MuiPaginationItem-root": { minWidth: 38, height: 38, fontSize: 14, fontWeight: 600 } }}
-          />}
-        </Box>}
+        {!busy && visible.length > 0 && <ListPagination className="exam-no-print" count={total}
+          page={currentPage - 1} pageSize={PAGE_SIZE} onPageChange={next => setPage(next + 1)}
+          disabled={saving || exporting} recordLabel="học viên" showSinglePageSummary />}
         {blank && groupId && offeringId && <Box className="exam-print-sheet" sx={{ display: "none" }}>
           <table data-testid="exam-print-table" aria-label="Danh sách in">
             <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead>

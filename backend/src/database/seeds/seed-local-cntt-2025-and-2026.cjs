@@ -126,7 +126,7 @@ async function run() {
           pob: 'Hải Phòng', nationality: 'Việt Nam', ethnicity: 'Kinh', religion: 'Không',
           majorId: major.id, majorName: major.name, trainingLevel: 'Thạc sĩ', academicYear: year,
           trainingModeGroup: 'Chính quy', trainingModeName: 'Đào tạo thông thường', language: 'Tiếng Việt',
-          status: 'approved', studyStatus: 'Đang học', isExemptForeignLanguage: false,
+          status: 'approved', studyStatus: 'Đã trúng tuyển', isExemptForeignLanguage: false,
           admissionDate: `${year}-09-01`, receiptType: 'Trực tiếp', profileCategory: 'Đầy đủ',
           documents: { docApplication: true, docCurriculumVitae: true, docDegree: true, docHealthCert: true, docPhoto: true, docTranscript: true },
           note: `[TEST_BATCH:${MARKER}] Hồ sơ mẫu đã trúng tuyển, lớp ${code}.`, extraData: { testBatch: MARKER, localOnly: true } });

@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { lockTrainingStructure } from "./training-structure-integrity.js";
 import { archiveMembership } from "./membership-history.js";
 import { AdmissionEvaluationService } from "./admission-evaluation.service.js";
+import { hasPaidAdmissionTuition } from "./learner-study-status.js";
 import { InjectModel } from "@nestjs/sequelize";
 import { Op, QueryTypes } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
@@ -132,17 +133,20 @@ export class MajorTransferService {
       if (!record) throw new NotFoundException("Không tìm thấy hồ sơ học viên.");
 
       if (dto.decision === "rejected") {
+        const previousStudyStatus = transfer.previousStudyStatus || (hasPaidAdmissionTuition(record) ? "Đang học" : "Đã trúng tuyển");
+        const restoredStudyStatus = record.trainingLevel === "Thạc sĩ" && ["Đã trúng tuyển", "Đang học"].includes(previousStudyStatus)
+          ? (hasPaidAdmissionTuition(record) ? "Đang học" : "Đã trúng tuyển") : previousStudyStatus;
         await this.admissionEvaluation.guardRecordUpdate(record, {
           majorId: transfer.fromMajorId,
           status: transfer.previousAdmissionStatus || "approved",
-          studyStatus: transfer.previousStudyStatus || "Đang học",
+          studyStatus: restoredStudyStatus,
         }, transaction);
         const oldMajor = await this.majors.findByPk(transfer.fromMajorId, { transaction });
         await record.update({
           majorId: transfer.fromMajorId,
           majorName: oldMajor?.name || record.majorName,
           status: transfer.previousAdmissionStatus || "approved",
-          studyStatus: transfer.previousStudyStatus || "Đang học",
+          studyStatus: restoredStudyStatus,
         } as never, { transaction });
         if (transfer.fromClassGroupId) {
           const existing = await this.memberships.findOne({

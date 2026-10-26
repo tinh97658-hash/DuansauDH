@@ -68,7 +68,100 @@ const configureReads = (
   });
 };
 
+describe('Training Plan draft scope', () => {
+  beforeEach(() => { jest.clearAllMocks(); });
+
+  it('returns to the last draft field when the browser tab becomes active', async () => {
+    configureReads([]);
+    await act(async () => { render(<TrainingPlan />); });
+    await clickAndWait(await screen.findByRole('button', { name: 'Thêm dòng mới' }));
+    const input = screen.getByPlaceholderText('Nhập tên học phần...');
+    fireEvent.change(input, { target: { value: 'Học phần đang nhập' } });
+    input.focus();
+    const row = input.closest('tr');
+    row.scrollIntoView = vi.fn();
+    input.blur();
+    fireEvent(window, new Event('focus'));
+    await waitFor(() => expect(input).toHaveFocus());
+    expect(row.scrollIntoView).toHaveBeenCalledWith({ block: 'center', inline: 'nearest', behavior: 'instant' });
+    expect(input).toHaveValue('Học phần đang nhập');
+
+    row.scrollIntoView.mockClear();
+    input.blur();
+    fireEvent(document, new Event('visibilitychange'));
+    await waitFor(() => expect(input).toHaveFocus());
+    expect(row.scrollIntoView).toHaveBeenCalledTimes(1);
+
+    await clickAndWait(screen.getByRole('button', { name: 'Hủy (Esc)' }));
+    row.scrollIntoView.mockClear();
+    fireEvent(window, new Event('focus'));
+    expect(row.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['Chuyên ngành', 'Quản trị kinh doanh'],
+    ['Ngành', 'Ngành hàng hải'],
+    ['Ngành', 'Tất cả ngành'],
+    ['Trình độ', 'Tiến sĩ'],
+  ])('closes the draft when changing %s to %s', async (filter, optionName) => {
+    configureReads([], [
+      { ...major, discipline: { id: major.disciplineId, name: 'Ngành công nghệ' } },
+      otherMajor,
+      { ...thirdMajor, discipline: { id: thirdMajor.disciplineId, name: 'Ngành hàng hải' } },
+    ]);
+    await act(async () => { render(<TrainingPlan />); });
+    await clickAndWait(await screen.findByRole('button', { name: 'Thêm dòng mới' }));
+    expect(screen.getByPlaceholderText('Mã số (101)')).toHaveFocus();
+    fireEvent.change(screen.getByPlaceholderText('Nhập tên học phần...'), { target: { value: 'Bản nháp cũ' } });
+
+    await act(async () => { fireEvent.mouseDown(screen.getByRole('button', { name: filter })); });
+    const list = await screen.findByRole('listbox');
+    await clickAndWait(within(list).getByRole('option', { name: new RegExp(optionName) }));
+
+    expect(screen.queryByPlaceholderText('Nhập tên học phần...')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Thêm dòng mới' })).toBeInTheDocument();
+    expect(axios.post).not.toHaveBeenCalled();
+    await clickAndWait(screen.getByRole('button', { name: 'Thêm dòng mới' }));
+    expect(screen.getByPlaceholderText('Nhập tên học phần...')).toHaveValue('');
+    expect(screen.getByPlaceholderText('Mã số (101)')).toHaveFocus();
+  });
+});
+
+describe('Training Plan CNTT catalog ordering',()=>{
+  beforeEach(()=>{jest.clearAllMocks();});
+  const displayedNames=()=>Array.from(screen.getByRole('table').querySelectorAll('tbody tr')).filter(row=>!row.cells[3]?.querySelector('input')).map(row=>row.cells[3]?.textContent).filter(Boolean);
+  it('sorts CNTT names A–Z and inserts a newly saved subject in the correct position',async()=>{
+    const local=[
+      {...root,id:'triet',majorId:major.id,name:'Triết học',codeNumber:501,codeText:'TH',sortOrder:1},
+      {...root,id:'dien',majorId:major.id,name:'Điện toán đám mây',codeNumber:502,codeText:'DT',sortOrder:2},
+      {...root,id:'an',majorId:major.id,name:'An toàn thông tin',codeNumber:503,codeText:'AT',sortOrder:3},
+    ];
+    configureReads(local);
+    await act(async()=>{render(<TrainingPlan/>);});
+    expect(displayedNames()).toEqual(['An toàn thông tin','Điện toán đám mây','Triết học']);
+    axios.post.mockResolvedValue({data:{...root,id:'new-cs',majorId:major.id,name:'Cơ sở dữ liệu',codeNumber:504,codeText:'CSDL',sortOrder:4,allowCrossMajor:false}});
+    await clickAndWait(screen.getByRole('button',{name:'Thêm dòng mới'}));
+    fireEvent.change(screen.getByPlaceholderText('Mã số (101)'),{target:{value:'504'}});
+    fireEvent.change(screen.getByPlaceholderText('Mã chữ (CS01)'),{target:{value:'CSDL'}});
+    fireEvent.change(screen.getByPlaceholderText('Nhập tên học phần...'),{target:{value:'Cơ sở dữ liệu'}});
+    await clickAndWait(screen.getByRole('button',{name:'Lưu & Thêm tiếp (Enter)'}));
+    await waitFor(()=>expect(displayedNames()).toEqual(['An toàn thông tin','Cơ sở dữ liệu','Điện toán đám mây','Triết học']));
+  });
+  it('keeps the existing catalog order for other majors',async()=>{
+    configureReads([{...root,id:'triet',name:'Triết học'},{...root,id:'an',name:'An toàn thông tin'}],[otherMajor]);
+    await act(async()=>{render(<TrainingPlan/>);});
+    expect(displayedNames()).toEqual(['Triết học','An toàn thông tin']);
+  });
+});
+
 describe("Training Plan new curriculum codes", () => {
+  it('shows exactly the five requested knowledge groups in the catalog filter',async()=>{
+    configureReads([]);
+    await act(async()=>{render(<TrainingPlan/>);});
+    await act(async()=>{fireEvent.mouseDown(screen.getByRole('button',{name:'Nhóm kiến thức'}));});
+    const list=await screen.findByRole('listbox');
+    expect(within(list).getAllByRole('option').map(option=>option.textContent)).toEqual(['Tất cả nhóm kiến thức','Kiến thức chung','Kiến thức ngành','Kiến thức chuyên ngành','Thực tập','Tốt nghiệp']);
+  });
   const year = String(new Date().getFullYear());
   const openDialog = async (globalCodes) => {
     configureReads([], [{ ...major, code: "" }]);
@@ -257,7 +350,7 @@ describe("Training Plan Subject identity persistence", () => {
   });
 
   it("saves the automatic sharing flag together with a new draft", async () => {
-    configureReads([]);
+    configureReads([], [major, otherMajor], []);
     axios.post.mockResolvedValue({ data: { subjects: [
       { ...root, id: "new-local", majorId: major.id, sharedMajorIds: [otherMajor.id] },
       { ...root, id: "new-other", majorId: otherMajor.id, codeNumber: 301, codeText: "OTHER", sharedMajorIds: [major.id] },
@@ -286,6 +379,86 @@ describe("Training Plan Subject identity persistence", () => {
       }),
       { withCredentials: true },
     ));
+  });
+
+  it("keeps all sharing options but requests codes only for selected majors without a matching course", async () => {
+    configureReads([], [major, otherMajor, thirdMajor]);
+    axios.post.mockResolvedValue({ data: {
+      subject: { ...root, id: 'new-mixed', majorId: major.id },
+      linkedSubjects: [root],
+      createdCounterparts: [{ ...root, id: 'new-third', majorId: thirdMajor.id }],
+    } });
+    await act(async () => { render(<TrainingPlan />); });
+    await clickAndWait(screen.getByRole('button', { name: 'Thêm dòng mới' }));
+    fireEvent.change(screen.getByPlaceholderText('Mã số (101)'), { target: { value: '503' } });
+    fireEvent.change(screen.getByPlaceholderText('Mã chữ (CS01)'), { target: { value: 'LOCAL' } });
+    fireEvent.change(screen.getByPlaceholderText('Nhập tên học phần...'), { target: { value: `  ${root.name.toLocaleUpperCase('vi')}  ` } });
+    fireEvent.mouseDown(screen.getByLabelText(/Phạm vi học chung:/));
+    const options = await screen.findByRole('listbox');
+    expect(within(options).getByRole('option', { name: /Quản trị kinh doanh/ })).toBeInTheDocument();
+    expect(within(options).getByRole('option', { name: /Khai thác hàng hải/ })).toBeInTheDocument();
+    await clickAndWait(within(options).getByRole('option', { name: 'Chọn tất cả' }));
+    fireEvent.keyDown(options, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument());
+    await clickAndWait(screen.getByRole('button', { name: 'Lưu & Thêm tiếp (Enter)' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Khai thác hàng hải/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Quản trị kinh doanh/)).not.toBeInTheDocument();
+    expect(within(dialog).getAllByLabelText('Mã số')).toHaveLength(2);
+    fireEvent.change(within(dialog).getAllByLabelText('Mã số')[1], { target: { value: '601' } });
+    fireEvent.change(within(dialog).getAllByLabelText('Mã chữ')[1], { target: { value: 'NEW-601' } });
+    await clickAndWait(within(dialog).getByRole('button', { name: 'Tạo cho tất cả chuyên ngành' }));
+    await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
+      expect.stringContaining('/plan/subjects/link-existing'),
+      expect.objectContaining({
+        source: expect.objectContaining({ sharedMajorIds: [otherMajor.id, thirdMajor.id] }),
+        existingSubjectIds: [root.id],
+        counterparts: [{ majorId: thirdMajor.id, codeNumber: 601, codeText: 'NEW-601' }],
+      }),
+      { withCredentials: true },
+    ));
+  });
+
+  it("links existing courses directly when every selected major already has the course", async () => {
+    configureReads([]);
+    axios.post.mockResolvedValue({ data: {
+      subject: { ...root, id: 'new-existing-only', majorId: major.id }, linkedSubjects: [root], createdCounterparts: [],
+    } });
+    await act(async () => { render(<TrainingPlan />); });
+    await clickAndWait(screen.getByRole('button', { name: 'Thêm dòng mới' }));
+    fireEvent.change(screen.getByPlaceholderText('Mã số (101)'), { target: { value: '504' } });
+    fireEvent.change(screen.getByPlaceholderText('Mã chữ (CS01)'), { target: { value: 'LOCAL' } });
+    fireEvent.change(screen.getByPlaceholderText('Nhập tên học phần...'), { target: { value: root.name } });
+    fireEvent.mouseDown(screen.getByLabelText(`Phạm vi học chung: ${root.name}`));
+    const options = await screen.findByRole('listbox');
+    await clickAndWait(within(options).getByRole('option', { name: /Quản trị kinh doanh/ }));
+    fireEvent.keyDown(options, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument());
+    await clickAndWait(screen.getByRole('button', { name: 'Lưu & Thêm tiếp (Enter)' }));
+    await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
+      expect.stringContaining('/plan/subjects/link-existing'),
+      expect.objectContaining({ existingSubjectIds: [root.id], counterparts: [] }),
+      { withCredentials: true },
+    ));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it("does not duplicate a same-name course with different credits during bulk creation", async () => {
+    configureReads([], [major, otherMajor], [{ ...root, credits: 2 }]);
+    await act(async () => { render(<TrainingPlan />); });
+    await clickAndWait(screen.getByRole('button', { name: 'Thêm dòng mới' }));
+    fireEvent.change(screen.getByPlaceholderText('Mã số (101)'), { target: { value: '505' } });
+    fireEvent.change(screen.getByPlaceholderText('Mã chữ (CS01)'), { target: { value: 'LOCAL' } });
+    fireEvent.change(screen.getByPlaceholderText('Nhập tên học phần...'), { target: { value: root.name } });
+    fireEvent.mouseDown(screen.getByLabelText(`Phạm vi học chung: ${root.name}`));
+    const options = await screen.findByRole('listbox');
+    await clickAndWait(within(options).getByRole('option', { name: /Quản trị kinh doanh/ }));
+    fireEvent.keyDown(options, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument());
+    await clickAndWait(screen.getByRole('button', { name: 'Lưu & Thêm tiếp (Enter)' }));
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('khác số tín chỉ (2 TC)'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(axios.post).not.toHaveBeenCalled();
   });
 
   it("does not suggest while typing and asks only after saving an exact name and credit match", async () => {
@@ -333,6 +506,36 @@ describe("Training Plan Subject identity persistence", () => {
       expect.objectContaining({ name: root.name, credits: 3 }),
       { withCredentials: true },
     ));
+  });
+
+  it.each([
+    ['TT', 'Thực tập chuyên ngành', 7],
+    ['TN', 'Đề án tốt nghiệp', 9],
+    ['CN', 'Thực tập chuyên ngành', 7],
+    ['CN', 'Đề án tốt nghiệp', 9],
+  ])('saves %s course %s without suggesting shared learning', async (subjectType, name, credits) => {
+    const existing = { ...root, name, credits, subjectType };
+    configureReads([], [major, otherMajor], [existing]);
+    axios.post.mockResolvedValue({ data: { ...existing, id: 'new-independent', majorId: major.id, sharedMajorIds: [], allowCrossMajor: false } });
+    await act(async () => { render(<TrainingPlan />); });
+    await clickAndWait(screen.getByRole('button', { name: 'Thêm dòng mới' }));
+    fireEvent.change(screen.getByPlaceholderText('Mã số (101)'), { target: { value: '526' } });
+    fireEvent.change(screen.getByPlaceholderText('Mã chữ (CS01)'), { target: { value: 'LOCAL' } });
+    const nameInput = screen.getByPlaceholderText('Nhập tên học phần...');
+    fireEvent.change(nameInput, { target: { value: name } });
+    const row = nameInput.closest('tr');
+    fireEvent.change(within(row.cells[4]).getByRole('spinbutton'), { target: { value: String(credits) } });
+    if (subjectType !== 'CN') {
+      fireEvent.mouseDown(within(row).getByRole('button', { name: 'Kiến thức chuyên ngành' }));
+      await clickAndWait(within(await screen.findByRole('listbox')).getByRole('option', { name: subjectType === 'TT' ? 'Thực tập' : 'Tốt nghiệp' }));
+    }
+    await clickAndWait(screen.getByRole('button', { name: 'Lưu & Thêm tiếp (Enter)' }));
+    await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
+      expect.stringMatching(/\/plan\/subjects$/),
+      expect.objectContaining({ name, credits, subjectType, sharedMajorIds: [], allowCrossMajor: false }),
+      { withCredentials: true },
+    ));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it("capitalizes the first character of a new subject name", async () => {
@@ -390,14 +593,14 @@ describe("Training Plan Subject identity persistence", () => {
     expect(nameInput).toHaveValue(root.name.slice(0, 3));
   });
 
-  it("shows every eligible major and requests codes for majors without the subject", async () => {
+  it.each([true, false])("shows every eligible major and requests codes for majors without the subject (link existing: %s)", async (linkExisting) => {
     configureReads([], [major, otherMajor, thirdMajor]);
     const created = { ...root, id: "created-all-majors", majorId: major.id, sharedMajorIds: [otherMajor.id, thirdMajor.id] };
-    axios.post.mockResolvedValue({ data: {
+    axios.post.mockResolvedValue({ data: linkExisting ? {
       subject: created,
       linkedSubjects: [{ ...root, sharedMajorIds: [major.id, thirdMajor.id] }],
       createdCounterparts: [{ ...root, id: "third-copy", majorId: thirdMajor.id, codeNumber: 501, codeText: "KTHH-501" }],
-    } });
+    } : { subjects: [created, { ...root, id: 'third-copy', majorId: thirdMajor.id }] } });
     await act(async () => { render(<TrainingPlan />); });
     await clickAndWait(await screen.findByRole("button", { name: "Thêm dòng mới" }));
     fireEvent.change(screen.getByPlaceholderText("Mã số (101)"), { target: { value: "403" } });
@@ -408,6 +611,7 @@ describe("Training Plan Subject identity persistence", () => {
 
     expect(screen.getByLabelText(/^(?:QTKD — )?Quản trị kinh doanh/)).toBeChecked();
     expect(screen.getByLabelText(/^(?:KTHH — )?Khai thác hàng hải/)).not.toBeChecked();
+    if (!linkExisting) await clickAndWait(screen.getByLabelText(/^(?:QTKD — )?Quản trị kinh doanh/));
     await clickAndWait(screen.getByLabelText(/^(?:KTHH — )?Khai thác hàng hải/));
     await clickAndWait(screen.getByRole("button", { name: "Xác nhận học chung" }));
 
@@ -417,9 +621,9 @@ describe("Training Plan Subject identity persistence", () => {
     fireEvent.change(textInputs[1], { target: { value: "KTHH-501" } });
     await clickAndWait(screen.getByRole("button", { name: "Tạo cho tất cả chuyên ngành" }));
     await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
-      expect.stringContaining("/plan/subjects/link-existing"),
+      expect.stringContaining(linkExisting ? "/plan/subjects/link-existing" : "/plan/subjects/shared"),
       expect.objectContaining({
-        existingSubjectIds: [root.id],
+        ...(linkExisting ? { existingSubjectIds: [root.id] } : {}),
         counterparts: [{ majorId: thirdMajor.id, codeNumber: 501, codeText: "KTHH-501" }],
       }),
       { withCredentials: true },

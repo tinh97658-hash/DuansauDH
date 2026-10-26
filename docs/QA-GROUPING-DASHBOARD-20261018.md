@@ -8,7 +8,7 @@
 
 Điểm cần cải thiện nhất là **tạo nhanh chuyển route làm mất selection và search**. Khuyến nghị modal/drawer **“+ Tạo mới” ngay trong Assignment**, tái sử dụng logic tạo nhóm hiện có; **chưa triển khai**.
 
-Chỉ audit Grouping và Dashboard. CourseOffering/Scheduling/Grades được dùng để chuẩn bị hoặc xử lý các trạng thái Dashboard, không đánh giá UX toàn bộ các module đó. Không kiểm lại QA-ADM-001/002, không điều tra DOB/GPA. Học viên trúng tuyển chưa xác nhận học phí được phân nhóm và chuyển Đang học là **quy tắc đã xác nhận**, không phải finding/risk của báo cáo này.
+Chỉ audit Grouping và Dashboard. CourseOffering/Scheduling/Grades được dùng để chuẩn bị hoặc xử lý các trạng thái Dashboard, không đánh giá UX toàn bộ các module đó. Không kiểm lại QA-ADM-001/002, không điều tra DOB/GPA. Quy tắc nhập học đã được thay đổi ngày 25/10/2026: **chỉ đã đóng học phí mới là Đang học**; phân nhóm không tự chuyển trạng thái. Các kết quả QA ngày 18/10 là ghi nhận lịch sử, không xác nhận quy tắc hiện tại. Xem [quy tắc học phí](TUITION-ENROLLMENT-POLICY.md).
 
 ## 1. Môi trường và dữ liệu
 

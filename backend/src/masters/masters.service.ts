@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
-import { Op, UniqueConstraintError } from "sequelize";
+import { literal, Op, UniqueConstraintError } from "sequelize";
 import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
@@ -13,7 +13,8 @@ import { ClassGroupService } from "../plan/class-group.service.js";
 import { admissionLearnerWhere } from "../plan/admission-learner-policy.js";
 import { classGroupCode, parseClassGroupCode } from "../plan/class-group-code.js";
 import { archiveMembership } from "../plan/membership-history.js";
-import { assignedLearnerSql } from "../plan/learner-study-status.js";
+import { hasPaidAdmissionTuition, paidLearnerStatusSql } from "../plan/learner-study-status.js";
+import { returnUnpaidToApplication } from "../plan/unpaid-enrollment.js";
 import {
   AssignMembersDto, AutoAssignDto, BatchCreateMastersClassGroupsDto, CreateMastersClassGroupDto, UpdateMastersClassGroupDto,
 } from "./dto/masters-class-group.dto.js";
@@ -282,7 +283,7 @@ export class MastersService {
         academicYear: r.academicYear,
         status: r.status,
         studyStatus: ["Đã trúng tuyển", "Đang học"].includes(r.studyStatus || "")
-          ? (assignment ? "Đang học" : "Đã trúng tuyển") : r.studyStatus,
+          ? (hasPaidAdmissionTuition(r) ? "Đang học" : "Đã trúng tuyển") : r.studyStatus,
         tuitionPaid: r.extraData?.tuitionPayment?.paid === true,
         note: r.note || "",
         assignedGroup: assignment ? assignment.group : null,
@@ -354,7 +355,7 @@ export class MastersService {
         }
         throw error;
       }
-      await this.admissionRecords.update({ studyStatus: "Đang học" }, { where: { id: { [Op.in]: admissionRecordIds } }, transaction });
+      await this.admissionRecords.update({ studyStatus: literal(paidLearnerStatusSql('"admission_records"')) }, { where: { id: { [Op.in]: admissionRecordIds } }, transaction });
       return { success: true, message: `Đã phân ${records.length} học viên vào nhóm "${group.name}".`, count: records.length };
     });
   }
@@ -375,10 +376,15 @@ export class MastersService {
     if (records.some(record => ["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Đã thôi học"].includes(record.studyStatus || ""))) {
       throw new ConflictException("Hãy kết thúc xử lý bảo lưu/thôi học trước khi thay đổi lớp.");
     }
+    const unpaid = records.find(record => record.trainingLevel === "Thạc sĩ" && !hasPaidAdmissionTuition(record));
+    if (unpaid) {
+      await returnUnpaidToApplication(this.sequelize, unpaid, actor, "Chưa nộp học phí, rút khỏi lớp và trở về hồ sơ đầu vào", transaction);
+      return { success: true, message: "Đã rút hồ sơ chưa nộp học phí khỏi lớp và đưa về Nộp hồ sơ đầu vào." };
+    }
     await archiveMembership(this.sequelize, member.id, actor, "Rút khỏi lớp học viên", transaction);
     await member.destroy({ transaction });
     for (const record of records) await this.sequelize.query(`UPDATE admission_records ar SET study_status =
-      CASE WHEN ${assignedLearnerSql('ar')} THEN 'Đang học' ELSE 'Đã trúng tuyển' END, updated_at = NOW()
+      ${paidLearnerStatusSql('ar')}, updated_at = NOW()
       WHERE ar.id = :id AND ar.study_status IN ('Đang học','Đã trúng tuyển')`, { replacements: { id: record.id }, transaction });
     return { success: true, message: "Đã rút học viên khỏi lớp." };
     });
@@ -538,7 +544,7 @@ export class MastersService {
       }
       throw error;
     }
-    await this.admissionRecords.update({ studyStatus: "Đang học" }, {
+    await this.admissionRecords.update({ studyStatus: literal(paidLearnerStatusSql('"admission_records"')) }, {
       where: { id: { [Op.in]: newMemberships.map(member => member.admissionRecordId) } }, transaction,
     });
     return {

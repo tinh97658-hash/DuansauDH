@@ -1,0 +1,381 @@
+{
+  "applied": true,
+  "major": {
+    "id": "45eaaf88-fcf6-4b8c-8f4e-c2a2268bb49d",
+    "name": "Quản lý vận tải và Logistics"
+  },
+  "sourceRows": 32,
+  "uniqueSourceSubjects": 29,
+  "duplicatesRemoved": [
+    "Thống kê kinh tế",
+    "Marketing trong vận tải & logistics",
+    "Thiết kế hệ thống logistics"
+  ],
+  "sourceCodeConflicts": [
+    {
+      "name": "Thực tập chuyên ngành",
+      "retainedCatalogCodeText": "VLTT",
+      "retainedCatalogCodeNumber": 529,
+      "semesterEntries": [
+        {
+          "codeText": "VLTT",
+          "codeNumber": 532
+        }
+      ],
+      "reason": "Table 7.2 is the catalog source; the semester plan has inconsistent codes."
+    },
+    {
+      "name": "Đề án tốt nghiệp",
+      "retainedCatalogCodeText": "VLĐA",
+      "retainedCatalogCodeNumber": 530,
+      "semesterEntries": [
+        {
+          "codeText": "VLĐA",
+          "codeNumber": 533
+        }
+      ],
+      "reason": "Table 7.2 is the catalog source; the semester plan has inconsistent codes."
+    }
+  ],
+  "existingPreserved": [
+    {
+      "id": "df6ced26-e719-4845-afb6-6ab64cd3dc9d",
+      "name": "Triết học"
+    },
+    {
+      "id": "4e9873a6-fa52-4625-87e5-4126ab59f90f",
+      "name": "Tiếng anh"
+    },
+    {
+      "id": "1301619f-8302-4213-9e97-d3410528d482",
+      "name": "Phương pháp nghiên cứu khoa học"
+    }
+  ],
+  "inserted": [
+    {
+      "id": "8dc5b216-d0f7-42de-9263-59c82fad1761",
+      "name": "Kinh tế học ứng dụng"
+    },
+    {
+      "id": "47ff5db6-bf4e-4aae-abc8-a5e11621bff5",
+      "name": "Phân tích kinh tế trong vận tải và logistics"
+    },
+    {
+      "id": "02389d31-4bbe-4e5c-8366-8189292c1af9",
+      "name": "Pháp luật vận tải và logistics"
+    },
+    {
+      "id": "d1dfa9a7-e71d-4e2e-bc2e-00a576a9bb71",
+      "name": "Quản lý nhà nước về kinh tế"
+    },
+    {
+      "id": "8e5a42f5-0d67-4efa-bd84-da870f08060d",
+      "name": "Thống kê kinh tế"
+    },
+    {
+      "id": "9883c44a-60b8-416d-92c3-854d7f688f3c",
+      "name": "Phát triển bền vững"
+    },
+    {
+      "id": "bb459013-049b-4b42-9f6b-f8567dcc0d75",
+      "name": "Kinh tế quốc tế"
+    },
+    {
+      "id": "6fb1666e-daad-42f4-9691-633373e8f151",
+      "name": "Địa lý kinh tế"
+    },
+    {
+      "id": "09da0fe0-a2d7-4ff2-8fe2-4f83d959c8cc",
+      "name": "Kế toán quản trị"
+    },
+    {
+      "id": "21622a24-042e-4808-afe7-8a33fe75dd3e",
+      "name": "Quản lý năng lượng"
+    },
+    {
+      "id": "5ccc35ca-6b4c-443b-8900-64cd13935972",
+      "name": "Ứng dụng các phương pháp toán trong kinh tế"
+    },
+    {
+      "id": "1a50a25b-9c01-433f-95c9-29f7f3a2c544",
+      "name": "Tổ chức khai thác phương tiện vận chuyển"
+    },
+    {
+      "id": "6c1657f1-b294-4a28-b8b9-f7e50437e628",
+      "name": "Quản lý và khai thác cảng, bến"
+    },
+    {
+      "id": "8d88849e-d990-4a6c-97eb-3f0f70614769",
+      "name": "Quản trị chiến lược chuỗi cung ứng"
+    },
+    {
+      "id": "2997510a-ccba-4d1d-8993-cf43e40b001b",
+      "name": "Logistics quốc tế"
+    },
+    {
+      "id": "fe380412-61f5-4926-ba14-0fcc13405694",
+      "name": "Giao nhận vận tải quốc tế"
+    },
+    {
+      "id": "30aa4eee-d4b7-4de5-b7de-f6287ffc3b1f",
+      "name": "Marketing trong vận tải & logistics"
+    },
+    {
+      "id": "74887c13-57d7-40f7-8cfe-0cc43c5b5144",
+      "name": "Quản trị kho hàng"
+    },
+    {
+      "id": "fcdbf1b8-504c-4886-8237-b25ce798515e",
+      "name": "Quản lý dịch vụ vận tải"
+    },
+    {
+      "id": "a34745b8-55ca-4aef-95f1-9386612ab426",
+      "name": "Thiết kế hệ thống logistics"
+    },
+    {
+      "id": "c4cbfec1-41d8-47ea-9f51-e5c3f2ae82ee",
+      "name": "Logistics điện tử"
+    },
+    {
+      "id": "10b9de5a-fd8c-4d8a-8643-5a88468b4a7b",
+      "name": "Quản lý rủi ro trong logistics"
+    },
+    {
+      "id": "f266c3a9-024b-46e9-b8ea-19822a4d3651",
+      "name": "Hệ thống vận tải thông minh"
+    },
+    {
+      "id": "a20cf6f6-86aa-40ee-b90e-22f1f9836b01",
+      "name": "Chính sách và chiến lược vận tải"
+    },
+    {
+      "id": "2e5b4ccd-b0dd-4f57-b103-c6ad49a1f68d",
+      "name": "Thực tập chuyên ngành"
+    },
+    {
+      "id": "baf210b9-4818-4b0d-8b2e-0430c4ae2415",
+      "name": "Đề án tốt nghiệp"
+    }
+  ],
+  "finalCatalogCount": 29,
+  "sharing": {
+    "groups": [
+      {
+        "name": "Triết học",
+        "credits": 3,
+        "otherMajors": [
+          "Kỹ thuật xây dựng công trình thủy",
+          "Quản lý cảng và an toàn hàng hải",
+          "Cơ khí thông minh và Robot",
+          "Quản lý môi trường",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Kỹ thuật môi trường",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý hàng hải",
+          "Công nghệ thông tin",
+          "Quản trị kinh doanh",
+          "Quản lý kinh tế",
+          "Quản lý tài chính",
+          "Quản lý kỹ thuật",
+          "Quản lý năng lượng",
+          "Quản lý sản xuất công nghiệp",
+          "Kỹ thuật tàu thủy"
+        ]
+      },
+      {
+        "name": "Tiếng anh",
+        "credits": 3,
+        "otherMajors": [
+          "Kỹ thuật xây dựng công trình thủy",
+          "Quản lý cảng và an toàn hàng hải",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý hàng hải",
+          "Quản lý sản xuất công nghiệp",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Quản trị kinh doanh",
+          "Quản lý kinh tế",
+          "Quản lý tài chính",
+          "Kỹ thuật môi trường",
+          "Quản lý năng lượng",
+          "Cơ khí thông minh và Robot",
+          "Công nghệ thông tin",
+          "Quản lý môi trường",
+          "Quản lý kỹ thuật",
+          "Kỹ thuật tàu thủy"
+        ]
+      },
+      {
+        "name": "Phương pháp nghiên cứu khoa học",
+        "credits": 2,
+        "otherMajors": [
+          "Cơ khí thông minh và Robot",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật môi trường",
+          "Kỹ thuật tàu thủy",
+          "Kỹ thuật xây dựng công trình thủy",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Quản lý cảng và an toàn hàng hải",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý hàng hải",
+          "Quản lý kinh tế",
+          "Quản lý kỹ thuật",
+          "Quản lý môi trường",
+          "Quản lý năng lượng",
+          "Quản lý sản xuất công nghiệp",
+          "Quản lý tài chính",
+          "Công nghệ thông tin"
+        ]
+      },
+      {
+        "name": "Thống kê kinh tế",
+        "credits": 2,
+        "otherMajors": [
+          "Quản trị kinh doanh",
+          "Quản lý kinh tế"
+        ]
+      },
+      {
+        "name": "Kế toán quản trị",
+        "credits": 2,
+        "otherMajors": [
+          "Quản trị kinh doanh"
+        ]
+      },
+      {
+        "name": "Quản lý năng lượng",
+        "credits": 2,
+        "otherMajors": [
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Quản lý kỹ thuật",
+          "Quản lý năng lượng"
+        ]
+      }
+    ],
+    "updates": [
+      {
+        "id": "00d15045-48ee-4a0e-9fc8-82933bdf9866",
+        "name": "Thống kê kinh tế",
+        "major": "Quản trị kinh doanh",
+        "previousAllowCrossMajor": true,
+        "previousSharedMajorIds": [
+          "9d9eabcd-ce85-4adf-b6ac-2d07215a847f"
+        ],
+        "sharedMajorIds": [
+          "9d9eabcd-ce85-4adf-b6ac-2d07215a847f",
+          "45eaaf88-fcf6-4b8c-8f4e-c2a2268bb49d"
+        ]
+      },
+      {
+        "id": "8e5a42f5-0d67-4efa-bd84-da870f08060d",
+        "name": "Thống kê kinh tế",
+        "major": "Quản lý vận tải và Logistics",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "8f9a6672-6081-4648-9a33-99cf681a1c9d",
+          "9d9eabcd-ce85-4adf-b6ac-2d07215a847f"
+        ]
+      },
+      {
+        "id": "9e422541-d66f-4602-bcbb-c93e44973c00",
+        "name": "Thống kê kinh tế",
+        "major": "Quản lý kinh tế",
+        "previousAllowCrossMajor": true,
+        "previousSharedMajorIds": [
+          "8f9a6672-6081-4648-9a33-99cf681a1c9d"
+        ],
+        "sharedMajorIds": [
+          "8f9a6672-6081-4648-9a33-99cf681a1c9d",
+          "45eaaf88-fcf6-4b8c-8f4e-c2a2268bb49d"
+        ]
+      },
+      {
+        "id": "f23ad04b-dfe7-49c8-a6ab-d792385369d1",
+        "name": "Kế toán quản trị",
+        "major": "Quản trị kinh doanh",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "45eaaf88-fcf6-4b8c-8f4e-c2a2268bb49d"
+        ]
+      },
+      {
+        "id": "09da0fe0-a2d7-4ff2-8fe2-4f83d959c8cc",
+        "name": "Kế toán quản trị",
+        "major": "Quản lý vận tải và Logistics",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "8f9a6672-6081-4648-9a33-99cf681a1c9d"
+        ]
+      },
+      {
+        "id": "d9fa782c-3b58-4cd4-aa58-22764c219d9e",
+        "name": "Quản lý năng lượng",
+        "major": "Kỹ thuật điều khiển và tự động hóa",
+        "previousAllowCrossMajor": true,
+        "previousSharedMajorIds": [
+          "6e75a117-9abb-4c09-9996-1bc7ced5392d",
+          "5acd688a-db01-41de-8c8c-401faae81e32"
+        ],
+        "sharedMajorIds": [
+          "6e75a117-9abb-4c09-9996-1bc7ced5392d",
+          "5acd688a-db01-41de-8c8c-401faae81e32",
+          "45eaaf88-fcf6-4b8c-8f4e-c2a2268bb49d"
+        ]
+      },
+      {
+        "id": "868cd8f5-9c66-4e4f-9641-74cbb721dc1d",
+        "name": "Quản lý năng lượng",
+        "major": "Quản lý kỹ thuật",
+        "previousAllowCrossMajor": true,
+        "previousSharedMajorIds": [
+          "bfb3eb56-59d3-4e10-9d47-ff07d2113065",
+          "5acd688a-db01-41de-8c8c-401faae81e32"
+        ],
+        "sharedMajorIds": [
+          "bfb3eb56-59d3-4e10-9d47-ff07d2113065",
+          "5acd688a-db01-41de-8c8c-401faae81e32",
+          "45eaaf88-fcf6-4b8c-8f4e-c2a2268bb49d"
+        ]
+      },
+      {
+        "id": "fa5a3a96-5692-4092-bc65-cc234c6cc4db",
+        "name": "Quản lý năng lượng",
+        "major": "Quản lý năng lượng",
+        "previousAllowCrossMajor": true,
+        "previousSharedMajorIds": [
+          "bfb3eb56-59d3-4e10-9d47-ff07d2113065",
+          "6e75a117-9abb-4c09-9996-1bc7ced5392d"
+        ],
+        "sharedMajorIds": [
+          "bfb3eb56-59d3-4e10-9d47-ff07d2113065",
+          "6e75a117-9abb-4c09-9996-1bc7ced5392d",
+          "45eaaf88-fcf6-4b8c-8f4e-c2a2268bb49d"
+        ]
+      },
+      {
+        "id": "21622a24-042e-4808-afe7-8a33fe75dd3e",
+        "name": "Quản lý năng lượng",
+        "major": "Quản lý vận tải và Logistics",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "bfb3eb56-59d3-4e10-9d47-ff07d2113065",
+          "6e75a117-9abb-4c09-9996-1bc7ced5392d",
+          "5acd688a-db01-41de-8c8c-401faae81e32"
+        ]
+      }
+    ],
+    "differentCredits": [],
+    "excludedCourses": [
+      "Thực tập chuyên ngành",
+      "Đề án tốt nghiệp"
+    ]
+  }
+}

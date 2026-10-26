@@ -1,0 +1,291 @@
+{
+  "source": "16. Chương trình khung CTĐT THS KTMT.docx",
+  "sourceTable": "7.2",
+  "majorCode": "KTMT",
+  "program": "masters",
+  "sourceRows": 28,
+  "duplicatesRemoved": [],
+  "sourceCodeConflicts": [],
+  "subjects": [
+    {
+      "sourceOrder": 1,
+      "codeText": "HPTH",
+      "codeNumber": 501,
+      "name": "Triết học",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 2,
+      "codeText": "HPTA",
+      "codeNumber": 502,
+      "name": "Tiếng Anh",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 3,
+      "codeText": "KMPN",
+      "codeNumber": 503,
+      "name": "Phương pháp nghiên cứu khoa học",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 4,
+      "codeText": "KMHM",
+      "codeNumber": 504,
+      "name": "Hóa học môi trường",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 5,
+      "codeText": "KMVH",
+      "codeNumber": 505,
+      "name": "Vi hoá sinh ứng dụng trong kỹ thuật Môi trường",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 6,
+      "codeText": "KMTN",
+      "codeNumber": 507,
+      "name": "Quản lý tài nguyên và môi trường",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 7,
+      "codeText": "QLĐM",
+      "codeNumber": 531,
+      "name": "Đánh giá tác động môi trường",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 8,
+      "codeText": "QLLC",
+      "codeNumber": 527,
+      "name": "Luật và chính sách môi trường",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 9,
+      "codeText": "KMSĐ",
+      "codeNumber": 523,
+      "name": "Suy thoái và bảo vệ môi trường đất",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 10,
+      "codeText": "QLMT",
+      "codeNumber": 526,
+      "name": "Quản lý môi trường",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 11,
+      "codeText": "KMNS",
+      "codeNumber": 516,
+      "name": "Các nguyên lý sản xuất sạch hơn",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 12,
+      "codeText": "KMĐM",
+      "codeNumber": 508,
+      "name": "Độc học môi trường",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 13,
+      "codeText": "KMQC",
+      "codeNumber": 506,
+      "name": "Các quá trình cơ bản trong KTMT",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 14,
+      "codeText": "KMQP",
+      "codeNumber": 510,
+      "name": "Kỹ thuật quan trắc và phân tích môi trường",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 15,
+      "codeText": "KMRN",
+      "codeNumber": 512,
+      "name": "Quản lý chất thải rắn và chất thải nguy hại",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 16,
+      "codeText": "KMNT",
+      "codeNumber": 511,
+      "name": "Kỹ thuật xử lý nước thải",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 17,
+      "codeText": "KMKO",
+      "codeNumber": 513,
+      "name": "Kỹ thuật kiểm soát ô nhiễm không khí, tiếng ồn và rung động",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 18,
+      "codeText": "KMKB",
+      "codeNumber": 515,
+      "name": "Kỹ thuật xử lý ô nhiễm môi trường biển",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 19,
+      "codeText": "KMXN",
+      "codeNumber": 519,
+      "name": "Xử lý nitơ và photpho trong nước thải",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 20,
+      "codeText": "KMQH",
+      "codeNumber": 517,
+      "name": "Ứng dụng công nghệ tiên tiến trong xử lý chất thải",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 21,
+      "codeText": "KMCT",
+      "codeNumber": 522,
+      "name": "Hệ thống cấp, thoát nước",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 22,
+      "codeText": "KMNL",
+      "codeNumber": 518,
+      "name": "Sử dụng năng lượng tiết kiệm và hiệu quả",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 23,
+      "codeText": "KMGM",
+      "codeNumber": 509,
+      "name": "Ứng dụng GIS trong kỹ thuật môi trường",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 24,
+      "codeText": "KMTC",
+      "codeNumber": 514,
+      "name": "Tái chế chất thải",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 25,
+      "codeText": "KMQL",
+      "codeNumber": 521,
+      "name": "Quản lý chất lượng môi trường",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 26,
+      "codeText": "KMBN",
+      "codeNumber": 520,
+      "name": "Biến đổi khí hậu và nước biển dâng",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 27,
+      "codeText": "KMTT",
+      "codeNumber": 526,
+      "name": "Thực tập chuyên ngành",
+      "credits": 7,
+      "subjectType": "TT",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 28,
+      "codeText": "KMĐA",
+      "codeNumber": 527,
+      "name": "Đề án tốt nghiệp",
+      "credits": 9,
+      "subjectType": "TN",
+      "isRequired": true,
+      "majorAssignment": true
+    }
+  ]
+}

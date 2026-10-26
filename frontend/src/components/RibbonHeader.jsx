@@ -81,8 +81,8 @@ export const ribbons = {
     ]),
     group("DANH MỤC CHUNG", [
       action("Dân tộc", "/system/ethnicities", GroupsOutlined, "#c0792a", { permissions: ["catalog.view"] }),
-      action("Quốc tịch", "/system/nationalities", FlagOutlined, "#3f8cc3", { permissions: ["catalog.view"] }),
       action("Phường xã", "/system/wards", LocationCityOutlined, "#168b7c", { permissions: ["catalog.view"] }),
+      action("Quốc tịch", "/system/nationalities", FlagOutlined, "#3f8cc3", { permissions: ["catalog.view"] }),
       action("Thành phố", "/system/cities", LocationCityOutlined, "#a04f86", { permissions: ["catalog.view"] }),
     ]),
     group("DANH MỤC ĐÀO TẠO", [

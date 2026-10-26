@@ -18,7 +18,7 @@ it("fills the screen with a small catalog and remembers independently resized co
     : [{ id: "unit-ck", code: "CK", name: "Viện Cơ khí", active: true }] }));
   try {
     const view = render(<Units />);
-    await screen.findByRole("button", { name: "Sửa mã đơn vị CK" });
+    await screen.findByText("CK");
     const widths = () => screen.getAllByRole("slider").map(handle => Number(handle.getAttribute("aria-valuenow")));
     expect(widths()).toHaveLength(5);
     expect(widths().reduce((sum, width) => sum + width, 0)).toBeCloseTo(1000);
@@ -30,7 +30,7 @@ it("fills the screen with a small catalog and remembers independently resized co
     expect(widths().reduce((sum, width) => sum + width, 0)).toBeCloseTo(1000);
     view.unmount();
     render(<Units />);
-    await screen.findByRole("button", { name: "Sửa mã đơn vị CK" });
+    await screen.findByText("CK");
     expect(screen.getByRole("slider", { name: "Độ rộng cột Tên đơn vị" })).toHaveAttribute("aria-valuenow", String(initial + 10));
   } finally { size.mockRestore(); localStorage.clear(); }
 });
@@ -43,10 +43,10 @@ it("manages faculty names separately from disciplines and reflects a renamed uni
   axios.put.mockImplementation(async (url, body) => { Object.assign(unit, body); return { data: unit }; });
   const view = render(<Units />);
   expect(await screen.findByText("Viện Cơ khí")).toBeInTheDocument();
-  fireEvent.doubleClick(await screen.findByRole("button", { name: "Sửa" }));
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  fireEvent.doubleClick(screen.getByText("Viện Cơ khí"));
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("Tên đơn vị"), { target: { value: "Viện Cơ khí mới" } });
-  fireEvent.keyDown(screen.getByLabelText("Tên đơn vị"), { key: "Enter" });
+  fireEvent.click(screen.getByRole("button", { name: "Lưu" }));
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.stringContaining("/system/units/unit-ck"),
     expect.objectContaining({ name: "Viện Cơ khí mới" }), { withCredentials: true }));
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
@@ -76,31 +76,33 @@ it("uses the catalog name in both the lecturer table and picker even when other 
   expect(await screen.findByRole("option", { name: unit.name })).toBeInTheDocument();
 });
 
-it("cancels inline edits and preserves a rejected value so it can be corrected and saved", async () => {
+it("opens a popup on double click and preserves a rejected value for correction", async () => {
   const unit = { id: "unit-ck", code: "CK", name: "Viện Cơ khí", active: true };
   axios.get.mockImplementation(async (url) => ({ data: url.endsWith("/auth/isStaff") ? { message: "admin" } : [unit] }));
   axios.put.mockReset();
   axios.put.mockRejectedValueOnce({ response: { data: { message: "Mã đã tồn tại" } } })
-    .mockResolvedValueOnce({ data: { code: "CK2" } });
+    .mockImplementationOnce(async (_, body) => { Object.assign(unit, body); return { data: unit }; });
   render(<Units />);
-  const nameCell = await screen.findByRole("button", { name: "Sửa tên đơn vị CK" });
+  const nameCell = await screen.findByText("Viện Cơ khí");
   fireEvent.click(nameCell);
   expect(screen.queryByLabelText("Tên đơn vị")).not.toBeInTheDocument();
   fireEvent.doubleClick(nameCell);
   fireEvent.change(screen.getByLabelText("Tên đơn vị"), { target: { value: "Hủy tên này" } });
-  fireEvent.keyDown(screen.getByLabelText("Tên đơn vị"), { key: "Escape" });
+  fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   expect(screen.getByText("Viện Cơ khí")).toBeInTheDocument();
   expect(axios.put).not.toHaveBeenCalled();
-  fireEvent.doubleClick(screen.getByRole("button", { name: "Sửa mã đơn vị CK" }));
+  fireEvent.click(screen.getByRole("button", { name: "Sửa" }));
   fireEvent.change(screen.getByLabelText("Mã đơn vị"), { target: { value: "DUP" } });
-  fireEvent.blur(screen.getByLabelText("Mã đơn vị"));
+  fireEvent.click(screen.getByRole("button", { name: "Lưu" }));
   expect(await screen.findByText("Mã đã tồn tại")).toBeInTheDocument();
   expect(screen.getByLabelText("Mã đơn vị")).toHaveValue("DUP");
   fireEvent.change(screen.getByLabelText("Mã đơn vị"), { target: { value: "CK2" } });
-  fireEvent.keyDown(screen.getByLabelText("Mã đơn vị"), { key: "Enter" });
-  expect(await screen.findByText("CK2")).toBeInTheDocument();
-  expect(axios.put).toHaveBeenLastCalledWith(expect.stringContaining("/system/units/unit-ck"), { code: "CK2" }, { withCredentials: true });
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Lưu" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole("cell", { name: "CK2" })).toBeInTheDocument());
+  expect(axios.put).toHaveBeenLastCalledWith(expect.stringContaining("/system/units/unit-ck"), { code: "CK2", name: unit.name, active: true }, { withCredentials: true });
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 });
 
 it("does not show a legacy faculty name as a unit when no catalog unit is selected", async () => {

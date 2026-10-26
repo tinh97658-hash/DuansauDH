@@ -1,0 +1,334 @@
+{
+  "source": "9. Chương trình khung CTĐT ThS QLSXCN 2025.2.doc",
+  "sourceTable": "7.2",
+  "majorCode": "QLSX",
+  "program": "masters",
+  "sourceRows": 32,
+  "duplicatesRemoved": [
+    "Bảo dưỡng hệ thống sản xuất công nghiệp",
+    "Kinh tế kĩ thuật",
+    "Quản lý dự án công nghiệp",
+    "Kỹ thuật quản lý Six Sigma"
+  ],
+  "sourceCodeConflicts": [
+    {
+      "name": "Phương pháp nghiên cứu khoa học",
+      "sourceCodeText": "PPNC",
+      "retainedExistingCodeText": "CKKH",
+      "codeNumber": 506,
+      "reason": "Preserve existing course code; CKKH is also used in the semester plan. Other new courses follow Table 7.2."
+    }
+  ],
+  "enableSharedLearning": true,
+  "subjects": [
+    {
+      "sourceOrder": 1,
+      "codeText": "HPTH",
+      "codeNumber": 501,
+      "name": "Triết học",
+      "sourceName": "Triết học",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 2,
+      "codeText": "HPTA",
+      "codeNumber": 502,
+      "name": "Tiếng Anh",
+      "sourceName": "Tiếng Anh",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 3,
+      "codeText": "QLHT",
+      "codeNumber": 503,
+      "name": "Quản lý hệ thống kỹ thuật",
+      "sourceName": "Quản lý hệ thống kỹ thuật (Engineering Management)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 4,
+      "codeText": "TBSX",
+      "codeNumber": 504,
+      "name": "Thiết bị sản xuất công nghiệp",
+      "sourceName": "Thiết bị sản xuất công nghiệp (Industrial Manufacturing Equipment)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 5,
+      "codeText": "TKPT",
+      "codeNumber": 505,
+      "name": "Thiết kế và phát triển sản phẩm",
+      "sourceName": "Thiết kế và phát triển sản phẩm (Product Design & Development)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 6,
+      "codeText": "CKKH",
+      "codeNumber": 506,
+      "name": "Phương pháp nghiên cứu khoa học",
+      "sourceName": "Phương pháp nghiên cứu khoa học (Scientific Research Method)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true,
+      "sourceCodeText": "PPNC"
+    },
+    {
+      "sourceOrder": 7,
+      "codeText": "KTGC",
+      "codeNumber": 507,
+      "name": "Kỹ thuật gia công tiên tiến",
+      "sourceName": "Kỹ thuật gia công tiên tiến (Advanced Manufacturing Processes)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 8,
+      "codeText": "BDHT",
+      "codeNumber": 508,
+      "name": "Bảo dưỡng hệ thống sản xuất công nghiệp",
+      "sourceName": "Bảo dưỡng hệ thống sản xuất công nghiệp (Maintenance of Manufacturing Systems)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 9,
+      "codeText": "KTKT",
+      "codeNumber": 509,
+      "name": "Kinh tế kĩ thuật",
+      "sourceName": "Kinh tế kĩ thuật (Engineering Economy)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 10,
+      "codeText": "HTTG",
+      "codeNumber": 510,
+      "name": "Hệ thống sản xuất tinh gọn",
+      "sourceName": "Hệ thống sản xuất tinh gọn (Lean Manufacturing Systems)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 11,
+      "codeText": "HĐĐĐ",
+      "codeNumber": 511,
+      "name": "Hoạch định và điều độ sản xuất",
+      "sourceName": "Hoạch định và điều độ sản xuất (Production Planning and Scheduling)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 14,
+      "codeText": "UDMT",
+      "codeNumber": 512,
+      "name": "Ứng dụng máy tính trong sản xuất",
+      "sourceName": "Ứng dụng máy tính trong sản xuất (Computer-Aided Manufacturing)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 15,
+      "codeText": "VLNC",
+      "codeNumber": 513,
+      "name": "Vật liệu nâng cao",
+      "sourceName": "Vật liệu nâng cao (Advanced Materials)",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 16,
+      "codeText": "TMCN",
+      "codeNumber": 514,
+      "name": "Thiết kế máy và công nghệ chế tạo",
+      "sourceName": "Thiết kế máy và công nghệ chế tạo (Machine Design and Manufacturing Technologies)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 17,
+      "codeText": "QLĐG",
+      "codeNumber": 515,
+      "name": "Quản lý và đánh giá chất lượng",
+      "sourceName": "Quản lý và đánh giá chất lượng (Total Quality management and assessment)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 18,
+      "codeText": "HTLH",
+      "codeNumber": 516,
+      "name": "Hệ thống sản xuất linh hoạt và tích hợp",
+      "sourceName": "Hệ thống sản xuất linh hoạt và tích hợp (Flexible Manufacturing Systems and Computer Integrated Manufacturing)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 19,
+      "codeText": "TCTB",
+      "codeNumber": 517,
+      "name": "Thiết kế, cấu trúc nhà máy và thiết bị công nghiệp",
+      "sourceName": "Thiết kế, cấu trúc nhà máy và thiết bị công nghiệp (Design, Construction on Industrial Plants and Related Facilities)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 20,
+      "codeText": "LTNM",
+      "codeNumber": 518,
+      "name": "Logistic trong nhà máy công nghiệp",
+      "sourceName": "Logistic trong nhà máy công nghiệp (Manufacturing logistics)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 21,
+      "codeText": "QLDA",
+      "codeNumber": 519,
+      "name": "Quản lý dự án công nghiệp",
+      "sourceName": "Quản lý dự án công nghiệp (Industrial Project Management )",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 22,
+      "codeText": "KTQL",
+      "codeNumber": 520,
+      "name": "Kỹ thuật quản lý Six Sigma",
+      "sourceName": "Kỹ thuật quản lý Six Sigma (Six Sigma Quality Engineering)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 23,
+      "codeText": "TĐĐK",
+      "codeNumber": 524,
+      "name": "Tự động và điều khiển các quá trình công nghiệp (nâng cao)",
+      "sourceName": "Tự động và điều khiển các quá trình công nghiệp (nâng cao) (Advanced Automation and Control of Industrial Processes)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 24,
+      "codeText": "HTTT",
+      "codeNumber": 522,
+      "name": "Hệ thống thông tin tích hợp",
+      "sourceName": "Hệ thống thông tin tích hợp (Integrated Industrial Information Systems)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 25,
+      "codeText": "KTVC",
+      "codeNumber": 523,
+      "name": "Kỹ thuật vận chuyển và xếp dỡ vật liệu",
+      "sourceName": "Kỹ thuật vận chuyển và xếp dỡ vật liệu (Transportation and Materials Handling Engineering)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 28,
+      "codeText": "SXTM",
+      "codeNumber": 521,
+      "name": "Sản xuất thông minh",
+      "sourceName": "Sản xuất thông minh (Intelligent Manufacturing)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 29,
+      "codeText": "PMHH",
+      "codeNumber": 525,
+      "name": "Phân tích và mô hình hoá các quy trình sản xuất",
+      "sourceName": "Phân tích và mô hình hoá các quy trình sản xuất (Manufacturing Systems Modeling and Analysis)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 30,
+      "codeText": "HTSX",
+      "codeNumber": 526,
+      "name": "Hệ thống và quy trinh sản xuất xanh",
+      "sourceName": "Hệ thống và quy trinh sản xuất xanh (Green Manufacturing Systems and Processes)",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 31,
+      "codeText": "TTTN",
+      "codeNumber": 527,
+      "name": "Thực tập chuyên ngành",
+      "sourceName": "Thực tập chuyên ngành",
+      "credits": 7,
+      "subjectType": "TT",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 32,
+      "codeText": "ĐATN",
+      "codeNumber": 528,
+      "name": "Đề án tốt nghiệp",
+      "sourceName": "Đề án tốt nghiệp",
+      "credits": 9,
+      "subjectType": "TN",
+      "isRequired": true,
+      "majorAssignment": true
+    }
+  ]
+}

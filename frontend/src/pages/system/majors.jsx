@@ -49,7 +49,7 @@ const Majors = () => (
       },
       { key: "isAdmissionScreening", label: "Xét tuyển đầu vào", type: "checkbox", align: "center", defaultValue: false },
       { key: "durationYears", label: "Thời gian đào tạo (năm)", type: "number", min: 0.5, step: 0.5, defaultValue: 2 },
-      { key: "maxOvertimeYears", label: "Thời gian vượt khung (năm)", type: "number", min: 0, step: 0.5, defaultValue: 2 },
+      { key: "maxOvertimeYears", label: "Thời gian vượt khung (năm)", type: "number", min: 0, step: 0.5, defaultValue: 4 },
     ]}
   />
 );

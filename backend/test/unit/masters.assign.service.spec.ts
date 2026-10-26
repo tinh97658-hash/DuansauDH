@@ -72,7 +72,7 @@ describe("MastersService.assignMembers", () => {
     classGroupMembers.bulkCreate.mockResolvedValue([{}]);
     await expect(service.assignMembers("g1", { admissionRecordIds: ["a1"] })).resolves.toMatchObject({ count: 1 });
     expect(classGroupMembers.bulkCreate).toHaveBeenCalled();
-    expect(admissionRecords.update).toHaveBeenCalledWith({ studyStatus: "Đang học" },
+    expect(admissionRecords.update).toHaveBeenCalledWith({ studyStatus: expect.objectContaining({ val: expect.stringContaining("tuitionPayment") }) },
       expect.objectContaining({ where: { id: { [Op.in]: ["a1"] } } }));
   });
   it("assigns eligible students to an open group inside a transaction", async () => {

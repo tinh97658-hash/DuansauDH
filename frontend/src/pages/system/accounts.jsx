@@ -3,7 +3,7 @@ import "./accounts.css";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress, FormControl, FormControlLabel,
   IconButton, MenuItem, Paper, Select, Stack, TableBody, TableCell, TableContainer,
-  TablePagination, TableRow, TextField, Tooltip, Typography,
+  TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import AddRounded from "@mui/icons-material/AddRounded";
 import ContentCopyRounded from "@mui/icons-material/ContentCopyRounded";
@@ -18,6 +18,7 @@ import AppDialog from "../../components/AppDialog";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
+import ListPagination from "../../components/ListPagination";
 import ResizableTable from "../../components/ResizableTable";
 import { personNameParts } from "../../utils/personName";
 import { usePermissions } from "../../features/accounts/usePermissions";
@@ -284,15 +285,7 @@ const Accounts = () => {
           </TableBody>
         </ResizableTable>
       </TableContainer>
-      {filtered.length > pageSize && (
-        <TablePagination
-          component="div" count={filtered.length} page={currentPage} rowsPerPage={pageSize} rowsPerPageOptions={[pageSize]}
-          onPageChange={(_, next) => setPage(next)}
-          getItemAriaLabel={(type) => (type === "next" ? "Trang sau" : "Trang trước")}
-          labelDisplayedRows={({ from, to, count }) => `${from}–${to} / ${count}`}
-          sx={{ bgcolor: "#fff", border: "1px solid #D7E4EE", borderTop: 0 }}
-        />
-      )}
+      <ListPagination count={filtered.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} />
 
       <AppDialog
         open={editorOpen}

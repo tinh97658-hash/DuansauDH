@@ -1,5 +1,6 @@
 import {getRoomFloor} from '../../utils/schedulingCalendar';
 import {normalize} from '../scheduling/shared';
+import {collectExamArrangements} from './examArrangement';
 
 export const examLabels={scheduled:'Đã xếp lịch',held:'Đã diễn ra',not_held:'Không diễn ra',cancelled:'Đã hủy'};
 export const examStatus=session=>session.pendingConfirmation?'Chờ xác nhận':examLabels[session.status];
@@ -16,7 +17,11 @@ export function matchesExam(offering,{discipline='',major='',year='',subject='',
   (!(discipline||major||year)||(offering.groups||[]).some(g=>(!discipline||g.disciplineId===discipline)&&(!major||g.majorId===major)&&(!year||g.academicYear===year)));
 }
 export function overlappingExams(sessions,form,exclude){
- return sessions.filter(s=>s.id!==exclude&&['scheduled','held'].includes(s.status)&&s.examDate===form.examDate&&s.startTime.slice(0,5)<form.endTime&&s.endTime.slice(0,5)>form.startTime);
+ const available=sessions.filter(s=>s.id!==exclude&&['scheduled','held'].includes(s.status)&&s.examDate===form.examDate);
+ const overlaps=s=>s.startTime.slice(0,5)<form.endTime&&s.endTime.slice(0,5)>form.startTime;
+ const actual=available.filter(overlaps);
+ const reservations=collectExamArrangements(available).filter(s=>s.isArrangement&&overlaps(s)).map(s=>({...s,candidateIds:[],candidateKeys:[]}));
+ return [...actual,...reservations];
 }
 export function examRoomReason(room,count,conflicts){
  if(room.isActive===false)return 'NGỪNG SỬ DỤNG';

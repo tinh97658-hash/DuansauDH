@@ -12,7 +12,7 @@ import {
   Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, FormControlLabel,
   IconButton, MenuItem, Paper, Radio, RadioGroup, Select,
-  Pagination, Stack, TableBody, TableCell, TableContainer, TableRow,
+  Stack, TableBody, TableCell, TableContainer, TableRow,
   TextField, Tooltip, Typography,
 } from "@mui/material";
 import AddPhotoAlternateRounded from "@mui/icons-material/AddPhotoAlternateRounded";
@@ -26,13 +26,14 @@ import VisibilityRounded from "@mui/icons-material/VisibilityRounded";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
 import { preloadPage } from "../../utils/lazyPage";
+import ListPagination from "../../components/ListPagination";
 import ResizableTable from "../../components/ResizableTable";
 import AdmissionTuitionCheckbox from "../../features/admission/AdmissionTuitionCheckbox";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { getSelectableMajors, normalizeMajorsResponse, selectMajorForLevel } from "../../utils/majors";
-import { personNameParts } from "../../utils/personName";
+import { personNameParts, nameInputError, normalizeNameInput } from "../../utils/personName";
 import { notifyGradebookSaved } from "../../utils/gradebookRevision";
 import {
   disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline,
@@ -233,10 +234,16 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
   const [selectedTuition, setSelectedTuition] = useState([]);
   const { can } = usePermissions();
   const isAdmin = can("admission.manage");
+  const canConfirmTuitionBatch = mode === "admitted-masters" && isAdmin;
 
   // Dialog State
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formData, setFormData] = useState(createEmptyForm(String(currentYear)));
+  const [fieldTouched, setFieldTouched] = useState({});
+  const lastNameError = nameInputError(formData.lastName, "Họ đệm");
+  const firstNameError = nameInputError(formData.firstName, "Tên");
+  const phoneError = /^[0-9]{10}$/.test(formData.phone || "") ? "" : "Số điện thoại bắt buộc gồm đúng 10 chữ số";
+  const idCardError = /^[0-9]{13}$/.test(formData.idCard || "") ? "" : "CCCD bắt buộc gồm đúng 13 chữ số";
   const [formDisciplineId, setFormDisciplineId] = useState("");
   const [deletingRecord, setDeletingRecord] = useState(null);
 
@@ -291,7 +298,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
   };
 
   const columns = [
-    ...(isMastersList && isAdmin ? [{
+    ...(canConfirmTuitionBatch ? [{
       key: "selectTuition", label: "Chọn học viên", width: 64, minWidth: 64, align: "center",
       header: <Checkbox size="small" inputProps={{ "aria-label": "Chọn tất cả học viên chưa nộp học phí trên trang này" }}
         disabled={saving || loading || !selectableTuitionRows.length}
@@ -402,6 +409,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
 
   // Open Add Dialog
   const handleOpenAdd = () => {
+    setFieldTouched({});
     const nextForm = createEmptyForm(year);
     const defaultMajor = selectMajorForLevel(majors, nextForm.trainingLevel);
     if (defaultMajor) {
@@ -416,6 +424,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
 
   // Open Edit Dialog
   const handleOpenEdit = (rec) => {
+    setFieldTouched({});
     const docs = rec.documents || {};
     const trainingLevel = rec.trainingLevel || "Thạc sĩ";
     const selectedMajor = selectMajorForLevel(majors, trainingLevel, rec.majorId);
@@ -492,14 +501,14 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
 
   // Save Form
   const handleSaveForm = async () => {
-    if (!formData.lastName?.trim() && !formData.firstName?.trim() && !formData.fullName?.trim()) {
-      toast.error("Vui lòng nhập Họ tên học viên");
+    setFieldTouched({ lastName: true, firstName: true, phone: true, idCard: true });
+    if (lastNameError || firstNameError || phoneError || idCardError) {
       return;
     }
 
-    const calculatedFullName = formData.lastName && formData.firstName
-      ? `${formData.lastName.trim()} ${formData.firstName.trim()}`
-      : (formData.fullName?.trim() || "Chưa có tên");
+    const lastName = normalizeNameInput(formData.lastName);
+    const firstName = normalizeNameInput(formData.firstName);
+    const calculatedFullName = `${lastName} ${firstName}`;
 
     const selectedMajor = selectableMajors.find((m) => m.id === formData.majorId);
     if (!selectedMajor) {
@@ -510,6 +519,8 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
 
     const payload = {
       ...formData,
+      lastName,
+      firstName,
       fullName: calculatedFullName,
       majorName,
       supplementSubjectsCount: Number(formData.supplementSubjectsCount || 0),
@@ -677,7 +688,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
       </Paper>
 
       {/* 3. MAIN TABLE GRID */}
-      {isMastersList && isAdmin && <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5 }}>
+      {canConfirmTuitionBatch && <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5 }}>
         <Stack direction="row" gap={1.5} alignItems="center" flexWrap="wrap">
           <Typography variant="body2">Đã chọn {selectedTuition.length} học viên</Typography>
           <Button variant="contained" disabled={saving || loading || !selectedTuition.length || selectedTuition.length > 500} onClick={confirmSelectedTuition}>Xác nhận đã nộp học phí ({selectedTuition.length})</Button>
@@ -736,7 +747,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                       },
                     }}
                   >
-                    {isMastersList && isAdmin && <TableCell align="center">
+                    {canConfirmTuitionBatch && <TableCell align="center">
                       <Checkbox size="small" checked={selectedTuitionIds.has(r.id)}
                         disabled={saving || loading || !selectableTuitionRows.some((row) => row.id === r.id)}
                         inputProps={{ "aria-label": `Chọn xác nhận học phí ${r.code || r.fullName}` }}
@@ -897,31 +908,8 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
             </TableBody>
           </ResizableTable>
         </TableContainer>
-        {pagination.totalPages > 1 && (
-          <Box sx={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 48, px: 0.5, pb: 0.5 }}>
-            <Typography variant="caption" sx={{ position: "absolute", left: 4, color: "#607486", fontWeight: 600 }}>
-              Hiển thị {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, pagination.total)} trên {pagination.total} hồ sơ
-            </Typography>
-            <Pagination
-              disabled={saving}
-              page={page}
-              count={pagination.totalPages}
-              onChange={(_event, nextPage) => setPage(nextPage)}
-              color="primary"
-              size="medium"
-              showFirstButton
-              showLastButton
-              sx={{
-                "& .MuiPaginationItem-root": {
-                  minWidth: 38,
-                  height: 38,
-                  fontSize: 14,
-                  fontWeight: 600,
-                },
-              }}
-            />
-          </Box>
-        )}
+        <ListPagination count={pagination.total} page={page - 1} pageSize={PAGE_SIZE}
+          onPageChange={next => setPage(next + 1)} disabled={saving} recordLabel="hồ sơ" />
         </Stack>
       )}
 
@@ -1045,6 +1033,11 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                     <TextField
                       size="small"
                       value={formData.lastName}
+                      required
+                      inputProps={{ "aria-label": "Họ đệm" }}
+                      onBlur={() => setFieldTouched((prev) => ({ ...prev, lastName: true }))}
+                      error={Boolean(fieldTouched.lastName && lastNameError)}
+                      helperText={fieldTouched.lastName && lastNameError}
                       onChange={(e) => setFormData((p) => ({ ...p, lastName: e.target.value }))}
                       fullWidth
                       sx={cellInputSx}
@@ -1057,6 +1050,11 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                     <TextField
                       size="small"
                       value={formData.firstName}
+                      required
+                      inputProps={{ "aria-label": "Tên" }}
+                      onBlur={() => setFieldTouched((prev) => ({ ...prev, firstName: true }))}
+                      error={Boolean(fieldTouched.firstName && firstNameError)}
+                      helperText={fieldTouched.firstName && firstNameError}
                       onChange={(e) => setFormData((p) => ({ ...p, firstName: e.target.value }))}
                       fullWidth
                       sx={cellInputSx}
@@ -1081,10 +1079,15 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                     <TextField
                       size="small"
                       value={formData.idCard}
-                      onChange={(e) => setFormData((p) => ({ ...p, idCard: e.target.value }))}
+                      onChange={(e) => setFormData((p) => ({ ...p, idCard: e.target.value.replace(/[^0-9]/g, "").slice(0, 13) }))}
+                      required
+                      inputProps={{ inputMode: "numeric", maxLength: 13, pattern: "[0-9]{13}", "aria-label": "CCCD" }}
+                      onBlur={() => setFieldTouched((prev) => ({ ...prev, idCard: true }))}
+                      error={Boolean(fieldTouched.idCard && idCardError)}
+                      helperText={fieldTouched.idCard && idCardError}
                       fullWidth
                       sx={cellInputSx}
-                      placeholder="031090001234"
+                      placeholder="0310900012345"
                     />
                   </Box>
                 </Stack>
@@ -1106,7 +1109,12 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                   <TextField
                     size="small"
                     value={formData.phone}
-                    onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value }))}
+                    onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value.replace(/[^0-9]/g, "").slice(0, 10) }))}
+                    required
+                    inputProps={{ inputMode: "numeric", maxLength: 10, pattern: "[0-9]{10}", "aria-label": "Số điện thoại" }}
+                    onBlur={() => setFieldTouched((prev) => ({ ...prev, phone: true }))}
+                    error={Boolean(fieldTouched.phone && phoneError)}
+                    helperText={fieldTouched.phone && phoneError}
                     fullWidth
                     sx={cellInputSx}
                     placeholder="0912345678"

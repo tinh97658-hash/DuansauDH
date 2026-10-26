@@ -1,5 +1,6 @@
+import 'reflect-metadata';
 import { Type } from 'class-transformer';
-import { IsDateString, IsEmpty, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsEmpty, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class ExamScheduleQueryDto {
   @IsDateString({strict:true}) @Matches(/^[1-9]\d{3}-\d{2}-\d{2}$/) from!:string;
@@ -28,4 +29,28 @@ export class ConfirmExamDto {
   @IsInt() @Min(0) version!:number;
   @IsOptional() @IsString() @MaxLength(2000) note?:string;
   @IsIn(['held','not_held']) status!:'held'|'not_held';
+}
+
+export class ExamArrangementGroupDto {
+  @IsOptional() @IsUUID() id?:string;
+  @IsOptional() @IsInt() @Min(0) version?:number;
+  @IsUUID() courseOfferingId!:string;
+  @IsUUID() snapshotId!:string;
+  @IsInt() @Min(0) eligibilityVersion!:number;
+  @IsInt() @Min(1) roundNo!:number;
+  @Matches(/^(?:[01]\d|2[0-3]):[0-5]\d$/) startTime!:string;
+  @Matches(/^(?:[01]\d|2[0-3]):[0-5]\d$/) endTime!:string;
+  @IsEmpty() candidateIds?:never;
+}
+export class SaveExamArrangementDto {
+  @IsOptional() @IsInt() @Min(0) version?:number;
+  @IsDateString({strict:true}) @Matches(/^[1-9]\d{3}-\d{2}-\d{2}$/) examDate!:string;
+  @IsIn(['MORNING','AFTERNOON']) period!:'MORNING'|'AFTERNOON';
+  @IsUUID() roomId!:string;
+  @IsOptional() @IsUUID() lecturerId?:string;
+  @IsOptional() @IsString() @MaxLength(255) externalInvigilatorName?:string;
+  @IsOptional() @IsString() @MaxLength(255) externalUnitName?:string;
+  @IsOptional() @IsString() @MaxLength(2000) note?:string;
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(100) @ValidateNested({each:true}) @Type(()=>ExamArrangementGroupDto)
+  groups!:ExamArrangementGroupDto[];
 }

@@ -1,0 +1,47 @@
+{
+  "removed": {
+    "id": "dd73b8a0-c13f-42a7-b275-63689c77b095",
+    "code": "QLTH",
+    "name": "Quản lý thuế",
+    "major_id": "9d9eabcd-ce85-4adf-b6ac-2d07215a847f",
+    "credits": 2,
+    "sort_order": 22,
+    "active": true,
+    "created_at": "2026-10-24T13:54:42.863Z",
+    "updated_at": "2026-10-24T13:54:42.863Z",
+    "code_number": 531,
+    "code_text": "QLTH",
+    "major_assignment": true,
+    "subject_type": "CN",
+    "is_required": false,
+    "program": "masters",
+    "canonical_subject_id": null,
+    "allow_cross_major": true,
+    "shared_major_ids": [
+      "8f9a6672-6081-4648-9a33-99cf681a1c9d"
+    ]
+  },
+  "retained": {
+    "id": "aabc41a3-883d-4b32-833b-aa6822072760",
+    "code": "QLTH",
+    "name": "Quản lý thuế",
+    "major_id": "9d9eabcd-ce85-4adf-b6ac-2d07215a847f",
+    "credits": 2,
+    "sort_order": 27,
+    "active": true,
+    "created_at": "2026-10-24T13:55:54.434Z",
+    "updated_at": "2026-10-24T13:55:54.434Z",
+    "code_number": 531,
+    "code_text": "QLTH",
+    "major_assignment": true,
+    "subject_type": "CN",
+    "is_required": false,
+    "program": "masters",
+    "canonical_subject_id": null,
+    "allow_cross_major": true,
+    "shared_major_ids": [
+      "8f9a6672-6081-4648-9a33-99cf681a1c9d"
+    ]
+  },
+  "reason": "Remove one duplicate Quản lý thuế from QLKT; retain the course referenced by the curriculum and preserve shared learning."
+}

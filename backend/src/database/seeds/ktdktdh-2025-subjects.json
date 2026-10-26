@@ -1,0 +1,306 @@
+{
+  "source": "10. Chương trình khung CTĐT THS_KTĐK&TĐH 2025.2.docx",
+  "sourceTable": "7.2",
+  "majorCode": "KTDKVTDH",
+  "program": "masters",
+  "sourceRows": 32,
+  "duplicatesRemoved": [
+    "Các phần mềm chuyên dụng",
+    "Xử lý số tín hiệu",
+    "Robot công nghiệp",
+    "Điều khiển số",
+    "Điều khiển vector máy điện xoay chiều ba pha"
+  ],
+  "sourceCodeConflicts": [
+    {
+      "name": "Robot công nghiệp",
+      "retainedCodeNumber": 521,
+      "discardedRepeatedCodeNumber": 519,
+      "reason": "Retained the first Table 7.2 entry, also confirmed by the semester plan in Section VIII."
+    },
+    {
+      "name": "Điều khiển số",
+      "retainedCodeNumber": 522,
+      "discardedRepeatedCodeNumber": 520,
+      "reason": "Retained the first Table 7.2 entry, also confirmed by the semester plan in Section VIII."
+    },
+    {
+      "name": "Điều khiển vector máy điện xoay chiều ba pha",
+      "retainedCodeNumber": 523,
+      "discardedRepeatedCodeNumber": 521,
+      "reason": "Retained the first Table 7.2 entry, also confirmed by the semester plan in Section VIII."
+    }
+  ],
+  "subjects": [
+    {
+      "sourceOrder": 1,
+      "codeText": "HPTH",
+      "codeNumber": 501,
+      "name": "Triết học",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 2,
+      "codeText": "HPTA",
+      "codeNumber": 502,
+      "name": "Tiếng Anh",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 3,
+      "codeText": "TĐKH",
+      "codeNumber": 503,
+      "name": "Phương pháp nghiên cứu khoa học",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 4,
+      "codeText": "TĐĐK",
+      "codeNumber": 504,
+      "name": "Lý thuyết điều khiển nâng cao",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 5,
+      "codeText": "TĐĐL",
+      "codeNumber": 505,
+      "name": "Hệ thống thông tin đo lường",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 6,
+      "codeText": "TĐTH",
+      "codeNumber": 506,
+      "name": "Tổng hợp các hệ thống điều khiển tự động truyền động điện",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 7,
+      "codeText": "TĐQT",
+      "codeNumber": 507,
+      "name": "Điều khiển quá trình",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 8,
+      "codeText": "TĐVI",
+      "codeNumber": 508,
+      "name": "Kỹ thuật vi điều khiển và PLC",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 9,
+      "codeText": "TĐQN",
+      "codeNumber": 509,
+      "name": "Quản lý năng lượng",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 10,
+      "codeText": "TĐPM",
+      "codeNumber": 510,
+      "name": "Các phần mềm chuyên dụng",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 11,
+      "codeText": "TĐXL",
+      "codeNumber": 511,
+      "name": "Xử lý số tín hiệu",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 12,
+      "codeText": "TĐLG",
+      "codeNumber": 512,
+      "name": "Điều khiển logic nâng cao",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 13,
+      "codeText": "TĐQL",
+      "codeNumber": 513,
+      "name": "Khoa học quản lý",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 16,
+      "codeText": "TĐTĐ",
+      "codeNumber": 514,
+      "name": "Điều khiển mờ và mạng nơ ron",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 17,
+      "codeText": "TĐCS",
+      "codeNumber": 515,
+      "name": "Các bộ biến đổi công suất bán dẫn",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 18,
+      "codeText": "TĐMT",
+      "codeNumber": 516,
+      "name": "Máy tính và ghép nối",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 19,
+      "codeText": "TĐTC",
+      "codeNumber": 518,
+      "name": "Mạng truyền thông công nghiệp",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 20,
+      "codeText": "TĐHT",
+      "codeNumber": 520,
+      "name": "Điều khiển hệ thống điện",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 21,
+      "codeText": "TĐRL",
+      "codeNumber": 517,
+      "name": "Bảo vệ rơle và tự động hóa trong hệ thống điện",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 22,
+      "codeText": "TĐTK",
+      "codeNumber": 519,
+      "name": "Thiết kế hệ thống tự động hóa",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 23,
+      "codeText": "TĐRB",
+      "codeNumber": 521,
+      "name": "Robot công nghiệp",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 24,
+      "codeText": "TĐSO",
+      "codeNumber": 522,
+      "name": "Điều khiển số",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 25,
+      "codeText": "TĐXC",
+      "codeNumber": 523,
+      "name": "Điều khiển vector máy điện xoay chiều ba pha",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 26,
+      "codeText": "TĐSX",
+      "codeNumber": 524,
+      "name": "Tự động hóa quá trình sản xuất",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 27,
+      "codeText": "TĐMP",
+      "codeNumber": 525,
+      "name": "Mô hình hoá và mô phỏng hệ thống điện",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 31,
+      "codeText": "TĐTT",
+      "codeNumber": 526,
+      "name": "Thực tập tốt nghiêp",
+      "credits": 7,
+      "subjectType": "TT",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 32,
+      "codeText": "TĐĐA",
+      "codeNumber": 527,
+      "name": "Đề án tốt nghiệp",
+      "credits": 9,
+      "subjectType": "TN",
+      "isRequired": true,
+      "majorAssignment": true
+    }
+  ]
+}

@@ -36,6 +36,49 @@ const reach = async () => {
 };
 beforeEach(() => { accessFixture.permissions = ["scheduling.organize"]; jest.clearAllMocks(); sessionStorage.clear(); });
 
+it.each(['major', 'another-major'])("omits internships from suggested courses and counts for %s", async majorId => {
+  mocks();
+  const scopedMajor = { ...major, id: majorId };
+  const scopedGroup = { ...group, majorId };
+  const courses = [subject,
+    { id: 'practice-type', code: 'TT01', subjectType: 'TT', name: 'Thực hành tại cơ sở' },
+    { id: 'practice-name', code: 'TT02', subjectType: 'CN', name: 'Thực tập chuyên ngành' },
+    { id: 'practice-legacy', code: 'TT03', name: '  THỰC  TẬP TỐT NGHIỆP  ' },
+  ];
+  const originalGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation(async url => url.includes('/system/majors') ? { data: [scopedMajor] }
+    : url.includes('/masters/class-groups') ? { data: [scopedGroup] }
+      : url.includes('/course-offering-candidates') ? { data: { subjects: courses.map(course => ({ subject: course, eligibleClassGroups: [scopedGroup] })) } }
+        : originalGet(url));
+  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  fireEvent.focus(await screen.findByRole('combobox', { name: 'Chọn chuyên ngành' }));
+  fireEvent.click(await screen.findByRole('option', { name: /Khai thác hàng hải/ }));
+  await screen.findByRole('option', { name: '2026' });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Khóa / Năm học' }), { target: { value: '2026' } });
+  expect(await screen.findByText('1 học phần hiện có thể tổ chức.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /HP01.*Khai thác cảng/ })).toBeInTheDocument();
+  for (const code of ['TT01', 'TT02', 'TT03']) expect(screen.queryByRole('button', { name: new RegExp(code) })).not.toBeInTheDocument();
+  fireEvent.change(screen.getByRole('textbox', { name: 'Tìm học phần' }), { target: { value: 'Thực tập' } });
+  expect(screen.getByText('Không có học phần khớp từ khóa.')).toBeInTheDocument();
+});
+
+it("does not restore an internship selection or preview its roster from a saved draft", async () => {
+  mocks();
+  const practice = { ...subject, id: 'practice', code: 'TTTN', name: 'Thực tập chuyên ngành', subjectType: 'TT' };
+  sessionStorage.setItem('scheduling:create-offering:current', JSON.stringify({
+    majorId: major.id, year: '2026', subjectId: practice.id, groupIds: [group.id], offeringName: 'Lớp thực tập đang soạn',
+  }));
+  const originalGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation(async url => url.includes('/course-offering-candidates')
+    ? { data: { subjects: [{ subject: practice, eligibleClassGroups: [group] }, { subject, eligibleClassGroups: [group] }] } }
+    : originalGet(url));
+  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  expect(await screen.findByText('1 học phần hiện có thể tổ chức.')).toBeInTheDocument();
+  expect(screen.queryByRole('textbox', { name: 'Tên lớp học phần' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /TTTN/ })).not.toBeInTheDocument();
+  expect(axios.post).not.toHaveBeenCalled();
+});
+
 it("keeps the confirmation and entered note mounted when the tab becomes visible and rechecks the session", async () => {
   mocks();
   render(<MemoryRouter><CourseOfferings /></MemoryRouter>);

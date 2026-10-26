@@ -76,8 +76,8 @@ describe("SystemService Room catalog", () => {
     const room = { id: "room-1", code: "301", update: jest.fn().mockResolvedValue(undefined) };
     rooms.findByPk.mockResolvedValue(room);
 
-    await expect(service.updateRoom(room.id, { name: "Phòng học 101", isActive: false })).resolves.toBe(room);
-    expect(room.update).toHaveBeenCalledWith({ name: "Phòng học 101", isActive: false });
+    await expect(service.updateRoom(room.id, { name: "Phòng học 101", floor: "Tầng trệt", isActive: false })).resolves.toBe(room);
+    expect(room.update).toHaveBeenCalledWith({ name: "Phòng học 101", floor: "Tầng trệt", isActive: false });
     expect(Reflect.getMetadata(PERMISSIONS_KEY, SystemController.prototype.updateRoom)).toEqual(["catalog.manage"]);
   });
 

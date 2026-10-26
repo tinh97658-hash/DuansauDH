@@ -1,5 +1,5 @@
 import { Transform } from "class-transformer";
-import { IsBoolean, IsEmail, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, MaxLength, Min, MinLength } from "class-validator";
+import { IsBoolean, IsEmail, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, MaxLength, Min, MinLength } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim());
 const trimUpper = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim().toUpperCase());
@@ -73,14 +73,16 @@ export class UpdateCatalogDto {
 }
 
 export class CreateRoomDto {
-  @IsString() @MinLength(1) @MaxLength(30) @Matches(/^\d/, { message: "Mã phòng phải bắt đầu bằng số tầng" }) @Transform(trimUpper) code!: string;
+  @IsOptional() @IsString() @MaxLength(30) @Transform(trim) floor?: string | null;
+  @IsString() @MinLength(1) @MaxLength(30) @Transform(trimUpper) code!: string;
   @IsString() @MinLength(1) @MaxLength(200) @Transform(trim) name!: string;
   @IsInt() @Min(1) capacity!: number;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }
 
 export class UpdateRoomDto {
-  @IsOptional() @IsString() @MinLength(1) @MaxLength(30) @Matches(/^\d/, { message: "Mã phòng phải bắt đầu bằng số tầng" }) @Transform(trimUpper) code?: string;
+  @IsOptional() @IsString() @MaxLength(30) @Transform(trim) floor?: string | null;
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(30) @Transform(trimUpper) code?: string;
   @IsOptional() @IsString() @MinLength(1) @MaxLength(200) @Transform(trim) name?: string;
   @IsOptional() @IsInt() @Min(1) capacity?: number;
   @IsOptional() @IsBoolean() isActive?: boolean;

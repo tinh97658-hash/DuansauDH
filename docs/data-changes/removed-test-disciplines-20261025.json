@@ -1,0 +1,35 @@
+[
+  {
+    "id": "4fa50f25-e871-49b1-8820-6066ca1f175f",
+    "code": "T0967EE52D9N",
+    "name": "T0967EE52D9 Discipline",
+    "description": null,
+    "sort_order": 0,
+    "active": true,
+    "created_at": "2026-10-16T11:23:42.606Z",
+    "updated_at": "2026-10-16T11:23:42.606Z",
+    "english_name": null
+  },
+  {
+    "id": "59abde31-7aee-4e39-9b35-e0b5a8d6c0f9",
+    "code": "T51322FA495N",
+    "name": "T51322FA495 Discipline",
+    "description": null,
+    "sort_order": 0,
+    "active": true,
+    "created_at": "2026-10-16T11:24:54.141Z",
+    "updated_at": "2026-10-16T11:24:54.141Z",
+    "english_name": null
+  },
+  {
+    "id": "b6962531-0783-403c-8bf0-6a9ddfd93a7f",
+    "code": "T976043719EN",
+    "name": "T976043719E Discipline",
+    "description": null,
+    "sort_order": 0,
+    "active": true,
+    "created_at": "2026-10-15T10:19:05.222Z",
+    "updated_at": "2026-10-15T10:19:05.222Z",
+    "english_name": null
+  }
+]

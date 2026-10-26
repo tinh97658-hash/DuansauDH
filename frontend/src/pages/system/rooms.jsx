@@ -1,7 +1,6 @@
 import React from "react";
 import CatalogManager from "../../components/CatalogManager";
 import { usePermissions } from "../../features/accounts/usePermissions";
-import { getRoomFloor } from "../../utils/schedulingCalendar";
 
 const Rooms = () => {
   const { can } = usePermissions();
@@ -17,14 +16,13 @@ const Rooms = () => {
     nameLabel="Tên phòng"
     addButtonLabel="Thêm phòng"
     activeField="isActive"
-    activeStatusLabel={(active) => active ? "Đang sử dụng" : "Ngừng sử dụng"}
-    showStatusBadge={false}
-    activeSwitchAriaLabel={(active, row) => `${active ? "Vô hiệu hóa" : "Kích hoạt"} phòng ${row.code}`}
+    showStatus
+    editOnDoubleClick
     sortable={false}
     showDeleteAction={false}
     validate={(form) => {
-      if (!form.code?.trim() || !form.name?.trim() || !/^\d/.test(form.code.trim())) {
-        return "Vui lòng nhập đủ tên phòng; mã phòng phải bắt đầu bằng số tầng.";
+      if (!form.code?.trim() || !form.name?.trim()) {
+        return "Vui lòng nhập đủ mã phòng và tên phòng.";
       }
       if (!Number.isInteger(Number(form.capacity)) || Number(form.capacity) <= 0) {
         return "Sức chứa phải là số nguyên lớn hơn 0.";
@@ -35,10 +33,12 @@ const Rooms = () => {
       {
         key: "floor",
         label: "Tầng",
-        type: "custom",
-        showInForm: false,
+        type: "text",
+        showInForm: true,
+        required: false,
+        helper: "Có thể để trống.",
         align: "center",
-        render: (row) => getRoomFloor(row.code) ?? "—",
+        display: (row) => row.floor ?? "—",
       },
       {
         key: "capacity",

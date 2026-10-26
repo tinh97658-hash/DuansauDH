@@ -15,7 +15,7 @@ const Disciplines = () => (
     codeLabel="Mã ngành"
     nameLabel="Tên ngành"
     showIndex={false}
-    showSortColumn={false}
+    sortable={false}
     editOnDoubleClick
     fields={[
       { key: "englishName", label: "Tên tiếng Anh", type: "text" },

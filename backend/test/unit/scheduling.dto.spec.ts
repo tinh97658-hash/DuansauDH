@@ -80,17 +80,17 @@ describe("TeachingSession DTOs", () => {
 });
 
 describe("Room DTOs", () => {
-  it("requires a positive integer capacity and a code starting with its floor digit", async () => {
-    const valid = plainToInstance(CreateRoomDto, { code: "301", name: "Phòng 301", capacity: 40 });
+  it("allows independent room codes and names and requires positive capacity", async () => {
+    const valid = plainToInstance(CreateRoomDto, { code: "A61P01", name: "Phòng 1", capacity: 40 });
     const missingCapacity = plainToInstance(CreateRoomDto, { code: "301", name: "Phòng 301" });
-    const invalidCode = plainToInstance(CreateRoomDto, { code: "A301", name: "Phòng 301", capacity: 40 });
+    const invalidCode = plainToInstance(CreateRoomDto, { code: "  ", name: "Phòng 301", capacity: 40 });
     expect(await validate(valid)).toHaveLength(0);
     expect(await validate(missingCapacity)).not.toHaveLength(0);
     expect(await validate(invalidCode)).not.toHaveLength(0);
   });
 
   it("allows a legacy Room to receive capacity through update", async () => {
-    const valid = plainToInstance(UpdateRoomDto, { capacity: 50 });
+    const valid = plainToInstance(UpdateRoomDto, { code: "A61P02", name: "Tên phòng tùy chọn", capacity: 50 });
     const invalid = plainToInstance(UpdateRoomDto, { capacity: 0 });
     expect(await validate(valid)).toHaveLength(0);
     expect(await validate(invalid)).not.toHaveLength(0);

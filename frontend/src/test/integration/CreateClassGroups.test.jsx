@@ -81,7 +81,7 @@ test.each([true, false])("quick-create prefills scope and returns to assignment 
     `/masters/assign-class-groups?year=${year}&disciplineId=d1&majorId=${major.id}${withId ? "&groupId=new-group" : ""}`,
   );
   expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/masters/class-groups/batch"),
-    expect.objectContaining({ majorId: major.id, academicYear: year, maxStudents: 40, count: 1 }),
+    expect.objectContaining({ majorId: major.id, academicYear: year, maxStudents: 20, count: 1 }),
     { withCredentials: true });
 });
 
@@ -98,6 +98,8 @@ test("changing group count refreshes names and keeps a create-only action", asyn
 
 test("creates empty group shells without automatic assignment fields", async () => {
   await openCreateDialog();
+  expect(screen.getByLabelText("Sĩ số tối đa / nhóm")).toHaveValue(20);
+  fireEvent.change(screen.getByLabelText("Sĩ số tối đa / nhóm"), { target: { value: "25" } });
   fireEvent.change(screen.getByLabelText("Số nhóm cần tạo"), { target: { value: "3" } });
   const createButton = await screen.findByRole("button", { name: "Tạo 3 nhóm" });
   await waitFor(() => expect(createButton).toBeEnabled());
@@ -108,6 +110,11 @@ test("creates empty group shells without automatic assignment fields", async () 
     expect.not.objectContaining({ autoAssign: expect.anything() }),
     { withCredentials: true },
   ));
+  expect(axios.post).toHaveBeenCalledWith(
+    expect.stringContaining("/masters/class-groups/batch"),
+    expect.objectContaining({ maxStudents: 25, count: 3 }),
+    { withCredentials: true },
+  );
 });
 
 test("starts at group 1 independently of other majors", async () => {

@@ -143,7 +143,7 @@ it("loads only a page, requests the next page, and resets search to page one", a
   await screen.findByText("HV001");
   expect(axios.get.mock.calls.some(([url]) => url.endsWith("/export"))).toBe(false);
   expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/class-score-summary$/), { params: { classGroupId: "g1", search: "", page: 1, pageSize: 15 } });
-  fireEvent.click(screen.getByRole("button", { name: /page 2/i }));
+  fireEvent.click(screen.getByRole("button", { name: /^Trang 2$/ }));
   const row = (await screen.findByText("HV016")).closest("tr");
   expect(within(row).getAllByRole("cell")[0]).toHaveTextContent("16");
   expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/class-score-summary$/), { params: { classGroupId: "g1", search: "", page: 2, pageSize: 15 } });

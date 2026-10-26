@@ -511,6 +511,7 @@ describe("AssignClassGroups summary and assignment", () => {
   it("inline open/cancel locks scope and preserves five selected IDs, hidden search, target and URL without reloading", async () => {
     const url = await prepareCreateDraft();
     const dialog = await openInlineCreate();
+    expect(within(dialog).getByLabelText("Sĩ số tối đa / nhóm")).toHaveValue(20);
     for (const label of ["Ngành", "Chuyên ngành", "Năm / khóa"]) expect(within(dialog).getByRole("button", { name: label })).toHaveAttribute("aria-disabled", "true");
     const calls = axios.get.mock.calls.length;
     fireEvent.click(within(dialog).getByRole("button", { name: "Hủy" }));

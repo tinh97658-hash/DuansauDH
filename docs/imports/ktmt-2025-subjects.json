@@ -1,0 +1,128 @@
+{
+  "applied": true,
+  "major": {
+    "id": "f5314d7f-0a64-4290-939d-8b53c79b3fd9",
+    "name": "Kỹ thuật môi trường"
+  },
+  "sourceRows": 28,
+  "uniqueSourceSubjects": 28,
+  "duplicatesRemoved": [],
+  "sourceCodeConflicts": [],
+  "existingPreserved": [
+    {
+      "id": "e6bea466-5fcc-43d4-89e7-3b1cca7de5e1",
+      "name": "Triết học"
+    },
+    {
+      "id": "294172e7-89ac-4753-a31a-faed662955e1",
+      "name": "Tiếng anh"
+    },
+    {
+      "id": "2db11ead-d5e8-4485-9323-6d5c38527768",
+      "name": "Phương pháp nghiên cứu khoa học"
+    }
+  ],
+  "inserted": [
+    {
+      "id": "a67eac08-28a4-43fc-b706-dd7b3c1cdad0",
+      "name": "Hóa học môi trường"
+    },
+    {
+      "id": "02692ef2-38e4-4905-ba3c-b829ee6026a9",
+      "name": "Vi hoá sinh ứng dụng trong kỹ thuật Môi trường"
+    },
+    {
+      "id": "fd3388c4-9f68-4b0a-81a9-9820bf2bb40e",
+      "name": "Quản lý tài nguyên và môi trường"
+    },
+    {
+      "id": "1d309dde-d9c6-4c35-8645-3a2c08ad9712",
+      "name": "Đánh giá tác động môi trường"
+    },
+    {
+      "id": "90683989-6d1e-4e7c-b49f-babf70c24ad9",
+      "name": "Luật và chính sách môi trường"
+    },
+    {
+      "id": "68a6e03d-d20b-4af1-8de5-4296951d3fac",
+      "name": "Suy thoái và bảo vệ môi trường đất"
+    },
+    {
+      "id": "2d374454-de14-48a9-8aa3-7236f4f440db",
+      "name": "Quản lý môi trường"
+    },
+    {
+      "id": "4d29fa1f-1b3e-461e-b06f-c2a2663b2c8e",
+      "name": "Các nguyên lý sản xuất sạch hơn"
+    },
+    {
+      "id": "44d62f47-0171-49b0-8fb1-315f8f15170d",
+      "name": "Độc học môi trường"
+    },
+    {
+      "id": "55fa8123-dd6c-49f5-8847-635f5410c90e",
+      "name": "Các quá trình cơ bản trong KTMT"
+    },
+    {
+      "id": "aec5e378-6b0d-4ebe-95fe-508ec9cc8280",
+      "name": "Kỹ thuật quan trắc và phân tích môi trường"
+    },
+    {
+      "id": "aa08c835-e0d7-4ca8-b62d-7d10056bcdf7",
+      "name": "Quản lý chất thải rắn và chất thải nguy hại"
+    },
+    {
+      "id": "7929e3dd-becf-485d-9977-83a170340252",
+      "name": "Kỹ thuật xử lý nước thải"
+    },
+    {
+      "id": "a82d5948-276a-43e5-8b21-7e7c6d231caa",
+      "name": "Kỹ thuật kiểm soát ô nhiễm không khí, tiếng ồn và rung động"
+    },
+    {
+      "id": "75b755a7-2336-44f9-ad3b-c7b69a05269d",
+      "name": "Kỹ thuật xử lý ô nhiễm môi trường biển"
+    },
+    {
+      "id": "dd92a5c1-f016-48a7-b462-1b32f9b72012",
+      "name": "Xử lý nitơ và photpho trong nước thải"
+    },
+    {
+      "id": "89b9b373-d719-4669-9a20-027ce38a1b70",
+      "name": "Ứng dụng công nghệ tiên tiến trong xử lý chất thải"
+    },
+    {
+      "id": "9e43bcea-6e52-4816-b618-98e897514127",
+      "name": "Hệ thống cấp, thoát nước"
+    },
+    {
+      "id": "a869fa99-754c-491f-90fe-849125db8f72",
+      "name": "Sử dụng năng lượng tiết kiệm và hiệu quả"
+    },
+    {
+      "id": "ca37e143-710c-44cb-aac1-d84b3f14c611",
+      "name": "Ứng dụng GIS trong kỹ thuật môi trường"
+    },
+    {
+      "id": "86581784-68a8-4f6b-8aed-22d74e08b13a",
+      "name": "Tái chế chất thải"
+    },
+    {
+      "id": "f2f265cf-826e-4e34-ba02-c0ca9df09fc4",
+      "name": "Quản lý chất lượng môi trường"
+    },
+    {
+      "id": "9015e7e9-4099-431e-aeb2-b3f7f798249b",
+      "name": "Biến đổi khí hậu và nước biển dâng"
+    },
+    {
+      "id": "fe14463f-8541-4965-9cad-4f218ef8b026",
+      "name": "Thực tập chuyên ngành"
+    },
+    {
+      "id": "4e657064-ae05-42ed-b59b-a8a0abb59838",
+      "name": "Đề án tốt nghiệp"
+    }
+  ],
+  "finalCatalogCount": 28
+}

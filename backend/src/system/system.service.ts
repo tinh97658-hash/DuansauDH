@@ -131,19 +131,28 @@ export class SystemService {
   }
 
   // ===== Dân tộc =====
-  async listEthnicities() { return this.listAll(this.ethnicities); }
+  async listEthnicities() {
+    const rows = await this.listAll(this.ethnicities, [["name", "ASC"]]);
+    return rows.sort((a: any, b: any) => a.name.localeCompare(b.name, "vi", { sensitivity: "base" }));
+  }
   async createEthnicity(dto: CreateCatalogDto) { return this.createSimple(this.ethnicities, dto, "Dân tộc"); }
   async updateEthnicity(id: string, dto: UpdateCatalogDto) { return this.updateSimple(this.ethnicities, id, dto, "Dân tộc"); }
   async removeEthnicity(id: string) { return this.removeSimple(this.ethnicities, id, "Dân tộc"); }
 
   // ===== Quốc tịch =====
-  async listNationalities() { return this.listAll(this.nationalities); }
+  async listNationalities() {
+    const rows = await this.listAll(this.nationalities, [["name", "ASC"]]);
+    return rows.sort((a: any, b: any) => a.name.localeCompare(b.name, "vi", { sensitivity: "base" }));
+  }
   async createNationality(dto: CreateCatalogDto) { return this.createSimple(this.nationalities, dto, "Quốc tịch"); }
   async updateNationality(id: string, dto: UpdateCatalogDto) { return this.updateSimple(this.nationalities, id, dto, "Quốc tịch"); }
   async removeNationality(id: string) { return this.removeSimple(this.nationalities, id, "Quốc tịch"); }
 
   // ===== Thành phố =====
-  async listCities() { return this.listAll(this.cities); }
+  async listCities() {
+    const rows = await this.listAll(this.cities, [["name", "ASC"]]);
+    return rows.sort((a: any, b: any) => a.name.localeCompare(b.name, "vi", { sensitivity: "base" }));
+  }
   async createCity(dto: CreateCatalogDto) { return this.createSimple(this.cities, dto, "Thành phố"); }
   async updateCity(id: string, dto: UpdateCatalogDto) { return this.updateSimple(this.cities, id, dto, "Thành phố"); }
   async removeCity(id: string) { return this.removeSimple(this.cities, id, "Thành phố"); }
@@ -172,10 +181,11 @@ export class SystemService {
 
   // ===== Phường xã =====
   async listWards() {
-    return this.wards.findAll({
+    const rows = await this.wards.findAll({
       include: [{ model: District, as: "district", attributes: ["id", "code", "name"], include: [{ model: City, as: "city", attributes: ["id", "code", "name"] }] }],
-      order: sort,
+      order: [["name", "ASC"]],
     });
+    return rows.sort((a: any, b: any) => a.name.localeCompare(b.name, "vi", { sensitivity: "base" }));
   }
   async createWard(dto: CreateCatalogDto) {
     if (!dto.code) throw new BadRequestException("Vui lòng nhập mã phường xã.");
@@ -495,13 +505,13 @@ export class SystemService {
 
   async createRoom(dto: CreateRoomDto) {
     await this.ensureCodeUnique(this.rooms, dto.code);
-    return this.rooms.create(this.pick(dto, ["code", "name", "capacity", "isActive"]) as any);
+    return this.rooms.create(this.pick(dto, ["code", "name", "floor", "capacity", "isActive"]) as any);
   }
 
   async updateRoom(id: string, dto: UpdateRoomDto) {
     const room = await this.findOr404(this.rooms, id, "Phòng học");
     if (dto.code && dto.code !== room.code) await this.ensureCodeUnique(this.rooms, dto.code, id);
-    await room.update(this.pick(dto, ["code", "name", "capacity", "isActive"]) as any);
+    await room.update(this.pick(dto, ["code", "name", "floor", "capacity", "isActive"]) as any);
     return room;
   }
 

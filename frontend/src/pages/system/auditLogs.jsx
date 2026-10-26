@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert, Box, CircularProgress, MenuItem, Paper, TableBody, TableCell,
-  TableContainer, TablePagination, TableRow, Tab, Tabs, Tooltip, Typography,
+  TableContainer, TableRow, Tab, Tabs, Tooltip, Typography,
 } from "@mui/material";
 import FeatureLayout from "../../components/FeatureLayout";
 import FilterSelectField from "../../components/FilterSelectField";
 import FilterSearchField from "../../components/FilterSearchField";
 import ResizableTable from "../../components/ResizableTable";
+import ListPagination from "../../components/ListPagination";
 import { listAuditLogs, listChangeLogs, listChangeLogTables } from "../../features/accounts/api";
 import { AUDIT_ACTION_LABELS, auditActionLabel, changeOperationLabel, tableLabel } from "../../features/accounts/constants";
 
@@ -71,7 +72,7 @@ const ManagementLogs = () => {
   const [logs, setLogs] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(25);
+  const pageSize = 25;
   const [action, setAction] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -129,19 +130,7 @@ const ManagementLogs = () => {
           </TableBody>
         </ResizableTable>
       </TableContainer>
-      <TablePagination
-        component="div"
-        count={total}
-        page={page}
-        rowsPerPage={pageSize}
-        rowsPerPageOptions={[25, 50, 100]}
-        onPageChange={(_, next) => setPage(next)}
-        onRowsPerPageChange={(event) => { setPageSize(Number(event.target.value)); setPage(0); }}
-        getItemAriaLabel={(type) => (type === "next" ? "Trang sau" : "Trang trước")}
-        labelDisplayedRows={({ from: start, to: end, count }) => `${start}–${end} / ${count}`}
-        labelRowsPerPage="Số dòng mỗi trang"
-        sx={{ bgcolor: "#fff", border: "1px solid #D7E4EE", borderTop: 0 }}
-      />
+      <ListPagination count={total} page={page} pageSize={pageSize} onPageChange={setPage} />
       <Typography sx={{ fontSize: 12, color: "#607486", mt: 1 }}>Tổng {total} bản ghi.</Typography>
     </>
   );
@@ -151,7 +140,7 @@ const DataChangeLogs = () => {
   const [logs, setLogs] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(25);
+  const pageSize = 25;
   const [table, setTable] = useState("");
   const [operation, setOperation] = useState("");
   const [from, setFrom] = useState("");
@@ -224,19 +213,7 @@ const DataChangeLogs = () => {
           </TableBody>
         </ResizableTable>
       </TableContainer>
-      <TablePagination
-        component="div"
-        count={total}
-        page={page}
-        rowsPerPage={pageSize}
-        rowsPerPageOptions={[25, 50, 100]}
-        onPageChange={(_, next) => setPage(next)}
-        onRowsPerPageChange={(event) => { setPageSize(Number(event.target.value)); setPage(0); }}
-        getItemAriaLabel={(type) => (type === "next" ? "Trang sau" : "Trang trước")}
-        labelDisplayedRows={({ from: start, to: end, count }) => `${start}–${end} / ${count}`}
-        labelRowsPerPage="Số dòng mỗi trang"
-        sx={{ bgcolor: "#fff", border: "1px solid #D7E4EE", borderTop: 0 }}
-      />
+      <ListPagination count={total} page={page} pageSize={pageSize} onPageChange={setPage} />
       <Typography sx={{ fontSize: 12, color: "#607486", mt: 1 }}>Tổng {total} bản ghi.</Typography>
     </>
   );

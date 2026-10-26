@@ -8,6 +8,8 @@ import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } fro
 import { personNameParts } from "../../utils/personName";
 
 const groupLabel = (group) => group?.isRetake ? group.code || group.name : [...new Set([group?.code, group?.name].filter(Boolean))].join(" · ");
+const isInternshipSubject = (subject) => String(subject.subjectType || "").trim().toUpperCase() === "TT"
+  || /^thuc\s+tap(?:\s|$)/.test(normalize(subject.name).trim());
 
 const readDraft = key => {
   try {
@@ -78,7 +80,8 @@ export default function CreateOffering({ user }) {
   const visibleMajors = majorsForDiscipline(majors.data || [], disciplineId);
   const groups = useLoad(async () => majorId ? rows(await api.get(`/masters/class-groups?${new URLSearchParams({ majorId })}`)) : [], [majorId]);
   const candidates = useLoad(async () => majorId && year ? (await api.get(`/scheduling/course-offering-candidates?${new URLSearchParams({ program: "masters", majorId, academicYear: year })}`)).subjects : [], [majorId, year, created?.id]);
-  const candidate = candidates.data?.find((item) => item.subject.id === subjectId);
+  const availableCandidates = (candidates.data || []).filter((item) => !isInternshipSubject(item.subject));
+  const candidate = availableCandidates.find((item) => item.subject.id === subjectId);
   const subject = candidate?.subject;
   const eligible = [...(candidate?.eligibleClassGroups || []), ...(candidate?.retakeClassGroups || [])];
   const otherCohortGroups = eligible.filter((group) => group.academicYear && group.academicYear !== year);
@@ -89,7 +92,7 @@ export default function CreateOffering({ user }) {
   const retakeClassGroupIds = chosen.filter(group => group.isRetake).map(group => group.id);
   const draft = { subjectId, classGroupIds: groupIds, majorId, academicYear: year, name: effectiveOfferingName.trim(),
     ...(retakeClassGroupIds.length ? { retakeClassGroupIds } : {}) };
-  const preview = useLoad(async () => groupIds.length ? api.post("/scheduling/course-offerings/roster-preview", draft) : { participants: [], participantCount: 0 }, [subjectId, majorId, year, groupIds.join(",")]);
+  const preview = useLoad(async () => groupIds.length && subject ? api.post("/scheduling/course-offerings/roster-preview", draft) : { participants: [], participantCount: 0 }, [subjectId, subject?.id, majorId, year, groupIds.join(",")]);
   const days = intersectDays(chosen);
 
   const resetSelection = () => {
@@ -141,14 +144,13 @@ export default function CreateOffering({ user }) {
   const participatingMajorNames = unique(participatingGroups.map(groupMajorName));
   const participatingMajors = participatingMajorNames.join(" · ");
   const participatingYears = unique(participatingGroups.map((group) => group.academicYear).filter(Boolean)).join(" · ");
-  const participatingGroupValues = participatingGroups.flatMap((group) => [
-    { key: `${group.id}:code`, label: group.code },
-    { key: `${group.id}:name`, label: group.name },
-  ].filter((item) => item.label));
+  const participatingGroupValues = participatingGroups.map((group) => ({
+    key: group.id, label: groupLabel(group),
+  })).filter((item) => item.label);
   const years = unique((groups.data || []).map((group) => group.academicYear)).sort((a, b) => b.localeCompare(a, "vi", { numeric: true }));
   const visibleGroups = eligible
     .filter((group) => normalize(`${group.code} ${group.name} ${groupMajorName(group)} ${group.academicYear || ""}`).includes(normalize(groupQuery)));
-  const filteredSubjects = (candidates.data || []).filter((item) => normalize(`${item.subject.code} ${item.subject.name}`).includes(normalize(query)));
+  const filteredSubjects = availableCandidates.filter((item) => normalize(`${item.subject.code} ${item.subject.name}`).includes(normalize(query)));
   const totalStudents = !groupIds.length ? 0 : preview.loading ? "…" : preview.error ? "—" : preview.data?.participantCount ?? 0;
 
   if (created) {
@@ -270,7 +272,7 @@ export default function CreateOffering({ user }) {
       </div>
     </aside>
     <section className="sl-right">
-      {!subject ? <div className="v20-empty-guide"><div><div className="sl-guide-icon">◇</div><div className="sl-eyebrow">TẠO LỚP HỌC PHẦN</div><h2>{!majorId ? "Bắt đầu bằng Chuyên ngành" : !year ? "Chọn khóa để tiếp tục" : "Chọn Học phần để tổ chức lớp học phần"}</h2><p>{major?.name}{year ? ` · ${year}` : ""}</p>{year && <strong>{candidates.data?.length || 0} học phần hiện có thể tổ chức.</strong>}</div></div> : <div className="sl-create-main">
+      {!subject ? <div className="v20-empty-guide"><div><div className="sl-guide-icon">◇</div><div className="sl-eyebrow">TẠO LỚP HỌC PHẦN</div><h2>{!majorId ? "Bắt đầu bằng Chuyên ngành" : !year ? "Chọn khóa để tiếp tục" : "Chọn Học phần để tổ chức lớp học phần"}</h2><p>{major?.name}{year ? ` · ${year}` : ""}</p>{year && <strong>{availableCandidates.length} học phần hiện có thể tổ chức.</strong>}</div></div> : <div className="sl-create-main">
         <div className="sl-create-name">
           <div className="sl-eyebrow">TẠO LỚP HỌC PHẦN</div>
           <div className="sl-create-name-field">

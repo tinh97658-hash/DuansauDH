@@ -39,7 +39,7 @@ test("creates a specialization with its required code", async () => {
   fireEvent.click(dialog.getByRole("button", { name: "Lưu" }));
   await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
     expect.stringContaining("/system/majors"),
-    expect.objectContaining({ code: "CNTT2", name: "Chuyên ngành mới", disciplineId: "d1" }),
+    expect.objectContaining({ code: "CNTT2", name: "Chuyên ngành mới", disciplineId: "d1", maxOvertimeYears: 4 }),
     { withCredentials: true },
   ));
 });

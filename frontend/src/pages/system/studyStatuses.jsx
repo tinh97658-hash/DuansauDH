@@ -3,6 +3,8 @@ import CatalogManager from "../../components/CatalogManager";
 
 const StudyStatuses = () => (
   <CatalogManager
+    sortable={false}
+    editOnDoubleClick
     title="Trạng thái học"
     group="Danh mục đào tạo"
     desc="Danh mục trạng thái học tập của học viên."

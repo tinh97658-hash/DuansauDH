@@ -14,7 +14,7 @@ it('limits catalog rendering, navigates to later rows, searches the entire catal
   axios.get.mockResolvedValue({ data: rows });
   render(<ThemeProvider theme={theme}><CssBaseline /><AuthSessionContext.Provider value={{ authenticated: true, user: { role: 'custom' }, access: { permissions: ['catalog.manage'] } }}><Units /></AuthSessionContext.Provider></ThemeProvider>);
   const table = await screen.findByRole('table', { name: 'Đơn vị' });
-  await screen.findByRole('button', { name: 'Sửa mã đơn vị DV1' });
+  await screen.findByRole('cell', { name: 'DV1' });
   expect(within(table).getAllByRole('row')).toHaveLength(26);
   expect(screen.queryByText('Đơn vị 30')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }));

@@ -49,8 +49,8 @@ export async function readReturnedMembers(db: Sequelize, groupIds: string[], sub
   `, { type: QueryTypes.SELECT, replacements: { groupIds, subjectIds }, transaction });
 }
 
-// Only admission after the previous class closed proves that a learner was not
-// taught there. Missing grades for an existing participant mean waiting, not first study.
+// Arrivals after the first scheduled session wait for a first attempt, even
+// while the original offering is active or that session was confirmed not held.
 export async function readLateUnstudiedMembers(db: Sequelize, groupIds: string[], subjectIds: string[], transaction?: Transaction): Promise<RetakeResult[]> {
   if (!groupIds.length || !subjectIds.length) return [];
   return db.query<RetakeResult>(`
@@ -67,15 +67,23 @@ export async function readLateUnstudiedMembers(db: Sequelize, groupIds: string[]
       AND ar.training_level = 'Thạc sĩ' AND (ar.status::text = 'approved' OR ar.study_status IN ('Đã trúng tuyển', 'Đang học'))
       AND ${studyEligibleRecordSql('ar')}
       AND NOT (COALESCE(ar.is_exempt_foreign_language, false) AND ${foreignLanguageSubjectSql(':subjectId')})
-      AND member.enrolled_at > (SELECT MAX(offering.completed_at) FROM course_offering_class_groups link
+      AND EXISTS (SELECT 1 FROM course_offering_class_groups link
         JOIN course_offerings offering ON offering.id = link.course_offering_id
-        WHERE link.class_group_id = member.class_group_id AND offering.subject_id IN (:subjectIds) AND offering.status = 'completed'
-          AND link.participant_ids IS NULL)
+        WHERE link.class_group_id = member.class_group_id AND offering.subject_id IN (:subjectIds)
+          AND member.enrolled_at > COALESCE(
+            offering.roster_started_at,
+            (SELECT MIN((session.session_date + session.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh')
+              FROM teaching_sessions session WHERE session.course_offering_id = offering.id
+                AND (session.session_date + session.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh' <= clock_timestamp()),
+            offering.completed_at)
+          AND (link.participant_ids IS NULL OR NOT (
+            ('admission:' || ar.id::text) = ANY(link.participant_ids)
+            OR ('student:' || COALESCE(ar.student_id::text, '')) = ANY(link.participant_ids))))
       AND NOT EXISTS (SELECT 1 FROM course_offering_class_groups link
         JOIN course_offerings offering ON offering.id = link.course_offering_id
         WHERE link.class_group_id = member.class_group_id AND offering.subject_id IN (:subjectIds)
-          AND link.participant_ids IS NOT NULL AND (('admission:' || ar.id::text) = ANY(link.participant_ids)
-            OR ('student:' || ar.student_id::text) = ANY(link.participant_ids)))
+          AND (link.participant_ids IS NULL OR (('admission:' || ar.id::text) = ANY(link.participant_ids)
+            OR ('student:' || ar.student_id::text) = ANY(link.participant_ids))))
       AND NOT EXISTS (SELECT 1 FROM course_exam_gradebooks book JOIN course_offerings offering ON offering.id = book.course_offering_id
         CROSS JOIN LATERAL jsonb_array_elements(book.grades) grade
         WHERE offering.subject_id IN (:subjectIds) AND (grade->>'participantId' = 'admission:' || ar.id::text

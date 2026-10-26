@@ -1,0 +1,327 @@
+{
+  "source": "4. Chương trình khung CTĐT THS QLDA 2025.2.doc",
+  "sourceTable": "7.2",
+  "majorCode": "QLDADTVXD",
+  "program": "masters",
+  "sourceRows": 32,
+  "duplicatesRemoved": [
+    "Quản lý an toàn lao động và môi trường trong xây dựng",
+    "Kiểm toán dự án xây dựng",
+    "Bảo hiểm dự án xây dựng"
+  ],
+  "sourceCodeConflicts": [
+    {
+      "name": "Kỹ thuật giám sát thi công xây dựng",
+      "retainedCatalogCodeText": "QLXD",
+      "retainedCatalogCodeNumber": 526,
+      "semesterEntries": [
+        {
+          "codeText": "QLGS",
+          "codeNumber": 526
+        }
+      ],
+      "reason": "Table 7.2 is the catalog source; the semester plan has inconsistent codes."
+    },
+    {
+      "name": "Phương pháp nghiên cứu khoa học",
+      "sourceCodeText": "TĐKH",
+      "retainedExistingCodeText": "TDKH",
+      "codeNumber": 503,
+      "reason": "Preserve existing same-name, same-credit course and sharing links instead of creating a duplicate or changing its code."
+    }
+  ],
+  "enableSharedLearning": true,
+  "subjects": [
+    {
+      "sourceOrder": 1,
+      "codeText": "HPTH",
+      "codeNumber": 501,
+      "name": "Triết học",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 2,
+      "codeText": "HPTA",
+      "codeNumber": 502,
+      "name": "Tiếng Anh",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 3,
+      "codeText": "TDKH",
+      "codeNumber": 503,
+      "name": "Phương pháp nghiên cứu khoa học",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true,
+      "sourceCodeText": "TĐKH"
+    },
+    {
+      "sourceOrder": 4,
+      "codeText": "QLKH",
+      "codeNumber": 525,
+      "name": "Tổ chức kế hoạch hóa sản xuất xây dựng",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 5,
+      "codeText": "QLTK",
+      "codeNumber": 518,
+      "name": "Thống kê ứng dụng trong quản lý xây dựng",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 6,
+      "codeText": "XDPL",
+      "codeNumber": 512,
+      "name": "Pháp luật và quản lý chính sách trong xây dựng",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 7,
+      "codeText": "QLDA",
+      "codeNumber": 513,
+      "name": "Quản lý dự án đầu tư xây dựng nâng cao",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 8,
+      "codeText": "XDVL",
+      "codeNumber": 505,
+      "name": "Vật liệu mới trong XDDD& CN",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 9,
+      "codeText": "XDCH",
+      "codeNumber": 530,
+      "name": "Công nghệ thi công hiện đại",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 10,
+      "codeText": "QLDA",
+      "codeNumber": 519,
+      "name": "Quản lý công trình XDDD& CN",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 11,
+      "codeText": "KTTC",
+      "codeNumber": 530,
+      "name": "Quản lý an toàn lao động và môi trường trong xây dựng",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 12,
+      "codeText": "XDVL",
+      "codeNumber": 510,
+      "name": "Vật liệu hiệu quả trong xây dựng",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 13,
+      "codeText": "KTTC",
+      "codeNumber": 531,
+      "name": "Kỹ thuật thi công công trình hạ tầng kỹ thuật",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 14,
+      "codeText": "QLHT",
+      "codeNumber": 520,
+      "name": "Quản lý hạ tầng kỹ thuật đô thị",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 16,
+      "codeText": "QLĐT",
+      "codeNumber": 511,
+      "name": "Quản lý đấu thầu và hợp đồng nâng cao",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 17,
+      "codeText": "QLCL",
+      "codeNumber": 533,
+      "name": "Quản lý chất lượng và tiến độ dự án",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 18,
+      "codeText": "QLTĐ",
+      "codeNumber": 521,
+      "name": "Thẩm định dự án xây dựng",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 19,
+      "codeText": "QLTC",
+      "codeNumber": 524,
+      "name": "Quản lý tài chính trong doanh nghiệp xây dựng",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 20,
+      "codeText": "QLCP",
+      "codeNumber": 512,
+      "name": "Quản lý chi phí đầu tư xây dựng",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 21,
+      "codeText": "QLKT",
+      "codeNumber": 516,
+      "name": "Kiểm toán dự án xây dựng",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 22,
+      "codeText": "QLBH",
+      "codeNumber": 523,
+      "name": "Bảo hiểm dự án xây dựng",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 23,
+      "codeText": "QLXD",
+      "codeNumber": 509,
+      "name": "Tin học ứng dụng trong quản lý xây dựng",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 24,
+      "codeText": "QLXD",
+      "codeNumber": 526,
+      "name": "Kỹ thuật giám sát thi công xây dựng",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 25,
+      "codeText": "QLTT",
+      "codeNumber": 522,
+      "name": "Quản lý thông tin CTXD",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 28,
+      "codeText": "QLKD",
+      "codeNumber": 507,
+      "name": "Kinh tế đầu tư xây dựng nâng cao",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 29,
+      "codeText": "QLĐG",
+      "codeNumber": 514,
+      "name": "Định giá trong xây dựng",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 30,
+      "codeText": "QLRR",
+      "codeNumber": 510,
+      "name": "Quản lý rủi ro dự án đầu tư xây dựng",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 31,
+      "codeText": "QLTT",
+      "codeNumber": 527,
+      "name": "Thực tập chuyên ngành",
+      "credits": 7,
+      "subjectType": "TT",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 32,
+      "codeText": "QLĐA",
+      "codeNumber": 528,
+      "name": "Đề án tốt nghiệp",
+      "credits": 9,
+      "subjectType": "TN",
+      "isRequired": true,
+      "majorAssignment": true
+    }
+  ]
+}

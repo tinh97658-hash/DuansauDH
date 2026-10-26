@@ -9,6 +9,7 @@ import {ExamScheduleService} from '../../src/masters/exam-schedule.service.js';
 import {AuditContextService} from '../../src/audit/audit-context.js';
 import {up,down} from '../../src/database/migrations/066-masters-exam-workflow.js';
 import {up as addLecturer} from '../../src/database/migrations/067-exam-session-lecturer.js';
+import {up as addArrangements} from '../../src/database/migrations/068-exam-arrangements.js';
 import {LEGACY_GRADING_POLICY} from '../../src/masters/grading-policy.js';
 import {ClassScoreSummaryService} from '../../src/reports/class-score-summary.service.js';
 import {ExamScheduleQueryDto} from '../../src/masters/dto/exam-schedule.dto.js';
@@ -72,6 +73,7 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
   await down({context:db.getQueryInterface()});
   await up({context:db.getQueryInterface()});
   await addLecturer({context:db.getQueryInterface()});
+  await addArrangements({context:db.getQueryInterface()});
  },60000);
  beforeEach(async()=>{f=await fixture();});
  afterAll(async()=>{await app?.close();});
@@ -345,8 +347,11 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
   await approve();await expect(exam({startTime,endTime})).rejects.toMatchObject({response:{code:'EXAM_WORKING_HOURS'}});
   expect(await sql('SELECT id FROM course_exam_sessions WHERE course_offering_id=:id',{id:f.offering.id})).toHaveLength(0);
  });
- it.each([['07:00','08:00'],['18:00','19:00'],['12:30','13:30']])('accepts daytime boundaries and cross-period exact intervals %s–%s',async(startTime,endTime)=>{
+ it.each([['07:00','08:00'],['18:00','19:00']])('accepts daytime boundaries within one period %s–%s',async(startTime,endTime)=>{
   await approve();const e=await exam({startTime,endTime});expect(e.id).toBeTruthy();
+ });
+ it('rejects an exam crossing the chosen morning/afternoon boundary',async()=>{
+  await approve();await expect(exam({startTime:'12:30',endTime:'13:30'})).rejects.toThrow('nằm trọn trong buổi');
  });
  it.each([['07:59',true],['08:00',false],['08:01',false]])('uses a controlled Vietnam DB start boundary at %s',async(clock,allowed)=>{
   await approve();const original=workflow.query.bind(workflow);

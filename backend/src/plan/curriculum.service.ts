@@ -3,6 +3,7 @@ import { InjectModel } from "@nestjs/sequelize";
 import { Op } from "sequelize";
 import { assertClassScopeEditable, assertCurriculumEditable, lockTrainingStructure } from "./training-structure-integrity.js";
 import { sortCurriculumSubjectsByVietnameseName } from "./curriculum-subject-order.js";
+import { SUBJECT_KNOWLEDGE_GROUPS } from './subject-knowledge-groups.js';
 import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { Major } from "../database/models/common/major.model.js";
@@ -21,14 +22,8 @@ import {
 } from "./dto/plan.dto.js";
 
 /** Khối kiến thức mặc định của mọi CTĐT (khớp `subjects.subject_type`). */
-const DEFAULT_BLOCKS = [
-  { code: "KC", name: "Khối kiến thức chung", sortOrder: 0 },
-  { code: "CS", name: "Kiến thức cơ sở ngành", sortOrder: 1 },
-  { code: "CN", name: "Kiến thức chuyên ngành", sortOrder: 2 },
-  { code: "TC", name: "Học phần tự chọn", sortOrder: 3 },
-  { code: "CH", name: "Chuyên đề", sortOrder: 4 },
-];
-const BLOCK_CODES = new Set(DEFAULT_BLOCKS.map((block) => block.code));
+const DEFAULT_BLOCKS = SUBJECT_KNOWLEDGE_GROUPS;
+const BLOCK_CODES = new Set<string>(DEFAULT_BLOCKS.map((block) => block.code));
 const SUBJECT_INCLUDE = { model: Subject, as: "subject" } as const;
 
 /**

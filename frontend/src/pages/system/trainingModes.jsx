@@ -3,6 +3,7 @@ import CatalogManager from "../../components/CatalogManager";
 
 const TrainingModes = () => (
   <CatalogManager
+    editOnDoubleClick
     title="Hình thức đào tạo"
     group="Danh mục đào tạo"
     desc="Danh mục hình thức đào tạo (chính quy, tại chức...)."
@@ -10,6 +11,7 @@ const TrainingModes = () => (
     itemName="hình thức đào tạo"
     codeLabel="Mã hình thức"
     nameLabel="Tên hình thức"
+    sortable={false}
     parent={{ field: "groupId", label: "Nhóm hình thức", columnLabel: "Nhóm hình thức", endpoint: "/system/training-mode-groups", optional: true, display: (row) => row.group?.name }}
   />
 );

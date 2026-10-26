@@ -4,6 +4,7 @@ import { QueryTypes, type Transaction } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import { RequestStudyLeaveDto, StudyLeaveActionDto } from './dto/study-leave.dto.js';
 import { BUSINESS_DATE_SQL, businessDate, studyLeaveEffectiveAt, validDate } from './study-leave-policy.js';
+import { tuitionPaidSql } from './learner-study-status.js';
 
 const columns = `id, admission_record_id AS "admissionRecordId", reason,
   start_date::text AS "startDate", end_date::text AS "endDate", status,
@@ -39,7 +40,9 @@ export class StudyLeaveService {
   // Runs before relevant HTTP requests. This also catches dates crossed while the server
   // was offline; no browser session or background worker is required for correctness.
   async synchronize() {
-    const due = await this.select(`SELECT id FROM study_leaves WHERE status = 'approved'
+    const funded = `EXISTS (SELECT 1 FROM admission_records funded WHERE funded.id=study_leaves.admission_record_id
+      AND (funded.training_level<>'Thạc sĩ' OR ${tuitionPaidSql('funded')}))`;
+    const due = await this.select(`SELECT id FROM study_leaves WHERE status = 'approved' AND ${funded}
       AND (NOT history @> '[{"action":"roster_withdrawn"}]'::jsonb
       OR (start_date <= ${BUSINESS_DATE_SQL} AND (activated_at IS NULL OR EXISTS (
         SELECT 1 FROM admission_records ar WHERE ar.id = admission_record_id
@@ -48,7 +51,7 @@ export class StudyLeaveService {
     if (!due.length) return;
     await this.db.transaction(async transaction => {
       await this.write('SELECT pg_advisory_xact_lock(21026)', {}, transaction);
-      const rows = await this.select(`SELECT ${columns} FROM study_leaves WHERE status = 'approved'
+      const rows = await this.select(`SELECT ${columns} FROM study_leaves WHERE status = 'approved' AND ${funded}
         AND (start_date <= ${BUSINESS_DATE_SQL} OR NOT history @> '[{"action":"roster_withdrawn"}]'::jsonb)
         ORDER BY admission_record_id FOR UPDATE`, {}, transaction);
       for (const leave of rows) {
@@ -179,8 +182,10 @@ export class StudyLeaveService {
     this.requireNote(dto.reason); this.dates(dto.startDate, dto.endDate);
     if (dto.startDate < businessDate()) throw new BadRequestException('Ngày bắt đầu bảo lưu không được trước hôm nay.');
     await this.db.transaction(async transaction => {
-      const [record] = await this.select('SELECT id, study_status FROM admission_records WHERE id = :id FOR UPDATE', { id: recordId }, transaction);
+      await this.write('SELECT pg_advisory_xact_lock(21026)', {}, transaction);
+      const [record] = await this.select('SELECT id, study_status, training_level, extra_data FROM admission_records WHERE id = :id FOR UPDATE', { id: recordId }, transaction);
       if (!record) throw new NotFoundException('Không tìm thấy học viên.');
+      if (record.training_level === 'Thạc sĩ' && record.extra_data?.tuitionPayment?.paid !== true) throw new ConflictException('Chưa nộp học phí nên chưa nhập học, không được bảo lưu. Hãy rút khỏi lớp và trở về hồ sơ đầu vào.');
       if (record.study_status !== 'Đang học') throw new ConflictException('Chỉ tạo yêu cầu bảo lưu cho học viên đang học.');
       const open = await this.select("SELECT id FROM study_leaves WHERE admission_record_id = :id AND status IN ('pending','approved')", { id: recordId }, transaction);
       if (open.length) throw new ConflictException('Học viên đang có yêu cầu hoặc đợt bảo lưu chưa kết thúc.');
@@ -203,13 +208,14 @@ export class StudyLeaveService {
       const [leave] = await this.select(`SELECT ${columns} FROM study_leaves WHERE id = :id FOR UPDATE`, { id }, transaction);
       if (!leave) throw new NotFoundException('Không tìm thấy yêu cầu bảo lưu.');
       recordId = leave.admissionRecordId;
-      const [record] = await this.select('SELECT id, study_status FROM admission_records WHERE id = :id FOR UPDATE', { id: recordId }, transaction);
+      const [record] = await this.select('SELECT id, study_status, training_level, extra_data FROM admission_records WHERE id = :id FOR UPDATE', { id: recordId }, transaction);
       const today = businessDate();
       const extensions: any[] = leave.extensions || [];
       let state = leave.status; let endDate = leave.endDate; let closedDate = leave.closedDate;
       if (['approve', 'reject'].includes(dto.action)) {
         if (state !== 'pending') throw new ConflictException('Yêu cầu đã được xử lý. Hãy tải lại.');
         if (dto.action === 'approve') {
+          if (record.training_level === 'Thạc sĩ' && record.extra_data?.tuitionPayment?.paid !== true) throw new ConflictException('Học viên chưa nộp học phí, không được duyệt bảo lưu.');
           this.dates(leave.startDate, leave.endDate);
           if (record.study_status !== 'Đang học') throw new ConflictException('Học viên không còn ở trạng thái đang học.');
           if (leave.startDate < today) throw new ConflictException('Ngày bắt đầu đã qua. Hãy từ chối và tạo yêu cầu với thời gian mới.');
@@ -235,6 +241,7 @@ export class StudyLeaveService {
           Object.assign(pending, { status: dto.action === 'approve_extension' ? 'approved' : 'rejected',
             decidedAt: new Date().toISOString(), decidedBy: this.event(dto.action, actor).actor, decisionNote: dto.note?.trim() || '' });
         } else if (['resume', 'withdraw'].includes(dto.action)) {
+          if (dto.action === 'resume' && record.training_level === 'Thạc sĩ' && record.extra_data?.tuitionPayment?.paid !== true) throw new ConflictException('Cần xác nhận đã nộp học phí nhập học trước khi tiếp nhận học lại.');
           this.requireNote(dto.note); state = dto.action === 'resume' ? 'resumed' : 'withdrawn'; closedDate = today;
           for (const pending of extensions.filter(row => row.status === 'pending')) Object.assign(pending, { status: 'cancelled', decisionNote: 'Đợt bảo lưu đã kết thúc.' });
           await this.write('UPDATE admission_records SET study_status = :status, updated_at = NOW() WHERE id = :id', {

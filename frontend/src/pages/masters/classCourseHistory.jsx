@@ -6,6 +6,7 @@ import SearchRounded from "@mui/icons-material/SearchRounded";
 import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 import FeatureLayout from "../../components/FeatureLayout";
 import OfferingDetails from "../../features/scheduling/OfferingDetails";
+import { useAuthSession } from "../../context/AuthSession";
 import { API_BASE_URL } from "../../config/http";
 import "./classCourseHistory.css";
 import { disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline } from "../../utils/disciplineScope";
@@ -86,6 +87,8 @@ const sameSubject = (subject, offering) => {
 };
 
 export default function ClassCourseHistory() {
+  const session = useAuthSession();
+  const [revision, setRevision] = useState(0);
   const [searchParams, setSearchParams] = useSearchParams();
   const [majors, setMajors] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -183,7 +186,7 @@ export default function ClassCourseHistory() {
     }).catch(() => active && setError("Không thể tải dữ liệu theo dõi tiến độ."))
       .finally(() => active && setLoadingReport(false));
     return () => { active = false; };
-  }, [academicYears, loadingCatalog, majorId, visibleMajors, years]);
+  }, [academicYears, loadingCatalog, majorId, visibleMajors, years, revision]);
 
   useEffect(() => {
     if (loadingCatalog || (majorId && !visibleMajors.some((major) => major.id === majorId))) return;
@@ -283,6 +286,6 @@ export default function ClassCourseHistory() {
         </>}
       </section>}
     </div>
-    {selectedOffering && <OfferingDetails offering={selectedOffering} user={{}} onClose={() => setSelectedOffering(null)} />}
+    {selectedOffering && <OfferingDetails offering={selectedOffering} user={session?.user || {}} onClose={() => setSelectedOffering(null)} onSaved={() => setRevision((value) => value + 1)} />}
   </FeatureLayout>;
 }

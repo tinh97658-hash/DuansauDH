@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { Alert, Button, Checkbox, Chip, Pagination, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Button, Checkbox, Chip, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import { Link, useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../config/http";
 import AppDialog from "../../components/AppDialog";
 import ConfirmDialog from "../../components/ConfirmDialog";
+import ListPagination from "../../components/ListPagination";
 import ResizableTable from "../../components/ResizableTable";
 import { getMockConfirmResult } from "../../utils/confirmHelper";
 import { createScoreTemplate, EXCEL_MIME, parseScoreExcel, readExcelFile } from "./admissionExcel";
@@ -160,10 +161,8 @@ export default function BulkAdmissionWorkflow({ data, visibleRows, paginationKey
         </TableBody>
       </ResizableTable>
     </TableContainer>
-    <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="center" justifyContent="space-between">
-      <Typography variant="body2">Hiển thị {visibleRows.length ? pageStart + 1 : 0}–{Math.min(pageStart + PAGE_SIZE, visibleRows.length)} trên {visibleRows.length} hồ sơ</Typography>
-      <Pagination aria-label="Phân trang hồ sơ xét tuyển" count={pageCount} page={currentPage} onChange={(_, value) => setPage(value)} color="primary" size="small" />
-    </Stack>
+    <ListPagination aria-label="Phân trang hồ sơ xét tuyển" count={visibleRows.length}
+      page={currentPage - 1} pageSize={PAGE_SIZE} onPageChange={next => setPage(next + 1)} recordLabel="hồ sơ" showSinglePageSummary />
 
     <AppDialog
       open={Boolean(preview)}
@@ -210,7 +209,8 @@ export default function BulkAdmissionWorkflow({ data, visibleRows, paginationKey
             ))}
           </TableBody>
         </Table>
-        <Pagination aria-label="Phân trang danh sách duyệt" count={Math.max(1, Math.ceil(preview.rows.length / PAGE_SIZE))} page={previewPage} onChange={(_, value) => setPreviewPage(value)} color="primary" size="small" />
+        <ListPagination aria-label="Phân trang danh sách duyệt" count={preview.rows.length}
+          page={previewPage - 1} pageSize={PAGE_SIZE} onPageChange={next => setPreviewPage(next + 1)} recordLabel="hồ sơ" disabled={busy} showSinglePageSummary />
         <Typography variant="body2" sx={{ fontWeight: 600 }}>Đã chọn {selected.length} hồ sơ.</Typography>
       </Stack>}
     </AppDialog>

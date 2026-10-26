@@ -250,6 +250,28 @@ describe("SchedulingService participant preview", () => {
 });
 
 describe("SchedulingService course-offering candidates", () => {
+  it.each(['major-1', 'major-2'])("does not suggest internships for %s, including legacy names", async majorId => {
+    const mocks = buildService();
+    const selectedGroup = group('internship-scope', 'N01', majorId);
+    const courses = [
+      { ...subject, majorId },
+      { ...subject, id: 'practice-type', majorId, subjectType: 'TT', name: 'Học phần thực hành tại cơ sở' },
+      { ...subject, id: 'practice-name', majorId, subjectType: 'CN', name: 'Thực tập chuyên ngành' },
+      { ...subject, id: 'practice-graduation', majorId, name: '  THỰC  TẬP TỐT NGHIỆP  ' },
+    ];
+    mocks.majors.findOne.mockResolvedValue({ id: majorId });
+    mocks.classGroups.findAll.mockResolvedValue([selectedGroup]);
+    mocks.classGroupMembers.findAll.mockResolvedValue([{ id: 'member', classGroupId: selectedGroup.id }]);
+    mocks.packages.findAll.mockResolvedValue(courses.map(course => ({
+      id: `entry-${course.id}`, curriculumId: selectedGroup.curriculumId,
+      subjectId: course.id, subject: course, isRequired: true,
+    })));
+    mocks.offeringGroups.findAll.mockResolvedValue([]);
+
+    const result = await mocks.service.listCourseOfferingCandidates({ program: 'masters', majorId, academicYear: '2026' });
+    expect(result.subjects.map(row => row.subject.id)).toEqual([subject.id]);
+  });
+
   it("derives eligible subjects from each class group's official package", async () => {
     const { service, majors, classGroups, classGroupMembers, packages, offeringGroups } = buildService();
     const g1 = group("group-1", "N01");

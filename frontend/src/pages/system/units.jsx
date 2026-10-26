@@ -11,7 +11,7 @@ const Units = () => (
     codeLabel="Mã đơn vị"
     nameLabel="Tên đơn vị"
     sortable={false}
-    inlineEdit
+    editOnDoubleClick
   />
 );
 

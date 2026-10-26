@@ -321,7 +321,6 @@ const CreateClassGroups = () => {
                     key={row.id}
                     hover
                     onDoubleClick={() => isAdmin && openEdit(row)}
-                    title={isAdmin ? "Nhấp đúp để chỉnh sửa" : undefined}
                     sx={{
                       ...(isAdmin ? { cursor: "pointer" } : {}),
                       "&:hover": { bgcolor: "#F5FAFE!important" },

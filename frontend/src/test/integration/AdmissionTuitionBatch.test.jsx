@@ -47,7 +47,7 @@ it("chọn cả trang chỉ lấy học viên chưa xác nhận và bỏ qua tr�
 });
 it("giữ lựa chọn qua nhiều trang và gửi toàn bộ danh sách chỉ trong một yêu cầu", async () => {
   mount(); fireEvent.click(await screen.findByLabelText("Chọn xác nhận học phí HV001"));
-  fireEvent.click(screen.getByRole("button", { name: /page 2/i }));
+  fireEvent.click(screen.getByRole("button", { name: /^Trang 2$/ }));
   fireEvent.click(await screen.findByLabelText("Chọn xác nhận học phí HV016"));
   fireEvent.click(screen.getByRole("button", { name: "Xác nhận đã nộp học phí (2)" }));
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.stringContaining("/tuition/confirm-batch"), { rows: [

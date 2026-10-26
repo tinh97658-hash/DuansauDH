@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Put, Query, UseGuards } from "@nestjs/common";
 import { ExamScheduleService } from './exam-schedule.service.js';
-import { ConfirmExamDto, ExamScheduleQueryDto, ExamSessionActionDto, RescheduleExamDto, ScheduleExamDto } from './dto/exam-schedule.dto.js';
+import { ConfirmExamDto, ExamScheduleQueryDto, ExamSessionActionDto, RescheduleExamDto, ScheduleExamDto, SaveExamArrangementDto } from './dto/exam-schedule.dto.js';
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
 import { CurrentUser } from "../common/auth-user.js";
 import { RequirePermissions } from "../common/permissions.decorator.js";
@@ -44,6 +44,10 @@ export class MastersController {
   finalWorkflow(@Body() dto:GradebookWorkflowDto,@CurrentUser() actor:any){return this.gradebooks.transition(dto,actor,'final');}
   @Get('exam-schedule') @RequirePermissions('gradebook.view')
   listExamSchedule(@Query() query:ExamScheduleQueryDto){return this.examSchedule.list(query);}
+  @Post('exam-arrangements') @RequirePermissions('scheduling.write')
+  createExamArrangement(@Body() dto:SaveExamArrangementDto,@CurrentUser() actor:any){return this.examSchedule.saveArrangement(null,dto,actor);}
+  @Put('exam-arrangements/:id') @RequirePermissions('scheduling.write')
+  updateExamArrangement(@Param('id',ParseUUIDPipe) id:string,@Body() dto:SaveExamArrangementDto,@CurrentUser() actor:any){return this.examSchedule.saveArrangement(id,dto,actor);}
   @Post('exam-sessions') @RequirePermissions('scheduling.write')
   scheduleExam(@Body() dto:ScheduleExamDto,@CurrentUser() actor:any){return this.examSchedule.schedule(dto,actor);}
   @Put('exam-sessions/:id') @RequirePermissions('scheduling.write')

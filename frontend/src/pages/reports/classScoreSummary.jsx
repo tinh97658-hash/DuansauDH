@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
-import { Alert, Button, Chip, CircularProgress, Menu, MenuItem, Pagination, Paper, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
+import { Alert, Button, Chip, CircularProgress, Menu, MenuItem, Paper, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
 import FeatureLayout from "../../components/FeatureLayout";
+import ListPagination from "../../components/ListPagination";
 import ResizableTable from "../../components/ResizableTable";
 import FilterSelectField from "../../components/FilterSelectField";
 import FilterSearchField from "../../components/FilterSearchField";
@@ -196,12 +197,9 @@ export default function ClassScoreSummary() {
             </TableBody>
           </ResizableTable>
         </TableContainer>
-        {currentReport.total > 0 && <div className="css-pagination">
-          <span>Hiển thị {((currentReport.page || page) - 1) * PAGE_SIZE + 1}–{((currentReport.page || page) - 1) * PAGE_SIZE + currentReport.rows.length} trên {currentReport.total} học viên</span>
-          {currentReport.total > PAGE_SIZE && <Pagination aria-label="Phân trang học viên" page={currentReport.page || page}
-            count={Math.ceil(currentReport.total / PAGE_SIZE)} onChange={(_event, nextPage) => setPage(nextPage)}
-            disabled={exporting} showFirstButton showLastButton color="primary" />}
-        </div>}
+        <ListPagination aria-label="Phân trang học viên" count={currentReport.total}
+          page={(currentReport.page || page) - 1} pageSize={PAGE_SIZE} onPageChange={next => setPage(next + 1)}
+          disabled={exporting} recordLabel="học viên" showSinglePageSummary />
       </>}
       </Paper>
     </section>

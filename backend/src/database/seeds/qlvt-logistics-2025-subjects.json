@@ -1,0 +1,331 @@
+{
+  "source": "15. Chương trình khung CTĐT ThS QLVT & Logistics 2025.2.doc",
+  "sourceTable": "7.2",
+  "majorCode": "QLVTVL",
+  "program": "masters",
+  "sourceRows": 32,
+  "duplicatesRemoved": [
+    "Thống kê kinh tế",
+    "Marketing trong vận tải & logistics",
+    "Thiết kế hệ thống logistics"
+  ],
+  "sourceCodeConflicts": [
+    {
+      "name": "Thực tập chuyên ngành",
+      "retainedCatalogCodeText": "VLTT",
+      "retainedCatalogCodeNumber": 529,
+      "semesterEntries": [
+        {
+          "codeText": "VLTT",
+          "codeNumber": 532
+        }
+      ],
+      "reason": "Table 7.2 is the catalog source; the semester plan has inconsistent codes."
+    },
+    {
+      "name": "Đề án tốt nghiệp",
+      "retainedCatalogCodeText": "VLĐA",
+      "retainedCatalogCodeNumber": 530,
+      "semesterEntries": [
+        {
+          "codeText": "VLĐA",
+          "codeNumber": 533
+        }
+      ],
+      "reason": "Table 7.2 is the catalog source; the semester plan has inconsistent codes."
+    }
+  ],
+  "enableSharedLearning": true,
+  "subjects": [
+    {
+      "sourceOrder": 1,
+      "codeText": "HPTH",
+      "codeNumber": 501,
+      "name": "Triết học",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 2,
+      "codeText": "HPTA",
+      "codeNumber": 502,
+      "name": "Tiếng Anh",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 3,
+      "codeText": "VLKH",
+      "codeNumber": 506,
+      "name": "Phương pháp nghiên cứu khoa học",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 4,
+      "codeText": "VLKT",
+      "codeNumber": 503,
+      "name": "Kinh tế học ứng dụng",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 5,
+      "codeText": "VLPT",
+      "codeNumber": 504,
+      "name": "Phân tích kinh tế trong vận tải và logistics",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 6,
+      "codeText": "VLPL",
+      "codeNumber": 505,
+      "name": "Pháp luật vận tải và logistics",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 7,
+      "codeText": "VLQL",
+      "codeNumber": 526,
+      "name": "Quản lý nhà nước về kinh tế",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 8,
+      "codeText": "VLTK",
+      "codeNumber": 508,
+      "name": "Thống kê kinh tế",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 9,
+      "codeText": "VLBV",
+      "codeNumber": 507,
+      "name": "Phát triển bền vững",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 10,
+      "codeText": "VLQT",
+      "codeNumber": 509,
+      "name": "Kinh tế quốc tế",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 11,
+      "codeText": "VLDL",
+      "codeNumber": 510,
+      "name": "Địa lý kinh tế",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 13,
+      "codeText": "VLKQ",
+      "codeNumber": 523,
+      "name": "Kế toán quản trị",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 14,
+      "codeText": "VLNL",
+      "codeNumber": 525,
+      "name": "Quản lý năng lượng",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 15,
+      "codeText": "VLTU",
+      "codeNumber": 512,
+      "name": "Ứng dụng các phương pháp toán trong kinh tế",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 16,
+      "codeText": "VLPT",
+      "codeNumber": 514,
+      "name": "Tổ chức khai thác phương tiện vận chuyển",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 17,
+      "codeText": "VLCB",
+      "codeNumber": 515,
+      "name": "Quản lý và khai thác cảng, bến",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 18,
+      "codeText": "VLCL",
+      "codeNumber": 521,
+      "name": "Quản trị chiến lược chuỗi cung ứng",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 19,
+      "codeText": "VLLQ",
+      "codeNumber": 511,
+      "name": "Logistics quốc tế",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 20,
+      "codeText": "VLGN",
+      "codeNumber": 516,
+      "name": "Giao nhận vận tải quốc tế",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 21,
+      "codeText": "VLMA",
+      "codeNumber": 517,
+      "name": "Marketing trong vận tải & logistics",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 22,
+      "codeText": "VLKH",
+      "codeNumber": 513,
+      "name": "Quản trị kho hàng",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 23,
+      "codeText": "VLDV",
+      "codeNumber": 518,
+      "name": "Quản lý dịch vụ vận tải",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 24,
+      "codeText": "VLHT",
+      "codeNumber": 519,
+      "name": "Thiết kế hệ thống logistics",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 25,
+      "codeText": "VLEL",
+      "codeNumber": 528,
+      "name": "Logistics điện tử",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 27,
+      "codeText": "VLQR",
+      "codeNumber": 520,
+      "name": "Quản lý rủi ro trong logistics",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 29,
+      "codeText": "VLTM",
+      "codeNumber": 522,
+      "name": "Hệ thống vận tải thông minh",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 30,
+      "codeText": "VLCS",
+      "codeNumber": 524,
+      "name": "Chính sách và chiến lược vận tải",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 31,
+      "codeText": "VLTT",
+      "codeNumber": 529,
+      "name": "Thực tập chuyên ngành",
+      "credits": 7,
+      "subjectType": "TT",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 32,
+      "codeText": "VLĐA",
+      "codeNumber": 530,
+      "name": "Đề án tốt nghiệp",
+      "credits": 9,
+      "subjectType": "TN",
+      "isRequired": true,
+      "majorAssignment": true
+    }
+  ]
+}

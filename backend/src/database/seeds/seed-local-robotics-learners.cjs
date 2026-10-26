@@ -52,7 +52,7 @@ async function run() {
            nationality, ethnicity, religion, city, pob, training_mode_name,
            grad_school, grad_major, grad_year, grad_degree_type, gpa, grad_classification,
            documents, note, extra_data, submitted_at, created_at, updated_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'Thạc sĩ',$9,$10,$11,'approved','Đang học',
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'Thạc sĩ',$9,$10,$11,'approved','Đã trúng tuyển',
           'Việt Nam','Kinh','Không','Thành phố Hải Phòng','Hải Phòng','Đào tạo thông thường',
           'Trường đại học mẫu','Kỹ thuật cơ khí',$12,'Chính quy',$13,'Khá',
           '{}'::json,$14,$15::json,NOW(),NOW(),NOW())`,
@@ -67,7 +67,8 @@ async function run() {
     const learners = (await client.query(`
       SELECT code, full_name, study_status FROM admission_records
       WHERE code=ANY($1::text[]) AND major_id=$2 AND training_level='Thạc sĩ'
-        AND academic_year=$3 AND status='approved' AND study_status='Đang học'
+        AND academic_year=$3 AND status='approved' AND study_status=CASE
+          WHEN COALESCE(extra_data->'tuitionPayment'->>'paid','false')='true' THEN 'Đang học' ELSE 'Đã trúng tuyển' END
       ORDER BY code`, [codes, major.id, YEAR])).rows;
     if (apply && learners.length !== 10) throw new Error(`Hậu kiểm không đủ 10 học viên: ${learners.length}.`);
     await client.query(apply ? "COMMIT" : "ROLLBACK");

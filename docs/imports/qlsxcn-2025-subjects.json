@@ -1,0 +1,277 @@
+{
+  "applied": true,
+  "major": {
+    "id": "fc68c9ed-7aa8-4a3a-96fa-7502e7a1db31",
+    "name": "Quản lý sản xuất công nghiệp"
+  },
+  "sourceRows": 32,
+  "uniqueSourceSubjects": 28,
+  "duplicatesRemoved": [
+    "Bảo dưỡng hệ thống sản xuất công nghiệp",
+    "Kinh tế kĩ thuật",
+    "Quản lý dự án công nghiệp",
+    "Kỹ thuật quản lý Six Sigma"
+  ],
+  "sourceCodeConflicts": [
+    {
+      "name": "Phương pháp nghiên cứu khoa học",
+      "sourceCodeText": "PPNC",
+      "retainedExistingCodeText": "CKKH",
+      "codeNumber": 506,
+      "reason": "Preserve existing course code; CKKH is also used in the semester plan. Other new courses follow Table 7.2."
+    }
+  ],
+  "existingPreserved": [
+    {
+      "id": "3805f0bc-2b9a-4229-bf78-7a4cd03a8a04",
+      "name": "Triết học"
+    },
+    {
+      "id": "cc1b40f4-dc72-4271-b9fd-8c80230dbd97",
+      "name": "Tiếng anh"
+    },
+    {
+      "id": "2cfeb6ed-045f-483b-b67b-2b4e8eddc330",
+      "name": "Phương pháp nghiên cứu khoa học"
+    }
+  ],
+  "inserted": [
+    {
+      "id": "264f8669-a8b7-40bb-8e1d-5fa8b1adcb5a",
+      "name": "Quản lý hệ thống kỹ thuật"
+    },
+    {
+      "id": "0743aadd-c726-40d4-9d57-d92ef23db51a",
+      "name": "Thiết bị sản xuất công nghiệp"
+    },
+    {
+      "id": "57234b5c-01c9-4ddc-bc47-f9acd091809d",
+      "name": "Thiết kế và phát triển sản phẩm"
+    },
+    {
+      "id": "850a8809-0b14-42a9-9f7b-b775256b9a83",
+      "name": "Kỹ thuật gia công tiên tiến"
+    },
+    {
+      "id": "46bb5187-e55d-4024-8c10-79eeda599eed",
+      "name": "Bảo dưỡng hệ thống sản xuất công nghiệp"
+    },
+    {
+      "id": "efe407ae-47fc-497a-bba9-89c8d9280889",
+      "name": "Kinh tế kĩ thuật"
+    },
+    {
+      "id": "b571677e-0c35-4b15-a839-6cbdc758ac99",
+      "name": "Hệ thống sản xuất tinh gọn"
+    },
+    {
+      "id": "ddfd3b57-56ab-4b0a-9e67-69f002395238",
+      "name": "Hoạch định và điều độ sản xuất"
+    },
+    {
+      "id": "0596c3a6-2ef8-43bd-9019-65337021d614",
+      "name": "Ứng dụng máy tính trong sản xuất"
+    },
+    {
+      "id": "2840ec71-1bf5-4058-9b4a-9faa086a32b1",
+      "name": "Vật liệu nâng cao"
+    },
+    {
+      "id": "3ba055e2-2bdc-48a1-b3d4-63c0973a46c0",
+      "name": "Thiết kế máy và công nghệ chế tạo"
+    },
+    {
+      "id": "241a1ea7-24de-4ed3-a3ce-17bf5ed67995",
+      "name": "Quản lý và đánh giá chất lượng"
+    },
+    {
+      "id": "d6beb4b5-11c4-435d-9348-e68a0f2cf207",
+      "name": "Hệ thống sản xuất linh hoạt và tích hợp"
+    },
+    {
+      "id": "33a317be-c128-451c-abcf-6036de02e6ab",
+      "name": "Thiết kế, cấu trúc nhà máy và thiết bị công nghiệp"
+    },
+    {
+      "id": "ae1cd2bc-93be-4a6b-9389-9f1db15a1168",
+      "name": "Logistic trong nhà máy công nghiệp"
+    },
+    {
+      "id": "8753a9ff-e118-43cd-b74e-7a33487d53e9",
+      "name": "Quản lý dự án công nghiệp"
+    },
+    {
+      "id": "f46a0764-a4c4-43e9-9540-82d01d797833",
+      "name": "Kỹ thuật quản lý Six Sigma"
+    },
+    {
+      "id": "aec1beed-a88c-4ff5-a88d-37fc123fa6ab",
+      "name": "Tự động và điều khiển các quá trình công nghiệp (nâng cao)"
+    },
+    {
+      "id": "7c4ad8cc-4647-4945-9d38-a5ecaad8adc7",
+      "name": "Hệ thống thông tin tích hợp"
+    },
+    {
+      "id": "fd6fde64-52b0-4ae4-ae27-704636424b87",
+      "name": "Kỹ thuật vận chuyển và xếp dỡ vật liệu"
+    },
+    {
+      "id": "91c6d04b-48cb-4a20-9396-203956a68cb4",
+      "name": "Sản xuất thông minh"
+    },
+    {
+      "id": "efdc5ebf-6939-41e6-a4b6-5f28fd452326",
+      "name": "Phân tích và mô hình hoá các quy trình sản xuất"
+    },
+    {
+      "id": "49a75793-c8bc-4c1f-a80f-fd7281effde8",
+      "name": "Hệ thống và quy trinh sản xuất xanh"
+    },
+    {
+      "id": "6fc3f62b-d7c6-4763-8f61-5d31f2c0a0ae",
+      "name": "Thực tập chuyên ngành"
+    },
+    {
+      "id": "59e18157-7d88-4009-bd2e-179d6da4c05d",
+      "name": "Đề án tốt nghiệp"
+    }
+  ],
+  "finalCatalogCount": 28,
+  "sharing": {
+    "groups": [
+      {
+        "name": "Triết học",
+        "credits": 3,
+        "otherMajors": [
+          "Kỹ thuật xây dựng công trình thủy",
+          "Quản lý cảng và an toàn hàng hải",
+          "Cơ khí thông minh và Robot",
+          "Quản lý môi trường",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Kỹ thuật môi trường",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý hàng hải",
+          "Công nghệ thông tin",
+          "Quản trị kinh doanh",
+          "Quản lý kinh tế",
+          "Quản lý vận tải và Logistics",
+          "Quản lý tài chính",
+          "Quản lý kỹ thuật",
+          "Quản lý năng lượng",
+          "Kỹ thuật tàu thủy"
+        ]
+      },
+      {
+        "name": "Tiếng anh",
+        "credits": 3,
+        "otherMajors": [
+          "Kỹ thuật xây dựng công trình thủy",
+          "Quản lý cảng và an toàn hàng hải",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý hàng hải",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Quản lý vận tải và Logistics",
+          "Quản trị kinh doanh",
+          "Quản lý kinh tế",
+          "Quản lý tài chính",
+          "Kỹ thuật môi trường",
+          "Quản lý năng lượng",
+          "Cơ khí thông minh và Robot",
+          "Công nghệ thông tin",
+          "Quản lý môi trường",
+          "Quản lý kỹ thuật",
+          "Kỹ thuật tàu thủy"
+        ]
+      },
+      {
+        "name": "Phương pháp nghiên cứu khoa học",
+        "credits": 2,
+        "otherMajors": [
+          "Cơ khí thông minh và Robot",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật môi trường",
+          "Kỹ thuật tàu thủy",
+          "Kỹ thuật xây dựng công trình thủy",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Quản lý cảng và an toàn hàng hải",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý hàng hải",
+          "Quản lý kinh tế",
+          "Quản lý kỹ thuật",
+          "Quản lý môi trường",
+          "Quản lý năng lượng",
+          "Quản lý tài chính",
+          "Quản lý vận tải và Logistics",
+          "Công nghệ thông tin"
+        ]
+      },
+      {
+        "name": "Kỹ thuật gia công tiên tiến",
+        "credits": 2,
+        "otherMajors": [
+          "Cơ khí thông minh và Robot"
+        ]
+      },
+      {
+        "name": "Hệ thống sản xuất linh hoạt và tích hợp",
+        "credits": 2,
+        "otherMajors": [
+          "Cơ khí thông minh và Robot"
+        ]
+      }
+    ],
+    "updates": [
+      {
+        "id": "458bd0b6-c88b-4948-843f-bbb02bd9391b",
+        "name": "Kỹ thuật gia công tiên tiến",
+        "major": "Cơ khí thông minh và Robot",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "fc68c9ed-7aa8-4a3a-96fa-7502e7a1db31"
+        ]
+      },
+      {
+        "id": "850a8809-0b14-42a9-9f7b-b775256b9a83",
+        "name": "Kỹ thuật gia công tiên tiến",
+        "major": "Quản lý sản xuất công nghiệp",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "ea78b1e6-6804-4987-82b2-7dccfa23af20"
+        ]
+      },
+      {
+        "id": "7853a322-a2ae-4c60-ae1b-c8df183a0c4b",
+        "name": "Hệ thống sản xuất linh hoạt và tích hợp",
+        "major": "Cơ khí thông minh và Robot",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "fc68c9ed-7aa8-4a3a-96fa-7502e7a1db31"
+        ]
+      },
+      {
+        "id": "d6beb4b5-11c4-435d-9348-e68a0f2cf207",
+        "name": "Hệ thống sản xuất linh hoạt và tích hợp",
+        "major": "Quản lý sản xuất công nghiệp",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "ea78b1e6-6804-4987-82b2-7dccfa23af20"
+        ]
+      }
+    ],
+    "differentCredits": [],
+    "excludedCourses": [
+      "Thực tập chuyên ngành",
+      "Đề án tốt nghiệp"
+    ]
+  }
+}

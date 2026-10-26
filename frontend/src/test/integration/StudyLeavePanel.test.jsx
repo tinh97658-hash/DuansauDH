@@ -4,11 +4,34 @@ import axios from 'axios';
 import StudyLeavePanel from '../../features/learners/StudyLeavePanel';
 
 jest.mock('axios');
-const record = { id: 'learner', fullName: 'Nguyễn Văn A', studyStatus: 'Đang học' };
+const record = { id: 'learner', fullName: 'Nguyễn Văn A', trainingLevel: 'Thạc sĩ', studyStatus: 'Đang học', extraData: { tuitionPayment: { paid: true } }, updatedAt: '2026-10-25T01:00:00Z' };
 const currentDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const leave = { id: 'leave', reason: 'Điều trị', startDate: '2026-01-01', endDate: '2026-06-30', status: 'approved', effectiveStatus: 'overdue',
   history: [], extensions: [], withdrawals: [{ snapshot: { courseOfferingId: 'old-class', subjectName: 'Môn học dở', phase: 'studying', grades: [{ testScore: 0, assignmentScore: 7 }] } }] };
 beforeEach(() => { jest.resetAllMocks(); axios.get.mockResolvedValue({ data: { leaves: [], affectedOfferings: [] } }); });
+
+it('routes an unpaid learner back to applications without creating a study leave', async () => {
+  const onChanged = jest.fn();
+  axios.post.mockResolvedValue({ data: { studyStatus: 'Nộp hồ sơ đầu vào', status: 'pending' } });
+  render(<StudyLeavePanel record={{ ...record, extraData: {}, studyStatus: 'Đã trúng tuyển' }} isAdmin onChanged={onChanged} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Rút hồ sơ chưa nhập học' }));
+  expect(screen.queryByRole('button', { name: 'Tạo yêu cầu bảo lưu' })).not.toBeInTheDocument();
+  expect(axios.post).not.toHaveBeenCalled();
+  const dialog = screen.getByRole('dialog');
+  expect(within(dialog).getByRole('button', { name: 'Xác nhận' })).toBeDisabled();
+  fireEvent.change(within(dialog).getByLabelText(/Lý do \/ thông tin quyết định/), { target: { value: 'Chưa đóng tiền, xin nghỉ' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Xác nhận' }));
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/admission-records/learner/withdraw-unpaid'), { note: 'Chưa đóng tiền, xin nghỉ', updatedAt: record.updatedAt }, { withCredentials: true }));
+  await waitFor(() => expect(onChanged).toHaveBeenCalled());
+  expect(await screen.findByText('Đã rút khỏi lớp và đưa về Nộp hồ sơ đầu vào.')).toBeInTheDocument();
+});
+
+it('rejects the legacy unpaid Đang học projection and hides withdrawal from readers', async () => {
+  render(<StudyLeavePanel record={{ ...record, extraData: {} }} />);
+  await screen.findByText(/Chưa nộp học phí nên chưa nhập học/);
+  expect(screen.queryByRole('button', { name: 'Tạo yêu cầu bảo lưu' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Rút hồ sơ chưa nhập học' })).not.toBeInTheDocument();
+});
 
 it('creates a dated pending request with a reason and refreshes the record after saving', async () => {
   const onChanged = jest.fn();

@@ -7,6 +7,11 @@ export class UpdateAdmissionTuitionDto {
   @IsDateString() updatedAt!: string;
 }
 
+export class WithdrawUnpaidAdmissionDto {
+  @IsDateString() updatedAt!: string;
+  @IsString() @IsNotEmpty() @MaxLength(2000) note!: string;
+}
+
 export class AdmissionTuitionRowDto {
   @IsUUID() admissionRecordId!: string;
   @IsDateString() updatedAt!: string;

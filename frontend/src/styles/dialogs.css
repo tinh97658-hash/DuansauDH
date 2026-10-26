@@ -216,9 +216,15 @@
     background: var(--primary-dark);
   }
 
-  body .app-popup :is(button, input, select, textarea):focus-visible {
+  body .app-popup button:focus-visible {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
+  }
+
+  body .app-popup :is(input, select, textarea):focus-visible {
+    outline: none;
+    box-shadow: none;
+    border-color: var(--primary);
   }
 
   body .app-popup :is(.sl-btn:disabled, .sl-drawer-close:disabled) {

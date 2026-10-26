@@ -53,6 +53,11 @@ const normalizeSubjectName = (value: unknown) => String(value || "")
   .replace(/\s+/g, " ")
   .toLocaleLowerCase("vi");
 
+const isInternshipSubject = (subject: { subjectType?: string; name?: string }) => (
+  String(subject.subjectType || "").trim().toUpperCase() === "TT"
+  || /^thuc\s+tap(?:\s|$)/.test(normalizeSubjectName(subject.name).normalize("NFD").replace(/[\u0300-\u036f]/g, ""))
+);
+
 @Injectable()
 export class SchedulingService {
   constructor(
@@ -672,7 +677,7 @@ export class SchedulingService {
     const results = await readRetakeResults(this.sequelize, groupIds, [...scope], transaction);
     const unstudied = await readLateUnstudiedMembers(this.sequelize, groupIds, [...scope], transaction);
     const returned = await readReturnedMembers(this.sequelize, groupIds, [...scope], transaction);
-    if (active.length && !returned.length) throw new ConflictException("Nhóm học lại đã được xếp vào lớp đang hoạt động. Hãy tải lại danh sách.");
+    if (active.length && !returned.length && !unstudied.length) throw new ConflictException("Nhóm học lại đã được xếp vào lớp đang hoạt động. Hãy tải lại danh sách.");
     const recordIds = [...new Set([...results, ...unstudied, ...returned].map(row => row.admissionRecordId))];
     const recognitions = recordIds.length ? await this.subjectRecognitions.findAll({
       where: { admissionRecordId: { [Op.in]: recordIds }, targetSubjectId: { [Op.in]: [...scope] }, status: "approved" }, transaction,
@@ -855,7 +860,7 @@ export class SchedulingService {
       for (const row of curriculumSubjectRows) {
         if (row.curriculumId !== group.curriculumId) continue;
         const localSubject = row.subject as Subject;
-        if (!localSubject) continue;
+        if (!localSubject || isInternshipSubject(localSubject)) continue;
         localPairs.push({ classGroupId: group.id, localSubject });
       }
     }
@@ -980,11 +985,12 @@ export class SchedulingService {
       const returned = [...new Map(returnedResults.filter(member => member.classGroupId === group.id && scope.has(member.subjectId)
         && !SchedulingService.isRecognizedFor(recognizedSet, scope, member.admissionRecordId))
         .map(member => [member.participantId, member])).values()];
+      const unstudied = status === "completed" || status === "active"
+        ? (await readLateUnstudiedMembers(this.sequelize, [group.id], [...scope]))
+          .filter(member => !SchedulingService.isRecognizedFor(recognizedSet, scope, member.admissionRecordId)) : [];
       if (status === "completed") {
         row.completedClassGroups.push(summary);
         const failed = failedRetakeMembers(retakeResults, group.id, scope)
-          .filter(member => !SchedulingService.isRecognizedFor(recognizedSet, scope, member.admissionRecordId));
-        const unstudied = (await readLateUnstudiedMembers(this.sequelize, [group.id], [...scope]))
           .filter(member => !SchedulingService.isRecognizedFor(recognizedSet, scope, member.admissionRecordId));
         const waiting = [...new Map([...failed, ...unstudied, ...returned].map(member => [member.participantId, member])).values()];
         if (waiting.length) row.retakeClassGroups.push({ ...summary, isRetake: true,
@@ -996,15 +1002,17 @@ export class SchedulingService {
       }
       else if (status === "active") {
         row.activeClassGroups.push(summary);
-        if (returned.length) row.retakeClassGroups.push({ ...summary, isRetake: true, memberCount: returned.length,
+        const waiting = [...new Map([...unstudied, ...returned].map(member => [member.participantId, member])).values()];
+        if (waiting.length) row.retakeClassGroups.push({ ...summary, isRetake: true, memberCount: waiting.length,
           returningCount: returned.length, retakeCount: returned.filter(member => member.studyType !== 'first_time').length,
-          unstudiedCount: returned.filter(member => member.studyType === 'first_time').length,
+          unstudiedCount: waiting.filter(member => member.studyType === 'first_time').length,
           name: summary.code || summary.name, sourceCourseOfferingIds: returned.map(member => member.sourceCourseOfferingId) });
       }
       else row.eligibleClassGroups.push({ ...summary, retakeCount: 0, unstudiedCount: summary.memberCount });
     }
 
     const subjects = [...result.values()]
+      .filter((row) => !isInternshipSubject(row.subject))
       .filter((row) => [...row.eligibleClassGroups, ...row.retakeClassGroups].some((group) => anchorGroupIds.has(group.id)))
       .sort((left, right) => {
         const leftKC = left.subject.subjectType === "KC" ? 0 : 1;

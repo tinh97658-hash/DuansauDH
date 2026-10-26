@@ -1,0 +1,350 @@
+{
+  "source": "5. Chương trình khung CTĐT CH KTXD CT DD&CN 2025.2.doc",
+  "sourceTable": "7.2",
+  "majorCode": "KTXDDDVCN",
+  "program": "masters",
+  "sourceRows": 32,
+  "duplicatesRemoved": [],
+  "sourceCodeConflicts": [
+    {
+      "name": "Phương pháp nghiên cứu khoa học",
+      "sourceCodeNumber": 503,
+      "retainedExistingCodeNumber": 506,
+      "codeText": "XDKH",
+      "reason": "Preserve existing same-name, same-credit course, its code and sharing links rather than creating a duplicate."
+    }
+  ],
+  "sourceCreditResolutions": [
+    {
+      "codeText": "XDOK",
+      "codeNumber": 521,
+      "name": "Ổn định Kết cấu thép và kết cấu thép nhẹ",
+      "credits": 2,
+      "reason": "Credit cell is empty in Table 7.2; verified against the same course in the semester plan."
+    }
+  ],
+  "enableSharedLearning": true,
+  "subjects": [
+    {
+      "sourceOrder": 1,
+      "codeText": "HPTH",
+      "codeNumber": 501,
+      "name": "Triết học",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 2,
+      "codeText": "HPTA",
+      "codeNumber": 502,
+      "name": "Tiếng Anh",
+      "credits": 3,
+      "subjectType": "KC",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 3,
+      "codeText": "XDKH",
+      "codeNumber": 506,
+      "name": "Phương pháp nghiên cứu khoa học",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true,
+      "sourceCodeNumber": 503
+    },
+    {
+      "sourceOrder": 4,
+      "codeText": "XDPS",
+      "codeNumber": 504,
+      "name": "Phương pháp Phần tử hữu hạn trong tính toán kết cấu",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 5,
+      "codeText": "XDVL",
+      "codeNumber": 505,
+      "name": "Vật liệu mới trong xây dựng DD và CN",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 6,
+      "codeText": "XDDA",
+      "codeNumber": 506,
+      "name": "Quản lý dự án xây dựng",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 7,
+      "codeText": "XDÔĐ",
+      "codeNumber": 507,
+      "name": "Ổn định công trình",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 8,
+      "codeText": "XDƯD",
+      "codeNumber": 508,
+      "name": "Tin học ứng dụng trong kỹ thuật công trình",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 9,
+      "codeText": "XDBV",
+      "codeNumber": 509,
+      "name": "Kết cấu tấm và vỏ mỏng",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 10,
+      "codeText": "XDQL",
+      "codeNumber": 510,
+      "name": "Quản lý dự án xây dựng nâng cao",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 11,
+      "codeText": "XDVT",
+      "codeNumber": 511,
+      "name": "Vật liệu và công nghệ chống thấm công trình xây dựng",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 12,
+      "codeText": "XDPL",
+      "codeNumber": 512,
+      "name": "Pháp luật và quản lý chính sách trong xây dựng",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 13,
+      "codeText": "XDTƯ",
+      "codeNumber": 513,
+      "name": "Lý thuyết tối ưu trong tính toán kết cấu",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 14,
+      "codeText": "XDPT",
+      "codeNumber": 514,
+      "name": "Phương pháp tính",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 15,
+      "codeText": "XDCP",
+      "codeNumber": 515,
+      "name": "Vật liệu composite",
+      "credits": 2,
+      "subjectType": "CS",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 16,
+      "codeText": "XDCL",
+      "codeNumber": 516,
+      "name": "Quản lý chất lượng Công trình xây dựng",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 17,
+      "codeText": "XDKN",
+      "codeNumber": 517,
+      "name": "Kết cấu nhà nhiều tầng bằng BTCT",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 18,
+      "codeText": "XDKT",
+      "codeNumber": 518,
+      "name": "Kết cấu công trình thép cao",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 19,
+      "codeText": "XDXN",
+      "codeNumber": 519,
+      "name": "Xử lý nền đất yếu",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 20,
+      "codeText": "XDCT",
+      "codeNumber": 520,
+      "name": "Công nghệ và tổ chức thi công",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 21,
+      "codeText": "XDOK",
+      "codeNumber": 521,
+      "name": "Ổn định Kết cấu thép và kết cấu thép nhẹ",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 22,
+      "codeText": "XDTC",
+      "codeNumber": 522,
+      "name": "Độ tin cậy và tuổi thọ công trình",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 23,
+      "codeText": "XDKC",
+      "codeNumber": 523,
+      "name": "Thiết kế kháng chấn công trình",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 24,
+      "codeText": "XDĐĐ",
+      "codeNumber": 524,
+      "name": "Động đất và và lý thuyết tính toán các công trình chịu động đất",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 25,
+      "codeText": "XDBĐ",
+      "codeNumber": 525,
+      "name": "Những vấn đề đặc biệt của kết cấu BTCT",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 26,
+      "codeText": "XDTĐ",
+      "codeNumber": 526,
+      "name": "Tác động của gió, bão, lốc lên công trình",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 27,
+      "codeText": "XDTN",
+      "codeNumber": 527,
+      "name": "Phương pháp thực nghiệm công trình",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 28,
+      "codeText": "XDTM",
+      "codeNumber": 528,
+      "name": "Tính toán thanh thành mỏng",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 29,
+      "codeText": "XDBƯ",
+      "codeNumber": 529,
+      "name": "Kết cấu BTCT ứng suất trước",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 30,
+      "codeText": "XDCH",
+      "codeNumber": 530,
+      "name": "Công nghệ thi công hiện đại",
+      "credits": 2,
+      "subjectType": "CN",
+      "isRequired": false,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 31,
+      "codeText": "XDTT",
+      "codeNumber": 531,
+      "name": "Thực tập tốt nghiệp",
+      "credits": 7,
+      "subjectType": "TT",
+      "isRequired": true,
+      "majorAssignment": true
+    },
+    {
+      "sourceOrder": 32,
+      "codeText": "XDĐA",
+      "codeNumber": 532,
+      "name": "Đề án tốt nghiệp",
+      "credits": 9,
+      "subjectType": "TN",
+      "isRequired": true,
+      "majorAssignment": true
+    }
+  ]
+}

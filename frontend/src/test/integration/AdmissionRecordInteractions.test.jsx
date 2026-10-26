@@ -3,6 +3,7 @@ import React from "react";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import axios from "axios";
+import { toast } from "react-toastify";
 import AdmissionRecords from "../../pages/plan/admissionRecords";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import theme from "../../theme";
@@ -20,6 +21,7 @@ vi.mock("react-toastify", () => ({ ToastContainer: () => null, toast: { success:
 
 const record = {
   id: "record-1", code: "HV001", lastName: "Nguyễn Văn", firstName: "An", fullName: "Nguyễn Văn An",
+  phone: "0912345678", idCard: "0310900012345",
   email: "an@example.test", gender: "Nam", majorId: "m1", trainingLevel: "Thạc sĩ", studyStatus: "Đã trúng tuyển", academicYear: "2025",
 };
 
@@ -42,6 +44,38 @@ const mount = mode => render(<ThemeProvider theme={theme}><CssBaseline /><Memory
     <Route path="/masters/study-leaves/:id" element={<p>Trang chi tiết học viên</p>} />
   </Routes>
 </MemoryRouter></ThemeProvider>);
+
+it.each([
+  ["Họ đệm", ""], ["Tên", "   "], ["Họ đệm", "Nguyễn123"],
+  ["Tên", "An@"], ["Tên", "安"], ["Tên", "Аn"],
+  ["Số điện thoại", ""], ["Số điện thoại", "091234567"],
+  ["CCCD", ""], ["CCCD", "031090001234"],
+])("blocks saving an invalid %s: %s even with an existing full name", async (label, value) => {
+  mount("admitted-masters");
+  fireEvent.click(await screen.findByRole("button", { name: "Sửa hồ sơ HV001" }));
+  const dialog = within(screen.getByRole("dialog"));
+  fireEvent.change(dialog.getByRole("textbox", { name: label, exact: true }), { target: { value } });
+  fireEvent.click(dialog.getByRole("button", { name: "Chấp nhận (Enter)" }));
+  expect(axios.put).not.toHaveBeenCalled();
+  expect(toast.error).not.toHaveBeenCalled();
+  expect(dialog.getByRole("textbox", { name: label, exact: true })).toHaveAttribute("aria-invalid", "true");
+  expect(dialog.getByRole("textbox", { name: label, exact: true })).toHaveAccessibleDescription();
+});
+
+it("saves complete Latin names with Vietnamese accents and normalized spacing", async () => {
+  axios.put.mockResolvedValue({ data: {} });
+  mount("admitted-masters");
+  fireEvent.click(await screen.findByRole("button", { name: "Sửa hồ sơ HV001" }));
+  const dialog = within(screen.getByRole("dialog"));
+  fireEvent.change(dialog.getByRole("textbox", { name: "Họ đệm", exact: true }), { target: { value: "  Nguyễn   Văn  ".normalize("NFD") } });
+  fireEvent.change(dialog.getByRole("textbox", { name: "Tên", exact: true }), { target: { value: "  Đạt  " } });
+  fireEvent.click(dialog.getByRole("button", { name: "Chấp nhận (Enter)" }));
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(
+    expect.stringContaining("/plan/admission-records/record-1"),
+    expect.objectContaining({ lastName: "Nguyễn Văn", firstName: "Đạt", fullName: "Nguyễn Văn Đạt" }),
+    { withCredentials: true },
+  ));
+});
 
 describe.each(["applications", "admitted-masters", "study-management"])("Student record interactions: %s", mode => {
   it.each(["HV001", "an@example.test", "Nam"])("opens the populated profile on double click of %s", async text => {
@@ -97,6 +131,18 @@ it("creates a profile with the year selected in the filter", async () => {
   fireEvent.click(within(categories).getByRole("option", { name: "Dự thính" }));
   fireEvent.change(dialog.getByPlaceholderText("Nguyễn Văn"), { target: { value: "Trần Văn" } });
   fireEvent.change(dialog.getByPlaceholderText("An"), { target: { value: "Bình" } });
+  const save = () => fireEvent.click(dialog.getByRole("button", { name: "Chấp nhận (Enter)" }));
+  save();
+  expect(axios.post).not.toHaveBeenCalled();
+  fireEvent.change(dialog.getByRole("textbox", { name: "Số điện thoại" }), { target: { value: "091234567" } });
+  fireEvent.change(dialog.getByRole("textbox", { name: "CCCD" }), { target: { value: "0310900012345" } });
+  save();
+  expect(axios.post).not.toHaveBeenCalled();
+  fireEvent.change(dialog.getByRole("textbox", { name: "Số điện thoại" }), { target: { value: "0912345678" } });
+  fireEvent.change(dialog.getByRole("textbox", { name: "CCCD" }), { target: { value: "031090001234" } });
+  save();
+  expect(axios.post).not.toHaveBeenCalled();
+  fireEvent.change(dialog.getByRole("textbox", { name: "CCCD" }), { target: { value: "0310900012345" } });
   fireEvent.click(dialog.getByRole("button", { name: "Chấp nhận (Enter)" }));
   await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
     expect.stringContaining("/plan/admission-records"),

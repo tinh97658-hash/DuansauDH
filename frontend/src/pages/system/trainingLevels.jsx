@@ -3,6 +3,8 @@ import CatalogManager from "../../components/CatalogManager";
 
 const TrainingLevels = () => (
   <CatalogManager
+    sortable={false}
+    editOnDoubleClick
     title="Trình độ đào tạo"
     group="Danh mục đào tạo"
     desc="Danh mục trình độ đào tạo (thạc sĩ, tiến sĩ...)."

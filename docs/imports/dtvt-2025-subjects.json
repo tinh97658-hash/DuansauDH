@@ -1,0 +1,129 @@
+{
+  "applied": true,
+  "major": {
+    "id": "85644801-faec-4a5b-96d0-62f233fa5fcb",
+    "name": "Kỹ thuật điện tử - viễn thông"
+  },
+  "sourceRows": 32,
+  "uniqueSourceSubjects": 27,
+  "duplicatesRemoved": [
+    "Hệ thống thông tin vệ tinh",
+    "Nguyên lý và thiết kế mạch siêu cao tần",
+    "Quản lý và quy hoạch hệ thống thông tin hàng hải",
+    "Quản lý tần số vô tuyến điện",
+    "Truyền hình số"
+  ],
+  "existingPreserved": [
+    {
+      "id": "c2658c4a-ed01-4dca-9420-4b1413bfc435",
+      "name": "Triết học"
+    },
+    {
+      "id": "ffb7ba3d-b266-4a57-8bd8-ba14bc6d7eff",
+      "name": "Tiếng anh"
+    }
+  ],
+  "inserted": [
+    {
+      "id": "aea9d0d2-9539-4107-9c83-44d0fcc0c7b0",
+      "name": "Phương pháp nghiên cứu khoa học"
+    },
+    {
+      "id": "f5b0d8b6-3504-4332-9456-194fd46c8ec5",
+      "name": "Lý thuyết thông tin và mã hóa"
+    },
+    {
+      "id": "874ab178-f69e-4dbb-ac2b-150a0c5f040e",
+      "name": "Xử lý số tín hiệu nâng cao"
+    },
+    {
+      "id": "a76c6997-31c6-4970-9e9a-fd468f41ba71",
+      "name": "Công nghệ Internet vạn vật"
+    },
+    {
+      "id": "38547790-0308-40ba-85fe-8cf82e0e9c5b",
+      "name": "Trí tuệ nhân tạo và ứng dụng"
+    },
+    {
+      "id": "3410493f-ff1b-4782-843d-8e5e5c1693da",
+      "name": "Cấu trúc và ứng dụng bộ vi xử lý"
+    },
+    {
+      "id": "8a08efd3-5fc8-4778-ad95-ca1ae8e85872",
+      "name": "Đồ án thiết kế mạch sử dụng FPGA"
+    },
+    {
+      "id": "b8d00a66-3151-4144-b224-e60b521b1b40",
+      "name": "Hệ thống thông tin vệ tinh"
+    },
+    {
+      "id": "00eb7fd0-fa64-40a2-a633-15d0c85fc384",
+      "name": "Nguyên lý và thiết kế mạch siêu cao tần"
+    },
+    {
+      "id": "e5db0da8-edd1-41c2-9662-a6e0bbf690d5",
+      "name": "Đo lường và điều khiển dùng máy tính"
+    },
+    {
+      "id": "a98c9e47-e825-41ad-9e61-3e7ba2555114",
+      "name": "Xử lý ảnh"
+    },
+    {
+      "id": "06c4b94e-ff36-44e3-b424-ba8ea19963a5",
+      "name": "Anten và truyền sóng nâng cao"
+    },
+    {
+      "id": "a6e5944c-9b85-4c02-aec6-ebb1682916d6",
+      "name": "Kỹ thuật thông tin số nâng cao"
+    },
+    {
+      "id": "73f41f57-f6f9-414c-9152-16841a309cd2",
+      "name": "Phân tích và thiết kế HT thông tin vô tuyến"
+    },
+    {
+      "id": "06284466-2061-485c-a663-da9d4b7e1df4",
+      "name": "Mô hình hoá hệ thống số và các phương pháp mô phỏng số"
+    },
+    {
+      "id": "385c0a1e-4b13-48ad-a1f2-6d3a8a23600f",
+      "name": "Hệ thống định vị và dẫn đường hàng hải"
+    },
+    {
+      "id": "c0d66901-44ca-42c9-a37f-ae17bba6aba9",
+      "name": "Quản lý và quy hoạch hệ thống thông tin hàng hải"
+    },
+    {
+      "id": "60295fd6-a1b9-4f7e-89ed-7802b4e79ddd",
+      "name": "Quản lý tần số vô tuyến điện"
+    },
+    {
+      "id": "3569c12b-1855-4eda-b940-34120064f99a",
+      "name": "Mạch tích hợp cỡ lớn và ứng dụng"
+    },
+    {
+      "id": "427180c1-e8c7-451a-9513-4a78226835d7",
+      "name": "Thông tin di động thế hệ mới"
+    },
+    {
+      "id": "f6e02e29-bb71-48e8-b8dc-44ed893f1638",
+      "name": "Truyền hình số"
+    },
+    {
+      "id": "d80d30c0-5563-4d44-8209-4402cd1ed321",
+      "name": "Thiết kế vi mạch cỡ lớn"
+    },
+    {
+      "id": "053f5852-4dff-4c82-8957-c9f87061455e",
+      "name": "Mạng thông tin quang tiên tiến"
+    },
+    {
+      "id": "318689ef-2e21-49ae-9281-2e9b2269c0a2",
+      "name": "Thực tập chuyên ngành"
+    },
+    {
+      "id": "dbe7b3ec-8173-4fae-b99f-4fdeb243b8f1",
+      "name": "Đề án tốt nghiệp"
+    }
+  ],
+  "finalCatalogCount": 27
+}

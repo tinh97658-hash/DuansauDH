@@ -16,6 +16,8 @@ const FIELDS = [
 
 const BridgeKnowledge = () => (
   <CatalogManager
+    sortable={false}
+    editOnDoubleClick
     title="Bổ sung kiến thức"
     group="Danh mục đào tạo"
     desc="Danh mục các học phần bổ sung kiến thức. Chỉ công nhận khi khai báo tương đương với một học phần của CTĐT."

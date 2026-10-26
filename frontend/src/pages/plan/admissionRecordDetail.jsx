@@ -529,6 +529,15 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
       toast.error("Vui lòng nhập họ và tên học viên");
       return;
     }
+    if (!/^[0-9]{10}$/.test(formData.phone || "")) {
+      toast.error("Số điện thoại bắt buộc gồm đúng 10 chữ số");
+      return;
+    }
+    if (!/^[0-9]{13}$/.test(formData.idCard || "")) {
+      toast.error("CCCD bắt buộc gồm đúng 13 chữ số");
+      return;
+    }
+
     const selectedMajor = selectableMajors.find((major) => major.id === formData.majorId);
     if (!selectedMajor) {
       toast.error("Vui lòng chọn chuyên ngành phù hợp với trình độ đào tạo");
@@ -1154,9 +1163,12 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                     size="small"
                     fullWidth
                     value={formData.idCard}
-                    onChange={(e) => setFormData((p) => ({ ...p, idCard: e.target.value }))}
+                    onChange={(e) => setFormData((p) => ({ ...p, idCard: e.target.value.replace(/[^0-9]/g, "").slice(0, 13) }))}
+                    required
+                    inputProps={{ inputMode: "numeric", maxLength: 13, pattern: "[0-9]{13}", "aria-label": "CCCD" }}
+                    error={Boolean(formData.idCard) && !/^[0-9]{13}$/.test(formData.idCard)}
                     sx={inputSx}
-                    placeholder="031200000000"
+                    placeholder="0312000000000"
                   />
                 </Box>
 
@@ -1178,7 +1190,10 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                     size="small"
                     fullWidth
                     value={formData.phone}
-                    onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value }))}
+                    onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value.replace(/[^0-9]/g, "").slice(0, 10) }))}
+                    required
+                    inputProps={{ inputMode: "numeric", maxLength: 10, pattern: "[0-9]{10}", "aria-label": "Số điện thoại" }}
+                    error={Boolean(formData.phone) && !/^[0-9]{10}$/.test(formData.phone)}
                     sx={inputSx}
                     placeholder="0912345678"
                   />
@@ -1493,7 +1508,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                       || (formData.trainingLevel === "Thạc sĩ" && ["Đã trúng tuyển", "Không trúng tuyển", "Đang học"].includes(s))) && s !== record.studyStatus}>{s}</MenuItem>
                   ))}
                 </Select>
-                {formData.trainingLevel === "Thạc sĩ" && <Typography variant="caption" color="text.secondary">Phê duyệt tại tab Xét tuyển. Phân lớp học viên để chuyển sang Đang học.</Typography>}
+                {formData.trainingLevel === "Thạc sĩ" && <Typography variant="caption" color="text.secondary">Duyệt trúng tuyển tại mục Điểm xét tuyển. Xác nhận đã nộp học phí nhập học mới chuyển sang Đang học; chưa đóng tiền muốn nghỉ thì rút hồ sơ để trở về Nộp hồ sơ đầu vào.</Typography>}
               </Box>
 
               <Box>

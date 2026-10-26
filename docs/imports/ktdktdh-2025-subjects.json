@@ -1,0 +1,149 @@
+{
+  "applied": true,
+  "major": {
+    "id": "bfb3eb56-59d3-4e10-9d47-ff07d2113065",
+    "name": "Kỹ thuật điều khiển và tự động hóa"
+  },
+  "sourceRows": 32,
+  "uniqueSourceSubjects": 27,
+  "duplicatesRemoved": [
+    "Các phần mềm chuyên dụng",
+    "Xử lý số tín hiệu",
+    "Robot công nghiệp",
+    "Điều khiển số",
+    "Điều khiển vector máy điện xoay chiều ba pha"
+  ],
+  "sourceCodeConflicts": [
+    {
+      "name": "Robot công nghiệp",
+      "retainedCodeNumber": 521,
+      "discardedRepeatedCodeNumber": 519,
+      "reason": "Retained the first Table 7.2 entry, also confirmed by the semester plan in Section VIII."
+    },
+    {
+      "name": "Điều khiển số",
+      "retainedCodeNumber": 522,
+      "discardedRepeatedCodeNumber": 520,
+      "reason": "Retained the first Table 7.2 entry, also confirmed by the semester plan in Section VIII."
+    },
+    {
+      "name": "Điều khiển vector máy điện xoay chiều ba pha",
+      "retainedCodeNumber": 523,
+      "discardedRepeatedCodeNumber": 521,
+      "reason": "Retained the first Table 7.2 entry, also confirmed by the semester plan in Section VIII."
+    }
+  ],
+  "existingPreserved": [
+    {
+      "id": "4e7c3387-96dd-444b-a551-dda6a95d988c",
+      "name": "Triết học"
+    },
+    {
+      "id": "7f116436-6f9d-458e-9083-4287e198a593",
+      "name": "Tiếng anh"
+    },
+    {
+      "id": "b675d49a-5a1f-44e3-9191-ef9faaab18af",
+      "name": "Phương pháp nghiên cứu khoa học"
+    }
+  ],
+  "inserted": [
+    {
+      "id": "eb246d78-603f-468b-abb3-3c016dddba88",
+      "name": "Lý thuyết điều khiển nâng cao"
+    },
+    {
+      "id": "582d67eb-a107-4f7a-adab-0de5d66e5c6e",
+      "name": "Hệ thống thông tin đo lường"
+    },
+    {
+      "id": "42e02dc9-2a94-479a-9b24-df911a75deba",
+      "name": "Tổng hợp các hệ thống điều khiển tự động truyền động điện"
+    },
+    {
+      "id": "6224e31d-09f0-4a23-9c0a-ec4a53261b65",
+      "name": "Điều khiển quá trình"
+    },
+    {
+      "id": "e1a64df8-6d61-4171-a54d-8601a2a85e36",
+      "name": "Kỹ thuật vi điều khiển và PLC"
+    },
+    {
+      "id": "d9fa782c-3b58-4cd4-aa58-22764c219d9e",
+      "name": "Quản lý năng lượng"
+    },
+    {
+      "id": "89311b11-343a-43aa-aca5-6c8a82a7fdfe",
+      "name": "Các phần mềm chuyên dụng"
+    },
+    {
+      "id": "33824a49-4365-420d-adae-1ad03ca396f9",
+      "name": "Xử lý số tín hiệu"
+    },
+    {
+      "id": "3099b537-7ecf-46d1-b93e-67ebb1bf0242",
+      "name": "Điều khiển logic nâng cao"
+    },
+    {
+      "id": "50e4e686-817a-4200-a1d5-01fedd033903",
+      "name": "Khoa học quản lý"
+    },
+    {
+      "id": "7f4534a8-e68e-4ca8-97b3-5da90bde78f2",
+      "name": "Điều khiển mờ và mạng nơ ron"
+    },
+    {
+      "id": "5e544b99-b638-4857-9ddf-ae4c4d4a8f41",
+      "name": "Các bộ biến đổi công suất bán dẫn"
+    },
+    {
+      "id": "383fc907-25d6-40db-b633-59cc219f5c07",
+      "name": "Máy tính và ghép nối"
+    },
+    {
+      "id": "8de2e9af-6e58-44c1-9631-0904b11803d4",
+      "name": "Mạng truyền thông công nghiệp"
+    },
+    {
+      "id": "a7377151-a495-4f0c-b2d4-5e6a477d5a29",
+      "name": "Điều khiển hệ thống điện"
+    },
+    {
+      "id": "1d0bbccb-c972-4ce2-b297-1d590172a58d",
+      "name": "Bảo vệ rơle và tự động hóa trong hệ thống điện"
+    },
+    {
+      "id": "71d2c9fb-013c-470c-b0e0-945ed2c3b232",
+      "name": "Thiết kế hệ thống tự động hóa"
+    },
+    {
+      "id": "58bbff3a-da48-44a4-be3e-521ffaa7ae08",
+      "name": "Robot công nghiệp"
+    },
+    {
+      "id": "6cd6733d-27e9-44fa-9566-6ba6349b8323",
+      "name": "Điều khiển số"
+    },
+    {
+      "id": "8b6b33a3-f647-43a7-8eee-3777909db647",
+      "name": "Điều khiển vector máy điện xoay chiều ba pha"
+    },
+    {
+      "id": "3eef7bce-0dfa-4e03-b844-14f6aade5efa",
+      "name": "Tự động hóa quá trình sản xuất"
+    },
+    {
+      "id": "f6ecf4ce-e4cc-4ae1-944f-f093723e0b6d",
+      "name": "Mô hình hoá và mô phỏng hệ thống điện"
+    },
+    {
+      "id": "6187a56e-4936-4379-9993-b1aefb3ce5d2",
+      "name": "Thực tập tốt nghiêp"
+    },
+    {
+      "id": "e64a0814-02ca-4986-8fbb-0fe09a79e261",
+      "name": "Đề án tốt nghiệp"
+    }
+  ],
+  "finalCatalogCount": 27
+}

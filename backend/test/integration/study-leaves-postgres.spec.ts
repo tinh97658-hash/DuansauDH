@@ -7,6 +7,11 @@ import { Sequelize } from 'sequelize-typescript';
 import type { Transaction } from 'sequelize';
 import { AppModule } from '../../src/app.module.js';
 import { StudyLeaveService } from '../../src/plan/study-leave.service.js';
+import { AdmissionEvaluationService } from '../../src/plan/admission-evaluation.service.js';
+import { MastersService } from '../../src/masters/masters.service.js';
+import { AdmissionEvaluation, AdmissionRound } from '../../src/database/models/plan/admission-evaluation.model.js';
+import { admissionRecordSnapshot } from '../../src/plan/admission-scoring.js';
+import { repairUnpaidStudyLeave } from '../../src/plan/unpaid-study-leave-repair.js';
 import { SchedulingService } from '../../src/scheduling/scheduling.service.js';
 import { ExamGradebookService } from '../../src/masters/exam-gradebook.service.js';
 import { ClassScoreSummaryService } from '../../src/reports/class-score-summary.service.js';
@@ -60,10 +65,11 @@ describeDb('Study leave lifecycle with real PostgreSQL and merged classes', () =
     const block = await CurriculumBlock.create({ curriculumId: curriculum.id, code: 'KC', name: 'General' });
     group = await ClassGroup.create({ code: prefix, name: prefix, majorId: major.id, program: 'masters', academicYear: '2026', curriculumId: curriculum.id });
     learner = await AdmissionRecord.create({ code: `${prefix}A`, fullName: `${prefix} A`, email: `${prefix}a@example.invalid`, majorId: major.id,
-      trainingLevel: 'Thạc sĩ', academicYear: '2026', status: 'approved', studyStatus: 'Đang học' });
+      trainingLevel: 'Thạc sĩ', academicYear: '2026', status: 'approved', studyStatus: 'Đang học', extraData: { tuitionPayment: { paid: true } } });
     other = await AdmissionRecord.create({ code: `${prefix}B`, fullName: `${prefix} B`, email: `${prefix}b@example.invalid`, majorId: major.id,
-      trainingLevel: 'Thạc sĩ', academicYear: '2026', status: 'approved', studyStatus: 'Đang học' });
-    await ClassGroupMember.bulkCreate([learner, other].map(person => ({ admissionRecordId: person.id, classGroupId: group.id })));
+      trainingLevel: 'Thạc sĩ', academicYear: '2026', status: 'approved', studyStatus: 'Đang học', extraData: { tuitionPayment: { paid: true } } });
+    await ClassGroupMember.bulkCreate([learner, other].map(person => ({ admissionRecordId: person.id, classGroupId: group.id,
+      enrolledAt: new Date(Date.now() - 7 * 86400000) })));
     subjects = []; offerings = [];
     for (let index = 0; index < 4; index++) {
       const subject = await Subject.create({ code: `${prefix}${index}`, codeText: `${prefix}${index}`, codeNumber: index + 1,
@@ -87,6 +93,163 @@ describeDb('Study leave lifecycle with real PostgreSQL and merged classes', () =
     return data.leaves[0];
   };
   const approve = async () => { const leave = await request(); await leaves.action(leave.id, { action: 'approve' }, actor); return leave; };
+
+  it('repairs a legacy unpaid approved leave, removes its false failures and membership, and cannot reactivate it', async () => {
+    const leave = await approve();
+    await learner.update({ extraData: {} });
+    expect((await leaves.detail(learner.id)).leaves[0].withdrawals.length).toBeGreaterThan(0);
+    expect(await repairUnpaidStudyLeave(db, learner, actor, tx)).toBe(true);
+    await learner.reload();
+    expect(learner).toMatchObject({ status: 'pending', studyStatus: 'Nộp hồ sơ đầu vào', extraData: { unpaidWithdrawal: expect.any(Object) } });
+    expect(learner.extraData?.tuitionPayment?.paid).not.toBe(true);
+    expect(await ClassGroupMember.count({ where: { admissionRecordId: learner.id } })).toBe(0);
+    const closed = (await leaves.detail(learner.id)).leaves.find(row => row.id === leave.id)!;
+    expect(closed.status).toBe('rejected');
+    expect(closed.history).toEqual(expect.arrayContaining([expect.objectContaining({ action: 'unpaid_leave_cancelled', previousStatus: 'approved', withdrawals: expect.any(Array) })]));
+    expect(closed.withdrawals).toHaveLength(0);
+    const oldBook = await CourseExamGradebook.findOne({ where: { courseOfferingId: offerings[0].id } });
+    expect(oldBook!.grades[0]).toMatchObject({ result: 'passed', courseScore: 8 });
+    await other.reload();
+    expect(other.extraData?.tuitionPayment.paid).toBe(true);
+    expect(await ClassGroupMember.count({ where: { admissionRecordId: other.id } })).toBe(1);
+    expect(await repairUnpaidStudyLeave(db, learner, actor, tx)).toBe(false);
+    await leaves.synchronize(); await leaves.synchronize(); await learner.reload();
+    expect(learner.studyStatus).toBe('Nộp hồ sơ đầu vào');
+  });
+
+  it('closes an unpaid pending leave without creating failed study results', async () => {
+    await request(); await learner.update({ extraData: {} });
+    expect(await repairUnpaidStudyLeave(db, learner, actor, tx)).toBe(true);
+    expect((await leaves.detail(learner.id)).leaves).toMatchObject([{ status: 'rejected', withdrawals: [] }]);
+    await learner.reload(); expect(learner.studyStatus).toBe('Nộp hồ sơ đầu vào');
+  });
+
+  it('preserves a paid approved leave and its valid failure history', async () => {
+    await approve();
+    const before = await leaves.detail(learner.id);
+    expect(await repairUnpaidStudyLeave(db, learner, actor, tx)).toBe(false);
+    expect(await leaves.detail(learner.id)).toEqual(before);
+    await learner.reload(); expect(learner.studyStatus).toBe('Đang bảo lưu');
+  });
+
+  it('never synchronizes an unpaid legacy approval back into active leave or creates new failures', async () => {
+    const leave = await approve();
+    await learner.update({ extraData: {}, studyStatus: 'Nộp hồ sơ đầu vào' });
+    await db.query('DELETE FROM course_offering_withdrawals WHERE study_leave_id=:id', { replacements: { id: leave.id } });
+    await leaves.synchronize(); await leaves.synchronize(); await learner.reload();
+    expect(learner.studyStatus).toBe('Nộp hồ sơ đầu vào');
+    expect((await leaves.detail(learner.id)).leaves[0].withdrawals).toHaveLength(0);
+    // Even a partial legacy correction (status already reset) is repaired fully.
+    expect(await repairUnpaidStudyLeave(db, learner, actor, tx)).toBe(true);
+    expect((await leaves.detail(learner.id)).leaves[0].status).toBe('rejected');
+  });
+
+  it('requires tuition for study leave even if an unpaid learner was already assigned', async () => {
+    await learner.update({ extraData: {} });
+    await expect(request()).rejects.toThrow('Chưa nộp học phí');
+    expect((await leaves.detail(learner.id)).leaves).toHaveLength(0);
+    expect(await ClassGroupMember.count({ where: { admissionRecordId: learner.id } })).toBe(1);
+  });
+
+  it.each(['manual', 'auto'])('keeps study status based on payment when class assignment is %s', async method => {
+    await ClassGroupMember.destroy({ where: { classGroupId: group.id } });
+    await learner.update({ extraData: {}, studyStatus: 'Đã trúng tuyển' });
+    const masters = app.get(MastersService);
+    if (method === 'manual') {
+      await masters.assignMembers(group.id, { admissionRecordIds: [learner.id, other.id] });
+    } else {
+      const secondGroup = await ClassGroup.create({ code: `${prefix}G2`, name: `${prefix}G2`, majorId: major.id,
+        program: 'masters', academicYear: '2026', curriculumId: group.curriculumId });
+      await masters.autoAssign({ classGroupIds: [group.id, secondGroup.id], admissionRecordIds: [learner.id, other.id], method: 'balanced' });
+    }
+    await learner.reload(); await other.reload();
+    expect(learner.studyStatus).toBe('Đã trúng tuyển');
+    expect(other.studyStatus).toBe('Đang học');
+    expect(await ClassGroupMember.count({ where: { admissionRecordId: learner.id } })).toBe(1);
+  });
+
+  it('uses tuition instead of assignment for study status and allows paid unassigned study leave', async () => {
+    const admissions = app.get(AdmissionEvaluationService);
+    await ClassGroupMember.destroy({ where: { admissionRecordId: learner.id } });
+    await learner.update({ studyStatus: 'Đã trúng tuyển', extraData: {} });
+    const paid = await admissions.updateTuition(learner.id, { paid: true, updatedAt: learner.updatedAt.toISOString() }, actor);
+    expect(paid.studyStatus).toBe('Đang học');
+    expect((await app.get(PlanService).getAdmissionRecord(learner.id)).studyStatus).toBe('Đang học');
+    expect((await request()).status).toBe('pending');
+  });
+
+  it('returns an unpaid learner to applications, removes active memberships and frozen roster entries, and preserves completed grades', async () => {
+    await learner.update({ extraData: {}, studyStatus: 'Đã trúng tuyển' });
+    const round = await AdmissionRound.create({ name: prefix, academicYear: '2026', regulationNo: '', rules: {}, majorThresholds: [{ majorId: major.id, cutoff: 15 }] });
+    const evaluation = await AdmissionEvaluation.create({ admissionRecordId: learner.id, roundId: round.id, decision: 'admitted',
+      version: 1, inputs: { manualTotal: 16 }, recordSnapshot: admissionRecordSnapshot(learner) });
+    await CourseOfferingClassGroup.update({ participantIds: [participant(), `admission:${other.id}`] }, { where: { courseOfferingId: offerings[1].id } });
+    const result = await app.get(AdmissionEvaluationService).withdrawUnpaid(learner.id, { note: 'Chưa đóng tiền, xin nghỉ', updatedAt: learner.updatedAt.toISOString() }, actor);
+    expect(result).toMatchObject({ status: 'pending', studyStatus: 'Nộp hồ sơ đầu vào' });
+    await evaluation.reload();
+    expect(evaluation).toMatchObject({ decision: 'pending', version: 2, inputs: { manualTotal: 16 } });
+    expect(await ClassGroupMember.count({ where: { admissionRecordId: learner.id } })).toBe(0);
+    expect(await ClassGroupMember.count({ where: { admissionRecordId: other.id } })).toBe(1);
+    const link = await CourseOfferingClassGroup.findOne({ where: { courseOfferingId: offerings[1].id } });
+    expect(link!.participantIds).toEqual([`admission:${other.id}`]);
+    const book = await CourseExamGradebook.findOne({ where: { courseOfferingId: offerings[0].id } });
+    expect(book!.grades[0].result).toBe('passed');
+    expect((await leaves.detail(learner.id)).leaves).toHaveLength(0);
+    const [history]: any = await db.query('SELECT action FROM admission_evaluation_history WHERE admission_record_id=:id', { replacements: { id: learner.id } });
+    expect(history).toMatchObject([{ action: 'unpaid_withdrawal' }]);
+    // Returning the profile really reopens editing rather than only hiding a row.
+    expect((await app.get(PlanService).updateAdmissionRecord(learner.id, { note: 'Làm hồ sơ lại' })).note).toBe('Làm hồ sơ lại');
+  });
+
+  it('returns unpaid class removals to applications but retains paid study status on class removal', async () => {
+    const masters = app.get(MastersService);
+    await learner.update({ extraData: {} });
+    const unpaidMember = await ClassGroupMember.findOne({ where: { admissionRecordId: learner.id } });
+    await masters.removeMember(group.id, unpaidMember!.id, actor);
+    await learner.reload(); expect(learner.studyStatus).toBe('Nộp hồ sơ đầu vào');
+    const paidMember = await ClassGroupMember.findOne({ where: { admissionRecordId: other.id } });
+    await masters.removeMember(group.id, paidMember!.id, actor);
+    await other.reload(); expect(other.studyStatus).toBe('Đang học');
+  });
+
+  it('does not allow paid learners or stale requests to use unpaid withdrawal', async () => {
+    const admissions = app.get(AdmissionEvaluationService);
+    await expect(admissions.withdrawUnpaid(learner.id, { note: 'Nghỉ', updatedAt: learner.updatedAt.toISOString() }, actor)).rejects.toThrow('đã đóng học phí');
+    await learner.update({ extraData: {} });
+    await expect(admissions.withdrawUnpaid(learner.id, { note: 'Nghỉ', updatedAt: '2000-01-01T00:00:00Z' }, actor)).rejects.toThrow('đã thay đổi');
+    expect(await ClassGroupMember.count({ where: { admissionRecordId: learner.id } })).toBe(1);
+  });
+
+  it('does not cancel tuition while a paid learner has a pending study leave', async () => {
+    await request();
+    await expect(app.get(AdmissionEvaluationService).updateTuition(learner.id, { paid: false, updatedAt: learner.updatedAt.toISOString() }, actor)).rejects.toThrow('bảo lưu đang mở');
+    await learner.reload();
+    expect(learner.extraData?.tuitionPayment.paid).toBe(true);
+    expect(learner.studyStatus).toBe('Đang học');
+  });
+
+  it('requires tuition before resuming a legacy leave and preserves leave status when payment is reconciled', async () => {
+    const leave = await approve();
+    await learner.update({ extraData: {} });
+    await expect(leaves.action(leave.id, { action: 'resume', note: 'Tiếp nhận' }, actor)).rejects.toThrow('nộp học phí');
+    await learner.reload();
+    const payment = await app.get(AdmissionEvaluationService).updateTuition(learner.id, { paid: true, updatedAt: learner.updatedAt.toISOString() }, actor);
+    expect(payment.studyStatus).toBe('Đang bảo lưu');
+    await leaves.action(leave.id, { action: 'resume', note: 'Đã đối soát học phí, tiếp nhận' }, actor);
+    await learner.reload(); expect(learner.studyStatus).toBe('Đang học');
+  });
+
+  it('keeps an unpaid withdrawal atomic when the learner still has an approved unfinished exam roster', async () => {
+    await learner.update({ extraData: {}, studyStatus: 'Đã trúng tuyển' });
+    const snapshot = randomUUID();
+    await db.query(`INSERT INTO course_exam_eligibility_snapshots(id,course_offering_id,version,rows,actor)
+      VALUES(:id,:offering,1,CAST(:rows AS jsonb),'{}'::jsonb)`, { replacements: { id: snapshot, offering: offerings[1].id, rows: JSON.stringify([{ participantId: participant() }]) } });
+    await db.query(`INSERT INTO course_exam_workflows(course_offering_id,eligibility_status,eligibility_version,eligibility_snapshot_id,result_status)
+      VALUES(:offering,'approved',1,:snapshot,'draft')`, { replacements: { offering: offerings[1].id, snapshot } });
+    await expect(app.get(AdmissionEvaluationService).withdrawUnpaid(learner.id, { note: 'Nghỉ', updatedAt: learner.updatedAt.toISOString() }, actor)).rejects.toThrow('danh sách thi');
+    await learner.reload(); expect(learner.status).toBe('approved');
+    expect(await ClassGroupMember.count({ where: { admissionRecordId: learner.id } })).toBe(1);
+  });
 
   it('routes every managed status to leave management even without approved admission or a leave, with independent filters and totals', async () => {
     const plan = app.get(PlanService);

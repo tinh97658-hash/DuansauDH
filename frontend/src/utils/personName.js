@@ -1,5 +1,16 @@
 const clean = (value) => String(value || "").trim().replace(/\s+/g, " ");
 
+export const normalizeNameInput = (value) => String(value || "").normalize("NFC").trim().replace(/ +/g, " ");
+
+export const nameInputError = (value, label) => {
+  const name = normalizeNameInput(value);
+  if (!name) return `Vui lòng nhập đầy đủ ${label}.`;
+  if (!/^\p{Script=Latin}+(?: \p{Script=Latin}+)*$/u.test(name)) {
+    return `${label} chỉ được chứa chữ cái Latin (bao gồm tiếng Việt có dấu) và khoảng trắng.`;
+  }
+  return "";
+};
+
 /**
  * Splits a Vietnamese display name into the two columns used by the system.
  * Prefer structured API fields and fall back to the last word of a legacy name.

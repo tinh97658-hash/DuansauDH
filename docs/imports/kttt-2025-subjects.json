@@ -1,0 +1,138 @@
+{
+  "applied": true,
+  "major": {
+    "id": "e8cbb3e8-a600-444c-bcda-af49a90e81b9",
+    "name": "Kỹ thuật tàu thủy"
+  },
+  "sourceRows": 32,
+  "uniqueSourceSubjects": 27,
+  "duplicatesRemoved": [
+    "Lý thuyết và ứng dụng CFD trong lĩnh vực đóng tàu",
+    "Quản lý tổ chức sản xuất trong đóng tàu",
+    "Ổn định công trình biển di động",
+    "Công nghệ đấu nối thân tàu trên mặt nước",
+    "Hệ thống thiết bị đẩy tiên tiến"
+  ],
+  "sourceCodeConflicts": [
+    {
+      "name": "Phương pháp nghiên cứu khoa học",
+      "sourceCodeText": "TTKH",
+      "retainedExistingCodeText": "TTNC",
+      "codeNumber": 503,
+      "reason": "Preserve the existing same-name, same-credit course and its sharing links instead of creating a duplicate or changing its code."
+    }
+  ],
+  "existingPreserved": [
+    {
+      "id": "25a29e51-ee92-495e-b944-e7ec21f29ed9",
+      "name": "Triết học"
+    },
+    {
+      "id": "e0ad0ab6-d2d6-4052-92c1-0a6a12a19a33",
+      "name": "Tiếng anh"
+    },
+    {
+      "id": "b7f91ce3-8d8a-496a-bb0f-82fe54717744",
+      "name": "Phương pháp nghiên cứu khoa học"
+    },
+    {
+      "id": "27bcaf4f-31f3-4257-809b-3532c3b7daf8",
+      "name": "Phương pháp phần tử hữu hạn"
+    }
+  ],
+  "inserted": [
+    {
+      "id": "92cbb0b8-298c-44b8-be31-ff1593c99aab",
+      "name": "Phương pháp tính"
+    },
+    {
+      "id": "0ea0b345-7e46-41d7-ac2e-652d64a35d2e",
+      "name": "Cơ sở đánh giá độ tin cậy"
+    },
+    {
+      "id": "17768e18-2b59-4dfc-840a-19956ab9fe07",
+      "name": "CAD/CAE trong thiết kế và đóng tàu"
+    },
+    {
+      "id": "ff10f6ff-7baf-494d-a1d8-2db818274720",
+      "name": "Lý thuyết và ứng dụng CFD trong lĩnh vực đóng tàu"
+    },
+    {
+      "id": "ae016ec2-6ecd-4529-97f0-62f7582a8240",
+      "name": "Quản lý tổ chức sản xuất trong đóng tàu"
+    },
+    {
+      "id": "62b0aac3-ea00-464e-992b-affc83d8d898",
+      "name": "CAE trong tính toán động lực học công trình nổi"
+    },
+    {
+      "id": "662e7039-994a-42f5-be79-563f8b9c716e",
+      "name": "Hệ thống neo giữ công trình biển nổi"
+    },
+    {
+      "id": "b281d8e7-351f-4f2b-9cb7-cf435a79f5b6",
+      "name": "Lý thuyết tối ưu trong đóng tàu"
+    },
+    {
+      "id": "a8127b7e-0b68-495a-870c-c8e5195ba08b",
+      "name": "CAE trong phân tích kết cấu tàu và công trình ngoài khơi"
+    },
+    {
+      "id": "17213a75-99db-4eea-9d6b-6e04cc90c505",
+      "name": "Thiết kế tàu thân thiện với môi trường"
+    },
+    {
+      "id": "6cd4f55c-802e-423c-95fd-19e621b172ca",
+      "name": "Thiết kế tàu cao tốc"
+    },
+    {
+      "id": "1697f330-c21a-4b4f-8783-f1a02c8cc2d5",
+      "name": "Công nghệ đóng tàu tiên tiến"
+    },
+    {
+      "id": "0672e6d0-1cc6-45c2-af5c-22f196feaf7a",
+      "name": "Độ bền tới hạn của kết cấu thân tàu"
+    },
+    {
+      "id": "2df998ab-39f4-49fa-8d2a-32c536c47f0f",
+      "name": "Động lực học của tàu và công trình biển trên sóng"
+    },
+    {
+      "id": "ff5975d8-e11a-4ea3-b716-ca2afc6b761d",
+      "name": "Ổn định công trình biển di động"
+    },
+    {
+      "id": "6a2c186b-7bc3-407e-985f-30121cd710d9",
+      "name": "Công nghệ đấu nối thân tàu trên mặt nước"
+    },
+    {
+      "id": "76edcf03-6e3a-4f5f-810c-2d66ea986e40",
+      "name": "Hệ thống thiết bị đẩy tiên tiến"
+    },
+    {
+      "id": "05907e0e-21f4-40b8-ad1d-5acc823bd7d8",
+      "name": "Động lực học thiết bị lặn"
+    },
+    {
+      "id": "3390b77c-9c67-4277-a2ea-e5fcc3cfcfc1",
+      "name": "Thiết kế tối ưu tàu và công trình biển di động"
+    },
+    {
+      "id": "64a8ccf3-af51-422c-822e-46ba00dc3f44",
+      "name": "Thiết kế tối ưu kết cấu tàu thủy"
+    },
+    {
+      "id": "b782d873-e078-4390-9794-43274bbb58c5",
+      "name": "Cơ sở thiết kế quy hoạch trong nhà máy đóng tàu"
+    },
+    {
+      "id": "6a1159e5-6805-4040-a3a9-60081289f0f4",
+      "name": "Thực tập chuyên ngành"
+    },
+    {
+      "id": "529eb15b-cada-48a7-8956-73f92443a80c",
+      "name": "Đề án tốt nghiệp"
+    }
+  ],
+  "finalCatalogCount": 27
+}

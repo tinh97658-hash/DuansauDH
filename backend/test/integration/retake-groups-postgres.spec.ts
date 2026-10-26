@@ -29,6 +29,8 @@ import { PlanService } from "../../src/plan/plan.service.js";
 import { LEGACY_GRADING_POLICY } from "../../src/masters/grading-policy.js";
 import { ExamScheduleService } from '../../src/masters/exam-schedule.service.js';
 import { Room } from '../../src/database/models/common/room.model.js';
+import { Lecturer } from '../../src/database/models/common/lecturer.model.js';
+import { TeachingSession } from '../../src/database/models/training/teaching-session.model.js';
 
 const describeDb = process.env.RUN_POSTGRES_SCHEDULING_TESTS === "true" ? describe : describe.skip;
 // Every read and write uses one rolled-back transaction, including service-created transactions.
@@ -88,6 +90,70 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
     source=await CourseOffering.create({subjectId:subject.id,status:'completed',completedAt:new Date(),completedByStaffId:staff.id});
     await CourseOfferingClassGroup.create({courseOfferingId:source.id,classGroupId:original.id});
   }
+
+  async function scheduledSource() {
+    await source.update({ status: "active", completedAt: null, completedByStaffId: null });
+    await ClassGroupMember.update({ enrolledAt: new Date("2000-01-01T00:00:00Z") }, { where: { classGroupId: original.id } });
+    const room = await Room.create({ code: prefix, name: prefix, capacity: 30, isActive: true });
+    const lecturer = await Lecturer.create({ code: prefix, name: prefix, active: true });
+    return TeachingSession.create({ courseOfferingId: source.id, roomId: room.id, lecturerId: lecturer.id,
+      sessionDate: "2099-01-01", startTime: "08:00", endTime: "10:00", period: "MORNING", status: "planned" });
+  }
+
+  async function addNewcomer() {
+    const late = await AdmissionRecord.create({ code: `${prefix}Late`, fullName: "Late newcomer", majorId: major.id,
+      trainingLevel: "Thạc sĩ", academicYear: "2026", status: "approved", studyStatus: "Đã trúng tuyển" });
+    await app.get(MastersService).assignMembers(original.id, { admissionRecordIds: [late.id] });
+    return `admission:${late.id}`;
+  }
+
+  it("updates a future offering roster and grade-entry list when a learner joins", async () => {
+    await scheduledSource();
+    const participant = await addNewcomer();
+    expect((await scheduling.getCourseOfferingRoster(source.id)).participants.map(row => row.id)).toContain(participant);
+    expect((await exams.get({ classGroupId: original.id, courseOfferingId: source.id })).rows.map((row: any) => row.participantId)).toContain(participant);
+    expect((await CourseOfferingClassGroup.findOne({ where: { courseOfferingId: source.id } }))!.participantIds).toBeNull();
+  });
+
+  it.each(["planned", "held", "not_held"] as const)("keeps a newcomer out after the first scheduled start (%s), and queues another class", async status => {
+    const session = await scheduledSource();
+    await session.update({ sessionDate: "2001-01-01", status,
+      confirmedAt: status === "planned" ? null : new Date(), confirmedByStaffId: status === "planned" ? null : staff.id });
+    const participant = await addNewcomer();
+    const expected = learners.slice(0, 3).map(row => `admission:${row.id}`).sort();
+    expect((await scheduling.getCourseOfferingRoster(source.id)).participants.map(row => row.id).sort()).toEqual(expected);
+    expect((await scheduling.getCourseOffering(source.id)).participantCount).toBe(3);
+    expect((await exams.get({ classGroupId: original.id, courseOfferingId: source.id })).rows.map((row: any) => row.participantId).sort()).toEqual(expected);
+    await source.update({ status: "completed", completedAt: new Date(), completedByStaffId: staff.id });
+    await db.query("UPDATE course_exam_workflows SET mode='new' WHERE course_offering_id=:id", { replacements: { id: source.id } });
+    const oldBook = await exams.get({ classGroupId: original.id, courseOfferingId: source.id });
+    await expect(exams.save({ classGroupId: original.id, courseOfferingId: source.id, revision: oldBook.revision,
+      rows: [{ participantId: participant, testScore: 8 }] } as any, staff)).rejects.toThrow("ngoài danh sách");
+    await source.update({ status: "active", completedAt: null, completedByStaffId: null });
+    const candidates = await scheduling.listCourseOfferingCandidates({ program: "masters", majorId: major.id, academicYear: "2026" });
+    expect(candidates.subjects.find(row => row.subject.id === subject.id)!.retakeClassGroups.find(row => row.id === original.id))
+      .toMatchObject({ memberCount: 1, retakeCount: 0, unstudiedCount: 1 });
+    const combined = await scheduling.createCourseOffering({ subjectId: subject.id, classGroupIds: [original.id, next.id],
+      retakeClassGroupIds: [original.id], academicYear: "2026" });
+    expect((await scheduling.getCourseOfferingRoster(combined.id)).participants.map(row => row.id).sort())
+      .toEqual([participant, `admission:${learners[3].id}`].sort());
+    expect((await exams.get({ classGroupId: original.id, courseOfferingId: combined.id })).rows.map((row: any) => row.participantId)).toEqual([participant]);
+    // Moving an elapsed schedule back into the future must not reopen the old roster.
+    await session.update({ sessionDate: "2099-01-01" });
+    expect((await scheduling.getCourseOfferingRoster(source.id)).participants.map(row => row.id).sort()).toEqual(expected);
+  });
+
+  it("handles started and future offerings independently for the same class group", async () => {
+    const session = await scheduledSource();
+    await session.update({ sessionDate: "2001-01-01" });
+    const future = await CourseOffering.create({ subjectId: subject.id, status: "active" });
+    await CourseOfferingClassGroup.create({ courseOfferingId: future.id, classGroupId: original.id });
+    await TeachingSession.create({ courseOfferingId: future.id, roomId: session.roomId, lecturerId: session.lecturerId,
+      sessionDate: "2099-02-01", startTime: "08:00", endTime: "10:00", period: "MORNING", status: "planned" });
+    const participant = await addNewcomer();
+    expect((await scheduling.getCourseOfferingRoster(source.id)).participants.map(row => row.id)).not.toContain(participant);
+    expect((await scheduling.getCourseOfferingRoster(future.id)).participants.map(row => row.id)).toContain(participant);
+  });
   async function fillAndApprove() {
     await freshGradeSource();
     const scope = { classGroupId: original.id, courseOfferingId: source.id, rosterScope: "offering" as const };
@@ -102,8 +168,9 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
     ] },staff)).rejects.toThrow("đã khóa");
     const eligible=await exams.transition({ ...scope, action: "approve", note: "Approved eligibility", revision: submitted.revision, version: 1 },staff,'eligibility');
     const room=await Room.create({code:prefix,name:prefix,capacity:10,isActive:true});
+    const lecturer=await Lecturer.create({code:prefix,name:prefix,active:true});
     const examSchedule=app.get(ExamScheduleService),state=eligible.workflow as any;
-    const session=await examSchedule.schedule({courseOfferingId:source.id,snapshotId:state.eligibility.snapshotId,eligibilityVersion:state.eligibility.version,examDate:'2099-01-01',startTime:'08:00',endTime:'10:00',roomId:room.id},staff);
+    const session=await examSchedule.schedule({courseOfferingId:source.id,snapshotId:state.eligibility.snapshotId,eligibilityVersion:state.eligibility.version,examDate:'2099-01-01',startTime:'08:00',endTime:'10:00',roomId:room.id,lecturerId:lecturer.id},staff);
     await db.query("UPDATE course_exam_sessions SET exam_date='2000-01-01' WHERE id=:id",{replacements:{id:session.id}});
     await examSchedule.confirm(session.id,{version:0,status:'held',note:'Held test exam'},staff);
     const final=await exams.save({...scope,revision:eligible.revision,rows:eligible.rows.map((row:any)=>({...row,examScore:8}))},staff);

@@ -13,7 +13,7 @@ describe('Study leave request date range', () => {
     ['2099-03-01', '2099-03-02'], ['2099-12-31', '2100-01-01'], ['2096-02-28', '2096-02-29'],
   ])('accepts the following day across calendar boundaries: %s to %s', async (startDate, endDate) => {
     const db = {
-      query: jest.fn().mockResolvedValueOnce([{ id: 'learner', study_status: 'Đang học' }])
+      query: jest.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 'learner', study_status: 'Đang học', training_level: 'Thạc sĩ', extra_data: { tuitionPayment: { paid: true } } }])
         .mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce(undefined),
       transaction: jest.fn(async callback => callback({})),
     };

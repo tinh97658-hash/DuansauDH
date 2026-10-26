@@ -3,6 +3,7 @@ import CatalogManager from "../../components/CatalogManager";
 
 const Ethnicities = () => (
   <CatalogManager
+    editOnDoubleClick
     title="Dân tộc"
     group="Danh mục chung"
     desc="Danh mục dân tộc dùng chung cho toàn hệ thống."
@@ -10,6 +11,7 @@ const Ethnicities = () => (
     itemName="dân tộc"
     codeLabel="Mã dân tộc"
     nameLabel="Tên dân tộc"
+    sortable={false}
   />
 );
 export default Ethnicities;

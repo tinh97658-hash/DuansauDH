@@ -63,7 +63,7 @@ export function buildBulkFixtures(options: BulkOptions): FixtureBatch[] {
   const majors = Array.from({ length: Math.min(classes, 3) }, (_, i) => add("Major", {
     name: `Chuyên ngành kiểm thử ${prefix} ${i + 1}`, trainingLevelId: level.id,
     disciplineId: discipline.id,
-    program: "masters", durationYears: 2, maxOvertimeYears: 2, active: true,
+    program: "masters", durationYears: 2, maxOvertimeYears: 4, active: true,
   }));
   const programs = majors.map((major, i) => add("TrainingProgram", {
     code: `${prefix}CT${i + 1}`, name: `Chương trình thạc sĩ ${major.name}`, trainingLevelId: level.id,

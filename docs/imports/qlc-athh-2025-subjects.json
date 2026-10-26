@@ -1,0 +1,251 @@
+{
+  "applied": true,
+  "major": {
+    "id": "a4ff7d2b-ff49-4591-821b-5a8a1df994c1",
+    "name": "Quản lý cảng và an toàn hàng hải"
+  },
+  "sourceRows": 32,
+  "uniqueSourceSubjects": 28,
+  "duplicatesRemoved": [
+    "Công nghệ viễn thám và GIS trong quản lý hạ tầng giao thông hàng hải",
+    "Quản lý khai thác bền vững hạ tầng giao thông hàng hải",
+    "Phân tích hiệu quả đầu tư dự án hàng hải",
+    "Quản lý dự án hàng hải"
+  ],
+  "sourceCodeConflicts": [
+    {
+      "name": "Khoa học quản lý và quản lý hàng hải",
+      "retainedCatalogCodeText": "QHQL",
+      "retainedCatalogCodeNumber": 506,
+      "semesterEntries": [
+        {
+          "codeText": "QHPL",
+          "codeNumber": 506
+        }
+      ],
+      "reason": "Table 7.2 is the catalog source; the semester plan has inconsistent codes."
+    },
+    {
+      "name": "Công trình cảng biển",
+      "retainedCatalogCodeText": "BĐCB",
+      "retainedCatalogCodeNumber": 521,
+      "semesterEntries": [
+        {
+          "codeText": "BĐBV",
+          "codeNumber": 521
+        }
+      ],
+      "reason": "Table 7.2 is the catalog source; the semester plan has inconsistent codes."
+    },
+    {
+      "name": "Đề án tốt nghiệp",
+      "retainedCatalogCodeText": "BĐTN",
+      "retainedCatalogCodeNumber": 532,
+      "semesterEntries": [
+        {
+          "codeText": "BĐĐA",
+          "codeNumber": 532
+        }
+      ],
+      "reason": "Table 7.2 is the catalog source; the semester plan has inconsistent codes."
+    }
+  ],
+  "existingPreserved": [
+    {
+      "id": "e10bc7ca-d51d-48a8-a094-7ed657183352",
+      "name": "Triết học"
+    },
+    {
+      "id": "9b234e91-78f0-4306-9384-336d67fa80f1",
+      "name": "Tiếng anh"
+    },
+    {
+      "id": "b926b43f-5431-4f36-b3a1-2e99e14e6f97",
+      "name": "Phương pháp nghiên cứu khoa học"
+    }
+  ],
+  "inserted": [
+    {
+      "id": "b0bc8ae9-d0d3-43c3-b424-6dd97070efce",
+      "name": "Lý thuyết độ tin cậy trong bảo đảm an toàn hàng hải"
+    },
+    {
+      "id": "a9edf689-bd3e-4569-adaf-d87fea91b604",
+      "name": "Phương pháp số"
+    },
+    {
+      "id": "0d9b7402-fd79-4c27-bda1-e142ecf705f4",
+      "name": "Khoa học quản lý và quản lý hàng hải"
+    },
+    {
+      "id": "48020fd2-e1a9-4bdb-a537-21854add4c37",
+      "name": "Phân tích rủi ro giao thông hàng hải"
+    },
+    {
+      "id": "e616fcf8-0ae8-43f0-b13b-f7058f77701f",
+      "name": "Quản lý môi trường và an ninh cảng biển"
+    },
+    {
+      "id": "69dc1e3c-7c8b-44dc-9bbc-2132df3c2ca5",
+      "name": "Mô phỏng an toàn hàng hải và kỹ thuật tối ưu hóa"
+    },
+    {
+      "id": "5dc26963-f1b0-4188-b83a-12497cd12fb2",
+      "name": "Công nghệ viễn thám và GIS trong quản lý hạ tầng giao thông hàng hải"
+    },
+    {
+      "id": "37ffd756-f28e-44de-8a8a-d4fd0b3525cc",
+      "name": "Quản lý khai thác bền vững hạ tầng giao thông hàng hải"
+    },
+    {
+      "id": "36eddcbe-9c8f-4cb6-9621-e2bfc21f65a6",
+      "name": "Pháp luật vận tải biển"
+    },
+    {
+      "id": "fd784fac-3625-42e5-831c-892b5a9b1e34",
+      "name": "Kinh tế hàng hải"
+    },
+    {
+      "id": "07b47780-875c-4bb7-ad2f-6249ca1c08d5",
+      "name": "Quản lý bảo trì kết cấu hạ tầng cảng biển và an toàn hàng hải"
+    },
+    {
+      "id": "ee05b04a-09a3-4afa-bfe2-681c46d8da91",
+      "name": "Nạo vét xây dựng công trình cảng biển và an toàn hàng hải"
+    },
+    {
+      "id": "3dfbc6ac-f342-4558-b41b-578a0b7e6d5d",
+      "name": "Khảo sát xây dựng công trình cảng biển và an toàn hàng hải"
+    },
+    {
+      "id": "11b5847c-30ab-4438-a8a3-ffe2d3f34f51",
+      "name": "Kỹ thuật thành lập hải đồ điện tử"
+    },
+    {
+      "id": "1bd172f5-5bdd-409d-aca8-2e1582123674",
+      "name": "Kỹ thuật an toàn hàng hải trong vùng nước hạn chế"
+    },
+    {
+      "id": "56114cfe-2894-4f80-9c01-2c51b14a2a20",
+      "name": "Công trình cảng biển"
+    },
+    {
+      "id": "7b4a2d19-0efd-497e-a800-079b67b4c549",
+      "name": "Công trình đường thủy"
+    },
+    {
+      "id": "8ba0b91f-005d-4831-ba3e-b0e671995520",
+      "name": "Công trình luồng hàng hải và khu nước cảng biển"
+    },
+    {
+      "id": "3993c048-5561-43ac-ad08-c01680a81459",
+      "name": "Phân tích hiệu quả đầu tư dự án hàng hải"
+    },
+    {
+      "id": "8eb23d79-7776-496b-84cd-9ec311f6f36d",
+      "name": "Quản lý dự án hàng hải"
+    },
+    {
+      "id": "c505437b-e3a9-42a0-8d68-8b1bf38eee3b",
+      "name": "Thiết bị bảo đảm an toàn hàng hải"
+    },
+    {
+      "id": "1c9d09bd-eb86-4de0-968a-ef5a553bc5f8",
+      "name": "Hệ thống bảo đảm an toàn giao thông hàng hải"
+    },
+    {
+      "id": "87335771-0f2e-4eac-a918-03d45d6e333f",
+      "name": "Các hệ thống đánh giá nguy cơ tai nạn hàng hải"
+    },
+    {
+      "id": "43d3973d-e060-4dad-95f3-c2fb6ba77fb9",
+      "name": "Thực tập chuyên ngành"
+    },
+    {
+      "id": "5770061f-15d9-4fe0-a060-6e9292f9e2c3",
+      "name": "Đề án tốt nghiệp"
+    }
+  ],
+  "finalCatalogCount": 28,
+  "sharing": {
+    "groups": [
+      {
+        "name": "Triết học",
+        "credits": 3,
+        "otherMajors": [
+          "Kỹ thuật xây dựng công trình thủy",
+          "Cơ khí thông minh và Robot",
+          "Quản lý môi trường",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Kỹ thuật môi trường",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý hàng hải",
+          "Công nghệ thông tin",
+          "Quản trị kinh doanh",
+          "Quản lý kinh tế",
+          "Quản lý vận tải và Logistics",
+          "Quản lý tài chính",
+          "Quản lý kỹ thuật",
+          "Quản lý năng lượng",
+          "Quản lý sản xuất công nghiệp",
+          "Kỹ thuật tàu thủy"
+        ]
+      },
+      {
+        "name": "Tiếng anh",
+        "credits": 3,
+        "otherMajors": [
+          "Kỹ thuật xây dựng công trình thủy",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý hàng hải",
+          "Quản lý sản xuất công nghiệp",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Quản lý vận tải và Logistics",
+          "Quản trị kinh doanh",
+          "Quản lý kinh tế",
+          "Quản lý tài chính",
+          "Kỹ thuật môi trường",
+          "Quản lý năng lượng",
+          "Cơ khí thông minh và Robot",
+          "Công nghệ thông tin",
+          "Quản lý môi trường",
+          "Quản lý kỹ thuật",
+          "Kỹ thuật tàu thủy"
+        ]
+      },
+      {
+        "name": "Phương pháp nghiên cứu khoa học",
+        "credits": 2,
+        "otherMajors": [
+          "Cơ khí thông minh và Robot",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật môi trường",
+          "Kỹ thuật tàu thủy",
+          "Kỹ thuật xây dựng công trình thủy",
+          "Kỹ thuật xây dựng dân dụng và công nghiệp",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý hàng hải",
+          "Quản lý kinh tế",
+          "Quản lý kỹ thuật",
+          "Quản lý môi trường",
+          "Quản lý năng lượng",
+          "Quản lý sản xuất công nghiệp",
+          "Quản lý tài chính",
+          "Quản lý vận tải và Logistics",
+          "Công nghệ thông tin"
+        ]
+      }
+    ],
+    "updates": [],
+    "differentCredits": [],
+    "excludedCourses": [
+      "Thực tập chuyên ngành",
+      "Đề án tốt nghiệp"
+    ]
+  }
+}

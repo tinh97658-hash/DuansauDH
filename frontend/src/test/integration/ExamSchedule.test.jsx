@@ -11,7 +11,7 @@ vi.mock('../../components/FeatureLayout',()=>({default:({children})=><div>{child
 vi.mock('../../features/scheduling/reference.css',()=>({}));
 vi.mock('../../features/scheduling/workspace.css',()=>({}));
 vi.mock('../../features/exams/examSchedule.css',()=>({}));
-vi.mock('../../utils/schedulingCalendar',async()=>({...await vi.importActual('../../utils/schedulingCalendar'),getBusinessTodayKey:()=> '2026-10-19'}));
+vi.mock('../../utils/schedulingCalendar',async()=>({...await vi.importActual('../../utils/schedulingCalendar'),getBusinessTodayKey:()=> '2026-10-19',getBusinessWallTime:()=> '2026-10-19 07:00:00'}));
 const date='2026-10-19',offering={id:'offering',name:'Lớp QT 2026',subjectId:'subject',subjectName:'Quản trị',subjectCode:'QT',snapshotId:'snapshot',eligibilityVersion:2,candidateCount:2,candidateIds:['student:a','student:b'],remainingCount:2,groups:[{id:'group',name:'QTKD2026',academicYear:'2026',majorId:'major',majorName:'Quản trị kinh doanh',disciplineId:'discipline',disciplineName:'Kinh doanh'}]};
 const room={id:'room',name:'Phòng giảng đường',code:'301',capacity:2,isActive:true};let data;
 const renderPage=(permissions=['gradebook.view','scheduling.write'])=>renderWithPermissions(<MemoryRouter><ExamSchedule/></MemoryRouter>,permissions);
@@ -35,7 +35,7 @@ it('marks today with the shared Teaching indicator and blocks past calendar date
  fireEvent.click(screen.getByRole('button',{name:'Tuần trước'}));
  await waitFor(()=>expect(axios.get).toHaveBeenLastCalledWith(expect.any(String),expect.objectContaining({params:{from:'2026-10-12',to:'2026-10-18'}})));
  for(const button of screen.getAllByRole('button',{name:/^Chọn /}))expect(button).toBeDisabled();
- for(const button of screen.getAllByRole('button',{name:'Ngày đã qua'}))expect(button).toBeDisabled();
+ expect(screen.queryByRole('button',{name:'+ Xếp lịch'})).toBeNull();
  fireEvent.click(screen.getByRole('button',{name:'Chọn 18/10/2026 Chiều'}));
  expect(screen.queryByRole('dialog')).toBeNull();
 });
@@ -117,7 +117,7 @@ it('uses the clicked afternoon without editable start/end times and requires an 
  renderPage();fireEvent.click(await within(screen.getByRole('complementary',{name:'Chưa xếp lịch'})).findByRole('button',{name:/Lớp QT/}));fireEvent.click(screen.getByRole('button',{name:'Chọn 19/10/2026 Chiều'}));
  expect(screen.queryByLabelText('Ngày thi')).toBeNull();expect(screen.getByText('Chiều')).toBeInTheDocument();expect(screen.queryByLabelText('Bắt đầu')).toBeNull();expect(screen.queryByLabelText('Kết thúc')).toBeNull();await waitFor(()=>expect(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/})).toBeEnabled());
  fireEvent.click(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/}));expect(screen.getByRole('button',{name:'Xếp lịch'})).toBeDisabled();expect(screen.queryByRole('option',{name:'Giảng viên cũ'})).toBeNull();
- chooseUnit('unit-1');chooseLecturer('lecturer');fireEvent.click(screen.getByRole('button',{name:'Xếp lịch'}));await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({examDate:date,startTime:'13:00',endTime:'14:00',lecturerId:'lecturer'}),expect.any(Object)));
+ chooseUnit('unit-1');chooseLecturer('lecturer');fireEvent.click(screen.getByRole('button',{name:'Xếp lịch'}));await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({examDate:date,startTime:'14:00',endTime:'15:00',lecturerId:'lecturer'}),expect.any(Object)));
 });
 it('disables lecturers already assigned to an overlapping exam even when the room is free',async()=>{
  data.sessions=[session({id:'existing',courseOfferingId:'other',roomId:'other-room',candidateIds:['other']})];renderPage();await open();

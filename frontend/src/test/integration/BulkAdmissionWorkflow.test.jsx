@@ -26,11 +26,11 @@ it("phân trang 15 hồ sơ và giữ điểm đang nhập khi chuyển trang", 
   mount({ data: { ...data, rows }, visibleRows: rows });
   expect(screen.getAllByRole("spinbutton")).toHaveLength(15);
   fireEvent.change(screen.getByLabelText("Điểm HS001"), { target: { value: "16.5" } });
-  fireEvent.click(screen.getByRole("button", { name: /page 2/i }));
+  fireEvent.click(screen.getByRole("button", { name: /^Trang 2$/ }));
   expect(screen.getAllByRole("spinbutton")).toHaveLength(1);
   expect(screen.getByText("Hiển thị 16–16 trên 16 hồ sơ")).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("Điểm HS016"), { target: { value: "17" } });
-  fireEvent.click(screen.getByRole("button", { name: /page 1/i }));
+  fireEvent.click(screen.getByRole("button", { name: /^Trang 1$/ }));
   expect(screen.getByLabelText("Điểm HS001")).toHaveValue(16.5);
   fireEvent.click(screen.getByRole("button", { name: /Lưu điểm hàng loạt/ }));
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.stringContaining("/scores"), { rows: [

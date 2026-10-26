@@ -14,10 +14,6 @@
 .css-student-link { display:block; color:inherit; text-decoration:none; }
 .css-student-link:hover,.css-student-link:focus-visible { color:var(--primary); text-decoration:underline; }
 .css-empty { display:flex; flex:1; align-items:center; justify-content:center; gap:10px; min-height:180px; padding:32px 16px; color:var(--text-secondary); font-size:12.5px; }
-.css-pagination { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:12px; padding:12px; border-top:1px solid var(--table-border-color); font-size:12px; }
-.css-pagination > span { grid-column:1; }
-.css-pagination > nav { grid-column:2; justify-self:center; }
-@media (max-width:600px) { .css-pagination { grid-template-columns:1fr; } .css-pagination > nav { grid-column:1; } }
 @media (max-width:1200px) {
   .css-filters { grid-template-columns:repeat(3,minmax(0,1fr)); }
 }

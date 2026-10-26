@@ -1,0 +1,261 @@
+{
+  "applied": true,
+  "major": {
+    "id": "134a9461-58da-4fad-9ff8-83253dc736e6",
+    "name": "Kỹ thuật xây dựng dân dụng và công nghiệp"
+  },
+  "sourceRows": 32,
+  "uniqueSourceSubjects": 32,
+  "duplicatesRemoved": [],
+  "sourceCodeConflicts": [
+    {
+      "name": "Phương pháp nghiên cứu khoa học",
+      "sourceCodeNumber": 503,
+      "retainedExistingCodeNumber": 506,
+      "codeText": "XDKH",
+      "reason": "Preserve existing same-name, same-credit course, its code and sharing links rather than creating a duplicate."
+    }
+  ],
+  "existingPreserved": [
+    {
+      "id": "7c02b320-2ab4-49ef-ae40-5be35b1ad1ab",
+      "name": "Triết học"
+    },
+    {
+      "id": "1911b490-c50a-4c3d-8f76-06a8bf37e9b9",
+      "name": "Tiếng anh"
+    },
+    {
+      "id": "416b8af1-696d-4b7d-a301-07110649c0c9",
+      "name": "Phương pháp nghiên cứu khoa học"
+    }
+  ],
+  "inserted": [
+    {
+      "id": "2207f066-118b-4359-87d0-4bf869050fc4",
+      "name": "Phương pháp Phần tử hữu hạn trong tính toán kết cấu"
+    },
+    {
+      "id": "6ac244d5-a2f8-4328-b1a0-f8c76cec287e",
+      "name": "Vật liệu mới trong xây dựng DD và CN"
+    },
+    {
+      "id": "d9cf602d-6a05-45e0-8616-af2362b6acb9",
+      "name": "Quản lý dự án xây dựng"
+    },
+    {
+      "id": "71004d78-ebca-4e0b-939b-27de256c82b0",
+      "name": "Ổn định công trình"
+    },
+    {
+      "id": "20d951de-a125-4741-91ee-a5ecce530752",
+      "name": "Tin học ứng dụng trong kỹ thuật công trình"
+    },
+    {
+      "id": "d1dc5e5f-ff17-4cf8-82f3-bae92e1a38b5",
+      "name": "Kết cấu tấm và vỏ mỏng"
+    },
+    {
+      "id": "fcf4e360-bedb-4685-8f7a-141c9ea86c15",
+      "name": "Quản lý dự án xây dựng nâng cao"
+    },
+    {
+      "id": "e9bbe593-7f2e-40e5-8fc6-84581b050907",
+      "name": "Vật liệu và công nghệ chống thấm công trình xây dựng"
+    },
+    {
+      "id": "76b65159-3461-4f40-99b0-3153a2af7d10",
+      "name": "Pháp luật và quản lý chính sách trong xây dựng"
+    },
+    {
+      "id": "a2c1a3e6-9618-41d6-ada2-124c39d4b88d",
+      "name": "Lý thuyết tối ưu trong tính toán kết cấu"
+    },
+    {
+      "id": "f036919d-37bc-46f8-a2b7-c44a7f310894",
+      "name": "Phương pháp tính"
+    },
+    {
+      "id": "883f9c66-8ba8-489a-a169-41afc7dcc5f7",
+      "name": "Vật liệu composite"
+    },
+    {
+      "id": "da7f7785-691e-49dc-bcac-71fbb2bedf04",
+      "name": "Quản lý chất lượng Công trình xây dựng"
+    },
+    {
+      "id": "e8608954-9da5-4d94-8a52-e1a107c359d8",
+      "name": "Kết cấu nhà nhiều tầng bằng BTCT"
+    },
+    {
+      "id": "b08506d7-177d-4433-946c-16b35b63f295",
+      "name": "Kết cấu công trình thép cao"
+    },
+    {
+      "id": "ac7678da-b411-4137-bc92-4cd76f2e8050",
+      "name": "Xử lý nền đất yếu"
+    },
+    {
+      "id": "19735def-1bec-4556-8fde-676e4e1ded3b",
+      "name": "Công nghệ và tổ chức thi công"
+    },
+    {
+      "id": "b2b3f6fc-b400-464a-bdf3-415c5a251963",
+      "name": "Ổn định Kết cấu thép và kết cấu thép nhẹ"
+    },
+    {
+      "id": "8f9c1f5a-3694-41ac-87a5-d21c6c9213e8",
+      "name": "Độ tin cậy và tuổi thọ công trình"
+    },
+    {
+      "id": "65a6edba-d41e-4c00-8646-24b01547b0fe",
+      "name": "Thiết kế kháng chấn công trình"
+    },
+    {
+      "id": "1984773f-6dd0-4faf-ad74-54c6c240eb03",
+      "name": "Động đất và và lý thuyết tính toán các công trình chịu động đất"
+    },
+    {
+      "id": "38d6c3fe-6f28-43b2-be11-428357c7963e",
+      "name": "Những vấn đề đặc biệt của kết cấu BTCT"
+    },
+    {
+      "id": "d97b6ff2-9b70-48b5-8646-5614c1c77d39",
+      "name": "Tác động của gió, bão, lốc lên công trình"
+    },
+    {
+      "id": "1e35c5be-b025-428b-a3d5-5395a1dc1bfd",
+      "name": "Phương pháp thực nghiệm công trình"
+    },
+    {
+      "id": "dd67ea63-fad6-4223-a4bf-7a440e8def92",
+      "name": "Tính toán thanh thành mỏng"
+    },
+    {
+      "id": "954f909a-4310-4662-afc5-a5dcb55baabe",
+      "name": "Kết cấu BTCT ứng suất trước"
+    },
+    {
+      "id": "f3993b1d-1f44-4dd3-9e95-9ac84ffae7c5",
+      "name": "Công nghệ thi công hiện đại"
+    },
+    {
+      "id": "7d292430-ff92-462d-868a-6f6ad3c6651d",
+      "name": "Thực tập tốt nghiệp"
+    },
+    {
+      "id": "6dff8291-59d0-40a1-a3d1-f1250d5784f5",
+      "name": "Đề án tốt nghiệp"
+    }
+  ],
+  "finalCatalogCount": 32,
+  "sharing": {
+    "groups": [
+      {
+        "name": "Triết học",
+        "credits": 3,
+        "otherMajors": [
+          "Kỹ thuật xây dựng công trình thủy",
+          "Quản lý cảng và an toàn hàng hải",
+          "Cơ khí thông minh và Robot",
+          "Quản lý môi trường",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật môi trường",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý hàng hải",
+          "Công nghệ thông tin",
+          "Quản trị kinh doanh",
+          "Quản lý kinh tế",
+          "Quản lý vận tải và Logistics",
+          "Quản lý tài chính",
+          "Quản lý kỹ thuật",
+          "Quản lý năng lượng",
+          "Quản lý sản xuất công nghiệp",
+          "Kỹ thuật tàu thủy"
+        ]
+      },
+      {
+        "name": "Tiếng anh",
+        "credits": 3,
+        "otherMajors": [
+          "Kỹ thuật xây dựng công trình thủy",
+          "Quản lý cảng và an toàn hàng hải",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý hàng hải",
+          "Quản lý sản xuất công nghiệp",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Quản lý vận tải và Logistics",
+          "Quản trị kinh doanh",
+          "Quản lý kinh tế",
+          "Quản lý tài chính",
+          "Kỹ thuật môi trường",
+          "Quản lý năng lượng",
+          "Cơ khí thông minh và Robot",
+          "Công nghệ thông tin",
+          "Quản lý môi trường",
+          "Quản lý kỹ thuật",
+          "Kỹ thuật tàu thủy"
+        ]
+      },
+      {
+        "name": "Phương pháp nghiên cứu khoa học",
+        "credits": 2,
+        "otherMajors": [
+          "Cơ khí thông minh và Robot",
+          "Kỹ thuật điện tử - viễn thông",
+          "Kỹ thuật điều khiển và tự động hóa",
+          "Kỹ thuật môi trường",
+          "Kỹ thuật tàu thủy",
+          "Kỹ thuật xây dựng công trình thủy",
+          "Quản lý cảng và an toàn hàng hải",
+          "Quản lý dự án đầu tư và xây dựng",
+          "Quản lý hàng hải",
+          "Quản lý kinh tế",
+          "Quản lý kỹ thuật",
+          "Quản lý môi trường",
+          "Quản lý năng lượng",
+          "Quản lý sản xuất công nghiệp",
+          "Quản lý tài chính",
+          "Quản lý vận tải và Logistics",
+          "Công nghệ thông tin"
+        ]
+      },
+      {
+        "name": "Phương pháp tính",
+        "credits": 2,
+        "otherMajors": [
+          "Kỹ thuật tàu thủy"
+        ]
+      }
+    ],
+    "updates": [
+      {
+        "id": "92cbb0b8-298c-44b8-be31-ff1593c99aab",
+        "name": "Phương pháp tính",
+        "major": "Kỹ thuật tàu thủy",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "134a9461-58da-4fad-9ff8-83253dc736e6"
+        ]
+      },
+      {
+        "id": "f036919d-37bc-46f8-a2b7-c44a7f310894",
+        "name": "Phương pháp tính",
+        "major": "Kỹ thuật xây dựng dân dụng và công nghiệp",
+        "previousAllowCrossMajor": false,
+        "previousSharedMajorIds": [],
+        "sharedMajorIds": [
+          "e8cbb3e8-a600-444c-bcda-af49a90e81b9"
+        ]
+      }
+    ],
+    "differentCredits": [],
+    "excludedCourses": [
+      "Thực tập tốt nghiệp",
+      "Đề án tốt nghiệp"
+    ]
+  }
+}

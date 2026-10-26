@@ -747,7 +747,7 @@ const AssignClassGroups = () => {
           </Paper>
         </>} />}
       <ConfirmDialog open={!!pendingRemoval} title="Bỏ học viên khỏi nhóm" severity="error"
-        content={`Bỏ ${pendingRemoval?.fullName || ""} khỏi nhóm ${pendingRemoval?.groupCode || ""}?`}
+        content={`Bỏ ${pendingRemoval?.fullName || ""} khỏi nhóm ${pendingRemoval?.groupCode || ""}? Nếu chưa nộp học phí, hồ sơ sẽ được rút khỏi lớp và trở về Nộp hồ sơ đầu vào; lịch sử vẫn được giữ.`}
         confirmText="Bỏ khỏi nhóm" loading={actionLoading} onConfirm={handleRemoveMember}
         onClose={() => { if (!actionInFlight.current) setPendingRemoval(null); }} />
       </Box>
