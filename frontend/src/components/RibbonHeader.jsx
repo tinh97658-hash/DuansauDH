@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import AdminPanelSettingsOutlined from "@mui/icons-material/AdminPanelSettingsOutlined";
 import AccountBalanceOutlined from "@mui/icons-material/AccountBalanceOutlined";
 import AddTaskOutlined from "@mui/icons-material/AddTaskOutlined";
+import CameraAltOutlined from "@mui/icons-material/CameraAltOutlined";
 import CategoryOutlined from "@mui/icons-material/CategoryOutlined";
 import CheckCircleOutline from "@mui/icons-material/CheckCircleOutline";
 import EventOutlined from "@mui/icons-material/EventOutlined";
@@ -121,6 +122,7 @@ export const ribbons = {
       action("Tạo lớp học phần", "/masters/course-offerings", NoteAddOutlined, "#0788b8", { permissions: ["scheduling.view"] }),
       action("Xếp lịch", "/masters/schedule", EventNoteOutlined, "#7b5fac", { permissions: ["scheduling.view"] }),
       action("Ma trận lớp học phần", "/masters/course-matrix", TableChartOutlined, "#168b7c", { permissions: ["scheduling.view"] }),
+      action("Điểm danh khuôn mặt", "/masters/attendance", CameraAltOutlined, "#2e7d32", { permissions: ["attendance.view"] }),
     ]),
     group("QUẢN LÝ ĐIỂM", [
       action("Danh sách thi, điểm thi", "/masters/exam-lists", ListAltOutlined, "#a04f86", { permissions: ["gradebook.view"] }),

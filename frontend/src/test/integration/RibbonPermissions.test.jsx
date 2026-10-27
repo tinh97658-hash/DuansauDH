@@ -16,6 +16,7 @@ const routesByPermission = {
   "gradebook.view": ["/masters/exam-lists", "/masters/exam-schedule"],
   "reports.view": ["/reports/class-score-summary", ...["class-lists", "course-scores", "ministerial-report", "temp-score-masters", "temp-score-doctoral", "diploma-appendix-masters", "diploma-appendix-doctoral"].map(s => "/reports/" + s)],
   "doctoral.view": ["admission-scores", "create-class-groups", "assign-class-groups", "exam-eligibility", "exam-scores", "exam-lists", "overview-topics", "university-workshops", "faculty-defense", "closed-review", "university-defense", "graduation-docs"].map(s => "/doctoral/" + s),
+  "attendance.view": ["/masters/attendance"],
 };
 const expected = new Map(Object.entries(routesByPermission).flatMap(([permission, routes]) => routes.map(route => [route, [permission]])));
 expected.set("/masters/class-course-history", ["plan.view", "scheduling.view"]);
@@ -47,8 +48,8 @@ describe("Ribbon read/navigation permission contracts", () => {
     expect(calendar).toHaveAttribute("aria-current", "page");
     expect(group.querySelectorAll(".ribbon-action")).toHaveLength(3);
   });
-  it("classifies all 63 actions against the independent contract", () => {
-    expect(items).toHaveLength(63);expect(expected.size).toBe(63);
+  it("classifies all 64 actions against the independent contract", () => {
+    expect(items).toHaveLength(64);expect(expected.size).toBe(64);
     for (const item of items) {
       expect(expected.has(item.route)).toBe(true);
       expect(item.permissions || []).toEqual(expected.get(item.route));

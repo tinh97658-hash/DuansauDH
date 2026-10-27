@@ -154,11 +154,11 @@ export default function AttendanceSession({ sessionId, onBack }) {
             </span>
             <span>
               <MeetingRoom sx={{ fontSize: 16, verticalAlign: "text-bottom", mr: 0.5 }} />
-              Phòng: {session?.room || "Chưa xếp phòng"}
+              Phòng: {typeof session?.room === "object" ? (session?.room?.code || session?.room?.name || "Chưa xếp phòng") : (session?.room || "Chưa xếp phòng")}
             </span>
             <span>
               <Person sx={{ fontSize: 16, verticalAlign: "text-bottom", mr: 0.5 }} />
-              Giảng viên: {session?.lecturer || "Chưa phân công"}
+              Giảng viên: {typeof session?.lecturer === "object" ? (session?.lecturer?.fullName || session?.lecturer?.name || "Chưa phân công") : (session?.lecturer || "Chưa phân công")}
             </span>
           </Typography>
         </Box>
@@ -291,15 +291,16 @@ export default function AttendanceSession({ sessionId, onBack }) {
                   );
                 }
 
-                return displayList.map((participant) => {
-                  const att = attMap.get(participant.id);
+                return displayList.map((participant, index) => {
+                  const pId = participant.id || participant.studentId || participant.learnerId || `p-${index}`;
+                  const att = attMap.get(pId) || attMap.get(participant.id);
                   return (
-                    <TableRow key={participant.id} hover>
+                    <TableRow key={pId} hover>
                       <TableCell sx={{ fontWeight: "bold" }}>
                         {participant.fullName || att?.displayName || "N/A"}
                       </TableCell>
                       <TableCell sx={{ color: "text.secondary", fontSize: 13, fontFamily: "monospace" }}>
-                        {participant.code || participant.id}
+                        {participant.code || participant.studentCode || pId}
                       </TableCell>
                       <TableCell>
                         {att ? (
