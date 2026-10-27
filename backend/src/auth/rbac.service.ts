@@ -7,6 +7,7 @@ import { StaffRole } from "../database/models/staff-role.model.js";
 export interface EffectiveAccess {
   permissions: Set<string>;
   roleCodes: string[];
+  groupScope?: { restrictView: boolean; restrictEdit: boolean; readOnly: boolean };
 }
 
 const CACHE_TTL_MS = 30_000;
@@ -59,6 +60,10 @@ export class RbacService {
     for (const role of roleModels) {
       for (const permission of role.permissions ?? []) permissions.add(permission.code);
     }
-    return { permissions, roleCodes: roleModels.map((role) => role.code) };
+    return { permissions, roleCodes: roleModels.map((role) => role.code), groupScope: {
+      restrictView: roleModels.some(role => role.restrictGroupView === true),
+      restrictEdit: roleModels.some(role => role.restrictGroupEdit === true),
+      readOnly: roleModels.some(role => role.groupReadOnly === true),
+    } };
   }
 }

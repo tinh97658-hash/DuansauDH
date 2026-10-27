@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Delete, Get, Param, ParseUUIDPip
 import { ExamScheduleService } from './exam-schedule.service.js';
 import { ConfirmExamDto, ExamScheduleQueryDto, ExamSessionActionDto, RescheduleExamDto, ScheduleExamDto, SaveExamArrangementDto } from './dto/exam-schedule.dto.js';
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
+import { GroupResponsibilityService } from "../auth/group-responsibility.service.js";
 import { CurrentUser } from "../common/auth-user.js";
 import { RequirePermissions } from "../common/permissions.decorator.js";
 import { PermissionsGuard } from "../common/permissions.guard.js";
@@ -21,6 +22,7 @@ import { AdmissionEvaluationService } from "../plan/admission-evaluation.service
 @RequirePermissions("masters.view")
 export class MastersController {
   constructor(
+    private readonly responsibility: GroupResponsibilityService,
     private readonly masters: MastersService,
     private readonly gradebooks: ExamGradebookService,
     private readonly admissionEvaluation: AdmissionEvaluationService,
@@ -99,23 +101,31 @@ export class MastersController {
     return this.masters.listEligibleStudents(majorId, academicYear);
   }
 
+  @Get("class-groups/options")
+  classGroupOptions(@Query("majorId") majorId?: string) {
+    return this.masters.classGroupOptions(majorId);
+  }
+
   @Get("class-groups/:id")
   getClassGroup(@Param("id") id: string) {
     return this.masters.getClassGroup(id);
   }
 
   @Post("class-groups") @RequirePermissions("masters.manage")
-  createClassGroup(@Body() dto: CreateMastersClassGroupDto) {
-    return this.masters.createClassGroup(dto);
+  async createClassGroup(@Body() dto: CreateMastersClassGroupDto, @CurrentUser() actor: any) {
+    const responsibleStaffId = await this.responsibility.forCreation(actor, dto.responsibleStaffId);
+    return this.masters.createClassGroup({ ...dto, responsibleStaffId });
   }
 
   @Post("class-groups/batch") @RequirePermissions("masters.manage")
-  batchCreateClassGroups(@Body() dto: BatchCreateMastersClassGroupsDto) {
-    return this.masters.batchCreateClassGroups(dto);
+  async batchCreateClassGroups(@Body() dto: BatchCreateMastersClassGroupsDto, @CurrentUser() actor: any) {
+    const responsibleStaffId = await this.responsibility.forCreation(actor, dto.responsibleStaffId);
+    return this.masters.batchCreateClassGroups({ ...dto, responsibleStaffId });
   }
 
   @Put("class-groups/:id") @RequirePermissions("masters.manage")
-  updateClassGroup(@Param("id") id: string, @Body() dto: UpdateMastersClassGroupDto) {
+  async updateClassGroup(@Param("id") id: string, @Body() dto: UpdateMastersClassGroupDto, @CurrentUser() actor: any) {
+    if (dto.responsibleStaffId !== undefined) await this.responsibility.forUpdate(actor, dto.responsibleStaffId);
     return this.masters.updateClassGroup(id, dto);
   }
 

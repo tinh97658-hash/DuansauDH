@@ -21,7 +21,7 @@ const readDraft = key => {
 export default function CreateOffering({ user }) {
   const { can } = usePermissions();
   const navigate = useNavigate();
-  const canEdit = can("scheduling.organize") || user.canManageScheduling === true;
+  const canEdit = can("scheduling.organize");
   const draftKey = `scheduling:create-offering:${user.id || user.email || "current"}`;
   const [initialDraft] = useState(() => readDraft(draftKey));
   const draftText = field => typeof initialDraft[field] === "string" ? initialDraft[field] : "";
@@ -78,8 +78,8 @@ export default function CreateOffering({ user }) {
   const majors = useLoad(async () => rows(await api.get("/system/majors?program=masters")).filter((item) => item.active !== false && !isCommonMajor(item)), []);
   const disciplines = disciplinesFromMajors(majors.data || []);
   const visibleMajors = majorsForDiscipline(majors.data || [], disciplineId);
-  const groups = useLoad(async () => majorId ? rows(await api.get(`/masters/class-groups?${new URLSearchParams({ majorId })}`)) : [], [majorId]);
-  const candidates = useLoad(async () => majorId && year ? (await api.get(`/scheduling/course-offering-candidates?${new URLSearchParams({ program: "masters", majorId, academicYear: year })}`)).subjects : [], [majorId, year, created?.id]);
+  const groups = useLoad(async signal => majorId ? rows(await api.get(`/masters/class-groups/options?${new URLSearchParams({ majorId })}`, { signal })) : [], [majorId]);
+  const candidates = useLoad(async signal => majorId && year ? (await api.get(`/scheduling/course-offering-candidates?${new URLSearchParams({ program: "masters", majorId, academicYear: year })}`, { signal })).subjects : [], [majorId, year, created?.id]);
   const availableCandidates = (candidates.data || []).filter((item) => !isInternshipSubject(item.subject));
   const candidate = availableCandidates.find((item) => item.subject.id === subjectId);
   const subject = candidate?.subject;
@@ -92,7 +92,7 @@ export default function CreateOffering({ user }) {
   const retakeClassGroupIds = chosen.filter(group => group.isRetake).map(group => group.id);
   const draft = { subjectId, classGroupIds: groupIds, majorId, academicYear: year, name: effectiveOfferingName.trim(),
     ...(retakeClassGroupIds.length ? { retakeClassGroupIds } : {}) };
-  const preview = useLoad(async () => groupIds.length && subject ? api.post("/scheduling/course-offerings/roster-preview", draft) : { participants: [], participantCount: 0 }, [subjectId, subject?.id, majorId, year, groupIds.join(",")]);
+  const preview = useLoad(async signal => groupIds.length && subject ? api.post("/scheduling/course-offerings/roster-preview", draft, { signal }) : { participants: [], participantCount: 0 }, [subjectId, subject?.id, majorId, year, groupIds.join(",")]);
   const days = intersectDays(chosen);
 
   const resetSelection = () => {

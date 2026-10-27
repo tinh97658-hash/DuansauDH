@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from "@nestjs/common";
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
+import { GroupResponsibilityService } from "../auth/group-responsibility.service.js";
 import { CurrentUser } from "../common/auth-user.js";
 import { RequirePermissions } from "../common/permissions.decorator.js";
 import { PermissionsGuard } from "../common/permissions.guard.js";
@@ -21,6 +22,7 @@ import { SubjectRecognitionService } from "./subject-recognition.service.js";
 @RequirePermissions("plan.view")
 export class PlanController {
   constructor(
+    private readonly responsibility: GroupResponsibilityService,
     private readonly plan: PlanService,
     private readonly curriculums: CurriculumService,
     private readonly majorTransfers: MajorTransferService,
@@ -46,7 +48,7 @@ export class PlanController {
 
   // ===== Lớp học =====
   @Get("classes") classes(@Query("majorId") majorId?: string, @Query("program") program?: string, @Query("year") year?: string) { return this.plan.listClasses(majorId, program, year); }
-  @Post("classes") @RequirePermissions("plan.manage") createClass(@Body() dto: CreateClassDto) { return this.plan.createClass(dto); }
+  @Post("classes") @RequirePermissions("plan.manage") async createClass(@Body() dto: CreateClassDto, @CurrentUser() actor: any) { return this.plan.createClass({ ...dto, responsibleStaffId: await this.responsibility.forCreation(actor, dto.responsibleStaffId) }); }
   @Put("classes/:id") @RequirePermissions("plan.manage") updateClass(@Param("id") id: string, @Body() dto: UpdateClassDto) { return this.plan.updateClass(id, dto); }
   @Delete("classes/:id") @RequirePermissions("plan.manage") removeClass(@Param("id") id: string) { return this.plan.removeClass(id); }
 

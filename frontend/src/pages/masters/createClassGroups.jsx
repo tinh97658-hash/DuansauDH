@@ -1,3 +1,4 @@
+import GroupResponsibleStaff from "../../features/accounts/GroupResponsibleStaff";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -27,6 +28,7 @@ const CLASS_GROUP_COLUMNS = [
   { key: "code", label: "Mã nhóm", width: 150, minWidth: 100 },
   { key: "major", label: "Ngành học", width: 220, minWidth: 150 },
   { key: "curriculum", label: "Chương trình đào tạo", width: 260, minWidth: 180 },
+  { key: "responsibleStaff", label: "Chuyên viên phụ trách", width: 220, minWidth: 180 },
   { key: "year", label: "Năm học", width: 100, minWidth: 80, align: "center" },
   { key: "students", label: "Sĩ số", width: 160, minWidth: 120 },
   { key: "status", label: "Trạng thái", width: 120, minWidth: 100, align: "center" },
@@ -36,7 +38,7 @@ const CLASS_GROUP_COLUMNS = [
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
 const CreateClassGroups = () => {
-  const { can } = usePermissions();
+  const { can, access } = usePermissions();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const quickCreateOpened = useRef(false);
@@ -58,7 +60,7 @@ const CreateClassGroups = () => {
   // Data & loading
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const isAdmin = can("masters.manage");
+  const isAdmin = can("masters.manage") && !access?.groupScope?.readOnly;
   const [error, setError] = useState("");
 
   // Dialogs
@@ -155,6 +157,8 @@ const CreateClassGroups = () => {
     setDialogDisciplineId(majorDisciplineId(groupMajor));
     setEditingId(group.id);
     setForm({
+      responsibleStaffId: group.responsibleStaffId || "",
+      responsibleStaff: group.responsibleStaff || null,
       code: group.code,
       count: 1,
       majorId: group.majorId || "",
@@ -299,13 +303,13 @@ const CreateClassGroups = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} align="center" sx={{ py: 5 }}>
+                <TableCell colSpan={9} align="center" sx={{ py: 5 }}>
                   <CircularProgress size={30} />
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} align="center" sx={{ py: 5, color: "text.secondary" }}>
+                <TableCell colSpan={9} align="center" sx={{ py: 5, color: "text.secondary" }}>
                   Chưa có nhóm học phần nào phù hợp. Bấm "Thêm nhóm mới" để bắt đầu.
                 </TableCell>
               </TableRow>
@@ -320,7 +324,7 @@ const CreateClassGroups = () => {
                   <TableRow
                     key={row.id}
                     hover
-                    onDoubleClick={() => isAdmin && openEdit(row)}
+                    onDoubleClick={() => isAdmin && row.canEdit !== false && openEdit(row)}
                     sx={{
                       ...(isAdmin ? { cursor: "pointer" } : {}),
                       "&:hover": { bgcolor: "#F5FAFE!important" },
@@ -335,6 +339,7 @@ const CreateClassGroups = () => {
                     </TableCell>
                     <TableCell>{row.major?.name || "-"}</TableCell>
                     <TableCell>{row.curriculum ? `${row.curriculum.code} — ${row.curriculum.name}` : "Chưa chọn"}</TableCell>
+                    <TableCell onDoubleClick={event => event.stopPropagation()}><GroupResponsibleStaff group={row} onSaved={loadGroups} /></TableCell>
                     <TableCell align="center">{row.academicYear || "-"}</TableCell>
                     <TableCell>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -373,7 +378,7 @@ const CreateClassGroups = () => {
                             <GroupWorkRounded fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        {isAdmin && (
+                        {isAdmin && row.canEdit !== false && (
                           <>
                             <Tooltip title="Chỉnh sửa">
                               <IconButton size="small" color="primary" onClick={() => openEdit(row)}>

@@ -65,8 +65,8 @@ export default function CourseMatrix({ user }) {
   const [viewMode, setViewMode] = useState("board"); // "board" | "pivot"
   const [detailOffering, setDetailOffering] = useState(null);
 
-  const canEdit = user.canManageScheduling === true;
-  const canDelete = canEdit || can("scheduling.organize");
+  const canEdit = can("scheduling.write");
+  const canDelete = can("scheduling.organize");
   const offerings = useLoad(async () => rows(await api.get("/scheduling/course-offerings?program=masters")), []);
   const majors = useLoad(async () => rows(await api.get("/system/majors?program=masters")), []);
   const disciplines = useMemo(() => disciplinesFromMajors(majors.data || []), [majors.data]);

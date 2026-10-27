@@ -60,7 +60,7 @@ it("hiển thị và lưu ma trận quyền admin như mọi vai trò khác", as
   fireEvent.click(screen.getByRole("button", { name: "Lưu quyền" }));
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(
     expect.stringContaining("/roles/role-admin/permissions"),
-    { permissionIds: ["perm-view"] }, { withCredentials: true },
+    { permissionIds: ["perm-view"], restrictGroupView: false, restrictGroupEdit: false, groupReadOnly: false }, { withCredentials: true },
   ));
 });
 
@@ -81,7 +81,7 @@ it("tick chọn quyền trong ma trận và lưu thay đổi theo mã quyền", 
 
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(
     expect.stringContaining("/roles/role-supervisor/permissions"),
-    { permissionIds: ["perm-view", "perm-manage"] },
+    { permissionIds: ["perm-view", "perm-manage"], restrictGroupView: false, restrictGroupEdit: false, groupReadOnly: false },
     { withCredentials: true },
   ));
 });
@@ -114,4 +114,19 @@ it("tạo vai trò tùy chỉnh mới", async () => {
     { code: "thu_ky_khoa", name: "Thư ký khoa", description: "" },
     { withCredentials: true },
   ));
+});
+
+
+it("các khóa mặc định tắt và lưu độc lập với quyền nghiệp vụ", async () => {
+  mount(["role.view", "role.manage"]);
+  const viewLock = await screen.findByRole("checkbox", { name: "Chỉ xem nhóm được phân công phụ trách" });
+  const editLock = screen.getByRole("checkbox", { name: "Chỉ sửa nhóm được phân công phụ trách" });
+  const readOnly = screen.getByRole("checkbox", { name: "Chỉ xem — khóa mọi thao tác sửa dữ liệu nhóm" });
+  expect(viewLock).not.toBeChecked(); expect(editLock).not.toBeChecked(); expect(readOnly).not.toBeChecked();
+  fireEvent.click(editLock); fireEvent.click(readOnly);
+  axios.put.mockResolvedValue({ data: { message: "Đã lưu" } });
+  fireEvent.click(screen.getByRole("button", { name: "Lưu quyền" }));
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+    restrictGroupView: false, restrictGroupEdit: true, groupReadOnly: true,
+  }), { withCredentials: true }));
 });

@@ -269,3 +269,32 @@ test("opens edit dialog with Image 2 compact layout and updates class group", as
     { withCredentials: true },
   ));
 });
+
+
+test("changes an assigned specialist only in the group editor and saves with the group", async () => {
+  const group = { id: "group-1", code: `CNTT ${year}.1.1`, majorId: major.id, curriculumId: curriculum.id,
+    academicYear: year, status: "open", major, curriculum, responsibleStaffId: "staff-1", responsibleStaff: { name: "Chuyên viên A" } };
+  axios.get.mockImplementation(async url => {
+    if (url.includes("/system/majors")) return { data: [major] };
+    if (url.includes("/plan/curriculums")) return { data: [curriculum] };
+    if (url.includes("/masters/class-groups")) return { data: [group] };
+    if (url.includes("/groups/assignees")) return { data: [
+      { id: "staff-1", name: "Chuyên viên A", email: "a@example.com" },
+      { id: "staff-2", name: "Chuyên viên B", email: "b@example.com" },
+    ] };
+    return { data: [] };
+  });
+  axios.put = jest.fn().mockResolvedValue({ data: {} });
+  renderWithPermissions(<MemoryRouter><CreateClassGroups /></MemoryRouter>, ["masters.manage", "groups.assign"]);
+  await screen.findByText("Chuyên viên A");
+  expect(screen.queryByRole("button", { name: "Đổi chuyên viên" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Phân công", exact: true })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Chỉnh sửa" }));
+  const select = await screen.findByRole("button", { name: /Chuyên viên phụ trách/ });
+  await waitFor(() => expect(select).toBeEnabled());
+  fireEvent.mouseDown(select);
+  fireEvent.click(await screen.findByRole("option", { name: "Chuyên viên B — b@example.com" }));
+  fireEvent.click(screen.getByRole("button", { name: "Lưu nhóm" }));
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.stringContaining("/masters/class-groups/group-1"),
+    expect.objectContaining({ responsibleStaffId: "staff-2" }), { withCredentials: true }));
+});

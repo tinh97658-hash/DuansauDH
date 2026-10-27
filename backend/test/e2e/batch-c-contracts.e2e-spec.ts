@@ -1,3 +1,4 @@
+import { GroupResponsibilityService } from "../../src/auth/group-responsibility.service.js";
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { randomUUID } from "node:crypto";
@@ -31,6 +32,7 @@ describe("Batch C domain authorization with real HTTP guards", () => {
     const module = await Test.createTestingModule({
       controllers: [PlanController, AdmissionEvaluationController, StudyLeaveController, SystemController],
       providers: [
+        { provide: GroupResponsibilityService, useValue: { forCreation: jest.fn(async (actor: any, requestedId?: string) => requestedId || actor.id) } },
         { provide: RbacService, useValue: { effectiveAccess: async () => ({ permissions }) } },
         ...[PlanService, CurriculumService, MajorTransferService, SubjectRecognitionService, AdmissionEvaluationService, StudyLeaveService].map(provide => ({ provide, useValue: service })),
         { provide: SystemService, useValue: new Proxy(service, { get: (t, key) => key === "listRooms" ? rooms : Reflect.get(t, key) }) },

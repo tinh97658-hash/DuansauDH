@@ -7,7 +7,7 @@ import { resolveSavedExamGrade } from "../../src/masters/exam-grade-calculation.
 import { LEGACY_GRADING_POLICY } from "../../src/masters/grading-policy.js";
 
 it.each(["masters", "master", "thac si", " Thạc sĩ "])("normalizes %s at both admission API boundaries", async trainingLevel => {
-  const create = plainToInstance(CreateAdmissionRecordDto, { fullName: "Learner", majorId: "00000000-0000-4000-8000-000000000001", trainingLevel });
+  const create = plainToInstance(CreateAdmissionRecordDto, { fullName: "Learner", idCard: "0123456789012", phone: "0912345678", majorId: "00000000-0000-4000-8000-000000000001", trainingLevel });
   const update = plainToInstance(UpdateAdmissionRecordDto, { trainingLevel });
   expect(create.trainingLevel).toBe("Thạc sĩ");
   expect(update.trainingLevel).toBe("Thạc sĩ");

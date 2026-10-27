@@ -1,3 +1,5 @@
+import { ResponsibleStaffSelect } from "../../features/accounts/GroupResponsibleStaff";
+import { usePermissions } from "../../features/accounts/usePermissions";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
@@ -102,6 +104,8 @@ const CompactField = ({ label, htmlFor, helper, error = false, children, sx }) =
 
 // Mounted per create/edit session. Both callers share this form, validation and API writes.
 const ClassGroupCreateDialog = ({ majors, initialValues, initialDisciplineId = "", editingId = null, lockedScope = false, isScopeCurrent, onClose, onSaved }) => {
+  const { can } = usePermissions();
+  const canAssign = can("groups.assign");
   const dialogOpen = true;
   const [form, setForm] = useState(() => ({ ...initialClassGroupForm(), ...initialValues }));
   const [dialogDisciplineId, setDialogDisciplineId] = useState(initialDisciplineId);
@@ -212,6 +216,7 @@ const ClassGroupCreateDialog = ({ majors, initialValues, initialDisciplineId = "
     if (editingId && !form.code?.trim()) return toast.error("Vui lòng nhập mã nhóm học phần.");
     if (!editingId && !form.majorId) return toast.error("Vui lòng chọn chuyên ngành.");
     if (!form.curriculumId) return toast.error("Vui lòng chọn chương trình đào tạo cho lớp.");
+    if (!editingId && canAssign && !form.responsibleStaffId) return toast.error("Vui lòng chọn chuyên viên phụ trách.");
     const count = Number(form.count || 0);
     if (!editingId && (count < 1 || count > 10)) return toast.error("Số lượng nhóm cần tạo từ 1 đến 10.");
     if (!editingId && nameTemplateError) return toast.error(nameTemplateError);
@@ -239,6 +244,9 @@ const ClassGroupCreateDialog = ({ majors, initialValues, initialDisciplineId = "
       };
 
       if (editingId) {
+        if (canAssign && form.responsibleStaffId && form.responsibleStaffId !== initialValues.responsibleStaffId) {
+          payload.responsibleStaffId = form.responsibleStaffId;
+        }
         await axios.put(`${API_BASE_URL}/masters/class-groups/${editingId}`, payload, { withCredentials: true });
         toast.success("Cập nhật nhóm học phần thành công.");
       } else {
@@ -247,6 +255,7 @@ const ClassGroupCreateDialog = ({ majors, initialValues, initialDisciplineId = "
         if (!shortName) throw new Error("Chuyên ngành chưa có mã.");
         const { data } = await axios.post(`${API_BASE_URL}/masters/class-groups/batch`, {
           count,
+          ...(canAssign ? { responsibleStaffId: form.responsibleStaffId } : {}),
           nameTemplate,
           nameIndexes,
           intakeRound: Number(form.intakeRound),
@@ -292,7 +301,8 @@ const ClassGroupCreateDialog = ({ majors, initialValues, initialDisciplineId = "
               variant="contained"
               onClick={handleSave}
               disabled={saving || (editingId ? (!form.code?.trim() || !form.curriculumId) : (
-                !form.majorId
+                (canAssign && !form.responsibleStaffId)
+                || !form.majorId
                 || !form.curriculumId
                 || Number(form.count) < 1
                 || Number(form.count) > 10
@@ -311,6 +321,8 @@ const ClassGroupCreateDialog = ({ majors, initialValues, initialDisciplineId = "
         {lockedScope && <Typography variant="body2" sx={{ mb: 1, color: "text.secondary" }}>Thạc sĩ · {initialValues.academicYear} · {selectedFormMajor?.name}</Typography>}
         {editingId ? (
             <Stack spacing="14px">
+              {canAssign ? <ResponsibleStaffSelect value={form.responsibleStaffId} onChange={responsibleStaffId => setForm(previous => ({ ...previous, responsibleStaffId }))} disabled={saving} />
+                : <Typography variant="body2">Chuyên viên phụ trách: {initialValues.responsibleStaff?.name || "Chưa phân công"}</Typography>}
               <Box sx={{ p: 1.75, border: "1px solid #d7e1e8", borderRadius: "8px", backgroundColor: "#fbfcfd" }}>
                 <Stack spacing="13px">
                   <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1fr) minmax(0, 1.4fr) minmax(120px, .7fr)" }, gap: 1.5 }}>
@@ -506,6 +518,8 @@ const ClassGroupCreateDialog = ({ majors, initialValues, initialDisciplineId = "
                 </Stack>
               </Box>
 
+              {!editingId && canAssign && <ResponsibleStaffSelect value={form.responsibleStaffId} onChange={responsibleStaffId => setForm(previous => ({ ...previous, responsibleStaffId }))} disabled={saving} />}
+              {!editingId && !canAssign && <Typography variant="body2" color="text.secondary">Bạn sẽ được ghi nhận là chuyên viên phụ trách các nhóm mới.</Typography>}
               {dialogScopeError && <Alert severity="error" sx={compactAlertSx}>{dialogScopeError}</Alert>}
 
 

@@ -32,7 +32,7 @@ const UnitInfo = lazyPage(() => import("./pages/system/unitInfo"), ["/system/uni
 const License = lazyPage(() => import("./pages/system/license"), ["/system/license"]);
 const ChangePassword = lazyPage(() => import("./pages/system/changePassword"), ["/system/change-password"]);
 const Accounts = lazyPage(() => import("./pages/system/accounts"), ["/system/accounts"]);
-const Roles = lazyPage(() => import("./pages/system/roles"), ["/system/roles"]);
+const Roles = lazyPage(() => import("./pages/system/roles.jsx"), ["/system/roles"]);
 const AuditLogs = lazyPage(() => import("./pages/system/auditLogs"), ["/system/audit-logs"]);
 const Ethnicities = lazyPage(() => import("./pages/system/ethnicities"), ["/system/ethnicities"]);
 const Nationalities = lazyPage(() => import("./pages/system/nationalities"), ["/system/nationalities"]);

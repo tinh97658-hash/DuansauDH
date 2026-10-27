@@ -1,5 +1,7 @@
+import { renderWithPermissions } from "../renderWithPermissions";
+const render = (ui, options) => renderWithPermissions(ui, ["scheduling.organize", "scheduling.write"], options);
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import axios from "axios";
 import OfferingDeleteButton from "../../features/scheduling/OfferingDeleteButton";
 

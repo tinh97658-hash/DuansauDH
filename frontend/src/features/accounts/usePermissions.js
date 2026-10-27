@@ -11,6 +11,7 @@ export const usePermissions = () => {
   const can = useCallback(
     (permission) => {
       if (!access) return false;
+      if (access.groupScope?.readOnly && /^(groups\.assign|(?:masters|doctoral|plan|admission)\.manage|scheduling\.(write|organize|assign)|gradebook\.(submit|approve|policy)|studyleave\.manage)$/.test(permission)) return false;
       return (access.permissions || []).includes(permission);
     },
     [access],

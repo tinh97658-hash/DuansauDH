@@ -1,3 +1,4 @@
+import { GroupResponsibilityService } from "../../src/auth/group-responsibility.service.js";
 import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
@@ -65,6 +66,7 @@ describe("Learner data access over HTTP", () => {
     const module = await Test.createTestingModule({
       controllers: [PlanController, StudyLeaveController, MastersController, ReportsController],
       providers: [
+        { provide: GroupResponsibilityService, useValue: { forCreation: jest.fn(async (actor: any, requestedId?: string) => requestedId || actor.id) } },
         { provide: PlanService, useValue: { listAdmissionRecords: read, getAdmissionRecord: read, createAdmissionRecord: write } },
         { provide: CurriculumService, useValue: {} },
         { provide: MajorTransferService, useValue: { list: read } },

@@ -1,10 +1,11 @@
 import { Transform } from "class-transformer";
-import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from "class-validator";
+import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateIf } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim());
 const trimUpper = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim().toUpperCase());
 
 export class CreateMastersClassGroupDto {
+  @IsOptional() @IsUUID() responsibleStaffId?: string;
   @IsString() @MaxLength(100) @Transform(trimUpper) code!: string;
   @IsOptional() @IsString() @MaxLength(200) @Transform(trim) name?: string;
   @IsOptional() @IsUUID() majorId?: string;
@@ -16,6 +17,7 @@ export class CreateMastersClassGroupDto {
 }
 
 export class UpdateMastersClassGroupDto {
+  @ValidateIf((_object, value) => value !== undefined) @IsUUID() responsibleStaffId?: string;
   @IsOptional() @IsString() @MaxLength(100) @Transform(trimUpper) code?: string;
   @IsOptional() @IsString() @MaxLength(200) @Transform(trim) name?: string;
   @IsOptional() @IsUUID() majorId?: string;
@@ -39,6 +41,7 @@ export class AutoAssignDto {
 }
 
 export class BatchCreateMastersClassGroupsDto {
+  @IsOptional() @IsUUID() responsibleStaffId?: string;
   @IsOptional() @IsString() @MaxLength(100) @Transform(trimUpper) codePrefix?: string;
   @IsOptional() @IsString() @MaxLength(160) @Transform(trim) namePrefix?: string;
   @IsOptional() @IsString() @MaxLength(200) @Transform(trim) nameTemplate?: string;

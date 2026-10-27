@@ -12,6 +12,7 @@ import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { Major } from "../database/models/common/major.model.js";
 import { Discipline } from "../database/models/common/discipline.model.js";
+import { Staff } from "../database/models/staff.model.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
 import { ClassGroupMember } from "../database/models/training/class-group-member.model.js";
 import { Subject } from "../database/models/plan/subject.model.js";
@@ -260,7 +261,8 @@ export class PlanService {
 
       return this.subjects.findByPk(id, {
         include: [
-          { model: Major, as: "major", attributes: ["id", "name"] },
+          { model: Staff, as: "responsibleStaff", attributes: ["id", "name", "email", "status"] },
+        { model: Major, as: "major", attributes: ["id", "name"] },
           { model: Subject, as: "canonicalSubject" },
         ],
         transaction,
@@ -498,6 +500,7 @@ export class PlanService {
     return this.classGroups.findAll({
       where,
       include: [
+        { model: Staff, as: "responsibleStaff", attributes: ["id", "name", "email", "status"] },
         { model: Major, as: "major", attributes: ["id", "name"] },
         {
           model: Curriculum,
@@ -513,6 +516,7 @@ export class PlanService {
     const created = await this.classGroupsService.create(dto as any);
     return this.classGroups.findByPk(created.id, {
       include: [
+        { model: Staff, as: "responsibleStaff", attributes: ["id", "name", "email", "status"] },
         { model: Major, as: "major", attributes: ["id", "name"] },
         { model: Curriculum, as: "curriculum", attributes: ["id", "code", "name", "totalCredits", "applicableFromYear", "active"] },
       ],
@@ -523,6 +527,7 @@ export class PlanService {
     await this.classGroupsService.update(id, dto as any);
     return this.classGroups.findByPk(id, {
       include: [
+        { model: Staff, as: "responsibleStaff", attributes: ["id", "name", "email", "status"] },
         { model: Major, as: "major", attributes: ["id", "name"] },
         { model: Curriculum, as: "curriculum", attributes: ["id", "code", "name", "totalCredits", "applicableFromYear", "active"] },
       ],

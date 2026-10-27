@@ -1,5 +1,7 @@
+import { renderWithPermissions } from "../renderWithPermissions";
+const render = (ui, options) => renderWithPermissions(ui, ["scheduling.view", "scheduling.write", "scheduling.organize"], options);
 import React from "react";
-import { cleanup, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import axios from "axios";
 import CourseMatrixPage from "../../pages/masters/courseMatrix";
@@ -58,13 +60,13 @@ function mockRequests(offerings, user = { role: "admin", canManageScheduling: tr
   }));
 }
 
-function renderMatrix(offerings, user) {
+function renderMatrix(offerings, user, permissions = ["scheduling.view", "scheduling.write", "scheduling.organize"]) {
   mockRequests(offerings, user);
-  return render(
+  return renderWithPermissions(
     <MemoryRouter initialEntries={["/masters/course-matrix"]}>
       <CourseMatrixPage />
       <LocationProbe />
-    </MemoryRouter>
+    </MemoryRouter>, permissions
   );
 }
 
@@ -278,7 +280,7 @@ it("excludes completed offerings from the active board, matrix, KPIs, filters, a
   fireEvent.click(screen.getByRole("button", { name: "Đóng" }));
 
   cleanup();
-  renderMatrix([activeScheduled, completedOnlySubject], { role: "supervisor", canManageScheduling: false });
+  renderMatrix([activeScheduled, completedOnlySubject], { role: "supervisor", canManageScheduling: true }, ["scheduling.view"]);
   await openMatrix();
   expect(screen.queryByRole("button", { name: "Xếp thêm →" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Xếp lịch →" })).not.toBeInTheDocument();

@@ -239,7 +239,7 @@ const Accounts = () => {
       {notice && <Alert severity={notice.type} onClose={() => setNotice(null)} sx={{ mb: 2 }}>{notice.message}</Alert>}
       {canAssign && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          Người phụ trách tổ chức lớp và xếp lịch hiện tại: <strong>{scheduleHolder ? scheduleHolder.name : "chưa phân công"}</strong>. Phân công mới sẽ chuyển quyền từ người cũ.
+          Người phụ trách tổ chức lớp và xếp lịch hiện tại: <strong>{scheduleHolder ? scheduleHolder.name : "chưa phân công"}</strong>. Phân công mới chuyển trách nhiệm từ người cũ. Quyền tạo lớp và sửa lịch được cấp riêng trong Vai trò & phân quyền.
         </Alert>
       )}
 
@@ -405,7 +405,7 @@ const Accounts = () => {
         title="PHÂN CÔNG PHỤ TRÁCH XẾP LỊCH"
         confirmText="Xác nhận phân công"
         loading={busy}
-        content={`Phân công ${assignTarget?.name || assignTarget?.email} phụ trách tổ chức lớp và xếp lịch?${scheduleHolder ? ` Quyền của ${scheduleHolder.name} sẽ được chuyển sang tài khoản này.` : ""}`}
+        content={`Phân công ${assignTarget?.name || assignTarget?.email} phụ trách tổ chức lớp và xếp lịch?${scheduleHolder ? ` Trách nhiệm phụ trách của ${scheduleHolder.name} sẽ được chuyển sang tài khoản này; quyền theo vai trò không thay đổi.` : ""}`}
       />
     </FeatureLayout>
   );

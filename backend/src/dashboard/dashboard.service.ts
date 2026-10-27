@@ -8,13 +8,13 @@ import { SystemService } from "../system/system.service.js";
 import { ExamGradebookService } from "../masters/exam-gradebook.service.js";
 import { businessCalendarDaysSince } from "../scheduling/scheduling-time.js";
 
-export const operationalPermissions = (user: unknown, permissions: Set<string>) => {
+export const operationalPermissions = (user: unknown, permissions: Set<string>, readOnly = false) => {
   const can = (...required: string[]) => user instanceof Staff && required.every((permission) => permissions.has(permission));
   return {
-    grouping: can("masters.view", "masters.manage"),
-    grades: can("gradebook.view", "gradebook.submit"),
-    scheduling: can("scheduling.view", "scheduling.write") && canWriteScheduling(user),
-    progress: can("scheduling.view", "scheduling.write") && canWriteScheduling(user),
+    grouping: !readOnly && can("masters.view", "masters.manage"),
+    grades: !readOnly && can("gradebook.view", "gradebook.submit"),
+    scheduling: !readOnly && can("scheduling.view", "scheduling.write") && canWriteScheduling(user, permissions),
+    progress: !readOnly && can("scheduling.view", "scheduling.write") && canWriteScheduling(user, permissions),
     overview: can("scheduling.view"),
   };
 };
@@ -113,8 +113,8 @@ export class DashboardService {
   }
 
   async operational(user: unknown, year: string, section?: DashboardSection) {
-    const access = user instanceof Staff ? await this.rbac.effectiveAccess(user) : { permissions: new Set<string>() };
-    const permissions = operationalPermissions(user, access.permissions);
+    const access = user instanceof Staff ? await this.rbac.effectiveAccess(user) : { permissions: new Set<string>(), groupScope: undefined };
+    const permissions = operationalPermissions(user, access.permissions, access.groupScope?.readOnly);
     let majorsPromise: Promise<any[]> | undefined;
     const majors = () => majorsPromise ||= this.system.listMajors("masters").then((rows) => rows.map(plain));
     const loaders: Partial<Record<DashboardSection, () => Promise<any>>> = {

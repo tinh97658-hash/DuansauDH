@@ -124,6 +124,7 @@ export class SetClassElectivesDto {
 
 // ===== Lớp học (class group) =====
 export class CreateClassDto {
+  @IsOptional() @IsUUID() responsibleStaffId?: string;
   @IsString() @MaxLength(30) @Transform(trimUpper) code!: string;
   @IsString() @MaxLength(200) @Transform(trim) name!: string;
   @IsOptional() @IsIn(["masters", "doctoral"]) program?: string;

@@ -1,5 +1,7 @@
+import { renderWithPermissions } from "../renderWithPermissions";
+const render = (ui, options) => renderWithPermissions(ui, ["scheduling.view", "scheduling.write", "scheduling.organize"], options);
 import React from "react";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import axios from "axios";
 import { API_BASE_URL } from "../../config/http";
@@ -169,7 +171,7 @@ it("completes teaching from details without a scheduling navigation callback", a
 });
 
 it("hides completion from viewers without scheduling authority", async () => {
-  render(<OfferingDetails offering={offering} user={{}} onClose={jest.fn()} />);
+  renderWithPermissions(<OfferingDetails offering={offering} user={{}} onClose={jest.fn()} />, ["scheduling.view"]);
   await screen.findByRole("button", { name: "Đã diễn ra (2)" });
   expect(screen.queryByRole("button", { name: "Xác nhận hoàn thành giảng dạy" })).not.toBeInTheDocument();
 });
@@ -879,4 +881,16 @@ it("renders the list of scheduled sessions and filters them by status", async ()
   fireEvent.click(screen.getByRole("button", { name: "Đã diễn ra (1)" }));
   expect(screen.queryByText("P.301")).not.toBeInTheDocument();
   expect(screen.getByText("P.302")).toBeInTheDocument();
+});
+
+
+it("allows a role with scheduling.write to schedule without the old assignee flag", async () => {
+  render(<MemoryRouter><ScheduleView user={{ canManageScheduling: false }} /></MemoryRouter>);
+  expect(await screen.findByRole("button", { name: "Xếp lịch", exact: true })).toBeEnabled();
+});
+
+it("does not expose schedule editing from the old assignee flag without RBAC", async () => {
+  renderWithPermissions(<MemoryRouter><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>, ["scheduling.view"]);
+  await screen.findByText("Chưa có quyền sửa lịch hoặc vai trò đang bị khóa chỉ xem. Quản trị viên cấu hình tại Vai trò & phân quyền.");
+  expect(screen.queryByRole("button", { name: "Xếp lịch", exact: true })).not.toBeInTheDocument();
 });
