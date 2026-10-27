@@ -162,14 +162,19 @@ export class FaceClientService {
     subjectId?: string;
     limit?: number;
   } = {}): Promise<BiometricAudit[]> {
-    const params = new URLSearchParams();
-    if (input.subjectId) params.set("subject_id", input.subjectId);
-    params.set("limit", String(input.limit ?? 50));
-    const body = await this.request<{ events: BiometricAudit[] }>(
-      `/api/integration/v1/audit?${params.toString()}`,
-      { method: "GET" },
-    );
-    return body.events;
+    try {
+      const params = new URLSearchParams();
+      if (input.subjectId) params.set("subject_id", input.subjectId);
+      params.set("limit", String(input.limit ?? 50));
+      const body = await this.request<{ events: BiometricAudit[] }>(
+        `/api/integration/v1/audit?${params.toString()}`,
+        { method: "GET" },
+      );
+      return body.events;
+    } catch (error) {
+      if (error instanceof FaceNotFoundError) return [];
+      throw error;
+    }
   }
 
   async getSubject(subjectId: string): Promise<FaceSubject | null> {

@@ -68,6 +68,7 @@ const ClassCourseHistory = lazyPage(() => import("./pages/masters/classCourseHis
 const MastersCourseOfferings = lazyPage(() => import("./pages/masters/courseOfferings"), ["/masters/course-offerings"]);
 const MastersSchedule = lazyPage(() => import("./pages/masters/schedule"), ["/masters/schedule"]);
 const SchedulePreview = lazyPage(() => import("./features/scheduling/SchedulePreview"), ["/masters/schedule/preview"]);
+const MastersAttendance = lazyPage(() => import("./pages/masters/attendance"), ["/masters/attendance", "/masters/attendance/:sessionId"]);
 const GradebookPreview = lazyPage(() => import("./features/exams/GradebookPreview"), ["/masters/exam-lists/preview"]);
 const MastersCourseMatrix = lazyPage(() => import("./pages/masters/courseMatrix"), ["/masters/course-matrix"]);
 const MastersExamEligibility = lazyPage(() => import("./pages/masters/examEligibility"), ["/masters/exam-eligibility"]);
@@ -175,6 +176,8 @@ function App() {
               <Route path="masters/course-offerings" element={<MastersCourseOfferings />} />
               <Route path="masters/schedule" element={<MastersSchedule />} />
               <Route path="masters/schedule/preview" element={<SchedulePreview />} />
+              <Route path="masters/attendance" element={<MastersAttendance />} />
+              <Route path="masters/attendance/:sessionId" element={<MastersAttendance />} />
               <Route path="masters/exam-lists/preview" element={<GradebookPreview />} />
               <Route path="masters/course-matrix" element={<MastersCourseMatrix />} />
               <Route path="masters/exam-eligibility" element={<MastersExamEligibility />} />
