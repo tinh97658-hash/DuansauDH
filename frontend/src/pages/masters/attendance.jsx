@@ -41,7 +41,7 @@ export default function AttendancePage() {
 
     // Lấy danh sách buổi học
     axios
-      .get(`${API_BASE_URL}/scheduling/sessions`, {
+      .get(`${API_BASE_URL}/scheduling/teaching-sessions`, {
         params: { from: filterDate, to: filterDate },
         withCredentials: true,
       })
@@ -51,15 +51,7 @@ export default function AttendancePage() {
       })
       .catch((err) => {
         if (!active) return;
-        // Nếu API lọc theo ngày chưa có, fallback lấy danh sách gần nhất
-        axios
-          .get(`${API_BASE_URL}/scheduling/sessions`, { withCredentials: true })
-          .then(({ data }) => {
-            if (active) setSessions(Array.isArray(data) ? data : []);
-          })
-          .catch((e) => {
-            if (active) setError(e.response?.data?.message || e.message || "Lỗi tải lịch buổi học");
-          });
+        setError(err.response?.data?.message || err.message || "Lỗi tải lịch buổi học");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -134,17 +126,25 @@ export default function AttendancePage() {
                   <TableCell>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                       <Schedule sx={{ fontSize: 16, color: "text.secondary" }} />
-                      {item.startTime} - {item.endTime || "..."}
+                      {item.period === "MORNING"
+                        ? "Sáng (07:30 - 11:30)"
+                        : item.period === "AFTERNOON"
+                        ? "Chiều (13:30 - 17:00)"
+                        : (item.startTime ? `${item.startTime} - ${item.endTime || "..."}` : "Trong ngày")}
                     </Box>
                   </TableCell>
-                  <TableCell>{item.courseOfferingName || item.subjectName || item.courseOfferingId?.slice(0, 8)}</TableCell>
+                  <TableCell sx={{ fontWeight: "500" }}>
+                    {item.courseOffering?.name || item.courseOfferingName || item.courseOffering?.subject?.name || item.courseOfferingId?.slice(0, 8)}
+                  </TableCell>
                   <TableCell>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                       <MeetingRoom sx={{ fontSize: 16, color: "text.secondary" }} />
-                      {item.room || "Chưa xếp"}
+                      {typeof item.room === "object" ? (item.room?.code || item.room?.name || "Chưa xếp") : (item.room || "Chưa xếp")}
                     </Box>
                   </TableCell>
-                  <TableCell>{item.lecturer || "Chưa phân công"}</TableCell>
+                  <TableCell>
+                    {typeof item.lecturer === "object" ? (item.lecturer?.name || item.lecturer?.fullName || "Chưa phân công") : (item.lecturer || "Chưa phân công")}
+                  </TableCell>
                   <TableCell>
                     <Chip
                       label={item.status === "held" ? "Đã diễn ra" : item.status === "planned" ? "Kế hoạch" : "Hủy"}

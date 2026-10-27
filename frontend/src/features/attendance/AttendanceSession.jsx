@@ -67,7 +67,7 @@ export default function AttendanceSession({ sessionId, onBack }) {
       // Lấy thông tin chi tiết buổi học qua API scheduling có sẵn
       try {
         const { data: sessData } = await axios.get(
-          `${API_BASE_URL}/scheduling/sessions/${sessionId}`,
+          `${API_BASE_URL}/scheduling/teaching-sessions/${sessionId}`,
           { withCredentials: true }
         );
         setSession(sessData);
@@ -144,13 +144,19 @@ export default function AttendanceSession({ sessionId, onBack }) {
               </Button>
             )}
             <Typography variant="h5" fontWeight="bold">
-              Điểm Danh Buổi Học
+              {session?.courseOffering?.name || session?.courseOfferingName || "Điểm Danh Buổi Học"}
             </Typography>
           </Box>
           <Typography variant="body2" color="text.secondary" sx={{ display: "flex", alignItems: "center", gap: 2, mt: 0.5 }}>
             <span>
               <Schedule sx={{ fontSize: 16, verticalAlign: "text-bottom", mr: 0.5 }} />
-              {session?.sessionDate} ({session?.startTime} - {session?.endTime || "..."})
+              {session?.sessionDate} (
+                {session?.period === "MORNING"
+                  ? "Sáng 07:30 - 11:30"
+                  : session?.period === "AFTERNOON"
+                  ? "Chiều 13:30 - 17:00"
+                  : (session?.startTime ? `${session.startTime} - ${session.endTime || "..."}` : "Trong ngày")}
+              )
             </span>
             <span>
               <MeetingRoom sx={{ fontSize: 16, verticalAlign: "text-bottom", mr: 0.5 }} />

@@ -69,7 +69,7 @@ describe("Attendance Feature UI Integration", () => {
 
   it("renders teaching session selector with header", async () => {
     axios.get.mockImplementation((url) => {
-      if (url.includes("/scheduling/sessions")) {
+      if (url.includes("/scheduling/teaching-sessions")) {
         return Promise.resolve({ data: mockTeachingSessions });
       }
       return Promise.reject(new Error("not found"));
@@ -96,7 +96,7 @@ describe("Attendance Feature UI Integration", () => {
       if (url.includes("/attendance/sessions/session-1/reviews")) {
         return Promise.resolve({ data: [] });
       }
-      if (url.includes("/scheduling/sessions/session-1")) {
+      if (url.includes("/scheduling/teaching-sessions/session-1")) {
         return Promise.resolve({ data: mockTeachingSessions[0] });
       }
       if (url.includes("/scheduling/offerings/offering-1/roster")) {
