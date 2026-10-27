@@ -1,3 +1,4 @@
+import { AuthSessionContext } from "../../context/AuthSession";
 import React from "react";
 import { act, fireEvent, render, screen, waitFor, within, cleanup } from "@testing-library/react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
@@ -35,7 +36,7 @@ const Navigation = () => {
   return <><output data-testid="url">{location.search}</output><output data-testid="path">{location.pathname}</output><button onClick={() => navigate(-1)}>Browser Back</button><button onClick={() => navigate(1)}>Browser Forward</button><button onClick={() => navigate(`/?year=${year}&disciplineId=d1&majorId=m2`)}>External scope change</button></>;
 };
 const openPage = async (url = "/") => {
-  await act(async () => { render(<MemoryRouter initialEntries={[url]}><Navigation /><AssignClassGroups /></MemoryRouter>); });
+  await act(async () => { render(<MemoryRouter initialEntries={[url]}><Navigation /><AuthSessionContext.Provider value={{ access: { permissions: ["masters.manage"] } }}><AssignClassGroups /></AuthSessionContext.Provider></MemoryRouter>); });
 };
 const choose = async (label, option) => {
   fireEvent.mouseDown(screen.getByRole("button", { name: label, exact: true }));

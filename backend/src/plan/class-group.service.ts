@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
 import { Op } from "sequelize";
 import type { Transaction } from "sequelize";
@@ -12,6 +12,7 @@ import { classGroupCode, parseClassGroupCode } from "./class-group-code.js";
 import { assertClassScopeEditable, lockTrainingStructure } from "./training-structure-integrity.js";
 
 export interface CreateClassGroupInput {
+  responsibleStaffId?: string;
   code: string;
   name: string;
   program?: string;
@@ -26,6 +27,7 @@ export interface CreateClassGroupInput {
 }
 
 export interface UpdateClassGroupInput {
+  responsibleStaffId?: string;
   code?: string;
   name?: string;
   program?: string;
@@ -119,6 +121,7 @@ export class ClassGroupService {
     await this.ensureCodeUnique(input.code, program, undefined, transaction);
     const group = await this.classGroups.create({
       program,
+      responsibleStaffId: input.responsibleStaffId || null,
       code: input.code,
       name: input.name,
       majorId: input.majorId || null,
@@ -139,6 +142,7 @@ export class ClassGroupService {
     const group = await this.classGroups.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
     if (!group) throw new NotFoundException("Không tìm thấy nhóm học phần.");
 
+    if (group.canEdit === false) throw new ForbiddenException("Bạn không được sửa nhóm này theo cấu hình vai trò.");
     const program = input.program || group.program;
     // Lớp bắt buộc thuộc một chuyên ngành (để suy ra CTĐT), nên không cho xoá trắng.
     const majorId = input.majorId ? input.majorId : group.majorId;
@@ -173,7 +177,7 @@ export class ClassGroupService {
       payload.intakeRound = parsed.intakeRound;
       payload.groupNumber = parsed.groupNumber;
     }
-    for (const key of ["code", "name", "program", "majorId", "academicYear", "maxStudents", "status", "note"] as const) {
+    for (const key of ["responsibleStaffId", "code", "name", "program", "majorId", "academicYear", "maxStudents", "status", "note"] as const) {
       const value = input[key as keyof UpdateClassGroupInput];
       if (value === undefined) continue;
       // `majorId` rỗng/null nghĩa là giữ nguyên chuyên ngành hiện có, không xoá trắng.
@@ -189,6 +193,7 @@ export class ClassGroupService {
   async remove(id: string, transaction?: Transaction) {
     const group = await this.classGroups.findByPk(id, { transaction });
     if (!group) throw new NotFoundException("Không tìm thấy nhóm học phần.");
+    if (group.canEdit === false) throw new ForbiddenException("Bạn không được xóa nhóm này theo cấu hình vai trò.");
     const memberCount = await this.classGroupMembers.count({ where: { classGroupId: id }, transaction });
     if (memberCount > 0) throw new ConflictException("Không thể xóa nhóm đang có học viên.");
     const offeringCount = await this.offeringGroups.count({ where: { classGroupId: id }, transaction });

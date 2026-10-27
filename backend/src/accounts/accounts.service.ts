@@ -334,7 +334,7 @@ export class AccountsService {
   async mePermissions(user: unknown) {
     if (!(user instanceof Staff)) return { permissions: [] as string[], roles: [] as string[] };
     const access = await this.rbac.effectiveAccess(user);
-    return { permissions: [...access.permissions], roles: access.roleCodes };
+    return { permissions: [...access.permissions], roles: access.roleCodes, groupScope: access.groupScope };
   }
 
   // ===== Helpers =====

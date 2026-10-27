@@ -31,6 +31,7 @@ const Roles = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [checked, setChecked] = useState(() => new Set());
   const [saving, setSaving] = useState(false);
+  const [groupScope, setGroupScope] = useState({ restrictGroupView: false, restrictGroupEdit: false, groupReadOnly: false });
 
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
@@ -60,6 +61,7 @@ const Roles = () => {
 
   useEffect(() => {
     setChecked(new Set((selectedRole?.permissions || []).map((permission) => permission.code)));
+    setGroupScope({ restrictGroupView: selectedRole?.restrictGroupView === true, restrictGroupEdit: selectedRole?.restrictGroupEdit === true, groupReadOnly: selectedRole?.groupReadOnly === true });
   }, [selectedRole]);
 
   const allPermissions = useMemo(() => catalog.flatMap((group) => group.permissions), [catalog]);
@@ -84,7 +86,7 @@ const Roles = () => {
     setError("");
     try {
       const ids = allPermissions.filter((permission) => checked.has(permission.code)).map((permission) => permission.id);
-      const result = await setRolePermissions(selectedRole.id, ids);
+      const result = await setRolePermissions(selectedRole.id, ids, groupScope);
       setNotice({ type: "success", message: result.message || "Cập nhật quyền cho vai trò thành công." });
       await load();
       await session?.refresh?.();
@@ -164,6 +166,23 @@ const Roles = () => {
     }
   };
 
+  const permissionGroups = catalog.some(group => group.group === "Nhóm học viên")
+    ? catalog : [...catalog, { group: "Nhóm học viên", permissions: [] }];
+  const renderGroupScope = () => (
+<Box sx={{ borderTop: "1px solid #DCE6EF", mt: 1, pt: 1 }}>
+                      <Typography fontWeight={700}>Khóa quyền theo nhóm học viên</Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Mặc định tắt các khóa. Quyền xem, sửa vẫn cần được cấp ở các mục nghiệp vụ tương ứng. Khóa áp dụng cả hồ sơ học viên, điểm và báo cáo liên quan. Khi một người có nhiều vai trò, khóa bật ở bất kỳ vai trò đang hoạt động nào đều có hiệu lực.</Typography>
+                      {[
+                        ["groupReadOnly", "Chỉ xem — khóa mọi thao tác sửa dữ liệu nhóm", "Bật: không tạo, sửa, xóa nhóm, phân công, thay đổi thành viên hoặc dữ liệu học viên liên quan. Tắt: cho phép sửa theo quyền nghiệp vụ."],
+                        ["restrictGroupView", "Chỉ xem nhóm được phân công phụ trách", "Bật: ẩn dữ liệu ngoài phân công, chặn truy cập trực tiếp. Nhóm chưa phân công không hiển thị. Tắt: xem tất cả nhóm nếu có quyền xem."],
+                        ["restrictGroupEdit", "Chỉ sửa nhóm được phân công phụ trách", "Bật: chỉ sửa dữ liệu nhóm mình phụ trách. Tắt: được sửa nhóm khác nếu có quyền sửa. Khóa chỉ xem ở trên luôn ưu tiên."],
+                      ].map(([key, label, description]) => <Box key={key} sx={{ mb: 1 }}>
+                        <FormControlLabel control={<Checkbox checked={groupScope[key]} onChange={event => setGroupScope(previous => ({ ...previous, [key]: event.target.checked }))} disabled={!canManage || saving} />} label={label} />
+                        <Typography variant="caption" display="block" color="text.secondary" sx={{ ml: 4 }}>{description}</Typography>
+                      </Box>)}
+                    </Box>
+  );
+
   return (
     <FeatureLayout title="Vai trò & phân quyền" group="Tài khoản & phân quyền" desc="Tạo vai trò tùy chỉnh và tick chọn quyền theo từng nhóm nghiệp vụ.">
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -231,31 +250,38 @@ const Roles = () => {
                   )}
                 </Stack>
 
+                <Box sx={{ bgcolor: "#F0F7FC", border: "1px solid #DCE6EF", borderRadius: 1, p: 1.25 }}>
+                  <Typography variant="body2">Đang phân quyền cho vai trò <strong>{selectedRole.name}</strong> — áp dụng cho {selectedRole.staffCount || 0} nhân sự mang vai trò này.</Typography>
+                  <Typography variant="caption" color="text.secondary">Hãy kiểm tra vai trò được gán trong Tài khoản nhân sự trước khi cấu hình. Quyền xem, quyền sửa và các khóa theo nhóm là các lựa chọn độc lập. Nút “Tất cả” chỉ chọn quyền nghiệp vụ; các khóa theo nhóm cần bật riêng. Thay đổi chỉ được áp dụng sau khi bấm Lưu quyền.</Typography>
+                </Box>
                 {(
                   <>
                     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 1.5 }}>
-                      {catalog.map((group) => {
+                      {permissionGroups.map((group) => {
                         const codes = group.permissions.map((permission) => permission.code);
                         const allChecked = codes.every((code) => checked.has(code));
                         return (
                           <Paper key={group.group} variant="outlined" sx={{ borderColor: "#DCE6EF", borderRadius: "8px", overflow: "hidden" }}>
                             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.25, py: 0.75, bgcolor: "#F7FAFC", borderBottom: "1px solid #E4EEF6" }}>
                               <Typography sx={{ fontWeight: 700, fontSize: 12, textTransform: "uppercase", color: "#3B5166" }}>{group.group}</Typography>
-                              <FormControlLabel
+                              {codes.length > 0 && <FormControlLabel
                                 sx={{ m: 0 }}
                                 control={<Checkbox size="small" checked={allChecked} onChange={() => toggleGroup(group)} disabled={!canManage || saving} inputProps={{ "aria-label": `Chọn tất cả ${group.group}` }} />}
                                 label={<Typography sx={{ fontSize: 12 }}>Tất cả</Typography>}
-                              />
+                              />}
                             </Stack>
                             <Box sx={{ p: 1 }}>
                               {group.permissions.map((permission) => (
+                                <Box key={permission.code} sx={{ mb: permission.description ? 1 : 0 }}>
                                 <FormControlLabel
-                                  key={permission.code}
                                   sx={{ display: "flex", m: 0, px: 0.5 }}
                                   control={<Checkbox size="small" checked={checked.has(permission.code)} onChange={() => togglePermission(permission.code)} disabled={!canManage || saving} inputProps={{ "aria-label": permission.name }} />}
                                   label={<Typography sx={{ fontSize: 12.5 }}>{permission.name}</Typography>}
                                 />
+                                {permission.description && <Typography variant="caption" component="p" color="text.secondary" sx={{ ml: 4, mr: 0.5, my: 0, lineHeight: 1.5 }}>{permission.description}</Typography>}
+                                </Box>
                               ))}
+                              {group.group === "Nhóm học viên" && renderGroupScope()}
                             </Box>
                           </Paper>
                         );

@@ -1,3 +1,4 @@
+import { PERMISSIONS_KEY } from "../../src/common/permissions.decorator.js";
 import { ExecutionContext, ForbiddenException } from "@nestjs/common";
 import { GUARDS_METADATA } from "@nestjs/common/constants";
 import { Staff } from "../../src/database/models/staff.model.js";
@@ -12,24 +13,41 @@ const contextFor = (user: unknown) => ({
 }) as unknown as ExecutionContext;
 
 describe("SchedulingWriteGuard", () => {
-  const guard = new SchedulingWriteGuard();
+  const rbac = { effectiveAccess: async (user: any) => ({ permissions: new Set<string>(user.permissions || []), groupScope: { readOnly: user.readOnly === true } }) } as unknown as RbacService;
+  const guard = new SchedulingWriteGuard(rbac);
   const staffUser = (canManageScheduling: boolean) => Object.assign(
     Object.create(Staff.prototype),
     { canManageScheduling },
   ) as Staff;
 
-  it("allows only the Staff member assigned to manage scheduling", () => {
+  it("allows scheduling.write without the old assignment flag", async () => {
+    const staff = Object.assign(staffUser(false), { permissions: ["scheduling.write"] });
+    await expect(guard.canActivate(contextFor(staff))).resolves.toBe(true);
+  });
+
+  it("does not grant write access from the assignment flag alone", async () => {
     const staff = staffUser(true);
-    expect(guard.canActivate(contextFor(staff))).toBe(true);
+    await expect(guard.canActivate(contextFor(staff))).rejects.toThrow(ForbiddenException);
   });
 
-  it("rejects another Staff member with read-only scheduling access", () => {
-    const staff = staffUser(false);
-    expect(() => guard.canActivate(contextFor(staff))).toThrow(ForbiddenException);
+  it("rejects non-Staff users", async () => {
+    await expect(guard.canActivate(contextFor({ canManageScheduling: true }))).rejects.toThrow(ForbiddenException);
   });
 
-  it("rejects non-Staff users", () => {
-    expect(() => guard.canActivate(contextFor({ canManageScheduling: true }))).toThrow(ForbiddenException);
+  it("read-only blocks writes even with both permission and assignment", async () => {
+    const staff = Object.assign(staffUser(true), { permissions: ["scheduling.write"], readOnly: true });
+    await expect(guard.canActivate(contextFor(staff))).rejects.toThrow(ForbiddenException);
+  });
+
+  it("does not use a coordinator flag to bypass organization permission or read-only", async () => {
+    await expect(new CourseOfferingWriteGuard(rbac).canActivate(contextFor(staffUser(true)))).rejects.toThrow(ForbiddenException);
+    const readonly = Object.assign(staffUser(true), { permissions: ["scheduling.organize"], readOnly: true });
+    await expect(new CourseOfferingWriteGuard(rbac).canActivate(contextFor(readonly))).rejects.toThrow(ForbiddenException);
+  });
+
+  it("separates class organization from timetable writes at the API boundary", () => {
+    expect(Reflect.getMetadata(PERMISSIONS_KEY, SchedulingController.prototype.createCourseOffering)).toEqual(["scheduling.organize"]);
+    expect(Reflect.getMetadata(PERMISSIONS_KEY, SchedulingController.prototype.deleteCourseOfferingSchedule)).toEqual(["scheduling.write"]);
   });
 
   it("protects every scheduling mutation endpoint", () => {
@@ -53,7 +71,7 @@ describe("SchedulingWriteGuard", () => {
     } as unknown as RbacService;
     const admin = Object.assign(staffUser(false), { role: "custom", permissions: ["scheduling.organize"] });
     expect(await new CourseOfferingWriteGuard(rbac).canActivate(contextFor(admin))).toBe(true);
-    expect(() => guard.canActivate(contextFor(admin))).toThrow(ForbiddenException);
+    await expect(guard.canActivate(contextFor(admin))).rejects.toThrow(ForbiddenException);
     await expect(new CourseOfferingWriteGuard(rbac).canActivate(contextFor(Object.assign(staffUser(false), { role: "admin" })))).rejects.toThrow(ForbiddenException);
     await expect(new CourseOfferingWriteGuard(rbac).canActivate(contextFor(Object.assign(staffUser(false), { role: "examiner" })))).rejects.toThrow(ForbiddenException);
   });

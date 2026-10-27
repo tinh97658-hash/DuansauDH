@@ -6,8 +6,8 @@ import "./reference.css";
 import "./workspace.css";
 
 export const api = {
-  get: async (path) => (await axios.get(`${API_BASE_URL}${path}`, { withCredentials: true })).data,
-  post: async (path, body) => (await axios.post(`${API_BASE_URL}${path}`, body, { withCredentials: true })).data,
+  get: async (path, options = {}) => (await axios.get(`${API_BASE_URL}${path}`, { ...options, withCredentials: true })).data,
+  post: async (path, body, options = {}) => (await axios.post(`${API_BASE_URL}${path}`, body, { ...options, withCredentials: true })).data,
   put: async (path, body) => (await axios.put(`${API_BASE_URL}${path}`, body, { withCredentials: true })).data,
   delete: async (path) => (await axios.delete(`${API_BASE_URL}${path}`, { withCredentials: true })).data,
 };
@@ -65,15 +65,18 @@ export const subjectLabel = (offering) => [offering?.subject?.code, offering?.su
 export const daysLabel = (days) => days?.length ? days.map((day) => day === 0 ? "CN" : `T${day + 1}`).join(", ") : "Chưa cấu hình";
 export const intersectDays = (groups) => groups.length ? [1, 2, 3, 4, 5, 6, 0].filter((day) => groups.every((group) => (group.allowedWeekdays || [1, 2, 3, 4, 5, 6, 0]).includes(day))) : [];
 
-// Ignore late responses when scope changes or the component unmounts.
+// Cancel signal-aware loaders and ignore late responses when scope changes or the component unmounts.
 export function useLoad(loader, dependencies) {
   const [state, setState] = useState({ data: null, loading: true, error: "" });
   const [revision, setRevision] = useState(0);
   const lastRevalidation = useRef(0);
+  const inFlight = useRef(false);
   const previousDependencies = useRef(null);
   const backgroundRefresh = useRef(false);
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
+    inFlight.current = true;
     const scopeChanged = !previousDependencies.current || dependencies.length !== previousDependencies.current.length
       || dependencies.some((value, index) => !Object.is(value, previousDependencies.current[index]));
     previousDependencies.current = [...dependencies];
@@ -82,19 +85,19 @@ export function useLoad(loader, dependencies) {
     // Focus/reload refreshes existing data in place; changing scope clears it.
     setState(previous => scopeChanged ? { data: null, loading: true, error: "" }
       : { ...previous, loading: !inBackground || previous.data == null, error: "" });
-    Promise.resolve().then(loader).then((data) => { if (active) setState({ data, loading: false, error: "" }); })
+    Promise.resolve().then(() => active ? loader(controller.signal) : undefined).then((data) => { if (active) setState({ data, loading: false, error: "" }); })
       .catch((error) => { if (active) setState(previous => ({
         data: [401, 403].includes(error?.response?.status) ? null : previous.data,
         loading: false, error: message(error),
-      })); });
-    return () => { active = false; };
+      })); }).finally(() => { if (active) inFlight.current = false; });
+    return () => { active = false; controller.abort(); };
     // Callers supply the values used by their loader, as with useEffect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...dependencies, revision]);
   useEffect(() => {
     const revalidate = (event) => {
       if (event?.type === "focus" && event.target !== window) return;
-      if (document.visibilityState === "hidden" || Date.now() - lastRevalidation.current < 250) return;
+      if (inFlight.current || document.visibilityState === "hidden" || Date.now() - lastRevalidation.current < 250) return;
       lastRevalidation.current = Date.now();
       backgroundRefresh.current = true;
       setRevision((value) => value + 1);

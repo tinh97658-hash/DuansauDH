@@ -1,3 +1,5 @@
+import { usePermissions } from "../../features/accounts/usePermissions";
+import GroupResponsibleStaff from "../../features/accounts/GroupResponsibleStaff";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useSearchParams } from "react-router-dom";
@@ -65,6 +67,8 @@ const TuitionStatus = ({ paid }) => (
 );
 
 const AssignClassGroups = () => {
+  const { can } = usePermissions();
+  const canManageGroups = can("masters.manage");
   const [searchParams, setSearchParams] = useSearchParams();
   const [createScope, setCreateScope] = useState(null);
   const [createFeedback, setCreateFeedback] = useState("");
@@ -215,6 +219,7 @@ const AssignClassGroups = () => {
   }, [assignmentMode, dataReady, loading, error, searchParams, targetGroupId, targetGroups, setSearchParams, postCreateLoading, suppressAutoTarget]);
 
   const currentTargetGroup = targetGroups.find((g) => g.id === targetGroupId) || null;
+  const canEditTarget = canManageGroups && currentTargetGroup?.canEdit !== false;
   const groupMembers = useMemo(() => (currentTargetGroup?.members || []).map((m) => normalizeClassGroupMember(m, currentTargetGroup)), [currentTargetGroup]);
   const maximumStudents = Number(currentTargetGroup?.maxStudents ?? 40);
   const currentMemberCount = Math.max(groupMembers.length, Number(currentTargetGroup?.memberCount || 0));
@@ -240,7 +245,7 @@ const AssignClassGroups = () => {
   };
 
   const handleAssignSelected = async () => {
-    if (actionInFlight.current || loading || groupsLoading || error || !currentTargetGroup || !selectedStudentIds.length || overCapacity) return;
+    if (!canEditTarget || actionInFlight.current || loading || groupsLoading || error || !currentTargetGroup || !selectedStudentIds.length || overCapacity) return;
     const scope = scopeKey;
     actionInFlight.current = true;
     setActionLoading(true);
@@ -260,7 +265,7 @@ const AssignClassGroups = () => {
   };
 
   const handleRemoveMember = async () => {
-    if (actionInFlight.current || !pendingRemoval || pendingRemoval.groupId !== targetGroupId) return;
+    if (!canEditTarget || actionInFlight.current || !pendingRemoval || pendingRemoval.groupId !== targetGroupId) return;
     actionInFlight.current = true;
     setActionLoading(true);
     const scope = scopeKey;
@@ -288,6 +293,7 @@ const AssignClassGroups = () => {
   const allGroupsFull = targetGroups.length > 0 && !targetGroups.some(groupHasSpace);
   const targetIsFull = !!currentTargetGroup && remainingCapacity === 0;
   const quickCreate = () => {
+    if (!canManageGroups) return;
     setCreateFeedback("");
     const scope = { key: scopeKey, year: selectedYear, disciplineId: selectedDiscipline, majorId: selectedMajor };
     createSession.current = scope;
@@ -495,7 +501,7 @@ const AssignClassGroups = () => {
                 endIcon={<ArrowForwardRounded />}
                 onClick={handleAssignSelected}
                 aria-describedby="assignment-selection-status"
-                disabled={selectedStudentIds.length === 0 || !currentTargetGroup || loading || groupsLoading || !!error || actionLoading || overCapacity}
+                disabled={!canEditTarget || selectedStudentIds.length === 0 || !currentTargetGroup || loading || groupsLoading || !!error || actionLoading || overCapacity}
                 sx={{ borderRadius: 0, boxShadow: "none", bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}
               >
                 {actionLoading ? "Đang xử lý..." : selectedStudentIds.length ? `Gán ${selectedStudentIds.length}` : "Gán"}
@@ -644,10 +650,10 @@ const AssignClassGroups = () => {
               <Typography variant="body2">{targetGroups.length === 0 ? "Chuyên ngành này hiện chưa có nhóm có thể tiếp nhận học viên."
                 : hasAvailableAlternative ? "Vẫn còn nhóm khác có thể tiếp nhận học viên."
                   : "Không còn nhóm đang mở nào còn chỗ trong chuyên ngành này."}</Typography>
-              {!hasAvailableAlternative && <Button size="small" onClick={quickCreate} disabled={actionLoading || postCreateLoading}>+ Tạo mới</Button>}
+              {!hasAvailableAlternative && <Button size="small" onClick={quickCreate} disabled={!canManageGroups || actionLoading || postCreateLoading}>+ Tạo mới</Button>}
             </Alert>}
             {createFeedback && <Alert severity="warning" sx={{ mb: 1 }} action={pendingCreatedReload && <Button
-              size="small" disabled={postCreateLoading}
+              size="small" disabled={!canManageGroups || postCreateLoading}
               onClick={() => handleGroupsCreated(pendingCreatedReload.createdGroups, pendingCreatedReload.scope)}>Tải lại nhóm</Button>}>{createFeedback}</Alert>}
 
             {/* Target Group Info & Progress */}
@@ -675,7 +681,7 @@ const AssignClassGroups = () => {
               </Alert>
             ) : null}
 
-            {currentTargetGroup && <><Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+            {currentTargetGroup && <><Box sx={{ mb: 1 }}><GroupResponsibleStaff group={currentTargetGroup} onSaved={reloadData} /></Box><Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#111827" }}>
                 Danh sách học viên trong nhóm ({groupMembers.length}):
               </Typography>
@@ -731,7 +737,7 @@ const AssignClassGroups = () => {
                               color="error"
                               aria-label={`Bỏ ${m.fullName} khỏi nhóm`}
                               onClick={() => setPendingRemoval({ ...m, groupId: targetGroupId, groupCode: currentTargetGroup.code })}
-                              disabled={actionLoading}
+                              disabled={!canEditTarget || actionLoading}
                             >
                               <DeleteOutlineRounded fontSize="small" />
                             </IconButton>

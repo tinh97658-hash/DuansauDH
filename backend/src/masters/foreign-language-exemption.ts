@@ -1,3 +1,5 @@
+import { participantRecordMatchSql } from "../common/participant-identity.js";
+
 /** Expressions passed here are application-owned SQL, never user input. */
 export function foreignLanguageSubjectSql(subjectExpression: string): string {
   return `EXISTS (SELECT 1 FROM subjects language_subject
@@ -13,8 +15,7 @@ export function profileForeignLanguageExemptSql(participantExpression: string, s
   academicYearExpression = "''"): string {
   return `(${foreignLanguageSubjectSql(subjectExpression)} AND COALESCE((
     SELECT exemption_record.is_exempt_foreign_language FROM admission_records exemption_record
-    WHERE ${participantExpression} = 'admission:' || exemption_record.id::text
-      OR ${participantExpression} = 'student:' || exemption_record.student_id::text
+    WHERE ${participantRecordMatchSql('exemption_record', participantExpression)}
     ORDER BY CASE WHEN ${participantExpression} = 'admission:' || exemption_record.id::text THEN 0 ELSE 1 END,
       CASE WHEN exemption_record.academic_year = ${academicYearExpression} THEN 0 ELSE 1 END,
       exemption_record.created_at DESC, exemption_record.id

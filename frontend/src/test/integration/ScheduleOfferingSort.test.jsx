@@ -1,5 +1,7 @@
+import { renderWithPermissions } from "../renderWithPermissions";
+const render = (ui, options) => renderWithPermissions(ui, ["scheduling.view", "scheduling.write", "scheduling.organize"], options);
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import axios from "axios";
 import Schedule from "../../features/scheduling/Schedule";

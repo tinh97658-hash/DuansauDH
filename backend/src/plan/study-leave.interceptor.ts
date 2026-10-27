@@ -1,11 +1,12 @@
 import { Injectable, type CallHandler, type ExecutionContext, type NestInterceptor } from '@nestjs/common';
+import { GroupScopeService } from "../auth/group-scope.service.js";
 import { StudyLeaveService } from './study-leave.service.js';
 
 @Injectable()
 export class StudyLeaveInterceptor implements NestInterceptor {
-  constructor(private readonly leaves: StudyLeaveService) {}
+  constructor(private readonly leaves: StudyLeaveService, private readonly scope: GroupScopeService) {}
   async intercept(context: ExecutionContext, next: CallHandler) {
-    if (context.getType() === 'http') {
+    if (context.getType() === 'http' && !this.scope.current()?.readOnly) {
       const path = context.switchToHttp().getRequest().url || '';
       if (/\/(plan|masters|scheduling|reports)(\/|\?)/.test(path)) await this.leaves.synchronize();
     }

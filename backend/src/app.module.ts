@@ -1,3 +1,4 @@
+import { GroupScopeMiddleware } from "./auth/group-scope.middleware.js";
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { InjectConnection } from "@nestjs/sequelize";
@@ -71,7 +72,7 @@ export class AppModule implements NestModule {
     ).forRoutes({ path: "*", method: RequestMethod.ALL });
 
     // Gắn ngữ cảnh người thực hiện cho nhật ký thay đổi dữ liệu (chạy sau passport.session).
-    consumer.apply(AuditContextMiddleware).forRoutes({ path: "*", method: RequestMethod.ALL });
+    consumer.apply(GroupScopeMiddleware, AuditContextMiddleware).forRoutes({ path: "*", method: RequestMethod.ALL });
 
     consumer.apply(rateLimit({
       windowMs: 15 * 60 * 1000,

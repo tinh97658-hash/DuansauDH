@@ -1,3 +1,4 @@
+import { usePermissions } from "../accounts/usePermissions";
 import DateField from "../../components/DateField";
 import React, { useEffect, useState } from "react";
 import { api, groupsOf, message, Modal, Notice, offeringTitle, rows, SearchSelect, subjectLabel, useLoad } from "./shared";
@@ -9,6 +10,7 @@ import LecturerPicker from "./LecturerPicker";
 
 const ROOM_CAPACITY_DEFICIT_LIMIT = 10;
 export default function SessionEditor({ session, offering, date, period, user, onClose, onSaved, onViewOffering }) {
+  const { can } = usePermissions();
   const initialPeriod = session?.period || period;
   const [form, setForm] = useState({ sessionDate: session?.sessionDate || date, period: initialPeriod,
     ...periodTimes(initialPeriod), lecturerId: session?.lecturerId || "", roomId: session?.roomId || "", note: session?.note || "" });
@@ -26,7 +28,7 @@ export default function SessionEditor({ session, offering, date, period, user, o
   const sessionForPeriod = session ? { ...session, endTime: periodTimes(session.period).endTime } : null;
   const future = session?.status === "planned" && !isSessionPast(sessionForPeriod);
   const pending = session?.status === "planned" && isSessionPast(sessionForPeriod);
-  const canManage = user.canManageScheduling === true && currentOffering.status !== "completed";
+  const canManage = can("scheduling.write") && currentOffering.status !== "completed";
   const suggestClosing = !session && shouldSuggestClosing(currentOffering);
   const editable = canManage && editing && (!session || future);
   const validTime = isPeriodTimeConsistent(form.period, form.startTime, form.endTime);

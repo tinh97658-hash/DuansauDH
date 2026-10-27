@@ -50,11 +50,11 @@ function fixture() {
 }
 
 describe("operational dashboard permissions", () => {
-  it("uses effective permissions and the scheduling assignment guard", () => {
+  it("uses effective permissions without a hidden scheduling assignment requirement", () => {
     expect(operationalPermissions(user(), new Set(DEFAULT_ROLE_PERMISSIONS[user().role]))).toEqual({ grouping: true, grades: true, scheduling: true, progress: true, overview: true });
-    expect(operationalPermissions(user("admin", false), new Set(DEFAULT_ROLE_PERMISSIONS[user("admin", false).role]))).toMatchObject({ scheduling: false, progress: false, grouping: true });
+    expect(operationalPermissions(user("admin", false), new Set(DEFAULT_ROLE_PERMISSIONS[user("admin", false).role]))).toMatchObject({ scheduling: true, progress: true, grouping: true });
     expect(operationalPermissions(user("supervisor", true), new Set(DEFAULT_ROLE_PERMISSIONS[user("supervisor", true).role]))).toEqual({ grouping: false, grades: false, scheduling: true, progress: true, overview: true });
-    expect(operationalPermissions(user("examiner", false), new Set(DEFAULT_ROLE_PERMISSIONS[user("examiner", false).role]))).toEqual({ grouping: false, grades: true, scheduling: false, progress: false, overview: true });
+    expect(operationalPermissions(user("examiner", false), new Set(DEFAULT_ROLE_PERMISSIONS[user("examiner", false).role]))).toEqual({ grouping: false, grades: true, scheduling: true, progress: true, overview: true });
     expect(Object.values(operationalPermissions(Student.build({ role: "admin" }), new Set(DEFAULT_ROLE_PERMISSIONS.admin)))).not.toContain(true);
     expect(Object.values(operationalPermissions({ role: "admin", canManageScheduling: true }, new Set(DEFAULT_ROLE_PERMISSIONS.admin)))).not.toContain(true);
   });

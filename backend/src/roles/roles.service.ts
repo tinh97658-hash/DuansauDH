@@ -1,3 +1,4 @@
+import { PERMISSIONS } from "../auth/permissions.js";
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import { col, fn, Op } from "sequelize";
@@ -34,6 +35,9 @@ const serializeRole = (role: Role) => {
     isSystem: value.isSystem,
     active: value.active,
     sortOrder: value.sortOrder,
+    restrictGroupView: value.restrictGroupView,
+    restrictGroupEdit: value.restrictGroupEdit,
+    groupReadOnly: value.groupReadOnly,
     permissions: (value.permissions ?? []).map((permission: any) => ({
       id: permission.id,
       code: permission.code,
@@ -74,11 +78,12 @@ export class RolesService {
 
   async permissionsCatalog() {
     const permissions = await this.permissions.findAll({ order: [["sortOrder", "ASC"]] });
+    const definitions = new Map(PERMISSIONS.map(permission => [permission.code, permission]));
     const groups = new Map<string, Array<{ id: string; code: string; name: string; description: string | null }>>();
     for (const permission of permissions) {
       const value: any = permission.get({ plain: true });
       if (!groups.has(value.group)) groups.set(value.group, []);
-      groups.get(value.group)!.push({ id: value.id, code: value.code, name: value.name, description: value.description });
+      groups.get(value.group)!.push({ id: value.id, code: value.code, name: definitions.get(value.code)?.name ?? value.name, description: definitions.get(value.code)?.description ?? value.description ?? null });
     }
     return [...groups.entries()].map(([group, items]) => ({ group, permissions: items }));
   }
@@ -102,6 +107,9 @@ export class RolesService {
         name: dto.name.trim(),
         description: dto.description?.trim() ?? null,
         isSystem: false,
+        restrictGroupView: dto.restrictGroupView ?? false,
+        restrictGroupEdit: dto.restrictGroupEdit ?? false,
+        groupReadOnly: dto.groupReadOnly ?? false,
         active: true,
         sortOrder: 100,
       } as any, { transaction });
@@ -128,6 +136,9 @@ export class RolesService {
     if (!role) throw new NotFoundException("Không tìm thấy vai trò.");
 
     const changes: Record<string, unknown> = {};
+    for (const key of ["restrictGroupView", "restrictGroupEdit", "groupReadOnly"] as const) {
+      if (dto[key] !== undefined) changes[key] = dto[key];
+    }
     if (dto.name !== undefined) changes.name = dto.name.trim();
     if (dto.description !== undefined) changes.description = dto.description?.trim() ?? null;
     if (dto.active !== undefined) {
@@ -174,6 +185,11 @@ export class RolesService {
 
     await this.sequelize.transaction(async (transaction) => {
       await this.administrationSafety.lock(transaction);
+      const scope: Record<string, boolean> = {};
+      for (const key of ["restrictGroupView", "restrictGroupEdit", "groupReadOnly"] as const) {
+        if (dto[key] !== undefined) scope[key] = dto[key]!;
+      }
+      if (Object.keys(scope).length) await role.update(scope, { transaction });
       await this.rolePermissions.destroy({ where: { roleId: id }, transaction });
       if (permissionIds.length) {
         await this.rolePermissions.bulkCreate(
@@ -188,7 +204,7 @@ export class RolesService {
     await this.audit.record({
       actorStaffId: actorId,
       action: "role.permissions.update",
-      metadata: { roleId: id, permissionIds },
+      metadata: { roleId: id, permissionIds, restrictGroupView: dto.restrictGroupView, restrictGroupEdit: dto.restrictGroupEdit, groupReadOnly: dto.groupReadOnly },
       ...context,
     });
     return { message: "Cập nhật quyền cho vai trò thành công", data: await this.detail(id) };

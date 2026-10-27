@@ -15,7 +15,7 @@ export const createRole = (payload) => axios.post(url("/roles"), payload, config
 
 export const updateRole = (id, payload) => axios.put(url(`/roles/${id}`), payload, config()).then(({ data }) => data);
 
-export const setRolePermissions = (id, permissionIds) =>
-  axios.put(url(`/roles/${id}/permissions`), { permissionIds }, config()).then(({ data }) => data);
+export const setRolePermissions = (id, permissionIds, scope = {}) =>
+  axios.put(url(`/roles/${id}/permissions`), { permissionIds, ...scope }, config()).then(({ data }) => data);
 
 export const deleteRole = (id) => axios.delete(url(`/roles/${id}`), config()).then(({ data }) => data);

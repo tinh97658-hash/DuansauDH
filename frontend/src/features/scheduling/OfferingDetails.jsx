@@ -20,8 +20,8 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
   const [completing, setCompleting] = useState(false);
   const [success, setSuccess] = useState("");
   const value = detail.data || offering;
-  const canManage = user?.canManageScheduling === true;
-  const canNotes = canManage || can("scheduling.organize");
+  const canManage = can("scheduling.write");
+  const canNotes = can("scheduling.organize");
   const summary = value.sessionSummary || {};
   const allSessions = sessions.data || [];
 

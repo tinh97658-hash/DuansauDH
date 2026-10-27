@@ -21,7 +21,7 @@ describe("Direct teaching-session API cannot bypass the server start cutoff", ()
       { provide: SchedulingService, useValue: service }, { provide: RbacService, useValue: { effectiveAccess: async () => ({ permissions: new Set(["scheduling.write"]) }) } },
     ] }).compile();
     app = module.createNestApplication();app.use((req: any, _res: any, next: any) => {
-      req.user = Object.defineProperties(Object.create(Staff.prototype), { canManageScheduling: { value: true }, mustChangePassword: { value: false } });req.isAuthenticated = () => true;next();
+      req.user = Object.defineProperties(Object.create(Staff.prototype), { canManageScheduling: { value: false }, mustChangePassword: { value: false } });req.isAuthenticated = () => true;next();
     });app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));await app.init();
   });
   afterAll(async () => { await app?.close(); });

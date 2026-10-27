@@ -3,6 +3,7 @@ import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import { literal, Op, UniqueConstraintError } from "sequelize";
 import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
+import { Staff } from "../database/models/staff.model.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
 import { ClassGroupMember } from "../database/models/training/class-group-member.model.js";
 import { AdmissionRecord } from "../database/models/plan/admission-record.model.js";
@@ -66,6 +67,15 @@ export class MastersService {
     return where;
   }
 
+  // Filter options do not need member profiles or the administrative group's full roster.
+  async classGroupOptions(majorId?: string) {
+    return this.classGroups.findAll({
+      where: { program: "masters", ...(majorId ? { majorId } : {}) },
+      attributes: ["id", "code", "name", "majorId", "academicYear"],
+      order: [["academicYear", "DESC"], ["code", "ASC"]],
+    });
+  }
+
   async listClassGroups(majorId?: string, academicYear?: string, status?: string) {
     const where: Record<string, unknown> = { program: "masters" };
     if (majorId) where.majorId = majorId;
@@ -75,6 +85,7 @@ export class MastersService {
     const groups = await this.classGroups.findAll({
       where,
       include: [
+        { model: Staff, as: "responsibleStaff", attributes: ["id", "name", "email", "status"] },
         { model: Major, as: "major", attributes: ["id", "name"] },
         { model: Curriculum, as: "curriculum", attributes: ["id", "code", "name", "applicableFromYear", "active"] },
         {
@@ -110,6 +121,7 @@ export class MastersService {
     const group = await this.classGroups.findOne({
       where: { id, program: "masters" },
       include: [
+        { model: Staff, as: "responsibleStaff", attributes: ["id", "name", "email", "status"] },
         { model: Major, as: "major", attributes: ["id", "name"] },
         { model: Curriculum, as: "curriculum", attributes: ["id", "code", "name", "applicableFromYear", "active"] },
         {
@@ -148,7 +160,8 @@ export class MastersService {
   }
 
   async updateClassGroup(id: string, dto: UpdateMastersClassGroupDto) {
-    await this.classGroupsService.update(id, dto);
+    const group = await this.classGroupsService.update(id, dto);
+    if (dto.responsibleStaffId !== undefined) return { id: group.id, responsibleStaffId: group.responsibleStaffId };
     return this.getClassGroup(id);
   }
 
@@ -180,6 +193,7 @@ export class MastersService {
           ? defaultCode : dto.nameTemplate.trim().replace("{n}", String(groupNumber));
         return {
           program: "masters",
+          responsibleStaffId: dto.responsibleStaffId,
           code,
           name: code,
           intakeRound,

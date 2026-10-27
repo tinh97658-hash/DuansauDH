@@ -31,6 +31,10 @@ export class Role extends Model {
   @Column({ type: DataType.BOOLEAN, allowNull: false })
   declare active: boolean;
 
+  @Default(false) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare restrictGroupView: boolean;
+  @Default(false) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare restrictGroupEdit: boolean;
+  @Default(false) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare groupReadOnly: boolean;
+
   @BelongsToMany(() => Permission, () => RolePermission)
   declare permissions: Permission[];
 

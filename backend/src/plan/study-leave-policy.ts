@@ -1,3 +1,5 @@
+import { participantRecordMatchSql } from "../common/participant-identity.js";
+
 export const BUSINESS_DATE_SQL = "(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh')::date";
 export const BLOCKED_STUDY_STATUSES = ["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Đã thôi học"];
 
@@ -12,14 +14,12 @@ export function notWithdrawnSql(participant: string, offering = ':offeringId') {
   return `NOT EXISTS (SELECT 1 FROM course_offering_withdrawals withdrawal
     JOIN admission_records withdrawn_record ON withdrawn_record.id = withdrawal.admission_record_id
     WHERE withdrawal.course_offering_id = ${offering} AND (withdrawal.participant_id = ${participant}
-      OR 'admission:' || withdrawn_record.id::text = ${participant}
-      OR 'student:' || withdrawn_record.student_id::text = ${participant}))`;
+      OR ${participantRecordMatchSql('withdrawn_record', participant)}))`;
 }
 
 export function availableParticipantSql(participant: string) {
   return `NOT EXISTS (SELECT 1 FROM admission_records paused_record
-    WHERE ('admission:' || paused_record.id::text = ${participant}
-      OR 'student:' || paused_record.student_id::text = ${participant})
+    WHERE ${participantRecordMatchSql('paused_record', participant)}
       AND NOT ${studyEligibleRecordSql('paused_record')})`;
 }
 

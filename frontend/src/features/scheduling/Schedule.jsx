@@ -1,3 +1,4 @@
+import { usePermissions } from "../accounts/usePermissions";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
@@ -244,6 +245,7 @@ function WeekOverflowPreview({ date, dayLabel, period, hiddenSessions, onOpenDay
 }
 
 export default function Schedule({ user }) {
+  const { can } = usePermissions();
   const [clock, setClock] = useState(() => new Date());
   useEffect(() => {
     const seconds = (time) => time.split(":").reduce((total, value) => total * 60 + Number(value), 0);
@@ -273,12 +275,12 @@ export default function Schedule({ user }) {
   const [selectedId, setSelected] = useState(previewReturn?.selectedId ?? requested);
   const [editor, setEditor] = useState(null);
   const [details, setDetails] = useState(null);
-  const [pendingOpen, setPendingOpen] = useState(dashboardQueue === "pending-confirmation" && user.canManageScheduling === true);
+  const [pendingOpen, setPendingOpen] = useState(dashboardQueue === "pending-confirmation" && can("scheduling.write"));
   const [focusedDate, setFocusedDate] = useState(previewReturn?.focusedDate || "");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(previewReturn?.sidebarCollapsed || false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const canEdit = user.canManageScheduling === true;
+  const canEdit = can("scheduling.write");
   const offerings = useLoad(async () => rows(await api.get("/scheduling/course-offerings?program=masters")), []);
   const majors = useLoad(async () => rows(await api.get("/system/majors?program=masters")), []);
   const disciplines = disciplinesFromMajors(majors.data || []);
@@ -398,7 +400,7 @@ export default function Schedule({ user }) {
       <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>2</b>CHUYÊN NGÀNH</div><SearchSelect label="Chuyên ngành" value={majorId} placeholder="Tất cả chuyên ngành" options={[{ id: "", name: "Tất cả chuyên ngành" }, ...visibleMajors]} onChange={(value) => changeScope(() => { setMajor(value); setYear(""); })} /></div>
       <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>3</b>KHÓA / NĂM HỌC</div><select className={`sl-select sl-year-select${year ? "" : " sl-placeholder"}`} aria-label="Khóa / Năm" value={year} onChange={(event) => changeScope(() => setYear(event.target.value))}><option value="">Tất cả</option>{unique(all.flatMap(groupsOf).filter((group) => (!disciplineId || visibleMajorIds.has(group.majorId || group.major?.id)) && (!majorId || (group.majorId || group.major?.id) === majorId)).map((group) => group.academicYear)).sort((a, b) => b.localeCompare(a, "vi", { numeric: true })).map((value) => <option key={value}>{value}</option>)}</select></div>
     </div>
-    {!canEdit && <div className="sl-attention">Quyền chỉ xem · Quản trị viên phân công người phụ trách tại Hệ thống → QL Người dùng.</div>}
+    {!canEdit && <div className="sl-attention">Chưa có quyền sửa lịch hoặc vai trò đang bị khóa chỉ xem. Quản trị viên cấu hình tại Vai trò & phân quyền.</div>}
     {dashboardQueue && <div className="sl-attention">{dashboardQueue === "unscheduled" ? "Đang xem lớp chưa có buổi học" : "Đang xem lớp có buổi chờ xác nhận"}<button type="button" className="sl-btn" onClick={() => { const next = new URLSearchParams(params); next.delete("queue"); setParams(next); }}>Bỏ lọc công việc</button></div>}
     {majors.error && <Notice error={majors.error} />}
   </div><div className="sl-worklist"><div className="sl-search-wrap"><span>⌕</span><input className="sl-search" aria-label="Tìm môn / lớp" placeholder="Tìm lớp học phần..." value={query} onChange={(event) => setQuery(event.target.value)} /></div><div className="sl-card-scroll">{offerings.loading ? <Notice>Đang tải lớp học phần...</Notice> : offerings.error ? <Notice error={offerings.error} /> : <section className="sl-section"><h2><span>LỚP HỌC PHẦN</span><span className="sl-offering-sort-actions">

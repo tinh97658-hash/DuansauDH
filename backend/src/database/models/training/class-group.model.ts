@@ -1,4 +1,6 @@
 import { BelongsTo, Column, DataType, Default, ForeignKey, HasMany, Model, Table } from "sequelize-typescript";
+import { groupScopeStorage } from "../../../auth/group-scope-context.js";
+import { Staff } from "../staff.model.js";
 import { Major } from "../common/major.model.js";
 import { ClassGroupMember } from "./class-group-member.model.js";
 import { Curriculum } from "../plan/curriculum.model.js";
@@ -21,5 +23,11 @@ export class ClassGroup extends Model {
   @Default("ADMINISTRATIVE") @Column({ type: DataType.STRING(30), allowNull: false }) declare groupType: string;
   @ForeignKey(() => Curriculum) @Column({ type: DataType.UUID, allowNull: true }) declare curriculumId: string | null;
   @BelongsTo(() => Curriculum) declare curriculum: Curriculum | null;
+  @ForeignKey(() => Staff) @Column({ type: DataType.UUID, allowNull: true }) declare responsibleStaffId: string | null;
+  @BelongsTo(() => Staff) declare responsibleStaff: Staff | null;
+  @Column(DataType.VIRTUAL) get canEdit(): boolean {
+    const scope = groupScopeStorage.getStore();
+    return !scope?.readOnly && (!scope?.restrictEdit || this.responsibleStaffId === scope.staffId);
+  }
   @HasMany(() => ClassGroupMember) declare members: ClassGroupMember[];
 }

@@ -1,3 +1,4 @@
+import { GroupResponsibilityService } from "../../src/auth/group-responsibility.service.js";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { randomUUID } from "node:crypto";
@@ -35,6 +36,7 @@ describe("Batch A API contracts with real guards and ValidationPipe", () => {
     const module = await Test.createTestingModule({
       controllers: [MastersController, AccountsController, RolesController],
       providers: [
+        { provide: GroupResponsibilityService, useValue: { forCreation: jest.fn(async (actor: any, requestedId?: string) => requestedId || actor.id) } },
         { provide: RbacService, useValue: rbac },
         { provide: MastersService, useValue: {} },
         { provide: ExamGradebookService, useValue: workflow },

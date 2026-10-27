@@ -38,7 +38,7 @@ export class SchedulingController {
   }
 
   @Post("course-offerings")
-  @RequirePermissions("scheduling.write")
+  @RequirePermissions("scheduling.organize")
   @UseGuards(CourseOfferingWriteGuard)
   createCourseOffering(@Body() dto: CreateCourseOfferingDto) {
     return this.scheduling.createCourseOffering(dto);
@@ -50,7 +50,7 @@ export class SchedulingController {
   }
 
   @Delete("course-offerings/:id")
-  @RequirePermissions("scheduling.write")
+  @RequirePermissions("scheduling.organize")
   @UseGuards(CourseOfferingWriteGuard)
   deleteCourseOffering(@Param("id", ParseUUIDPipe) id: string) {
     return this.scheduling.deleteCourseOffering(id);
@@ -58,20 +58,20 @@ export class SchedulingController {
 
   @Delete("course-offerings/:id/teaching-sessions")
   @RequirePermissions("scheduling.write")
-  @UseGuards(CourseOfferingWriteGuard)
+  @UseGuards(SchedulingWriteGuard)
   deleteCourseOfferingSchedule(@Param("id", ParseUUIDPipe) id: string) {
     return this.scheduling.deleteCourseOfferingSchedule(id);
   }
 
   @Post("course-offerings/participant-preview")
-  @RequirePermissions("scheduling.write")
+  @RequirePermissions("scheduling.organize")
   @UseGuards(CourseOfferingWriteGuard)
   previewCourseOfferingParticipants(@Body() dto: PreviewCourseOfferingParticipantsDto) {
     return this.scheduling.previewCourseOfferingParticipants(dto);
   }
 
   @Post("course-offerings/roster-preview")
-  @RequirePermissions("scheduling.write")
+  @RequirePermissions("scheduling.organize")
   @UseGuards(CourseOfferingWriteGuard)
   previewCourseOfferingRoster(@Body() dto: PreviewCourseOfferingParticipantsDto) {
     return this.scheduling.previewCourseOfferingRoster(dto);
@@ -87,17 +87,17 @@ export class SchedulingController {
   roster(@Param("id", ParseUUIDPipe) id: string) { return this.scheduling.getCourseOfferingRoster(id); }
 
   @Put("course-offerings/:id/roster-notes")
-  @RequirePermissions("scheduling.write")
+  @RequirePermissions("scheduling.organize")
   @UseGuards(CourseOfferingWriteGuard)
   rosterNotes(@Param("id", ParseUUIDPipe) id: string, @Body() dto: UpdateRosterNotesDto) { return this.scheduling.updateRosterNotes(id, dto); }
 
   @Put("groups/:id/settings")
-  @RequirePermissions("scheduling.write")
+  @RequirePermissions("scheduling.organize")
   @UseGuards(CourseOfferingWriteGuard)
   groupSettings(@Param("id", ParseUUIDPipe) id: string, @Body() dto: SchedulingGroupSettingsDto) { return this.scheduling.updateSchedulingGroup(id, dto); }
 
   @Get("course-offering-students/:subjectId")
-  @RequirePermissions("scheduling.write")
+  @RequirePermissions("scheduling.organize")
   @UseGuards(CourseOfferingWriteGuard)
   individualStudents(@Param("subjectId", ParseUUIDPipe) subjectId: string, @Query("search") search?: string) {
     return this.scheduling.listIndividualStudents(subjectId, search);

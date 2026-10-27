@@ -637,21 +637,21 @@ export class SchedulingService {
       const roster = await this.previewCourseOfferingRoster(dto);
       return { classGroupCount: dto.classGroupIds.length, participantCount: roster.participantCount };
     }
-    const groups = await this.classGroups.findAll({
-      where: { id: { [Op.in]: dto.classGroupIds } },
-      attributes: ["id"],
-    });
-    if (groups.length !== dto.classGroupIds.length) {
-      throw new NotFoundException("Danh sách có nhóm học viên không tồn tại.");
-    }
+    await this.requirePreviewGroups(dto.classGroupIds);
     return {
-      classGroupCount: groups.length,
+      classGroupCount: dto.classGroupIds.length,
       participantCount: await this.participantCountForGroups(dto.classGroupIds, dto.subjectId),
     };
   }
 
+  private async requirePreviewGroups(classGroupIds: string[]) {
+    const groups = await this.classGroups.findAll({ where: { id: { [Op.in]: classGroupIds } }, attributes: ["id"] });
+    if (groups.length !== classGroupIds.length) throw new NotFoundException("Danh sách có nhóm học viên không tồn tại.");
+  }
+
   async previewCourseOfferingRoster(dto: PreviewCourseOfferingParticipantsDto, savedLinks?: CourseOfferingClassGroup[], savedOfferingId?: string) {
-    await this.previewCourseOfferingParticipants({ classGroupIds: dto.classGroupIds });
+    // The roster below already computes membership and eligibility; avoid loading it twice just to count it.
+    await this.requirePreviewGroups(dto.classGroupIds);
     const retakeIds = dto.retakeClassGroupIds || [];
     if (retakeIds.some(id => !dto.classGroupIds.includes(id))) throw new BadRequestException("Nhóm học lại phải thuộc danh sách lớp đã chọn.");
     const retakes = retakeIds.length ? await this.retakeGroupRosters(dto.subjectId!, retakeIds) : new Map<string, RetakeResult[]>();

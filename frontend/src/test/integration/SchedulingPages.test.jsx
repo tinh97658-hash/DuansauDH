@@ -253,7 +253,7 @@ it("prefills and saves the exam exemption note supplied by the roster preview", 
 });
 
 it("uses session permissions and never exposes the demo role switch", async () => {
-  mocks({ role: "supervisor", canManageScheduling: false }, []);
+  mocks({ role: "supervisor", canManageScheduling: true }, []);
   render(<MemoryRouter><CourseOfferings /></MemoryRouter>); await reach();
   expect(screen.getByRole("button", { name: /KTHH-2026 · Nhóm 1/ })).toBeDisabled();
   expect(screen.queryByRole("combobox", { name: "Vai trò" })).not.toBeInTheDocument();

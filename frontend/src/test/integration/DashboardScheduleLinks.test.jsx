@@ -1,5 +1,7 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { renderWithPermissions } from "../renderWithPermissions";
+const render = (ui) => renderWithPermissions(ui, ["scheduling.view", "scheduling.write"]);
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 import axios from "axios";

@@ -84,4 +84,16 @@ describe("RbacService", () => {
     expect(staffRoles.findAll).toHaveBeenCalledTimes(2);
   });
 
+
+  it("defaults scope locks to off, combines explicit locks and ignores disabled roles", async () => {
+    const { service, staffRoles } = build();
+    staffRoles.findAll.mockResolvedValue([{ role: role("custom", ["masters.view"]) }]);
+    expect((await service.effectiveAccess({ id: "a" })).groupScope).toEqual({ restrictView: false, restrictEdit: false, readOnly: false });
+    staffRoles.findAll.mockResolvedValue([
+      { role: { ...role("custom", ["masters.manage"]), restrictGroupEdit: true } },
+      { role: { ...role("reader", ["masters.view"]), groupReadOnly: true } },
+      { role: { ...role("disabled", [], false), restrictGroupView: true } },
+    ]);
+    expect((await service.effectiveAccess({ id: "b" })).groupScope).toEqual({ restrictView: false, restrictEdit: true, readOnly: true });
+  });
 });
