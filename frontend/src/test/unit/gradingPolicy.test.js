@@ -12,11 +12,11 @@ it("uses the row's frozen policy for calculations and sends its version to the s
   expect(draftOf({ ...row, courseScore: 5, grade4: 0, result: "failed" })).toMatchObject({ courseScore: "5.0", grade4: "0.0", result: "failed" });
 });
 
-it("checks minimums against rounded components and converts the rounded total", () => {
+it("retains a score below its configured minimum while converting the rounded total", () => {
   const policy = clonePolicy();
   policy.minimums = { testScore: 0, assignmentScore: 0, examScore: 5.8 };
   const row = { participantId: "p1", testScore: "5.54", assignmentScore: "6", examScore: "5.76", examExempt: false, letterGrade: "", gradingPolicy: policy };
-  expect(gradePayload(row)).toMatchObject({ testScore: 5.5, examScore: 5.8, courseScore: 5.8, letterGrade: "C", grade4: 2, result: "passed" });
+  expect(gradePayload(row)).toMatchObject({ testScore: 5.54, examScore: 5.76, courseScore: 5.8, letterGrade: "C", grade4: 2, result: "failed" });
 });
 
 it("does not accept incomplete or contradictory configuration", () => {
@@ -45,8 +45,25 @@ it("derives exam eligibility from both current configured minimums and never qua
   expect(calculateExamEligibility({ ...row, eligibilityPolicy: policy, gradingPolicy: clonePolicy(), assignmentScore: 6 })).toBe(false);
 });
 
-it("keeps the outcome pending until an exam score is entered even when its weight is zero", () => {
+it("does not apply a component minimum to a zero-weight component", () => {
   const policy = { ...clonePolicy(), weights: { testScore: 50, assignmentScore: 50, examScore: 0 } };
   expect(calculatePolicyGrade({ testScore: 8, assignmentScore: 8, examScore: null }, policy)).toMatchObject({ result: "pending", courseScore: null });
   expect(calculatePolicyGrade({ testScore: 8, assignmentScore: 8, examScore: 0 }, policy)).toMatchObject({ result: "passed", courseScore: 8 });
+  expect(calculatePolicyGrade({ testScore: 8, assignmentScore: 8, examScore: 5.5 }, policy)).toMatchObject({ result: "passed", courseScore: 8 });
+});
+
+it.each([4, 5.5, 6.5])("uses configured exam minimum %s without a hard-coded limit", minimum => {
+  const policy = clonePolicy(); policy.minimums.examScore = minimum;
+  expect(calculatePolicyGrade({ testScore: 10, assignmentScore: 10, examScore: minimum - 0.01 }, policy).result).toBe("failed");
+  expect(calculatePolicyGrade({ testScore: 10, assignmentScore: 10, examScore: minimum }, policy).result).toBe("passed");
+});
+
+it.each([5.5, 6.5])("does not let a rounded weighted total cross course minimum %s", minimum => {
+  const policy = clonePolicy(); policy.courseMinimum = minimum;
+  const below = minimum - 0.01;
+  const draft = draftOf({ participantId: "p1", testScore: below, assignmentScore: below, examScore: below,
+    examExempt: false, letterGrade: "", workflowPhase: "final", eligibilityFrozen: true, eligible: true, gradingPolicy: policy });
+  expect(draft.courseScore).toBe(minimum.toFixed(1));
+  expect(draft.result).toBe("failed");
+  expect(gradePayload(draft)).toMatchObject({ testScore: below, assignmentScore: below, examScore: below, courseScore: minimum, result: "failed" });
 });

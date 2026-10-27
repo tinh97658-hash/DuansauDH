@@ -7,7 +7,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { RbacService } from '../auth/rbac.service.js';
 import { assertGradebookWorkflowAccess } from './gradebook-workflow-access.js';
 import { auditActor } from '../plan/membership-history.js';
-import { calculateExamEligibility, calculateExamGrade, roundExamScore } from './exam-grade-calculation.js';
+import { calculateExamEligibility, calculateExamGrade, resolveSavedExamGrade } from './exam-grade-calculation.js';
 import { LEGACY_GRADING_POLICY } from './grading-policy.js';
 import { resolveApprovedExamRows, unresolvedExamRows } from './exam-tracking.js';
 
@@ -25,11 +25,14 @@ export class ExamWorkflowService {
     return this.db.query(sql,{replacements:{...replacements},transaction,type:QueryTypes.SELECT});
   }
   async state(id: string, transaction?: Transaction) {
-    const [state] = await this.query('SELECT * FROM course_exam_workflows WHERE course_offering_id=:id',{id},transaction);
+    const [state] = await this.query(`SELECT w.*, NOT EXISTS (
+      SELECT 1 FROM course_exam_sessions s WHERE s.course_offering_id=w.course_offering_id AND s.status<>'cancelled'
+    ) AS eligibility_can_reopen FROM course_exam_workflows w WHERE w.course_offering_id=:id`,{id},transaction);
     return state || {course_offering_id:id,mode:'new',eligibility_status:'draft',eligibility_version:0,result_status:'not_available',result_version:0};
   }
   publicState(s: any) {
-    return {mode:s.mode,eligibility:{status:s.eligibility_status,version:s.eligibility_version,snapshotId:s.eligibility_snapshot_id||null},
+    return {mode:s.mode,eligibility:{status:s.eligibility_status,version:s.eligibility_version,snapshotId:s.eligibility_snapshot_id||null,
+      canReopen:s.mode==='new'&&['submitted','approved'].includes(s.eligibility_status)&&s.result_status!=='approved'&&s.eligibility_can_reopen===true},
       final:{status:s.result_status,version:s.result_version},status:s.result_status==='not_available'?s.eligibility_status:s.result_status,
       version:s.eligibility_version};
   }
@@ -100,13 +103,13 @@ export class ExamWorkflowService {
         if(approved){
           if((value.testScore!==undefined&&value.testScore!==row.testScore)||(value.assignmentScore!==undefined&&value.assignmentScore!==row.assignmentScore)||value.examExempt!==row.examExempt)throw new ConflictException('Điểm thành phần và tư cách đã duyệt không được thay đổi.');
           if(!row.examScoreEditable)throw new ConflictException('Chỉ nhập điểm thi sau khi ca thi của học viên được xác nhận Đã diễn ra.');
-          const examScore=roundExamScore(value.examScore);
+          const examScore=value.examScore??null;
           changed.push({...row,examScore,...calculateExamGrade({...row,examScore},row.gradingPolicy,row.eligibilityPolicy),notes:value.notes||'',attemptScores:examScore==null?[]:[examScore]});
         }else{
           if(value.examScore!=null)throw new ConflictException('Chưa đến giai đoạn nhập điểm thi.');
           const policy=row.eligibilityPolicy||LEGACY_GRADING_POLICY;
           if((value.policyVersion??0)!==policy.version||(value.policyRulesVersion??0)!==(policy.rulesVersion??0))throw new ConflictException('Cấu hình điểm đã thay đổi. Hãy tải lại.');
-          changed.push(this.componentRow({...row,testScore:roundExamScore(value.testScore),assignmentScore:roundExamScore(value.assignmentScore),examExempt:value.examExempt,notes:value.notes||'',gradingPolicy:row.gradingPolicy||policy}));
+          changed.push(this.componentRow({...row,testScore:value.testScore??null,assignmentScore:value.assignmentScore??null,examExempt:value.examExempt,notes:value.notes||'',gradingPolicy:row.gradingPolicy||policy}));
         }
       }
       await this.writeRows(dto.courseOfferingId,changed,transaction);
@@ -142,7 +145,10 @@ export class ExamWorkflowService {
           if(dto.action==='approve'){
             snapshotId=randomUUID();await this.db.query(`INSERT INTO course_exam_eligibility_snapshots(id,course_offering_id,version,rows,actor)
               VALUES(:snapshotId,:id,:version,CAST(:rows AS jsonb),CAST(:actor AS jsonb))`,{transaction,replacements:{snapshotId,id,version:version+1,rows:JSON.stringify(rows),actor:JSON.stringify(auditActor(actor))}});
-            await this.writeRows(id,rows.map(row=>({...row,eligibilityFrozen:true,workflowPhase:'final',examScoreEditable:false})),transaction);
+            await this.writeRows(id,rows.map(row=>{
+              const frozen = {...row,eligibilityFrozen:true,workflowPhase:'final',examScoreEditable:false};
+              return {...frozen,...resolveSavedExamGrade(frozen)};
+            }),transaction);
           }
           await this.db.query(`UPDATE course_exam_workflows SET eligibility_status=:next,eligibility_version=eligibility_version+1,
             eligibility_submission=CAST(:submission AS jsonb),eligibility_snapshot_id=:snapshotId,

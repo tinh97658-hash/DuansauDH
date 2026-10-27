@@ -2,6 +2,12 @@ import { calculateExamEligibility, calculateExamGrade, resolveSavedExamGrade } f
 
 const emptyResult = { examScore: null, courseScore: null, grade4: null, letterGrade: '', attemptScores: [], result: 'pending' };
 
+export function gradebookCompletionStatus(state: any, examGradesComplete: boolean) {
+  const locked = state.mode === 'legacy_preserved'
+    ? state.legacyGradebookStatus === 'approved' : state.result_status === 'approved';
+  return locked ? 'completed' : examGradesComplete ? 'needs_lock' : 'incomplete';
+}
+
 // The gradebook and tracking summaries resolve the same frozen roster and held exams.
 export function resolveApprovedExamRows(frozenRows: any[], books: any[], heldIds: string[], state: any) {
   const saved = new Map<string, any>();
@@ -10,9 +16,12 @@ export function resolveApprovedExamRows(frozenRows: any[], books: any[], heldIds
   return frozenRows.map(frozen => {
     const previous = saved.get(frozen.participantId);
     const examScore = held.has(frozen.participantId) ? previous?.examScore ?? null : null;
-    const calculated = frozen.eligible === true && held.has(frozen.participantId)
+    const calculated = state.result_status === 'approved' && previous?.finalized
+      ? resolveSavedExamGrade({ ...previous, eligibilityFrozen: true, eligible: frozen.eligible,
+        examExempt: frozen.examExempt, profileForeignLanguageExempt: frozen.profileForeignLanguageExempt })
+      : frozen.eligible === true && held.has(frozen.participantId)
       ? calculateExamGrade({ ...frozen, examScore }, frozen.gradingPolicy, frozen.eligibilityPolicy)
-      : { ...emptyResult, ...(frozen.studyLeaveFailure ? { result: 'failed' } : frozen.profileForeignLanguageExempt ? { result: 'passed' } : frozen.examExempt ? { result: 'exempt' } : {}) };
+      : { ...emptyResult, ...(frozen.studyLeaveFailure ? { result: 'failed' } : frozen.profileForeignLanguageExempt ? { result: 'passed' } : frozen.examExempt ? { result: 'exempt' } : frozen.eligible === false ? { result: 'failed' } : {}) };
     return { ...frozen, ...calculated, examScore: frozen.eligible === true ? examScore : null, attemptScores: examScore == null ? [] : [examScore],
       notes: previous?.notes ?? frozen.notes, eligibilityFrozen: true,
       examScoreEditable: frozen.eligible === true && held.has(frozen.participantId) && state.result_status === 'draft',

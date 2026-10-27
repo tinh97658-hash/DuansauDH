@@ -4,8 +4,6 @@ import { api, Notice, useLoad } from "./shared";
 import CreateOffering from "./CreateOffering";
 import Schedule from "./Schedule";
 import CourseMatrix from "./CourseMatrix";
-import "./reference.css";
-import "./workspace.css";
 import { useAuthSession } from "../../context/AuthSession";
 
 export default function Workspace({ mode }) {

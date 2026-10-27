@@ -14,6 +14,15 @@ export const DEFAULT_GRADING_POLICY = {
 };
 export const clonePolicy = policy => JSON.parse(JSON.stringify(policy || DEFAULT_GRADING_POLICY));
 const number = value => String(value ?? "").trim() === "" ? NaN : Number(String(value).replace(",", "."));
+// Draft inputs may display one decimal while preserving the original mark.
+export const componentScore = (row, key) => {
+  const raw = row.rawScores?.[key];
+  if (raw !== undefined) {
+    const displayed = raw === null ? "" : (Math.round((raw + Number.EPSILON * 10) * 10) / 10).toFixed(1);
+    if (String(row[key] ?? "") === displayed || number(row[key]) === raw) return raw === null ? NaN : raw;
+  }
+  return number(row[key]);
+};
 export const numericPolicy = policy => ({
   ...policy,
   weights: Object.fromEntries(POLICY_COMPONENTS.map(([key]) => [key, number(policy.weights[key])])),
@@ -46,16 +55,17 @@ export function calculatePolicyGrade(row, policy = DEFAULT_GRADING_POLICY) {
   if (row.studyLeaveFailure) return { courseScore: null, grade4: null, letterGrade: "", result: "failed" };
   if (row.profileForeignLanguageExempt) return { courseScore: null, grade4: null, letterGrade: "", result: "passed" };
   const active = POLICY_COMPONENTS.filter(([key]) => Number(policy.weights[key]) > 0);
-  const scores = Object.fromEntries(active.map(([key]) => [key, number(row[key])]));
+  const scores = Object.fromEntries(active.map(([key]) => [key, componentScore(row, key)]));
   const ineligible = !row.examExempt && calculateExamEligibility(row, row.eligibilityPolicy || policy) === false;
   if (ineligible) return { courseScore: 0, grade4: 0, letterGrade: "F", result: "failed" };
   const result = row.examExempt ? "exempt" : ineligible ? "failed" : "pending";
-  const examScore = number(row.examScore);
+  const examScore = componentScore(row, "examScore");
   if (!Number.isFinite(examScore) || examScore < 0 || examScore > 10 || active.some(([key]) => !Number.isFinite(scores[key]) || scores[key] < 0 || scores[key] > 10)) return { courseScore: null, grade4: null, letterGrade: "", result };
-  const weighted = active.reduce((sum, [key]) => sum + scores[key] * Number(policy.weights[key]) / 100, 0);
+  const weighted = active.reduce((sum, [key]) => sum + scores[key] * Number(policy.weights[key]), 0) / 100;
   const courseScore = Math.round((weighted + Number.EPSILON * 10) * 10) / 10;
   const band = [...policy.bands].sort((a, b) => Number(b.minimum) - Number(a.minimum)).find(band => courseScore >= Number(band.minimum));
-  const passed = !ineligible && active.every(([key]) => scores[key] >= Number(policy.minimums[key])) && courseScore >= Number(policy.courseMinimum);
+  const passed = !ineligible && active.every(([key]) => scores[key] >= Number(policy.minimums[key]))
+    && weighted >= Number(policy.courseMinimum);
   return { courseScore, grade4: Number(band.grade4), letterGrade: band.letter, result: row.examExempt ? "exempt" : passed ? "passed" : "failed" };
 }
 
@@ -63,9 +73,9 @@ export function calculateExamEligibility(row, policy = row.eligibilityPolicy || 
   if (row.studyLeaveFailure) return false;
   if (row.examExempt) return false;
   const keys = ["testScore", "assignmentScore"];
-  const scores = keys.map(key => number(row[key]));
+  const scores = keys.map(key => componentScore(row, key));
   if (scores.some(score => !Number.isFinite(score) || score < 0 || score > 10)) return null;
-  return keys.every((key, index) => Math.round((scores[index] + Number.EPSILON * 10) * 10) / 10 >= Number(policy.minimums[key]));
+  return keys.every((key, index) => scores[index] >= Number(policy.minimums[key]));
 }
 
 export function announcePolicyChange() {

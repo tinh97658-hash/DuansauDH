@@ -1,5 +1,6 @@
 import { isSessionEndedInBusinessTimezone, isSessionStartedInBusinessTimezone } from "./scheduling-time.js";
 import { randomUUID } from "node:crypto";
+import { latestParticipantResults, retakeProgress } from "./class-course-progress.js";
 import { QueryTypes } from "sequelize";
 import { excludeRecognizedExamParticipant } from "../masters/recognized-exam-participant.js";
 import { profileForeignLanguageExemptSql } from "../masters/foreign-language-exemption.js";
@@ -137,6 +138,7 @@ export class SchedulingService {
     const progressMembers = await this.classGroupMembers.findAll({
       where: { classGroupId: { [Op.in]: groupIds } },
       attributes: ["id", "classGroupId", "studentId", "admissionRecordId"],
+      include: [{ model: AdmissionRecord, attributes: ["id", "studentId", "studyStatus"] }],
     });
     const curriculumIds = [...new Set(groups.map((group) => group.curriculumId).filter((id): id is string => Boolean(id)))];
     const curriculumRows = curriculumIds.length === 0 ? [] : await this.curriculumSubjects.findAll({
@@ -148,12 +150,13 @@ export class SchedulingService {
     });
     const links = await this.offeringGroups.findAll({
       where: { classGroupId: { [Op.in]: groupIds } },
-      attributes: ["classGroupId", "courseOfferingId"],
+      attributes: ["classGroupId", "courseOfferingId", "participantIds", "studyRole"],
     });
     const offeringIds = [...new Set(links.map((link) => link.courseOfferingId))];
     const offerings = offeringIds.length === 0 ? [] : await this.courseOfferings.findAll({
       where: { id: { [Op.in]: offeringIds } },
       include: [{ model: Subject, as: "subject", required: true, where: { program } }],
+      order: [["createdAt", "ASC"], ["id", "ASC"]],
     });
     const sessions = offeringIds.length === 0 ? [] : await this.teachingSessions.findAll({
       where: { courseOfferingId: { [Op.in]: offeringIds } },
@@ -165,10 +168,17 @@ export class SchedulingService {
     });
 
     const completedOfferingIds = offerings.filter((offering) => offering.status === "completed").map((offering) => offering.id);
+    const resultSubjectIds = [...new Set(offerings.map(offering => offering.subjectId || offering.subject.id))];
+    const results = await readRetakeResults(this.sequelize, groupIds, resultSubjectIds);
+    const withdrawn = await this.withdrawnIdentities(offeringIds);
+    const admissionIds = [...new Set(progressMembers.map(member => member.admissionRecordId).filter(Boolean))];
+    const recognitions = admissionIds.length && resultSubjectIds.length ? await this.subjectRecognitions.findAll({
+      where: { admissionRecordId: { [Op.in]: admissionIds }, targetSubjectId: { [Op.in]: [...new Set([...resultSubjectIds, ...catalogSubjects.map(subject => subject.id)])] }, status: "approved" },
+    }) : [];
     // Check the whole class, including learners outside the gradebook's current page.
     // A component score alone does not complete grading; zero totals and exemptions do.
     const gradeEntryCounts = completedOfferingIds.length === 0 ? [] : await this.sequelize.query<{
-      classGroupId: string; courseOfferingId: string; missingGradeCount: number;
+      classGroupId: string; courseOfferingId: string; missingGradeCount: number; missingParticipantIds: string[];
     }>(`
       WITH people AS (
         SELECT DISTINCT cm.class_group_id,
@@ -191,12 +201,14 @@ export class SchedulingService {
             AND jsonb_typeof(grade->'assignmentScore') = 'number'
             AND (grade->>'testScore')::numeric BETWEEN 0 AND 10
             AND (grade->>'assignmentScore')::numeric BETWEEN 0 AND 10
-            AND (ROUND((grade->>'testScore')::numeric, 1) < COALESCE(
+            AND ((grade->>'testScore')::numeric < COALESCE(
               (SELECT (policy->'minimums'->>'testScore')::numeric FROM shared_grading_rules ORDER BY version DESC LIMIT 1), 4)
-              OR ROUND((grade->>'assignmentScore')::numeric, 1) < COALESCE(
+              OR (grade->>'assignmentScore')::numeric < COALESCE(
               (SELECT (policy->'minimums'->>'assignmentScore')::numeric FROM shared_grading_rules ORDER BY version DESC LIMIT 1), 4)))
       )
       SELECT link.class_group_id AS "classGroupId", link.course_offering_id AS "courseOfferingId",
+        ARRAY_AGG(DISTINCT person.participant_id) FILTER (WHERE person.participant_id IS NOT NULL AND saved.participant_id IS NULL
+          AND NOT ${profileForeignLanguageExemptSql('person.participant_id', 'offering.subject_id', '(SELECT academic_year FROM class_groups WHERE id = link.class_group_id)')}) AS "missingParticipantIds",
         COUNT(DISTINCT person.participant_id) FILTER (WHERE saved.participant_id IS NULL
           AND NOT ${profileForeignLanguageExemptSql('person.participant_id', 'offering.subject_id', '(SELECT academic_year FROM class_groups WHERE id = link.class_group_id)')})::int AS "missingGradeCount"
       FROM course_offering_class_groups link
@@ -210,6 +222,7 @@ export class SchedulingService {
       GROUP BY link.class_group_id, link.course_offering_id
     `, { type: QueryTypes.SELECT, replacements: { groupIds, completedOfferingIds } });
     const missingGradeCounts = new Map(gradeEntryCounts.map((row) => [`${row.classGroupId}:${row.courseOfferingId}`, Number(row.missingGradeCount)]));
+    const missingParticipants = new Map(gradeEntryCounts.map(row => [`${row.classGroupId}:${row.courseOfferingId}`, row.missingParticipantIds]));
 
     const offeringById = new Map(offerings.map((offering) => [offering.id, offering]));
     const offeringIdsByGroup = new Map<string, string[]>();
@@ -235,15 +248,50 @@ export class SchedulingService {
       const subjects = catalogSubjects.map((subject) => {
         const entry = curriculumEntries.get(subject.id);
         const subjectId = logicalSubjectId(subject);
-        const matchingOfferings = groupOfferings.filter((offering) => logicalSubjectId(offering.subject) === subjectId);
-        const matchingSessions = matchingOfferings.flatMap((offering) => sessionsByOffering.get(offering.id) || [])
+        // Merged classes can use another major's local subject without a canonical
+        // mapping. Apply the same sharing rules used when creating the offering.
+        const matchingOfferings = groupOfferings.filter((offering) => logicalSubjectId(offering.subject) === subjectId
+          || (this.sharingEnabled(offering.subject, group.majorId) && this.sameSubjectAcrossMajors(subject, offering.subject)));
+        const matchingSubjectIds = new Set([subject.id, ...matchingOfferings.map(offering => offering.subjectId || offering.subject.id)]);
+        const latest = latestParticipantResults(results, group.id, matchingSubjectIds);
+        const members = progressMembers.filter(member => member.classGroupId === group.id);
+        const recognizedRecords = new Set(recognitions.filter(row => matchingSubjectIds.has(row.targetSubjectId)).map(row => row.admissionRecordId));
+        const eligibleParticipants = new Set(members.filter(member => !BLOCKED_STUDY_STATUSES.includes(member.admissionRecord?.studyStatus || "")
+          && !recognizedRecords.has(member.admissionRecordId!)).map(member => this.memberIdentity(member)));
+        const groupLinks = new Map(links.filter(link => link.classGroupId === group.id).map(link => [link.courseOfferingId, link]));
+        const offeringSummaries = matchingOfferings.map(offering => {
+          const link = groupLinks.get(offering.id)!;
+          const rosterIds = [...new Set(Array.isArray(link.participantIds) ? link.participantIds
+            : members.map(member => this.memberIdentity(member)))].filter(id => !withdrawn.has(`${offering.id}:${id}`));
+          const offeringSessions = sessionsByOffering.get(offering.id) || [];
+          const held = offeringSessions.filter(session => session.status === "held").length;
+          const planned = offeringSessions.filter(session => session.status === "planned").length;
+          const key = `${group.id}:${offering.id}`;
+          const missingIds = missingParticipants.get(key);
+          // A later passing/exempt attempt resolves an older missing result.
+          const needsGradeEntry = Array.isArray(missingIds) ? missingIds.some(id => {
+            const outcome = latest.get(id);
+            return !outcome || !["passed", "exempt"].includes(outcome.result);
+          }) : (missingGradeCounts.get(key) || 0) > 0;
+          return {
+            id: offering.id, name: offering.name || subject.name, studyRole: link.studyRole || "primary",
+            status: offering.status === "completed" ? "completed" : held > 0 ? "in_progress" : planned > 0 ? "scheduled" : "not_started",
+            memberCount: rosterIds.length, heldSessionCount: held, plannedSessionCount: planned,
+            sessionCount: offeringSessions.length, needsGradeEntry,
+            participantIds: rosterIds,
+          };
+        });
+        const primaryIds = new Set(offeringSummaries.filter(offering => offering.studyRole === "primary").map(offering => offering.id));
+        const primaryOfferings = matchingOfferings.filter(offering => primaryIds.has(offering.id));
+        const matchingSessions = primaryOfferings.flatMap((offering) => sessionsByOffering.get(offering.id) || [])
           .sort((a, b) => a.sessionDate.localeCompare(b.sessionDate) || a.startTime.localeCompare(b.startTime));
         const heldSessionCount = matchingSessions.filter((session) => session.status === "held").length;
         const plannedSessionCount = matchingSessions.filter((session) => session.status === "planned").length;
-        const completed = matchingOfferings.some((offering) => offering.status === "completed");
+        const completed = primaryOfferings.some((offering) => offering.status === "completed");
         const status = completed ? "completed" : heldSessionCount > 0 ? "in_progress" : plannedSessionCount > 0 ? "scheduled" : "not_started";
-        const incompleteOffering = matchingOfferings.find((offering) => offering.status === "completed"
-          && (missingGradeCounts.get(`${group.id}:${offering.id}`) || 0) > 0);
+        const incompleteOffering = offeringSummaries.find(offering => offering.status === "completed" && offering.needsGradeEntry);
+        const retakes = retakeProgress(latest, offeringSummaries.filter(offering => offering.studyRole === "retake"
+          && offering.status !== "completed"), eligibleParticipants);
         return {
           curriculumSubjectId: entry?.id || null,
           subjectId: subject.id,
@@ -254,7 +302,11 @@ export class SchedulingService {
           status,
           needsGradeEntry: !!incompleteOffering,
           incompleteCourseOfferingId: incompleteOffering?.id || null,
+          primaryCourseOfferingId: primaryOfferings[0]?.id || null,
+          ...retakes,
+          offerings: offeringSummaries.map(({ participantIds, ...offering }) => offering),
           heldSessionCount,
+          plannedSessionCount,
           sessionCount: matchingSessions.length,
           sessions: matchingSessions.map((session) => ({
             id: session.id,
@@ -1171,6 +1223,7 @@ export class SchedulingService {
       await this.offeringGroups.bulkCreate(sortedGroupIds.map((classGroupId) => ({
         courseOfferingId: offering.id,
         classGroupId,
+        studyRole: retakeGroupIds.includes(classGroupId) ? "retake" : "primary",
         ...(retakeRosters.has(classGroupId) ? { participantIds: retakeRosters.get(classGroupId)!.map(row => row.participantId) } : {}),
       })), { transaction });
 

@@ -21,9 +21,9 @@ const loadSheet = async (report) => {
 };
 const textOf = (cell) => cell.value?.richText ? cell.value.richText.map(run => run.text).join("") : cell.value;
 
-it("exports interrupted study-leave attempts as Không đạt instead of an empty mark", async () => {
+it.each([{ studyLeaveFailure: true }, { eligibilityFrozen: true }])("exports a failed attempt without a numerical score as Không đạt: %j", async flags => {
   const report = sampleReport(1, 1);
-  report.rows[0].scores.hp0 = { score: null, result: "failed", studyLeaveFailure: true };
+  report.rows[0].scores.hp0 = { score: null, result: "failed", ...flags };
   const sheet = await loadSheet(report);
   expect(sheet.getCell("G11").value).toBe("Không đạt");
 });

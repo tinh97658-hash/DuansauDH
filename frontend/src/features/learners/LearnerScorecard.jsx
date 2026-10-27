@@ -6,7 +6,7 @@ import { Alert, Button, Chip, CircularProgress, MenuItem, Paper, TableBody, Tabl
 import FilterSelectField from "../../components/FilterSelectField";
 import ResizableTable from "../../components/ResizableTable";
 import { API_BASE_URL } from "../../config/http";
-import { RESULT_LABELS, SCORE_FIELDS, formatAttemptScores } from "../exams/gradebook";
+import { calculateGrade, RESULT_LABELS, SCORE_FIELDS, formatAttemptScores } from "../exams/gradebook";
 import { calculateExamEligibility } from "../exams/gradingPolicy";
 import "./learnerScorecard.css";
 import { useSubjectCatalogRevision } from "../../utils/subjectCatalog";
@@ -53,7 +53,12 @@ export default function LearnerScorecard({ admissionRecordId, classGroupId, onCl
 
   const subjects = (report?.subjects || []).map(subject => {
     const details = subject.grade?.details;
-    if (!details || details.finalized || subject.grade.studyLeaveFailure || details.studyLeaveFailure || details.source === "recognition" || details.examExempt || calculateExamEligibility(details) !== false) return subject;
+    if (details?.workflowPhase === 'components' || (details?.eligibilityFrozen && details.eligible === false)) {
+      const calculated = calculateGrade({ ...details, courseScore: subject.grade.score, result: subject.grade.result });
+      return { ...subject, grade: { ...subject.grade, score: calculated.courseScore, result: calculated.result,
+        details: { ...details, ...calculated } } };
+    }
+    if (!details || details.workflowPhase || details.eligibilityFrozen || details.finalized || subject.grade.studyLeaveFailure || details.studyLeaveFailure || details.source === "recognition" || details.examExempt || calculateExamEligibility(details) !== false) return subject;
     return { ...subject, grade: { ...subject.grade, score: 0, result: "failed",
       details: { ...details, examScore: 0, courseScore: 0, grade4: 0, letterGrade: "F", attemptScores: [0] } } };
   });

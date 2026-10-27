@@ -85,6 +85,9 @@ describe("Studied curriculum subjects", () => {
   });
 
   it.each([
+    [{ workflowPhase: 'components', eligibilityFrozen: false, testScore: 3.9, assignmentScore: 5 }, null],
+    [{ workflowPhase: 'final', eligibilityFrozen: true, eligible: false, testScore: 3.9, assignmentScore: 5 }, 'failed'],
+    [{ workflowPhase: 'final', eligibilityFrozen: true, eligible: false, testScore: 3.9, assignmentScore: 5, finalized: true }, 'failed'],
     [{ testScore: 6, assignmentScore: 3, examScore: null, examExempt: false }, "failed"],
     [{ testScore: 8, assignmentScore: 8, examScore: 9, examExempt: false }, "passed"],
     [{ testScore: null, assignmentScore: null, examScore: null, examExempt: true }, "exempt"],

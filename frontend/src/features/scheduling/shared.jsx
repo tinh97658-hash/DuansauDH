@@ -2,6 +2,8 @@ import React, { useEffect, useId, useRef, useState } from "react";
 import axios from "axios";
 import { Dialog } from "@mui/material";
 import { API_BASE_URL } from "../../config/http";
+import "./reference.css";
+import "./workspace.css";
 
 export const api = {
   get: async (path) => (await axios.get(`${API_BASE_URL}${path}`, { withCredentials: true })).data,
@@ -22,7 +24,7 @@ export const unique = (items) => [...new Set(items.filter(Boolean))];
 export const normalize = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[đĐ]/g, "d").toLowerCase();
 export const groupsOf = (offering) => (offering?.groupLinks || []).map((link) => {
   const group = link.classGroup;
-  return group && Array.isArray(link.participantIds)
+  return group && (link.studyRole ? link.studyRole === "retake" : Array.isArray(link.participantIds))
     ? { ...group, isRetake: true, name: group.code || group.name, memberCount: group.memberCount ?? link.participantIds.length }
     : group;
 }).filter(Boolean);

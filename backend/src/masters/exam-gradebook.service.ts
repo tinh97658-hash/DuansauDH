@@ -10,7 +10,7 @@ import { CourseOffering } from "../database/models/training/course-offering.mode
 import { CourseOfferingClassGroup } from "../database/models/training/course-offering-class-group.model.js";
 import { CourseExamGrade, CourseExamGradebook } from "../database/models/training/course-exam-gradebook.model.js";
 import { ExamGradebookQueryDto, ExamGradeRowDto, SaveExamGradebookDto } from "./dto/exam-gradebook.dto.js";
-import { calculateExamEligibility, calculateExamGrade, roundExamScore } from "./exam-grade-calculation.js";
+import { calculateExamEligibility, calculateExamGrade } from "./exam-grade-calculation.js";
 import { GradingPolicyService } from "./grading-policy.service.js";
 import { excludeRecognizedExamParticipant } from "./recognized-exam-participant.js";
 import { LEGACY_GRADING_POLICY, type GradingPolicy } from "./grading-policy.js";
@@ -27,7 +27,7 @@ import { isDeepStrictEqual } from "node:util";
 import { RbacService } from "../auth/rbac.service.js";
 import { assertGradebookWorkflowAccess } from "./gradebook-workflow-access.js";
 import { ExamWorkflowService } from './exam-workflow.service.js';
-import { legacyExamGradesComplete, resolveApprovedExamRows, unresolvedExamRows } from './exam-tracking.js';
+import { gradebookCompletionStatus, legacyExamGradesComplete, resolveApprovedExamRows, unresolvedExamRows } from './exam-tracking.js';
 
 export const emptyExamGrade = (participantId: string): CourseExamGrade => ({
   participantId, eligible: null, examExempt: false, testScore: null, assignmentScore: null,
@@ -66,7 +66,7 @@ export class ExamGradebookService {
     const tracking = this.workflow ? await this.tracking(courseOfferings.map(offering => typeof offering.get === 'function' ? offering.get({ plain: true }) : offering)) : new Map();
     return { groups, courseOfferings: courseOfferings.map(offering => {
       const value = typeof offering.get === "function" ? offering.get({ plain: true }) : offering;
-      return { ...value, examGradesComplete: tracking.get(value.id)?.examGradesComplete === true, groupLinks: value.groupLinks.map((link: any) => ({ ...link,
+      return { ...value, gradebookCompletionStatus: tracking.get(value.id)?.gradebookCompletionStatus || 'incomplete', examGradesComplete: tracking.get(value.id)?.examGradesComplete === true, groupLinks: value.groupLinks.map((link: any) => ({ ...link,
         subject: byId.has(link.classGroupId) ? examSubjectForGroup(byId.get(link.classGroupId), value.subject) : value.subject,
       })) };
     }) };
@@ -112,6 +112,7 @@ export class ExamGradebookService {
         }
       }
       result.set(state.id, { componentsEntered, componentsApproved: approved, examCompleted, examGradesComplete,
+        gradebookCompletionStatus: gradebookCompletionStatus(state, examGradesComplete),
         legacy: state.mode === 'legacy_preserved', candidateCount: candidates.length,
         completedTeachingAt: state.completedTeachingAt, componentScoreApprovedAt: approved ? state.componentScoreApprovedAt : null,
         examCompletedAt: examCompleted ? state.examCompletedAt : null });
@@ -162,12 +163,20 @@ export class ExamGradebookService {
     const state=this.workflow?await this.workflow.state(offering.id,transaction):null;
     if(state?.mode==='new'&&state.eligibility_status==='approved'){
       const all=await this.workflow!.approvedRows(offering.id,state,transaction);
+      const assigned = await this.workflow!.query(`SELECT DISTINCT c.participant_id FROM course_exam_sessions es
+        JOIN course_exam_session_candidates c ON c.session_id=es.id
+        WHERE es.course_offering_id=:id AND es.eligibility_snapshot_id=:snapshot AND es.status IN ('scheduled','held')`,
+        {id:offering.id,snapshot:state.eligibility_snapshot_id},transaction);
+      const assignedIds = new Set(assigned.map(row=>row.participant_id));
+      const candidates = all.filter((row:any)=>row.eligible===true&&!row.examExempt);
+      const examScheduling = {candidateCount:candidates.length,remainingCount:candidates.filter((row:any)=>!assignedIds.has(row.participantId)).length};
+      const examGradesComplete = candidates.length > 0 && !unresolvedExamRows(all).length;
       const scoped=query.rosterScope==='offering'?all:all.filter((r:any)=>r.classGroupId===group.id);
       const search=(query.search||'').trim().toLocaleLowerCase('vi');
       const rows=scoped.filter((r:any)=>(query.mode!=='exam'||(r.eligible===true&&!r.examExempt))&&(!search||`${r.code} ${r.fullName}`.toLocaleLowerCase('vi').includes(search)));
       const pageSize=Math.min(15,Math.max(1,query.pageSize||15)),page=Math.min(query.page||1,Math.max(1,Math.ceil(rows.length/pageSize)));
       return {group:{id:group.id,name:group.name,code:group.code,academicYear:group.academicYear},
-        offering:{...(typeof offering.get==='function'?offering.get({plain:true}):offering),examGradesComplete:all.some((row:any)=>row.eligible===true&&!row.examExempt)&&!unresolvedExamRows(all).length},workflow:this.workflow!.publicState(state),
+        offering:{...(typeof offering.get==='function'?offering.get({plain:true}):offering),examScheduling,examGradesComplete,gradebookCompletionStatus:gradebookCompletionStatus(state,examGradesComplete)},workflow:this.workflow!.publicState(state),
         revision:await this.workflow!.revision(offering.id,transaction),total:rows.length,totalRows:scoped.length,unassessedRows:0,page,pageSize,
         eligibilityPolicy:all[0]?.eligibilityPolicy||LEGACY_GRADING_POLICY,rows:rows.slice((page-1)*pageSize,page*pageSize)};
     }
@@ -234,8 +243,8 @@ export class ExamGradebookService {
             OR jsonb_typeof(grade->'assignmentScore') IS DISTINCT FROM 'number' THEN NULL
           WHEN (grade->>'testScore')::numeric NOT BETWEEN 0 AND 10
             OR (grade->>'assignmentScore')::numeric NOT BETWEEN 0 AND 10 THEN NULL
-          ELSE ROUND((grade->>'testScore')::numeric, 1) >= (policy->'minimums'->>'testScore')::numeric
-            AND ROUND((grade->>'assignmentScore')::numeric, 1) >= (policy->'minimums'->>'assignmentScore')::numeric
+          ELSE (grade->>'testScore')::numeric >= (policy->'minimums'->>'testScore')::numeric
+            AND (grade->>'assignmentScore')::numeric >= (policy->'minimums'->>'assignmentScore')::numeric
         END AS eligibility FROM roster
       ), filtered AS (
         SELECT * FROM assessed
@@ -268,7 +277,7 @@ export class ExamGradebookService {
     } });
     return {
       group: { id: group.id, name: group.name, code: group.code, academicYear: group.academicYear },
-      offering: { ...(typeof offering.get === 'function' ? offering.get({ plain: true }) : offering), ...(state?.mode === 'new' ? { examGradesComplete: false } : {}) },
+      offering: { ...(typeof offering.get === 'function' ? offering.get({ plain: true }) : offering), ...(state?.mode === 'new' ? { examGradesComplete: false, gradebookCompletionStatus: 'incomplete' } : {}) },
       workflow: state?this.workflow!.publicState(state):{ status: offering.gradebookStatus || "draft", version: offering.gradebookVersion || 0 },
       revision: result.revision, total: state?.mode==='new'&&query.mode==='exam'?0:result.total, totalRows: result.totalRows, unassessedRows: result.unassessedRows, page: result.page, pageSize,
       eligibilityPolicy: currentPolicy,
@@ -344,7 +353,11 @@ export class ExamGradebookService {
     if (!previous && ((row.policyVersion ?? 0) !== currentPolicy.version || (row.policyRulesVersion ?? 0) !== (currentPolicy.rulesVersion ?? 0))) {
       throw new ConflictException("Cách tính điểm của môn đã thay đổi trong lúc nhập. Hãy tải lại cấu hình trước khi lưu; điểm vừa nhập chưa bị lưu hoặc thay đổi.");
     }
-    const scores = { testScore: roundExamScore(row.testScore), assignmentScore: roundExamScore(row.assignmentScore), examScore: roundExamScore(row.examScore) };
+    const scores = {
+      testScore: row.testScore ?? null,
+      assignmentScore: row.assignmentScore ?? null,
+      examScore: row.examScore ?? null,
+    };
     const { policyVersion: _policyVersion, policyRulesVersion: _rulesVersion, ...values } = row;
     return { ...emptyExamGrade(row.participantId), ...values, ...scores,
       eligible: calculateExamEligibility({ ...row, ...scores }, currentPolicy),

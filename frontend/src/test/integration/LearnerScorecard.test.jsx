@@ -103,6 +103,27 @@ it("maps old ineligible profile grades to zeros and F without replacing prerequi
   expect(within(screen.getByText("HP04").closest("tr")).getByText("Chưa có kết quả")).toBeInTheDocument();
 });
 
+it.each([false, true])('maps a confirmed disqualification into the personal scorecard without inventing marks (finalized: %s)', async finalized => {
+  axios.get.mockResolvedValue({ data: { ...scorecard(), subjects: [
+    { ...subjects[0], grade: { score: null, result: 'pending', details: { source: 'gradebook', workflowPhase: 'final',
+      eligibilityFrozen: true, eligible: false, testScore: 3.9, assignmentScore: 5, examScore: null, finalized } } }, subjects[3],
+  ] } });
+  render(<LearnerScorecard admissionRecordId='ar1' classGroupId='g1'/>);
+  const cells = within((await screen.findByText('HP01')).closest('tr')).getAllByRole('cell').map(cell=>cell.textContent);
+  expect(cells.slice(5)).toEqual(['3.9', '5', '', '', '', '', '', 'Không đạt']);
+  expect(screen.getByText('1/2 học phần có kết quả')).toBeInTheDocument();
+});
+
+it('keeps an unapproved eligibility preview pending in the personal scorecard', async () => {
+  axios.get.mockResolvedValue({ data: { ...scorecard(), subjects: [
+    { ...subjects[0], grade: { score: null, result: 'pending', details: { source: 'gradebook', workflowPhase: 'components',
+      eligibilityFrozen: false, eligible: false, testScore: 3.9, assignmentScore: 5 } } },
+  ] } });
+  render(<LearnerScorecard admissionRecordId='ar1' classGroupId='g1'/>);
+  const cells = within((await screen.findByText('HP01')).closest('tr')).getAllByRole('cell').map(cell=>cell.textContent);
+  expect(cells.slice(5)).toEqual(['3.9', '5', '', '', '', '', '', 'Chưa có kết quả']);
+});
+
 it("counts a profile language exemption as a passed course without making up numerical grades", async () => {
   axios.get.mockResolvedValue({ data: { ...scorecard(), subjects: [{ ...subjects[1], grade: {
     score: null, result: "passed", profileForeignLanguageExempt: true,

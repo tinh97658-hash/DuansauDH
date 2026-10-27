@@ -39,6 +39,12 @@ const inputSx = {
   "& input": { px: 0.75, py: 0.5, textAlign: "center" },
 };
 const modes = { all: "Cả bảng điểm", exam: "DS thi" };
+const completionGroups = {
+  incomplete: { label: 'CẦN HOÀN THIỆN', order: 0 },
+  needs_lock: { label: 'CẦN KHÓA ĐIỂM', order: 1 },
+  completed: { label: 'ĐÃ HOÀN TẤT', order: 2 },
+};
+const completionOf = offering => completionGroups[offering.gradebookCompletionStatus] ? offering.gradebookCompletionStatus : 'incomplete';
 const PAGE_SIZE = 15;
 const EXAM_WARNING_ID = "exam-missing-component-scores";
 const EXAM_WARNING_CONTAINER = "exam-gradebook-warnings";
@@ -121,8 +127,11 @@ export default function ExamLists() {
   const canApproveGrades = can("gradebook.approve");
   const canEditPolicy = can("gradebook.policy");
   const refreshOfferingCompletion = offering => {
-    if (typeof offering?.examGradesComplete !== 'boolean') return;
-    setSubjects(previous => previous.map(item => item.id === offering.id ? { ...item, examGradesComplete: offering.examGradesComplete } : item));
+    if (!offering) return;
+    setSubjects(previous => previous.map(item => item.id === offering.id ? { ...item,
+      ...(typeof offering.examGradesComplete === 'boolean' ? { examGradesComplete: offering.examGradesComplete } : {}),
+      ...(offering.gradebookCompletionStatus ? { gradebookCompletionStatus: offering.gradebookCompletionStatus } : {}),
+    } : item));
   };
   const dirtyCount = Object.keys(dirty).length;
 
@@ -156,7 +165,7 @@ export default function ExamLists() {
     } })
       .then(({ data }) => { if (active) {
         setWorkflow(data.workflow || { status: "draft", version: 0 });
-        if (data.offering) setLoadedOffering({ id: offeringId, status: data.offering.status });
+        if (data.offering) setLoadedOffering({ id: offeringId, status: data.offering.status, examScheduling: data.offering.examScheduling });
         refreshOfferingCompletion(data.offering);
         const refreshedDirty = { ...dirtyRef.current };
         setRows(data.rows.map(row => {
@@ -205,7 +214,7 @@ export default function ExamLists() {
   const visibleClasses = classChoices.filter(({ group }) => (!majorId || group.majorId === majorId)
     && (!yearFilter || group.academicYear === yearFilter));
   const offeringChoices = [...new Map(visibleClasses.map(entry => [entry.offering.id, entry])).values()]
-    .sort((a, b) => Number(a.offering.examGradesComplete === true) - Number(b.offering.examGradesComplete === true));
+    .sort((a, b) => completionGroups[completionOf(a.offering)].order - completionGroups[completionOf(b.offering)].order);
   const selectedEntry = classChoices.find(entry => entry.key === `${groupId}:${offeringId}`);
   const year = selectedEntry?.group.academicYear || "";
   const teachingCompleted = (loadedOffering?.id === offeringId ? loadedOffering.status : selectedEntry?.offering.status) === "completed";
@@ -254,19 +263,27 @@ export default function ExamLists() {
     if (rows.find(row => row.participantId === id)?.profileForeignLanguageExempt || rows.find(row => row.participantId === id)?.studyLeaveFailure) return;
     if(('testScore' in patch||'assignmentScore' in patch||'examExempt' in patch)&&!componentEditable)return;
     if('examScore' in patch&&(!resultEditable||!rows.find(row=>row.participantId===id)?.examScoreEditable))return;
-    const apply = row => ["testScore", "assignmentScore", "examScore", "examExempt"].some(key => key in patch) ? updateGradeDraft({ ...row, ...patch }) : { ...row, ...patch };
+    const apply = row => ["testScore", "assignmentScore", "examScore", "examExempt"].some(key => key in patch) ? updateGradeDraft(row, patch) : { ...row, ...patch };
     setRows((current) => current.map((row) => row.participantId === id ? apply(row) : row));
     const row = dirty[id] || rows.find(item => item.participantId === id);
     setDirty((current) => ({ ...current, [id]: apply(row) })); setSuccess("");
   };
+  const formatInput = (id, key) => {
+    const format = row => ({ ...row, [key]: formatScore(row[key]) });
+    setRows(current => current.map(row => row.participantId === id ? format(row) : row));
+    setDirty(current => current[id] ? { ...current, [id]: format(current[id]) } : current);
+  };
   const runWorkflow = async () => {
-    setSaving(true); setError("");
+    setSaving(true); setError(""); setSuccess("");
     try {
       await axios.post(`${API_BASE_URL}/masters/exam-lists/${workflowPhase}/workflow`, { classGroupId: groupId, courseOfferingId: offeringId,
         rosterScope: "offering", revision, version: workflow[workflowPhase==='final'?'final':'eligibility'].version, action: workflowAction, note: workflowNote });
       setWorkflowAction(""); setWorkflowNote(""); setPolicyRevision(value => value + 1);
       notifyGradebookSaved();
-    } catch (failure) { setError(errorMessage(failure, "Không thể xử lý bảng điểm.")); }
+    } catch (failure) {
+      if (workflowPhase === 'eligibility' && workflowAction === 'submit') setWorkflowAction("");
+      setError(errorMessage(failure, "Không thể xử lý bảng điểm."));
+    }
     finally { setSaving(false); }
   };
   const loadHistory = async () => {
@@ -373,10 +390,10 @@ export default function ExamLists() {
             onChange={(event) => { const value = event.target.value; requestChange(() => selectClass(offeringChoices.find(entry => entry.offering.id === value))); }}>
             {!offeringChoices.length && <MenuItem value="">Chưa có lớp học phần</MenuItem>}
             {offeringChoices.flatMap((entry, index) => [
-              ...(index === 0 || Boolean(offeringChoices[index - 1].offering.examGradesComplete) !== Boolean(entry.offering.examGradesComplete)
-                ? [<OfferingGroupHeader key={`heading-${entry.offering.id}`}>{entry.offering.examGradesComplete ? 'ĐÃ HOÀN TẤT' : 'CẦN HOÀN THIỆN'}</OfferingGroupHeader>] : []),
-              <MenuItem key={entry.offering.id} value={entry.offering.id} className={entry.offering.examGradesComplete ? 'exam-offering-completed' : ''}
-                sx={entry.offering.examGradesComplete ? { color: '#8796a5', '&.Mui-selected': { color: '#526a82', bgcolor: '#edf3f8' } } : undefined}>{offeringLabel(entry)}</MenuItem>,
+              ...(index === 0 || completionOf(offeringChoices[index - 1].offering) !== completionOf(entry.offering)
+                ? [<OfferingGroupHeader key={`heading-${entry.offering.id}`}>{completionGroups[completionOf(entry.offering)].label}</OfferingGroupHeader>] : []),
+              <MenuItem key={entry.offering.id} value={entry.offering.id} className={completionOf(entry.offering)==='completed' ? 'exam-offering-completed' : ''}
+                sx={completionOf(entry.offering)==='completed' ? { color: '#8796a5', '&.Mui-selected': { color: '#526a82', bgcolor: '#edf3f8' } } : completionOf(entry.offering)==='needs_lock' ? { color: '#9a5b00' } : undefined}>{offeringLabel(entry)}</MenuItem>,
             ])}
           </FilterSelectField>
           <FilterSelectField label="Môn" value={subjectKey(selectedEntry?.subject)} disabled sx={{ flex: "0 1 220px", minWidth: 180 }}>
@@ -387,6 +404,7 @@ export default function ExamLists() {
       </Paper>
 
       <div className="exam-workspace-controls exam-no-print">
+      {newWorkflow&&selectedEntry?.offering.gradebookCompletionStatus==='needs_lock'&&workflow.final.status!=='approved'&&<Alert severity="warning">{workflow.final.status==='submitted'?'Đã lưu đủ điểm thi hết môn. Kết quả đang chờ duyệt để khóa điểm.':'Đã lưu đủ điểm thi hết môn. Cần gửi duyệt và duyệt kết quả để khóa điểm.'}</Alert>}
       {legacyWorkflow&&<Alert severity="info">Bảng điểm cũ được bảo toàn, chỉ xem trong quy trình mới. Cần rà soát trước khi chuyển đổi; không tự suy diễn danh sách thi hoặc ca thi đã diễn ra.</Alert>}
       {newWorkflow&&mode==='exam'&&workflow.eligibility.status!=='approved'&&<Alert severity="info">DS thi chỉ hiển thị sau khi duyệt tư cách thi. Tư cách dự kiến chưa phải danh sách được phép xếp thi.</Alert>}
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} flexWrap="wrap" className="exam-workflow-toolbar">
@@ -395,10 +413,10 @@ export default function ExamLists() {
         {newWorkflow&&workflow.eligibility.status!=='approved'&&<Typography variant="caption">Chưa đến giai đoạn nhập điểm thi.</Typography>}
         {newWorkflow&&canSubmitGrades&&componentEditable&&<Button disabled={busy||saving||dirtyCount>0||!teachingCompleted||!offeringId} onClick={()=>beginWorkflow('eligibility','submit')}>Gửi duyệt tư cách</Button>}
         {newWorkflow&&canApproveGrades&&workflow.eligibility.status==='submitted'&&<Button disabled={busy||saving||dirtyCount>0} onClick={()=>beginWorkflow('eligibility','approve')}>Duyệt tư cách</Button>}
-        {newWorkflow&&canApproveGrades&&workflow.eligibility.status!=='draft'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','reopen')}>Mở lại tư cách</Button>}
+        {newWorkflow&&canApproveGrades&&workflow.eligibility.canReopen&&workflow.final.status!=='approved'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','reopen')}>Mở lại tư cách</Button>}
         {newWorkflow&&workflow.eligibility.status==='approved'&&<>
           <Chip label={{not_available:'Chờ ca thi diễn ra',draft:'Kết quả nháp',submitted:'Kết quả chờ duyệt',approved:'Kết quả đã duyệt'}[workflow.final.status]} />
-          {can('gradebook.view')&&<Button component={Link} to={`/masters/exam-schedule?offeringId=${offeringId}`}>Xếp lịch thi</Button>}
+          {can('gradebook.view')&&workflow.final.status!=='approved'&&loadedOffering?.id===offeringId&&loadedOffering.examScheduling?.candidateCount>0&&<Button component={Link} to={`/masters/exam-schedule?offeringId=${offeringId}`}>{loadedOffering.examScheduling.remainingCount>0?'Xếp lịch thi':'Xem lịch thi'}</Button>}
           {canSubmitGrades&&workflow.final.status==='draft'&&<Button disabled={busy||saving||dirtyCount>0} onClick={()=>beginWorkflow('final','submit')}>Gửi duyệt kết quả</Button>}
           {canApproveGrades&&workflow.final.status==='submitted'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('final','approve')}>Duyệt kết quả</Button>}
           {canApproveGrades&&['submitted','approved'].includes(workflow.final.status)&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('final','reopen')}>Mở lại kết quả</Button>}
@@ -450,7 +468,7 @@ export default function ExamLists() {
                   const disabled = rowLocked || (['testScore','assignmentScore'].includes(key)?!componentEditable:key==='examScore'?!resultEditable||!row.examScoreEditable:true);
                   const cellClass = key === 'examScore' ? (disabled ? 'exam-derived-cell exam-score-locked' : 'exam-editable-cell') : calculatedColumns.has(key) ? 'exam-derived-cell' : undefined;
                   return <TableCell key={key} align="center" className={cellClass}>
-                  <TextField fullWidth size="small" value={blank ? "" : row[key]} disabled={disabled} InputProps={{ readOnly: ["courseScore", "grade4"].includes(key) }} error={!blank && numericScore(row[key]) !== null && (!Number.isFinite(numericScore(row[key])) || numericScore(row[key]) < 0 || numericScore(row[key]) > max)} onChange={["courseScore", "grade4"].includes(key) ? undefined : (event) => { const value = event.target.value; const score = numericScore(value); if (value === "" || (/^\d*(?:[.,]\d*)?$/.test(value) && Number.isFinite(score) && score >= 0 && score <= max)) edit(row.participantId, { [key]: value }); }} onBlur={calculatedColumns.has(key) ? undefined : (event) => { const value = formatScore(event.target.value, max); if (value !== row[key]) edit(row.participantId, { [key]: value }); }} inputProps={{ "aria-label": `${label} ${row.code}`, inputMode: "decimal" }} sx={inputSx} />
+                  <TextField fullWidth size="small" value={blank ? "" : row[key]} disabled={disabled} InputProps={{ readOnly: ["courseScore", "grade4"].includes(key) }} error={!blank && numericScore(row[key]) !== null && (!Number.isFinite(numericScore(row[key])) || numericScore(row[key]) < 0 || numericScore(row[key]) > max)} onChange={["courseScore", "grade4"].includes(key) ? undefined : (event) => { const value = event.target.value; const score = numericScore(value); if (value === "" || (/^\d*(?:[.,]\d*)?$/.test(value) && Number.isFinite(score) && score >= 0 && score <= max)) edit(row.participantId, { [key]: value }); }} onBlur={calculatedColumns.has(key) ? undefined : () => formatInput(row.participantId, key)} inputProps={{ "aria-label": `${label} ${row.code}`, inputMode: "decimal" }} sx={inputSx} />
                 </TableCell>;
                 })}
                 <TableCell className="exam-derived-cell"><TextField fullWidth size="small" value={blank ? "" : row.letterGrade} disabled={rowLocked || (row.eligible === false && !row.examExempt)} InputProps={{ readOnly: true }} inputProps={{ "aria-label": `Thang điểm chữ ${row.code}`, maxLength: 10 }} sx={inputSx} /></TableCell>
@@ -477,7 +495,7 @@ export default function ExamLists() {
         </Box>}
       </Paper>
       <details className="exam-rules-disclosure exam-no-print"><summary>Quy tắc tính điểm và tư cách thi</summary>
-      <Typography sx={{ color: "#607486", fontSize: 11.5 }}>Tư cách dự kiến dùng điểm thành phần và cấu hình hiện hành. Sau khi duyệt, DS thi và điểm thành phần được lưu cố định. Chưa đến giai đoạn nhập điểm thi khi chưa có ca thi được xác nhận Đã diễn ra. Không đủ tư cách thi được giữ nguyên quyết định, không tự chuyển thành 0/F. Kết quả cuối được gửi duyệt và mở lại riêng. Các ô nền xanh xám được tính tự động. Nháy đúp mép tiêu đề để tự căn độ rộng cột.</Typography>
+      <Typography sx={{ color: "#607486", fontSize: 11.5 }}>Tư cách dự kiến dùng điểm thành phần và cấu hình hiện hành. Điều kiện đạt so sánh điểm gốc của các thành phần và điểm học phần trước khi làm tròn với ngưỡng trong Cài đặt điểm số. Điểm hiển thị và quy đổi vẫn làm tròn như cũ. Sau khi duyệt, DS thi và điểm thành phần được lưu cố định. Chưa đến giai đoạn nhập điểm thi khi chưa có ca thi được xác nhận Đã diễn ra. Không đủ tư cách thi được giữ nguyên quyết định, không tự chuyển thành 0/F. Kết quả cuối được gửi duyệt và mở lại riêng. Các ô nền xanh xám được tính tự động. Nháy đúp mép tiêu đề để tự căn độ rộng cột.</Typography>
       </details>
       {dirtyCount > 0 && !blank && <Alert severity="warning" sx={{ mt: 1 }} className="exam-no-print">Bạn có điểm chưa lưu. Bảng điểm Excel và PDF sử dụng các điểm vừa nhập.</Alert>}
       {settingsOpen && <GradeSettingsDialog canEdit={canEditPolicy} initialMajorId={majorId} initialYear={year} groups={groups} onClose={() => setSettingsOpen(false)} />}

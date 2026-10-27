@@ -94,6 +94,12 @@ npm run db:seed:common
 
 ## Cấu hình môi trường
 
+### Thống kê tiến độ lớp chính và học lại (migration 076)
+
+Chạy `npm --prefix backend run db:migrate` rồi khởi động lại backend khi cập nhật chức năng này.
+Migration 076 lưu vai trò lớp chính/học lại theo từng lớp hành chính tham gia; lớp chính đã chốt danh sách không bị coi là lớp học lại chỉ vì có danh sách học viên cố định.
+Thống kê lấy lịch học của lớp chính, giữ cảnh báo vàng khi thiếu điểm và cảnh báo cam cho học viên đang học lại hoặc chưa được bố trí học lại. Bấm trạng thái để chọn lớp học phần liên quan; kết quả học lại được xét riêng theo học viên của từng lớp hành chính.
+
 ### Cập nhật vòng đời học viên (migration 061)
 
 Sao lưu database trước khi cập nhật, chạy từ thư mục gốc:

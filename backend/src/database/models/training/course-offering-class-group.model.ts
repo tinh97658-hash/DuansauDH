@@ -10,6 +10,10 @@ export class CourseOfferingClassGroup extends Model {
   @BelongsTo(() => CourseOffering, { foreignKey: "courseOfferingId", as: "courseOffering" })
   declare courseOffering: any;
 
+  // A merged offering may be primary for one group and a retake for another.
+  @Default("primary") @Column({ type: DataType.STRING(12), allowNull: false })
+  declare studyRole: "primary" | "retake";
+
   @ForeignKey(() => ClassGroup) @Column({ type: DataType.UUID, allowNull: false }) declare classGroupId: string;
   @BelongsTo(() => ClassGroup, { foreignKey: "classGroupId", as: "classGroup" }) declare classGroup: ClassGroup;
 

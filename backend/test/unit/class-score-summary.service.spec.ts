@@ -69,6 +69,19 @@ const buildScorecard = () => {
   return { service, sequelize, student, groups };
 };
 
+it.each([false, true])('maps a saved disqualification into class and personal reports without invented marks (finalized: %s)', async finalized => {
+  const { service, sequelize } = build();
+  const details = { source: 'gradebook', workflowPhase: 'final', eligibilityFrozen: true, eligible: false,
+    testScore: 3.9, assignmentScore: 5, examScore: null, courseScore: null, result: 'pending', finalized };
+  sequelize.query.mockReset()
+    .mockResolvedValueOnce([{ id: 'hp1', name: 'Triết học', credits: 3 }])
+    .mockResolvedValueOnce([{ total: 1, page: 1, rows: [{ participantId: 'student:one' }] }])
+    .mockResolvedValueOnce([{ participantId: 'student:one', subjectId: 'hp1', score: null, result: 'pending', details }]);
+  const data = await service.get({ classGroupId: 'g1' }, false, { includeDetails: true });
+  expect(data.rows[0].scores.hp1).toMatchObject({ score: null, result: 'failed', eligibilityFrozen: true,
+    details: { examScore: null, courseScore: null, grade4: null, letterGrade: '', result: 'failed' } });
+});
+
 it("opens the requested member class and scopes the scorecard to one learner", async () => {
   const { service, student, groups } = buildScorecard();
   const get = jest.spyOn(service, "get").mockResolvedValue({

@@ -39,6 +39,38 @@ it("keeps policy information visible but disables writes without policy access",
   expect(axios.put).not.toHaveBeenCalled();
 });
 
+it("compares original sample marks to every configured minimum while rounding only the result display", async () => {
+  render(<GradeSettingsDialog initialMajorId="m1" initialYear="2026" onClose={jest.fn()} />);
+  await screen.findByText("Triết học");
+  fireEvent.click(screen.getByRole("button", { name: "Điều kiện đạt" }));
+  const change = (label, value) => fireEvent.change(screen.getByLabelText(label), { target: { value: String(value) } });
+  change("Điểm mẫu điểm kiểm tra", 4);
+  change("Điểm mẫu điểm btl/tl/kt", 4);
+  change("Điểm mẫu điểm thi hết môn", 4);
+  change("Điểm mẫu học phần (thang 10)", 5.49);
+  expect(screen.getByRole("status")).toHaveTextContent("Thang 10: 5.5");
+  expect(screen.getByRole("status")).toHaveTextContent("Không đạt");
+  change("Điểm mẫu học phần (thang 10)", 5.5);
+  expect(screen.getByRole("status")).not.toHaveTextContent("Không đạt");
+  for (const label of ["Điểm mẫu điểm kiểm tra", "Điểm mẫu điểm btl/tl/kt", "Điểm mẫu điểm thi hết môn"]) {
+    change(label, 3.99);
+    expect(screen.getByRole("status")).toHaveTextContent("Không đạt");
+    change(label, 4);
+    expect(screen.getByRole("status")).not.toHaveTextContent("Không đạt");
+  }
+  change("Điểm thi hết môn tối thiểu", 6);
+  change("Điểm mẫu điểm thi hết môn", 5.99);
+  expect(screen.getByRole("status")).toHaveTextContent("Không đạt");
+  change("Điểm mẫu điểm thi hết môn", 6);
+  expect(screen.getByRole("status")).not.toHaveTextContent("Không đạt");
+  change("Điểm học phần tối thiểu để đạt", 6.5);
+  change("Điểm mẫu học phần (thang 10)", 6.49);
+  expect(screen.getByRole("status")).toHaveTextContent("Thang 10: 6.5");
+  expect(screen.getByRole("status")).toHaveTextContent("Không đạt");
+  change("Điểm mẫu học phần (thang 10)", 6.5);
+  expect(screen.getByRole("status")).not.toHaveTextContent("Không đạt");
+});
+
 it("edits independent percentages from 0 to 100 and formats them when leaving the cell", async () => {
   render(<GradeSettingsDialog initialMajorId="m1" initialYear="2026" onClose={jest.fn()} />);
   const test = await screen.findByLabelText("Tỷ trọng điểm kiểm tra TH01");

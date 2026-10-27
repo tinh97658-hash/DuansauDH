@@ -16,7 +16,7 @@ export const scoreSummaryColumns = (subjects) => [
   })),
 ];
 
-export const scoreSummaryValue = (entry) => entry?.studyLeaveFailure ? "Không đạt" : entry?.profileForeignLanguageExempt || entry?.result === "exempt" ? "MT" : entry?.score == null ? "" : entry.score;
+export const scoreSummaryValue = (entry) => entry?.studyLeaveFailure ? "Không đạt" : entry?.profileForeignLanguageExempt || entry?.result === "exempt" ? "MT" : entry?.score == null ? entry?.result === "failed" ? "Không đạt" : "" : entry.score;
 
 const TABLE_HEADER_ROW = 10;
 const reportFont = (size = 11, extra = {}) => ({ name: "Times New Roman", size, color: { argb: "FF000000" }, ...extra });

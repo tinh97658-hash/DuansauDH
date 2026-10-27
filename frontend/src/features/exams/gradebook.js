@@ -1,6 +1,6 @@
 import { formatDate } from "../../utils/dateFormat";
 import { personNameParts } from "../../utils/personName";
-import { calculateExamEligibility, calculatePolicyGrade, DEFAULT_GRADING_POLICY } from "./gradingPolicy";
+import { calculateExamEligibility, calculatePolicyGrade, componentScore, DEFAULT_GRADING_POLICY } from "./gradingPolicy";
 
 export const isExamCandidate = row => (row.eligibilityFrozen?row.eligible:calculateExamEligibility(row)) === true && !row.examExempt;
 
@@ -16,26 +16,39 @@ export const formatScore = (value, max = 10) => {
   if (score === null) return "";
   return Number.isFinite(score) && score >= 0 && score <= max ? roundScore(score).toFixed(1) : String(value);
 };
+const COMPONENT_KEYS = ["testScore", "assignmentScore", "examScore"];
+const rawComponentScores = row => Object.fromEntries(COMPONENT_KEYS.map(key => {
+  const value = componentScore(row, key);
+  return [key, Number.isNaN(value) ? null : value];
+}));
+const formatFieldScore = (row, key, max) => formatScore(row[key], max);
 export const formatAttemptScores = value => {
   const scores = Array.isArray(value) ? value : String(value ?? "").trim() ? String(value).split(/[;,]/) : [];
   return scores.map(score => formatScore(score)).filter(Boolean).join(", ");
 };
 export const calculateGrade = (row) => {
-  if(row.workflowPhase==='components'||(row.eligibilityFrozen&&row.eligible===false))return {courseScore:null,grade4:null,letterGrade:'',result:row.studyLeaveFailure?'failed':row.profileForeignLanguageExempt?'passed':row.examExempt?'exempt':'pending'};
+  const ineligible = row.eligibilityFrozen && row.eligible === false && !row.examExempt && !row.profileForeignLanguageExempt;
+  if (row.finalized) return { courseScore: numericScore(row.courseScore), grade4: numericScore(row.grade4),
+    letterGrade: row.letterGrade || "", result: ineligible && (!row.result || row.result === 'pending') ? 'failed' : row.result || "pending" };
+  if(row.workflowPhase==='components'||(row.eligibilityFrozen&&row.eligible===false))return {courseScore:null,grade4:null,letterGrade:'',result:row.studyLeaveFailure?'failed':row.profileForeignLanguageExempt?'passed':row.examExempt?'exempt':ineligible?'failed':'pending'};
   return calculatePolicyGrade(row, row.gradingPolicy || DEFAULT_GRADING_POLICY);
 };
-export const updateGradeDraft = (row) => {
-  const grade = calculateGrade(row);
-  const eligible = row.eligibilityFrozen?row.eligible:calculateExamEligibility(row);
-  return { ...row, ...grade, eligible, attemptScores: !row.workflowPhase && !row.studyLeaveFailure && !row.examExempt && eligible === false ? "0.0" : formatScore(row.examScore), courseScore: formatScore(grade.courseScore), grade4: formatScore(grade.grade4, 4) };
+export const updateGradeDraft = (row, patch = {}) => {
+  const rawScores = rawComponentScores(row);
+  for (const key of COMPONENT_KEYS) if (Object.prototype.hasOwnProperty.call(patch, key)) rawScores[key] = numericScore(patch[key]);
+  const draft = { ...row, ...patch, rawScores };
+  const grade = calculateGrade(draft);
+  const eligible = draft.eligibilityFrozen?draft.eligible:calculateExamEligibility(draft);
+  return { ...draft, ...grade, eligible, attemptScores: !draft.workflowPhase && !draft.studyLeaveFailure && !draft.examExempt && eligible === false ? "0.0" : formatScore(draft.examScore), courseScore: formatScore(grade.courseScore), grade4: formatScore(grade.grade4, 4) };
 };
 export const attemptScores = (value) => String(value ?? "").trim() === "" ? [] : String(value).split(";").map(numericScore);
 export const draftOf = (row) => {
-  if(row.workflowPhase)return updateGradeDraft({...row,...Object.fromEntries(SCORE_FIELDS.map(([key,,max])=>[key,formatScore(row[key],max)])),notes:row.notes||''});
-  const eligible = calculateExamEligibility(row);
+  const rawScores = rawComponentScores(row);
+  if(row.workflowPhase)return updateGradeDraft({...row,rawScores,...Object.fromEntries(SCORE_FIELDS.map(([key,,max])=>[key,formatFieldScore(row,key,max)])),notes:row.notes||''});
+  const eligible = calculateExamEligibility({ ...row, rawScores });
   const draft = {
-    ...row, eligible, result: !row.examExempt && eligible === false ? "failed" : row.result,
-    ...Object.fromEntries(SCORE_FIELDS.map(([key, , max]) => [key, formatScore(row[key], max)])),
+    ...row, rawScores, eligible, result: !row.examExempt && eligible === false ? "failed" : row.result,
+    ...Object.fromEntries(SCORE_FIELDS.map(([key, , max]) => [key, formatFieldScore(row, key, max)])),
     letterGrade: row.letterGrade || "", attemptScores: formatScore(row.examScore), notes: row.notes || "",
   };
   return !row.examExempt && eligible === false ? updateGradeDraft(draft) : draft;
@@ -52,7 +65,7 @@ export const rowError = (row) => {
   return "";
 };
 export const gradePayload = (row) => {
-  const scores = Object.fromEntries(SCORE_FIELDS.map(([key, , max]) => [key, numericScore(formatScore(row[key], max))]));
+  const scores = { ...Object.fromEntries(SCORE_FIELDS.map(([key, , max]) => [key, numericScore(formatFieldScore(row, key, max))])), ...rawComponentScores(row) };
   return {
     participantId: row.participantId, eligible: row.eligibilityFrozen?row.eligible:calculateExamEligibility({ ...row, ...scores }), examExempt: row.examExempt,
     ...((row.workflowPhase==='components'?row.eligibilityPolicy:row.gradingPolicy) ? { policyVersion: (row.workflowPhase==='components'?row.eligibilityPolicy:row.gradingPolicy).version } : {}),
@@ -91,7 +104,7 @@ export const gradebookRowValues = (row, index, blank = false) => {
   const name = personNameParts(row);
   return [index + 1, row.code || "—", name.familyAndMiddle, name.givenName, displayGradeDate(row.dob), row.gender || "—",
     row.eligible == null ? "Chưa xét" : row.eligible ? "Đủ tư cách" : "Không đủ tư cách", row.examExempt ? "Có" : "Không",
-    ...(!blank ? [...SCORE_FIELDS.map(([key, , max]) => key === "examScore" && ineligible ? "0.0" : formatScore(row[key], max)), row.letterGrade, ineligible ? "0.0" : formatScore(row.examScore)] : []),
+    ...(!blank ? [...SCORE_FIELDS.map(([key, , max]) => key === "examScore" && ineligible ? "0.0" : formatFieldScore(row, key, max)), row.letterGrade, ineligible ? "0.0" : formatScore(row.examScore)] : []),
     ...(!blank ? [row.studyLeaveFailure ? "Không đạt" : RESULT_LABELS[row.result] || RESULT_LABELS.pending] : [row.notes || ""])];
 };
 export const gradebookCsv = (rows, blank = false) => {

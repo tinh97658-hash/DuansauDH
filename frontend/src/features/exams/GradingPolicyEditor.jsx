@@ -10,13 +10,14 @@ export default function GradingPolicyEditor({ subject, policy, mode, onApply, re
   const conversion = mode === "conversion";
   const invalid = policyError(draft);
   const numeric = numericPolicy(draft);
-  const roundedExample = Object.fromEntries(POLICY_COMPONENTS.map(([key]) => [key, example[key] === "" ? null : Math.round((Number(example[key]) + Number.EPSILON * 10) * 10) / 10]));
+  const rawExample = Object.fromEntries(POLICY_COMPONENTS.map(([key]) => [key, example[key] === "" ? null : Number(String(example[key]).replace(",", "."))]));
+  const rawSharedScore = example.courseScore === "" ? null : Number(String(example.courseScore).replace(",", "."));
   const sharedScore = example.courseScore === "" ? null : Math.round((Number(example.courseScore) + Number.EPSILON * 10) * 10) / 10;
   const band = numeric.bands.find(level => sharedScore >= level.minimum);
-  const sharedComplete = sharedScore !== null && Number.isFinite(sharedScore) && sharedScore >= 0 && sharedScore <= 10
-    && (conversion || POLICY_COMPONENTS.every(([key]) => roundedExample[key] !== null && Number.isFinite(roundedExample[key]) && roundedExample[key] >= 0 && roundedExample[key] <= 10));
+  const sharedComplete = rawSharedScore !== null && Number.isFinite(rawSharedScore) && rawSharedScore >= 0 && rawSharedScore <= 10
+    && (conversion || POLICY_COMPONENTS.every(([key]) => rawExample[key] !== null && Number.isFinite(rawExample[key]) && rawExample[key] >= 0 && rawExample[key] <= 10));
   const preview = invalid ? null : shared ? sharedComplete && band ? { courseScore: sharedScore, grade4: band.grade4, letterGrade: band.letter,
-    result: sharedScore >= numeric.courseMinimum && POLICY_COMPONENTS.every(([key]) => roundedExample[key] >= numeric.minimums[key]) ? "passed" : "failed" } : null : calculatePolicyGrade(roundedExample, numeric);
+    result: rawSharedScore >= numeric.courseMinimum && POLICY_COMPONENTS.every(([key]) => rawExample[key] >= numeric.minimums[key]) ? "passed" : "failed" } : null : calculatePolicyGrade(rawExample, numeric);
   const bands = draft.useDefaultBands ? DEFAULT_GRADING_POLICY.bands : draft.bands;
   const field = (label, value, change, max = 10, disabled = false, showLabel = true) => {
     const input = <TextField size="small" fullWidth type="number" value={value}
@@ -54,7 +55,7 @@ export default function GradingPolicyEditor({ subject, policy, mode, onApply, re
           </Box>)}
           {field("Điểm học phần tối thiểu để đạt", draft.courseMinimum, value => setDraft(current => ({ ...current, courseMinimum: value })))}
         </Box>
-        <Typography variant="body2">Đạt khi mọi thành phần có tỷ trọng lớn hơn 0 thỏa điểm tối thiểu và điểm học phần sau làm tròn thỏa ngưỡng đạt. Ngưỡng 0 không giới hạn thành phần đó.</Typography>
+        <Typography variant="body2">Đạt khi điểm gốc của mọi thành phần có tỷ trọng lớn hơn 0 và điểm học phần trước làm tròn bằng hoặc lớn hơn ngưỡng đã cài đặt. Làm tròn chỉ dùng để hiển thị và quy đổi thang điểm. Ngưỡng 0 không giới hạn thành phần đó.</Typography>
       </>}
       {invalid && <Alert severity="error">{invalid}</Alert>}
       <Box sx={{ p: 1.5, border: "1px solid var(--table-border-color, #D7E4EE)", borderRadius: "4px" }}>

@@ -113,6 +113,82 @@ it("removes the reminder on the next visit after the class grades have been save
   expect(screen.queryByRole("img", { name: "Hãy nhập điểm môn học" })).not.toBeInTheDocument();
 });
 
+const primaryProgress = { id: "primary", name: "Lớp chính 16 học viên", studyRole: "primary", status: "completed",
+  memberCount: 16, heldSessionCount: 2, plannedSessionCount: 2, needsGradeEntry: false };
+const retakeOffering = { id: "retake", name: "Lớp ghép học lại", studyRole: "retake", status: "in_progress",
+  memberCount: 2, heldSessionCount: 1, plannedSessionCount: 3, needsGradeEntry: false };
+function mockRetakeProgress(overrides = {}) {
+  const classes = makeClasses();
+  classes[0] = { ...classes[0], subjects: [{ ...baseSubjects[0], status: "completed", primaryCourseOfferingId: "primary",
+    offerings: [retakeOffering, primaryProgress], activeRetakeCount: 2, waitingRetakeCount: 0, ...overrides }] };
+  mockData({ classes, offerings: [{ ...offering, id: "retake", name: retakeOffering.name }, { ...offering, id: "primary", name: primaryProgress.name }] });
+}
+
+it("keeps both yellow and orange warnings in the originating class and lists primary before the newer retake", async () => {
+  mockRetakeProgress({ needsGradeEntry: true });
+  mount();
+  const table = await chooseScope();
+  const orange = within(table).getByRole("img", { name: "Có lớp đang học lại" });
+  const cell = orange.closest("td");
+  expect(orange).toHaveClass("tp-retake-warning");
+  expect(cell.cellIndex).toBe(3);
+  expect(within(cell).getByRole("img", { name: "Hãy nhập điểm môn học" })).toHaveClass("tp-grade-warning");
+  fireEvent.mouseOver(orange);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Có lớp đang học lại");
+  fireEvent.click(within(cell).getByRole("button", { name: "Xem chi tiết: Hoàn thành" }));
+  const picker = screen.getByRole("dialog");
+  const options = within(picker).getAllByRole("button").filter(button => button.classList.contains("tp-offering-option"));
+  expect(options[0]).toHaveTextContent("Lớp chính 16 học viên");
+  expect(options[0]).toHaveTextContent("2 buổi đã học · 2 buổi đã xếp lịch");
+  expect(options[1]).toHaveTextContent("Lớp học lại · 2 học viên");
+  fireEvent.click(options[0]);
+  expect(screen.getByRole("dialog", { name: "Chi tiết lớp học phần" })).toHaveTextContent("Lớp chính 16 học viên");
+  fireEvent.click(screen.getByRole("button", { name: "Đóng" }));
+  fireEvent.click(screen.getByRole("button", { name: /Lớp ghép học lại/ }));
+  expect(screen.getByRole("dialog", { name: "Chi tiết lớp học phần" })).toHaveTextContent("Lớp ghép học lại");
+});
+
+it("shows a waiting-placement warning separately and allows both orange reasons at once", async () => {
+  mockRetakeProgress({ waitingRetakeCount: 1 });
+  mount();
+  const table = await chooseScope();
+  expect(within(table).getByRole("img", { name: "Có lớp đang học lại" })).toBeInTheDocument();
+  expect(within(table).getByRole("img", { name: "Có học viên chưa qua, chưa bố trí lớp học lại" })).toBeInTheDocument();
+});
+
+it("opens the only primary offering directly and removes all warnings when everyone passes", async () => {
+  mockRetakeProgress({ activeRetakeCount: 0, waitingRetakeCount: 0, needsGradeEntry: false, offerings: [primaryProgress] });
+  mount();
+  const table = await chooseScope();
+  expect(within(table).queryByRole("img")).not.toBeInTheDocument();
+  fireEvent.click(within(table).getAllByRole("button", { name: "Xem chi tiết: Hoàn thành" })[0]);
+  expect(screen.getByRole("dialog", { name: "Chi tiết lớp học phần" })).toHaveTextContent("Lớp chính 16 học viên");
+});
+
+it("preserves the primary in-progress state and opens the list instead of the newer retake", async () => {
+  mockRetakeProgress({ status: "in_progress", offerings: [{ ...primaryProgress, status: "in_progress" }, retakeOffering] });
+  mount();
+  const table = await chooseScope();
+  fireEvent.click(within(table).getByRole("button", { name: "Xem chi tiết: Đang học" }));
+  expect(screen.getByRole("dialog")).toHaveTextContent("Lớp chính 16 học viên");
+  expect(screen.getByRole("dialog")).toHaveTextContent("Lớp ghép học lại");
+});
+
+it("opens a merged primary class from another major even when the local subject has a different ID", async () => {
+  const classes = makeClasses();
+  const merged = { ...primaryProgress, id: "merged-primary", name: "Lớp ghép liên ngành", status: "scheduled" };
+  classes[0] = { ...classes[0], subjects: [{ ...baseSubjects[0], subjectId: "local-major-subject",
+    logicalSubjectId: "local-major-subject", status: "scheduled", primaryCourseOfferingId: merged.id, offerings: [merged] }] };
+  mockData({ classes: classes.slice(0, 1), offerings: [{ ...offering, id: merged.id, name: merged.name, subject: {
+    id: "other-major-subject", code: baseSubjects[0].code, name: baseSubjects[0].name,
+  } }] });
+  mount();
+  const table = await chooseScope();
+  const row = within(table).getByRole("row", { name: /NCKH01/ });
+  fireEvent.click(within(row.cells[3]).getByRole("button", { name: "Xem chi tiết: Đã xếp lịch" }));
+  expect(screen.getByRole("dialog", { name: "Chi tiết lớp học phần" })).toHaveTextContent(merged.name);
+});
+
 it("selects a valid major and its newest available year on initial load", async () => {
   mount();
   expect(await chooseScope()).toBeInTheDocument();

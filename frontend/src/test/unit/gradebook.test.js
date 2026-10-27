@@ -1,4 +1,5 @@
 import { calculateGrade, draftOf, formatAttemptScores, formatScore, gradebookColumns, gradebookCsv, gradebookRowValues, gradePayload, rowError, updateGradeDraft, visibleGradeRows } from "../../features/exams/gradebook";
+import { clonePolicy } from "../../features/exams/gradingPolicy";
 
 it("formats exam attempts as comma-separated scores with one decimal place", () => {
   expect(formatAttemptScores([1, 4, 6])).toBe("1.0, 4.0, 6.0");
@@ -9,6 +10,52 @@ it("formats exam attempts as comma-separated scores with one decimal place", () 
 });
 
 const row = (overrides = {}) => draftOf({ participantId: "student:one", code: "HV001", fullName: "Nguyễn Văn An", eligible: null, examExempt: false, result: "pending", ...overrides });
+
+it.each([false, true])('displays and exports confirmed ineligibility as failed without inventing marks (finalized: %s)', finalized => {
+  const draft = row({ testScore: 3.9, assignmentScore: 5, eligible: false, eligibilityFrozen: true, workflowPhase: 'final', finalized });
+  expect(draft).toMatchObject({ result: 'failed', examScore: '', courseScore: '', grade4: '', letterGrade: '', attemptScores: '' });
+  expect(visibleGradeRows([draft], 'exam', '')).toHaveLength(0);
+  expect(gradebookRowValues(draft, 0).slice(-6)).toEqual(['', '', '', '', '', 'Không đạt']);
+  expect(row({ testScore: 3.9, assignmentScore: 5, workflowPhase: 'components', eligibilityFrozen: false }).result).toBe('pending');
+});
+
+it.each(["testScore", "assignmentScore"])("retains below-threshold %s through reopening, editing, saving and export", key => {
+  for (const score of [3.95, 3.99, 3.9999]) {
+    const draft = row({ testScore: 8, assignmentScore: 8, examScore: 10, [key]: score });
+    expect(draft[key]).toBe("4.0");
+    expect(draft.eligible).toBe(false);
+    expect(gradePayload(draft)).toMatchObject({ [key]: score, eligible: false, result: "failed" });
+    expect(visibleGradeRows([draft], "exam", "")).toHaveLength(0);
+    expect(gradebookRowValues(draft, 0)).toContain("4.0");
+  }
+  expect(row({ [key]: 3.89 })[key]).toBe("3.9");
+  expect(gradePayload(row({ testScore: 4, assignmentScore: 4, examScore: 10 })).eligible).toBe(true);
+});
+
+it.each([5.45, 5.49, 5.4999])("preserves original exam score %s while displaying the rounded value", score => {
+  const policy = clonePolicy(); policy.minimums.examScore = 5.5;
+  const draft = updateGradeDraft(row({ testScore: 10, assignmentScore: 10, examScore: score, gradingPolicy: policy }));
+  expect(draft.examScore).toBe("5.5");
+  expect(draft.result).toBe("failed");
+  expect(gradePayload(draft)).toMatchObject({ examScore: score, result: "failed", attemptScores: [score] });
+  expect(gradebookRowValues(draft, 0)).toContain("5.5");
+});
+
+it("allows replacing a displayed rounded mark with the exact threshold", () => {
+  const below = row({ testScore: 3.99, assignmentScore: 8, examScore: 8 });
+  expect(below.testScore).toBe("4.0");
+  expect(below.eligible).toBe(false);
+  const edited = updateGradeDraft(below, { testScore: "4.0" });
+  expect(edited.eligible).toBe(true);
+  expect(gradePayload(edited).testScore).toBe(4);
+});
+
+it("keeps official finalized results stable and applies current thresholds after reopening", () => {
+  const saved = { testScore: 10, assignmentScore: 10, examScore: 3.99, courseScore: 7.7, grade4: 3,
+    letterGrade: "B", result: "passed", workflowPhase: "final", eligibilityFrozen: true, eligible: true };
+  expect(row({ ...saved, finalized: true })).toMatchObject({ result: "passed", courseScore: "7.7" });
+  expect(row({ ...saved, finalized: false })).toMatchObject({ result: "failed", examScore: "4.0" });
+});
 
 it("keeps an interrupted study-leave attempt failed without inventing final marks", () => {
   const failed = row({ studyLeaveFailure: true, testScore: 8, assignmentScore: 9, result: "pending" });
@@ -63,9 +110,9 @@ it("weights components and replaces manually supplied derived grades", () => {
   expect(updateGradeDraft(row({ testScore: 8, assignmentScore: 8, examScore: 8 })).courseScore).toBe("8.0");
 });
 
-it.each([[0, "F", 0], [3.9, "F", 0], [4, "D", 1], [4.9, "D", 1], [5, "D+", 1.5], [5.4, "D+", 1.5], [5.5, "C", 2], [6.4, "C", 2], [6.5, "C+", 2.5], [6.9, "C+", 2.5], [7, "B", 3], [7.9, "B", 3], [8, "B+", 3.5], [8.4, "B+", 3.5], [8.5, "A", 4], [8.9, "A", 4], [9, "A+", 4], [10, "A+", 4], [8.91, "A", 4], [8.34, "B+", 3.5], [8.95, "A+", 4], [3.95, "D", 1]])("converts rounded score %s to %s", (score, letterGrade, grade4) => {
+it.each([[0, "F", 0], [3.9, "F", 0], [4, "D", 1], [4.9, "D", 1], [5, "D+", 1.5], [5.4, "D+", 1.5], [5.5, "C", 2], [6.4, "C", 2], [6.5, "C+", 2.5], [6.9, "C+", 2.5], [7, "B", 3], [7.9, "B", 3], [8, "B+", 3.5], [8.4, "B+", 3.5], [8.5, "A", 4], [8.9, "A", 4], [9, "A+", 4], [10, "A+", 4], [8.91, "A", 4], [8.34, "B+", 3.5], [8.95, "A+", 4], [3.95, "F", 0]])("converts rounded score %s to %s", (score, letterGrade, grade4) => {
   const rounded = Math.round((score + Number.EPSILON * 10) * 10) / 10;
-  expect(calculateGrade({ testScore: score, assignmentScore: score, examScore: score })).toMatchObject({ courseScore: rounded < 4 ? 0 : rounded, letterGrade, grade4, result: grade4 < 2 ? "failed" : "passed" });
+  expect(calculateGrade({ testScore: score, assignmentScore: score, examScore: score })).toMatchObject({ courseScore: score < 4 ? 0 : rounded, letterGrade, grade4, result: grade4 < 2 ? "failed" : "passed" });
 });
 
 it.each([
@@ -76,14 +123,14 @@ it.each([
   [10, 5.4, 10, 8.9, "A", "passed"],
   [5.49, 10, 10, 8.9, "A", "passed"],
   [6.8, 6.8, 4, 5.4, "D+", "failed"],
-  [6.9, 6.9, 4, 5.5, "C", "passed"],
+  [6.9, 6.9, 4, 5.5, "C", "failed"],
   [7.4, 3.6, 5.6, 0, "F", "failed"],
   [5, 6.9, 5.8, 5.9, "C", "passed"],
   [0, 4, 6, 0, "F", "failed"],
   [4, 10, 10, 8.5, "A", "passed"],
   [3.9, 10, 10, 0, "F", "failed"],
   [10, 3.9, 10, 0, "F", "failed"],
-])("requires every component >= 4 and rounded total >= 5.5 (%s, %s, %s)", (testScore, assignmentScore, examScore, courseScore, letterGrade, result) => {
+])("checks component minima and unrounded total against configured thresholds (%s, %s, %s)", (testScore, assignmentScore, examScore, courseScore, letterGrade, result) => {
   expect(calculateGrade({ testScore, assignmentScore, examScore })).toMatchObject({ courseScore, letterGrade, result });
 });
 
@@ -149,7 +196,7 @@ it.each([[6, "6.0"], [0, "0.0"], [5.76, "5.8"], [5.54, "5.5"], [5.55, "5.6"], ["
   expect(formatScore(input)).toBe(expected);
 });
 
-it("saves rounded components and calculates results from the rounded scores", () => {
-  expect(gradePayload({ ...row(), testScore: "5.54", assignmentScore: "6", examScore: "5.76" })).toMatchObject({ testScore: 5.5, assignmentScore: 6, examScore: 5.8, attemptScores: [5.8], courseScore: 5.8, result: "passed" });
+it("saves original components and rounds only their display and calculated total", () => {
+  expect(gradePayload({ ...row(), testScore: "5.54", assignmentScore: "6", examScore: "5.76" })).toMatchObject({ testScore: 5.54, assignmentScore: 6, examScore: 5.76, attemptScores: [5.76], courseScore: 5.8, result: "passed" });
   expect(row({ testScore: 6, grade4: 2 })).toMatchObject({ testScore: "6.0", grade4: "2.0" });
 });

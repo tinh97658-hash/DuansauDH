@@ -4,7 +4,7 @@ import { INestApplicationContext } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { getConnectionToken } from "@nestjs/sequelize";
 import { Sequelize } from "sequelize-typescript";
-import type { Transaction } from "sequelize";
+import { QueryTypes, type Transaction } from "sequelize";
 import { AppModule } from "../../src/app.module.js";
 import { SchedulingService } from "../../src/scheduling/scheduling.service.js";
 import { ExamGradebookService } from "../../src/masters/exam-gradebook.service.js";
@@ -90,6 +90,178 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
     source=await CourseOffering.create({subjectId:subject.id,status:'completed',completedAt:new Date(),completedByStaffId:staff.id});
     await CourseOfferingClassGroup.create({courseOfferingId:source.id,classGroupId:original.id});
   }
+
+  const progressOf = async (groupId: string) => {
+    const report = await scheduling.getClassCurriculumProgress({ majorId: major.id, academicYear: "2026" });
+    return report.classes.find(group => group.id === groupId)!.subjects.find(row => row.subjectId === subject.id)!;
+  };
+
+  it.each(["testScore", "assignmentScore"])("keeps failing %s decimals below four in the eligibility workflow", async key => {
+    await freshGradeSource();
+    const scope = { classGroupId: original.id, courseOfferingId: source.id, rosterScope: "offering" as const };
+    for (const [score, expected, eligible] of [[3.89, 3.89, false], [3.95, 3.95, false], [3.99, 3.99, false], [4, 4, true]] as const) {
+      const before = await exams.get(scope);
+      const after = await exams.save({ ...scope, revision: before.revision, rows: before.rows.map((row: any) => ({
+        participantId: row.participantId, testScore: 8, assignmentScore: 8, [key]: score, examScore: null,
+        examExempt: false, letterGrade: "", attemptScores: [], result: "pending" as const,
+        policyVersion: row.eligibilityPolicy.version, policyRulesVersion: row.eligibilityPolicy.rulesVersion,
+      })) }, staff);
+      expect(after.rows.every((row: any) => row[key] === expected && row.eligible === eligible)).toBe(true);
+      const book = await CourseExamGradebook.findOne({ where: { courseOfferingId: source.id, classGroupId: original.id } });
+      expect(book!.grades.every((row: any) => row[key] === expected && row.eligible === eligible)).toBe(true);
+    }
+  });
+
+  it.each([
+    { minimum: 4, coursework: 8, below: 3.99, passes: 4 },
+    { minimum: 5.5, coursework: 8, below: 5.49, passes: 5.5 },
+    { minimum: 6.5, coursework: 8, below: 6.49, passes: 6.5 },
+    { minimum: 4, coursework: 5.49, below: 5.49, passes: 5.51 },
+  ])("uses configured exam minimum $minimum and original coursework $coursework through saving and reloading", async ({ minimum, coursework, below, passes }) => {
+    const versions = await db.query<{ version: number }>("SELECT COALESCE(MAX(version),0)+1 AS version FROM shared_grading_rules", { type: QueryTypes.SELECT });
+    const version = Number(versions[0].version);
+    await db.query("INSERT INTO shared_grading_rules(version,policy,created_at) VALUES(:version,CAST(:policy AS jsonb),now())", {
+      replacements: { version, policy: JSON.stringify({ ...LEGACY_GRADING_POLICY, version, minimums: { testScore: 4, assignmentScore: 4, examScore: minimum } }) },
+    });
+    await freshGradeSource();
+    const scope = { classGroupId: original.id, courseOfferingId: source.id, rosterScope: "offering" as const };
+    const before = await exams.get(scope);
+    let data = await exams.save({ ...scope, revision: before.revision, rows: before.rows.map((row: any) => ({
+      participantId: row.participantId, testScore: coursework, assignmentScore: coursework, examScore: null, examExempt: false,
+      letterGrade: "", attemptScores: [], result: "pending" as const,
+      policyVersion: row.eligibilityPolicy.version, policyRulesVersion: row.eligibilityPolicy.rulesVersion,
+    })) }, staff);
+    for (const action of ["submit", "approve"] as const) data = await exams.transition({ ...scope, action,
+      note: "Threshold regression", revision: data.revision, version: (data.workflow as any).eligibility.version }, staff, "eligibility");
+    const room = await Room.create({ code: prefix, name: prefix, capacity: 30, isActive: true });
+    const lecturer = await Lecturer.create({ code: prefix, name: prefix, active: true });
+    const state = data.workflow as any;
+    const session = await app.get(ExamScheduleService).schedule({ courseOfferingId: source.id,
+      snapshotId: state.eligibility.snapshotId, eligibilityVersion: state.eligibility.version,
+      examDate: "2099-01-01", startTime: "08:00", endTime: "10:00", roomId: room.id, lecturerId: lecturer.id }, staff);
+    await db.query("UPDATE course_exam_sessions SET exam_date='2000-01-01' WHERE id=:id", { replacements: { id: session.id } });
+    await app.get(ExamScheduleService).confirm(session.id, { version: 0, status: "held", note: "Threshold regression" }, staff);
+    for (const [score, result] of [[below, "failed"], [passes, "passed"]] as const) {
+      const current = await exams.get(scope);
+      const saved = await exams.save({ ...scope, revision: current.revision, rows: current.rows.map((row: any) => ({
+        participantId: row.participantId, testScore: row.testScore, assignmentScore: row.assignmentScore,
+        examScore: score, examExempt: false, letterGrade: "", attemptScores: [], result: "pending" as const,
+      })) }, staff);
+      expect(saved.rows.every((row: any) => row.examScore === score && row.result === result)).toBe(true);
+      const reloaded = await exams.get(scope);
+      expect(reloaded.rows.every((row: any) => row.examScore === score && row.result === result)).toBe(true);
+      if (coursework === 5.49 && score === below) expect(reloaded.rows.every((row: any) => row.courseScore === 5.5)).toBe(true);
+    }
+  });
+
+  it("shows a merged offering under each major's own subject, keeping primary and retake progress separate", async () => {
+    const otherMajor = await Major.create({ code: `${prefix}Other`, name: `${prefix} Other major`,
+      disciplineId: major.disciplineId, program: "masters", active: true });
+    const localSubject = await Subject.create({ code: prefix, codeText: prefix, codeNumber: 1,
+      name: subject.name, credits: subject.credits, majorId: otherMajor.id, program: "masters", active: true });
+    const curriculum = await Curriculum.create({ code: `${prefix}Other`, name: `${prefix} Other curriculum`,
+      majorId: otherMajor.id, program: "masters", applicableFromYear: "2026" });
+    const block = await CurriculumBlock.create({ curriculumId: curriculum.id, code: "KC", name: "General" });
+    await CurriculumSubject.create({ curriculumId: curriculum.id, blockId: block.id, subjectId: localSubject.id });
+    await next.update({ majorId: otherMajor.id, curriculumId: curriculum.id });
+    await learners[3].update({ majorId: otherMajor.id });
+    await subject.update({ allowCrossMajor: true, sharedMajorIds: [otherMajor.id] });
+
+    const merged = await scheduling.createCourseOffering({ subjectId: subject.id, classGroupIds: [original.id, next.id],
+      retakeClassGroupIds: [original.id], academicYear: "2026" });
+    const room = await Room.create({ code: prefix, name: prefix, capacity: 30, isActive: true });
+    const lecturer = await Lecturer.create({ code: prefix, name: prefix, active: true });
+    const session = await TeachingSession.create({ courseOfferingId: merged.id, roomId: room.id, lecturerId: lecturer.id,
+      sessionDate: "2099-01-01", startTime: "08:00", endTime: "10:00", period: "MORNING", status: "planned" });
+    const otherProgress = async () => {
+      const report = await scheduling.getClassCurriculumProgress({ majorId: otherMajor.id, academicYear: "2026" });
+      return report.classes.find(group => group.id === next.id)!.subjects.find(row => row.subjectId === localSubject.id)!;
+    };
+    expect(await otherProgress()).toMatchObject({ subjectId: localSubject.id, logicalSubjectId: localSubject.id,
+      primaryCourseOfferingId: merged.id, status: "scheduled", sessionCount: 1, plannedSessionCount: 1,
+      activeRetakeCount: 0, offerings: [expect.objectContaining({ id: merged.id, studyRole: "primary", memberCount: 1 })] });
+    expect(await progressOf(original.id)).toMatchObject({ status: "completed", primaryCourseOfferingId: source.id,
+      activeRetakeCount: 1 });
+
+    await session.update({ status: "held", confirmedAt: new Date(), confirmedByStaffId: staff.id });
+    expect(await otherProgress()).toMatchObject({ status: "in_progress", heldSessionCount: 1, plannedSessionCount: 0 });
+    await merged.update({ status: "completed", completedAt: new Date(), completedByStaffId: staff.id });
+    expect(await otherProgress()).toMatchObject({ status: "completed", needsGradeEntry: true });
+    const book = await CourseExamGradebook.create({ classGroupId: next.id, courseOfferingId: merged.id, revision: 1,
+      grades: [{ participantId: `admission:${learners[3].id}`, courseScore: 3, result: "failed" }] });
+    expect(await otherProgress()).toMatchObject({ status: "completed", needsGradeEntry: false, waitingRetakeCount: 1 });
+    expect(await progressOf(original.id)).toMatchObject({ waitingRetakeCount: 0 });
+    await book.update({ grades: [{ participantId: `admission:${learners[3].id}`, courseScore: 8, result: "passed" }] });
+    expect(await otherProgress()).toMatchObject({ status: "completed", needsGradeEntry: false, waitingRetakeCount: 0 });
+  });
+
+  it("keeps primary teaching progress when a newer merged retake has its own sessions", async () => {
+    await source.update({ status: "active", completedAt: null, completedByStaffId: null });
+    const room = await Room.create({ code: prefix, name: prefix, capacity: 30, isActive: true });
+    const lecturer = await Lecturer.create({ code: prefix, name: prefix, active: true });
+    const merged = await CourseOffering.create({ subjectId: subject.id, status: "active", name: "New merged retake" });
+    await CourseOfferingClassGroup.bulkCreate([
+      { courseOfferingId: merged.id, classGroupId: original.id, studyRole: "retake", participantIds: [`admission:${learners[1].id}`] },
+      { courseOfferingId: merged.id, classGroupId: next.id, studyRole: "primary" },
+    ]);
+    for (const [index, offeringId] of [source.id, source.id, source.id, source.id, merged.id].entries()) {
+      await TeachingSession.create({ courseOfferingId: offeringId, roomId: room.id, lecturerId: lecturer.id,
+        sessionDate: `2099-01-0${index + 1}`, startTime: "08:00", endTime: "10:00", period: "MORNING",
+        status: index < 2 ? "held" : "planned",
+        ...(index < 2 ? { confirmedAt: new Date(), confirmedByStaffId: staff.id } : {}) });
+    }
+    const progress = await progressOf(original.id);
+    expect(progress).toMatchObject({ primaryCourseOfferingId: source.id, status: "in_progress",
+      heldSessionCount: 2, plannedSessionCount: 2, sessionCount: 4, activeRetakeCount: 1 });
+    expect(progress.offerings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: source.id, studyRole: "primary", memberCount: 3 }),
+      expect.objectContaining({ id: merged.id, studyRole: "retake", memberCount: 1, plannedSessionCount: 1 }),
+    ]));
+    expect(await progressOf(next.id)).toMatchObject({ primaryCourseOfferingId: merged.id, status: "scheduled", activeRetakeCount: 0 });
+  });
+
+  it("separates missing marks, failed learners awaiting placement, and active merged retakes", async () => {
+    expect(await progressOf(original.id)).toMatchObject({ status: "completed", needsGradeEntry: true,
+      activeRetakeCount: 0, waitingRetakeCount: 1 });
+    const merged = await scheduling.createCourseOffering({ subjectId: subject.id, classGroupIds: [original.id, next.id],
+      retakeClassGroupIds: [original.id], academicYear: "2026" });
+    expect(merged.groupLinks.find(link => link.classGroupId === original.id)?.studyRole).toBe("retake");
+    expect(merged.groupLinks.find(link => link.classGroupId === next.id)?.studyRole).toBe("primary");
+    expect(await progressOf(original.id)).toMatchObject({ status: "completed", needsGradeEntry: true,
+      activeRetakeCount: 1, waitingRetakeCount: 0, activeRetakeOfferingIds: [merged.id] });
+    expect(await progressOf(next.id)).toMatchObject({ status: "not_started", needsGradeEntry: false,
+      activeRetakeCount: 0, waitingRetakeCount: 0 });
+  });
+
+  it("shows missing retake marks after teaching ends, then clears orange when the learner passes", async () => {
+    const merged = await scheduling.createCourseOffering({ subjectId: subject.id, classGroupIds: [original.id, next.id],
+      retakeClassGroupIds: [original.id], academicYear: "2026" });
+    await merged.update({ status: "completed", completedAt: new Date(), completedByStaffId: staff.id });
+    expect(await progressOf(original.id)).toMatchObject({ status: "completed", needsGradeEntry: true,
+      activeRetakeCount: 0, waitingRetakeCount: 0 });
+    await CourseExamGradebook.create({ classGroupId: original.id, courseOfferingId: merged.id, revision: 1,
+      grades: [{ participantId: `admission:${learners[1].id}`, courseScore: 8, result: "passed" }] });
+    expect(await progressOf(original.id)).toMatchObject({ activeRetakeCount: 0, waitingRetakeCount: 0 });
+    const originalBook = await CourseExamGradebook.findOne({ where: { courseOfferingId: source.id, classGroupId: original.id } });
+    // Editing an older book must not override the passing result of a newer attempt.
+    await originalBook!.update({ grades: learners.slice(0, 3).map((learner, index) => ({
+      participantId: `admission:${learner.id}`, courseScore: index === 1 ? 3 : 8, result: index === 1 ? "failed" : "passed",
+    })) });
+    expect(await progressOf(original.id)).toMatchObject({ needsGradeEntry: false, activeRetakeCount: 0, waitingRetakeCount: 0 });
+    // The other group's failed learner must not reintroduce CNTT's orange warning.
+    await CourseExamGradebook.create({ classGroupId: next.id, courseOfferingId: merged.id, revision: 1,
+      grades: [{ participantId: `admission:${learners[3].id}`, courseScore: 3, result: "failed" }] });
+    expect(await progressOf(original.id)).toMatchObject({ activeRetakeCount: 0, waitingRetakeCount: 0 });
+    expect(await progressOf(next.id)).toMatchObject({ activeRetakeCount: 0, waitingRetakeCount: 1 });
+  });
+
+  it("does not classify missing results as failures and clears every warning once all learners pass", async () => {
+    const book = await CourseExamGradebook.findOne({ where: { courseOfferingId: source.id, classGroupId: original.id } });
+    await book!.update({ grades: learners.slice(0, 3).map(learner => ({ participantId: `admission:${learner.id}`, result: "pending", courseScore: null })) });
+    expect(await progressOf(original.id)).toMatchObject({ needsGradeEntry: true, activeRetakeCount: 0, waitingRetakeCount: 0 });
+    await book!.update({ grades: learners.slice(0, 3).map(learner => ({ participantId: `admission:${learner.id}`, result: "passed", courseScore: 8 })) });
+    expect(await progressOf(original.id)).toMatchObject({ status: "completed", needsGradeEntry: false, activeRetakeCount: 0, waitingRetakeCount: 0 });
+  });
 
   async function scheduledSource() {
     await source.update({ status: "active", completedAt: null, completedByStaffId: null });

@@ -6,6 +6,7 @@ import SearchRounded from "@mui/icons-material/SearchRounded";
 import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 import FeatureLayout from "../../components/FeatureLayout";
 import OfferingDetails from "../../features/scheduling/OfferingDetails";
+import { Modal } from "../../features/scheduling/shared";
 import { useAuthSession } from "../../context/AuthSession";
 import { API_BASE_URL } from "../../config/http";
 import "./classCourseHistory.css";
@@ -63,15 +64,25 @@ function YearMultiSelect({ years, value, onChange, disabled }) {
   </div>;
 }
 
-function StatusBadge({ status, offering, onOpen, needsGradeEntry }) {
+function StatusBadge({ subject, offering, onOpen }) {
+  const { status, needsGradeEntry, activeRetakeCount = 0, waitingRetakeCount = 0 } = subject;
   const info = statusInfo[status] || statusInfo.not_started;
   const warn = status === "completed" && needsGradeEntry === true;
-  return <span className={`tp-status-cell${warn ? " tp-has-grade-warning" : ""}`}>
-    {offering ? <button type="button" className={`tp-status tp-status-button tp-${info.tone}`} onClick={() => onOpen(offering)} aria-label={`Xem chi tiết: ${info.label}`}>{info.label}</button>
-      : <span className={`tp-status tp-${info.tone}`}>{info.label}</span>}
-    {warn && <Tooltip title="Hãy nhập điểm môn học" describeChild arrow placement="top" enterDelay={0} enterNextDelay={0}>
-      <span className="tp-grade-warning" role="img" aria-label="Hãy nhập điểm môn học" tabIndex={0}><WarningAmberRounded aria-hidden="true" /></span>
-    </Tooltip>}
+  const warnings = [
+    ...(warn ? [{ text: "Hãy nhập điểm môn học", tone: "grade" }] : []),
+    ...(activeRetakeCount > 0 ? [{ text: "Có lớp đang học lại", tone: "retake" }] : []),
+    ...(waitingRetakeCount > 0 ? [{ text: "Có học viên chưa qua, chưa bố trí lớp học lại", tone: "retake" }] : []),
+  ];
+  const canOpen = Boolean(offering || subject.offerings?.length);
+  const content = <>
+    <span>{info.label}</span>
+    {warnings.map(warning => <Tooltip key={warning.text} title={warning.text} describeChild arrow placement="top" enterDelay={0} enterNextDelay={0}>
+      <span className={`tp-warning tp-${warning.tone}-warning`} role="img" aria-label={warning.text} tabIndex={canOpen ? undefined : 0}><WarningAmberRounded aria-hidden="true" /></span>
+    </Tooltip>)}
+  </>;
+  return <span className="tp-status-cell">
+    {canOpen ? <button type="button" className={`tp-status tp-status-button tp-${info.tone}`} onClick={onOpen} aria-label={`Xem chi tiết: ${info.label}`}>{content}</button>
+      : <span className={`tp-status tp-${info.tone}`}>{content}</span>}
   </span>;
 }
 
@@ -101,6 +112,7 @@ export default function ClassCourseHistory() {
   const [report, setReport] = useState(null);
   const [offerings, setOfferings] = useState([]);
   const [selectedOffering, setSelectedOffering] = useState(null);
+  const [offeringChoice, setOfferingChoice] = useState(null);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [loadingReport, setLoadingReport] = useState(false);
   const [error, setError] = useState("");
@@ -160,6 +172,7 @@ export default function ClassCourseHistory() {
       setReport(null);
       setOfferings([]);
       setSelectedOffering(null);
+      setOfferingChoice(null);
       setLoadingReport(false);
       return undefined;
     }
@@ -167,6 +180,7 @@ export default function ClassCourseHistory() {
     setReport(null);
     setOfferings([]);
     setSelectedOffering(null);
+    setOfferingChoice(null);
     setLoadingReport(true);
     setError("");
     Promise.all(academicYears.map(async (academicYear) => {
@@ -217,9 +231,17 @@ export default function ClassCourseHistory() {
 
   const offeringFor = (classGroup, subject) => {
     const candidates = offerings.filter((offering) => offeringGroups(offering).some((group) => group.id === classGroup.id) && sameSubject(subject, offering));
+    if (subject.primaryCourseOfferingId) return candidates.find(offering => offering.id === subject.primaryCourseOfferingId)
+      || subject.offerings?.find(offering => offering.id === subject.primaryCourseOfferingId) || null;
     if (subject.status === "completed") return candidates.find((offering) => offering.status === "completed") || candidates[0] || null;
     if (subject.status === "not_started") return null;
     return candidates.find((offering) => offering.status === "active") || candidates[0] || null;
+  };
+
+  const openProgress = (classGroup, subject, fallback) => {
+    const related = [...(subject.offerings || [])].sort((a, b) => Number(a.studyRole !== "primary") - Number(b.studyRole !== "primary"));
+    if (related.length > 1) setOfferingChoice({ classGroup, subject, offerings: related });
+    else if (related.length === 1 || fallback) setSelectedOffering(related[0] || fallback);
   };
 
   const curriculumLabels = [...new Set(classes.map((classGroup) => classGroup.curriculum?.code).filter(Boolean))];
@@ -257,7 +279,7 @@ export default function ClassCourseHistory() {
       {!loadingCatalog && !loadingReport && !error && report && <section className="tp-content" aria-label="Tổng quan tiến độ">
         <header className="tp-matrix-heading">
           <div><h2>Tiến độ học phần theo lớp</h2><p>{classes.length} lớp{curriculumLabels.length ? ` · ${curriculumLabels.length} chương trình đào tạo` : ""}</p></div>
-          <p>Chọn trạng thái của một lớp để xem chi tiết lớp học phần.</p>
+          <p>Tiến độ theo lớp chính. Chọn trạng thái để xem lớp chính và các lớp học lại.</p>
         </header>
 
         {classes.length === 0 ? <div className="tp-empty-classes">
@@ -278,7 +300,7 @@ export default function ClassCourseHistory() {
                 const subject = row.byClass[classGroup.id];
                 if (!subject?.curriculumSubjectId) return <td className="tp-centered tp-not-applicable" key={classGroup.id} aria-label={`Không áp dụng cho ${classGroup.code}`}>-</td>;
                 const offering = offeringFor(classGroup, subject);
-                return <td className="tp-centered" key={classGroup.id}><StatusBadge status={subject.status} offering={offering} onOpen={setSelectedOffering} needsGradeEntry={subject.needsGradeEntry} /></td>;
+                return <td className="tp-centered" key={classGroup.id}><StatusBadge subject={subject} offering={offering} onOpen={() => openProgress(classGroup, subject, offering)} /></td>;
               })}
             </tr>)}</tbody>
           </table></div></div>
@@ -286,6 +308,15 @@ export default function ClassCourseHistory() {
         </>}
       </section>}
     </div>
-    {selectedOffering && <OfferingDetails offering={selectedOffering} user={session?.user || {}} onClose={() => setSelectedOffering(null)} onSaved={() => setRevision((value) => value + 1)} />}
+    {offeringChoice && !selectedOffering && <Modal wide className="tp-offering-picker" title={`Lớp học phần · ${offeringChoice.subject.name} · ${offeringChoice.classGroup.code}`} onClose={() => setOfferingChoice(null)}>
+      <p>Sĩ số bên dưới chỉ tính học viên của lớp {offeringChoice.classGroup.code} trong từng lớp học phần.</p>
+      <div className="tp-offering-list">{offeringChoice.offerings.map(offering => <button type="button" className="tp-offering-option" key={offering.id} onClick={() => setSelectedOffering(offering)}>
+        <span className="tp-offering-name"><strong>{offering.name}</strong><small>{offering.studyRole === "primary" ? "Lớp chính" : "Lớp học lại"} · {offering.memberCount} học viên</small></span>
+        <span className="tp-offering-progress"><span className={`tp-status tp-${(statusInfo[offering.status] || statusInfo.not_started).tone}`}>{(statusInfo[offering.status] || statusInfo.not_started).label}</span><small>{offering.heldSessionCount} buổi đã học · {offering.plannedSessionCount} buổi đã xếp lịch</small>
+          {offering.status === "completed" && offering.needsGradeEntry && <span className="tp-picker-grade-warning"><WarningAmberRounded aria-hidden="true" /> Hãy nhập điểm môn học</span>}
+        </span>
+      </button>)}</div>
+    </Modal>}
+    {selectedOffering && <OfferingDetails key={selectedOffering.id} offering={selectedOffering} user={session?.user || {}} onClose={() => setSelectedOffering(null)} onSaved={() => setRevision((value) => value + 1)} />}
   </FeatureLayout>;
 }

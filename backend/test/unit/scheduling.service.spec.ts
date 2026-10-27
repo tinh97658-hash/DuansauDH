@@ -647,7 +647,7 @@ describe("SchedulingService.createCourseOffering", () => {
       { transaction },
     );
     expect(mocks.offeringGroups.bulkCreate).toHaveBeenCalledWith(
-      [{ courseOfferingId: "offering-1", classGroupId: g1.id }],
+      [{ courseOfferingId: "offering-1", classGroupId: g1.id, studyRole: "primary" }],
       { transaction },
     );
     expect(result).toEqual(expect.objectContaining({ id: "offering-1" }));
@@ -800,8 +800,8 @@ describe("SchedulingService.createCourseOffering", () => {
     });
 
     expect(mocks.offeringGroups.bulkCreate).toHaveBeenCalledWith([
-      { courseOfferingId: "offering-mixed", classGroupId: g1.id },
-      { courseOfferingId: "offering-mixed", classGroupId: g2.id },
+      { courseOfferingId: "offering-mixed", classGroupId: g1.id, studyRole: "primary" },
+      { courseOfferingId: "offering-mixed", classGroupId: g2.id, studyRole: "primary" },
     ], { transaction });
 
     expect(mocks.courseOfferings.create).toHaveBeenCalledWith(
@@ -906,6 +906,31 @@ describe("SchedulingService.createCourseOffering", () => {
 });
 
 describe("SchedulingService persisted reads", () => {
+  it.each([
+    { share: true, allowed: ["major-1"], credits: 3, program: "masters", matches: true },
+    { share: true, allowed: ["other-major"], credits: 3, program: "masters", matches: false },
+    { share: false, allowed: undefined, credits: 3, program: "masters", matches: false },
+    { share: true, allowed: ["major-1"], credits: 2, program: "masters", matches: false },
+    { share: true, allowed: ["major-1"], credits: 3, program: "doctoral", matches: false },
+  ])("matches different local subject IDs only within permitted merged-course scope: %j", async ({ share, allowed, credits, program, matches }) => {
+    const mocks = buildService();
+    const selectedGroup = group("group-1");
+    mocks.majors.findOne.mockResolvedValue({ id: "major-1" });
+    mocks.classGroups.findAll.mockResolvedValue([selectedGroup]);
+    mocks.subjects.findAll.mockResolvedValue([subject]);
+    mocks.packages.findAll.mockResolvedValue([officialPackage(selectedGroup.id)]);
+    mocks.offeringGroups.findAll.mockResolvedValue([{ classGroupId: selectedGroup.id, courseOfferingId: "merged", studyRole: "primary" }]);
+    mocks.courseOfferings.findAll.mockResolvedValue([{ id: "merged", status: "active", subject: {
+      ...subject, id: "other-local-subject", majorId: "other-major", name: `  ${subject.name.toUpperCase()}  `,
+      allowCrossMajor: share, sharedMajorIds: allowed, credits, program,
+    } }]);
+    mocks.teachingSessions.findAll.mockResolvedValue([{ id: "session", courseOfferingId: "merged",
+      sessionDate: "2099-01-01", startTime: "08:00:00", status: "planned" }]);
+    const result = await mocks.service.getClassCurriculumProgress({ majorId: "major-1", academicYear: "2026" });
+    expect(result.classes[0].subjects[0]).toMatchObject({ subjectId: subject.id,
+      primaryCourseOfferingId: matches ? "merged" : null, status: matches ? "scheduled" : "not_started", sessionCount: matches ? 1 : 0 });
+  });
+
   it.each([true, false])("returns the complete scoped catalog even for a class with curriculum=%s", async (hasCurriculum) => {
     const mocks = buildService();
     const selectedGroup = { ...group("group-1"), curriculumId: hasCurriculum ? curriculumIdFor("group-1") : null };

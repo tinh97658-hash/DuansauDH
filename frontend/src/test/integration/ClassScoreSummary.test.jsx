@@ -49,6 +49,18 @@ it("refreshes the open class summary after exam grades are saved", async () => {
   expect(await screen.findByText("8.5")).toBeInTheDocument();
 });
 
+it('shows a saved disqualification as Không đạt instead of a blank cell and refreshes when the latest result changes', async () => {
+  let result = 'failed';
+  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith('/options') ? { groups }
+    : { ...reportFor(config.params.classGroupId), rows: [{ ...student, scores: { hp1: { score: null, result, eligibilityFrozen: true } } }] } }));
+  mount();
+  const failed = await screen.findByText('Không đạt');
+  expect(failed).toHaveClass('css-failed');
+  result = 'pending';
+  act(() => notifyGradebookSaved());
+  await waitFor(()=>expect(screen.queryByText('Không đạt')).not.toBeInTheDocument());
+});
+
 it("shows a profile language exemption as passed in the summary after the profile is saved", async () => {
   let exempt = false;
   axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups }

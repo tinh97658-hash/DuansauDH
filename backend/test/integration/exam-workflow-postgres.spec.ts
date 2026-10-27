@@ -164,18 +164,27 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
   expect(result.rows.map((r:any)=>r.participantId)).toEqual(ids);expect(result.rows[0].testScore).toBe(8);expect(result.rows[0].fullName).not.toBe('Changed after snapshot');
   await expect(db.query('UPDATE course_exam_eligibility_snapshots SET rows=rows WHERE id=:id',{replacements:{id:(approved.workflow as any).eligibility.snapshotId}})).rejects.toThrow('immutable');
  });
- it('does not turn a new approved ineligible decision into 0/F or put it in DS thi',async()=>{
+ it('marks approved ineligibility failed without inventing 0/F or putting the learner in DS thi',async()=>{
   await save({testScore:1});await transition('eligibility','submit');const b=await transition('eligibility','approve');
-  expect(b.rows[0]).toMatchObject({eligible:false,examScore:null,courseScore:null,grade4:null,letterGrade:'',result:'pending'});
+  expect(b.rows[0]).toMatchObject({eligible:false,examScore:null,courseScore:null,grade4:null,letterGrade:'',result:'failed'});
   expect((await grades.get({...f.scope,mode:'exam'})).total).toBe(0);await expect(exam()).rejects.toThrow('Không có thí sinh');
+  const books=await sql('SELECT grades FROM course_exam_gradebooks WHERE course_offering_id=:id',{id:f.offering.id});
+  expect(books.flatMap(book=>book.grades).every(row=>row.result==='failed')).toBe(true);
+  await transition('final','submit');const locked=await transition('final','approve');
+  expect(locked.rows.every((row:any)=>row.result==='failed'&&row.examScore===null&&row.courseScore===null)).toBe(true);
  });
  it('supports existing exemption completion without counting exempt people as exam candidates',async()=>{
   await save({examExempt:true,testScore:null,assignmentScore:null});await transition('eligibility','submit');const b=await transition('eligibility','approve');
   expect(b.rows.every((r:any)=>r.examExempt)).toBe(true);expect((await grades.get({...f.scope,mode:'exam'})).total).toBe(0);
  });
  it('allows audited eligibility reopening before scheduling and blocks it when history exists',async()=>{
-  await approve();await transition('eligibility','reopen');await approve();await exam();
+  const approved=await approve();expect((approved.workflow as any).eligibility.canReopen).toBe(true);
+  const reopened=await transition('eligibility','reopen');expect((reopened.workflow as any).eligibility.canReopen).toBe(false);
+  await approve();const session=await exam();
+  expect(((await read()).workflow as any).eligibility.canReopen).toBe(false);
   await expect(transition('eligibility','reopen')).rejects.toThrow('Lịch thi');
+  await schedule.cancel(session.id,{version:0,note:'Hủy lịch để điều chỉnh danh sách trước thi'},f.actor);
+  expect(((await read()).workflow as any).eligibility.canReopen).toBe(true);
  });
  it('requires approved eligibility, checks snapshot versions and uses candidate capacity',async()=>{
   await expect(exam()).rejects.toThrow('chưa duyệt');await approve();

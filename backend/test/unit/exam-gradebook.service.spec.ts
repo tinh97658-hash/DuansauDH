@@ -141,6 +141,7 @@ it("requires both prerequisite scores independently of their weighting, and requ
   expect(calculateExamEligibility({ testScore: 6, assignmentScore: null, examExempt: false }, policy)).toBeNull();
   expect(calculateExamGrade({ testScore: 8, assignmentScore: 8, examScore: null, examExempt: false }, policy).result).toBe("pending");
   expect(calculateExamGrade({ testScore: 8, assignmentScore: 8, examScore: 0, examExempt: false }, policy).result).toBe("passed");
+  expect(calculateExamGrade({ testScore: 8, assignmentScore: 8, examScore: 5.5, examExempt: false }, policy).result).toBe("passed");
 });
 
 it("returns frozen policies with saved grades and the current policy with unentered grades", async () => {
@@ -210,7 +211,7 @@ it("provides majors and linked course classes for gradebook filters", async () =
   offerings.findAll.mockResolvedValue([offering]);
 
   expect(await service.options()).toEqual({ groups: [group], courseOfferings: [{ ...offering,
-    examGradesComplete: false,
+    examGradesComplete: false, gradebookCompletionStatus: 'incomplete',
     groupLinks: [{ classGroupId: "g1", subject: offering.subject }],
   }] });
   expect(groups.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { program: "masters" }, attributes: expect.arrayContaining(["majorId"]), include: expect.arrayContaining([expect.objectContaining({ as: "major", attributes: ["id", "name"] })]) }));
@@ -298,10 +299,18 @@ it("saves zero course and converted scores for an ineligible learner without rec
   })] }), expect.anything());
 });
 
-it("rounds component scores before storing and calculating the grade", async () => {
+it("stores original component scores and rounds only the calculated total", async () => {
   const { service, books } = build();
   await service.save({ ...query, revision: 0, rows: [{ ...emptyExamGrade("student:s1"), testScore: 5.54, assignmentScore: 6, examScore: 5.76 }] });
-  expect(books.create).toHaveBeenCalledWith(expect.objectContaining({ grades: [expect.objectContaining({ testScore: 5.5, assignmentScore: 6, examScore: 5.8, courseScore: 5.8, attemptScores: [5.8], result: "passed" })] }), expect.anything());
+  expect(books.create).toHaveBeenCalledWith(expect.objectContaining({ grades: [expect.objectContaining({ testScore: 5.54, assignmentScore: 6, examScore: 5.76, courseScore: 5.8, attemptScores: [5.76], result: "passed" })] }), expect.anything());
+});
+
+it.each(["testScore", "assignmentScore", "examScore"])("does not round %s across its passing threshold on save", async key => {
+  const { service, books, policies } = build();
+  const score = key === "examScore" ? 5.49 : 3.99;
+  policies.latest.mockResolvedValue({ ...LEGACY_GRADING_POLICY, minimums: { ...LEGACY_GRADING_POLICY.minimums, examScore: 5.5 } });
+  await service.save({ ...query, revision: 0, rows: [{ ...emptyExamGrade("student:s1"), testScore: 8, assignmentScore: 8, examScore: 8, [key]: score }] });
+  expect(books.create).toHaveBeenCalledWith(expect.objectContaining({ grades: [expect.objectContaining({ [key]: score, result: "failed" })] }), expect.anything());
 });
 
 it("stores notes with an exempt student's grade", async () => {
