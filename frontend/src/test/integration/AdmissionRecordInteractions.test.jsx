@@ -36,7 +36,7 @@ beforeEach(() => {
   });
 });
 
-const mount = mode => render(<ThemeProvider theme={theme}><CssBaseline /><MemoryRouter>
+const mount = mode => render(<ThemeProvider theme={theme}><CssBaseline /><MemoryRouter useTransitions={false}>
   <Routes>
     <Route path="/" element={<AdmissionRecords mode={mode} />} />
     <Route path="/plan/admission-records/:id" element={<p>Trang chi tiết học viên</p>} />

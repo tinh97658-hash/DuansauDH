@@ -1,0 +1,59 @@
+name: Security checks
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '20 2 * * 1'
+permissions:
+  contents: read
+jobs:
+  dependencies-and-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-ci-password
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NODE_ENV: test
+      DB_HOST: 127.0.0.1
+      DB_PORT: '5432'
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: disposable-ci-password
+      POSTGRES_DB: postgres
+      PORT: '3001'
+      SESSION_SECRET: disposable-ci-session-secret-at-least-32-characters
+      FRONTEND_URL: http://localhost:3100
+      API_PUBLIC_URL: http://localhost:3001
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm ci --prefix backend
+      - run: npm ci --prefix frontend --ignore-scripts
+      - name: Audit all dependency trees
+        run: |
+          npm audit
+          npm --prefix backend audit
+          npm --prefix frontend audit
+      - run: npm --prefix backend run build
+      - run: npm --prefix backend test
+      - name: Verify migrations and session revocation on a disposable database
+        run: node security-review/verify-postgres.cjs
+      - run: npm --prefix frontend test -- --maxWorkers=2
+      - run: npm --prefix frontend run build

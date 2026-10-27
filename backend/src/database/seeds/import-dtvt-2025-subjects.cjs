@@ -19,7 +19,7 @@ async function importSubjectCatalog(manifest, reportName) {
   const db = new Sequelize(process.env.POSTGRES_DB, process.env.POSTGRES_USER, process.env.POSTGRES_PASSWORD, {
     dialect: 'postgres', host: process.env.DB_HOST, port: Number(process.env.DB_PORT), logging: false,
     dialectOptions: /^(true|1)$/i.test(process.env.DATABASE_SSL || '')
-      ? { ssl: { require: true, rejectUnauthorized: false } } : {},
+      ? { ssl: { require: true, rejectUnauthorized: true, ...(process.env.DATABASE_SSL_CA ? { ca: process.env.DATABASE_SSL_CA } : {}) } } : {},
   });
   const transaction = await db.transaction();
   try {

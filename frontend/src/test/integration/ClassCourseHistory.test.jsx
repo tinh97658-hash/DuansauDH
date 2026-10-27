@@ -51,7 +51,7 @@ function CurrentLocation() {
   return <output data-testid="location">{useLocation().search}</output>;
 }
 function mount(query = "", session = null) {
-  return render(<AuthSessionContext.Provider value={session}><MemoryRouter initialEntries={[`/masters/class-course-history${query}`]}><ClassCourseHistory /><CurrentLocation /></MemoryRouter></AuthSessionContext.Provider>);
+  return render(<AuthSessionContext.Provider value={session}><MemoryRouter useTransitions={false} initialEntries={[`/masters/class-course-history${query}`]}><ClassCourseHistory /><CurrentLocation /></MemoryRouter></AuthSessionContext.Provider>);
 }
 
 async function chooseScope({ expectTable = true } = {}) {

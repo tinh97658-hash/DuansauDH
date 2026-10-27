@@ -9,7 +9,7 @@ jest.mock("axios");
 
 function renderRoute() {
   return render(
-    <MemoryRouter initialEntries={["/private"]}>
+    <MemoryRouter useTransitions={false} initialEntries={["/private"]}>
       <Routes>
         <Route path="/login" element={<h1>Login page</h1>} />
         <Route element={<ProtectedRoute />}>
@@ -28,7 +28,7 @@ describe("ProtectedRoute", () => {
       ? Promise.resolve({ data: { authenticated: true, user: { role: 'examiner' } } })
       : Promise.resolve(permissionsResponse));
     const Page = ({ name }) => <><p>{name}: {useAuthSession().user.role}</p><Link to='/second'>Next</Link></>;
-    await act(async () => { render(<MemoryRouter initialEntries={['/first']}><Routes><Route element={<ProtectedRoute />}>
+    await act(async () => { render(<MemoryRouter useTransitions={false} initialEntries={['/first']}><Routes><Route element={<ProtectedRoute />}>
       <Route path='/first' element={<Page name='First' />} /><Route path='/second' element={<Page name='Second' />} />
     </Route></Routes></MemoryRouter>); });
     await screen.findByText('First: examiner');
@@ -62,7 +62,7 @@ describe("ProtectedRoute", () => {
       : Promise.resolve(permissionsResponse));
 
     render(
-      <MemoryRouter initialEntries={["/private"]}>
+      <MemoryRouter useTransitions={false} initialEntries={["/private"]}>
         <Routes>
           <Route path="/login" element={<h1>Login page</h1>} />
           <Route element={<ProtectedRoute />}>

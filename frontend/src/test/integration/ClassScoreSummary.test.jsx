@@ -32,7 +32,7 @@ beforeEach(() => {
   axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups } : reportFor(config.params.classGroupId) }));
   createClassScoreWorkbook.mockResolvedValue(new Blob(["xlsx"]));
 });
-const mount = () => render(<MemoryRouter><ClassScoreSummary /></MemoryRouter>);
+const mount = () => render(<MemoryRouter useTransitions={false}><ClassScoreSummary /></MemoryRouter>);
 const chooseFilter = (label, text) => {
   fireEvent.mouseDown(screen.getByLabelText(label));
   fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: new RegExp(`^${text}`) }));

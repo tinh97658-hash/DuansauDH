@@ -100,7 +100,7 @@ export const databaseModels = [
         synchronize: false,
         logging: config.get("NODE_ENV") === "development" ? (sql: string) => console.debug(sql) : false,
         dialectOptions: config.get<boolean>("DATABASE_SSL")
-          ? { ssl: { require: true, rejectUnauthorized: false } }
+          ? { ssl: { require: true, rejectUnauthorized: true, ...(config.get<string>("DATABASE_SSL_CA") ? { ca: config.get<string>("DATABASE_SSL_CA") } : {}) } }
           : {},
         pool: {
           max: config.get<number>("DB_POOL_MAX", 10),

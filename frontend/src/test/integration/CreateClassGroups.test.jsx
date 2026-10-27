@@ -30,7 +30,7 @@ const mockRequests = () => {
 };
 
 const renderPage = () => render(
-  <MemoryRouter>
+  <MemoryRouter useTransitions={false}>
     <CreateClassGroups />
   </MemoryRouter>,
 );
@@ -67,7 +67,7 @@ test.each([true, false])("quick-create prefills scope and returns to assignment 
   axios.post.mockResolvedValue({ data: withId ? { groups: [{
     id: "new-group", majorId: major.id, academicYear: year, status: "open",
   }] } : { success: true } });
-  render(<MemoryRouter initialEntries={[`/masters/create-class-groups?quickCreate=1&program=masters&year=${year}&disciplineId=d1&majorId=${major.id}&returnTo=https://example.com`]}>
+  render(<MemoryRouter useTransitions={false} initialEntries={[`/masters/create-class-groups?quickCreate=1&program=masters&year=${year}&disciplineId=d1&majorId=${major.id}&returnTo=https://example.com`]}>
     <Routes>
       <Route path="/masters/create-class-groups" element={<CreateClassGroups />} />
       <Route path="/masters/assign-class-groups" element={<ReturnLocation />} />
@@ -285,7 +285,7 @@ test("changes an assigned specialist only in the group editor and saves with the
     return { data: [] };
   });
   axios.put = jest.fn().mockResolvedValue({ data: {} });
-  renderWithPermissions(<MemoryRouter><CreateClassGroups /></MemoryRouter>, ["masters.manage", "groups.assign"]);
+  renderWithPermissions(<MemoryRouter useTransitions={false}><CreateClassGroups /></MemoryRouter>, ["masters.manage", "groups.assign"]);
   await screen.findByText("Chuyên viên A");
   expect(screen.queryByRole("button", { name: "Đổi chuyên viên" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Phân công", exact: true })).not.toBeInTheDocument();

@@ -5,10 +5,11 @@ import { Submission } from "../database/models/submission.model.js";
 import { NotificationModule } from "../notifications/notification.module.js";
 import { StudentsRepository } from "./students.repository.js";
 import { StudentsService } from "./students.service.js";
+import { UploadStorageService } from "./upload-storage.service.js";
 
 @Module({
   imports: [SequelizeModule.forFeature([Student, Submission]), NotificationModule],
-  providers: [StudentsRepository, StudentsService],
+  providers: [StudentsRepository, StudentsService, UploadStorageService],
   exports: [StudentsRepository, StudentsService],
 })
 export class StudentsModule {}

@@ -174,7 +174,11 @@ có một dòng mô tả vai trò của từng tab để người dùng phân bi
 Toàn bộ cấu hình local nằm trong **`.env` ở thư mục gốc**, được Git bỏ qua.
 Docker Compose, backend, migration, seed và frontend đều đọc file này.
 Backend không còn tìm `config.env` hoặc `.env` riêng trong thư mục con.
-Môi trường mới cần tạo `.env` với các biến bên dưới và mật khẩu riêng.
+Môi trường mới chạy `Copy-Item .env.example .env`, rồi điền mật khẩu riêng và `SESSION_SECRET` trước khi khởi động. Không commit `.env`.
+
+Khi clone repository, dùng `git clone --recurse-submodules <repository-url>` để lấy cả SecuritySkills. Với bản clone đã có, chạy `git submodule update --init --recursive`.
+
+Git giữ mã nguồn, migration, test, lockfile, tài nguyên giao diện/font/giấy phép, cấu hình mẫu, báo cáo Markdown và script kiểm chứng. Log, build, coverage, backup, upload người dùng, snapshot trong `docs/data-changes` và JSON sinh ra trong `security-review` chỉ lưu local. Tạo lại các kết quả kiểm chứng khi cần; không dùng `.gitignore` để thay thế cơ chế backup riêng.
 
 Các biến chính:
 

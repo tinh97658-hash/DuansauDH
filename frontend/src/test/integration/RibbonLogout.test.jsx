@@ -7,7 +7,7 @@ import { API_BASE_URL } from "../../config/http";
 
 jest.mock("axios", () => ({ post: jest.fn(), defaults: {} }));
 const Location = () => <output data-testid="route">{useLocation().pathname}</output>;
-const renderPage = (forced = false) => render(<MemoryRouter initialEntries={["/system/change-password"]}><Location /><Routes>
+const renderPage = (forced = false) => render(<MemoryRouter useTransitions={false} initialEntries={["/system/change-password"]}><Location /><Routes>
   <Route path="/login" element={<h1>Login page</h1>} />
   <Route path="*" element={<AuthSessionContext.Provider value={{ authenticated: true, user: { role: "custom", mustChangePassword: forced }, access: { permissions: [], roles: [] } }}><RibbonHeader /></AuthSessionContext.Provider>} />
 </Routes></MemoryRouter>);

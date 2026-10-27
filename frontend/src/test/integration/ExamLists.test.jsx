@@ -21,7 +21,7 @@ const testTheme = createTheme({ components: { MuiButtonBase: { defaultProps: { d
 let testPermissions = [];
 let phaseFixture='components';
 const workflowFor=(phase='components')=>({mode:phase==='legacy'?'legacy_preserved':'new',eligibility:{status:phase==='components'?'draft':'approved',version:phase==='components'?0:2,snapshotId:phase==='components'?null:'snapshot',canReopen:phase==='waiting'},final:{status:phase==='components'||phase==='waiting'?'not_available':phase==='locked'?'approved':'draft',version:phase==='locked'?2:0},status:phase==='locked'?'approved':'draft',version:0});
-const render = (ui, url = "/") => renderUi(<MemoryRouter initialEntries={[url]}><AuthSessionContext.Provider value={{ access: { permissions: testPermissions } }}><ThemeProvider theme={testTheme}>{ui}</ThemeProvider></AuthSessionContext.Provider></MemoryRouter>);
+const render = (ui, url = "/") => renderUi(<MemoryRouter useTransitions={false} initialEntries={[url]}><AuthSessionContext.Provider value={{ access: { permissions: testPermissions } }}><ThemeProvider theme={testTheme}>{ui}</ThemeProvider></AuthSessionContext.Provider></MemoryRouter>);
 const savedRow = { participantId: "student:one", code: "HV001", fullName: "Nguyễn Văn An", dob: "1990-01-02", gender: "Nam", eligible: null, examExempt: false, testScore: null, assignmentScore: null, examScore: null, courseScore: null, grade4: null, letterGrade: "", attemptScores: [], result: "pending" };
 const data = { revision: 0, rows: [savedRow], total: 1, totalRows: 1, unassessedRows: 1, page: 1, pageSize: 15 };
 const paged = (gradeRows, params = {}) => {

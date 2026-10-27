@@ -1,18 +1,7 @@
-import { mkdirSync } from "node:fs";
-import { extname, resolve } from "node:path";
+import { extname } from "node:path";
 import multer from "multer";
-
-const uploadDirectory = (relativePath: string) => {
-  const directory = resolve(process.cwd(), relativePath);
-  mkdirSync(directory, { recursive: true });
-  return directory;
-};
-
-const diskStorage = (directory: string, filename: (request: any, file: Express.Multer.File) => string) =>
-  multer.diskStorage({
-    destination: (_request, _file, callback) => callback(null, uploadDirectory(directory)),
-    filename: (request, file, callback) => callback(null, filename(request, file)),
-  });
+import { Injectable, type CallHandler, type ExecutionContext, type NestInterceptor, HttpException } from "@nestjs/common";
+import { finalize } from "rxjs";
 
 const safeExtension = (originalname: string) =>
   extname(originalname).toLowerCase().replace(/[^a-z0-9.]/gi, "");
@@ -51,8 +40,7 @@ const ALLOWED_PHOTO_EXTENSIONS = new Set([
 ]);
 
 export const submissionUploadOptions = {
-  storage: diskStorage("public/submissions/submitted", (request, file) =>
-    `userDocs-${request.user.id}-${Date.now()}${safeExtension(file.originalname)}`),
+  storage: multer.memoryStorage(),
   fileFilter: (_request: any, file: Express.Multer.File, callback: multer.FileFilterCallback) => {
     const ext = safeExtension(file.originalname);
     if (ALLOWED_DOCUMENT_EXTENSIONS.has(ext) && (ALLOWED_DOCUMENT_MIMES.has(file.mimetype) || file.mimetype === "application/octet-stream")) {
@@ -60,12 +48,11 @@ export const submissionUploadOptions = {
     }
     return callback(new multer.MulterError("LIMIT_UNEXPECTED_FILE", file.fieldname));
   },
-  limits: { fileSize: 20 * 1024 * 1024, files: 1 },
+  limits: { fileSize: 20 * 1024 * 1024, files: 1, fields: 4, parts: 5 },
 };
 
 export const photoUploadOptions = {
-  storage: diskStorage("public/img/users", (request, file) =>
-    `user-${request.user.id}-${Date.now()}${safeExtension(file.originalname)}`),
+  storage: multer.memoryStorage(),
   fileFilter: (_request: any, file: Express.Multer.File, callback: multer.FileFilterCallback) => {
     const ext = safeExtension(file.originalname);
     if (ALLOWED_PHOTO_MIMES.has(file.mimetype) && ALLOWED_PHOTO_EXTENSIONS.has(ext)) {
@@ -73,5 +60,19 @@ export const photoUploadOptions = {
     }
     return callback(new multer.MulterError("LIMIT_UNEXPECTED_FILE", file.fieldname));
   },
-  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 2, parts: 3 },
 };
+
+@Injectable()
+export class UploadAdmissionInterceptor implements NestInterceptor {
+  private static readonly active = new Set<string>();
+  intercept(context: ExecutionContext, next: CallHandler) {
+    const id = String(context.switchToHttp().getRequest().user.id);
+    if (UploadAdmissionInterceptor.active.has(id) || UploadAdmissionInterceptor.active.size >= 4) {
+      throw new HttpException("Đang xử lý tệp. Vui lòng thử lại sau.", 429);
+    }
+    UploadAdmissionInterceptor.active.add(id);
+    try { return next.handle().pipe(finalize(() => UploadAdmissionInterceptor.active.delete(id))); }
+    catch (error) { UploadAdmissionInterceptor.active.delete(id); throw error; }
+  }
+}

@@ -15,7 +15,7 @@ const record = { id: 'record', fullName: 'Nguyễn Văn A', code: 'HV001', major
 const session = { authenticated: true, user: { role: 'admin' } };
 const StudyManagementReturn = () => <p>Danh sách quản lý bảo lưu {useLocation().search}</p>;
 const mount = (entry = '/plan/admission-records/record') => render(<ThemeProvider theme={theme}><CssBaseline /><AuthSessionContext.Provider value={session}>
-  <MemoryRouter initialEntries={[entry]}><Routes>
+  <MemoryRouter useTransitions={false} initialEntries={[entry]}><Routes>
     <Route path='/plan/admission-records/:id' element={<AdmissionRecordDetail />} />
     <Route path='/masters/admitted-records/:id' element={<AdmissionRecordDetail returnPath="/masters/admitted-records" />} />
     <Route path='/masters/study-leaves/:id' element={<AdmissionRecordDetail returnPath="/masters/study-leaves" />} />

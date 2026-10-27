@@ -14,7 +14,7 @@ vi.mock('../../features/exams/examSchedule.css',()=>({}));
 vi.mock('../../utils/schedulingCalendar',async()=>({...await vi.importActual('../../utils/schedulingCalendar'),getBusinessTodayKey:()=> '2026-10-19',getBusinessWallTime:()=> '2026-10-19 07:00:00'}));
 const date='2026-10-19',offering={id:'offering',name:'Lớp QT 2026',subjectId:'subject',subjectName:'Quản trị',subjectCode:'QT',snapshotId:'snapshot',eligibilityVersion:2,candidateCount:2,candidateIds:['student:a','student:b'],remainingCount:2,groups:[{id:'group',name:'QTKD2026',academicYear:'2026',majorId:'major',majorName:'Quản trị kinh doanh',disciplineId:'discipline',disciplineName:'Kinh doanh'}]};
 const room={id:'room',name:'Phòng giảng đường',code:'301',capacity:2,isActive:true};let data;
-const renderPage=(permissions=['gradebook.view','scheduling.write'])=>renderWithPermissions(<MemoryRouter><ExamSchedule/></MemoryRouter>,permissions);
+const renderPage=(permissions=['gradebook.view','scheduling.write'])=>renderWithPermissions(<MemoryRouter useTransitions={false}><ExamSchedule/></MemoryRouter>,permissions);
 const queueButton=()=>within(screen.getByRole('complementary',{name:'Chưa xếp lịch'})).getByRole('button',{name:/Lớp QT/});
 const open=async()=>{fireEvent.click(await within(screen.getByRole('complementary',{name:'Chưa xếp lịch'})).findByRole('button',{name:/Lớp QT/}));fireEvent.click(screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'}));await screen.findByRole('dialog',{name:'XẾP LỊCH THI'});await waitFor(()=>expect(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/})).toBeEnabled());};
 const chooseScope=(label,name)=>{fireEvent.focus(screen.getByRole('combobox',{name:label}));fireEvent.click(screen.getByRole('option',{name}));};
@@ -102,7 +102,7 @@ it.each(['held','not_held','cancelled'])('retains historical %s session and hide
 it('hides edit/cancel for elapsed scheduled sessions',async()=>{data.sessions=[session({canEdit:false})];renderPage();fireEvent.click(await screen.findByRole('button',{name:/^Lớp QT.*19\/10\/2026 08:00/}));expect(screen.queryByRole('button',{name:'Hủy lịch'})).toBeNull();expect(screen.queryByRole('button',{name:'Sửa lịch'})).toBeNull();});
 it('blocks a loaded candidate overlap even when a different room is free',async()=>{data.sessions=[session({id:'other',courseOfferingId:'other',roomId:'other-room'})];renderPage();await open();selectRoom();expect(screen.getByRole('button',{name:'Xếp lịch'})).toBeDisabled();expect(screen.getByRole('alert')).toHaveTextContent('2 thí sinh đang có lịch thi khác');});
 it.each(['click','Enter',' '])('opens an entire overlap list row with %s',action=>{
- const select=vi.fn(),item=session();renderWithPermissions(<MemoryRouter><ExamListTable sessions={[item]} onSelect={select}/></MemoryRouter>,[]);
+ const select=vi.fn(),item=session();renderWithPermissions(<MemoryRouter useTransitions={false}><ExamListTable sessions={[item]} onSelect={select}/></MemoryRouter>,[]);
  const row=screen.getAllByRole('row')[1];if(action==='click')fireEvent.click(row);else fireEvent.keyDown(row,{key:action});expect(select).toHaveBeenCalledOnce();expect(select).toHaveBeenCalledWith(item);
 });
 it('keeps long academic names out of queue identifiers, calendar cards and active bar, with details on hover',async()=>{

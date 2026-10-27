@@ -8,7 +8,7 @@ jest.mock("../../features/admission/admissionExcel", () => ({ createScoreTemplat
 vi.mock("axios", () => ({ default: { put: vi.fn(), post: vi.fn(), defaults: {} } }));
 const row = { admissionRecordId: "record-1", code: "HS001", fullName: "Nguyễn Văn An", birthYear: 1996, gender: "Nam", phone: "0900000001", email: "demo@example.com", version: 0, total: null, decision: "pending", stale: false, meetsCutoff: null };
 const data = { round: { id: "round-1", majorThresholds: [{ majorId: "major-1", cutoff: 15 }] }, rows: [row], admittedCount: 0 };
-const mount = (props = {}) => render(<MemoryRouter><BulkAdmissionWorkflow data={data} visibleRows={data.rows} admin onRefresh={jest.fn().mockResolvedValue()} {...props} /></MemoryRouter>);
+const mount = (props = {}) => render(<MemoryRouter useTransitions={false}><BulkAdmissionWorkflow data={data} visibleRows={data.rows} admin onRefresh={jest.fn().mockResolvedValue()} {...props} /></MemoryRouter>);
 const preview = { round: data.round, rows: [{ ...row, total: 16 }], previewToken: "token" };
 beforeEach(() => {
   jest.clearAllMocks(); axios.put.mockResolvedValue({ data: { savedCount: 1 } });

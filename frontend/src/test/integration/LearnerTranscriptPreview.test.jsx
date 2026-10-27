@@ -26,7 +26,7 @@ const mountPrint = () => {
   const url = tab.location.replace.mock.calls[0][0];
   const id = new URL(url, "http://localhost").searchParams.get("preview");
   expect(readLearnerTranscript(id)).not.toBeNull();
-  const view = render(<React.StrictMode><MemoryRouter initialEntries={[url]}><LearnerTranscriptPreview /></MemoryRouter></React.StrictMode>);
+  const view = render(<React.StrictMode><MemoryRouter useTransitions={false} initialEntries={[url]}><LearnerTranscriptPreview /></MemoryRouter></React.StrictMode>);
   return { ...view, id };
 };
 it("automatically dispatches native print once without viewer controls and closes after print or cancel", async () => {
@@ -104,7 +104,7 @@ it("normalizes missing fields without inventing a cohort, duration or degree num
 it("handles missing or invalid print snapshots without dispatching print", () => {
   sessionStorage.setItem("learner-transcript-preview:bad", JSON.stringify({ version: 1, fields: [] }));
   expect(readLearnerTranscript("bad")).toBeNull();
-  render(<MemoryRouter initialEntries={["/reports/learner-transcript/preview?preview=bad"]}><LearnerTranscriptPreview /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false} initialEntries={["/reports/learner-transcript/preview?preview=bad"]}><LearnerTranscriptPreview /></MemoryRouter>);
   expect(screen.getByRole("alert")).toHaveTextContent("Không tìm thấy dữ liệu in");
   expect(window.print).not.toHaveBeenCalled();
 });

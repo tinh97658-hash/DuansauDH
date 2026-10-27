@@ -56,7 +56,7 @@ const loadedDialog = async () => {
 };
 
 it("offers exactly summary Excel and personal transcript actions, loading roster on demand", async () => {
-  render(<MemoryRouter><ClassScoreSummary /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><ClassScoreSummary /></MemoryRouter>);
   await screen.findByText("HV001");
   expect(axios.get.mock.calls.some(([url]) => url.endsWith("/roster") || url.endsWith("/export"))).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "Xuất file" }));

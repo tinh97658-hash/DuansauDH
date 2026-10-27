@@ -24,7 +24,7 @@ const cards = () => Array.from(screen.getByRole("complementary").querySelectorAl
 const badge = () => screen.getByRole("heading", { name: /LỚP HỌC PHẦN/ }).querySelector("b");
 const sortButton = label => screen.getByRole("button", { name: label });
 const openSchedule = async () => {
-  render(<MemoryRouter><Schedule user={{ canManageScheduling: true }} /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><Schedule user={{ canManageScheduling: true }} /></MemoryRouter>);
   await screen.findByText("Lớp A");
   await waitFor(() => expect(cards()).toHaveLength(4));
 };

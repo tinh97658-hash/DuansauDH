@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import bcrypt from "bcrypt";
 import { randomBytes } from "node:crypto";
-import { col, fn, Op, where, Transaction } from "sequelize";
+import { col, fn, literal, Op, where, Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { AuditService } from "../audit/audit.service.js";
 import { ChangeLogService } from "../audit/change-log.service.js";
@@ -294,7 +294,9 @@ export class AccountsService {
       password: await bcrypt.hash(dto.newPassword, 12),
       mustChangePassword: false,
       passwordChangedAt: new Date(),
-    });
+      sessionVersion: literal('"session_version" + 1'),
+    }, { returning: true });
+    user.sessionVersion = staff.sessionVersion;
 
     await this.audit.record({
       actorStaffId: staff.id,

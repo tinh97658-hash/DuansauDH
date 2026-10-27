@@ -75,7 +75,7 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 const previewUrl = () => tab.location.replace.mock.calls[0][0];
 const previewId = () => new URL(previewUrl(), "http://localhost").searchParams.get("preview");
-const mountPreview = (url = previewUrl()) => render(<MemoryRouter initialEntries={[url]}><AdmissionPreview /></MemoryRouter>);
+const mountPreview = (url = previewUrl()) => render(<MemoryRouter useTransitions={false} initialEntries={[url]}><AdmissionPreview /></MemoryRouter>);
 
 it.each(["detail", "list"])("%s keeps every A4 field, checklist, headings and signatures identical in DOCX and PDF", async (variant) => {
   const data = buildAdmissionDocument(record, { variant, now: new Date(2026, 9, 8) });
@@ -140,7 +140,7 @@ it("reports corrupt/missing snapshot data instead of fetching a different record
 });
 
 it.each(["applications", "admitted-masters"])("%s list keeps the relevant row actions without document export", async (mode) => {
-  render(<MemoryRouter><AdmissionRecords mode={mode} /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><AdmissionRecords mode={mode} /></MemoryRouter>);
   await screen.findAllByText(record.email);
   expect(screen.queryByRole("button", { name: /In \/ Xuất/ })).not.toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: /^Sửa hồ sơ / })).toHaveLength(2);
@@ -154,7 +154,7 @@ it.each(["applications", "admitted-masters"])("%s list keeps the relevant row ac
 });
 
 it("both detail dropdowns export the current unsaved form, and blocked PDF tabs leave it intact", async () => {
-  render(<MemoryRouter initialEntries={["/plan/admission-records/record"]}><Routes><Route path="/plan/admission-records/:id" element={<AdmissionRecordDetail />} /></Routes></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false} initialEntries={["/plan/admission-records/record"]}><Routes><Route path="/plan/admission-records/:id" element={<AdmissionRecordDetail />} /></Routes></MemoryRouter>);
   await screen.findByDisplayValue(record.fullName);
   const input = screen.getByDisplayValue(record.fullName);
   fireEvent.change(input, { target: { value: "Tên đang chỉnh sửa" } });

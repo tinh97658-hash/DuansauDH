@@ -34,7 +34,7 @@ beforeEach(() => {
 });
 
 it("lands on only unscheduled offerings from the dashboard year and allows clearing the queue filter", async () => {
-  render(<MemoryRouter initialEntries={["/masters/schedule?year=2026&queue=unscheduled"]}><Schedule user={{ role: "admin", canManageScheduling: true }} /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false} initialEntries={["/masters/schedule?year=2026&queue=unscheduled"]}><Schedule user={{ role: "admin", canManageScheduling: true }} /></MemoryRouter>);
   await screen.findByRole("button", { name: /^LỚP CHƯA CÓ LỊCH/ });
   expect(screen.queryByRole("button", { name: /^LỚP KHÓA CŨ/ })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /^LỚP ĐÃ CÓ LỊCH/ })).not.toBeInTheDocument();
@@ -44,7 +44,7 @@ it("lands on only unscheduled offerings from the dashboard year and allows clear
 });
 
 it("opens the pending confirmation workflow scoped to the selected year and offering", async () => {
-  render(<MemoryRouter initialEntries={[`/masters/schedule?year=2026&queue=pending-confirmation&offeringId=${encodeURIComponent(pending.id)}`]}><Schedule user={{ role: "admin", canManageScheduling: true }} /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false} initialEntries={[`/masters/schedule?year=2026&queue=pending-confirmation&offeringId=${encodeURIComponent(pending.id)}`]}><Schedule user={{ role: "admin", canManageScheduling: true }} /></MemoryRouter>);
   const dialog = await screen.findByRole("dialog");
   await waitFor(() => expect(within(dialog).getByText("LỚP CHỜ XÁC NHẬN")).toBeInTheDocument());
   expect(within(dialog).queryByText("LỚP KHÓA CŨ")).not.toBeInTheDocument();

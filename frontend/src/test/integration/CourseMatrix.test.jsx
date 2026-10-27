@@ -63,7 +63,7 @@ function mockRequests(offerings, user = { role: "admin", canManageScheduling: tr
 function renderMatrix(offerings, user, permissions = ["scheduling.view", "scheduling.write", "scheduling.organize"]) {
   mockRequests(offerings, user);
   return renderWithPermissions(
-    <MemoryRouter initialEntries={["/masters/course-matrix"]}>
+    <MemoryRouter useTransitions={false} initialEntries={["/masters/course-matrix"]}>
       <CourseMatrixPage />
       <LocationProbe />
     </MemoryRouter>, permissions
@@ -316,7 +316,7 @@ it("combines all filters and preserves discipline dependency and the selected vi
   data.forEach((item, index) => item.groupLinks.forEach(link => { link.classGroup.majorId = index === 2 ? "m2" : "m1"; }));
   axios.get.mockImplementation(async (url) => ({ data: url.endsWith("/auth/session")
     ? { user: { canManageScheduling: true } } : url.includes("/system/majors") ? majors : data }));
-  const { container } = render(<MemoryRouter><CourseMatrixPage /></MemoryRouter>);
+  const { container } = render(<MemoryRouter useTransitions={false}><CourseMatrixPage /></MemoryRouter>);
   await screen.findByRole("region", { name: "Khóa 2026" });
   const expectKpis = (values) => expect(Array.from(container.querySelectorAll(".sl-matrix-kpi strong"), e => Number(e.textContent))).toEqual(values);
   const change = (label, value) => fireEvent.change(screen.getByLabelText(label), { target: { value } });

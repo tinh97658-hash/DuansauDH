@@ -23,6 +23,8 @@ export class Student extends Model {
   @Column({ type: DataType.STRING, allowNull: false }) declare email: string;
   @Column({ type: DataType.STRING, allowNull: false, field: "tel_no" }) declare telNo: string;
   @Column({ type: DataType.STRING, allowNull: false }) declare password: string;
+  @Default(0)
+  @Column({ type: DataType.INTEGER, allowNull: false, field: "session_version" }) declare sessionVersion: number;
   @Default("student")
   @Column(DataType.ENUM("admin", "student", "supervisor")) declare role: string;
   @Column({ type: DataType.ENUM("prospective", "registered"), allowNull: false, field: "account_type" }) declare accountType: string;

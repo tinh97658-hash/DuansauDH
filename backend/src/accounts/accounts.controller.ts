@@ -35,8 +35,10 @@ export class AccountsController {
 
   @Patch("me/password")
   @AllowPasswordChangeRequired()
-  changeOwnPassword(@CurrentUser() user: any, @Body() dto: ChangeOwnPasswordDto, @Req() request: Request) {
-    return this.accounts.changeOwnPassword(user, dto, contextFrom(request));
+  async changeOwnPassword(@CurrentUser() user: any, @Body() dto: ChangeOwnPasswordDto, @Req() request: Request) {
+    const result = await this.accounts.changeOwnPassword(user, dto, contextFrom(request));
+    await new Promise<void>((resolve, reject) => request.logIn(user, (error: Error) => error ? reject(error) : resolve()));
+    return result;
   }
 
   @Get("audit-logs")

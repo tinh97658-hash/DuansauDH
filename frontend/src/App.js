@@ -13,6 +13,7 @@ const PageLoader = () => (
 );
 
 const Login = lazyPage(() => import("./pages/loginPage"), ["/login"]);
+const ResetPassword = lazyPage(() => import("./pages/resetPassword"), ["/reset-password"]);
 const UserProfile = lazyPage(() => import("./pages/userProfile"), ["/profile"]);
 const UserProfileView = lazyPage(() => import("./pages/userProfileView"), ["/profileView"]);
 const ReviewTable = lazyPage(() => import("./pages/reviewTablePage"), ["/reviewTable"]);
@@ -109,10 +110,11 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <BrowserRouter>
+      <BrowserRouter useTransitions={false}>
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route element={<ProtectedRoute />}>
               <Route index element={<ViewLoggedPage />} />
               <Route path="viewLogged" element={<ViewLoggedPage />} />

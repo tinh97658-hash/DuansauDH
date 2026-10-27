@@ -47,7 +47,7 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 const previewUrl = () => tab.location.replace.mock.calls[tab.location.replace.mock.calls.length - 1][0];
 const previewId = () => new URL(previewUrl(), "http://localhost").searchParams.get("preview");
-const renderPreview = () => render(<MemoryRouter initialEntries={[previewUrl()]}><SchedulePreview /></MemoryRouter>);
+const renderPreview = () => render(<MemoryRouter useTransitions={false} initialEntries={[previewUrl()]}><SchedulePreview /></MemoryRouter>);
 
 it.each([
   ["2025-12-29", "2026-01-04", "Tuần 1 năm 2026"],
@@ -72,7 +72,8 @@ it("shows the existing document without system navigation, and only prints when 
   exportSchedule(snapshot);
   const first = renderPreview();
   expect(screen.getByText("TRƯỜNG ĐẠI HỌC HÀNG HẢI VIỆT NAM")).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: documentTitle })).toBeInTheDocument();
+  // JSDOM does not apply the preview's @media screen override for print-only DOM.
+  expect(screen.getByText(documentTitle, { selector: "h1" })).toBeInTheDocument();
   expect(screen.getByText(documentRange)).toBeInTheDocument();
   expect(screen.getByText("Lịch trực lãnh đạo:")).toBeInTheDocument();
   expect(screen.getByText("Lịch trực chuyên viên:")).toBeInTheDocument();
@@ -81,20 +82,20 @@ it("shows the existing document without system navigation, and only prints when 
   expect(screen.getAllByText("(Ký, ghi rõ họ tên)")).toHaveLength(2);
   expect(screen.queryByText("(Đã ký)")).not.toBeInTheDocument();
   expect(screen.getByText("Tổng số: 1 buổi học")).toBeInTheDocument();
-  expect(screen.getByRole("table")).toHaveTextContent("Cơ sở dữ liệu");
+  expect(screen.getByRole("table", { hidden: true })).toHaveTextContent("Cơ sở dữ liệu");
   expect(screen.getAllByRole("button")).toHaveLength(1);
   expect(window.print).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "In / Lưu PDF", exact: true }));
   expect(window.print).toHaveBeenCalledTimes(1);
   first.unmount();
   renderPreview();
-  expect(screen.getByRole("table")).toHaveTextContent("Ghi chú tiếng Việt");
+  expect(screen.getByRole("table", { hidden: true })).toHaveTextContent("Ghi chú tiếng Việt");
 });
 
 it("reports missing or corrupt preview data instead of loading another week", () => {
   window.sessionStorage.setItem("schedule-preview:bad", "{");
   expect(readSchedulePreview("bad")).toBeNull();
-  render(<MemoryRouter initialEntries={["/masters/schedule/preview?preview=bad"]}><SchedulePreview /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false} initialEntries={["/masters/schedule/preview?preview=bad"]}><SchedulePreview /></MemoryRouter>);
   expect(screen.getByRole("alert")).toHaveTextContent("Không tìm thấy dữ liệu xem trước");
   expect(screen.queryByRole("table")).not.toBeInTheDocument();
   expect(axios.get).not.toHaveBeenCalled();
@@ -253,7 +254,7 @@ it("handles empty schedules in preview and both document formats", async () => {
   const empty = { ...snapshot, rows: [] };
   exportSchedule(empty);
   renderPreview();
-  expect(screen.getByRole("table")).toHaveTextContent("Không có lịch học trong phạm vi đã chọn.");
+  expect(screen.getByRole("table", { hidden: true })).toHaveTextContent("Không có lịch học trong phạm vi đã chọn.");
   expect(screen.getByText("Tổng số: 0 buổi học")).toBeInTheDocument();
   for (const create of [createScheduleExcel, createScheduleWord]) {
     expect((await create(empty)).size).toBeGreaterThan(100);
@@ -272,7 +273,7 @@ it.each(["Xuất Word", "Xuất Excel", "Xuất PDF"])("%s uses the selected wee
         id: `session-${index}`, courseOffering, sessionDate: new URL(url, "http://localhost").searchParams.get("from"),
         period: "MORNING", status: "planned", startTime: "08:00", endTime: "11:00",
       })) : [] }));
-  const mounted = render(<MemoryRouter><Schedule user={{ canManageScheduling: false }} /></MemoryRouter>);
+  const mounted = render(<MemoryRouter useTransitions={false}><Schedule user={{ canManageScheduling: false }} /></MemoryRouter>);
   await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled());
   fireEvent.focus(screen.getByRole("combobox", { name: "Ngành" }));
   fireEvent.click(screen.getByRole("option", { name: snapshot.discipline }));
@@ -334,7 +335,7 @@ it.each(["Xuất Word", "Xuất Excel", "Xuất PDF"])("%s uses the selected wee
   if (format === "Xuất PDF") {
     expect(readScheduleReturnView()).toMatchObject({ disciplineId: discipline.id, majorId: major.id, year: "2026", week: lastQuery.get("from") });
     mounted.unmount();
-    render(<MemoryRouter><Schedule user={{ canManageScheduling: false }} /></MemoryRouter>);
+    render(<MemoryRouter useTransitions={false}><Schedule user={{ canManageScheduling: false }} /></MemoryRouter>);
     await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled());
     expect(screen.getByRole("combobox", { name: "Ngành" })).toHaveValue(discipline.name);
     expect(screen.getByRole("combobox", { name: "Chuyên ngành" })).toHaveValue(major.name);

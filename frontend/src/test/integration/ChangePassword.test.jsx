@@ -16,7 +16,7 @@ const mount = (session) => render(
   <ThemeProvider theme={theme}>
     <CssBaseline />
     <AuthSessionContext.Provider value={session}>
-      <MemoryRouter>
+      <MemoryRouter useTransitions={false}>
         <ChangePassword />
       </MemoryRouter>
     </AuthSessionContext.Provider>

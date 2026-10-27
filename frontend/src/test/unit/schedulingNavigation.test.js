@@ -60,7 +60,7 @@ describe("Masters scheduling ribbon", () => {
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ message: "admin" }) });
     try {
-      render(<MemoryRouter initialEntries={["/masters/class-course-history"]}><AuthorizedRibbon /></MemoryRouter>);
+      render(<MemoryRouter useTransitions={false} initialEntries={["/masters/class-course-history"]}><AuthorizedRibbon /></MemoryRouter>);
       const sectionNavigation = await screen.findByRole("navigation", { name: "Nhóm chức năng" });
       const actionRail = screen.getByRole("region", { name: "Tác vụ chức năng" });
       const action = within(actionRail).getByRole("button", { name: "Thống kê tiến độ" });
@@ -78,7 +78,7 @@ describe("Masters scheduling ribbon", () => {
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ message: "admin" }) });
     try {
-      const { container } = render(<MemoryRouter initialEntries={["/system/majors"]}><AuthorizedRibbon /></MemoryRouter>);
+      const { container } = render(<MemoryRouter useTransitions={false} initialEntries={["/system/majors"]}><AuthorizedRibbon /></MemoryRouter>);
       const collapse = await screen.findByRole("button", { name: "Thu gọn menu tác vụ" });
       const header = container.querySelector(".ribbon-header");
 
@@ -141,7 +141,7 @@ describe("Masters scheduling ribbon", () => {
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ message: "admin" }) });
     try {
-      render(<MemoryRouter initialEntries={[path]}><AuthorizedRibbon /></MemoryRouter>);
+      render(<MemoryRouter useTransitions={false} initialEntries={[path]}><AuthorizedRibbon /></MemoryRouter>);
       const active = await screen.findByRole("button", { name: activeLabel });
       const other = screen.getByRole("button", { name: otherLabel });
       expect(active).toHaveAttribute("aria-current", "page");

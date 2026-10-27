@@ -80,6 +80,10 @@ export class AppModule implements NestModule {
     })).forRoutes({ path: "*", method: RequestMethod.ALL });
 
     consumer.apply(rateLimit({
+      windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: "draft-7", legacyHeaders: false,
+    })).forRoutes({ path: "user/submit", method: RequestMethod.POST }, { path: "user/uploadpp", method: RequestMethod.PATCH });
+
+    consumer.apply(rateLimit({
       windowMs: 15 * 60 * 1000,
       limit: 100,
       standardHeaders: "draft-7",

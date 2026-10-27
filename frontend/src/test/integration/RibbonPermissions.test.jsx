@@ -22,7 +22,7 @@ expected.set("/masters/class-course-history", ["plan.view", "scheduling.view"]);
 for (const route of ["/system/unit-info", "/system/license", "/system/change-password", "/system/check-update", null]) expected.set(route, []);
 const items = Object.values(ribbons).flatMap(sections => sections.flatMap(section => section.actions));
 const session = (permissions, role = "custom") => ({ user: { role }, access: permissions === null ? null : { permissions, roles: [] } });
-const view = (value, route = "/") => <MemoryRouter initialEntries={[route]}><AuthSessionContext.Provider value={value}><RibbonHeader /></AuthSessionContext.Provider></MemoryRouter>;
+const view = (value, route = "/") => <MemoryRouter useTransitions={false} initialEntries={[route]}><AuthSessionContext.Provider value={value}><RibbonHeader /></AuthSessionContext.Provider></MemoryRouter>;
 const visibleLabels = container => [...container.querySelectorAll(".ribbon-action span")].map(e => e.textContent);
 
 describe("Ribbon read/navigation permission contracts", () => {
@@ -109,7 +109,7 @@ describe("Ribbon read/navigation permission contracts", () => {
     const original = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ message: "admin" }) });
     try {
-      const { container } = render(<MemoryRouter><RibbonHeader /></MemoryRouter>);
+      const { container } = render(<MemoryRouter useTransitions={false}><RibbonHeader /></MemoryRouter>);
       expect(await screen.findByRole("button", { name: "Đổi mật khẩu" })).toBeInTheDocument();
       expect(visibleLabels(container)).toHaveLength(5);
       expect(screen.queryByText("Tài khoản nhân sự")).not.toBeInTheDocument();

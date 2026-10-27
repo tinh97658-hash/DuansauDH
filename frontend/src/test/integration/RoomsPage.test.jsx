@@ -10,7 +10,7 @@ jest.mock("@mui/icons-material", () => ({
   AddRounded: () => null, EditRounded: () => null, SearchRounded: () => null,
 }));
 const renderPage = async () => {
-  await act(async () => { render(<MemoryRouter><Rooms /></MemoryRouter>); });
+  await act(async () => { render(<MemoryRouter useTransitions={false}><Rooms /></MemoryRouter>); });
 };
 const clickAndWait = async (element) => { await act(async () => { fireEvent.click(element); }); };
 
@@ -67,7 +67,7 @@ describe("Room admin catalog", () => {
 
   it("uses the shared ordinary read for catalog.view without exposing write controls", async () => {
     axios.get.mockResolvedValue({ data: [{ ...room, isActive: true }] });
-    await act(async () => { renderWithPermissions(<MemoryRouter><Rooms /></MemoryRouter>, ["catalog.view"]); });
+    await act(async () => { renderWithPermissions(<MemoryRouter useTransitions={false}><Rooms /></MemoryRouter>, ["catalog.view"]); });
     expect(await screen.findByText("301")).toBeInTheDocument();
     expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/system\/rooms$/), { withCredentials: true });
     expect(axios.get.mock.calls.some(([url]) => url.includes("includeInactive"))).toBe(false);

@@ -99,6 +99,8 @@ export async function up({ context: qi }: { context: QueryInterface }) {
         AND NOT EXISTS (SELECT 1 FROM public.course_offering_students s WHERE s.course_offering_id=offering) $$;
     `, { transaction });
     for (const [table, predicate] of Object.entries(policies)) {
+      // Optional legacy table; fresh installations use learner_subject_results.
+      if (table === 'masters_bridge_courses' && !await qi.tableExists(table, { transaction })) continue;
       const read = predicate.replaceAll('WRITE', 'false');
       const write = `COALESCE(current_setting('app.group_read_only',true),'true') <> 'true' AND (${predicate.replaceAll('WRITE', 'true')})`;
       await qi.sequelize.query(`ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY;
@@ -117,10 +119,13 @@ export async function up({ context: qi }: { context: QueryInterface }) {
 
 export async function down({ context: qi }: { context: QueryInterface }) {
   await qi.sequelize.transaction(async transaction => {
-    for (const table of Object.keys(policies)) await qi.sequelize.query(`
+    for (const table of Object.keys(policies)) {
+      if (table === 'masters_bridge_courses' && !await qi.tableExists(table, { transaction })) continue;
+      await qi.sequelize.query(`
       DROP POLICY group_scope_read ON "${table}"; DROP POLICY group_scope_insert ON "${table}";
       DROP POLICY group_scope_update ON "${table}"; DROP POLICY group_scope_delete ON "${table}";
       ALTER TABLE "${table}" DISABLE ROW LEVEL SECURITY;`, { transaction });
+    }
     await qi.sequelize.query(`DROP FUNCTION app_offering_empty(uuid); DROP FUNCTION app_arrangement_offerings(uuid);
       DROP FUNCTION app_offering_allowed(uuid,boolean); DROP FUNCTION app_student_allowed(uuid,boolean);
       DROP FUNCTION app_record_allowed(uuid,boolean); DROP FUNCTION app_group_allowed(uuid,boolean);

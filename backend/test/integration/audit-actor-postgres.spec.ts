@@ -56,14 +56,14 @@ describeDb("Audit actor propagation with real PostgreSQL, HTTP and connection po
     }
     agentA = request.agent(app.getHttpServer());
     agentB = request.agent(app.getHttpServer());
-    await agentA.post("/user/login").set("x-request-id", prefix + "-login-a").set("user-agent", "qa-audit-integration").send({ email: emailA, password }).expect(200);
-    await agentB.post("/user/login").set("x-request-id", prefix + "-login-b").set("user-agent", "qa-audit-integration").send({ email: emailB, password }).expect(200);
+    await agentA.post("/user/login").set("Origin", new URL(app.get(ConfigService).getOrThrow<string>("FRONTEND_URL")).origin).set("x-request-id", prefix + "-login-a").set("user-agent", "qa-audit-integration").send({ email: emailA, password }).expect(200);
+    await agentB.post("/user/login").set("Origin", new URL(app.get(ConfigService).getOrThrow<string>("FRONTEND_URL")).origin).set("x-request-id", prefix + "-login-b").set("user-agent", "qa-audit-integration").send({ email: emailB, password }).expect(200);
   }, 30000);
 
   afterAll(async () => {
     if (db) {
       await select("DELETE FROM ethnicities WHERE id IN (:ids)", { ids: ids.ethnicities.length ? ids.ethnicities : [randomUUID()] });
-      await select("DELETE FROM sessions WHERE data::jsonb #>> '{passport,user}' LIKE ANY(ARRAY[:patterns]::text[])", { patterns: [...ids.staff.map(id => `staff:${id}:%`), `student:${ids.student}`] });
+      await select("DELETE FROM sessions WHERE data::jsonb #>> '{passport,user}' LIKE ANY(ARRAY[:patterns]::text[])", { patterns: [...ids.staff.map(id => `staff:${id}:%`), `student:${ids.student}:%`] });
       await select("DELETE FROM students WHERE id=:id", { id: ids.student });
       await select("DELETE FROM staff_roles WHERE staff_id IN (:ids)", { ids: ids.staff });
       await select("DELETE FROM staff WHERE id IN (:ids)", { ids: ids.staff });
@@ -161,7 +161,7 @@ describeDb("Audit actor propagation with real PostgreSQL, HTTP and connection po
     const email = `${prefix}-student@example.invalid`.toLowerCase();
     await select("INSERT INTO students(id,name_with_initials,full_name,postal_address,email,tel_no,password,account_type,approval_state,created_at,updated_at) VALUES(:id,'QA',:name,'QA',:email,'000',:hash,'registered','approved',now(),now())", { id: ids.student, name: prefix, email, hash: await bcrypt.hash(password, 4) });
     const student = request.agent(app.getHttpServer());
-    await student.post("/user/login").send({ email, password }).expect(200);
+    await student.post("/user/login").set("Origin", new URL(app.get(ConfigService).getOrThrow<string>("FRONTEND_URL")).origin).send({ email, password }).expect(200);
     const requestId = prefix + "-student-password";
     await student.patch("/user/updatePassword").set("x-request-id", requestId).send({ passwordCurrent: password, password: "Changed-student-password" }).expect(200);
     const [row] = await select("SELECT * FROM db_change_logs WHERE table_name='students' AND request_id=:requestId", { requestId });

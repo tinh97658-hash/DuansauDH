@@ -37,6 +37,7 @@ describe("Forced Staff password change over HTTP", () => {
     app.use((req: any, _res: any, next: () => void) => {
       req.user = current;
       req.isAuthenticated = () => Boolean(current);
+      req.logIn = (_user: any, done: any) => done();
       next();
     });
     await app.init();
@@ -46,7 +47,7 @@ describe("Forced Staff password change over HTTP", () => {
 
   const user = (role: string, forced: boolean) => Object.defineProperties(Object.create(Staff.prototype), {
     id: { value: "staff-test" }, role: { value: role }, mustChangePassword: { value: forced, writable: true },
-    sessionVersion: { value: 7 },
+    sessionVersion: { value: 7, writable: true },
   });
 
   it("blocks an admin with account.view before business operations execute", async () => {
@@ -61,11 +62,11 @@ describe("Forced Staff password change over HTTP", () => {
   it("allows the real password service and continues the same session after changing password", async () => {
     current = user("admin", true);
     Object.defineProperty(current, "password", { value: await bcrypt.hash("old-test-password", 4), writable: true });
-    current.update = async (values: any) => Object.assign(current, values);
+    current.update = async (values: any) => Object.assign(current, { ...values, sessionVersion: current.sessionVersion + 1 });
     await request(app.getHttpServer()).patch("/accounts/me/password")
       .send({ currentPassword: "old-test-password", newPassword: "new-test-password" }).expect(200);
     expect(current.mustChangePassword).toBe(false);
-    expect(current.sessionVersion).toBe(7);
+    expect(current.sessionVersion).toBe(8);
     expect(await bcrypt.compare("new-test-password", current.password)).toBe(true);
     await request(app.getHttpServer()).get("/accounts").expect(200);
   });

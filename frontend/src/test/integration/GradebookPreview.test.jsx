@@ -15,7 +15,7 @@ it("previews only qualified non-exempt students with exam-list columns", () => {
   try {
     openGradebookPreview(document);
     const url = replace.mock.calls[0][0];
-    render(<MemoryRouter initialEntries={[url]}><GradebookPreview /></MemoryRouter>);
+    render(<MemoryRouter useTransitions={false} initialEntries={[url]}><GradebookPreview /></MemoryRouter>);
     expect(screen.getByRole("table", { name: "Danh sách thi" })).toBeInTheDocument();
     expect(screen.getByText("HV001")).toBeInTheDocument();
     expect(screen.queryByText("HV002")).not.toBeInTheDocument();
@@ -35,7 +35,7 @@ it("previews every student with metadata, signing roles and an explicit print ac
     const url = replace.mock.calls[0][0];
     const id = new URL(url, "http://localhost").searchParams.get("preview");
     expect(readGradebookPreview(id).rows).toHaveLength(40);
-    render(<MemoryRouter initialEntries={[url]}><GradebookPreview /></MemoryRouter>);
+    render(<MemoryRouter useTransitions={false} initialEntries={[url]}><GradebookPreview /></MemoryRouter>);
     expect(screen.getByRole("heading", { name: document.title })).toBeInTheDocument();
     expect(screen.getByText("TRƯỜNG ĐẠI HỌC HÀNG HẢI VIỆT NAM")).toBeInTheDocument();
     expect(screen.getByText("VIỆN ĐÀO TẠO SAU ĐẠI HỌC")).toBeInTheDocument();
@@ -54,7 +54,7 @@ it("previews every student with metadata, signing roles and an explicit print ac
 });
 it("reports invalid snapshots and blocked popups without navigating away from unsaved grades", () => {
   sessionStorage.setItem("gradebook-preview:bad", "{"); expect(readGradebookPreview("bad")).toBeNull();
-  render(<MemoryRouter initialEntries={["/?preview=bad"]}><GradebookPreview /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false} initialEntries={["/?preview=bad"]}><GradebookPreview /></MemoryRouter>);
   expect(screen.getByRole("alert")).toHaveTextContent("Không tìm thấy bản xem trước");
   const open = jest.spyOn(window, "open").mockReturnValue(null);
   try { expect(() => openGradebookPreview(buildGradebookDocument({}, {}, []))).toThrow("cho phép mở tab mới"); }

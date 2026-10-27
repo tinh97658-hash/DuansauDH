@@ -6,7 +6,7 @@ import { CurrentUser } from "../common/auth-user.js";
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
 import { AllowPasswordChangeRequired } from "../common/allow-password-change-required.decorator.js";
 import { StudentGuard } from "../common/student.guard.js";
-import { photoUploadOptions, submissionUploadOptions } from "../common/uploads.js";
+import { photoUploadOptions, submissionUploadOptions, UploadAdmissionInterceptor } from "../common/uploads.js";
 import { Staff } from "../database/models/staff.model.js";
 import { StaffService } from "../staff/staff.service.js";
 import { ForgotPasswordDto, ResetPasswordDto, UpdatePasswordDto } from "../students/dto/password.dto.js";
@@ -29,7 +29,7 @@ export class UserController {
   index() { return { message: "Đăng nhập thành công" }; }
 
   @Post("login")
-  @UseGuards(LocalAuthGuard)
+  @UseGuards(LogoutOriginGuard, LocalAuthGuard)
   @HttpCode(200)
   login() { return { message: "Đăng nhập thành công" }; }
 
@@ -40,8 +40,8 @@ export class UserController {
   }
 
   @Post("forgotPassword")
-  forgotPassword(@Body() input: ForgotPasswordDto, @Req() request: Request) {
-    return this.students.forgotPassword(input.email, `${request.protocol}://${request.get("host")}`);
+  forgotPassword(@Body() input: ForgotPasswordDto) {
+    return this.students.forgotPassword(input.email, String(this.config.getOrThrow("FRONTEND_URL")).replace(/\/$/, ""));
   }
 
   @Patch("resetPassword/:token")
@@ -51,20 +51,23 @@ export class UserController {
 
   @Patch("updatePassword")
   @UseGuards(StudentGuard)
-  updatePassword(@CurrentUser() user: any, @Body() input: UpdatePasswordDto) {
-    return this.students.updatePassword(user.id, input);
+  async updatePassword(@CurrentUser() user: any, @Body() input: UpdatePasswordDto, @Req() request: any) {
+    const result = await this.students.updatePassword(user.id, input);
+    user.sessionVersion = result.sessionVersion;
+    await new Promise<void>((resolve, reject) => request.logIn(user, (error: Error) => error ? reject(error) : resolve()));
+    return { message: result.message };
   }
 
   @Post("submit")
   @UseGuards(StudentGuard)
-  @UseInterceptors(FileInterceptor("submissionFile", submissionUploadOptions))
+  @UseInterceptors(UploadAdmissionInterceptor, FileInterceptor("submissionFile", submissionUploadOptions))
   submit(@CurrentUser() user: any, @Body() input: SubmissionDto, @UploadedFile() file?: Express.Multer.File) {
     return this.students.submit(user.id, input.submission, file);
   }
 
   @Patch("uploadpp")
   @UseGuards(StudentGuard)
-  @UseInterceptors(FileInterceptor("photo", photoUploadOptions))
+  @UseInterceptors(UploadAdmissionInterceptor, FileInterceptor("photo", photoUploadOptions))
   uploadPhoto(@CurrentUser() user: any, @UploadedFile() file?: Express.Multer.File) {
     return this.students.updatePhoto(user.id, file);
   }

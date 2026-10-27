@@ -4,7 +4,7 @@ import ExamEligibility from '../../pages/masters/examEligibility';
 
 it('preserves bookmarked scope when opening the current eligibility workflow', () => {
   const Destination = () => <output>{useLocation().search}</output>;
-  render(<MemoryRouter initialEntries={['/masters/exam-eligibility?year=2026&groupId=g1&offeringId=o1']}>
+  render(<MemoryRouter useTransitions={false} initialEntries={['/masters/exam-eligibility?year=2026&groupId=g1&offeringId=o1']}>
     <Routes><Route path="/masters/exam-eligibility" element={<ExamEligibility/>}/>
       <Route path="/masters/exam-lists" element={<Destination/>}/></Routes>
   </MemoryRouter>);

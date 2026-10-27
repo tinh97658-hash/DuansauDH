@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
-import { col, fn, Op, where } from "sequelize";
+import { col, fn, literal, Op, where } from "sequelize";
 import { Student } from "../database/models/student.model.js";
 import { Submission } from "../database/models/submission.model.js";
 
@@ -40,6 +40,16 @@ export class StudentsRepository {
 
   findResetToken(token: string) {
     return this.students.findOne({ where: { passwordResetToken: token, passwordResetExpires: { [Op.gt]: new Date() } } });
+  }
+
+  async replacePassword(id: string, previousPassword: string, password: string, resetToken?: string) {
+    const [count, rows] = await this.students.update({ password, sessionVersion: literal('"session_version" + 1'),
+      passwordResetToken: null, passwordResetExpires: null }, {
+      where: { id, password: previousPassword, ...(resetToken ? {
+        passwordResetToken: resetToken, passwordResetExpires: { [Op.gt]: new Date() },
+      } : {}) }, returning: true,
+    });
+    return count === 1 ? rows[0] : null;
   }
 
 }

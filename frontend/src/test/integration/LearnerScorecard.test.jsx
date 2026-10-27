@@ -63,7 +63,7 @@ const LocationProbe = () => {
   const navigate = useNavigate();
   return <><output data-testid="location">{location.pathname}{location.search}</output><button onClick={() => navigate(-1)}>Lùi lịch sử</button></>;
 };
-const mount = (entry = "/masters/admitted-records/ar1") => render(<MemoryRouter initialEntries={[entry]}>
+const mount = (entry = "/masters/admitted-records/ar1") => render(<MemoryRouter useTransitions={false} initialEntries={[entry]}>
   <LocationProbe /><Routes>
     <Route path="/reports/class-score-summary" element={<ClassScoreSummary />} />
     <Route path="/masters/admitted-records/:id" element={<AdmissionRecordDetail returnPath="/masters/admitted-records" />} />

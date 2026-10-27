@@ -25,7 +25,7 @@ it("shares spare container width evenly, preserves manual resizing, and updates 
   const originalObserver = global.ResizeObserver;
   let measure;
   const disconnect = jest.fn();
-  global.ResizeObserver = jest.fn(callback => { measure = callback; return { observe: jest.fn(), disconnect }; });
+  global.ResizeObserver = jest.fn(function (callback) { measure = callback; return { observe: jest.fn(), disconnect }; });
   try {
     const view = render(table("email"));
     const name = screen.getByRole("slider", { name: "Độ rộng cột Họ đệm" });

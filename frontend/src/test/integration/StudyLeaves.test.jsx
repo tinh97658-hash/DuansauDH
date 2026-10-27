@@ -16,7 +16,7 @@ const row = { id: 'leave', admissionRecordId: 'record', fullName: 'Nguyễn Văn
 beforeEach(() => { jest.resetAllMocks(); axios.get.mockResolvedValue({ data: { rows: [row], total: 1 } }); });
 
 it('shows overdue days, a pending extension and a direct link to the learner leave tab', async () => {
-  render(<MemoryRouter><StudyLeaves /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><StudyLeaves /></MemoryRouter>);
   expect(await screen.findByText('Nguyễn Văn A')).toBeInTheDocument();
   expect(screen.getByText('3 ngày')).toBeInTheDocument();
   expect(screen.getByText('Có gia hạn chờ duyệt')).toBeInTheDocument();
@@ -24,7 +24,7 @@ it('shows overdue days, a pending extension and a direct link to the learner lea
 });
 
 it('passes search and an overdue filter to the API and keeps the list empty when nothing matches', async () => {
-  render(<MemoryRouter><StudyLeaves /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><StudyLeaves /></MemoryRouter>);
   await screen.findByText('Nguyễn Văn A');
   axios.get.mockResolvedValue({ data: { rows: [], total: 0 } });
   fireEvent.change(screen.getByLabelText('Tìm mã hoặc tên học viên'), { target: { value: 'HV999' } });
@@ -50,7 +50,7 @@ const setupManaged = (total = 7) => axios.get.mockImplementation(async url => {
 
 it('adds managed profiles without a leave while retaining the existing leave list', async () => {
   setupManaged();
-  render(<MemoryRouter><StudyLeaves /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><StudyLeaves /></MemoryRouter>);
   await screen.findByText('Nguyễn Văn A');
   fireEvent.click(screen.getByRole('tab', { name: 'Hồ sơ bảo lưu' }));
   const table = await screen.findByRole('table', { name: 'Hồ sơ bảo lưu' });
@@ -70,7 +70,7 @@ it('adds managed profiles without a leave while retaining the existing leave lis
 
 it('restores the managed tab from its URL and filters/paginates on the server', async () => {
   setupManaged(45);
-  render(<MemoryRouter initialEntries={['/masters/study-leaves?view=records']}><StudyLeaves /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false} initialEntries={['/masters/study-leaves?view=records']}><StudyLeaves /></MemoryRouter>);
   await screen.findByText('HV0');
   fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }));
   await waitFor(() => expect(axios.get).toHaveBeenLastCalledWith(expect.stringContaining('page=2'), expect.any(Object)));
@@ -87,12 +87,12 @@ it('restores the managed tab from its URL and filters/paginates on the server', 
 
 it('keeps the profile columns and edit actions without bulk tuition selection in the retained-profile tab', async () => {
   setupManaged();
-  const admitted = render(<MemoryRouter><AdmissionRecords mode="admitted-masters" /></MemoryRouter>);
+  const admitted = render(<MemoryRouter useTransitions={false}><AdmissionRecords mode="admitted-masters" /></MemoryRouter>);
   const source = await screen.findByRole('table', { name: 'Hồ sơ trúng tuyển' });
   expect(within(source).getByRole('checkbox', { name: 'Chọn tất cả học viên chưa nộp học phí trên trang này' })).toBeInTheDocument();
   const headers = within(source).getAllByRole('columnheader').slice(1).map(cell => cell.textContent);
   admitted.unmount();
-  render(<MemoryRouter initialEntries={['/masters/study-leaves?view=records']}><StudyLeaves /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false} initialEntries={['/masters/study-leaves?view=records']}><StudyLeaves /></MemoryRouter>);
   const retained = await screen.findByRole('table', { name: 'Hồ sơ bảo lưu' });
   expect(within(retained).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(headers);
   expect(within(retained).queryByRole('checkbox', { name: /Chọn.*học phí/ })).not.toBeInTheDocument();

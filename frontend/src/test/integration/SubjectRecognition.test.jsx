@@ -67,7 +67,7 @@ const clickAndWait = async (element) => {
   await act(async () => { fireEvent.click(element); await new Promise((resolve) => setTimeout(resolve, 0)); });
 };
 
-const renderPage = () => render(<MemoryRouter><AdminAdmissionRecordDetail returnPath="/masters/admitted-records" /></MemoryRouter>);
+const renderPage = () => render(<MemoryRouter useTransitions={false}><AdminAdmissionRecordDetail returnPath="/masters/admitted-records" /></MemoryRouter>);
 const renderLearningPage = async () => {
   renderPage();
   await clickAndWait(await screen.findByRole("tab", { name: "Học tập" }));

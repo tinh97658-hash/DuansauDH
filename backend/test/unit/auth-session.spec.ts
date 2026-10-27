@@ -35,11 +35,30 @@ describe("Staff session deserialization", () => {
 
   it("keeps Student session lookup independent of the Staff policy", async () => {
     const { staff, students, serializer } = build();
-    const student = { id: "learner" };
+    const student = { id: "learner", accountType: "registered", approvalState: "approved", sessionVersion: 2 };
     students.findById.mockResolvedValue(student);
     const done = jest.fn();
-    await serializer.deserializeUser("student:learner", done);
+    await serializer.deserializeUser("student:learner:2", done);
     expect(done).toHaveBeenCalledWith(null, student);
     expect(staff.findById).not.toHaveBeenCalled();
+  });
+
+  it("rejects legacy, malformed and unknown session types", async () => {
+    const { auth, staff, students } = build();
+    for (const key of ["staff:s1", "student:s1", "other:s1:0", "staff:s1:NaN", "staff:s1:0:extra"]) {
+      expect(await auth.deserialize(key)).toBeNull();
+    }
+    expect(staff.findById).not.toHaveBeenCalled();
+    expect(students.findById).not.toHaveBeenCalled();
+  });
+
+  it("rejects revoked Student sessions and accounts no longer approved", async () => {
+    const { auth, students } = build();
+    students.findById.mockResolvedValue({ accountType: "registered", approvalState: "approved", sessionVersion: 3 });
+    expect(await auth.deserialize("student:learner:2")).toBeNull();
+    students.findById.mockResolvedValue({ accountType: "prospective", approvalState: "approved", sessionVersion: 2 });
+    expect(await auth.deserialize("student:learner:2")).toBeNull();
+    students.findById.mockResolvedValue({ accountType: "registered", approvalState: "not approved", sessionVersion: 2 });
+    expect(await auth.deserialize("student:learner:2")).toBeNull();
   });
 });

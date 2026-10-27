@@ -25,7 +25,7 @@ const fixture = (count = 7, year = "2026") => ({ year, permissions, sources: {
 } });
 const Location = () => { const location = useLocation(); return <output data-testid="location">{location.pathname}{location.search}</output>; };
 const open = async () => {
-  await act(async () => render(<MemoryRouter initialEntries={["/viewLogged?year=2026"]}><Location /><Home /></MemoryRouter>));
+  await act(async () => render(<MemoryRouter useTransitions={false} initialEntries={["/viewLogged?year=2026"]}><Location /><Home /></MemoryRouter>));
 };
 beforeEach(() => { vi.clearAllMocks(); axios.get.mockResolvedValue({ data: fixture() }); });
 

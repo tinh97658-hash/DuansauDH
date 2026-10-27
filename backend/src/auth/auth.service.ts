@@ -73,12 +73,20 @@ export class AuthService {
   }
 
   async deserialize(key: string) {
-    const [type, id, version] = String(key).split(":");
-    if (type !== "staff") return this.students.findById(id);
+    const parts = String(key).split(":");
+    const [type, id, version] = parts;
+    if (parts.length !== 3 || !id || !/^\d+$/.test(version || "")) return null;
+    if (type === "student") {
+      const student = await this.students.findById(id);
+      if (!student || student.accountType !== "registered" || student.approvalState !== "approved" ||
+        Number(version) !== student.sessionVersion) return null;
+      return student;
+    }
+    if (type !== "staff") return null;
 
     const staff = await this.staff.findById(id);
     if (!staff || staff.status !== "active") return null;
-    if (version !== undefined && Number(version) !== staff.sessionVersion) return null;
+    if (Number(version) !== staff.sessionVersion) return null;
     return staff;
   }
 

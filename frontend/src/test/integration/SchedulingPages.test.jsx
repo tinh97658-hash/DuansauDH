@@ -50,7 +50,7 @@ it.each(['major', 'another-major'])("omits internships from suggested courses an
     : url.includes('/masters/class-groups') ? { data: [scopedGroup] }
       : url.includes('/course-offering-candidates') ? { data: { subjects: courses.map(course => ({ subject: course, eligibleClassGroups: [scopedGroup] })) } }
         : originalGet(url));
-  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   fireEvent.focus(await screen.findByRole('combobox', { name: 'Chọn chuyên ngành' }));
   fireEvent.click(await screen.findByRole('option', { name: /Khai thác hàng hải/ }));
   await screen.findByRole('option', { name: '2026' });
@@ -72,7 +72,7 @@ it("does not restore an internship selection or preview its roster from a saved 
   axios.get.mockImplementation(async url => url.includes('/course-offering-candidates')
     ? { data: { subjects: [{ subject: practice, eligibleClassGroups: [group] }, { subject, eligibleClassGroups: [group] }] } }
     : originalGet(url));
-  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   expect(await screen.findByText('1 học phần hiện có thể tổ chức.')).toBeInTheDocument();
   expect(screen.queryByRole('textbox', { name: 'Tên lớp học phần' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /TTTN/ })).not.toBeInTheDocument();
@@ -81,7 +81,7 @@ it("does not restore an internship selection or preview its roster from a saved 
 
 it("keeps the confirmation and entered note mounted when the tab becomes visible and rechecks the session", async () => {
   mocks();
-  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   await reach();
   fireEvent.click(screen.getByRole("button", { name: /KTHH-2026.*Nhóm 1/ }));
   const next = screen.getByRole("button", { name: "Tạo lớp học phần" });
@@ -108,13 +108,13 @@ it("keeps the confirmation and entered note mounted when the tab becomes visible
 
 it("restores the scope, course, class and custom name after leaving and reopening the page", async () => {
   mocks();
-  const first = render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  const first = render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   await reach();
   fireEvent.click(screen.getByRole("button", { name: /KTHH-2026.*Nhóm 1/ }));
   fireEvent.change(screen.getByRole("textbox", { name: "Tên lớp học phần" }), { target: { value: "Lớp đang soạn" } });
   await screen.findByText("HV001");
   first.unmount();
-  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   await screen.findByText("HV001");
   expect(screen.getByRole("combobox", { name: "Khóa / Năm học" })).toHaveValue("2026");
   expect(screen.getByRole("textbox", { name: "Tên lớp học phần" })).toHaveValue("Lớp đang soạn");
@@ -129,7 +129,7 @@ it("selects a retake group as one class, previews only its failed learner and su
   const failed = { id: "admission:failed", code: "HV-FAILED", fullName: "Phan Hải Yến" };
   axios.post.mockImplementation(async url => ({ data: url.endsWith("/roster-preview")
     ? { participants: [failed], participantCount: 1 } : { id: "retake-offering", participantCount: 1 } }));
-  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   await reach();
   fireEvent.click(screen.getByRole("button", { name: /CKTM2026.01/ }));
   await screen.findByText("HV-FAILED");
@@ -149,7 +149,7 @@ it("shows a short class title with retake and newcomer counts", async () => {
   const originalGet = axios.get.getMockImplementation();
   axios.get.mockImplementation(url => url.includes("/course-offering-candidates")
     ? Promise.resolve({ data: { subjects: [{ subject, eligibleClassGroups: [], retakeClassGroups: [mixed] }] } }) : originalGet(url));
-  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   await reach();
   const card = screen.getByRole("button", { name: /CKTM2026.1.1/ });
   expect(within(card).getByText("CKTM2026.1.1")).toBeInTheDocument();
@@ -173,7 +173,7 @@ it("labels only KC knowledge-block subjects as common", async () => {
   }));
   axios.post.mockResolvedValue({ data: { participants: [], participantCount: 0 } });
 
-  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   await reach();
 
   expect(within(screen.getByRole("button", { name: /HP01/ })).queryByText("Môn chung")).not.toBeInTheDocument();
@@ -193,7 +193,7 @@ it("shows each group's own major and submits mixed-major groups outside the work
           : url.includes("/course-offering-candidates") ? { subjects: [{ subject, eligibleClassGroups: [group, maritimeGroup, computingGroup] }] }
             : [],
   }));
-  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   await reach();
   const maritimeButton = screen.getByRole("button", { name: /KTH2026.01 · Lớp hàng hải/ });
   const computingButton = screen.getByRole("button", { name: /CNT2026.02 · Lớp CNTT/ });
@@ -217,7 +217,7 @@ it("shows each group's own major and submits mixed-major groups outside the work
   expect(screen.getByText(`${maritime.name} · ${computing.name} · Năm 2026`)).toBeInTheDocument();
 });
 it("creates a real API draft with blank editable notes and opens scheduling after save", async () => {
-  mocks(); render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  mocks(); render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   await reach();
   fireEvent.click(screen.getByRole("button", { name: /KTHH-2026 · Nhóm 1/ }));
   const create = screen.getByRole("button", { name: "Tạo lớp học phần" });
@@ -237,7 +237,7 @@ it("prefills and saves the exam exemption note supplied by the roster preview", 
   const ordinary = { id: "admission:two", code: "HV002", fullName: "Trần Bình", note: "" };
   axios.post.mockImplementation(async url => ({ data: url.endsWith("/roster-preview")
     ? { participants: [exempt, ordinary], participantCount: 2 } : { id: "offering", subject, participantCount: 2 } }));
-  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   await reach();
   fireEvent.click(screen.getByRole("button", { name: /KTHH-2026 · Nhóm 1/ }));
   const create = screen.getByRole("button", { name: "Tạo lớp học phần" });
@@ -254,14 +254,14 @@ it("prefills and saves the exam exemption note supplied by the roster preview", 
 
 it("uses session permissions and never exposes the demo role switch", async () => {
   mocks({ role: "supervisor", canManageScheduling: true }, []);
-  render(<MemoryRouter><CourseOfferings /></MemoryRouter>); await reach();
+  render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>); await reach();
   expect(screen.getByRole("button", { name: /KTHH-2026 · Nhóm 1/ })).toBeDisabled();
   expect(screen.queryByRole("combobox", { name: "Vai trò" })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Tạo lớp học phần" })).toBeDisabled();
 });
 it("blocks creation when the authoritative roster fails", async () => {
   mocks(); axios.post.mockRejectedValue({ response: { data: { message: "Danh sách đã thay đổi" } } });
-  render(<MemoryRouter><CourseOfferings /></MemoryRouter>); await reach();
+  render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>); await reach();
   fireEvent.click(screen.getByRole("button", { name: /KTHH-2026 · Nhóm 1/ }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Danh sách đã thay đổi");
   expect(screen.getByRole("button", { name: "Tạo lớp học phần" })).toBeDisabled();
@@ -285,7 +285,7 @@ it("allows selecting and merging groups from different cohorts into the course o
       : url.includes("/course-offering-candidates") ? { subjects: [{ subject, eligibleClassGroups: [group, group2024] }] }
       : [],
   }));
-  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   await reach();
 
   expect(screen.getByText(/1 nhóm khóa khác/)).toBeInTheDocument();
@@ -318,7 +318,7 @@ it("allows selecting and merging groups from different cohorts into the course o
 
 it("suggests offering name dynamically and supports custom edit and reset", async () => {
   mocks();
-  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   await reach();
 
   const nameInput = screen.getByRole("textbox", { name: "Tên lớp học phần" });
@@ -382,7 +382,7 @@ it("renders course matrix across cohorts, displays KPIs and switches between vie
       : []
   }));
 
-  render(<MemoryRouter initialEntries={["/masters/course-matrix"]}><CourseMatrixPage /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false} initialEntries={["/masters/course-matrix"]}><CourseMatrixPage /></MemoryRouter>);
 
   expect(await screen.findByText("Tổng số lớp học phần")).toBeInTheDocument();
   expect(screen.queryByText("MA TRẬN LỚP HỌC PHẦN THEO KHÓA")).not.toBeInTheDocument();
@@ -425,7 +425,7 @@ it("displays combined student count in Box 2, shows all roster students, removes
       : { id: "offering", subject, participantCount: 2 },
   }));
 
-  render(<MemoryRouter><CourseOfferings /></MemoryRouter>);
+  render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   await reach();
 
   // Before selecting groups, Box 2 shows hint and 0 học viên

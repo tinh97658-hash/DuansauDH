@@ -34,7 +34,7 @@ beforeEach(() => {
     return { data: { confirmedCount: payload.rows.length } };
   });
 });
-const mount = () => render(<MemoryRouter><AdmissionRecords mode="admitted-masters" /></MemoryRouter>);
+const mount = () => render(<MemoryRouter useTransitions={false}><AdmissionRecords mode="admitted-masters" /></MemoryRouter>);
 it("chọn cả trang chỉ lấy học viên chưa xác nhận và bỏ qua trạng thái tạm hoãn", async () => {
   mount();
   const all = await screen.findByLabelText("Chọn tất cả học viên chưa nộp học phí trên trang này");
