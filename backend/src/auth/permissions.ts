@@ -87,14 +87,39 @@ export const PERMISSIONS: PermissionDefinition[] = [
 
   // ===== Hướng dẫn & phản biện =====
   { code: "supervision.review", group: "Hướng dẫn & phản biện", name: "Duyệt hồ sơ được phân công" },
+
+  // ===== Điểm danh =====
+  { code: "attendance.view", group: "Điểm danh", name: "Xem điểm danh", description: "Xem bản ghi điểm danh, sự kiện nhận diện và hàng đợi duyệt của lớp được phân quyền." },
+  { code: "attendance.enroll", group: "Điểm danh", name: "Đăng ký sinh trắc học", description: "Đăng ký hoặc thay thế template khuôn mặt cho học viên trong roster. Cần có consent hợp lệ." },
+  { code: "attendance.record", group: "Điểm danh", name: "Ghi điểm danh", description: "Ghi hoặc sửa điểm danh thủ công và chạy nhận diện tại kiosk cho buổi học được phân quyền." },
+  { code: "attendance.review", group: "Điểm danh", name: "Duyệt kết quả nhận diện", description: "Xử lý hàng đợi REVIEW/UNKNOWN: chấp nhận, gán người khác, từ chối hoặc bỏ qua." },
+  { code: "attendance.export", group: "Điểm danh", name: "Xuất báo cáo điểm danh", description: "Xuất CSV báo cáo điểm danh của lớp được phân quyền." },
 ];
 
 export const PERMISSION_CODES: string[] = PERMISSIONS.map((permission) => permission.code);
 
-const VIEW_PERMISSIONS = ["catalog.view", "plan.view", "admission.view", "masters.view", "doctoral.view", "scheduling.view", "gradebook.view", "reports.view"];
+const VIEW_PERMISSIONS = [
+  "catalog.view",
+  "plan.view",
+  "admission.view",
+  "masters.view",
+  "doctoral.view",
+  "scheduling.view",
+  "gradebook.view",
+  "reports.view",
+  "attendance.view",
+];
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   admin: PERMISSION_CODES,
-  supervisor: [...VIEW_PERMISSIONS, "supervision.review", "scheduling.write"],
+  supervisor: [
+    ...VIEW_PERMISSIONS,
+    "supervision.review",
+    "scheduling.write",
+    "attendance.enroll",
+    "attendance.record",
+    "attendance.review",
+    "attendance.export",
+  ],
   examiner: [...VIEW_PERMISSIONS, "scheduling.write", "gradebook.submit", "gradebook.policy"],
 };

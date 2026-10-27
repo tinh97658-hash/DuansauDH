@@ -9,6 +9,7 @@ import session from "express-session";
 import passport from "passport";
 import { Sequelize } from "sequelize-typescript";
 import { AccountsModule } from "./accounts/accounts.module.js";
+import { AttendanceModule } from "./attendance/attendance.module.js";
 import { AuditContextMiddleware } from "./audit/audit-context.js";
 import { AuditModule } from "./audit/audit.module.js";
 import { AuthModule } from "./auth/auth.module.js";
@@ -44,6 +45,7 @@ import { DashboardModule } from "./dashboard/dashboard.module.js";
     ReportsModule,
     SchedulingModule,
     DashboardModule,
+    AttendanceModule,
   ],
 })
 export class AppModule implements NestModule {

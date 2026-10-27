@@ -68,6 +68,12 @@ import { DoctoralThesisTopic } from "./models/doctoral/doctoral-thesis-topic.mod
 import { DoctoralWorkshop } from "./models/doctoral/doctoral-workshop.model.js";
 import { DoctoralDefense } from "./models/doctoral/doctoral-defense.model.js";
 import { DoctoralReview } from "./models/doctoral/doctoral-review.model.js";
+// Điểm danh
+import {
+  TeachingSessionAttendance,
+  AttendanceRecognitionEvent,
+  AttendanceReviewQueue,
+} from "../attendance/attendance.models.js";
 
 export const databaseModels = [
   Student, Staff, StaffStudent, Submission,
@@ -82,6 +88,8 @@ export const databaseModels = [
   // Training (class & exam)
   ClassGroup, ClassGroupMember, ClassGroupElective, CourseOffering, CourseOfferingClassGroup, CourseOfferingStudent,
   MajorTransfer, SubjectRecognition, LearnerSubjectResult, TeachingSession, ExamSession, ExamEligibility, ExamResult, CourseExamGradebook,
+  // Attendance
+  TeachingSessionAttendance, AttendanceRecognitionEvent, AttendanceReviewQueue,
   // Masters
   MastersAdmissionScore, EnglishExamSession, EnglishExamScore, EnglishCertification, GraduationDefense, GraduationRecord,
   // Doctoral
