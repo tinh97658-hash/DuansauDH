@@ -5,6 +5,11 @@ export interface GroupScopeContext {
   restrictView: boolean;
   restrictEdit: boolean;
   readOnly: boolean;
+  schedulingView?: boolean;
+  schedulingAction?: 'view' | 'write' | 'organize';
+  schedulingGrants?: import('./scheduling-scopes.js').ScopedGrant[];
+  academicDomain?: 'gradebook' | 'exam' | 'studyleave' | 'policy';
+  academicPermission?: string;
 }
 
 export const groupScopeStorage = new AsyncLocalStorage<GroupScopeContext>();

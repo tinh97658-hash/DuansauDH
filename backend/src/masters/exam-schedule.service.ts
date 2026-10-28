@@ -13,7 +13,7 @@ import {activeExam, validateExamArrangement,externalInvigilatorKey} from './exam
 export class ExamScheduleService {
   constructor(@InjectConnection() private readonly db:Sequelize,private readonly workflow:ExamWorkflowService,private readonly rbac:RbacService){}
   private query(sql:string,args:any={},tx?:Transaction){return this.workflow.query(sql,args,tx);}
-  private async authorize(actor:any){if(!(actor instanceof Staff)||!(await this.rbac.effectiveAccess(actor)).permissions.has('scheduling.write'))throw new ForbiddenException('Bạn không có quyền xếp lịch thi.');}
+  private async authorize(actor:any){if(!(actor instanceof Staff))throw new ForbiddenException('Bạn không có quyền xếp lịch thi.');const access=await this.rbac.effectiveAccess(actor,true);if(!access.permissions.has('scheduling.write')||access.groupScope?.readOnly)throw new ForbiddenException('Bạn không có quyền xếp lịch thi.');}
   async list(query:ExamScheduleQueryDto){
     const bounds=await this.query(`SELECT (CAST(:to AS date) - CAST(:from AS date)) BETWEEN 0 AND 62 ok`,query);
     if(!bounds[0]?.ok)throw new BadRequestException('Khoảng lịch tối đa 63 ngày.');

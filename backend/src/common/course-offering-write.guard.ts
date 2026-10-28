@@ -12,7 +12,7 @@ export class CourseOfferingWriteGuard implements CanActivate {
   async canActivate(context: ExecutionContext) {
     const user = context.switchToHttp().getRequest().user;
     if (!(user instanceof Staff)) throw new ForbiddenException("Bạn không có quyền tổ chức lớp học phần.");
-    const access = await this.rbac.effectiveAccess(user);
+    const access = await this.rbac.effectiveAccess(user, true);
     if (!access.permissions.has("scheduling.organize") || access.groupScope?.readOnly) throw new ForbiddenException("Bạn không có quyền tổ chức lớp học phần.");
     return true;
   }

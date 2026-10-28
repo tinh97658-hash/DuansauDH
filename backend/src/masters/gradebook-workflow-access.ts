@@ -21,8 +21,8 @@ export async function assertGradebookWorkflowAccess(
     throw new BadRequestException("Thao tác bảng điểm không hợp lệ.");
   }
   const permission = ACTION_PERMISSIONS[action as keyof typeof ACTION_PERMISSIONS];
-  const access = await rbac.effectiveAccess(actor);
-  if (!access.permissions.has(permission)) {
+  const access = await rbac.effectiveAccess(actor, true);
+  if (!access.permissions.has(permission) || access.groupScope?.readOnly) {
     throw new ForbiddenException("Bạn không có quyền thực hiện thao tác này");
   }
 }

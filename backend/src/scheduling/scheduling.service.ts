@@ -7,7 +7,7 @@ import { profileForeignLanguageExemptSql } from "../masters/foreign-language-exe
 import { commonWeekdays, isEarlierAcademicYear, readRetakes } from "./retake-policy.js";
 import { failedRetakeMembers, readRetakeResults, readLateUnstudiedMembers, readReturnedMembers, type RetakeResult } from "./retake-groups.js";
 import { availableParticipantSql, BLOCKED_STUDY_STATUSES, BUSINESS_DATE_SQL, notWithdrawnSql } from "../plan/study-leave-policy.js";
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
 import { Op, literal } from "sequelize";
 import type { Transaction } from "sequelize";
@@ -43,6 +43,7 @@ import {
   UpdateTeachingSessionDto,
 } from "./dto/scheduling.dto.js";
 import { enabledSchedulingPrograms, isSchedulingProgramEnabled } from "./scheduling-program.policy.js";
+import { groupScopeStorage } from "../auth/group-scope-context.js";
 
 type OfferingStatus = "active" | "completed";
 
@@ -86,6 +87,29 @@ export class SchedulingService {
     }
   }
 
+  async classGroupOptions(majorId?: string) {
+    const groups = await this.classGroups.findAll({
+      where: { program: "masters", ...(majorId ? { majorId } : {}) },
+      attributes: ["id", "code", "name", "majorId", "academicYear"],
+      order: [["academicYear", "DESC"], ["code", "ASC"]],
+    });
+    return this.attachGroupOrganizationCapabilities(groups);
+  }
+
+  private async attachGroupOrganizationCapabilities(groups: Array<ClassGroup | any>) {
+    if (!groupScopeStorage.getStore()?.schedulingAction || !groups.length) return groups;
+    const capabilities = await this.sequelize.query<{ id: string; allowed: boolean }>(
+      'SELECT id, app_schedule_group_allowed(id,true) AS allowed FROM class_groups WHERE id IN (:ids)', {
+        replacements: { ids: groups.map(group => group.id) }, type: QueryTypes.SELECT,
+      });
+    const allowed = new Set(capabilities.filter(row => row.allowed).map(row => row.id));
+    for (const group of groups) {
+      if (typeof group.setDataValue === 'function') group.setDataValue('canOrganize', allowed.has(group.id));
+      else group.canOrganize = allowed.has(group.id);
+    }
+    return groups;
+  }
+
   private groupSummary(group: ClassGroup | any, localSubject?: Subject | any, memberCount = 0) {
     const value = typeof group?.get === "function" ? group.get({ plain: true }) : group;
     const local = typeof localSubject?.get === "function" ? localSubject.get({ plain: true }) : localSubject;
@@ -100,6 +124,7 @@ export class SchedulingService {
       memberCount,
       allowedWeekdays: value.allowedWeekdays || [1, 2, 3, 4, 5, 6, 0],
       groupType: value.groupType || "ADMINISTRATIVE",
+      ...(value.canOrganize !== undefined ? { canOrganize: value.canOrganize } : {}),
       ...(local ? {
         localSubject: {
           id: local.id,
@@ -158,6 +183,7 @@ export class SchedulingService {
       include: [{ model: Subject, as: "subject", required: true, where: { program } }],
       order: [["createdAt", "ASC"], ["id", "ASC"]],
     });
+    if (groupScopeStorage.getStore()?.schedulingAction) await this.attachParticipantCounts(offerings);
     const sessions = offeringIds.length === 0 ? [] : await this.teachingSessions.findAll({
       where: { courseOfferingId: { [Op.in]: offeringIds } },
       include: [
@@ -274,6 +300,7 @@ export class SchedulingService {
             return !outcome || !["passed", "exempt"].includes(outcome.result);
           }) : (missingGradeCounts.get(key) || 0) > 0;
           return {
+            canWriteSchedule: offering.canWriteSchedule, canOrganize: offering.canOrganize,
             id: offering.id, name: offering.name || subject.name, studyRole: link.studyRole || "primary",
             status: offering.status === "completed" ? "completed" : held > 0 ? "in_progress" : planned > 0 ? "scheduled" : "not_started",
             memberCount: rosterIds.length, heldSessionCount: held, plannedSessionCount: planned,
@@ -521,6 +548,43 @@ export class SchedulingService {
    * này phải loại học viên khỏi sĩ số ở mã kia.
    */
   private async attachParticipantCounts(offerings: Array<CourseOffering | any>, transaction?: Transaction) {
+    const scope = groupScopeStorage.getStore();
+    if (scope?.staffId && scope.schedulingAction) {
+      const ids = [...new Set(offerings.map(row => row.id).filter(Boolean))];
+      const capabilities = ids.length ? await this.sequelize.query<{ id: string; write: boolean; organize: boolean }>(
+        "SELECT id, app_schedule_allowed(id,'scheduling.write') AS write, app_schedule_allowed(id,'scheduling.organize') AS organize FROM course_offerings WHERE id IN (:ids)",
+        { replacements: { ids }, type: QueryTypes.SELECT, transaction },
+      ) : [];
+      const byId = new Map(capabilities.map(row => [row.id, row]));
+      for (const offering of offerings) {
+        const values = { canWriteSchedule: byId.get(offering.id)?.write === true,
+          canOrganize: byId.get(offering.id)?.organize === true,
+          scheduleWriteBlockedReason: byId.get(offering.id)?.write ? null : scope.readOnly ? 'READ_ONLY' : 'SCHEDULE_SCOPE_DENIED' };
+        for (const [key, value] of Object.entries(values)) {
+          if (typeof offering.setDataValue === 'function') offering.setDataValue(key, value);
+          else offering[key] = value;
+        }
+      }
+    } else if (scope?.staffId && (scope.restrictView || scope.restrictEdit || scope.readOnly)) {
+      const ids = [...new Set(offerings.map(row => row.id).filter(Boolean))];
+      const capabilities = !scope.readOnly && ids.length ? await this.sequelize.query<{ id: string; allowed: boolean }>(
+        'SELECT id, (app_offering_allowed(id, false) AND app_offering_allowed(id, true)) AS allowed FROM course_offerings WHERE id IN (:ids)',
+        { replacements: { ids }, type: QueryTypes.SELECT, transaction },
+      ) : [];
+      const writable = new Set(capabilities.filter(row => row.allowed).map(row => row.id));
+      for (const offering of offerings) {
+        if (typeof offering.setDataValue === 'function') offering.setDataValue('scopeWritable', writable.has(offering.id));
+        else offering.scopeWritable = writable.has(offering.id);
+      }
+    }
+    if (scope?.schedulingAction) {
+      for (const offering of offerings) {
+        const rows = await this.sequelize.query<{ count: number }>('SELECT app_schedule_count(:id) AS count', {
+          replacements: { id: offering.id }, type: QueryTypes.SELECT, transaction });
+        this.setParticipantCount(offering, Number(rows[0]?.count ?? 0));
+      }
+      return offerings;
+    }
     const withdrawn = await this.withdrawnIdentities(offerings.map(row => row.id).filter(Boolean), transaction);
     const groupIds = [...new Set(offerings.flatMap((offering) => (
       (offering.groupLinks || []).map((link: CourseOfferingClassGroup | any) => link.classGroupId || link.classGroup?.id)
@@ -813,6 +877,11 @@ export class SchedulingService {
   }
 
   private setSessionSummary(offering: CourseOffering | any, summary: Record<string, unknown>) {
+    if (groupScopeStorage.getStore()?.schedulingAction) {
+      const canComplete = offering.canWriteSchedule === true && offering.status === 'active' && Number(summary.heldCount) > 0;
+      if (typeof offering?.setDataValue === 'function') offering.setDataValue('canCompleteTeaching', canComplete);
+      else offering.canCompleteTeaching = canComplete;
+    }
     if (typeof offering?.setDataValue === "function") offering.setDataValue("sessionSummary", summary);
     else offering.sessionSummary = summary;
   }
@@ -882,6 +951,7 @@ export class SchedulingService {
       include: [{ model: Major, as: "major", attributes: ["id", "name"] }],
       order: [["code", "ASC"]],
     });
+    await this.attachGroupOrganizationCapabilities(groups);
     const anchorGroupIds = new Set(groups.filter((group) => group.majorId === query.majorId && group.academicYear === query.academicYear).map((group) => group.id));
     if (anchorGroupIds.size === 0) {
       return { scope: { program, majorId: query.majorId, academicYear: query.academicYear }, subjects: [] };
@@ -1245,7 +1315,7 @@ export class SchedulingService {
           subjectName: subject.name, groupIds: sortedGroupIds }, transaction,
       });
 
-      return this.findCourseOfferingById(offering.id, transaction);
+      return this.publicCourseOffering(await this.findCourseOfferingById(offering.id, transaction));
     });
   }
 
@@ -1276,11 +1346,12 @@ export class SchedulingService {
       include: this.offeringIncludes({ program }),
       order: [["createdAt", "DESC"]],
     });
-    return this.attachCourseOfferingMetadata(offerings);
+    await this.attachCourseOfferingMetadata(offerings);
+    return offerings.map(offering => this.publicCourseOffering(offering));
   }
 
   async getCourseOffering(id: string) {
-    return this.findCourseOfferingById(id);
+    return this.publicCourseOffering(await this.findCourseOfferingById(id));
   }
 
   private normalizeTime(value: string) {
@@ -1343,6 +1414,13 @@ export class SchedulingService {
       { model: Room, as: "room", attributes: ["id", "code", "name", "capacity", "isActive"] },
       { model: Staff, as: "confirmedBy", attributes: ["id", "name", "email"] },
     ];
+  }
+
+  private async assertScheduleAccess(id: string, transaction: Transaction, permission = 'scheduling.write') {
+    if (!groupScopeStorage.getStore()?.schedulingAction) return;
+    const rows = await this.sequelize.query<{ allowed: boolean }>(
+      "SELECT app_schedule_allowed(:id,:permission) AS allowed", { replacements: { id, permission }, type: QueryTypes.SELECT, transaction });
+    if (!rows[0]?.allowed) throw new ForbiddenException('Bạn không có quyền thao tác lịch của lớp học phần này.');
   }
 
   private async offeringGroupIds(courseOfferingId: string, transaction: Transaction) {
@@ -1417,7 +1495,9 @@ export class SchedulingService {
     if (classGroupIds.length === 0) {
       throw new BadRequestException("Lớp học phần chưa có thành phần nhóm học viên hợp lệ.");
     }
-    const lockedGroups = await this.classGroups.findAll({
+    const lockedGroups = groupScopeStorage.getStore()?.schedulingAction
+      ? await this.sequelize.query<any>('SELECT id, program, allowed_weekdays AS "allowedWeekdays" FROM app_schedule_groups(:id)', { replacements: { id: courseOfferingId }, type: QueryTypes.SELECT, transaction })
+      : await this.classGroups.findAll({
       where: { id: { [Op.in]: classGroupIds } },
       order: [["id", "ASC"]],
       transaction,
@@ -1441,7 +1521,9 @@ export class SchedulingService {
       throw new BadRequestException("Thành phần nhóm học viên không phù hợp với chương trình của lớp học phần.");
     }
 
-    const participantCount = (await this.offeringMemberIdentities(courseOfferingId, classGroupIds, transaction)).size;
+    const participantCount = groupScopeStorage.getStore()?.schedulingAction
+      ? Number((await this.sequelize.query<{ count: number }>('SELECT app_schedule_count(:id) AS count', { replacements: { id: courseOfferingId }, type: QueryTypes.SELECT, transaction }))[0]?.count ?? 0)
+      : (await this.offeringMemberIdentities(courseOfferingId, classGroupIds, transaction)).size;
     if (targetRoom.capacity === null || targetRoom.capacity === undefined) {
       throw new ConflictException({
         code: "ROOM_CAPACITY_MISSING",
@@ -1523,6 +1605,16 @@ export class SchedulingService {
     transaction: Transaction,
     excludeSessionId?: string,
   ) {
+    if (groupScopeStorage.getStore()?.schedulingAction) {
+      const rows = await this.sequelize.query<{ conflict: string | null }>(
+        'SELECT app_schedule_conflict(:offering,:day,:slot,:room,:lecturer,:excluded) AS conflict', {
+          replacements: { offering: values.courseOfferingId, day: values.sessionDate, slot: values.period,
+            room: values.roomId, lecturer: values.lecturerId, excluded: excludeSessionId ?? null }, type: QueryTypes.SELECT, transaction,
+        });
+      if (rows[0]?.conflict) throw new ConflictException({ code: rows[0].conflict,
+        message: 'Phòng, giảng viên hoặc học viên đã có lịch trong buổi này. Vui lòng chọn tài nguyên hoặc buổi khác.' });
+      return;
+    }
     const where: Record<string | symbol, unknown> = {
       sessionDate: values.sessionDate,
       period: values.period,
@@ -1641,6 +1733,7 @@ export class SchedulingService {
     this.assertTargetSessionNotStarted(dto.sessionDate, startTime);
     return this.sequelize.transaction(async (transaction) => {
       await this.sequelize.query("SELECT pg_advisory_xact_lock(21025)", { transaction });
+      await this.assertScheduleAccess(dto.courseOfferingId, transaction);
       await this.assertOfferingLecturer(dto.courseOfferingId, dto.lecturerId, transaction);
       const classGroupIds = await this.offeringGroupIds(dto.courseOfferingId, transaction);
       const resources = await this.lockAndValidateSessionResources(
@@ -1679,6 +1772,7 @@ export class SchedulingService {
       await this.sequelize.query("SELECT pg_advisory_xact_lock(21025)", { transaction });
       const session = await this.teachingSessions.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!session) throw new NotFoundException("Không tìm thấy buổi học.");
+      await this.assertScheduleAccess(session.courseOfferingId, transaction);
       if (session.status !== "planned") throw new ConflictException("Chỉ buổi học đang ở trạng thái đã xếp mới được chỉnh sửa.");
       if (this.sessionHasEnded(session)) {
         throw new ConflictException({
@@ -1727,6 +1821,7 @@ export class SchedulingService {
     return this.sequelize.transaction(async (transaction) => {
       const session = await this.teachingSessions.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!session) throw new NotFoundException("Không tìm thấy buổi học.");
+      await this.assertScheduleAccess(session.courseOfferingId, transaction);
       const offering = await this.courseOfferings.findByPk(session.courseOfferingId, { transaction });
       if (!offering) throw new BadRequestException("Lớp học phần của buổi học không còn tồn tại.");
       await this.requireEnabledOfferingSubject(offering, transaction);
@@ -1767,6 +1862,7 @@ export class SchedulingService {
 
   async deleteCourseOfferingSchedule(id: string) {
     return this.sequelize.transaction(async transaction => {
+      await this.assertScheduleAccess(id, transaction);
       await this.lockOfferingForDeletion(id, transaction);
       const deletedCount = await this.teachingSessions.destroy({ where: { courseOfferingId: id }, transaction });
       return { id, deletedCount };
@@ -1775,6 +1871,7 @@ export class SchedulingService {
 
   async deleteCourseOffering(id: string) {
     return this.sequelize.transaction(async transaction => {
+      await this.assertScheduleAccess(id, transaction, 'scheduling.organize');
       const { offering, sessions } = await this.lockOfferingForDeletion(id, transaction);
       if (sessions.length) {
         throw new ConflictException({ code: "OFFERING_HAS_SCHEDULE",
@@ -1797,6 +1894,7 @@ export class SchedulingService {
     return this.sequelize.transaction(async (transaction) => {
       const session = await this.teachingSessions.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!session) throw new NotFoundException("Không tìm thấy buổi học.");
+      await this.assertScheduleAccess(session.courseOfferingId, transaction);
       const offering = await this.courseOfferings.findByPk(session.courseOfferingId, { transaction });
       if (!offering) throw new BadRequestException("Lớp học phần của buổi học không còn tồn tại.");
       await this.requireEnabledOfferingSubject(offering, transaction);
@@ -1818,10 +1916,11 @@ export class SchedulingService {
   async completeCourseOffering(id: string, staffId: string, dto: CompleteCourseOfferingDto = {}) {
     return this.sequelize.transaction(async (transaction) => {
       await this.sequelize.query("SELECT pg_advisory_xact_lock(21025)", { transaction });
+      await this.assertScheduleAccess(id, transaction);
       const offering = await this.courseOfferings.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!offering) throw new NotFoundException("Không tìm thấy lớp học phần.");
       await this.requireEnabledOfferingSubject(offering, transaction);
-      if (offering.status === "completed") return this.findCourseOfferingById(id, transaction);
+      if (offering.status === "completed") return this.publicCourseOffering(await this.findCourseOfferingById(id, transaction));
       const sessions = await this.teachingSessions.findAll({
         where: { courseOfferingId: id },
         attributes: ["id", "status", "sessionDate", "endTime"],
@@ -1863,7 +1962,7 @@ export class SchedulingService {
         completedAt: new Date(),
         completedByStaffId: staffId,
       }, { transaction });
-      return this.findCourseOfferingById(id, transaction);
+      return this.publicCourseOffering(await this.findCourseOfferingById(id, transaction));
     });
   }
 
@@ -1883,6 +1982,27 @@ export class SchedulingService {
     const value = typeof session?.get === "function" ? session.get({ plain: true }) : { ...session };
     delete value.startTime;
     delete value.endTime;
+    if (value.courseOffering) value.courseOffering = this.publicCourseOffering(value.courseOffering);
+    return value;
+  }
+
+  private publicCourseOffering(offering: CourseOffering | any) {
+    if (!groupScopeStorage.getStore()?.restrictView && !groupScopeStorage.getStore()?.schedulingAction) return offering;
+    const value = typeof offering?.get === "function" ? offering.get({ plain: true }) : { ...offering };
+    // These JSON columns can contain learners from groups hidden by row-level security.
+    delete value.gradebookSnapshot;
+    delete value.participantNotes;
+    value.groupLinks = (value.groupLinks || []).map((link: any) => {
+      const { participantIds, ...visible } = link;
+      if (visible.classGroup) {
+        const group = visible.classGroup;
+        visible.classGroup = Object.fromEntries([
+          'id', 'program', 'code', 'name', 'majorId', 'major', 'academicYear',
+          'status', 'allowedWeekdays', 'groupType', 'memberCount', 'canOrganize',
+        ].filter(key => group[key] !== undefined).map(key => [key, group[key]]));
+      }
+      return visible;
+    });
     return value;
   }
 
@@ -1913,6 +2033,7 @@ export class SchedulingService {
     const ids = new Set(roster.participants.map((row) => row.id));
     if (dto.participantNotes.some((entry) => !ids.has(entry.participantId))) throw new BadRequestException("Ghi chú chứa học viên ngoài danh sách lớp.");
     return this.sequelize.transaction(async (transaction) => {
+      await this.assertScheduleAccess(id, transaction, 'scheduling.organize');
       const offering = await this.courseOfferings.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!offering) throw new NotFoundException("Không tìm thấy lớp học phần.");
       await offering.update({ participantNotes: dto.participantNotes.map((entry) => ({ ...entry, note: entry.note.trim() })).filter((entry) => entry.note) }, { transaction });

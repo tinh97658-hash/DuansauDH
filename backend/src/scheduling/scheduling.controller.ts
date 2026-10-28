@@ -27,6 +27,11 @@ import { SchedulingService } from "./scheduling.service.js";
 export class SchedulingController {
   constructor(private readonly scheduling: SchedulingService) {}
 
+  @Get("class-groups/options")
+  classGroupOptions(@Query("majorId", new ParseUUIDPipe({ optional: true })) majorId?: string) {
+    return this.scheduling.classGroupOptions(majorId);
+  }
+
   @Get("course-offering-candidates")
   candidates(@Query() query: CourseOfferingCandidatesQueryDto) {
     return this.scheduling.listCourseOfferingCandidates(query);
@@ -80,7 +85,7 @@ export class SchedulingController {
   @Get("retakes")
   retakes(@Query() dto: RetakeQueryDto) { return this.scheduling.listRetakes(dto); }
 
-  @Post("retakes") @RequirePermissions("scheduling.write") @UseGuards(SchedulingWriteGuard)
+  @Post("retakes") @RequirePermissions("scheduling.organize") @UseGuards(CourseOfferingWriteGuard)
   registerRetake(@Body() dto: RegisterRetakeDto) { return this.scheduling.registerRetake(dto); }
 
   @Get("course-offerings/:id/roster")

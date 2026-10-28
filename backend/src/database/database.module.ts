@@ -1,3 +1,4 @@
+import { RolePermissionScope } from './models/role-permission-scope.model.js';
 import { AdmissionRound, AdmissionEvaluation, AdmissionEvaluationHistory } from "./models/plan/admission-evaluation.model.js";
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -72,7 +73,7 @@ import { DoctoralReview } from "./models/doctoral/doctoral-review.model.js";
 export const databaseModels = [
   Student, Staff, StaffStudent, Submission,
   // RBAC & quản lý tài khoản
-  Role, Permission, RolePermission, StaffRole, AuthAuditLog, DbChangeLog,
+  Role, Permission, RolePermission, RolePermissionScope, StaffRole, AuthAuditLog, DbChangeLog,
   // Common
   Ethnicity, Nationality, City, District, Ward, TrainingModeGroup, TrainingMode, TrainingLevel,
   Discipline, Major, StudyStatus, BridgeKnowledgeSubject, Lecturer, Unit, Room, TrainingProgram,

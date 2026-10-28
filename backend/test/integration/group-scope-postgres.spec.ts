@@ -13,6 +13,12 @@ import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes, Transaction } from 'sequelize';
 import { AppModule } from '../../src/app.module.js';
 import { GroupScopeService } from '../../src/auth/group-scope.service.js';
+import { Discipline } from '../../src/database/models/common/discipline.model.js';
+import { Major } from '../../src/database/models/common/major.model.js';
+import { Subject } from '../../src/database/models/plan/subject.model.js';
+import { Room } from '../../src/database/models/common/room.model.js';
+import { Lecturer } from '../../src/database/models/common/lecturer.model.js';
+import { TeachingSession } from '../../src/database/models/training/teaching-session.model.js';
 
 const describeDb = process.env.RUN_GROUP_SCOPE_POSTGRES_TESTS === 'true' ? describe : describe.skip;
 
@@ -28,6 +34,7 @@ describeDb('Group scope through PostgreSQL and pooled queries', () => {
   let unassigned: string;
   let ownedRecord: string;
   let otherRecord: string;
+  const catalogIds = { discipline: randomUUID(), major: randomUUID(), english: randomUUID(), subject: randomUUID() };
   const flags = (restrictView = false, restrictEdit = false, readOnly = false) => ({
     permissions: new Set<string>(), roleCodes: [], groupScope: { restrictView, restrictEdit, readOnly },
   });
@@ -45,6 +52,11 @@ describeDb('Group scope through PostgreSQL and pooled queries', () => {
     });
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     await app.init();
+    await Discipline.create({ id: catalogIds.discipline, code: `S${catalogIds.discipline.slice(0, 8)}`, name: 'Scope test discipline' });
+    await Major.create({ id: catalogIds.major, disciplineId: catalogIds.discipline, code: `S${catalogIds.major.slice(0, 8)}`, name: 'Scope test major', program: 'masters' });
+    for (const [id, name] of [[catalogIds.english, 'Tiếng Anh'], [catalogIds.subject, 'Scope test subject']]) {
+      await Subject.create({ id, code: `S${id.slice(0, 8)}`, name, majorId: catalogIds.major, program: 'masters' });
+    }
   });
   beforeEach(async () => {
     jest.spyOn(app.get(RbacService), "effectiveAccess").mockImplementation(async () => httpAccess);
@@ -72,7 +84,14 @@ describeDb('Group scope through PostgreSQL and pooled queries', () => {
       await db.query('DELETE FROM staff WHERE id=:id', { replacements: { id: staffId } });
     }
   });
-  afterAll(async () => { await app?.close(); });
+  afterAll(async () => {
+    if (db) {
+      await Subject.destroy({ where: { id: [catalogIds.english, catalogIds.subject] } });
+      await Major.destroy({ where: { id: catalogIds.major } });
+      await Discipline.destroy({ where: { id: catalogIds.discipline } });
+    }
+    await app?.close();
+  });
 
   it('does not restrict an employee until a lock is enabled', async () => {
     const rows = await scope.run(staffId, flags(), () => query('SELECT id FROM class_groups WHERE id IN (:ids)', { ids: [owned, other, unassigned] }));
@@ -131,7 +150,7 @@ describeDb('Group scope through PostgreSQL and pooled queries', () => {
     ClassGroup.addHook('beforeFind', 'observe_scope', () => { observed = scope.current(); });
     const list = await request(app.getHttpServer()).get('/masters/class-groups').expect(200);
     ClassGroup.removeHook('beforeFind', 'observe_scope');
-    expect(configured).toHaveBeenCalledWith(staffId, httpAccess);
+    expect(configured).toHaveBeenCalledWith(staffId, httpAccess, false, undefined);
     expect(observed).toEqual(expect.objectContaining({ staffId, restrictView: true }));
     expect(list.body.map((group: any) => group.id)).toEqual([owned]);
     const options = await request(app.getHttpServer()).get('/masters/class-groups/options').expect(200);
@@ -152,7 +171,11 @@ describeDb('Group scope through PostgreSQL and pooled queries', () => {
     expect(assigned.body.data.responsibleStaffId).toBe(staffId);
     httpAccess = { ...flags(false, false, true), permissions: httpAccess.permissions };
     await request(app.getHttpServer()).put(`/groups/${owned}/responsible-staff`).send({ responsibleStaffId: staffId }).expect(403);
-
+    httpAccess = { ...flags(true, true), permissions: new Set(['scheduling.view', 'scheduling.organize']) };
+    const schedulingOptions = await request(app.getHttpServer()).get('/scheduling/class-groups/options').expect(200);
+    expect(schedulingOptions.body.map((group: any) => group.id)).toEqual(expect.arrayContaining([owned]));
+    expect(schedulingOptions.body.map((group: any) => group.id)).toContain(unassigned);
+    await request(app.getHttpServer()).get('/masters/class-groups/options').expect(403);
   });
 
   it('can create an offering for the assigned group under both scope locks', async () => {
@@ -177,6 +200,57 @@ describeDb('Group scope through PostgreSQL and pooled queries', () => {
       expect(await query('SELECT id FROM course_offerings WHERE id=:id', { id: offering.id })).toHaveLength(0);
       expect(await query('SELECT id FROM course_exam_gradebooks WHERE course_offering_id=:id', { id: offering.id })).toHaveLength(0);
     });
+  });
+
+  it('shows a shared timetable only in scheduling reads and retains learner and write restrictions', async () => {
+    const [subject] = await query('SELECT id FROM subjects LIMIT 1');
+    const offering = await CourseOffering.create({ subjectId: subject.id }, { transaction: tx });
+    const room = await Room.create({ code: `R${randomUUID().slice(0, 8)}`, name: 'Scope room', capacity: 50, isActive: true }, { transaction: tx });
+    const lecturer = await Lecturer.create({ code: `L${randomUUID().slice(0, 8)}`, name: 'Scope lecturer', active: true }, { transaction: tx });
+    const session = await TeachingSession.create({ courseOfferingId: offering.id, sessionDate: '2099-01-05', startTime: '07:00', endTime: '12:00', period: 'MORNING', lecturerId: lecturer.id, roomId: room.id }, { transaction: tx });
+    for (const groupId of [owned, other]) await query(`INSERT INTO course_offering_class_groups(id,course_offering_id,class_group_id,created_at,updated_at)
+      VALUES (:id,:offering,:groupId,now(),now()) RETURNING id`, { id: randomUUID(), offering: offering.id, groupId });
+    await query(`INSERT INTO course_exam_gradebooks(id,course_offering_id,class_group_id,grades,created_at,updated_at)
+      VALUES (:id,:offering,:owned,'[]'::jsonb,now(),now()) RETURNING id`, { id: randomUUID(), offering: offering.id, owned });
+    await scope.run(staffId, flags(true, true), async () => {
+      expect(await query('SELECT id FROM course_offerings WHERE id=:id', { id: offering.id })).toHaveLength(1);
+      expect(await query('SELECT id FROM teaching_sessions WHERE id=:id', { id: session.id })).toHaveLength(1);
+      expect(await query('SELECT class_group_id FROM course_offering_class_groups WHERE course_offering_id=:id', { id: offering.id })).toEqual([{ class_group_id: owned }]);
+      expect(await query('SELECT id FROM admission_records WHERE id=:id', { id: otherRecord })).toHaveLength(0);
+      expect(await query('SELECT id FROM course_exam_gradebooks WHERE course_offering_id=:id', { id: offering.id })).toHaveLength(0);
+      expect(await query('SELECT app_offering_allowed(:id,true) AS allowed', { id: offering.id })).toEqual([{ allowed: false }]);
+      expect(await query("UPDATE course_offerings SET note='blocked' WHERE id=:id RETURNING id", { id: offering.id })).toHaveLength(0);
+      expect(await query('DELETE FROM course_offerings WHERE id=:id RETURNING id', { id: offering.id })).toHaveLength(0);
+      expect(await query("UPDATE teaching_sessions SET note='blocked' WHERE id=:id RETURNING id", { id: session.id })).toHaveLength(0);
+      expect(await query('DELETE FROM teaching_sessions WHERE id=:id RETURNING id', { id: session.id })).toHaveLength(0);
+    }, true);
+    await tx.commit();
+    try {
+      httpAccess = { ...flags(true, true), permissions: new Set(['scheduling.view', 'scheduling.write', 'scheduling.organize']) };
+      const detail = await request(app.getHttpServer()).get(`/scheduling/course-offerings/${offering.id}`).expect(200);
+      expect(detail.body.canWriteSchedule).toBe(true);
+      expect(detail.body).not.toHaveProperty('gradebookSnapshot');
+      expect(detail.body).not.toHaveProperty('participantNotes');
+      expect(detail.body.groupLinks.map((link: any) => link.classGroupId).sort()).toEqual([owned, other].sort());
+      const roster = await request(app.getHttpServer()).get(`/scheduling/course-offerings/${offering.id}/roster`).expect(200);
+      expect(roster.body.participants.map((person: any) => person.id)).toEqual(expect.arrayContaining([`admission:${ownedRecord}`, `admission:${otherRecord}`]));
+      const calendar = await request(app.getHttpServer()).get('/scheduling/teaching-sessions?from=2099-01-05&to=2099-01-05').expect(200);
+      expect(calendar.body.map((row: any) => row.id)).toContain(session.id);
+      expect(calendar.body.find((row: any) => row.id === session.id).courseOffering.canWriteSchedule).toBe(true);
+      httpAccess = { ...flags(true, true, true), permissions: httpAccess.permissions };
+      await request(app.getHttpServer()).delete(`/scheduling/course-offerings/${offering.id}/teaching-sessions`).expect(403);
+      await request(app.getHttpServer()).delete(`/scheduling/teaching-sessions/${session.id}`).expect(403);
+      await request(app.getHttpServer()).put(`/scheduling/teaching-sessions/${session.id}/confirmation`).send({ status: 'held' }).expect(403);
+      httpAccess = { ...flags(true, true, true), permissions: httpAccess.permissions };
+      await request(app.getHttpServer()).get(`/scheduling/course-offerings/${offering.id}`).expect(200);
+    } finally {
+      await TeachingSession.destroy({ where: { id: session.id } });
+      await db.query('DELETE FROM course_exam_gradebooks WHERE course_offering_id=:id', { replacements: { id: offering.id } });
+      await db.query('DELETE FROM course_offering_class_groups WHERE course_offering_id=:id', { replacements: { id: offering.id } });
+      await CourseOffering.destroy({ where: { id: offering.id } });
+      await Room.destroy({ where: { id: room.id } });
+      await Lecturer.destroy({ where: { id: lecturer.id } });
+    }
   });
 
   it('keeps exemption lookups correct and scoped, including malformed participant identities', async () => {

@@ -1,4 +1,5 @@
-import { BelongsToMany, Column, DataType, Default, Model, Table } from "sequelize-typescript";
+import { RolePermissionScope } from './role-permission-scope.model.js';
+import { BelongsToMany, HasMany, Column, DataType, Default, Model, Table } from "sequelize-typescript";
 import { Permission } from "./permission.model.js";
 import { RolePermission } from "./role-permission.model.js";
 import { Staff } from "./staff.model.js";
@@ -34,6 +35,9 @@ export class Role extends Model {
   @Default(false) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare restrictGroupView: boolean;
   @Default(false) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare restrictGroupEdit: boolean;
   @Default(false) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare groupReadOnly: boolean;
+
+  @Default(1) @Column({ type: DataType.INTEGER, allowNull: false }) declare schedulingScopeVersion: number;
+  @HasMany(() => RolePermissionScope) declare permissionScopes: RolePermissionScope[];
 
   @BelongsToMany(() => Permission, () => RolePermission)
   declare permissions: Permission[];

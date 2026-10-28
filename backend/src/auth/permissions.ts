@@ -71,9 +71,9 @@ export const PERMISSIONS: PermissionDefinition[] = [
   { code: "doctoral.manage", group: "Đào tạo Tiến sĩ", name: "Quản lý nghiệp vụ Tiến sĩ", description: "Quyền quản lý nghiệp vụ Tiến sĩ; chỉ có tác dụng với các chức năng đã triển khai thao tác ghi và kiểm tra quyền này." },
 
   // ===== Lớp học phần & xếp lịch =====
-  { code: "scheduling.view", group: "Lớp học phần & xếp lịch", name: "Xem lớp học phần, lịch học", description: "Xem lớp học phần, danh sách học viên và lịch học trong phạm vi được phép." },
+  { code: "scheduling.view", group: "Lớp học phần & xếp lịch", name: "Xem lớp học phần, lịch học", description: "Xem lớp học phần, danh sách học viên và lịch học toàn viện, không cần phân công nhóm." },
   { code: "scheduling.organize", group: "Lớp học phần & xếp lịch", name: "Tổ chức lớp học phần", description: "Tạo, quản lý và xóa lớp học phần theo điều kiện nghiệp vụ. Không cần được phân công quản lý lịch; quyền sửa lịch học được cấp riêng." },
-  { code: "scheduling.write", group: "Lớp học phần & xếp lịch", name: "Xếp, sửa và xác nhận lịch", description: "Tạo, sửa, xóa, xác nhận lịch học và xử lý lịch thi trong phạm vi được phép. Không cần cờ phân công quản lý lịch. Các khóa chỉ xem và giới hạn theo nhóm vẫn có hiệu lực." },
+  { code: "scheduling.write", group: "Lớp học phần & xếp lịch", name: "Xếp, sửa và xác nhận lịch", description: "Xếp, sửa, xóa, xác nhận buổi học và hoàn thành giảng dạy toàn viện, không cần phân công nhóm. Khóa Chỉ xem luôn chặn ghi. Không bao gồm tổ chức lớp hoặc nhập, duyệt điểm." },
   { code: "scheduling.assign", group: "Lớp học phần & xếp lịch", name: "Phân công người quản lý lịch đào tạo", description: "Chọn người đầu mối phụ trách lịch đào tạo; phân công mới chuyển trách nhiệm từ người cũ. Không tự cấp quyền tạo lớp hoặc sửa lịch; các quyền nghiệp vụ được chọn riêng." },
 
   // ===== Thi & điểm =====

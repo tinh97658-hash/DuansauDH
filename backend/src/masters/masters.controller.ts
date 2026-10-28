@@ -4,7 +4,7 @@ import { ConfirmExamDto, ExamScheduleQueryDto, ExamSessionActionDto, RescheduleE
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
 import { GroupResponsibilityService } from "../auth/group-responsibility.service.js";
 import { CurrentUser } from "../common/auth-user.js";
-import { RequirePermissions } from "../common/permissions.decorator.js";
+import { RequirePermissions, RequireAnyPermissions } from "../common/permissions.decorator.js";
 import { PermissionsGuard } from "../common/permissions.guard.js";
 import { GradebookWorkflowGuard } from "./gradebook-workflow.guard.js";
 import { GradingPolicyService } from "./grading-policy.service.js";
@@ -44,7 +44,7 @@ export class MastersController {
   eligibilityWorkflow(@Body() dto:GradebookWorkflowDto,@CurrentUser() actor:any){return this.gradebooks.transition(dto,actor,'eligibility');}
   @Post('exam-lists/final/workflow') @RequirePermissions() @UseGuards(GradebookWorkflowGuard)
   finalWorkflow(@Body() dto:GradebookWorkflowDto,@CurrentUser() actor:any){return this.gradebooks.transition(dto,actor,'final');}
-  @Get('exam-schedule') @RequirePermissions('gradebook.view')
+  @Get('exam-schedule') @RequirePermissions() @RequireAnyPermissions('scheduling.view','gradebook.view')
   listExamSchedule(@Query() query:ExamScheduleQueryDto){return this.examSchedule.list(query);}
   @Post('exam-arrangements') @RequirePermissions('scheduling.write')
   createExamArrangement(@Body() dto:SaveExamArrangementDto,@CurrentUser() actor:any){return this.examSchedule.saveArrangement(null,dto,actor);}

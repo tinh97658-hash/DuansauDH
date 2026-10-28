@@ -25,6 +25,7 @@ export class ClassGroup extends Model {
   @BelongsTo(() => Curriculum) declare curriculum: Curriculum | null;
   @ForeignKey(() => Staff) @Column({ type: DataType.UUID, allowNull: true }) declare responsibleStaffId: string | null;
   @BelongsTo(() => Staff) declare responsibleStaff: Staff | null;
+  @Column({ type: DataType.VIRTUAL }) declare canOrganize: boolean;
   @Column(DataType.VIRTUAL) get canEdit(): boolean {
     const scope = groupScopeStorage.getStore();
     return !scope?.readOnly && (!scope?.restrictEdit || this.responsibleStaffId === scope.staffId);

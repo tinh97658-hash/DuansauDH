@@ -32,6 +32,7 @@ export class GroupResponsibilityService {
 
   assign(groupId: string, staffId: string) {
     return this.db.transaction(async transaction => {
+      await this.db.query('SELECT pg_advisory_xact_lock(74621901)', { transaction });
       const group = await ClassGroup.findByPk(groupId, { transaction, lock: transaction.LOCK.UPDATE });
       if (!group) throw new NotFoundException('Không tìm thấy nhóm trong phạm vi được phép.');
       const staff = await Staff.findByPk(staffId, { transaction, lock: transaction.LOCK.UPDATE });

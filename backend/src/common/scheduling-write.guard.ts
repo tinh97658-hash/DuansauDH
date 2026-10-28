@@ -12,8 +12,9 @@ export class SchedulingWriteGuard implements CanActivate {
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest();
     if (!(request.user instanceof Staff)) throw new ForbiddenException("Bạn không có quyền chỉnh sửa lịch đào tạo.");
-    const access = await this.rbac.effectiveAccess(request.user);
-    if (!canWriteScheduling(request.user, access.permissions) || access.groupScope?.readOnly) {
+    const access = await this.rbac.effectiveAccess(request.user, true);
+    const writing = !['GET', 'HEAD', 'OPTIONS'].includes(request.method);
+    if (!canWriteScheduling(request.user, access.permissions) || (writing && access.groupScope?.readOnly)) {
       throw new ForbiddenException("Bạn chưa có quyền xếp, sửa và xác nhận lịch hoặc vai trò đang bị khóa chỉ xem.");
     }
     return true;

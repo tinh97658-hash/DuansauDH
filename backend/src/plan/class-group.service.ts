@@ -138,6 +138,9 @@ export class ClassGroupService {
 
   async update(id: string, input: UpdateClassGroupInput, transaction?: Transaction) {
     if (!transaction) return this.sequelize.transaction((tx) => this.update(id, input, tx));
+    if (input.responsibleStaffId !== undefined) {
+      await this.sequelize.query('SELECT pg_advisory_xact_lock(74621901)', { transaction });
+    }
     await lockTrainingStructure(this.sequelize, transaction);
     const group = await this.classGroups.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
     if (!group) throw new NotFoundException("Không tìm thấy nhóm học phần.");

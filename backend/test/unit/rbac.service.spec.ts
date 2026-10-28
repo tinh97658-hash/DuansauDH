@@ -14,6 +14,32 @@ describe("RbacService", () => {
     return { service, roles, staffRoles };
   };
 
+  it('preserves permission/scope/role pairs when multiple roles are combined', async () => {
+    const { service, staffRoles } = build();
+    staffRoles.findAll.mockResolvedValue([
+      { role: { ...role('viewer', []), id: 'viewer', schedulingScopeVersion: 1,
+        permissions: [{ id: 'view', code: 'scheduling.view' }], permissionScopes: [{ permissionId: 'view', scope: 'institution' }] } },
+      { role: { ...role('writer', []), id: 'writer', schedulingScopeVersion: 1,
+        permissions: [{ id: 'write', code: 'scheduling.write' }], permissionScopes: [{ permissionId: 'write', scope: 'related_offerings' }] } },
+      { role: { ...role('unscoped', []), id: 'unscoped', schedulingScopeVersion: 1,
+        permissions: [{ id: 'organize', code: 'scheduling.organize' }], permissionScopes: [] } },
+    ]);
+    const access = await service.effectiveAccess({ id: 'a' });
+    expect(access.schedulingGrants).toEqual([
+      { roleId: 'viewer', permission: 'scheduling.view', scope: 'institution' },
+      { roleId: 'writer', permission: 'scheduling.write', scope: 'institution' },
+      { roleId: 'unscoped', permission: 'scheduling.organize', scope: 'institution' },
+    ]);
+    expect(access.permissions.has('gradebook.approve')).toBe(false);
+  });
+
+  it('refreshes write decisions even while a cached read still exists', async () => {
+    const { service, staffRoles } = build();
+    staffRoles.findAll.mockResolvedValueOnce([{ role: role('writer', ['scheduling.write']) }]).mockResolvedValueOnce([]);
+    expect((await service.effectiveAccess({ id: 'a' })).permissions.has('scheduling.write')).toBe(true);
+    expect((await service.effectiveAccess({ id: 'a' }, true)).permissions.has('scheduling.write')).toBe(false);
+  });
+
   it("hợp quyền của mọi vai trò được gán", async () => {
     const { service, staffRoles } = build();
     staffRoles.findAll.mockResolvedValue([

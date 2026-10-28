@@ -1,3 +1,5 @@
+import { RolePermissionScope } from '../database/models/role-permission-scope.model.js';
+import { automaticInstitutionScopes } from '../auth/scheduling-scopes.js';
 import { PERMISSIONS } from "../auth/permissions.js";
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
@@ -38,6 +40,9 @@ const serializeRole = (role: Role) => {
     restrictGroupView: value.restrictGroupView,
     restrictGroupEdit: value.restrictGroupEdit,
     groupReadOnly: value.groupReadOnly,
+    schedulingScopeVersion: 1,
+    schedulingScopes: Object.fromEntries(Object.entries(automaticInstitutionScopes((value.permissions ?? []).map((permission: any) => permission.code))).filter(([code]) => code.startsWith('scheduling.'))),
+    academicScopes: automaticInstitutionScopes((value.permissions ?? []).map((permission: any) => permission.code)),
     permissions: (value.permissions ?? []).map((permission: any) => ({
       id: permission.id,
       code: permission.code,
@@ -62,7 +67,7 @@ export class RolesService {
 
   async list() {
     const roles = await this.roles.findAll({
-      include: [PERMISSION_INCLUDE],
+      include: [PERMISSION_INCLUDE, { model: RolePermissionScope, as: "permissionScopes" }],
       order: [["isSystem", "DESC"], ["sortOrder", "ASC"], ["name", "ASC"]],
     });
 
@@ -89,7 +94,7 @@ export class RolesService {
   }
 
   async detail(id: string) {
-    const role = await this.roles.findByPk(id, { include: [PERMISSION_INCLUDE] });
+    const role = await this.roles.findByPk(id, { include: [PERMISSION_INCLUDE, { model: RolePermissionScope, as: "permissionScopes" }] });
     if (!role) throw new NotFoundException("Không tìm thấy vai trò.");
     return serializeRole(role);
   }
@@ -101,9 +106,11 @@ export class RolesService {
     const permissionIds = [...new Set(dto.permissionIds ?? [])];
     if (permissionIds.length) await this.assertPermissionsExist(permissionIds);
 
+    const scoped = await this.prepareScopes(permissionIds, dto.schedulingScopes ?? {});
     const created = await this.sequelize.transaction(async (transaction) => {
       const role = await this.roles.create({
         code,
+        schedulingScopeVersion: 1,
         name: dto.name.trim(),
         description: dto.description?.trim() ?? null,
         isSystem: false,
@@ -119,13 +126,14 @@ export class RolesService {
           { transaction },
         );
       }
+      await this.saveScopes(role.id, scoped, transaction);
       return role;
     });
 
     await this.audit.record({
       actorStaffId: actorId,
       action: "role.create",
-      metadata: { roleId: created.id, code, permissionIds },
+      metadata: { roleId: created.id, code, permissionIds, schedulingScopes: dto.schedulingScopes },
       ...context,
     });
     return { message: "Tạo vai trò thành công", data: await this.detail(created.id) };
@@ -153,6 +161,9 @@ export class RolesService {
 
     await this.sequelize.transaction(async (transaction) => {
       await this.administrationSafety.lock(transaction);
+      const lockedRole = await this.roles.findByPk(id, { transaction, lock: transaction.LOCK?.UPDATE });
+      if (!lockedRole) throw new NotFoundException('Không tìm thấy vai trò.');
+      const scoped = await this.updatedScopes(lockedRole, permissionIds, dto.schedulingScopes, transaction);
       if (Object.keys(changes).length) await role.update(changes, { transaction });
       if (permissionIds) {
         await this.rolePermissions.destroy({ where: { roleId: id }, transaction });
@@ -163,6 +174,7 @@ export class RolesService {
           );
         }
       }
+      if (scoped) { await this.saveScopes(id, scoped, transaction); await role.update({ schedulingScopeVersion: 1 }, { transaction }); }
       await this.administrationSafety.assertRetained(transaction);
     });
 
@@ -170,7 +182,7 @@ export class RolesService {
     await this.audit.record({
       actorStaffId: actorId,
       action: "role.update",
-      metadata: { roleId: id, ...changes, permissionIds },
+      metadata: { roleId: id, ...changes, permissionIds, schedulingScopes: dto.schedulingScopes },
       ...context,
     });
     return { message: "Cập nhật vai trò thành công", data: await this.detail(id) };
@@ -185,6 +197,9 @@ export class RolesService {
 
     await this.sequelize.transaction(async (transaction) => {
       await this.administrationSafety.lock(transaction);
+      const lockedRole = await this.roles.findByPk(id, { transaction, lock: transaction.LOCK?.UPDATE });
+      if (!lockedRole) throw new NotFoundException('Không tìm thấy vai trò.');
+      const scoped = await this.updatedScopes(lockedRole, permissionIds, dto.schedulingScopes, transaction);
       const scope: Record<string, boolean> = {};
       for (const key of ["restrictGroupView", "restrictGroupEdit", "groupReadOnly"] as const) {
         if (dto[key] !== undefined) scope[key] = dto[key]!;
@@ -197,6 +212,7 @@ export class RolesService {
           { transaction },
         );
       }
+      if (scoped) { await this.saveScopes(id, scoped, transaction); await role.update({ schedulingScopeVersion: 1 }, { transaction }); }
       await this.administrationSafety.assertRetained(transaction);
     });
 
@@ -204,7 +220,7 @@ export class RolesService {
     await this.audit.record({
       actorStaffId: actorId,
       action: "role.permissions.update",
-      metadata: { roleId: id, permissionIds, restrictGroupView: dto.restrictGroupView, restrictGroupEdit: dto.restrictGroupEdit, groupReadOnly: dto.groupReadOnly },
+      metadata: { roleId: id, permissionIds, schedulingScopes: dto.schedulingScopes, restrictGroupView: dto.restrictGroupView, restrictGroupEdit: dto.restrictGroupEdit, groupReadOnly: dto.groupReadOnly },
       ...context,
     });
     return { message: "Cập nhật quyền cho vai trò thành công", data: await this.detail(id) };
@@ -233,6 +249,22 @@ export class RolesService {
       ...context,
     });
     return { message: "Đã xóa vai trò." };
+  }
+
+  private async prepareScopes(ids: string[], _scopes: Record<string, string>, transaction?: any) {
+    const permissions = await this.permissions.findAll({ where: { id: { [Op.in]: ids } }, transaction });
+    const scopes = automaticInstitutionScopes(permissions.map(permission => permission.code));
+    return permissions.filter(permission => scopes[permission.code]).map(permission => ({ permissionId: permission.id, scope: 'institution' }));
+  }
+
+  private async updatedScopes(role: Role, ids: string[] | undefined, _scopes: Record<string, string> | undefined, transaction: any) {
+    if (ids === undefined) return undefined;
+    return this.prepareScopes(ids, {}, transaction);
+  }
+
+  private async saveScopes(roleId: string, scopes: Array<{ permissionId: string; scope: string }>, transaction: any) {
+    // Permission replacement already cascades obsolete scope rows.
+    if (scopes.length) await RolePermissionScope.bulkCreate(scopes.map(entry => ({ roleId, ...entry })), { transaction });
   }
 
   private async assertPermissionsExist(permissionIds: string[]) {

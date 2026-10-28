@@ -2,6 +2,7 @@ import { Op } from "sequelize";
 import { BadRequestException } from "@nestjs/common";
 import { jest } from "@jest/globals";
 import { SchedulingService } from "../../src/scheduling/scheduling.service.js";
+import { groupScopeStorage } from "../../src/auth/group-scope-context.js";
 
 const transaction = { LOCK: { UPDATE: "UPDATE" } };
 
@@ -46,6 +47,33 @@ const buildService = () => {
     sequelize, rooms, lecturers, teachingSessions,
   };
 };
+
+describe('Scoped scheduling responses', () => {
+  it('redacts cross-group JSON from shared offering and session responses', async () => {
+    const { service, courseOfferings, teachingSessions } = buildService();
+    const shared = {
+      id: 'shared', subject: { program: 'masters' }, groupLinks: [{ classGroupId: 'owned', participantIds: ['admission:hidden'] }],
+      gradebookSnapshot: { learners: ['outside-group'] }, participantNotes: [{ participantId: 'outside', note: 'private' }],
+    };
+    courseOfferings.findAll.mockResolvedValue([shared]);
+    teachingSessions.findAll.mockResolvedValue([{ id: 'session', courseOffering: shared, sessionDate: '2099-01-01' }]);
+    // Counts/summary are unrelated to serialization and exercised by the service tests below.
+    jest.spyOn(service as any, 'attachCourseOfferingMetadata').mockResolvedValue([shared]);
+    jest.spyOn(service as any, 'attachParticipantCounts').mockResolvedValue([shared]);
+    await groupScopeStorage.run({ staffId: 'staff', restrictView: true, restrictEdit: true, readOnly: false, schedulingView: true }, async () => {
+      const [offering] = await service.listCourseOfferings({ program: 'masters' } as any);
+      const [session] = await service.listTeachingSessions({ from: '2099-01-01', to: '2099-01-02' });
+      for (const value of [offering, session.courseOffering]) {
+        expect(value).not.toHaveProperty('gradebookSnapshot');
+        expect(value).not.toHaveProperty('participantNotes');
+        expect(value.groupLinks[0]).not.toHaveProperty('participantIds');
+        expect(value.groupLinks[0].classGroupId).toBe('owned');
+      }
+    });
+    expect(shared.participantNotes).toHaveLength(1);
+    expect(shared.groupLinks[0].participantIds).toHaveLength(1);
+  });
+});
 
 const subject = {
   id: "subject-1",

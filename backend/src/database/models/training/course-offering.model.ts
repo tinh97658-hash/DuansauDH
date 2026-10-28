@@ -33,6 +33,11 @@ export class CourseOffering extends Model {
   @Column({ type: DataType.VIRTUAL }) declare allowedWeekdays: number[];
 
   @Column({ type: DataType.VIRTUAL }) declare participantCount: number;
+  @Column({ type: DataType.VIRTUAL }) declare canWriteSchedule: boolean;
+  @Column({ type: DataType.VIRTUAL }) declare canOrganize: boolean;
+  @Column({ type: DataType.VIRTUAL }) declare canCompleteTeaching: boolean;
+  @Column({ type: DataType.VIRTUAL }) declare scheduleWriteBlockedReason: string | null;
+  @Column({ type: DataType.VIRTUAL }) declare scopeWritable: boolean;
   @Column({ type: DataType.VIRTUAL }) declare sessionSummary: {
     totalCount: number;
     heldCount: number;

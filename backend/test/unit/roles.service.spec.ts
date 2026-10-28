@@ -22,8 +22,8 @@ const roleRecord = (overrides: any = {}) => {
 
 const build = () => {
   const roles = { findAll: jest.fn(), findByPk: jest.fn(), findOne: jest.fn(), create: jest.fn(), count: jest.fn() };
-  const permissions = { findAll: jest.fn(), count: jest.fn() };
-  const rolePermissions = { bulkCreate: jest.fn(), destroy: jest.fn() };
+  const permissions = { findAll: jest.fn().mockResolvedValue([]), count: jest.fn() };
+  const rolePermissions = { findAll: jest.fn().mockResolvedValue([]), bulkCreate: jest.fn(), destroy: jest.fn() };
   const staffRoles = { findAll: jest.fn(), count: jest.fn() };
   const sequelize = { transaction: jest.fn((callback: any) => callback({})) };
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
@@ -38,6 +38,12 @@ const build = () => {
 };
 
 describe("RolesService", () => {
+  it('ignores obsolete client scope choices and derives scope from granted actions', async () => {
+    const { service, permissions } = build();
+    permissions.findAll.mockResolvedValue([{ id: 'schedule', code: 'scheduling.write' }]);
+    await expect((service as any).prepareScopes(['schedule'], { 'scheduling.write': 'related_offerings' }, {}))
+      .resolves.toEqual([{ permissionId: 'schedule', scope: 'institution' }]);
+  });
   it("không cho trùng mã vai trò", async () => {
     const { service, roles } = build();
     roles.findOne.mockResolvedValue(roleRecord({ code: "custom" }));
