@@ -375,9 +375,9 @@ function OfferingCard({ offering, canEdit, canDelete, onChanged, onSelectOfferin
       )}
       <div className="sl-matrix-card-meta">
         <span>{groups.length} lớp/nhóm · {offering.participantCount ?? 0} HV</span>
-        {canDelete && <OfferingDeleteButton offering={offering} className="sl-matrix-delete-link"
+        {(canDelete || canEdit) && <OfferingDeleteButton offering={offering} className="sl-matrix-delete-link"
           onDeleted={onChanged} onScheduleDeleted={onChanged} />}
-        {canEdit && offering.status === "active" && (
+        {canEdit && (offering.canWriteSchedule ?? offering.scopeWritable) !== false && offering.status === "active" && (
           <button
             type="button"
             className="sl-matrix-schedule-link"
@@ -552,9 +552,9 @@ function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, canDelete,
                                 <CrossCohortBadge cohorts={linkedCohorts} />
                                 <div className="sl-pivot-card-stats">
                                   <OfferingStatus offering={offering} />
-                                  {canDelete && <OfferingDeleteButton offering={offering} className="sl-matrix-delete-link"
+                                  {(canDelete || canEdit) && <OfferingDeleteButton offering={offering} className="sl-matrix-delete-link"
                                     onDeleted={onChanged} onScheduleDeleted={onChanged} />}
-                                  {canEdit && offering.status === "active" && (
+                                  {canEdit && (offering.canWriteSchedule ?? offering.scopeWritable) !== false && offering.status === "active" && (
                                     <button
                                       type="button"
                                       className="sl-pivot-schedule-btn sl-matrix-schedule-link"

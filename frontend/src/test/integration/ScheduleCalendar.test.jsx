@@ -23,6 +23,35 @@ beforeEach(() => {
   axios.get.mockImplementation(async (url) => ({ data: url.endsWith("/auth/session") ? { user: { canManageScheduling: true } } : url.includes("/course-offerings?") ? [offering] : url.endsWith("/course-offerings/offering") ? offering : url.includes("/lecturers") ? lecturers : url.includes("/rooms") ? rooms : url.endsWith("/roster") ? { participants: [{ id: "student:one", code: "HV001", fullName: "Nguyễn An", note: "" }] } : [] }));
   axios.post.mockResolvedValue({ data: {} }); axios.put.mockResolvedValue({ data: {} }); axios.delete.mockResolvedValue({ data: {} });
 });
+
+it("loads and saves a schedule without catalog.manage", async () => {
+  const originalGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation((url, options) => url.includes("includeInactive=true")
+    ? Promise.reject({ response: { status: 403, data: { message: "catalog.manage required" } } }) : originalGet(url, options));
+  const saved = vi.fn();
+  renderWithPermissions(<SessionEditor session={{ id: "existing", sessionDate: "2099-01-05", period: "MORNING", status: "planned", lecturerId: "l", roomId: "r" }} offering={offering} onClose={vi.fn()} onSaved={saved} />, ["scheduling.view", "scheduling.write"]);
+  fireEvent.click(screen.getByRole("button", { name: "Chỉnh sửa" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Lưu buổi học" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "Lưu buổi học" }));
+  await waitFor(() => expect(saved).toHaveBeenCalled());
+  expect(axios.get).toHaveBeenCalledWith(`${API_BASE_URL}/system/rooms`, expect.anything());
+});
+
+it("shows the retired room on a historical session without requesting inactive rooms", async () => {
+  renderWithPermissions(<SessionEditor session={{ id: "old", sessionDate: "2020-01-05", period: "MORNING", status: "held", roomId: "retired", room: { id: "retired", code: "901", capacity: 40, isActive: false } }} offering={offering} onClose={vi.fn()} />, ["scheduling.view"]);
+  expect(await screen.findByRole("button", { name: /901.*Ngừng sử dụng/i })).toBeDisabled();
+  expect(axios.get.mock.calls.some(([url]) => url.includes("includeInactive=true"))).toBe(false);
+});
+
+it("keeps a shared offering read-only when its scope disallows writes", async () => {
+  const originalGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation((url, options) => url.endsWith("/course-offerings/offering")
+    ? Promise.resolve({ data: { ...offering, scopeWritable: false } }) : originalGet(url, options));
+  renderWithPermissions(<SessionEditor session={{ id: "shared", sessionDate: "2099-01-05", period: "MORNING", status: "planned" }} offering={{ ...offering, scopeWritable: false }} onClose={vi.fn()} />, ["scheduling.view", "scheduling.write"]);
+  await screen.findByRole("button", { name: /301/ });
+  expect(screen.queryByRole("button", { name: "Chỉnh sửa" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Xóa buổi học" })).not.toBeInTheDocument();
+});
 it.each([
   ["2026-10-19T23:59:59Z", true, true],
   ["2026-10-20T00:00:00Z", false, true],

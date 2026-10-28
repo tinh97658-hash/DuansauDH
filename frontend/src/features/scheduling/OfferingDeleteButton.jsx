@@ -7,15 +7,15 @@ const scheduleWarning = "Vui lòng xóa lịch học trước khi xóa lớp h�
 
 export default function OfferingDeleteButton({ offering, disabled = false, className = "sl-btn sl-btn-danger", onDeleted, onScheduleDeleted }) {
   const { can } = usePermissions();
-  const canDeleteClass = can("scheduling.organize");
-  const canDeleteSchedule = can("scheduling.write");
+  const canDeleteClass = can("scheduling.organize") && (offering.canOrganize ?? offering.scopeWritable) !== false;
+  const canDeleteSchedule = can("scheduling.write") && (offering.canWriteSchedule ?? offering.scopeWritable) !== false;
   const [dialog, setDialog] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const locked = offering.status === "completed" || (offering.sessionSummary?.heldCount || 0) > 0;
   const hasSchedule = (offering.sessionSummary?.totalCount || 0) > 0;
   const remove = async () => {
-    if (!canDeleteClass || (dialog === "schedule" && !canDeleteSchedule)) return;
+    if (disabled || locked || saving || (dialog === "schedule" ? !canDeleteSchedule : dialog !== "offering" || !canDeleteClass)) return;
     setSaving(true); setError("");
     const removingSchedule = dialog === "schedule";
     try {
@@ -29,20 +29,23 @@ export default function OfferingDeleteButton({ offering, disabled = false, class
     } finally { setSaving(false); }
   };
   return <>
-    <button type="button" className={className} disabled={!canDeleteClass || disabled || locked || saving}
+    {canDeleteSchedule && hasSchedule && <button type="button" className={className} disabled={disabled || locked || saving}
+      aria-label={`Xóa lịch học ${offeringTitle(offering)}`}
+      onClick={() => { setError(""); setDialog("schedule"); }}>Xóa lịch học</button>}
+    {canDeleteClass && <button type="button" className={className} disabled={disabled || locked || saving}
       title={locked ? "Không thể xóa lớp học phần đã có buổi xác nhận diễn ra" : "Xóa lớp học phần"}
       aria-label={`Xóa lớp học phần ${offeringTitle(offering)}`}
-      onClick={() => { setError(""); setDialog(hasSchedule ? "warning" : "offering"); }}>Xóa lớp</button>
+      onClick={() => { setError(""); setDialog(hasSchedule ? "warning" : "offering"); }}>Xóa lớp</button>}
     {dialog && <Modal title={dialog === "schedule" ? "Xóa lịch học" : "Xóa lớp học phần"} busy={saving}
       onClose={() => setDialog(null)} actions={<>
         <button type="button" className="sl-btn" disabled={saving} onClick={() => setDialog(null)}>Hủy</button>
         {dialog === "warning"
-          ? <button type="button" className="sl-btn sl-btn-danger" disabled={!canDeleteSchedule} onClick={() => setDialog("schedule")}>Xóa lịch học</button>
+          ? <button type="button" className="sl-btn sl-btn-danger" disabled={!canDeleteSchedule || disabled || locked} onClick={() => setDialog("schedule")}>Xóa lịch học</button>
           : <button type="button" className="sl-btn sl-btn-danger" disabled={saving} onClick={remove}>
             {saving ? "Đang xóa..." : dialog === "schedule" ? "Xác nhận xóa lịch học" : "Xác nhận xóa lớp"}</button>}
       </>}>
       {dialog === "warning" ? <Alert severity="warning">{scheduleWarning}</Alert>
-        : dialog === "schedule" ? <p>Xóa toàn bộ lịch học của lớp “{offeringTitle(offering)}”? Lớp học phần vẫn được giữ lại. Sau đó bạn có thể xóa lớp học phần.</p>
+        : dialog === "schedule" ? <p>Xóa toàn bộ lịch học của lớp “{offeringTitle(offering)}”? Lớp học phần vẫn được giữ lại.</p>
           : <p>Xóa lớp học phần “{offeringTitle(offering)}” và các liên kết ghép lớp của lớp này?</p>}
       {error && <Notice error={error} />}
     </Modal>}

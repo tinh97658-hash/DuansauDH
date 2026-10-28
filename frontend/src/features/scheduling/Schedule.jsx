@@ -288,7 +288,7 @@ export default function Schedule({ user }) {
   const visibleMajorIds = new Set(visibleMajors.map((major) => major.id));
   const end = formatDateKey(addDays(week, 6));
   const sessions = useLoad(async () => rows(await api.get(`/scheduling/teaching-sessions?${new URLSearchParams({ from: week, to: end })}`)), [week, end]);
-  const pending = useLoad(async () => canEdit ? rows(await api.get("/scheduling/pending-teaching-sessions")) : [], [canEdit]);
+  const pending = useLoad(async () => canEdit ? rows(await api.get("/scheduling/pending-teaching-sessions")).filter(row => (row.courseOffering?.canWriteSchedule ?? row.courseOffering?.scopeWritable) !== false) : [], [canEdit]);
   const all = offerings.data || [];
   const selected = all.find((offering) => offering.id === selectedId);
   useEffect(() => {
@@ -318,7 +318,7 @@ export default function Schedule({ user }) {
   const weekDays = weekDaysFrom(week);
   const selectedDays = selected?.allowedWeekdays || intersectDays(groupsOf(selected));
   const selectedGroupIds = new Set(groupsOf(selected).map((group) => group.id));
-  const selecting = canEdit && selected?.status === "active";
+  const selecting = canEdit && (selected?.canWriteSchedule ?? selected?.scopeWritable) !== false && selected?.status === "active";
   const refresh = () => { offerings.reload(); sessions.reload(); pending.reload(); };
   const saved = () => { setEditor(null); setDetails(null); setError(""); refresh(); };
   const openSession = (session) => { setDetails(null); setPendingOpen(false); setEditor({ session, offering: all.find((row) => row.id === session.courseOfferingId) || session.courseOffering }); };
@@ -417,7 +417,7 @@ export default function Schedule({ user }) {
           <button type="button" className="sl-close-suggestion" aria-label={closingMessage} onClick={() => setDetails(offering)}><WarningAmberRounded aria-hidden="true" /></button>
         </Tooltip>}
       </div>
-      <div className="sl-card-foot"><div className="sl-card-copy"><strong>Đã diễn ra {summary.heldCount || 0} buổi</strong><span className={!summary.futurePlannedCount ? "sl-no-week" : ""}>{summary.futurePlannedCount ? `Có ${summary.futurePlannedCount} lịch sắp tới` : "Chưa có lịch tuần này"}</span></div>{canEdit && offering.status === "active" && <button className="sl-btn sl-btn-primary sl-btn-sm" onClick={() => select(offering)}>Xếp lịch</button>}</div>
+      <div className="sl-card-foot"><div className="sl-card-copy"><strong>Đã diễn ra {summary.heldCount || 0} buổi</strong><span className={!summary.futurePlannedCount ? "sl-no-week" : ""}>{summary.futurePlannedCount ? `Có ${summary.futurePlannedCount} lịch sắp tới` : "Chưa có lịch tuần này"}</span></div>{canEdit && (offering.canWriteSchedule ?? offering.scopeWritable) !== false && offering.status === "active" && <button className="sl-btn sl-btn-primary sl-btn-sm" onClick={() => select(offering)}>Xếp lịch</button>}</div>
     </article>;
   })}{!listed.length && <Notice>Không có lớp học phần trong phạm vi đã chọn.</Notice>}</section>}</div></div></div></aside>
   <section className="sl-right"><div className="sl-schedule-head"><h1>XẾP LỊCH</h1><div className="sl-week"><button aria-label="Tuần trước" onClick={() => changeWeek(formatDateKey(addDays(week, -7)))}>‹</button><strong>{vietnameseDate(week)} — {vietnameseDate(end)}</strong><button aria-label="Tuần sau" onClick={() => changeWeek(formatDateKey(addDays(week, 7)))}>›</button></div>

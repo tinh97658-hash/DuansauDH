@@ -124,7 +124,7 @@ export const ribbons = {
     ]),
     group("QUẢN LÝ ĐIỂM", [
       action("Danh sách thi, điểm thi", "/masters/exam-lists", ListAltOutlined, "#a04f86", { permissions: ["gradebook.view"] }),
-      action('Xếp lịch thi', '/masters/exam-schedule', CalendarMonthOutlined, '#b75c75', { permissions: ['gradebook.view'] }),
+      action('Xếp lịch thi', '/masters/exam-schedule', CalendarMonthOutlined, '#b75c75', { anyPermissions: ['gradebook.view','scheduling.view'] }),
       action("Tổng hợp điểm của lớp", "/reports/class-score-summary", SummarizeOutlined, "#168b7c", { permissions: ["reports.view"] }),
     ]),
     group("THỦ TỤC ĐẦU RA", [
@@ -206,7 +206,7 @@ const RibbonHeader = () => {
   const hasPermission = (permission) => access
     ? (access.permissions || []).includes(permission)
     : false;
-  const canSee = (item) => (!item.roles || item.roles.includes(role)) && (!item.permissions || item.permissions.every(hasPermission));
+  const canSee = (item) => (!item.roles || item.roles.includes(role)) && (!item.permissions || item.permissions.every(hasPermission)) && (!item.anyPermissions || item.anyPermissions.some(hasPermission));
   const visibleTabs = tabs.filter(([id]) => ribbons[id].some(section => section.actions.some(canSee)));
   const selectedTab = visibleTabs.some(([id]) => id === activeTab) ? activeTab : visibleTabs[0]?.[0];
   const runAction = async (item) => {

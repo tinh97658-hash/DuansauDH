@@ -10,6 +10,34 @@ const offering = (summary = {}) => ({ id: "offering-1", name: "Lớp Triết h�
   sessionSummary: { heldCount: 0, totalCount: 0, ...summary } });
 beforeEach(() => { axios.delete.mockReset(); axios.delete.mockResolvedValue({ data: { deleted: true } }); });
 
+it("lets a timetable-only role delete the schedule without class organization access", async () => {
+  const onScheduleDeleted = vi.fn();
+  renderWithPermissions(<OfferingDeleteButton offering={offering({ totalCount: 2 })} onScheduleDeleted={onScheduleDeleted} />, ["scheduling.view", "scheduling.write"]);
+  expect(screen.queryByRole("button", { name: /Xóa lớp học phần/ })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /Xóa lịch học Lớp/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Xác nhận xóa lịch học" }));
+  await waitFor(() => expect(onScheduleDeleted).toHaveBeenCalledTimes(1));
+  expect(axios.delete).toHaveBeenCalledWith(expect.stringContaining("/course-offerings/offering-1/teaching-sessions"), expect.anything());
+});
+
+it('uses separate backend capabilities for schedule deletion and class deletion', () => {
+  render(<OfferingDeleteButton offering={{ ...offering({ totalCount: 2 }), canWriteSchedule: true, canOrganize: false, scopeWritable: false }} />);
+  expect(screen.getByRole('button', { name: /Xóa lịch học Lớp/ })).toBeEnabled();
+  expect(screen.queryByRole('button', { name: /Xóa lớp học phần/ })).not.toBeInTheDocument();
+});
+
+it("does not let an organizer delete the timetable", () => {
+  renderWithPermissions(<OfferingDeleteButton offering={offering({ totalCount: 2 })} />, ["scheduling.view", "scheduling.organize"]);
+  fireEvent.click(screen.getByRole("button", { name: /Xóa lớp học phần/ }));
+  expect(screen.getByRole("button", { name: "Xóa lịch học" })).toBeDisabled();
+  expect(axios.delete).not.toHaveBeenCalled();
+});
+
+it.each([["scheduling.view"], ["scheduling.write", "scheduling.organize"]])("hides mutations outside the offering scope for %j", permissions => {
+  renderWithPermissions(<OfferingDeleteButton offering={{ ...offering({ totalCount: 2 }), scopeWritable: false }} />, permissions);
+  expect(screen.queryByRole("button")).not.toBeInTheDocument();
+});
+
 it("locks deletion after a confirmed held session", () => {
   render(<OfferingDeleteButton offering={offering({ heldCount: 1, totalCount: 2 })} />);
   expect(screen.getByRole("button", { name: /Xóa lớp học phần/ })).toBeDisabled();

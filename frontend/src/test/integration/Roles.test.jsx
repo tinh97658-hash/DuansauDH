@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import axios from "axios";
 import Roles from "../../pages/system/roles";
@@ -129,4 +129,26 @@ it("các khóa mặc định tắt và lưu độc lập với quyền nghiệp 
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
     restrictGroupView: false, restrictGroupEdit: true, groupReadOnly: true,
   }), { withCredentials: true }));
+});
+
+const schedulingRole = (scopes) => {
+  const permissions = [
+    { id: 'sv', code: 'scheduling.view', name: 'Xem lịch' },
+    { id: 'sw', code: 'scheduling.write', name: 'Thao tác lịch' },
+  ];
+  axios.get.mockImplementation(url => Promise.resolve({ data: String(url).endsWith('/roles/permissions')
+    ? [{ group: 'Lịch học', permissions }]
+    : [{ id: 'scheduler', code: 'scheduler', name: 'Chuyên viên lịch', permissions, schedulingScopeVersion: 1, schedulingScopes: scopes }] }));
+};
+
+it('tự động toàn viện và bỏ lựa chọn phạm vi cũ', async () => {
+  schedulingRole({ 'scheduling.view': 'related_offerings', 'scheduling.write': 'related_offerings' });
+  mount(['role.view', 'role.manage']);
+  await screen.findByText(/tự động có phạm vi Toàn viện/);
+  await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Xem lịch' })).toBeChecked());
+  expect(screen.queryByLabelText('Phạm vi: Xem lịch')).not.toBeInTheDocument();
+  axios.put.mockResolvedValue({ data: { message: 'Đã lưu' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Lưu quyền' }));
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ permissionIds: ['sv', 'sw'] }), { withCredentials: true }));
+  expect(axios.put.mock.calls[0][1]).not.toHaveProperty('schedulingScopes');
 });

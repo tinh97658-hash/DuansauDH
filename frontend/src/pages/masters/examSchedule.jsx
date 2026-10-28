@@ -21,7 +21,7 @@ import '../../features/exams/examSchedule.css';
 
 const errorText=e=>{const message=e.response?.data?.message;return Array.isArray(message)?message.join(' '):message||'Không thể xử lý lịch thi. Hãy thử lại.';};
 export default function ExamSchedule(){
- const {can}=usePermissions(),canWrite=can('scheduling.write'),canView=can('gradebook.view');const [params]=useSearchParams();
+ const {can}=usePermissions(),canWrite=can('scheduling.write'),canView=can('gradebook.view')||can('scheduling.view');const [params]=useSearchParams();
  const [week,setWeek]=useState(()=>formatDateKey(mondayOf(getBusinessTodayKey()))),[revision,setRevision]=useState(0);
  const [data,setData]=useState({queue:[],approvedOfferings:[],sessions:[],rooms:[]}),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState('');
  const [filters,setFilters]=useState({discipline:'',major:'',year:'',search:''});

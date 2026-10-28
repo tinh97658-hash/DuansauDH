@@ -91,7 +91,7 @@ const Roles = () => {
       await load();
       await session?.refresh?.();
     } catch (failure) {
-      setError(failure.response?.data?.message || "Không thể cập nhật quyền.");
+      setError(failure.response?.data?.message || failure.message || "Không thể cập nhật quyền.");
     } finally {
       setSaving(false);
     }
@@ -171,7 +171,7 @@ const Roles = () => {
   const renderGroupScope = () => (
 <Box sx={{ borderTop: "1px solid #DCE6EF", mt: 1, pt: 1 }}>
                       <Typography fontWeight={700}>Khóa quyền theo nhóm học viên</Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Mặc định tắt các khóa. Quyền xem, sửa vẫn cần được cấp ở các mục nghiệp vụ tương ứng. Khóa áp dụng cả hồ sơ học viên, điểm và báo cáo liên quan. Khi một người có nhiều vai trò, khóa bật ở bất kỳ vai trò đang hoạt động nào đều có hiệu lực.</Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Khóa xem/sửa nhóm áp dụng cho hồ sơ, phân nhóm và báo cáo. Lớp học phần, lịch học, thi và điểm dùng phạm vi Toàn viện tự động. Khóa Chỉ xem ở bất kỳ vai trò đang hoạt động nào luôn chặn ghi, kể cả lịch toàn viện.</Typography>
                       {[
                         ["groupReadOnly", "Chỉ xem — khóa mọi thao tác sửa dữ liệu nhóm", "Bật: không tạo, sửa, xóa nhóm, phân công, thay đổi thành viên hoặc dữ liệu học viên liên quan. Tắt: cho phép sửa theo quyền nghiệp vụ."],
                         ["restrictGroupView", "Chỉ xem nhóm được phân công phụ trách", "Bật: ẩn dữ liệu ngoài phân công, chặn truy cập trực tiếp. Nhóm chưa phân công không hiển thị. Tắt: xem tất cả nhóm nếu có quyền xem."],
@@ -254,6 +254,8 @@ const Roles = () => {
                   <Typography variant="body2">Đang phân quyền cho vai trò <strong>{selectedRole.name}</strong> — áp dụng cho {selectedRole.staffCount || 0} nhân sự mang vai trò này.</Typography>
                   <Typography variant="caption" color="text.secondary">Hãy kiểm tra vai trò được gán trong Tài khoản nhân sự trước khi cấu hình. Quyền xem, quyền sửa và các khóa theo nhóm là các lựa chọn độc lập. Nút “Tất cả” chỉ chọn quyền nghiệp vụ; các khóa theo nhóm cần bật riêng. Thay đổi chỉ được áp dụng sau khi bấm Lưu quyền.</Typography>
                 </Box>
+                <Alert severity="info">Các quyền thuộc Lớp học phần &amp; xếp lịch và Thi &amp; điểm tự động có phạm vi Toàn viện, không cần phân công nhóm. Quyền xem, sửa, nhập và duyệt vẫn được cấp riêng. Khóa Chỉ xem vẫn chặn ghi.</Alert>
+                {groupScope.groupReadOnly && <Alert severity="warning">Khóa Chỉ xem chặn mọi thao tác ghi lịch và điểm, kể cả quyền Toàn viện.</Alert>}
                 {(
                   <>
                     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 1.5 }}>
@@ -292,7 +294,7 @@ const Roles = () => {
                         <Button variant="contained" startIcon={<SaveRounded />} onClick={savePermissions} disabled={saving} sx={{ bgcolor: "#0788B8", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F" } }}>
                           {saving ? <CircularProgress size={18} sx={{ color: "inherit", mr: 1 }} /> : null}Lưu quyền
                         </Button>
-                        <Typography sx={{ fontSize: 12.5, color: "#607486" }}>Đã chọn {checked.size}/{allPermissions.length} quyền. Thay đổi có hiệu lực trong ~30 giây.</Typography>
+                        <Typography sx={{ fontSize: 12.5, color: "#607486" }}>Đã chọn {checked.size}/{allPermissions.length} quyền. Request ghi tiếp theo kiểm tra lại quyền.</Typography>
                       </Stack>
                     )}
                   </>

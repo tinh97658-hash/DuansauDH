@@ -24,7 +24,7 @@ const subject = { id: "subject", code: "HP01", name: "Khai thác cảng" };
 const participant = { id: "student:one", code: "HV001", fullName: "Nguyễn An", note: "Ghi chú nhóm không được tự điền" };
 const mocks = (user = { role: "admin" }, permissions = ["scheduling.organize"]) => {
   accessFixture.permissions = permissions;
-  axios.get.mockImplementation(async (url) => ({ data: url.endsWith("/auth/session") ? { user } : url.includes("/system/majors") ? [major] : url.includes("/masters/class-groups") ? [group] : url.includes("/course-offering-candidates") ? { subjects: [{ subject, eligibleClassGroups: [group] }] } : url.includes("/retakes?") ? [] : [] }));
+  axios.get.mockImplementation(async (url) => ({ data: url.endsWith("/auth/session") ? { user } : url.includes("/system/majors") ? [major] : url.includes("/scheduling/class-groups/options") ? [group] : url.includes("/course-offering-candidates") ? { subjects: [{ subject, eligibleClassGroups: [group] }] } : url.includes("/retakes?") ? [] : [] }));
   axios.post.mockImplementation(async (url) => ({ data: url.endsWith("/roster-preview") ? { participants: [participant], participantCount: 1 } : { id: "offering", subject, participantCount: 1 } }));
 };
 const reach = async () => {
@@ -35,6 +35,19 @@ const reach = async () => {
   fireEvent.click(await screen.findByRole("button", { name: /HP01.*Khai thác cảng/ }));
 };
 beforeEach(() => { accessFixture.permissions = ["scheduling.organize"]; jest.clearAllMocks(); sessionStorage.clear(); });
+
+it('disables a visible group outside the backend organization capability', async () => {
+  mocks();
+  const originalGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation(async url => url.includes('/course-offering-candidates')
+    ? { data: { subjects: [{ subject, eligibleClassGroups: [{ ...group, canOrganize: false }] }] } }
+    : originalGet(url));
+  render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
+  await reach();
+  expect(screen.getByRole('button', { name: /KTHH-2026.*Nhóm 1/ })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Tạo lớp học phần' })).toBeDisabled();
+  expect(axios.post).not.toHaveBeenCalled();
+});
 
 it.each(['major', 'another-major'])("omits internships from suggested courses and counts for %s", async majorId => {
   mocks();
@@ -47,7 +60,7 @@ it.each(['major', 'another-major'])("omits internships from suggested courses an
   ];
   const originalGet = axios.get.getMockImplementation();
   axios.get.mockImplementation(async url => url.includes('/system/majors') ? { data: [scopedMajor] }
-    : url.includes('/masters/class-groups') ? { data: [scopedGroup] }
+    : url.includes('/scheduling/class-groups/options') ? { data: [scopedGroup] }
       : url.includes('/course-offering-candidates') ? { data: { subjects: courses.map(course => ({ subject: course, eligibleClassGroups: [scopedGroup] })) } }
         : originalGet(url));
   render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
@@ -164,7 +177,7 @@ it("labels only KC knowledge-block subjects as common", async () => {
   axios.get.mockImplementation(async (url) => ({ data:
     url.endsWith("/auth/session") ? { user: { role: "admin" } }
       : url.includes("/system/majors") ? [major]
-        : url.includes("/masters/class-groups") ? [group]
+        : url.includes("/scheduling/class-groups/options") ? [group]
           : url.includes("/course-offering-candidates") ? { subjects: [
             { subject: crossMajorSubject, eligibleClassGroups: [group] },
             { subject: commonSubject, eligibleClassGroups: [group] },
@@ -189,7 +202,7 @@ it("shows each group's own major and submits mixed-major groups outside the work
   axios.get.mockImplementation(async (url) => ({ data:
     url.endsWith("/auth/session") ? { user: { role: "admin" } }
       : url.includes("/system/majors") ? [major, maritime, computing]
-        : url.includes("/masters/class-groups") ? [group]
+        : url.includes("/scheduling/class-groups/options") ? [group]
           : url.includes("/course-offering-candidates") ? { subjects: [{ subject, eligibleClassGroups: [group, maritimeGroup, computingGroup] }] }
             : [],
   }));
@@ -281,7 +294,7 @@ it("allows selecting and merging groups from different cohorts into the course o
   axios.get.mockImplementation(async (url) => ({
     data: url.endsWith("/auth/session") ? { user: { role: "admin" } }
       : url.includes("/system/majors") ? [major]
-      : url.includes("/masters/class-groups") ? [group]
+      : url.includes("/scheduling/class-groups/options") ? [group]
       : url.includes("/course-offering-candidates") ? { subjects: [{ subject, eligibleClassGroups: [group, group2024] }] }
       : [],
   }));

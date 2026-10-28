@@ -78,7 +78,7 @@ export default function CreateOffering({ user }) {
   const majors = useLoad(async () => rows(await api.get("/system/majors?program=masters")).filter((item) => item.active !== false && !isCommonMajor(item)), []);
   const disciplines = disciplinesFromMajors(majors.data || []);
   const visibleMajors = majorsForDiscipline(majors.data || [], disciplineId);
-  const groups = useLoad(async signal => majorId ? rows(await api.get(`/masters/class-groups/options?${new URLSearchParams({ majorId })}`, { signal })) : [], [majorId]);
+  const groups = useLoad(async signal => majorId ? rows(await api.get(`/scheduling/class-groups/options?${new URLSearchParams({ majorId })}`, { signal })) : [], [majorId]);
   const candidates = useLoad(async signal => majorId && year ? (await api.get(`/scheduling/course-offering-candidates?${new URLSearchParams({ program: "masters", majorId, academicYear: year })}`, { signal })).subjects : [], [majorId, year, created?.id]);
   const availableCandidates = (candidates.data || []).filter((item) => !isInternshipSubject(item.subject));
   const candidate = availableCandidates.find((item) => item.subject.id === subjectId);
@@ -332,8 +332,9 @@ export default function CreateOffering({ user }) {
                   <button
                     key={group.id}
                     aria-pressed={picked}
-                    className={`${picked ? "sl-picked" : ""} ${incompatible ? "sl-disabled" : ""}`}
-                    disabled={!canEdit || incompatible}
+                    className={`${picked ? "sl-picked" : ""} ${incompatible || group.canOrganize === false ? "sl-disabled" : ""}`}
+                    disabled={!canEdit || incompatible || group.canOrganize === false}
+                    title={group.canOrganize === false ? 'Nhóm ngoài phạm vi tổ chức lớp được cấp.' : undefined}
                     onClick={() => toggleGroup(group)}
                   >
                     <span className="sl-create-checkbox">{picked ? "✓" : ""}</span>

@@ -1,8 +1,12 @@
+> Quy tắc hiện hành 28/10/2026: các quyền đã cấp trong Lớp học phần & xếp lịch và Thi & điểm tự động có phạm vi Toàn viện (migration 084), bỏ lựa chọn phạm vi. Quyền hành động độc lập; khóa Chỉ xem được giữ. Xem `KE-HOACH-PHAN-QUYEN-LICH-HOC-VA-DIEM.md`. Nội dung scope theo phân công trước 084 không còn áp dụng cho hai nhóm nghiệp vụ này.
+
 # KẾ HOẠCH: MODULE QUẢN LÝ TÀI KHOẢN & PHÂN QUYỀN (RBAC)
 
 > Trạng thái: **Đã hoàn thành — Phase 1–8 xong (RBAC, API tài khoản/vai trò, chuyển `@Roles`→permission, giao diện, dọn dẹp/test/tài liệu, nhật ký thay đổi dữ liệu cấp DB, ghi nhận đăng nhập/đăng xuất; thống nhất admin vào RBAC permission).**
 > Ngày lập: 2026-10-18 (cập nhật 2026-10-19: thống nhất mọi vai trò theo permission).
 > Phạm vi áp dụng: `backend/` (NestJS 11 + Sequelize + Umzug) và `frontend/` (React + MUI).
+
+> Cập nhật 28/10/2026: lịch học có grant scope riêng từ migration 082; xem [hướng dẫn phân công và phạm vi lịch](docs/group-responsibility.md). Quy tắc phải bao phủ đủ mọi nhóm tiếp tục áp dụng cho tổ chức lớp, điểm và lịch thi theo chính sách tương ứng; thao tác lịch chung đã chuyển đổi chỉ cần một nhóm phụ trách. Các vai trò chưa được đối chiếu scope vẫn ở chế độ tương thích.
 
 ---
 

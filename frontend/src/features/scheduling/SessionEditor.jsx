@@ -20,15 +20,19 @@ export default function SessionEditor({ session, offering, date, period, user, o
   const [deleting, setDeleting] = useState(false);
   const [unitFilter, setUnitFilter] = useState(null);
   const catalog = useLoad(async () => {
-    const [lecturers, units, rooms, detail, offeringSessions] = await Promise.all([api.get("/system/lecturers"), api.get("/system/units"), api.get("/system/rooms?includeInactive=true"), api.get(`/scheduling/course-offerings/${offering.id}`), api.get(`/scheduling/course-offerings/${offering.id}/teaching-sessions`)]);
-    return { lecturers: rows(lecturers), units: rows(units), rooms: rows(rooms), offering: detail, offeringSessions: Array.isArray(offeringSessions) ? offeringSessions : [] };
-  }, [offering.id]);
+    const [lecturers, units, rooms, detail, offeringSessions] = await Promise.all([api.get("/system/lecturers"), api.get("/system/units"), api.get("/system/rooms"), api.get(`/scheduling/course-offerings/${offering.id}`), api.get(`/scheduling/course-offerings/${offering.id}/teaching-sessions`)]);
+    const availableRooms = rows(rooms);
+    // A historical room stays visible without requiring catalog administration access.
+    const historicalRoom = session?.room;
+    return { lecturers: rows(lecturers), units: rows(units), rooms: historicalRoom && !availableRooms.some(room => room.id === historicalRoom.id)
+      ? [...availableRooms, { ...historicalRoom, isActive: false }] : availableRooms, offering: detail, offeringSessions: Array.isArray(offeringSessions) ? offeringSessions : [] };
+  }, [offering.id, session?.id, session?.room]);
   const availability = useLoad(async () => rows(await api.get(`/scheduling/teaching-sessions?${new URLSearchParams({ from: form.sessionDate, to: form.sessionDate })}`)), [form.sessionDate]);
   const currentOffering = catalog.data?.offering || offering;
   const sessionForPeriod = session ? { ...session, endTime: periodTimes(session.period).endTime } : null;
   const future = session?.status === "planned" && !isSessionPast(sessionForPeriod);
   const pending = session?.status === "planned" && isSessionPast(sessionForPeriod);
-  const canManage = can("scheduling.write") && currentOffering.status !== "completed";
+  const canManage = can("scheduling.write") && (currentOffering.canWriteSchedule ?? currentOffering.scopeWritable) !== false && currentOffering.status !== "completed";
   const suggestClosing = !session && shouldSuggestClosing(currentOffering);
   const editable = canManage && editing && (!session || future);
   const validTime = isPeriodTimeConsistent(form.period, form.startTime, form.endTime);

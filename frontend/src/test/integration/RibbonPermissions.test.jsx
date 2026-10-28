@@ -51,7 +51,8 @@ describe("Ribbon read/navigation permission contracts", () => {
     expect(items).toHaveLength(63);expect(expected.size).toBe(63);
     for (const item of items) {
       expect(expected.has(item.route)).toBe(true);
-      expect(item.permissions || []).toEqual(expected.get(item.route));
+      if (item.route === '/masters/exam-schedule') expect(item.anyPermissions).toEqual(['gradebook.view','scheduling.view']);
+      else expect(item.permissions || []).toEqual(expected.get(item.route));
       expect(item.roles).toBeUndefined();
     }
   });
@@ -73,7 +74,7 @@ describe("Ribbon read/navigation permission contracts", () => {
       for (const label of labels) seen.add(label);
       for (const section of container.querySelectorAll(".ribbon-group")) expect(section.querySelectorAll(".ribbon-action").length).toBeGreaterThan(0);
     }
-    const allowed = items.filter(item => expected.get(item.route).every(p => permissions.includes(p))).map(item => item.label);
+    const allowed = items.filter(item => item.route === '/masters/exam-schedule' ? permissions.some(p => ['scheduling.view','gradebook.view'].includes(p)) : expected.get(item.route).every(p => permissions.includes(p))).map(item => item.label);
     expect([...seen].sort()).toEqual(allowed.sort());
   });
   it("hides gated actions while access loads, then shows only loaded permissions", () => {
