@@ -10,6 +10,13 @@ import { getBusinessWallTime } from "../scheduling/scheduling-time.js";
 export const DEFAULT_LATE_AFTER_MINUTES = 15;
 export const DEFAULT_ATTENDANCE_POLICY_VERSION = "attendance-policy-example-v0";
 
+export function attendanceWindow(session: SessionClock, now = new Date()) {
+  const start = Date.parse(`${session.sessionDate}T${session.startTime}Z`);
+  const end = Date.parse(`${session.sessionDate}T${session.endTime || session.startTime}Z`);
+  const current = Date.parse(`${getBusinessWallTime(now).replace(" ", "T")}Z`);
+  return { valid: Number.isFinite(start) && Number.isFinite(end) && end > start && current >= start - 30 * 60_000 && current <= end };
+}
+
 export interface SessionClock {
   sessionDate: string;
   startTime: string;

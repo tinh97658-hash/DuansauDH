@@ -22,6 +22,7 @@ import {
   ListAttendanceReviewsQueryDto,
   ResolveAttendanceReviewDto,
   RecognizeAttendanceDto,
+  AttendanceTelemetryDto,
 } from "./attendance.dto.js";
 import { AttendanceService } from "./attendance.service.js";
 import {
@@ -34,6 +35,37 @@ import {
 @RequirePermissions("attendance.view")
 export class AttendanceController {
   constructor(private readonly attendance: AttendanceService) {}
+
+  @Post("participants/:participantId/enrollment/analyze")
+  @RequirePermissions("attendance.enroll")
+  @UseInterceptors(FileInterceptor("image", attendanceProbeUploadOptions))
+  analyzeEnrollment(@Param("participantId") participantId: string, @UploadedFile() file: Express.Multer.File | undefined) {
+    return this.attendance.analyzeEnrollment(participantId, file);
+  }
+
+  @Post("sessions/:sessionId/analyze")
+  @RequirePermissions("attendance.record")
+  @UseInterceptors(FileInterceptor("image", attendanceProbeUploadOptions))
+  analyzeSession(@Param("sessionId", ParseUUIDPipe) sessionId: string, @UploadedFile() file: Express.Multer.File | undefined) {
+    return this.attendance.analyzeSession(sessionId, file);
+  }
+
+  @Get("sessions/:sessionId/workflow")
+  workflow(@Param("sessionId", ParseUUIDPipe) sessionId: string) {
+    return this.attendance.attendanceWorkflow(sessionId);
+  }
+
+  @Post("sessions/:sessionId/open")
+  @RequirePermissions("attendance.record")
+  open(@Param("sessionId", ParseUUIDPipe) sessionId: string, @CurrentUser() staff: Staff) {
+    return this.attendance.openAttendance(sessionId, staff);
+  }
+
+  @Post("sessions/:sessionId/close")
+  @RequirePermissions("attendance.record")
+  close(@Param("sessionId", ParseUUIDPipe) sessionId: string, @CurrentUser() staff: Staff) {
+    return this.attendance.closeAttendance(sessionId, staff);
+  }
 
   @Post("participants/:participantId/enrollment")
   @RequirePermissions("attendance.enroll")
@@ -88,9 +120,23 @@ export class AttendanceController {
     return this.attendance.recognize(sessionId, image, dto, staff);
   }
 
+  @Post("sessions/:sessionId/telemetry")
+  @RequirePermissions("attendance.record")
+  telemetry(
+    @Param("sessionId", ParseUUIDPipe) sessionId: string,
+    @Body() dto: AttendanceTelemetryDto,
+  ) {
+    return this.attendance.recordTelemetry(sessionId, dto);
+  }
+
   @Get("sessions/:sessionId/attendance")
   listSessionAttendance(@Param("sessionId", ParseUUIDPipe) sessionId: string) {
     return this.attendance.listSessionAttendance(sessionId);
+  }
+
+  @Get("sessions/:sessionId/enrollments")
+  listSessionEnrollments(@Param("sessionId", ParseUUIDPipe) sessionId: string) {
+    return this.attendance.listSessionEnrollments(sessionId);
   }
 
   @Get("sessions/:sessionId/reviews")

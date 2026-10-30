@@ -17,7 +17,7 @@ export type AttendanceStatus =
   | "LEFT_EARLY"
   | "LATE_EARLY";
 
-export type AttendanceSource = "FACE" | "MANUAL" | "REVIEW";
+export type AttendanceSource = "FACE" | "MANUAL" | "REVIEW" | "SYSTEM";
 export type RecognitionDecision = "ACCEPT" | "REVIEW" | "UNKNOWN" | "ERROR";
 export type ReviewStatus = "PENDING" | "RESOLVED" | "DISMISSED";
 export type ReviewResolution =

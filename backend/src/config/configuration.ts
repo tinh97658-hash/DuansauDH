@@ -32,5 +32,8 @@ export const environmentSchema = Joi.object({
   TRUST_PROXY: Joi.number().integer().min(0).default(0),
   GOOGLE_CLIENT_ID: Joi.string().allow("").default(""),
   GOOGLE_CLIENT_SECRET: Joi.string().allow("").default(""),
+  FACE_ENROLLMENT_DUPLICATE_THRESHOLD: Joi.number().min(0).max(1).optional(),
+  ATTENDANCE_AMBIGUITY_SCORE: Joi.number().min(0).max(1).optional(),
+  ATTENDANCE_AMBIGUITY_MARGIN: Joi.number().min(0).max(1).optional(),
   LOG_LEVEL: Joi.string().default("info"),
 }).unknown(true);

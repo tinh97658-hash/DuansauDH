@@ -14,11 +14,11 @@ const imageFilter: multer.Options["fileFilter"] = (_request, file, callback) => 
 export const attendanceEnrollmentUploadOptions: multer.Options = {
   storage: multer.memoryStorage(),
   fileFilter: imageFilter,
-  limits: { fileSize: 10 * 1024 * 1024, files: 5 },
+  limits: { fileSize: 10_000_000, files: 5 },
 };
 
 export const attendanceProbeUploadOptions: multer.Options = {
   storage: multer.memoryStorage(),
   fileFilter: imageFilter,
-  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  limits: { fileSize: 10_000_000, files: 1 },
 };

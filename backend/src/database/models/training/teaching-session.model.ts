@@ -29,6 +29,12 @@ export class TeachingSession extends Model {
   @Column({ type: DataType.ENUM("planned", "held", "not_held"), allowNull: false })
   declare status: "planned" | "held" | "not_held";
 
+  @Default("NOT_OPEN") @Column({ type: DataType.STRING(16), allowNull: false }) declare attendanceState: "NOT_OPEN" | "OPEN" | "CLOSED";
+  @Column({ type: DataType.DATE, allowNull: true }) declare attendanceOpenedAt: Date | null;
+  @Column({ type: DataType.DATE, allowNull: true }) declare attendanceClosedAt: Date | null;
+  @Column({ type: DataType.UUID, allowNull: true }) declare attendanceOpenedByStaffId: string | null;
+  @Column({ type: DataType.UUID, allowNull: true }) declare attendanceClosedByStaffId: string | null;
+
   @Column({ type: DataType.DATE, allowNull: true }) declare confirmedAt: Date | null;
   @ForeignKey(() => Staff) @Column({ type: DataType.UUID, allowNull: true }) declare confirmedByStaffId: string | null;
   @BelongsTo(() => Staff, { foreignKey: "confirmedByStaffId", as: "confirmedBy" }) declare confirmedBy: Staff | null;
