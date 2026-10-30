@@ -1,0 +1,20 @@
+# Locked Evaluation Protocol Configuration
+episodes:
+  source: data/processed/frozen_episodes/cross_camera
+  index: data/processed/frozen_episodes/cross_camera/frozen_episodes_index.csv
+  gallery_sizes: [100, 300, 400]
+  primary_gallery_size: 300
+  seeds: [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035]
+protocols:
+  p_mixed:
+    description: Mated probes from both same-camera and cross-camera
+  p_cross:
+    description: Mated probes strictly from different cameras than gallery
+calibration:
+  target_fpir: 0.01
+  calibration_split: nonmated_calibration
+  validation_split: nonmated_validation
+metrics:
+  primary_representation: inter_camera_rank1
+  primary_operational: tpir_at_1pct_fpir
+  guardrail_metrics: [mixed_rank1, intra_camera_rank1]

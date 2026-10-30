@@ -1,0 +1,5 @@
+hypothesis,metric,delta_points,status,notes
+H1: Camera-aware sampling improves inter-camera Rank-1,Inter-camera Rank-1 Delta,-2.7729707497098266,NOT SUPPORTED,E1 (4.27%) vs B2 (7.04%)
+H2: Cross-camera SupCon improves inter-camera Rank-1,Inter-camera Rank-1 Delta,1.76315848805491,SUPPORTED,E2 (8.80%) vs B2 (7.04%)
+E3: Combined Camera-aware Sampler + SupCon,Inter-camera Rank-1 Delta,-1.231158857539432,NOT SUPPORTED,E3 (5.81%) vs B2 (7.04%)
+H4: Representation gains transfer to Open-set TPIR@1% FPIR,Operational TPIR Delta,-1.6168479780706893,NOT SUPPORTED / TRADE-OFF,E3 TPIR (2.62%) vs B2 TPIR (4.23%)

@@ -1,0 +1,79 @@
+{
+  "phase": "metadata_only",
+  "model_inference": false,
+  "score_evaluation": false,
+  "physical_camera_namespace_verified": false,
+  "sessions_available": false,
+  "subset_source": "test",
+  "split_stats": {
+    "dev": {
+      "images": 2000,
+      "identities": 600,
+      "duplicate_paths": 0,
+      "missing_camera": 0,
+      "missing_session": 2000,
+      "camera_parser_mismatches": 0,
+      "camera_token_counts": {
+        "cam2": 658,
+        "cam1": 1154,
+        "cam3": 150,
+        "cam4": 34,
+        "cam10": 4
+      },
+      "role_counts": {
+        "gallery": 800,
+        "mated": 800,
+        "nonmated": 400
+      },
+      "missing_camera_by_role": {},
+      "identities_with_at_least_two_known_tokens": 434,
+      "identities_with_no_known_token": 0
+    },
+    "test": {
+      "images": 2000,
+      "identities": 600,
+      "duplicate_paths": 0,
+      "missing_camera": 74,
+      "missing_session": 2000,
+      "camera_parser_mismatches": 0,
+      "camera_token_counts": {
+        "cam1": 981,
+        "cam3": 109,
+        "cam2": 760,
+        "cam4": 46,
+        "MISSING": 74,
+        "cam10": 12,
+        "cam11": 2,
+        "cam14": 2,
+        "cam5": 14
+      },
+      "role_counts": {
+        "gallery": 800,
+        "mated": 800,
+        "nonmated": 400
+      },
+      "missing_camera_by_role": {
+        "gallery": 34,
+        "mated": 34,
+        "nonmated": 6
+      },
+      "identities_with_at_least_two_known_tokens": 522,
+      "identities_with_no_known_token": 20
+    }
+  },
+  "dev_test_identity_overlap": 0,
+  "archive_members_matched": 4000,
+  "archive_members_missing": 0,
+  "archive_readme_sha256": "ce97f44c6ddeefd758391caa3c18b56cbf557b7f03ac86791a6cea8fb3c8f852",
+  "archive_readme_camera_schema": "[PersonID]_[CameraID]_[ImageName].jpg",
+  "archive_readme_missing_provenance": "No verified global physical-camera namespace or session/track linkage established by this audit",
+  "source_hashes": {
+    "data\\processed\\qmul_subset_samedomain\\manifest_dev.csv": "3e89f49aee6bf333db0b825c088fcd4144a3be8ff0674fbba6cb4c5ee427d3c8",
+    "data\\processed\\qmul_subset_samedomain\\manifest_test.csv": "d2896edd2d0c8d63a84fb591fe363f4f619596d9990253b1d69d98fd748a9a51",
+    "data\\processed\\qmul_subset_samedomain\\subset_stats.json": "295cdb8ce50680295d155c5a835f166cc9fa42eafeb3525c51da93818d837599",
+    "scripts\\prepare_qmul_subset.py": "d16807237d1b0e6d70ec4ef8ad0c8584971a07c721de26ae16a3b819ff16e935",
+    "src\\data\\splits.py": "a6394db5461de5eb5b0b1ce04c6924954a08856c990f68ecdb28fd19394a63e2",
+    "src\\data\\manifest.py": "a4adc4dbe0ca506770b8151550efd7737ac7e8ccdca16c63e9e40f5a188f2cc6"
+  },
+  "runner_sha256": "b6f6a83695a5164f2a0876de4f1cfaa1cdd1db7b397d99b2fa3845695258c01c"
+}

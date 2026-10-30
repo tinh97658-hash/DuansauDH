@@ -1,0 +1,221 @@
+{
+  "inventory_date_local": "2026-10-28",
+  "timezone": "Asia/Saigon",
+  "research_repo": "D:\\Thigiacmaytinh\\face-attendance\\single-shot-open-set-fr",
+  "scope": "read_existing_reports_and_frozen_aggregates_only",
+  "new_inference": false,
+  "new_training": false,
+  "cloud_job_accessed": false,
+  "new_test_evaluation": false,
+  "audit": {
+    "script": "scripts/audit_paper_numbers.py",
+    "exit_code": 0,
+    "passed": 49,
+    "total": 49,
+    "interpretation": "numeric agreement with stored outputs; not statistical or methodological certification"
+  },
+  "hash_interpretation": "Hashes computed at inventory time; not proof of original run provenance.",
+  "files": [
+    {
+      "relative_path": "paper/outline.md",
+      "bytes": 14181,
+      "sha256_at_inventory": "a8ebb0c0600f212dea471850d8363de63e4096f10485a53355d349e1eb833c0d"
+    },
+    {
+      "relative_path": "paper/draft_v0.1.md",
+      "bytes": 34830,
+      "sha256_at_inventory": "a35a7aba9157ac076969b43fca614a20d8d8dfa1c0fc07fe80dc0e2a37dfd66c"
+    },
+    {
+      "relative_path": "docs/adaface_dev_results_20261028.md",
+      "bytes": 6310,
+      "sha256_at_inventory": "c4bcc8c37b5ce1ae4d6e2658266c4e518aa650e4d4429dd6d71209008cde2b70"
+    },
+    {
+      "relative_path": "outputs/baseline_test_multiseed.json",
+      "bytes": 4123,
+      "sha256_at_inventory": "79a9a5afefb06ef47cfd8b38e8727cf9b4d85480b05ae74da248a24f6b55b2a8"
+    },
+    {
+      "relative_path": "outputs/qmul_finetune_r50_all_e15/eval_test/flip_multiseed.json",
+      "bytes": 4142,
+      "sha256_at_inventory": "58d8ac5141294970af8cb443f22a902d7ea4d45f360de0c7fdecb3433796bf84"
+    },
+    {
+      "relative_path": "outputs/b0_finetuned_all_n100_n400/summary.json",
+      "bytes": 10753,
+      "sha256_at_inventory": "1f4082e3e190938fc02ab94b46fb85b4467d57c1c445ad22cd48623005cd6b21"
+    },
+    {
+      "relative_path": "outputs/b0_finetuned_all_n100_n400/probes_all_methods_N300.csv",
+      "bytes": 265823,
+      "sha256_at_inventory": "6b260a0aee9aecedecab41a77cf5274eae06c95f8699c4e742c2b322c4229d53"
+    },
+    {
+      "relative_path": "outputs/risk_coverage_qmul/summary.json",
+      "bytes": 134850,
+      "sha256_at_inventory": "514d19176d11a1a5df870e0fddfea496044747a6676db1a97d373b6e4e05320d"
+    },
+    {
+      "relative_path": "outputs/risk_coverage_qmul/quality_curves_summary.csv",
+      "bytes": 18153,
+      "sha256_at_inventory": "c40201b29c28f186acb2717ec258fea76baba2fd86d8e5b6fa34466e68e0fb64"
+    },
+    {
+      "relative_path": "outputs/risk_coverage_qmul/openset_curves_summary.csv",
+      "bytes": 24209,
+      "sha256_at_inventory": "f34eb382f5948bcbf09deeadcce3b6a88fa52be019309d72330806eaf1653d09"
+    },
+    {
+      "relative_path": "outputs/risk_coverage_qmul/aurc_summary.csv",
+      "bytes": 3474,
+      "sha256_at_inventory": "4e925eb22753681d376ef454375409e03f551d71fbefcf23aa42cfbc13518253"
+    },
+    {
+      "relative_path": "outputs/adaface_dev_controlled_20261028/summary.csv",
+      "bytes": 3585,
+      "sha256_at_inventory": "3a561cf24615e6fce6e5b9679af2ca32dd2d730823b7c182e1b8c25645ef8c53"
+    },
+    {
+      "relative_path": "outputs/adaface_dev_controlled_20261028/paired_tta.csv",
+      "bytes": 662,
+      "sha256_at_inventory": "1d1ff3872b6b144e0580983343b83e6877cb1def673b88ec196fd85af29a899a"
+    },
+    {
+      "relative_path": "outputs/adaface_dev_controlled_20261028/protocol.json",
+      "bytes": 3871,
+      "sha256_at_inventory": "9abec22bad576de608e092f6a81fa71df9a3ed0d5c6cd605f1d09ffdeb00f15c"
+    },
+    {
+      "relative_path": "outputs/adaface_lfw_dev_sanity_20261028/summary.json",
+      "bytes": 507,
+      "sha256_at_inventory": "757eb63ea3ccb4e549700b9ec5b8d17ab0600f06d3904624f099cc7305b6c761"
+    },
+    {
+      "relative_path": "src/evaluation/development_comparison.py",
+      "bytes": 6207,
+      "sha256_at_inventory": "a9f62d6325475d87864e0b5a94cb063edd5f398648ccf7c39b758cae4da58da6"
+    },
+    {
+      "relative_path": "scripts/analyze_risk_coverage.py",
+      "bytes": 23225,
+      "sha256_at_inventory": "44b682b6139901f6393c16cc62d3141406097c5c8695fa254bb4bf37d501f668"
+    },
+    {
+      "relative_path": "scripts/audit_paper_numbers.py",
+      "bytes": 6007,
+      "sha256_at_inventory": "362ec7ed1360dcd4aeeee5ce43677670a138e91a0868406b69a1285ccec739d4"
+    }
+  ],
+  "dev_n300_adapted_arcface": [
+    {
+      "model": "arcface_finetuned",
+      "tta": "none",
+      "n_gallery": "300",
+      "n_seeds": "5",
+      "rank1_accuracy_mean": "0.304",
+      "rank1_accuracy_seed_sd": "0.017344547654330255",
+      "rank5_mean": "0.42299999999999993",
+      "rank5_seed_sd": "0.011749704488009697",
+      "fnir_mean": "0.8783333333333333",
+      "fnir_seed_sd": "0.03425800798515743",
+      "fpir_mean": "0.008666666666666666",
+      "fpir_seed_sd": "0.012156388352540312",
+      "calibration_fpir_mean": "0.006666666666666666",
+      "calibration_fpir_seed_sd": "9.69739903612216e-19"
+    },
+    {
+      "model": "arcface_finetuned",
+      "tta": "flip",
+      "n_gallery": "300",
+      "n_seeds": "5",
+      "rank1_accuracy_mean": "0.31933333333333336",
+      "rank1_accuracy_seed_sd": "0.011820415484331413",
+      "rank5_mean": "0.43166666666666664",
+      "rank5_seed_sd": "0.00849836585598797",
+      "fnir_mean": "0.8703333333333333",
+      "fnir_seed_sd": "0.01709450853994413",
+      "fpir_mean": "0.011333333333333334",
+      "fpir_seed_sd": "0.007302967433402215",
+      "calibration_fpir_mean": "0.006666666666666666",
+      "calibration_fpir_seed_sd": "9.69739903612216e-19"
+    }
+  ],
+  "test_n300_aurc": [
+    {
+      "n_gallery": 300,
+      "split": "test",
+      "policy": "gap",
+      "aurc_mean": 0.5948435023913816,
+      "max_overall_rank1_mean": 0.364,
+      "coverage_at_max_overall_mean": 0.9783333333333333,
+      "full_rank1_mean": 0.364,
+      "random_risk_mean": 0.6359999999999999,
+      "aurc_sd": 0.03849990486742147,
+      "max_overall_rank1_sd": 0.01742444005158017,
+      "coverage_at_max_overall_sd": 0.008498365855988016,
+      "full_rank1_sd": 0.01742444005158017,
+      "random_risk_sd": 0.017424440051580156
+    },
+    {
+      "n_gallery": 300,
+      "split": "test",
+      "policy": "min_side",
+      "aurc_mean": 0.6086483705951423,
+      "max_overall_rank1_mean": 0.364,
+      "coverage_at_max_overall_mean": 0.9956666666666667,
+      "full_rank1_mean": 0.364,
+      "random_risk_mean": 0.6359999999999999,
+      "aurc_sd": 0.013517739266235545,
+      "max_overall_rank1_sd": 0.01742444005158017,
+      "coverage_at_max_overall_sd": 0.00968962790249907,
+      "full_rank1_sd": 0.01742444005158017,
+      "random_risk_sd": 0.017424440051580156
+    },
+    {
+      "n_gallery": 300,
+      "split": "test",
+      "policy": "score",
+      "aurc_mean": 0.3494259249335526,
+      "max_overall_rank1_mean": 0.364,
+      "coverage_at_max_overall_mean": 0.9776666666666667,
+      "full_rank1_mean": 0.364,
+      "random_risk_mean": 0.6359999999999999,
+      "aurc_sd": 0.02498318906883589,
+      "max_overall_rank1_sd": 0.01742444005158017,
+      "coverage_at_max_overall_sd": 0.01031449896451053,
+      "full_rank1_sd": 0.01742444005158017,
+      "random_risk_sd": 0.017424440051580156
+    }
+  ],
+  "evidence_rows": 15,
+  "follow_up_analysis": {
+    "report": "ket-qua-phan-ra-fnir-aurc-20261028.md",
+    "phase": "posthoc cached-embedding analysis; cutoffs unchanged",
+    "current_evidence_rows": 17,
+    "unit_tests_passed": 4,
+    "aurc_parity_checks": 30,
+    "operating_point_parity_rows": 30,
+    "replicates": 2000,
+    "input_hashes_rechecked_unchanged": true,
+    "runner_sha256": "9ed3c9039dd5513b3eeaafae8e63e2c5762352dda39e445b8f973856dd698a20",
+    "provenance_relative_to_workspace": ".tmp/research-evidence-20261028/provenance.json",
+    "public_aggregate_sha256": {
+      "fnir-decomposition-20261028.csv": "64194c23aef19c0ad12a5c388ed14009aba967f68908a88cccb4641e514a5963",
+      "paired-aurc-ci-20261028.csv": "6c805e6aaa0f3a5e1a8e357deca7cfb6c81151326f76088573443baf1497b320"
+    }
+  },
+  "camera_metadata_follow_up": {
+    "report": "audit-camera-session-20261028.md",
+    "current_evidence_rows": 20,
+    "total_research_tests_passed": 6,
+    "metadata_only": true,
+    "source_hashes_unchanged": true,
+    "archive_members_matched": 4000,
+    "dev_test_identity_overlap": 0,
+    "test_missing_camera_tokens": 74,
+    "session_ids_missing": 4000,
+    "physical_camera_namespace_verified": false,
+    "audit_sha256": "d98e2b8092eb12b8236451f6ebaf242a567d70b5206d572d3835227ac464c753"
+  }
+}

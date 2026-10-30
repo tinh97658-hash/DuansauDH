@@ -98,7 +98,7 @@ describe("Masters scheduling ribbon", () => {
     const entryGroup = ribbons.masters.find((section) => section.label === "THỦ TỤC ĐẦU VÀO");
     const learningGroup = ribbons.masters.find((section) => section.label === "XẾP LỊCH HỌC");
     const gradeGroup = ribbons.masters.find((section) => section.label === "QUẢN LÝ ĐIỂM");
-    expect(learningGroup.actions).toHaveLength(3);
+    expect(learningGroup.actions).toHaveLength(4);
     expect(gradeGroup.actions.map(({ label, route }) => ({ label, route }))).toEqual([
       { label: "Danh sách thi, điểm thi", route: "/masters/exam-lists" },
       { label: "Xếp lịch thi", route: "/masters/exam-schedule" },
@@ -114,6 +114,7 @@ describe("Masters scheduling ribbon", () => {
     expect(learningGroup.actions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ label: "Ma trận lớp học phần", route: "/masters/course-matrix" }),
+        expect.objectContaining({ label: "Điểm danh khuôn mặt", route: "/masters/attendance" }),
       ])
     );
     expect(entryGroup.actions).toEqual(

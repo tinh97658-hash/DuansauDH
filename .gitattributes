@@ -1,0 +1,7 @@
+# Normalize text in Git and use LF when checking out on every platform.
+# Git detects binary files automatically and leaves their bytes unchanged.
+* text=auto eol=lf
+
+# Windows command scripts need CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf

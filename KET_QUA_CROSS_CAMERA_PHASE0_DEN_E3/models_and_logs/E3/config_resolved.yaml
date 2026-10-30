@@ -1,0 +1,15 @@
+backbone_onnx: D:\Thigiacmaytinh\face-attendance\single-shot-open-set-fr\data\raw\models\buffalo_l\w600k_r50.onnx
+batch_size: 32
+device: cuda
+epochs: 3
+exp_id: E3
+head_lr: 0.001
+k_images: 4
+lambda_cc: 0.05
+lr: 0.0001
+p_identities: 8
+seed: 2026
+steps_per_epoch: 300
+temperature: 0.07
+use_balanced_sampler: true
+use_cross_camera_loss: true

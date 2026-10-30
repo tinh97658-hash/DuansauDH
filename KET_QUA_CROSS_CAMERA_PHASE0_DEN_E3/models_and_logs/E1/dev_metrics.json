@@ -1,0 +1,24 @@
+{
+  "best_inter_camera_rank1": 0.046822742474916385,
+  "final_epoch_metrics": {
+    "mixed_rank1": 0.1349206349206349,
+    "inter_camera_rank1": 0.046822742474916385,
+    "intra_camera_rank1": 0.2634146341463415,
+    "mixed_rank5": 0.22420634920634921,
+    "inter_camera_rank5": 0.10367892976588629,
+    "calibrated_threshold_1pct": 0.537988007068634,
+    "achieved_fpir_validation": 0.02,
+    "achieved_fpir_ci_lower": 0.006824751322967455,
+    "achieved_fpir_ci_upper": 0.057146683270386085,
+    "false_accepts_val": 3,
+    "total_val_nonmates": 150,
+    "tpir_at_1pct_fpir": 0.027777777777777776,
+    "fnir_at_1pct_fpir": 0.9722222222222222,
+    "inter_camera_tpir_at_1pct_fpir": 0.006688963210702341,
+    "inter_camera_fnir_at_1pct_fpir": 0.9933110367892977,
+    "n_mated": 504,
+    "n_inter": 299,
+    "n_intra": 205
+  },
+  "training_time_seconds": 199.62668800354004
+}

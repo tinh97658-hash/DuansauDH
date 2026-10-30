@@ -1,0 +1,7 @@
+split,episode_role,appearances,unique_images,unique_identities,images_seen_in_multiple_seeds,max_seeds_per_image
+dev,gallery,1500,1044,400,384,4
+dev,mated,3000,1466,400,998,5
+dev,unknown,1500,817,509,369,5
+test,gallery,1500,1040,400,370,4
+test,mated,3000,1448,400,992,5
+test,unknown,1500,825,507,379,5

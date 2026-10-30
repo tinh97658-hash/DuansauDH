@@ -1,0 +1,18 @@
+# Phase 0: Feasibility and Data Audit Configuration
+experiment: phase0_audit
+manifests:
+  train_subset: data/processed/qmul_train/manifest_train.csv
+  train_all: data/processed/qmul_train_all/manifest_train.csv
+  dev: data/processed/qmul_subset_samedomain/manifest_dev.csv
+  test: data/processed/qmul_subset_samedomain/manifest_test.csv  # Metadata audit only!
+checkpoints:
+  buffalo_l_onnx: data/raw/models/buffalo_l/w600k_r50.onnx
+  b0_ft_best: outputs/qmul_finetune_r50_all_e15/best.pt
+  adaface_ckpt: data/raw/models/adaface/adaface_ir50_ms1mv2.ckpt
+metrics:
+  camera_token_regex: "_cam(\\d+)_"
+  blur_metric: laplacian_variance
+  min_multi_camera_ids_for_go: 100
+outputs:
+  dir: outputs/cross_camera/phase0
+  report: reports/phase0_camera_feasibility.md

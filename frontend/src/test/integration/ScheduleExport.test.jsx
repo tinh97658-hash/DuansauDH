@@ -69,10 +69,12 @@ it("opens an isolated snapshot in a new tab, keeps each export and survives remo
 });
 
 it("shows the existing document without system navigation, and only prints when In is clicked", () => {
+  // jsdom does not apply the `@media screen` override that reveals the print sheet,
+  // so query it explicitly instead of weakening the content assertions.
   exportSchedule(snapshot);
   const first = renderPreview();
   expect(screen.getByText("TRƯỜNG ĐẠI HỌC HÀNG HẢI VIỆT NAM")).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: documentTitle })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: documentTitle, hidden: true })).toBeInTheDocument();
   expect(screen.getByText(documentRange)).toBeInTheDocument();
   expect(screen.getByText("Lịch trực lãnh đạo:")).toBeInTheDocument();
   expect(screen.getByText("Lịch trực chuyên viên:")).toBeInTheDocument();
@@ -81,14 +83,14 @@ it("shows the existing document without system navigation, and only prints when 
   expect(screen.getAllByText("(Ký, ghi rõ họ tên)")).toHaveLength(2);
   expect(screen.queryByText("(Đã ký)")).not.toBeInTheDocument();
   expect(screen.getByText("Tổng số: 1 buổi học")).toBeInTheDocument();
-  expect(screen.getByRole("table")).toHaveTextContent("Cơ sở dữ liệu");
+  expect(screen.getByRole("table", { hidden: true })).toHaveTextContent("Cơ sở dữ liệu");
   expect(screen.getAllByRole("button")).toHaveLength(1);
   expect(window.print).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "In / Lưu PDF", exact: true }));
   expect(window.print).toHaveBeenCalledTimes(1);
   first.unmount();
   renderPreview();
-  expect(screen.getByRole("table")).toHaveTextContent("Ghi chú tiếng Việt");
+  expect(screen.getByRole("table", { hidden: true })).toHaveTextContent("Ghi chú tiếng Việt");
 });
 
 it("reports missing or corrupt preview data instead of loading another week", () => {
@@ -253,7 +255,7 @@ it("handles empty schedules in preview and both document formats", async () => {
   const empty = { ...snapshot, rows: [] };
   exportSchedule(empty);
   renderPreview();
-  expect(screen.getByRole("table")).toHaveTextContent("Không có lịch học trong phạm vi đã chọn.");
+  expect(screen.getByRole("table", { hidden: true })).toHaveTextContent("Không có lịch học trong phạm vi đã chọn.");
   expect(screen.getByText("Tổng số: 0 buổi học")).toBeInTheDocument();
   for (const create of [createScheduleExcel, createScheduleWord]) {
     expect((await create(empty)).size).toBeGreaterThan(100);

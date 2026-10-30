@@ -1,0 +1,23 @@
+{
+  "dev_manifest": "D:\\Thigiacmaytinh\\face-attendance\\single-shot-open-set-fr\\data\\processed\\qmul_subset_samedomain\\manifest_dev.csv",
+  "manifest_sha256": "3e89f49aee6bf333db0b825c088fcd4144a3be8ff0674fbba6cb4c5ee427d3c8",
+  "gallery_sizes": [
+    100,
+    300,
+    400
+  ],
+  "seeds": [
+    2026,
+    2027,
+    2028,
+    2029,
+    2030,
+    2031,
+    2032,
+    2033,
+    2034,
+    2035
+  ],
+  "total_episodes": 30,
+  "index_sha256": "da5f9802803695fec19d721221c31e8350ae410121cf4cca0d5b6ed7fe9e31e1"
+}

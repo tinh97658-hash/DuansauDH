@@ -1,0 +1,44 @@
+{
+  "N100": {
+    "mixed_rank1_mean": 0.19117488776615982,
+    "mixed_rank1_std": 0.0383260737094422,
+    "inter_camera_rank1_mean": 0.08052866684137211,
+    "inter_camera_rank1_std": 0.03608641828621104,
+    "intra_camera_rank1_mean": 0.33766929113341215,
+    "intra_camera_rank1_std": 0.058383806935712115,
+    "tpir_1pct_fpir_mean": 0.03620386433088489,
+    "tpir_1pct_fpir_std": 0.015506800860455631,
+    "inter_camera_tpir_mean": 0.014921472873937622,
+    "inter_camera_tpir_std": 0.01638978941951739,
+    "achieved_fpir_mean": 0.0064,
+    "calibrated_threshold_mean": 0.482154443860054
+  },
+  "N300": {
+    "mixed_rank1_mean": 0.1576176784880387,
+    "mixed_rank1_std": 0.011977283098481204,
+    "inter_camera_rank1_mean": 0.05806997894814585,
+    "inter_camera_rank1_std": 0.012038425157240316,
+    "intra_camera_rank1_mean": 0.2886277541968424,
+    "intra_camera_rank1_std": 0.028803344333210523,
+    "tpir_1pct_fpir_mean": 0.026171366717897097,
+    "tpir_1pct_fpir_std": 0.01131892077432601,
+    "inter_camera_tpir_mean": 0.005968387227424659,
+    "inter_camera_tpir_std": 0.005707090431298099,
+    "achieved_fpir_mean": 0.004666666666666667,
+    "calibrated_threshold_mean": 0.5221054136753083
+  },
+  "N400": {
+    "mixed_rank1_mean": 0.14283163599282842,
+    "mixed_rank1_std": 0.005932426900111877,
+    "inter_camera_rank1_mean": 0.05032406036703154,
+    "inter_camera_rank1_std": 0.007016116752334302,
+    "intra_camera_rank1_mean": 0.26585528934610175,
+    "intra_camera_rank1_std": 0.017310118434782355,
+    "tpir_1pct_fpir_mean": 0.01952054146264332,
+    "tpir_1pct_fpir_std": 0.01026593850252507,
+    "inter_camera_tpir_mean": 0.0031589848141476812,
+    "inter_camera_tpir_std": 0.003514704329717415,
+    "achieved_fpir_mean": 0.006,
+    "calibrated_threshold_mean": 0.5441471189260483
+  }
+}

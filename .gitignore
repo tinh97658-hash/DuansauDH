@@ -1,29 +1,88 @@
-ServerSide/node_modules
-ServerSide/dist
-ServerSide/.env.auth
-ServerSide/config.env
-.env
-/node_modules/
-/backend/node_modules/
-/backend/dist/
-/backend/coverage/
-/frontend/node_modules/
-/frontend/build/
-/frontend/coverage/
+# Dependencies and package manager caches (keep lockfiles in Git)
+node_modules/
+.npm/
+.pnpm-store/
 
-# Local diagnostics, database backups and generated verification reports
+# Standalone local tooling repository (not a project submodule)
+/superpowers/
+
+# Local environment and credentials (keep example files in Git)
+.env
+.env.*
+config.env
+config.env.*
+!.env.example
+!.env.*.example
+!config.env.example
+!config.env.*.example
+
+# Frontend and backend build output, including the legacy backend
+/frontend/build/
+/frontend/dist/
+/backend/dist/
+/ServerSide/dist/
+*.tsbuildinfo
+.vite/
+.cache/
+.eslintcache
+.stylelintcache
+
+# Test coverage and generated test reports
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+/frontend-lifecycle-*-results.json
+/backend/realistic-test-verification.json
+
+# Runtime logs and diagnostics
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+report.*.json
+
+# Local temporary files and database backups (keep SQL migrations in Git)
 /.tmp/
 /.docker-recovery/
-*.log
+/pgsms-full-backup-*/
+/pgsms-full-backup-*.zip
 *.dump
 *.dmp
+
+# User-uploaded documents and photos
+/backend/public/submissions/submitted/*
+!/backend/public/submissions/submitted/.gitkeep
+/backend/public/img/users/user-*
+/public/submissions/submitted/*
+!/public/submissions/submitted/.gitkeep
+/public/img/users/user-*
+
+# Python research environments and caches
+.venv/
+venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
-/backend/realistic-test-verification.json
-.env.*
-!.env.example
-!.env.*.example
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Research model weights (keep reports, metrics and experiment configs in Git)
+/KET_QUA_*/**/*.ckpt
+/KET_QUA_*/**/*.pt
+/KET_QUA_*/**/*.pth
+/KET_QUA_*/**/*.onnx
+
+# OS metadata and editor temporary files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
 
 # Local transcript implementation diary and retired comparison fonts
 /TRANSCRIPT-EXPORT-CONTINUOUS-IMPLEMENTATION.md

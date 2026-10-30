@@ -1,0 +1,26 @@
+# Experiment E3: Combined Camera-Balanced PxK Sampling + Cross-Camera SupCon Loss
+exp_id: E3
+model:
+  backbone: resnet50_arcface
+  pretrained_onnx: data/raw/models/buffalo_l/w600k_r50.onnx
+  embedding_dim: 512
+  face_chip_size: 112
+training:
+  batch_size: 32
+  p_identities: 8
+  k_images: 4
+  sampler: camera_balanced_pxk
+  epochs: 3
+  steps_per_epoch: 300
+  learning_rate: 1.0e-4
+  head_learning_rate: 1.0e-3
+  weight_decay: 1.0e-4
+  optimizer: AdamW
+  scheduler: CosineAnnealingLR
+  amp: true
+  seed: 2026
+loss:
+  arcface_scale: 64.0
+  arcface_margin: 0.5
+  lambda_cc: 0.05
+  temperature: 0.07

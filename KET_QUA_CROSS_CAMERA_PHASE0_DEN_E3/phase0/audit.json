@@ -1,0 +1,204 @@
+{
+  "verdict": "GO",
+  "manifest_stats": [
+    {
+      "split": "train_subset",
+      "manifest_path": "D:\\Thigiacmaytinh\\face-attendance\\single-shot-open-set-fr\\data\\processed\\qmul_train\\manifest_train.csv",
+      "total_images": 45050,
+      "unique_identities": 3190,
+      "duplicate_paths": 0,
+      "camera_mismatches": 0,
+      "identities_ge2_cameras": 3047,
+      "identities_1_camera": 94,
+      "identities_0_camera": 49,
+      "images_per_id_mean": 14.122257053291536,
+      "images_per_id_min": 4,
+      "images_per_id_max": 20,
+      "images_per_id_median": 18.0,
+      "camera_distribution": {
+        "cam1": 18098,
+        "cam2": 16548,
+        "cam3": 6615,
+        "cam4": 2330,
+        "cam5": 343,
+        "cam6": 62,
+        "cam7": 17,
+        "cam8": 22,
+        "cam9": 21,
+        "UNKNOWN": 900,
+        "cam10": 20,
+        "cam11": 24,
+        "cam12": 16,
+        "cam13": 18,
+        "cam14": 14,
+        "cam15": 2
+      }
+    },
+    {
+      "split": "train_all",
+      "manifest_path": "D:\\Thigiacmaytinh\\face-attendance\\single-shot-open-set-fr\\data\\processed\\qmul_train_all\\manifest_train.csv",
+      "total_images": 78733,
+      "unique_identities": 5319,
+      "duplicate_paths": 0,
+      "camera_mismatches": 0,
+      "identities_ge2_cameras": 5224,
+      "identities_1_camera": 43,
+      "identities_0_camera": 52,
+      "images_per_id_mean": 14.80221846211694,
+      "images_per_id_min": 2,
+      "images_per_id_max": 40,
+      "images_per_id_median": 6.0,
+      "camera_distribution": {
+        "cam1": 32501,
+        "cam2": 29531,
+        "cam3": 11226,
+        "cam4": 3358,
+        "cam5": 383,
+        "cam6": 72,
+        "cam7": 25,
+        "cam8": 37,
+        "cam9": 41,
+        "UNKNOWN": 1378,
+        "cam10": 37,
+        "cam11": 42,
+        "cam12": 34,
+        "cam13": 42,
+        "cam14": 20,
+        "cam15": 3,
+        "cam16": 3
+      }
+    },
+    {
+      "split": "dev",
+      "manifest_path": "D:\\Thigiacmaytinh\\face-attendance\\single-shot-open-set-fr\\data\\processed\\qmul_subset_samedomain\\manifest_dev.csv",
+      "total_images": 2000,
+      "unique_identities": 600,
+      "duplicate_paths": 0,
+      "camera_mismatches": 0,
+      "identities_ge2_cameras": 434,
+      "identities_1_camera": 166,
+      "identities_0_camera": 0,
+      "images_per_id_mean": 3.3333333333333335,
+      "images_per_id_min": 2,
+      "images_per_id_max": 4,
+      "images_per_id_median": 4.0,
+      "camera_distribution": {
+        "cam2": 658,
+        "cam1": 1154,
+        "cam3": 150,
+        "cam4": 34,
+        "cam10": 4
+      }
+    },
+    {
+      "split": "test",
+      "manifest_path": "D:\\Thigiacmaytinh\\face-attendance\\single-shot-open-set-fr\\data\\processed\\qmul_subset_samedomain\\manifest_test.csv",
+      "total_images": 2000,
+      "unique_identities": 600,
+      "duplicate_paths": 0,
+      "camera_mismatches": 0,
+      "identities_ge2_cameras": 522,
+      "identities_1_camera": 58,
+      "identities_0_camera": 20,
+      "images_per_id_mean": 3.3333333333333335,
+      "images_per_id_min": 2,
+      "images_per_id_max": 4,
+      "images_per_id_median": 4.0,
+      "camera_distribution": {
+        "cam1": 981,
+        "cam3": 109,
+        "cam2": 760,
+        "cam4": 46,
+        "UNKNOWN": 74,
+        "cam10": 12,
+        "cam11": 2,
+        "cam14": 2,
+        "cam5": 14
+      }
+    }
+  ],
+  "leak_audit": {
+    "train_all__vs__train_subset": {
+      "common_identities_count": 3190,
+      "common_identities_sample": [
+        "100",
+        "10000",
+        "10001",
+        "10004",
+        "10005"
+      ],
+      "common_paths_count": 28001
+    },
+    "dev__vs__train_subset": {
+      "common_identities_count": 0,
+      "common_identities_sample": [],
+      "common_paths_count": 0
+    },
+    "dev__vs__train_all": {
+      "common_identities_count": 0,
+      "common_identities_sample": [],
+      "common_paths_count": 0
+    },
+    "dev__vs__test": {
+      "common_identities_count": 0,
+      "common_identities_sample": [],
+      "common_paths_count": 0
+    },
+    "test__vs__train_subset": {
+      "common_identities_count": 0,
+      "common_identities_sample": [],
+      "common_paths_count": 0
+    },
+    "test__vs__train_all": {
+      "common_identities_count": 0,
+      "common_identities_sample": [],
+      "common_paths_count": 0
+    }
+  },
+  "cross_pairs_stats": {
+    "train_subset": {
+      "total_images": 45050,
+      "unique_identities": 3190,
+      "multi_camera_identities": 3047,
+      "multi_camera_identity_percentage": 95.51724137931035,
+      "total_cross_camera_positive_pairs": 173463,
+      "pairs_per_multi_id_mean": 56.92911060059075
+    },
+    "train_all": {
+      "total_images": 78733,
+      "unique_identities": 5319,
+      "multi_camera_identities": 5224,
+      "multi_camera_identity_percentage": 98.21394999059973,
+      "total_cross_camera_positive_pairs": 550735,
+      "pairs_per_multi_id_mean": 105.4240045941807
+    },
+    "dev": {
+      "total_images": 2000,
+      "unique_identities": 600,
+      "multi_camera_identities": 434,
+      "multi_camera_identity_percentage": 72.33333333333334,
+      "total_cross_camera_positive_pairs": 1647,
+      "pairs_per_multi_id_mean": 3.794930875576037
+    }
+  },
+  "checkpoint_provenance": {
+    "buffalo_l_w600k_r50.onnx": {
+      "path": "D:\\Thigiacmaytinh\\face-attendance\\single-shot-open-set-fr\\data\\raw\\models\\buffalo_l\\w600k_r50.onnx",
+      "bytes": 174383860,
+      "sha256": "4c06341c33c2ca1f86781dab0e829f88ad5b64be9fba56e56bc9ebdefc619e43",
+      "exists": true
+    },
+    "b0_best_checkpoint.pt": {
+      "path": "D:\\Thigiacmaytinh\\face-attendance\\single-shot-open-set-fr\\outputs\\qmul_finetune_r50_all_e15\\best.pt",
+      "bytes": 174518346,
+      "sha256": "36e6f2de3389cdb89f5b76ab4fb0b24781d4d4084580ec300da937c669462b9c",
+      "exists": true
+    },
+    "adaface_ir50_ms1mv2.ckpt": {
+      "path": "D:\\Thigiacmaytinh\\face-attendance\\single-shot-open-set-fr\\data\\raw\\models\\adaface\\adaface_ir50_ms1mv2.ckpt",
+      "bytes": 700286703,
+      "sha256": "234da6ce931f821e0a8e920063dc2091d8122ea46285c159d2f25d3f762fecb3",
+      "exists": true
+    }
+  }
+}
