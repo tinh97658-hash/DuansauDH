@@ -17,6 +17,9 @@ ServerSide/config.env
 *.log
 *.dump
 *.dmp
+__pycache__/
+*.py[cod]
+.pytest_cache/
 /backend/realistic-test-verification.json
 .env.*
 !.env.example

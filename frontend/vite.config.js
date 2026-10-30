@@ -107,7 +107,11 @@ export default defineConfig(({ mode }) => {
       setupFiles: "./src/setupTests.js",
       css: true,
       clearMocks: true,
-      testTimeout: 25000,
+      testTimeout: 30000,
+      // jsdom workers are memory hungry; letting Vitest spawn one per CPU
+      // starves the main thread and causes spurious onTaskUpdate timeouts.
+      maxWorkers: process.env.CI ? 2 : 4,
+      minWorkers: 1,
       include: ["src/**/*.{test,spec}.{js,jsx}"],
       exclude: ["node_modules", "dist"],
     },
