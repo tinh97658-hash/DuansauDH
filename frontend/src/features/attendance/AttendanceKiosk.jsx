@@ -1,45 +1,71 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControlLabel,
-  IconButton,
-  Switch,
-  Typography,
-  Chip,
-} from "@mui/material";
-import {
-  ArrowBack,
-  CameraAlt,
-  CheckCircle,
-  HelpOutline,
-  VideocamOff,
-  Warning,
-} from "@mui/icons-material";
-import { recognizeAttendance } from "./attendanceApi";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { analyzeAttendanceFrame, recognizeAttendance, reportAttendanceTelemetry } from "./attendanceApi";
+import { errorMessage } from "./attendanceDisplay";
+import AttendanceScanView from "./AttendanceScanView";
+import { captureStableFace, captureAnalyzedFrame } from "./faceCapture";
 
 export default function AttendanceKiosk({ session, onClose, onAttendanceRecorded }) {
+  const scanAllowed = Boolean(session?.id) && session?.attendanceState === "OPEN" && session?.status !== "not_held";
+  const scanAllowedRef = useRef(scanAllowed);
+  scanAllowedRef.current = scanAllowed;
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const activeRef = useRef(false);
+  const processingRef = useRef(false);
+  const requestRef = useRef(null);
+  const metricsRef = useRef(null);
+  const departureRequiredRef = useRef(false);
+  const nextScanDelayRef = useRef(300);
+  const recordedRef = useRef(onAttendanceRecorded);
+  recordedRef.current = onAttendanceRecorded;
   const [streamActive, setStreamActive] = useState(false);
   const [cameraError, setCameraError] = useState(null);
   const [autoScan, setAutoScan] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
+  const [recentScans, setRecentScans] = useState([]);
+  const [captureGuide, setCaptureGuide] = useState("Đưa một khuôn mặt vào khung và giữ yên.");
+  const [awaitingDeparture, setAwaitingDeparture] = useState(false);
+
+  const reportMetrics = useCallback((metrics, outcome, eventId) => {
+    const committedAt = performance.now();
+    // Diagnostics must never delay or change the attendance result.
+    void reportAttendanceTelemetry(session.id, {
+      ...(eventId ? { eventId } : {}), outcome,
+      captureMs: metrics.captureMs, recognitionHttpMs: metrics.recognitionHttpMs,
+      uiCommitMs: Math.max(0, committedAt - metrics.finishedAt),
+      totalMs: Math.max(0, committedAt - metrics.startedAt), frameCount: metrics.frameCount,
+    }).catch(() => {});
+  }, [session?.id]);
+
+  useLayoutEffect(() => {
+    if (!result || !metricsRef.current) return;
+    const metrics = metricsRef.current;
+    metricsRef.current = null;
+    reportMetrics(metrics, result.decision, result.eventId);
+  }, [result, reportMetrics]);
 
   // Khởi động webcam
   useEffect(() => {
     let stream = null;
+    let disposed = false;
+    activeRef.current = scanAllowed;
+    processingRef.current = false;
+    departureRequiredRef.current = false;
+    nextScanDelayRef.current = 300;
+    metricsRef.current = null;
+    setAwaitingDeparture(false);
+    setProcessing(false);
+    setStreamActive(false);
+    setResult(null);
+    setRecentScans([]);
+    setCameraError(null);
+    setCaptureGuide(scanAllowed ? "Đưa một khuôn mặt vào khung và giữ yên." : "Buổi học chưa mở hoặc đã dừng điểm danh. Vui lòng quay lại danh sách.");
     const startCamera = async () => {
       try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error("Trình duyệt không hỗ trợ camera. Hãy mở bằng HTTPS hoặc localhost.");
+        }
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: "user",
@@ -48,13 +74,16 @@ export default function AttendanceKiosk({ session, onClose, onAttendanceRecorded
           },
           audio: false,
         });
+        if (disposed || !videoRef.current) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          setStreamActive(true);
           setCameraError(null);
         }
       } catch (err) {
-        console.error("Lỗi truy cập camera:", err);
+        if (disposed) return;
         setCameraError(
           err.name === "NotAllowedError"
             ? "Quyền truy cập camera bị từ chối. Vui lòng cho phép trình duyệt truy cập camera."
@@ -63,289 +92,164 @@ export default function AttendanceKiosk({ session, onClose, onAttendanceRecorded
       }
     };
 
-    startCamera();
+    if (scanAllowed) startCamera();
 
     return () => {
+      disposed = true;
+      activeRef.current = false;
+      requestRef.current?.abort();
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
+        if (videoRef.current?.srcObject === stream) videoRef.current.srcObject = null;
       }
     };
-  }, []);
+  }, [session?.id, scanAllowed]);
 
   // Chụp frame từ video và gửi đến backend
   const captureFrame = useCallback(async () => {
-    if (!videoRef.current || !canvasRef.current || processing) return;
+    if (!activeRef.current || !scanAllowedRef.current || departureRequiredRef.current || !session?.id || session.attendanceState !== "OPEN" || session.status === "not_held" || !videoRef.current || !canvasRef.current || processingRef.current) return;
 
     const video = videoRef.current;
-    if (video.videoWidth === 0 || video.videoHeight === 0) return;
+    if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) return;
 
+    processingRef.current = true;
     setProcessing(true);
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    setResult(null);
+    const controller = new AbortController();
+    requestRef.current = controller;
+    const metrics = { startedAt: performance.now(), finishedAt: 0, captureMs: 0, recognitionHttpMs: 0, frameCount: 0 };
+    let recognitionStartedAt = null;
+    try {
+      const sample = await captureStableFace({ video, canvas: canvasRef.current, signal: controller.signal,
+        analyze: (blob, signal) => { metrics.frameCount++; return analyzeAttendanceFrame(session.id, blob, signal); }, onGuide: setCaptureGuide });
+      if (controller.signal.aborted || !scanAllowedRef.current) return;
+      metrics.captureMs = performance.now() - metrics.startedAt;
+      if (!sample) {
+        nextScanDelayRef.current = 1000;
+        metrics.finishedAt = performance.now();
+        reportMetrics(metrics, "NO_CAPTURE");
+        return;
+      }
+      nextScanDelayRef.current = 300;
+      setCaptureGuide("Khuôn mặt đã ổn định. Đang đối chiếu danh sách lớp…");
+      const formData = new FormData();
+      formData.append("image", sample.blob, "probe.jpg");
+      formData.append("deviceId", "kiosk-web");
+      if (sample.analysis.capture_token) formData.append("captureToken", sample.analysis.capture_token);
 
-    canvas.toBlob(
-      async (blob) => {
-        if (!blob) {
-          setProcessing(false);
-          return;
-        }
+      recognitionStartedAt = performance.now();
+      const response = await recognizeAttendance(session.id, formData, { signal: controller.signal });
+      if (controller.signal.aborted || !activeRef.current || !scanAllowedRef.current) return;
+      if (response.decision === "ACCEPT" && !response.attendanceId) {
+        throw new Error("Chưa xác nhận được việc lưu điểm danh. Vui lòng quét lại hoặc liên hệ cán bộ phụ trách.");
+      }
+      metrics.finishedAt = performance.now();
+      metrics.recognitionHttpMs = metrics.finishedAt - recognitionStartedAt;
+      metricsRef.current = metrics;
+      if (["ACCEPT", "REVIEW"].includes(response.decision)) {
+        departureRequiredRef.current = true;
+        setAwaitingDeparture(true);
+        setCaptureGuide("Vui lòng rời khung camera để người tiếp theo điểm danh.");
+      }
+      setResult(response);
+      if (response.decision === "ACCEPT") {
+        setRecentScans((items) => [response, ...items.filter((item) => item.attendanceId !== response.attendanceId)].slice(0, 5));
+      }
 
-        try {
-          const formData = new FormData();
-          formData.append("image", blob, "probe.jpg");
-          formData.append("deviceId", "kiosk-web");
-
-          const response = await recognizeAttendance(session.id, formData);
-          setResult(response);
-
-          if (response.decision === "ACCEPT" && onAttendanceRecorded) {
-            onAttendanceRecorded();
-          }
-        } catch (err) {
-          const detail = err.response?.data?.message || err.message || "Lỗi nhận diện";
-          setResult({
-            decision: "ERROR",
-            reason: detail,
-          });
-        } finally {
-          setProcessing(false);
-        }
-      },
-      "image/jpeg",
-      0.9
-    );
-  }, [processing, session.id, onAttendanceRecorded]);
+      if (["ACCEPT", "REVIEW"].includes(response.decision)) {
+        recordedRef.current?.();
+      }
+    } catch (err) {
+      if (controller.signal.aborted || !activeRef.current || !scanAllowedRef.current) return;
+      if (err.response?.status === 409) setAutoScan(false);
+      metrics.finishedAt = performance.now();
+      if (recognitionStartedAt === null) metrics.captureMs = metrics.finishedAt - metrics.startedAt;
+      else metrics.recognitionHttpMs = metrics.finishedAt - recognitionStartedAt;
+      metricsRef.current = metrics;
+      setResult({ decision: "ERROR", reason: errorMessage(err, "Lỗi nhận diện") });
+    } finally {
+      if (requestRef.current === controller) {
+        processingRef.current = false;
+        requestRef.current = null;
+        if (activeRef.current) setProcessing(false);
+      }
+    }
+  }, [session?.id, session?.status, session?.attendanceState, reportMetrics]);
 
   // Quét tự động định kỳ nếu autoScan bật
   useEffect(() => {
-    if (!autoScan || !streamActive || processing) return;
+    if (!autoScan || !streamActive || processing || result || awaitingDeparture || session?.attendanceState !== "OPEN" || session?.status === "not_held") return;
 
-    const timer = setInterval(() => {
-      // Chỉ chụp nếu chưa có kết quả hiển thị hoặc kết quả đã hiển thị quá 3s
-      if (!processing) {
-        captureFrame();
-      }
-    }, 2800);
+    const timer = setTimeout(() => {
+      captureFrame();
+    }, nextScanDelayRef.current);
 
-    return () => clearInterval(timer);
-  }, [autoScan, streamActive, processing, captureFrame]);
+    return () => clearTimeout(timer);
+  }, [autoScan, streamActive, processing, result, awaitingDeparture, captureFrame, session?.attendanceState, session?.status]);
 
-  // Tự động xóa kết quả sau 4 giây để sẵn sàng cho người tiếp theo
+  // Two consecutive empty frames re-arm capture; a face staying in view never does.
   useEffect(() => {
-    if (!result) return;
+    if (!awaitingDeparture || !streamActive || session?.attendanceState !== "OPEN" || session?.status === "not_held") return;
+    const controller = new AbortController();
+    let timer;
+    let emptyFrames = 0;
+    const poll = async () => {
+      if (controller.signal.aborted || !activeRef.current) return;
+      if (processingRef.current) { timer = setTimeout(poll, 500); return; }
+      processingRef.current = true;
+      requestRef.current = controller;
+      try {
+        const sample = await captureAnalyzedFrame({ video: videoRef.current, canvas: canvasRef.current,
+          signal: controller.signal, analyze: (blob, signal) => analyzeAttendanceFrame(session.id, blob, signal) });
+        if (controller.signal.aborted) return;
+        emptyFrames = sample?.analysis.status === "no_face" && sample.analysis.face_count === 0 ? emptyFrames + 1 : 0;
+        if (emptyFrames >= 2) {
+          departureRequiredRef.current = false;
+          nextScanDelayRef.current = 300;
+          setAwaitingDeparture(false);
+          setResult(null);
+          setCaptureGuide("Sẵn sàng cho người tiếp theo. Nhìn vào camera và giữ yên.");
+          return;
+        }
+        setCaptureGuide("Vui lòng rời khung camera để người tiếp theo điểm danh.");
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        emptyFrames = 0;
+        if (err.response?.status === 409) {
+          setAutoScan(false);
+          setCaptureGuide("Buổi điểm danh đã đóng. Vui lòng quay lại danh sách điểm danh.");
+          return;
+        }
+        setCaptureGuide("Chưa kiểm tra được camera. Vui lòng chờ hoặc quay lại danh sách điểm danh.");
+      } finally {
+        if (requestRef.current === controller) {
+          processingRef.current = false;
+          requestRef.current = null;
+        }
+      }
+      if (!controller.signal.aborted) timer = setTimeout(poll, 500);
+    };
+    // Give the confirmation a brief readable interval; it stays in recent results.
+    timer = setTimeout(poll, 1000);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [awaitingDeparture, streamActive, session?.id, session?.attendanceState, session?.status]);
+
+  // Failed attempts may retry without requiring the person to leave the frame.
+  useEffect(() => {
+    if (!result || awaitingDeparture) return;
     const timeout = setTimeout(() => {
       setResult(null);
-    }, 4000);
+    }, 1800);
     return () => clearTimeout(timeout);
-  }, [result]);
+  }, [result, awaitingDeparture]);
 
-  return (
-    <Dialog fullScreen open onClose={onClose}>
-      <Box
-        sx={{
-          bgcolor: "#121212",
-          color: "#fff",
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        {/* Header Kiosk */}
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            px: 3,
-            py: 2,
-            borderBottom: "1px solid #333",
-            bgcolor: "#1e1e1e",
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <IconButton onClick={onClose} sx={{ color: "#fff" }} title="Thoát Kiosk">
-              <ArrowBack />
-            </IconButton>
-            <Box>
-              <Typography variant="h6" fontWeight="bold">
-                Kiosk Điểm Danh Khuôn Mặt
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#aaa" }}>
-                Buổi: {session?.sessionDate} ({session?.startTime} - {session?.endTime || "..."}) | Phòng: {session?.room || "Chưa xếp"}
-              </Typography>
-            </Box>
-          </Box>
-
-          <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={autoScan}
-                  onChange={(e) => setAutoScan(e.target.checked)}
-                  color="primary"
-                />
-              }
-              label="Quét tự động (2.8s)"
-              sx={{ color: "#ccc" }}
-            />
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={processing ? <CircularProgress size={20} color="inherit" /> : <CameraAlt />}
-              onClick={captureFrame}
-              disabled={processing || !streamActive}
-            >
-              {processing ? "Đang nhận diện..." : "Quét ngay"}
-            </Button>
-          </Box>
-        </Box>
-
-        {/* Khung Camera & Canvas */}
-        <Box
-          sx={{
-            flex: 1,
-            position: "relative",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden",
-            bgcolor: "#000",
-          }}
-        >
-          {cameraError ? (
-            <Box sx={{ textAlign: "center", p: 4, maxWidth: 500 }}>
-              <VideocamOff sx={{ fontSize: 64, color: "#f44336", mb: 2 }} />
-              <Alert severity="error">{cameraError}</Alert>
-              <Button
-                variant="outlined"
-                sx={{ mt: 3, color: "#fff", borderColor: "#fff" }}
-                onClick={() => window.location.reload()}
-              >
-                Tải lại trang
-              </Button>
-            </Box>
-          ) : (
-            <>
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "contain",
-                  transform: "scaleX(-1)", // Gương selfie tự nhiên
-                }}
-              />
-              <canvas ref={canvasRef} style={{ display: "none" }} />
-
-              {/* Khung hướng dẫn định vị khuôn mặt */}
-              <Box
-                sx={{
-                  position: "absolute",
-                  width: { xs: 260, sm: 320 },
-                  height: { xs: 340, sm: 420 },
-                  borderRadius: "50%",
-                  border: processing
-                    ? "4px dashed #2196f3"
-                    : result?.decision === "ACCEPT"
-                    ? "4px solid #4caf50"
-                    : result?.decision === "REVIEW"
-                    ? "4px solid #ff9800"
-                    : "3px dashed rgba(255,255,255,0.4)",
-                  pointerEvents: "none",
-                  boxShadow: processing ? "0 0 30px rgba(33, 150, 243, 0.4)" : "none",
-                  transition: "all 0.3s ease",
-                }}
-              />
-
-              {/* Thông báo kết quả ngay trên màn hình */}
-              {result && (
-                <Card
-                  sx={{
-                    position: "absolute",
-                    bottom: 40,
-                    width: { xs: "90%", sm: 500 },
-                    bgcolor:
-                      result.decision === "ACCEPT"
-                        ? "rgba(46, 125, 50, 0.95)"
-                        : result.decision === "REVIEW"
-                        ? "rgba(237, 108, 2, 0.95)"
-                        : "rgba(211, 47, 47, 0.95)",
-                    color: "#fff",
-                    boxShadow: 8,
-                    borderRadius: 3,
-                    backdropFilter: "blur(6px)",
-                  }}
-                >
-                  <CardContent sx={{ display: "flex", alignItems: "center", gap: 2, p: 2 }}>
-                    {result.decision === "ACCEPT" ? (
-                      <CheckCircle sx={{ fontSize: 48, color: "#fff" }} />
-                    ) : result.decision === "REVIEW" ? (
-                      <Warning sx={{ fontSize: 48, color: "#fff" }} />
-                    ) : (
-                      <HelpOutline sx={{ fontSize: 48, color: "#fff" }} />
-                    )}
-
-                    <Box sx={{ flex: 1 }}>
-                      {result.decision === "ACCEPT" ? (
-                        <>
-                          <Typography variant="h6" fontWeight="bold">
-                            {result.participant?.displayName || "Học viên"}
-                          </Typography>
-                          <Typography variant="body2">
-                            Mã: {result.participant?.id || "N/A"}
-                          </Typography>
-                          <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
-                            <Chip
-                              label="ĐIỂM DANH THÀNH CÔNG"
-                              size="small"
-                              sx={{ bgcolor: "#fff", color: "#2e7d32", fontWeight: "bold" }}
-                            />
-                            {result.similarity && (
-                              <Chip
-                                label={`Độ tin cậy: ${(result.similarity * 100).toFixed(1)}%`}
-                                size="small"
-                                sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "#fff" }}
-                              />
-                            )}
-                          </Box>
-                        </>
-                      ) : result.decision === "REVIEW" ? (
-                        <>
-                          <Typography variant="h6" fontWeight="bold">
-                            Chờ xác nhận thủ công
-                          </Typography>
-                          <Typography variant="body2">
-                            Độ tương đồng nằm trong vùng cần xem xét. Đã đẩy vào hàng đợi duyệt.
-                          </Typography>
-                        </>
-                      ) : (
-                        <>
-                          <Typography variant="h6" fontWeight="bold">
-                            Không nhận diện được
-                          </Typography>
-                          <Typography variant="body2">
-                            {result.reason === "empty_roster"
-                              ? "Lớp chưa có học viên trong danh sách."
-                              : result.reason === "subject_not_in_roster"
-                              ? "Khuôn mặt không thuộc danh sách lớp học phần này."
-                              : "Vui lòng nhìn thẳng vào camera hoặc điểm danh thủ công."}
-                          </Typography>
-                        </>
-                      )}
-                    </Box>
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          )}
-        </Box>
-      </Box>
-    </Dialog>
-  );
+  return <AttendanceScanView
+    session={session} onClose={onClose} videoRef={videoRef} canvasRef={canvasRef}
+    cameraError={cameraError} streamActive={streamActive} autoScan={autoScan}
+    setAutoScan={setAutoScan} processing={processing} result={result}
+    recentScans={recentScans} captureFrame={captureFrame}
+    captureGuide={captureGuide}
+    awaitingDeparture={awaitingDeparture}
+    onCameraReady={() => setStreamActive(true)}
+  />;
 }

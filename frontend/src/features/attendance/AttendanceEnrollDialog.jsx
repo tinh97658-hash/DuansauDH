@@ -20,21 +20,23 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import {
-  AddPhotoAlternate,
-  Close,
-  DeleteForever,
-  Face,
-  History,
-} from "@mui/icons-material";
+import AddPhotoAlternate from "@mui/icons-material/AddPhotoAlternate";
+import Close from "@mui/icons-material/Close";
+import DeleteForever from "@mui/icons-material/DeleteForever";
+import Face from "@mui/icons-material/Face";
+import History from "@mui/icons-material/History";
 import {
   enrollParticipant,
   getParticipantEnrollment,
   listParticipantAudit,
   withdrawParticipantEnrollment,
 } from "./attendanceApi";
+import { formatEnrollmentError } from "./enrollmentError";
+import { errorMessage } from "./attendanceDisplay";
+import GuidedEnrollmentCapture from "./GuidedEnrollmentCapture";
 
 export default function AttendanceEnrollDialog({ participant, open, onClose }) {
+  const participantId = participant?.id || participant?.studentId || participant?.learnerId;
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -47,26 +49,36 @@ export default function AttendanceEnrollDialog({ participant, open, onClose }) {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [previews, setPreviews] = useState([]);
   const [replace, setReplace] = useState(true);
+  const [capturing, setCapturing] = useState(false);
+
+  useEffect(() => () => previews.forEach((url) => URL.revokeObjectURL(url)), [previews]);
 
   // Nạp thông tin đăng ký khuôn mặt hiện tại
   useEffect(() => {
-    if (!open || !participant?.id) return;
+    if (!open || !participantId) return;
 
     let active = true;
     setLoading(true);
     setError(null);
     setSuccess(null);
+    setEnrollmentInfo(null);
+    setAuditLogs([]);
+    setShowAudit(false);
+    setReplace(true);
     setSelectedFiles([]);
     setPreviews([]);
 
     Promise.all([
-      getParticipantEnrollment(participant.id).catch(() => ({ subject: null })),
-      listParticipantAudit(participant.id, 10).catch(() => ({ events: [] })),
+      getParticipantEnrollment(participantId),
+      listParticipantAudit(participantId, 10),
     ])
       .then(([enrollRes, auditRes]) => {
         if (!active) return;
         setEnrollmentInfo(enrollRes?.subject || null);
         setAuditLogs(auditRes?.events || []);
+      })
+      .catch((err) => {
+        if (active) setError(errorMessage(err, "Không tải được thông tin đăng ký khuôn mặt."));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -75,19 +87,30 @@ export default function AttendanceEnrollDialog({ participant, open, onClose }) {
     return () => {
       active = false;
     };
-  }, [open, participant?.id]);
+  }, [open, participantId]);
 
   // Xử lý chọn ảnh
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files || []);
+    e.target.value = "";
     if (!files.length) return;
 
     if (files.length < 3 || files.length > 5) {
+      setSelectedFiles([]);
+      setPreviews([]);
       setError("Vui lòng chọn từ 3 đến 5 ảnh chân dung rõ mặt.");
       return;
     }
 
+    if (files.some((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 10_000_000 || file.size === 0)) {
+      setSelectedFiles([]);
+      setPreviews([]);
+      setError("Mỗi ảnh phải là JPEG, PNG hoặc WebP, không rỗng và không quá 10 MB.");
+      return;
+    }
+
     setError(null);
+    setSuccess(null);
     setSelectedFiles(files);
 
     // Tạo preview URL
@@ -113,19 +136,19 @@ export default function AttendanceEnrollDialog({ participant, open, onClose }) {
       });
       formData.append("replace", String(replace));
 
-      const res = await enrollParticipant(participant.id, formData);
+      const res = await enrollParticipant(participantId, formData);
       setSuccess(`Đăng ký thành công ${res.templates_added} mẫu khuôn mặt.`);
       setSelectedFiles([]);
       setPreviews([]);
 
       // Tải lại thông tin
-      const updated = await getParticipantEnrollment(participant.id);
+      const updated = await getParticipantEnrollment(participantId);
       setEnrollmentInfo(updated?.subject || null);
-      const audit = await listParticipantAudit(participant.id, 10);
+      const audit = await listParticipantAudit(participantId, 10);
       setAuditLogs(audit?.events || []);
     } catch (err) {
-      const detail = err.response?.data?.message || err.message || "Lỗi đăng ký khuôn mặt";
-      setError(detail);
+      const detail = errorMessage(err, "Lỗi đăng ký khuôn mặt");
+      setError(formatEnrollmentError(detail));
     } finally {
       setSubmitting(false);
     }
@@ -142,13 +165,13 @@ export default function AttendanceEnrollDialog({ participant, open, onClose }) {
     setSuccess(null);
 
     try {
-      const res = await withdrawParticipantEnrollment(participant.id);
+      const res = await withdrawParticipantEnrollment(participantId);
       setSuccess(`Đã xóa ${res.templates_deleted} mẫu khuôn mặt. Dữ liệu sinh trắc học đã được thu hồi.`);
       setEnrollmentInfo(null);
-      const audit = await listParticipantAudit(participant.id, 10);
+      const audit = await listParticipantAudit(participantId, 10);
       setAuditLogs(audit?.events || []);
     } catch (err) {
-      const detail = err.response?.data?.message || err.message || "Lỗi thu hồi sinh trắc";
+      const detail = errorMessage(err, "Lỗi thu hồi sinh trắc");
       setError(detail);
     } finally {
       setSubmitting(false);
@@ -156,15 +179,15 @@ export default function AttendanceEnrollDialog({ participant, open, onClose }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={submitting ? undefined : onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <Face color="primary" />
-          <Typography variant="h6" fontWeight="bold">
+          <Typography component="span" variant="h6" fontWeight="bold">
             Đăng ký khuôn mặt: {participant?.fullName || participant?.id}
           </Typography>
         </Box>
-        <IconButton onClick={onClose} size="small">
+        <IconButton onClick={onClose} disabled={submitting} size="small">
           <Close />
         </IconButton>
       </DialogTitle>
@@ -205,16 +228,20 @@ export default function AttendanceEnrollDialog({ participant, open, onClose }) {
               )}
             </Box>
 
-            {error && <Alert severity="error">{error}</Alert>}
+            {error && <Alert severity="error" sx={{ whiteSpace: "pre-line" }}>{error}</Alert>}
             {success && <Alert severity="success">{success}</Alert>}
 
             {/* Chọn ảnh mới */}
             <Box>
+              <GuidedEnrollmentCapture participantId={participantId} disabled={loading || submitting} onActiveChange={setCapturing} onComplete={(files) => {
+                setSelectedFiles(files); setPreviews(files.map((file) => URL.createObjectURL(file))); setError(null); setSuccess(null);
+              }} />
               <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
                 Đăng ký / Cập nhật mẫu mới (Yêu cầu 3–5 ảnh):
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                 Chụp ảnh rõ mặt, các góc nghiêng nhẹ khác nhau (thẳng, nghiêng trái, nghiêng phải 10–15 độ), đủ sáng.
+                Mỗi khuôn mặt chỉ được đăng ký cho một học viên; hệ thống sẽ kiểm tra trùng với các mẫu đã có trước khi lưu.
               </Typography>
 
               <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
@@ -222,7 +249,7 @@ export default function AttendanceEnrollDialog({ participant, open, onClose }) {
                   variant="outlined"
                   component="label"
                   startIcon={<AddPhotoAlternate />}
-                  disabled={submitting}
+                  disabled={submitting || loading || capturing}
                 >
                   Chọn 3–5 ảnh chân dung
                   <input
@@ -237,6 +264,7 @@ export default function AttendanceEnrollDialog({ participant, open, onClose }) {
                 <FormControlLabel
                   control={
                     <Switch
+                      disabled={submitting}
                       checked={replace}
                       onChange={(e) => setReplace(e.target.checked)}
                       color="primary"
@@ -343,14 +371,14 @@ export default function AttendanceEnrollDialog({ participant, open, onClose }) {
       </DialogContent>
 
       <DialogActions sx={{ p: 2 }}>
-        <Button onClick={onClose} color="inherit">
+        <Button onClick={onClose} disabled={submitting} color="inherit">
           Đóng
         </Button>
         <Button
           variant="contained"
           color="primary"
           onClick={handleEnrollSubmit}
-          disabled={submitting || selectedFiles.length < 3 || selectedFiles.length > 5}
+          disabled={loading || submitting || capturing || selectedFiles.length < 3 || selectedFiles.length > 5}
         >
           {submitting ? "Đang xử lý..." : "Lưu mẫu khuôn mặt"}
         </Button>

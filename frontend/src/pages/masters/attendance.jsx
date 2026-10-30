@@ -22,6 +22,8 @@ import { ArrowForward, Event, MeetingRoom, Schedule } from "@mui/icons-material"
 import axios from "axios";
 import { API_BASE_URL } from "../../config/http";
 import AttendanceSession from "../../features/attendance/AttendanceSession";
+import FeatureLayout from "../../components/FeatureLayout";
+import { courseLabel, errorMessage, roomLabel, sessionTime } from "../../features/attendance/attendanceDisplay";
 
 export default function AttendancePage() {
   const { sessionId } = useParams();
@@ -30,7 +32,7 @@ export default function AttendancePage() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [filterDate, setFilterDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [filterDate, setFilterDate] = useState(() => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()));
 
   useEffect(() => {
     if (sessionId) return; // Nếu đã có sessionId cụ thể thì không cần nạp danh sách buổi
@@ -51,7 +53,7 @@ export default function AttendancePage() {
       })
       .catch((err) => {
         if (!active) return;
-        setError(err.response?.data?.message || err.message || "Lỗi tải lịch buổi học");
+        setError(errorMessage(err, "Lỗi tải lịch buổi học"));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -64,11 +66,12 @@ export default function AttendancePage() {
 
   // Nếu URL có sessionId, hiển thị chi tiết điểm danh buổi đó
   if (sessionId) {
-    return <AttendanceSession sessionId={sessionId} onBack={() => navigate("/masters/attendance")} />;
+    return <FeatureLayout title="Điểm danh khuôn mặt"><AttendanceSession sessionId={sessionId} onBack={() => navigate("/masters/attendance")} /></FeatureLayout>;
   }
 
   // Nếu chưa chọn buổi, hiển thị danh mục các buổi học để chọn
   return (
+    <FeatureLayout title="Điểm danh khuôn mặt">
     <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 3 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 2 }}>
         <Box>
@@ -126,20 +129,16 @@ export default function AttendancePage() {
                   <TableCell>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                       <Schedule sx={{ fontSize: 16, color: "text.secondary" }} />
-                      {item.period === "MORNING"
-                        ? "Sáng (07:30 - 11:30)"
-                        : item.period === "AFTERNOON"
-                        ? "Chiều (13:30 - 17:00)"
-                        : (item.startTime ? `${item.startTime} - ${item.endTime || "..."}` : "Trong ngày")}
+                      {sessionTime(item)}
                     </Box>
                   </TableCell>
                   <TableCell sx={{ fontWeight: "500" }}>
-                    {item.courseOffering?.name || item.courseOfferingName || item.courseOffering?.subject?.name || item.courseOfferingId?.slice(0, 8)}
+                    {courseLabel(item)}
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                       <MeetingRoom sx={{ fontSize: 16, color: "text.secondary" }} />
-                      {typeof item.room === "object" ? (item.room?.code || item.room?.name || "Chưa xếp") : (item.room || "Chưa xếp")}
+                      {roomLabel(item.room)}
                     </Box>
                   </TableCell>
                   <TableCell>
@@ -169,5 +168,6 @@ export default function AttendancePage() {
         )}
       </TableContainer>
     </Box>
+    </FeatureLayout>
   );
 }
