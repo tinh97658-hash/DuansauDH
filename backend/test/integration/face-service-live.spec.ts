@@ -2,7 +2,9 @@ import { describe, expect, it } from "@jest/globals";
 import { ConfigService } from "@nestjs/config";
 import { FaceClientService } from "../../src/attendance/face-client.service.js";
 
-describe("Live Face-Service Integration (Docker 127.0.0.1:8010)", () => {
+const describeLiveFace = process.env.RUN_LIVE_FACE_TESTS === "true" ? describe : describe.skip;
+
+describeLiveFace("Live Face-Service Integration (Docker 127.0.0.1:8010)", () => {
   const config = {
     get: (key: string) => {
       if (key === "FACE_SERVICE_URL") return "http://127.0.0.1:8010";
