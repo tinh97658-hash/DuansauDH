@@ -8,6 +8,7 @@ import InfoOutlined from "@mui/icons-material/InfoOutlined";
 import RefreshRounded from "@mui/icons-material/RefreshRounded";
 import BulkAdmissionWorkflow from "../../features/admission/BulkAdmissionWorkflow";
 import FeatureLayout from "../../components/FeatureLayout";
+import InlineReportExport from "../../components/InlineReportExport";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import AppDialog from "../../components/AppDialog";
@@ -149,6 +150,7 @@ export default function AdmissionScores() {
               <Button size="small" variant="contained" startIcon={<AddRounded />} disabled={workflowBusy || saving} onClick={() => runWithDiscardCheck(() => openForm(null))} sx={{ bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F" } }}>Tạo đợt xét tuyển</Button>
             </>}
           </Stack>
+          <InlineReportExport height={38} />
         </Stack>
       </Paper>
       {loading && <Box sx={{ textAlign: "center", p: 2 }}><CircularProgress size={28} /></Box>}

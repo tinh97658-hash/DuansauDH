@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, within, waitFor, act } from "@testing-library/react";
+import { render, screen, within, waitFor, act, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { normalizeLearnerTranscript, transcriptDocumentDetails, transcriptMetadataRows, transcriptSubjectValues, openLearnerTranscript, readLearnerTranscript } from "../../features/learners/learnerTranscript";
 import LearnerTranscriptPreview from "../../features/learners/LearnerTranscriptPreview";
@@ -29,12 +29,11 @@ const mountPrint = () => {
   const view = render(<React.StrictMode><MemoryRouter useTransitions={false} initialEntries={[url]}><LearnerTranscriptPreview /></MemoryRouter></React.StrictMode>);
   return { ...view, id };
 };
-it("automatically dispatches native print once without viewer controls and closes after print or cancel", async () => {
+it("shows the document before explicit printing and keeps the preview after printing or cancel", async () => {
   const { id } = mountPrint();
-  await waitFor(() => expect(window.print).toHaveBeenCalledTimes(1));
-  expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
-  expect(screen.queryAllByRole("button")).toHaveLength(0);
-  expect(document.querySelector("nav")).toBeNull();
+  expect(window.print).not.toHaveBeenCalled();
+  await waitFor(() => expect(screen.getByRole("button", { name: "In / Lưu PDF" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "In / Lưu PDF" }));
   const table = document.querySelector("table");
   expect(within(table).getAllByRole("row", { hidden: true })).toHaveLength(5);
   expect(within(table).getByText("0")).toBeInTheDocument();
@@ -44,21 +43,23 @@ it("automatically dispatches native print once without viewer controls and close
   expect(screen.getByText("Điểm trung bình chung học phần:")).toHaveTextContent("—");
   expect(screen.getByLabelText("Ký xác nhận bảng điểm")).toHaveTextContent("CHUYÊN VIÊN");
   expect(Array.from(document.querySelectorAll("tbody tr")).map(row => row.cells[1].textContent)).toEqual(report.subjects.map(subject => subject.name));
-  expect(document.querySelector("style").textContent).toContain("@media screen");
+  expect(document.querySelector("style").textContent).toContain("@media print");
   act(() => window.dispatchEvent(new Event("afterprint")));
-  expect(window.close).toHaveBeenCalledTimes(1);
-  expect(readLearnerTranscript(id)).toBeNull();
+  expect(window.close).not.toHaveBeenCalled();
+  expect(readLearnerTranscript(id)).not.toBeNull();
   expect(window.print).toHaveBeenCalledTimes(1);
 });
-it("waits for document fonts before measuring and dispatching print", async () => {
+it("waits for document fonts before enabling explicit print", async () => {
   const original = Object.getOwnPropertyDescriptor(document, "fonts");
   let ready;
   Object.defineProperty(document, "fonts", { configurable: true, value: { ready: new Promise(resolve => { ready = resolve; }) } });
   try {
     mountPrint();
     expect(window.print).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "In / Lưu PDF" })).toBeDisabled();
     await act(async () => ready());
-    await waitFor(() => expect(window.print).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole("button", { name: "In / Lưu PDF" })).toBeEnabled());
+    expect(window.print).not.toHaveBeenCalled();
   } finally { if (original) Object.defineProperty(document, "fonts", original); else delete document.fonts; }
 });
 it("cancels scheduled printing when the temporary document unmounts", async () => {

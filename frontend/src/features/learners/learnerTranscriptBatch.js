@@ -3,6 +3,7 @@ import { API_BASE_URL } from "../../config/http";
 import { learnerTranscriptFilename, normalizeLearnerTranscript } from "./learnerTranscript";
 import { createLearnerTranscriptWord } from "./learnerTranscriptWord";
 import { createLearnerTranscriptPdf } from "./learnerTranscriptPdf";
+import { createLearnerTranscriptExcel } from "./learnerTranscriptExcel";
 import { sanitizeDocumentFilenamePart } from "../../utils/documentFiles";
 
 export async function fetchClassTranscripts(classGroupId) {
@@ -28,9 +29,9 @@ export function selectTranscriptScorecards(scorecards, selectedIds) {
 }
 
 export async function generateTranscriptDocuments(scorecards, format, { isCancelled = () => false, now = new Date() } = {}) {
-  if (!["word", "pdf"].includes(format)) throw new Error("Định dạng bảng điểm không hợp lệ.");
+  if (!["word", "pdf", "excel"].includes(format)) throw new Error("Định dạng bảng điểm không hợp lệ.");
   if (!scorecards.length) throw new Error("Lớp chưa có học viên để xuất bảng điểm.");
-  const generate = format === "pdf" ? createLearnerTranscriptPdf : createLearnerTranscriptWord;
+  const generate = format === "excel" ? createLearnerTranscriptExcel : format === "pdf" ? createLearnerTranscriptPdf : createLearnerTranscriptWord;
   const used = new Set();
   const documents = [];
   for (const scorecard of scorecards) {
@@ -38,7 +39,7 @@ export async function generateTranscriptDocuments(scorecards, format, { isCancel
     const transcript = normalizeLearnerTranscript(scorecard, { now });
     const identity = transcript.learner.participantId || transcript.learner.admissionRecordId;
     if (!identity) throw new Error("Học viên thiếu định danh để xuất bảng điểm.");
-    const extension = format === "pdf" ? "pdf" : "docx";
+    const extension = format === "excel" ? "xlsx" : format === "pdf" ? "pdf" : "docx";
     const base = learnerTranscriptFilename(transcript, format).slice(0, -(extension.length + 1));
     const filename = `${base.slice(0, 160)}-${sanitizeDocumentFilenamePart(identity).slice(0, 64)}.${extension}`.replace(/\.\./g, "-");
     const key = filename.normalize("NFC").toLocaleLowerCase("vi");

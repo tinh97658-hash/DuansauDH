@@ -18,6 +18,7 @@
 .transcript-dialog .transcript-file-icon { width:24px; height:24px; flex:none; }
 .transcript-dialog .transcript-file-icon-pdf { color:var(--danger); }
 .transcript-dialog .transcript-file-icon-word { color:var(--secondary); }
+.transcript-dialog .transcript-file-icon-excel { color:#107c41; }
 .transcript-dialog .transcript-format-note { margin:12px 0 0; color:var(--text-secondary); font-size:12px; line-height:1.5; }
 .transcript-dialog .transcript-selection-controls { display:flex; align-items:center; flex-wrap:wrap; gap:8px 16px; padding:12px 0; margin-bottom:16px; border-top:1px solid var(--table-border-color); border-bottom:1px solid var(--table-border-color); }
 .transcript-dialog .transcript-selection-controls > .MuiFormControlLabel-root { margin:0; }

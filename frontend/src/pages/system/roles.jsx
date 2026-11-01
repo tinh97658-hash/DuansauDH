@@ -65,6 +65,7 @@ const Roles = () => {
   }, [selectedRole]);
 
   const allPermissions = useMemo(() => catalog.flatMap((group) => group.permissions), [catalog]);
+  const assignable = permission => !permission.assignableRoleCodes || permission.assignableRoleCodes.includes(selectedRole?.code);
 
   const togglePermission = (code) => setChecked((previous) => {
     const next = new Set(previous);
@@ -74,7 +75,7 @@ const Roles = () => {
 
   const toggleGroup = (group) => setChecked((previous) => {
     const next = new Set(previous);
-    const codes = group.permissions.map((permission) => permission.code);
+    const codes = group.permissions.filter(assignable).map((permission) => permission.code);
     const allChecked = codes.every((code) => next.has(code));
     codes.forEach((code) => (allChecked ? next.delete(code) : next.add(code)));
     return next;
@@ -85,7 +86,7 @@ const Roles = () => {
     setSaving(true);
     setError("");
     try {
-      const ids = allPermissions.filter((permission) => checked.has(permission.code)).map((permission) => permission.id);
+      const ids = allPermissions.filter((permission) => assignable(permission) && checked.has(permission.code)).map((permission) => permission.id);
       const result = await setRolePermissions(selectedRole.id, ids, groupScope);
       setNotice({ type: "success", message: result.message || "Cập nhật quyền cho vai trò thành công." });
       await load();
@@ -184,7 +185,8 @@ const Roles = () => {
   );
 
   return (
-    <FeatureLayout title="Vai trò & phân quyền" group="Tài khoản & phân quyền" desc="Tạo vai trò tùy chỉnh và tick chọn quyền theo từng nhóm nghiệp vụ.">
+    <FeatureLayout title="Vai trò & phân quyền" group="Tài khoản & phân quyền" desc="Tạo vai trò tùy chỉnh và tick chọn quyền theo từng nhóm nghiệp vụ."
+      exportConfig={false}>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {notice && <Alert severity={notice.type} onClose={() => setNotice(null)} sx={{ mb: 2 }}>{notice.message}</Alert>}
       {loading ? (
@@ -194,7 +196,9 @@ const Roles = () => {
           <Paper variant="outlined" sx={{ borderColor: "#C6D5E1", borderRadius: "10px", overflow: "hidden" }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.5, py: 1, bgcolor: "#F5F9FC", borderBottom: "1px solid #DCE6EF" }}>
               <Typography sx={{ fontWeight: 700, fontSize: 13, color: "#173E75" }}>DANH SÁCH VAI TRÒ</Typography>
-              {canManage && <Tooltip title="Thêm vai trò"><IconButton size="small" color="primary" aria-label="Thêm vai trò" onClick={openCreateRole} disabled={saving}><AddRounded fontSize="small" /></IconButton></Tooltip>}
+              <Stack direction="row" spacing={1} alignItems="center">
+                {canManage && <Tooltip title="Thêm vai trò"><IconButton size="small" color="primary" aria-label="Thêm vai trò" onClick={openCreateRole} disabled={saving}><AddRounded fontSize="small" /></IconButton></Tooltip>}
+              </Stack>
             </Stack>
             <Stack divider={<Divider flexItem />}>
               {roles.map((role) => (
@@ -260,7 +264,7 @@ const Roles = () => {
                   <>
                     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 1.5 }}>
                       {permissionGroups.map((group) => {
-                        const codes = group.permissions.map((permission) => permission.code);
+                        const codes = group.permissions.filter(assignable).map((permission) => permission.code);
                         const allChecked = codes.every((code) => checked.has(code));
                         return (
                           <Paper key={group.group} variant="outlined" sx={{ borderColor: "#DCE6EF", borderRadius: "8px", overflow: "hidden" }}>
@@ -277,7 +281,7 @@ const Roles = () => {
                                 <Box key={permission.code} sx={{ mb: permission.description ? 1 : 0 }}>
                                 <FormControlLabel
                                   sx={{ display: "flex", m: 0, px: 0.5 }}
-                                  control={<Checkbox size="small" checked={checked.has(permission.code)} onChange={() => togglePermission(permission.code)} disabled={!canManage || saving} inputProps={{ "aria-label": permission.name }} />}
+                                  control={<Checkbox size="small" checked={assignable(permission) && checked.has(permission.code)} onChange={() => togglePermission(permission.code)} disabled={!canManage || saving || !assignable(permission)} inputProps={{ "aria-label": permission.name }} />}
                                   label={<Typography sx={{ fontSize: 12.5 }}>{permission.name}</Typography>}
                                 />
                                 {permission.description && <Typography variant="caption" component="p" color="text.secondary" sx={{ ml: 4, mr: 0.5, my: 0, lineHeight: 1.5 }}>{permission.description}</Typography>}

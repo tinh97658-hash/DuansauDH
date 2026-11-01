@@ -1,3 +1,4 @@
+import AppSelect from "../../components/AppSelect";
 import React, { useState } from "react";
 import { api, message, Modal, Notice } from "./shared";
 
@@ -14,9 +15,9 @@ export default function GroupSettings({ groups, onClose, onSaved }) {
     finally { setSaving(false); }
   };
   return <Modal title="Ngày học và loại nhóm" busy={saving} onClose={onClose} actions={<><button className="sl-btn" disabled={saving} onClick={onClose}>Hủy</button><button className="sl-btn sl-btn-primary" disabled={saving || !id || !days.length} onClick={save}>Lưu cấu hình nhóm</button></>}>
-    <label className="v20-field">Lớp / nhóm<select disabled={saving} value={id} onChange={(event) => { const group = groups.find((row) => row.id === event.target.value); setId(group.id); setDays(group.allowedWeekdays || [1, 2, 3, 4, 5, 6, 0]); setType(group.groupType || "ADMINISTRATIVE"); }}>
+    <label className="v20-field">Lớp / nhóm<AppSelect disabled={saving} value={id} onChange={(event) => { const group = groups.find((row) => row.id === event.target.value); setId(group.id); setDays(group.allowedWeekdays || [1, 2, 3, 4, 5, 6, 0]); setType(group.groupType || "ADMINISTRATIVE"); }}>
       {groups.map((group) => <option value={group.id} key={group.id}>{group.code} · {group.name}</option>)}
-    </select></label><label className="v20-field">Loại nhóm<select disabled={saving} value={type} onChange={(event) => setType(event.target.value)}><option value="ADMINISTRATIVE">Hành chính</option><option value="NON_ADMINISTRATIVE">Không hành chính</option></select></label>
+    </AppSelect></label><label className="v20-field">Loại nhóm<AppSelect disabled={saving} value={type} onChange={(event) => setType(event.target.value)}><option value="ADMINISTRATIVE">Hành chính</option><option value="NON_ADMINISTRATIVE">Không hành chính</option></AppSelect></label>
     <p>Ngày có thể học của nhóm, áp dụng cho các lớp học phần của nhóm:</p><div className="v20-days">{[1, 2, 3, 4, 5, 6, 0].map((day) => <label key={day}><input type="checkbox" disabled={saving} checked={days.includes(day)} onChange={() => setDays((current) => current.includes(day) ? current.filter((value) => value !== day) : [...current, day])} />{day === 0 ? "Chủ nhật" : `Thứ ${day + 1}`}</label>)}</div>{error && <Notice error={error} />}
   </Modal>;
 }

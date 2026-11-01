@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import "./accounts.css";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress, FormControl, FormControlLabel,
-  IconButton, MenuItem, Paper, Select, Stack, TableBody, TableCell, TableContainer,
+  IconButton, InputAdornment, MenuItem, Paper, Select, Stack, TableBody, TableCell, TableContainer,
   TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import AddRounded from "@mui/icons-material/AddRounded";
@@ -206,9 +206,10 @@ const Accounts = () => {
   const selectedPrimaryOptions = editorRoleOptions.filter((role) => form.roleIds.includes(role.id));
 
   return (
-    <FeatureLayout title="Tài khoản nhân sự" group="Tài khoản & phân quyền" desc="Tạo, khóa/mở, đặt lại mật khẩu và phân vai trò cho tài khoản nội bộ.">
+    <FeatureLayout title="Tài khoản nhân sự" group="Tài khoản & phân quyền" desc="Tạo, khóa/mở, đặt lại mật khẩu và phân vai trò cho tài khoản nội bộ."
+      exportConfig={false}>
       <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5, bgcolor: "#FFF", borderColor: "#C6D5E1", borderRadius: "10px", boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)" }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems="flex-end">
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} useFlexGap alignItems="flex-end" sx={{ flexWrap: "wrap" }}>
           <FilterSearchField
             placeholder="Tìm theo họ tên hoặc email..."
             value={search}
@@ -363,13 +364,18 @@ const Accounts = () => {
         onConfirm={() => setCredentials(null)}
         maxWidth="xs"
       >
-        <Stack spacing={1.5}>
+        <Stack spacing={2} className="account-credentials">
           <Alert severity="warning">Hãy sao chép và gửi mật khẩu này cho nhân sự. Hệ thống không lưu mật khẩu dạng rõ.</Alert>
-          <TextField label="Email" value={credentials?.email || ""} fullWidth size="small" InputProps={{ readOnly: true }} />
-          <Stack direction="row" spacing={1} alignItems="center">
-            <TextField label="Mật khẩu" value={credentials?.password || ""} fullWidth size="small" InputProps={{ readOnly: true }} />
-            <Tooltip title="Sao chép"><IconButton onClick={copyPassword} aria-label="Sao chép mật khẩu"><ContentCopyRounded /></IconButton></Tooltip>
-          </Stack>
+          <Box className="account-credential-field">
+            <Typography component="label" htmlFor="created-account-email">Email</Typography>
+            <TextField id="created-account-email" value={credentials?.email || ""} fullWidth size="small" InputProps={{ readOnly: true }} />
+          </Box>
+          <Box className="account-credential-field">
+            <Typography component="label" htmlFor="created-account-password">Mật khẩu</Typography>
+            <TextField id="created-account-password" className="account-credential-password" value={credentials?.password || ""} fullWidth size="small" InputProps={{ readOnly: true,
+              endAdornment: <InputAdornment position="end"><Tooltip title="Sao chép mật khẩu"><IconButton onClick={copyPassword} aria-label="Sao chép mật khẩu" edge="end"><ContentCopyRounded fontSize="small" /></IconButton></Tooltip></InputAdornment>,
+            }} />
+          </Box>
         </Stack>
       </AppDialog>
 

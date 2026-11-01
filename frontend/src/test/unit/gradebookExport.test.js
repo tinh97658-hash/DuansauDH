@@ -81,7 +81,7 @@ it.each([4, 40])("writes an actual single-sheet workbook with %i students and bo
   expect(sheet.getCell("A4").value).toBe("BẢNG ĐIỂM MÔN HỌC");
   expect(sheet.getCell("A6").value).toBe(`Lớp: ${group.name}`);
   expect(sheet.getCell("A7").value).toBe(`Học phần: ${offering.subject.name}`);
-  expect(sheet.model.merges).toEqual(["A1:P1", "A2:P2", "A4:P4", "A6:D6", "A7:D7"]);
+  expect(sheet.model.merges).toEqual(["A1:H1", "I1:P1", "A2:H2", "I2:P2", "A3:H3", "I3:P3", "A4:P4", "A6:D6", "A7:D7"]);
   for (const cell of ["A1", "A2", "A4"]) expect(sheet.getCell(cell).alignment.horizontal).toBe("center");
   for (const column of [2, 5, 9, 10, 11, 12, 13, 14]) {
     expect(sheet.getCell(10, column).alignment.wrapText).not.toBe(true);
@@ -109,7 +109,8 @@ it.each([4, 40])("writes an actual single-sheet workbook with %i students and bo
   expect(sheet.views[0]).toMatchObject({ state: "frozen", xSplit: 4, ySplit: 9, topLeftCell: "E10", showGridLines: false });
   expect(sheet.pageSetup).toMatchObject({ paperSize: 9, orientation: "landscape", scale: 100, fitToPage: false, printArea: `A1:P${9 + count}`, printTitlesRow: "9:9" });
   const text = JSON.stringify(sheet.model);
-  for (const forbidden of ["VIỆN TRƯỞNG", "PHỤ TRÁCH LỚP", "CỘNG HÒA", "Độc lập", "Hải Phòng, ngày", "Tra cứu điểm"]) expect(text).not.toContain(forbidden);
+  for (const required of ["BỘ XÂY DỰNG", "CỘNG HÒA", "Độc lập", "Hải Phòng, ngày"]) expect(text).toContain(required);
+  for (const forbidden of ["VIỆN TRƯỞNG", "PHỤ TRÁCH LỚP", "Tra cứu điểm"]) expect(text).not.toContain(forbidden);
   expect(JSON.stringify(rows)).toBe(before);
 });
 
@@ -150,12 +151,17 @@ it("prints nine exam columns including notes without the final outcome column", 
   expect(sheet.name).toBe("Danh sách thi");
   expect(sheet.getCell("A1").value).toBe(document.university);
   expect(sheet.getCell("A2").value).toBe(document.institute);
-  expect(sheet.getRow(1).values).toContain("DANH SÁCH THI");
+  expect(sheet.getRow(1).values).toContain("LỊCH THI KẾT THÚC HỌC PHẦN");
   expect(sheet.getRow(2).values).toContain(`Lớp: ${group.name}`);
   expect(sheet.getCell("A3").value).toBe(`Học phần: ${offering.subject.name}`);
   expect(sheet.getRow(EXAM_LIST_HEADER_ROW).values.slice(1)).toEqual(gradebookColumns(true).map(column => column.label));
   expect(sheet.columnCount).toBe(9);
-  expect(sheet.rowCount).toBe(EXAM_LIST_HEADER_ROW + rows.length);
+  expect(sheet.rowCount).toBe(EXAM_LIST_HEADER_ROW + rows.length + 7);
+  expect(sheet.getCell("A45").value).toBe("Tổng số: 40 học viên");
+  expect(sheet.getCell("A46").value).toBe("Lịch trực lãnh đạo:");
+  expect(sheet.getCell("A48").value).toBe("Viện trưởng Viện ĐTSĐH");
+  expect(sheet.getRow(48).values).toContain("Cán bộ phụ trách");
+  expect(sheet.headerFooter.oddFooter).toBe(schedule.headerFooter.oddFooter);
   expect(sheet.getCell("B5").value).toBe(rows[0].code);
   expect(sheet.getCell("B5").type).toBe(ExcelJS.ValueType.String);
   expect(sheet.getCell("E5").value).toBe("02/01/90");
@@ -168,7 +174,7 @@ it("prints nine exam columns including notes without the final outcome column", 
   expect(gradebookDocumentColumns(document, true)[8].key).toBe("notes");
   for (let column = 1; column <= 9; column++) {
     const header = sheet.getCell(EXAM_LIST_HEADER_ROW, column);
-    const scheduleHeader = schedule.getCell(4, column);
+    const scheduleHeader = schedule.getCell(4, Math.min(column, schedule.columnCount));
     expect(header.font).toMatchObject({ name: scheduleHeader.font.name, size: scheduleHeader.font.size, bold: scheduleHeader.font.bold });
     expect(header.fill).toEqual(scheduleHeader.fill);
     expect(header.border).toEqual(scheduleHeader.border);
@@ -178,7 +184,7 @@ it("prints nine exam columns including notes without the final outcome column", 
     expect(sheet.getCell(5, column).isMerged).toBe(false);
   }
   expect(sheet.pageSetup).toMatchObject({ paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0,
-    printTitlesRow: "4:4", printArea: "A1:I44", margins: schedule.pageSetup.margins });
+    printTitlesRow: "4:4", printArea: "A1:I51", margins: schedule.pageSetup.margins });
   expect(sheet.views[0]).toMatchObject({ state: "frozen", ySplit: 4, showGridLines: true });
   expect(sheet.autoFilter).toBe("A4:I44");
   expect(sheet.getCell("I4").value).toBe("Ghi chú");

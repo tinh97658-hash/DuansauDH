@@ -26,6 +26,6 @@ export function overlappingExams(sessions,form,exclude){
 export function examRoomReason(room,count,conflicts){
  if(room.isActive===false)return 'NGỪNG SỬ DỤNG';
  if(room.capacity==null)return 'CHƯA CÓ SỨC CHỨA';
- if(room.capacity<count)return 'KHÔNG ĐỦ CHỖ';
+ if(count-room.capacity>2)return 'KHÔNG ĐỦ CHỖ';
  return conflicts.some(s=>s.roomId===room.id)?'ĐÃ CÓ LỊCH':'';
 }

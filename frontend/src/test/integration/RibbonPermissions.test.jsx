@@ -26,6 +26,15 @@ const view = (value, route = "/") => <MemoryRouter useTransitions={false} initia
 const visibleLabels = container => [...container.querySelectorAll(".ribbon-action span")].map(e => e.textContent);
 
 describe("Ribbon read/navigation permission contracts", () => {
+  it("uses identical navigation tiles for admin and supervisor with the same view permissions", () => {
+    const permissions = Object.keys(routesByPermission);
+    const { container, rerender } = render(view(session(permissions, "admin"), "/masters/assign-class-groups"));
+    const tileMarkup = () => [...container.querySelectorAll('.ribbon-action')].map(button => button.outerHTML);
+    const admin = tileMarkup();
+    rerender(view(session(permissions, "supervisor"), "/masters/assign-class-groups"));
+    expect(tileMarkup()).toEqual(admin);
+    expect(screen.getByRole('button', { name: 'Phân nhóm học viên' })).toHaveAttribute('aria-current', 'page');
+  });
   it('keeps the teaching tile purple and changes only the exam scheduling tile to muted rose',()=>{
     render(view(session(['scheduling.view','gradebook.view']),'/masters/exam-lists'));
     const teaching=screen.getByRole('button',{name:'Xếp lịch'}),exam=screen.getByRole('button',{name:'Xếp lịch thi'});

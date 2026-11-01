@@ -189,8 +189,8 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
  it('requires approved eligibility, checks snapshot versions and uses candidate capacity',async()=>{
   await expect(exam()).rejects.toThrow('chưa duyệt');await approve();
   await expect(exam({eligibilityVersion:0})).rejects.toThrow('phiên bản');
-  await f.room.update({capacity:1});await expect(exam()).rejects.toThrow('đủ 2');
-  await f.room.update({capacity:2});await exam();
+  await f.room.update({capacity:null});await expect(exam()).rejects.toMatchObject({response:{code:'EXAM_ROOM_CAPACITY'}});
+  await f.room.update({capacity:1});await exam();
   expect((await sql('SELECT * FROM course_exam_session_candidates')).filter(r=>r.session_id)).not.toHaveLength(0);
  });
  it.each(['2000-01-01','2020-01-01'])('rejects past starts %s',async(date)=>{await approve();await expect(exam({examDate:date})).rejects.toThrow('đã bắt đầu');});

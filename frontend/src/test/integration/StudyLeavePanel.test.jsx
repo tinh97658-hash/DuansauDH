@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import axios from 'axios';
 import StudyLeavePanel from '../../features/learners/StudyLeavePanel';
+import StudyLeaveRequestDialog from '../../features/learners/StudyLeaveRequestDialog';
 
 jest.mock('axios');
 const record = { id: 'learner', fullName: 'Nguyễn Văn A', trainingLevel: 'Thạc sĩ', studyStatus: 'Đang học', extraData: { tuitionPayment: { paid: true } }, updatedAt: '2026-10-25T01:00:00Z' };
@@ -33,22 +34,54 @@ it('rejects the legacy unpaid Đang học projection and hides withdrawal from r
   expect(screen.queryByRole('button', { name: 'Rút hồ sơ chưa nhập học' })).not.toBeInTheDocument();
 });
 
-it('creates a dated pending request with a reason and refreshes the record after saving', async () => {
-  const onChanged = jest.fn();
-  axios.post.mockResolvedValue({ data: { leaves: [{ ...leave, status: 'pending', effectiveStatus: 'pending', withdrawals: [] }], affectedOfferings: [] } });
-  render(<StudyLeavePanel record={record} isAdmin onChanged={onChanged} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Tạo yêu cầu bảo lưu' }));
+it('requires choosing a learner by code before creating a dated request', async () => {
+  const onCreated = jest.fn();
+  axios.get.mockResolvedValue({ data: [{ ...record, code: 'HV001' }] });
+  axios.post.mockResolvedValue({ data: {} });
+  render(<StudyLeaveRequestDialog onCreated={onCreated} onClose={jest.fn()} />);
   const dialog = screen.getByRole('dialog');
   expect(within(dialog).getByRole('button', { name: 'Xác nhận' })).toBeDisabled();
   fireEvent.change(within(dialog).getByLabelText(/Ngày bắt đầu bảo lưu/), { target: { value: currentDate() } });
   fireEvent.change(within(dialog).getByLabelText(/Ngày kết thúc bảo lưu/), { target: { value: '2099-06-30' } });
   fireEvent.change(within(dialog).getByLabelText(/Lý do \/ thông tin quyết định/), { target: { value: 'Điều trị' } });
+  expect(within(dialog).getByRole('button', { name: 'Xác nhận' })).toBeDisabled();
+  fireEvent.change(screen.getByRole('combobox', { name: /Mã học viên/ }), { target: { value: 'HV001' } });
+  fireEvent.click(await screen.findByRole('option', { name: /HV001 — Nguyễn Văn A/ }));
   fireEvent.click(within(dialog).getByRole('button', { name: 'Xác nhận' }));
   await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/admission-records/learner/study-leaves'), {
     reason: 'Điều trị', startDate: currentDate(), endDate: '2099-06-30',
   }, { withCredentials: true }));
-  expect(await screen.findByText('Chờ duyệt')).toBeInTheDocument();
-  await waitFor(() => expect(onChanged).toHaveBeenCalled());
+  await waitFor(() => expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ id: 'learner', code: 'HV001' })));
+});
+
+it('clears the selected profile when the learner code is edited', async () => {
+  axios.get.mockResolvedValue({ data: [{ ...record, code: 'HV001' }] });
+  render(<StudyLeaveRequestDialog onCreated={jest.fn()} onClose={jest.fn()} />);
+  fireEvent.change(screen.getByRole('combobox', { name: /Mã học viên/ }), { target: { value: 'HV001' } });
+  fireEvent.click(await screen.findByRole('option', { name: /HV001 — Nguyễn Văn A/ }));
+  fireEvent.change(screen.getByLabelText('Ngày kết thúc bảo lưu'), { target: { value: '31/12/2099' } });
+  fireEvent.change(screen.getByLabelText(/Lý do \/ thông tin quyết định/), { target: { value: 'Điều trị' } });
+  expect(screen.getByRole('button', { name: 'Xác nhận' })).toBeEnabled();
+  fireEvent.change(screen.getByRole('combobox', { name: /Mã học viên/ }), { target: { value: 'HV002' } });
+  expect(screen.getByRole('button', { name: 'Xác nhận' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Xác nhận' }));
+  expect(axios.post).not.toHaveBeenCalled();
+});
+
+it('preserves the selected profile and form after a rejected request', async () => {
+  axios.get.mockResolvedValue({ data: [{ ...record, code: 'HV001' }] });
+  axios.post.mockRejectedValue({ response: { data: { message: 'Học viên đã có yêu cầu đang chờ duyệt.' } } });
+  const onCreated = jest.fn();
+  render(<StudyLeaveRequestDialog onCreated={onCreated} onClose={jest.fn()} />);
+  fireEvent.change(screen.getByRole('combobox', { name: /Mã học viên/ }), { target: { value: 'HV001' } });
+  fireEvent.click(await screen.findByRole('option', { name: /HV001 — Nguyễn Văn A/ }));
+  fireEvent.change(screen.getByLabelText('Ngày kết thúc bảo lưu'), { target: { value: '31/12/2099' } });
+  fireEvent.change(screen.getByLabelText(/Lý do \/ thông tin quyết định/), { target: { value: 'Điều trị' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Xác nhận' }));
+  expect(await screen.findByText('Học viên đã có yêu cầu đang chờ duyệt.')).toBeInTheDocument();
+  expect(screen.getByRole('combobox', { name: /Mã học viên/ })).toHaveValue('HV001');
+  expect(screen.getByLabelText(/Lý do \/ thông tin quyết định/)).toHaveValue('Điều trị');
+  expect(onCreated).not.toHaveBeenCalled();
 });
 
 it('shows an overdue extension separately from the unchanged current deadline and keeps zero in old grades', async () => {
@@ -101,14 +134,18 @@ it('allows reading history but hides decisions for a non-admin', async () => {
 });
 
 it('does not enable mutations while the profile has unsaved edits', async () => {
+  axios.get.mockResolvedValue({ data: { leaves: [leave], affectedOfferings: [] } });
   render(<StudyLeavePanel record={record} isAdmin disabled />);
-  expect(await screen.findByRole('button', { name: 'Tạo yêu cầu bảo lưu' })).toBeDisabled();
+  expect(await screen.findByRole('button', { name: 'Tiếp nhận học lại' })).toBeDisabled();
+  expect(screen.queryByRole('button', { name: 'Tạo yêu cầu bảo lưu' })).toBeNull();
   expect(screen.getByText(/Lưu hoặc hủy thay đổi hồ sơ/)).toBeInTheDocument();
 });
 
 it('requires the end date to be strictly later and rechecks it after the start date changes', async () => {
-  render(<StudyLeavePanel record={record} isAdmin />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Tạo yêu cầu bảo lưu' }));
+  axios.get.mockResolvedValue({ data: [{ ...record, code: 'HV001' }] });
+  render(<StudyLeaveRequestDialog onCreated={jest.fn()} onClose={jest.fn()} />);
+  fireEvent.change(screen.getByRole('combobox', { name: /Mã học viên/ }), { target: { value: 'HV001' } });
+  fireEvent.click(await screen.findByRole('option', { name: /HV001 — Nguyễn Văn A/ }));
   const dialog = screen.getByRole('dialog');
   const start = within(dialog).getByLabelText('Ngày bắt đầu bảo lưu');
   const end = within(dialog).getByLabelText('Ngày kết thúc bảo lưu');
@@ -127,7 +164,7 @@ it('requires the end date to be strictly later and rechecks it after the start d
   fireEvent.change(start, { target: { value: '31/12/2099' } });
   expect(end).toHaveAttribute('aria-invalid', 'true');
   expect(confirm).toBeDisabled();
-  expect(dialog.querySelectorAll('input[type="date"]')[1]).toHaveAttribute('min', '2100-01-01');
+  expect(end).toHaveAttribute('min', '2100-01-01');
   fireEvent.change(end, { target: { value: '01/01/2100' } });
   expect(confirm).toBeEnabled();
 });

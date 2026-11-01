@@ -13,6 +13,7 @@ export interface PermissionDefinition {
   name: string;
   group: string;
   description?: string;
+  assignableRoleCodes?: string[];
 }
 
 export interface RoleDefinition {
@@ -81,7 +82,10 @@ export const PERMISSIONS: PermissionDefinition[] = [
   { code: "gradebook.submit", group: "Thi & điểm", name: "Nhập và gửi duyệt điểm", description: "Nhập, lưu và gửi duyệt điểm. Cấp thêm quyền xem bảng điểm để thao tác trên giao diện; không bao gồm quyền duyệt hoặc mở lại điểm." },
   { code: "gradebook.approve", group: "Thi & điểm", name: "Duyệt, khóa và mở lại điểm", description: "Duyệt, khóa và mở lại điểm theo quy trình. Cấp thêm quyền xem bảng điểm; không thay thế quyền nhập và gửi duyệt." },
   { code: "gradebook.policy", group: "Thi & điểm", name: "Cấu hình quy chế chấm điểm", description: "Cấu hình quy chế tính điểm và điều kiện đạt. Cần quyền xem nghiệp vụ Thạc sĩ để mở phần cấu hình tương ứng." },
-  { code: "studyleave.manage", group: "Thi & điểm", name: "Quản lý bảo lưu", description: "Tiếp nhận và xử lý yêu cầu bảo lưu, gia hạn hoặc kết thúc bảo lưu trong phạm vi được phép. Cấp thêm quyền xem kế hoạch, CTĐT để xem danh sách bảo lưu." },
+  { code: "studyleave.request", group: "Bảo lưu & chuyển chuyên ngành", name: "Tạo yêu cầu bảo lưu", description: "Tạo yêu cầu bảo lưu và đề nghị gia hạn. Không được duyệt hoặc từ chối. Cần thêm quyền xem kế hoạch, CTĐT." },
+  { code: "studyleave.approve", group: "Bảo lưu & chuyển chuyên ngành", name: "Duyệt, từ chối và xử lý bảo lưu", description: "Chỉ dành cho quản trị hệ thống: duyệt, từ chối bảo lưu hoặc gia hạn, tiếp nhận học lại và xác nhận thôi học.", assignableRoleCodes: ["admin"] },
+  { code: "majortransfer.request", group: "Bảo lưu & chuyển chuyên ngành", name: "Tạo yêu cầu chuyển chuyên ngành", description: "Tạo yêu cầu chuyển chuyên ngành trong phạm vi được phép. Không được duyệt hoặc từ chối. Cần thêm quyền xem hồ sơ." },
+  { code: "majortransfer.approve", group: "Bảo lưu & chuyển chuyên ngành", name: "Duyệt, từ chối chuyển chuyên ngành", description: "Chỉ dành cho quản trị hệ thống: duyệt hoặc từ chối yêu cầu chuyển chuyên ngành.", assignableRoleCodes: ["admin"] },
 
   // ===== Báo cáo & thống kê =====
   { code: "reports.view", group: "Báo cáo & thống kê", name: "Xem báo cáo", description: "Xem báo cáo, bảng tổng hợp và bảng điểm cá nhân trong phạm vi dữ liệu được phép." },
@@ -92,6 +96,10 @@ export const PERMISSIONS: PermissionDefinition[] = [
 ];
 
 export const PERMISSION_CODES: string[] = PERMISSIONS.map((permission) => permission.code);
+export const permissionAssignableToRole = (code: string, roleCode: string) => {
+  const allowed = PERMISSIONS.find(permission => permission.code === code)?.assignableRoleCodes;
+  return !allowed || allowed.includes(roleCode);
+};
 
 const VIEW_PERMISSIONS = ["catalog.view", "plan.view", "admission.view", "masters.view", "doctoral.view", "scheduling.view", "gradebook.view", "reports.view"];
 

@@ -45,6 +45,25 @@ const mount = mode => render(<ThemeProvider theme={theme}><CssBaseline /><Memory
   </Routes>
 </MemoryRouter></ThemeProvider>);
 
+it("filters learners by the assigned group and clears the group when changing year", async () => {
+  const reads = axios.get.getMockImplementation();
+  axios.get.mockImplementation(url => url.includes("/plan/classes?")
+    ? Promise.resolve({ data: [{ id: "group-cktm", code: "CKTM 2026.1.1", academicYear: String(new Date().getFullYear()), majorId: "m1" }] })
+    : reads(url));
+  mount("admitted-masters");
+  await screen.findByText("Nguyễn Văn");
+  fireEvent.mouseDown(screen.getByRole("button", { name: "Mã nhóm" }));
+  fireEvent.click(await screen.findByRole("option", { name: "CKTM 2026.1.1" }));
+  await waitFor(() => expect(axios.get.mock.calls.some(([url]) => url.includes("classGroupId=group-cktm"))).toBe(true));
+  fireEvent.mouseDown(screen.getByRole("button", { name: "Năm" }));
+  fireEvent.click(screen.getByRole("option", { name: String(new Date().getFullYear() - 1) }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Mã nhóm" })).toHaveTextContent("Tất cả mã nhóm"));
+  await waitFor(() => {
+    const calls = axios.get.mock.calls.filter(([url]) => url.includes("/admission-records?"));
+    expect(calls.at(-1)[0]).not.toContain("classGroupId=");
+  });
+});
+
 it.each([
   ["Họ đệm", ""], ["Tên", "   "], ["Họ đệm", "Nguyễn123"],
   ["Tên", "An@"], ["Tên", "安"], ["Tên", "Аn"],
@@ -108,6 +127,24 @@ describe.each(["applications", "admitted-masters", "study-management"])("Student
     expect(within(screen.getByRole("dialog")).getByRole("textbox", { name: "Năm nhập học" })).toHaveValue("2025");
     expect(within(screen.getByRole("dialog")).queryByRole("textbox", { name: "Năm vào trường" })).not.toBeInTheDocument();
   });
+});
+
+it("keeps manual profile creation open and shows the duplicate learner code error", async () => {
+  const message = 'Mã học viên đã được sử dụng. Vui lòng nhập mã khác.';
+  axios.post.mockRejectedValue({ response: { status: 409, data: { code: 'LEARNER_CODE_EXISTS', message } } });
+  mount('applications');
+  await screen.findByRole('cell', { name: 'HV001' });
+  fireEvent.click(screen.getByRole('button', { name: 'Thêm hồ sơ mới' }));
+  const dialog = within(screen.getByRole('dialog'));
+  fireEvent.change(dialog.getByPlaceholderText('VD: HV26001'), { target: { value: 'HV001' } });
+  fireEvent.change(dialog.getByPlaceholderText('Nguyễn Văn'), { target: { value: 'Trần Văn' } });
+  fireEvent.change(dialog.getByPlaceholderText('An'), { target: { value: 'Bình' } });
+  fireEvent.change(dialog.getByRole('textbox', { name: 'Số điện thoại' }), { target: { value: '0912345678' } });
+  fireEvent.change(dialog.getByRole('textbox', { name: 'CCCD' }), { target: { value: '0310900012345' } });
+  fireEvent.click(dialog.getByRole('button', { name: 'Chấp nhận (Enter)' }));
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  expect(dialog.getByPlaceholderText('VD: HV26001')).toHaveValue('HV001');
 });
 
 it("creates a profile with the year selected in the filter", async () => {

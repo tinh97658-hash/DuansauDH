@@ -64,6 +64,7 @@ const buildService = () => {
     individualStudents as never,
     admissionRecords as never,
     subjectRecognitions as never,
+    { get: jest.fn().mockResolvedValue({ rows: [] }) } as never,
   );
   return {
     individualStudents, admissionRecords, service, courseOfferings, offeringGroups, subjects, classGroups, classGroupMembers,
@@ -554,6 +555,22 @@ describe("SchedulingService TeachingSession", () => {
     const query = mocks.teachingSessions.findAll.mock.calls[0][0] as any;
     expect(query.where.sessionDate[Op.between]).toEqual(["2026-09-01", "2026-09-30"]);
     expect(query.where.roomId).toBe("room-1");
+  });
+
+  it("previews same-offering, shared-group and cross-group student conflicts without blocking independent classes", async () => {
+    const mocks = buildService();
+    mocks.courseOfferings.findByPk.mockResolvedValue({ ...offering(), subject, groupLinks: [{ classGroupId: "group-1" }] });
+    jest.spyOn(mocks.service as any, "attachParticipantCounts").mockResolvedValue(undefined);
+    const identities = jest.spyOn(mocks.service as any, "offeringMemberIdentities").mockImplementation(async (id: any) => new Set(id === "independent" ? ["student-other"] : ["student-shared"]));
+    const other = (id: string, groupId: string, overrides = {}) => session({ id, courseOfferingId: id, courseOffering: { ...offering({ id }), subject, groupLinks: [{ classGroupId: groupId }] }, ...overrides });
+    mocks.teachingSessions.findAll.mockResolvedValue([
+      session(), other("same-group", "group-1"), other("shared-student", "different-group"),
+      other("independent", "independent-group"), other("cancelled", "group-1", { status: "not_held" }),
+    ]);
+    const result = await mocks.service.listTeachingSessions({ from: "2999-09-12", to: "2999-09-18", conflictForOfferingId: "offering-1" });
+    expect(result.map(row => row.schedulingConflict)).toEqual(["SAME_OFFERING", "CLASS_GROUP_CONFLICT", "STUDENT_CONFLICT", null, null]);
+    expect(identities).toHaveBeenCalledTimes(3);
+    expect((mocks.teachingSessions.findAll.mock.calls[0][0] as any).where.courseOfferingId).toBeUndefined();
   });
 
   it("lists all and only planned sessions whose exact end datetime has passed", async () => {

@@ -64,7 +64,7 @@ describeDb('Scheduling grants: PostgreSQL RLS and actual HTTP requests', () => {
         await query(`INSERT INTO role_permission_scopes(role_id,permission_id,scope)
           SELECT :role,id,:scope FROM permissions WHERE code IN ('scheduling.view','scheduling.write') RETURNING role_id`, { role: ids[`role${suffix}`], scope: suffix === 'D' ? 'institution' : 'related_offerings' });
       }
-      await query(`INSERT INTO role_permissions(role_id,permission_id,created_at,updated_at) SELECT :role,id,now(),now() FROM permissions WHERE code IN ('gradebook.view','gradebook.submit','studyleave.manage') RETURNING role_id`, { role: ids.roleD });
+      await query(`INSERT INTO role_permissions(role_id,permission_id,created_at,updated_at) SELECT :role,id,now(),now() FROM permissions WHERE code IN ('gradebook.view','gradebook.submit','studyleave.request') RETURNING role_id`, { role: ids.roleD });
       for (const [key, staff] of [['groupA', ids.staffA], ['groupB', ids.staffB], ['unassigned', null], ['other', null]]) {
         await query(`INSERT INTO class_groups(id,program,code,name,academic_year,responsible_staff_id,created_at,updated_at)
           VALUES (:id,'masters',:id,:id,'2099',:staff,now(),now()) RETURNING id`, { id: ids[key as string], staff });
@@ -111,6 +111,33 @@ describeDb('Scheduling grants: PostgreSQL RLS and actual HTTP requests', () => {
       if (createdPermissions.length) await query('DELETE FROM permissions WHERE id IN (:ids)', { ids: createdPermissions });
     }
     await app?.close();
+  });
+
+  it.each(['held', 'not_held'])('freezes a started roster internally while confirming %s', async status => {
+    await query("UPDATE teaching_sessions SET session_date='2020-01-01' WHERE id=:id RETURNING id", { id: ids.session });
+    // Reproduce a legacy session which has not yet materialized its roster.
+    await query('UPDATE course_offerings SET roster_started_at=NULL WHERE id=:id RETURNING id', { id: ids.unrelated });
+    await query('UPDATE course_offering_class_groups SET participant_ids=NULL WHERE course_offering_id=:id RETURNING id', { id: ids.unrelated });
+    await scoped(ids.staffD);
+    expect(await query(`UPDATE teaching_sessions SET status=:status,confirmed_at=now(),confirmed_by_staff_id=:staff
+      WHERE id=:id RETURNING status`, { id: ids.session, staff: ids.staffD, status })).toEqual([{ status }]);
+    expect(await query('SELECT roster_started_at IS NOT NULL AS frozen FROM course_offerings WHERE id=:id', { id: ids.unrelated })).toEqual([{ frozen: true }]);
+    expect(await query('SELECT participant_ids IS NOT NULL AS frozen FROM course_offering_class_groups WHERE course_offering_id=:id', { id: ids.unrelated })).toEqual([{ frozen: true }]);
+    expect(await query("SELECT current_setting('app.scheduling_action') AS action")).toEqual([{ action: 'write' }]);
+    await expect(db.transaction({ transaction: tx }, async savepoint => {
+      await db.query("UPDATE course_offerings SET gradebook_snapshot='[]'::jsonb WHERE id=:id", {
+        replacements: { id: ids.unrelated }, transaction: savepoint,
+      });
+    })).rejects.toThrow();
+  });
+
+  it('does not expose the internal roster freeze function to a scoped actor', async () => {
+    await scoped();
+    await expect(db.transaction({ transaction: tx }, async savepoint => {
+      await db.query('SELECT freeze_started_offering_roster(:id,NULL)', {
+        replacements: { id: ids.unrelated }, transaction: savepoint,
+      });
+    })).rejects.toThrow();
   });
 
   it('allows A and B to write their shared timetable, including the unassigned group', async () => {

@@ -1,4 +1,15 @@
 import {examCandidateConflicts,examCandidateConflictDetails,examConflictCandidateCount,arrangementProblems} from '../../features/exams/examArrangement';
+import {examRoomReason} from '../../features/exams/examPlanner';
+
+it.each([30,31,32])('allows %s candidates in a 30-seat exam room',count=>{
+ expect(examRoomReason({id:'room',capacity:30,isActive:true},count,[])).toBe('');
+});
+it('blocks three extra candidates and still blocks unavailable or occupied rooms',()=>{
+ expect(examRoomReason({id:'room',capacity:30},33,[])).toBe('KHÔNG ĐỦ CHỖ');
+ expect(examRoomReason({id:'room',capacity:null},31,[])).toBe('CHƯA CÓ SỨC CHỨA');
+ expect(examRoomReason({id:'room',capacity:30,isActive:false},31,[])).toBe('NGỪNG SỬ DỤNG');
+ expect(examRoomReason({id:'room',capacity:30},32,[{roomId:'room'}])).toBe('ĐÃ CÓ LỊCH');
+});
 
 const group=(extra={})=>({name:'Lớp A',subjectName:'Môn A',courseOfferingId:'a',roundNo:1,startTime:'08:00',endTime:'09:00',candidateIds:['admission:a'],candidateKeys:['student:s'],candidates:[{participantId:'admission:a',fullName:'Nguyễn An'}],...extra});
 const other=extra=>group({name:'Lớp B',subjectName:'Môn B',courseOfferingId:'b',candidateIds:['student:s'],...extra});

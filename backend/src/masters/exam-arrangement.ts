@@ -1,6 +1,7 @@
 import {BadRequestException, ConflictException} from '@nestjs/common';
 
 export const activeExam = (s:any) => ['scheduled','held'].includes(s.status);
+export const examRoomFits = (capacity:number|null|undefined,count:number) => capacity!=null && count-capacity<=2;
 export const externalInvigilatorKey=(unit:string,name:string)=>JSON.stringify([unit,name].map(v=>v.trim().replace(/\s+/g,' ').toLowerCase()));
 export const overlapExam = (a:any,b:any) => a.startTime<b.endTime && a.endTime>b.startTime;
 

@@ -28,6 +28,14 @@ it.each([{ studyLeaveFailure: true }, { eligibilityFrozen: true }])("exports a f
   expect(sheet.getCell("G11").value).toBe("Không đạt");
 });
 
+it('exports a profile language exemption saved in the gradebook as MT', async () => {
+  const report = sampleReport(1, 1);
+  report.rows[0].scores.hp0 = { score: null, result: 'passed', profileForeignLanguageExempt: true,
+    examExempt: true, eligibilityFrozen: true, finalized: true };
+  const sheet = await loadSheet(report);
+  expect(sheet.getCell('G11').value).toBe('MT');
+});
+
 it("produces a readable xlsx with numeric marks, missing marks, exemptions and all rows", async () => {
   const subjects = ["Triết học", "Tiếng Anh", "Luận văn"].map((name, index) => ({ id: `hp${index}`, code: `HP${index}`, name, credits: 3, isRequired: true }));
   const rows = Array.from({ length: 60 }, (_, index) => ({ code: `HV${index}`, fullName: "Nguyễn Văn An", dob: "1997-04-16", gender: "Nam", scores: { hp0: { score: index === 0 ? 0 : 8.2, result: index === 0 ? "failed" : "passed" }, hp1: { score: null, result: "exempt" } } }));
@@ -46,10 +54,13 @@ it("uses a formal masthead, merged title, separate metadata and notes after the 
   const report = sampleReport();
   const before = JSON.stringify(report);
   const sheet = await loadSheet(report);
-  expect(sheet.getCell("A1").value).toBe("TRƯỜNG ĐẠI HỌC HÀNG HẢI VIỆT NAM");
-  expect(sheet.getCell("A2").value).toBe("VIỆN ĐÀO TẠO SAU ĐẠI HỌC");
+  expect(sheet.getCell("A1").value).toBe("BỘ XÂY DỰNG");
+  expect(sheet.getCell("A2").value).toBe("TRƯỜNG ĐẠI HỌC HÀNG HẢI VIỆT NAM");
+  expect(sheet.getCell("A3").value).toBe("VIỆN ĐÀO TẠO SAU ĐẠI HỌC");
+  expect(sheet.getCell("E1").value).toBe("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM");
+  expect(sheet.getCell("E2").value).toBe("Độc lập - Tự do - Hạnh phúc");
   expect(sheet.getCell("A4").value).toBe("TỔNG HỢP ĐIỂM CỦA LỚP");
-  expect(sheet.model.merges).toEqual(expect.arrayContaining(["A1:I1", "A2:I2", "A4:I4", "A6:I6", "A7:I7", "A8:I8"]));
+  expect(sheet.model.merges).toEqual(expect.arrayContaining(["A1:D1", "E1:I1", "A2:D2", "E2:I2", "A3:D3", "E3:I3", "A4:I4", "A6:I6", "A7:I7", "A8:I8"]));
   expect(sheet.getCell("A4").font).toMatchObject({ name: "Times New Roman", bold: true, size: 16, color: { argb: "FF000000" } });
   expect(sheet.getCell("A4").alignment).toMatchObject({ horizontal: "center", vertical: "middle" });
   expect(textOf(sheet.getCell("A6"))).toBe("Lớp: CNTT2026.1.1");

@@ -261,6 +261,8 @@ export class ClassScoreSummaryService {
           ...(entry.details?.finalized ? { finalized: true } : {}),
           ...(entry.details?.eligibilityFrozen ? { eligibilityFrozen: true } : {}),
           ...(entry.details?.studyLeaveFailure ? { studyLeaveFailure: true } : {}),
+          ...(entry.details?.profileForeignLanguageExempt ? { profileForeignLanguageExempt: true } : {}),
+          ...(entry.details?.examExempt ? { examExempt: true } : {}),
           ...(scope.includeDetails ? { details: entry.details } : {}) };
       }
       for (const person of rows) {

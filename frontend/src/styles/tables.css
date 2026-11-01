@@ -14,7 +14,7 @@
     overflow: auto;
   }
 
-  body :is(#root, .MuiDialog-root, .scheduling-v20) table {
+  body :is(#root, .MuiDialog-root, .scheduling-v20) table:not(.document-report-table) {
     min-width: 100%;
     font-family: var(--app-font-family);
     font-size: 12.5px;
@@ -22,7 +22,7 @@
     border-spacing: 0;
   }
 
-  body :is(#root, .MuiDialog-root, .scheduling-v20) table > thead > tr > th {
+  body :is(#root, .MuiDialog-root, .scheduling-v20) table:not(.document-report-table) > thead > tr > th {
     padding: 9px 16px 9px 8px !important;
     border-bottom: 2px solid var(--table-border-color) !important;
     border-right: 1px solid var(--table-row-border-color) !important;
@@ -36,7 +36,7 @@
     text-transform: none;
   }
 
-  body :is(#root, .MuiDialog-root, .scheduling-v20) table > tbody > tr > :is(td, th) {
+  body :is(#root, .MuiDialog-root, .scheduling-v20) table:not(.document-report-table) > tbody > tr > :is(td, th) {
     padding: 7px 8px !important;
     border-bottom: 1px solid var(--table-row-border-color) !important;
     border-right: 1px solid var(--table-row-border-color) !important;
@@ -47,24 +47,24 @@
   }
 
   /* Outlined status labels retain their meaning without faint default borders. */
-  body :is(#root, .MuiDialog-root) table .MuiChip-outlined {
+  body :is(#root, .MuiDialog-root) table:not(.document-report-table) .MuiChip-outlined {
     border-color: currentColor;
   }
 
   /* Preserve the larger loading/empty-state cells and their action buttons. */
-  body :is(#root, .MuiDialog-root, .scheduling-v20) table > tbody > tr:only-child > [colspan] {
+  body :is(#root, .MuiDialog-root, .scheduling-v20) table:not(.document-report-table) > tbody > tr:only-child > [colspan] {
     padding: 32px 16px !important;
   }
 
-  body :is(#root, .MuiDialog-root, .scheduling-v20) table > tbody > tr:hover:not(.Mui-selected) {
+  body :is(#root, .MuiDialog-root, .scheduling-v20) table:not(.document-report-table) > tbody > tr:hover:not(.Mui-selected) {
     background-color: var(--table-hover-bg) !important;
   }
 
-  body :is(#root, .MuiDialog-root, .scheduling-v20) table > :is(thead, tbody) > tr > :last-child {
+  body :is(#root, .MuiDialog-root, .scheduling-v20) table:not(.document-report-table) > :is(thead, tbody) > tr > :last-child {
     border-right: 0 !important;
   }
 
-  body :is(#root, .MuiDialog-root, .scheduling-v20) table > tbody > tr:last-child > :is(td, th) {
+  body :is(#root, .MuiDialog-root, .scheduling-v20) table:not(.document-report-table) > tbody > tr:last-child > :is(td, th) {
     border-bottom: 0 !important;
   }
 
@@ -88,12 +88,12 @@
   }
 
   /* Native matrices have sticky cells with their own background rules. */
-  body :is(#root, .scheduling-v20) table:not(.MuiTable-root):not(.table) > tbody > tr > :is(td, th) {
+  body :is(#root, .scheduling-v20) table:not(.document-report-table):not(.MuiTable-root):not(.table) > tbody > tr > :is(td, th) {
     height: auto;
     background-color: var(--surface-bg);
   }
 
-  body :is(#root, .scheduling-v20) table:not(.MuiTable-root):not(.table) > tbody > tr:hover > :is(td, th) {
+  body :is(#root, .scheduling-v20) table:not(.document-report-table):not(.MuiTable-root):not(.table) > tbody > tr:hover > :is(td, th) {
     background-color: var(--table-hover-bg);
   }
 

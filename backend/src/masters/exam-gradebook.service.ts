@@ -79,6 +79,9 @@ export class ExamGradebookService {
     const metadata = await this.sequelize.query<any>(`
       SELECT o.id, o.completed_at AS "completedTeachingAt", o.gradebook_status AS "legacyGradebookStatus", o.gradebook_snapshot AS "legacyGradebookSnapshot",
         w.mode, w.eligibility_status, w.result_status,
+        w.eligibility_submission->>'at' AS "eligibilitySubmittedAt", w.result_snapshot->>'at' AS "resultSubmittedAt",
+        w.eligibility_submission->'reopenRequest' AS "eligibilityReopenRequest",
+        NOT EXISTS (SELECT 1 FROM course_exam_sessions es WHERE es.course_offering_id=o.id AND es.status<>'cancelled') AS "eligibilityCanReopen",
         p.created_at AS "componentScoreApprovedAt", p.rows AS "approvedRows",
         COALESCE((SELECT jsonb_agg(jsonb_build_object('grades',b.grades) ORDER BY b.updated_at DESC,b.class_group_id)
           FROM course_exam_gradebooks b WHERE b.course_offering_id=o.id),'[]'::jsonb) AS books,
@@ -112,6 +115,12 @@ export class ExamGradebookService {
         }
       }
       result.set(state.id, { componentsEntered, componentsApproved: approved, examCompleted, examGradesComplete,
+        eligibilityStatus: state.eligibility_status,
+        resultStatus: state.mode === 'legacy_preserved' ? state.legacyGradebookStatus : state.result_status,
+        eligibilitySubmittedAt: state.eligibilitySubmittedAt,
+        eligibilityReopenRequest: state.eligibilityReopenRequest,
+        eligibilityCanReopen: state.eligibilityCanReopen,
+        resultSubmittedAt: state.mode === 'legacy_preserved' ? state.legacyGradebookSnapshot?.at : state.resultSubmittedAt,
         gradebookCompletionStatus: gradebookCompletionStatus(state, examGradesComplete),
         legacy: state.mode === 'legacy_preserved', candidateCount: candidates.length,
         completedTeachingAt: state.completedTeachingAt, componentScoreApprovedAt: approved ? state.componentScoreApprovedAt : null,
@@ -405,6 +414,7 @@ export class ExamGradebookService {
 
   async transition(dto: GradebookWorkflowDto, actor: any,phase:'eligibility'|'final'='eligibility') {
     if(this.workflow){await this.scope(dto);await this.workflow.transition(dto,actor,phase,tx=>this.allWorkflowRows(dto,tx));return this.get({...dto,rosterScope:'offering'});}
+    if (['request_reopen','reject_reopen'].includes(dto.action)) throw new BadRequestException('Bảng điểm cũ không hỗ trợ xin mở lại tư cách.');
     await assertGradebookWorkflowAccess(actor, dto.action, this.rbac);
     if (!dto.note?.trim()) throw new BadRequestException("Nhập lý do hoặc căn cứ xử lý bảng điểm.");
     await this.sequelize.transaction(async transaction => {

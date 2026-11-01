@@ -11,6 +11,13 @@ const validRecord = {
 };
 
 describe.each([CreateAdmissionRecordDto, UpdateAdmissionRecordDto])("%p contact validation", (Dto) => {
+  it('normalizes manual learner codes and rejects codes longer than storage allows', async () => {
+    const dto = plainToInstance(Dto, { ...validRecord, code: ' hv26001 ' });
+    expect(await validate(dto)).toHaveLength(0);
+    expect(dto.code).toBe('HV26001');
+    const errors = await validate(plainToInstance(Dto, { ...validRecord, code: 'X'.repeat(51) }));
+    expect(errors.some(error => error.property === 'code')).toBe(true);
+  });
   it("accepts exact digit counts and preserves leading zeros", async () => {
     const dto = plainToInstance(Dto, validRecord);
     expect(await validate(dto)).toHaveLength(0);

@@ -15,6 +15,8 @@ import EditRounded from "@mui/icons-material/EditRounded";
 import GroupWorkRounded from "@mui/icons-material/GroupWorkRounded";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
+import InlineReportExport from "../../components/InlineReportExport";
+import { tableReport } from "../../utils/reportExport";
 import { usePermissions } from "../../features/accounts/usePermissions";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
@@ -208,6 +210,16 @@ const CreateClassGroups = () => {
 
   return (
     <FeatureLayout
+      exportConfig={{ disabled: loading || !!error, getReport: () => tableReport("Danh sách nhóm học viên", CLASS_GROUP_COLUMNS, filtered, (row, column) => {
+        if (column.key === "curriculum") return row.curriculum ? `${row.curriculum.code} — ${row.curriculum.name}` : "Chưa chọn";
+        if (column.key === "major") return row.major?.name;
+        if (column.key === "responsibleStaff") return row.responsibleStaff?.name || "Chưa phân công";
+        if (column.key === "year") return row.academicYear;
+        if (column.key === "students") return `${row.memberCount || 0}/${row.maxStudents || 40}`;
+        if (column.key === "status") return row.status === "open" ? "Đang mở" : "Đã đóng";
+        return row[column.key];
+      },
+      [["Phạm vi", `${filtered.length} nhóm phù hợp bộ lọc`]]) }}
       title="Tạo nhóm học viên"
       group="Thủ tục đầu vào"
       desc="Quản lý và mở các nhóm học phần cho học viên Thạc sĩ theo từng ngành học và khóa tuyển sinh."
@@ -227,7 +239,7 @@ const CreateClassGroups = () => {
           boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
         }}
       >
-        <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="flex-end">
+        <Stack direction="row" flexWrap="wrap" alignItems="flex-end" sx={{ gap: 1.5 }}>
           <FilterSelectField label="Năm học" sx={{ flex: "1 1 190px", minWidth: 190 }}
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
@@ -265,9 +277,10 @@ const CreateClassGroups = () => {
             placeholder="Tìm theo mã nhóm, ngành học..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            sx={{ flex: "2 1 360px", minWidth: 280 }}
+            sx={{ flex: "2 1 280px", minWidth: 220 }}
           />
 
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0, ml: "auto" }}>
           {isAdmin && (
             <Button
               variant="contained"
@@ -279,6 +292,8 @@ const CreateClassGroups = () => {
               Thêm nhóm mới
             </Button>
           )}
+          <InlineReportExport />
+          </Stack>
         </Stack>
       </Paper>
 

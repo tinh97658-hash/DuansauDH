@@ -52,43 +52,68 @@ export async function readReturnedMembers(db: Sequelize, groupIds: string[], sub
 // Arrivals after the first scheduled session wait for a first attempt, even
 // while the original offering is active or that session was confirmed not held.
 export async function readLateUnstudiedMembers(db: Sequelize, groupIds: string[], subjectIds: string[], transaction?: Transaction): Promise<RetakeResult[]> {
-  if (!groupIds.length || !subjectIds.length) return [];
-  return db.query<RetakeResult>(`
-    SELECT DISTINCT member.class_group_id AS "classGroupId", :subjectId::uuid AS "subjectId",
-      CASE WHEN ar.student_id IS NOT NULL THEN 'student:' || ar.student_id::text ELSE 'admission:' || ar.id::text END AS "participantId",
-      ar.id AS "admissionRecordId", COALESCE(ar.code, '') AS code, ar.full_name AS "fullName",
+  const rows = await readLateUnstudiedMembersForScopes(db, [{ key: 'single', groupIds, subjectIds }], transaction);
+  return rows.map(({ scopeKey, ...row }) => row);
+}
+
+export interface UnstudiedMemberScope { key: string; groupIds: string[]; subjectIds: string[] }
+
+export async function readLateUnstudiedMembersForScopes(db: Sequelize, scopes: UnstudiedMemberScope[], transaction?: Transaction): Promise<Array<RetakeResult & { scopeKey: string }>> {
+  const requested = scopes.filter(scope => scope.groupIds.length && scope.subjectIds.length);
+  if (!requested.length) return [];
+  return db.query<RetakeResult & { scopeKey: string }>(`
+    WITH requested AS MATERIALIZED (
+      SELECT item->>'key' AS scope_key,
+        ARRAY(SELECT jsonb_array_elements_text(item->'groupIds'))::uuid[] AS group_ids,
+        ARRAY(SELECT jsonb_array_elements_text(item->'subjectIds'))::uuid[] AS subject_ids
+      FROM jsonb_array_elements(CAST(:scopes AS jsonb)) item
+    ), relevant_offerings AS MATERIALIZED (
+      SELECT offering.id, offering.subject_id, COALESCE(offering.roster_started_at,
+        (SELECT MIN((session.session_date + session.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh')
+          FROM teaching_sessions session WHERE session.course_offering_id=offering.id
+            AND (session.session_date + session.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh' <= clock_timestamp()),
+        offering.completed_at) AS cutoff
+      FROM course_offerings offering WHERE offering.subject_id IN (SELECT unnest(subject_ids) FROM requested)
+    ), rosters AS MATERIALIZED (
+      SELECT link.class_group_id, link.participant_ids, offering.subject_id, offering.cutoff
+      FROM course_offering_class_groups link JOIN relevant_offerings offering ON offering.id=link.course_offering_id
+      WHERE link.class_group_id IN (SELECT unnest(group_ids) FROM requested)
+    ), graded_participants AS MATERIALIZED (
+      SELECT offering.subject_id, grade->>'participantId' AS participant_id
+      FROM course_exam_gradebooks book JOIN relevant_offerings offering ON offering.id=book.course_offering_id
+      CROSS JOIN LATERAL jsonb_array_elements(book.grades) grade
+    ), members AS MATERIALIZED (
+      SELECT member.*, ar.id AS record_id, ar.student_id AS record_student_id, ar.code AS record_code,
+        ar.full_name AS record_full_name, ar.is_exempt_foreign_language
+      FROM class_group_members member
+      JOIN LATERAL (SELECT a.* FROM admission_records a WHERE a.id = member.admission_record_id
+        OR (member.admission_record_id IS NULL AND a.student_id = member.student_id)
+        ORDER BY a.created_at DESC, a.id LIMIT 1) ar ON true
+      WHERE member.class_group_id IN (SELECT unnest(group_ids) FROM requested)
+        AND ar.training_level = 'Thạc sĩ' AND (ar.status::text = 'approved' OR ar.study_status IN ('Đã trúng tuyển', 'Đang học'))
+        AND ${studyEligibleRecordSql('ar')}
+    )
+    SELECT DISTINCT requested.scope_key AS "scopeKey", member.class_group_id AS "classGroupId", requested.subject_ids[1] AS "subjectId",
+      CASE WHEN member.record_student_id IS NOT NULL THEN 'student:' || member.record_student_id::text ELSE 'admission:' || member.record_id::text END AS "participantId",
+      member.record_id AS "admissionRecordId", COALESCE(member.record_code, '') AS code, member.record_full_name AS "fullName",
       'pending' AS result, 'completed' AS "sourceStatus", member.enrolled_at AS "recordedAt",
       member.id AS "bookId", '' AS "sourceCourseOfferingId", 'first_time' AS "studyType"
-    FROM class_group_members member
-    JOIN LATERAL (SELECT a.* FROM admission_records a WHERE a.id = member.admission_record_id
-      OR (member.admission_record_id IS NULL AND a.student_id = member.student_id)
-      ORDER BY a.created_at DESC, a.id LIMIT 1) ar ON true
-    WHERE member.class_group_id IN (:groupIds)
-      AND ar.training_level = 'Thạc sĩ' AND (ar.status::text = 'approved' OR ar.study_status IN ('Đã trúng tuyển', 'Đang học'))
-      AND ${studyEligibleRecordSql('ar')}
-      AND NOT (COALESCE(ar.is_exempt_foreign_language, false) AND ${foreignLanguageSubjectSql(':subjectId')})
-      AND EXISTS (SELECT 1 FROM course_offering_class_groups link
-        JOIN course_offerings offering ON offering.id = link.course_offering_id
-        WHERE link.class_group_id = member.class_group_id AND offering.subject_id IN (:subjectIds)
-          AND member.enrolled_at > COALESCE(
-            offering.roster_started_at,
-            (SELECT MIN((session.session_date + session.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh')
-              FROM teaching_sessions session WHERE session.course_offering_id = offering.id
-                AND (session.session_date + session.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh' <= clock_timestamp()),
-            offering.completed_at)
+    FROM requested JOIN members member ON member.class_group_id=ANY(requested.group_ids)
+    WHERE NOT (COALESCE(member.is_exempt_foreign_language, false) AND ${foreignLanguageSubjectSql('requested.subject_ids[1]')})
+      AND EXISTS (SELECT 1 FROM rosters link
+        WHERE link.class_group_id = member.class_group_id AND link.subject_id = ANY(requested.subject_ids)
+          AND member.enrolled_at > link.cutoff
           AND (link.participant_ids IS NULL OR NOT (
-            ('admission:' || ar.id::text) = ANY(link.participant_ids)
-            OR ('student:' || COALESCE(ar.student_id::text, '')) = ANY(link.participant_ids))))
-      AND NOT EXISTS (SELECT 1 FROM course_offering_class_groups link
-        JOIN course_offerings offering ON offering.id = link.course_offering_id
-        WHERE link.class_group_id = member.class_group_id AND offering.subject_id IN (:subjectIds)
-          AND (link.participant_ids IS NULL OR (('admission:' || ar.id::text) = ANY(link.participant_ids)
-            OR ('student:' || ar.student_id::text) = ANY(link.participant_ids))))
-      AND NOT EXISTS (SELECT 1 FROM course_exam_gradebooks book JOIN course_offerings offering ON offering.id = book.course_offering_id
-        CROSS JOIN LATERAL jsonb_array_elements(book.grades) grade
-        WHERE offering.subject_id IN (:subjectIds) AND (grade->>'participantId' = 'admission:' || ar.id::text
-          OR grade->>'participantId' = 'student:' || ar.student_id::text))
-  `, { type: QueryTypes.SELECT, replacements: { groupIds, subjectIds, subjectId: subjectIds[0] }, transaction });
+            ('admission:' || member.record_id::text) = ANY(link.participant_ids)
+            OR ('student:' || COALESCE(member.record_student_id::text, '')) = ANY(link.participant_ids))))
+      AND NOT EXISTS (SELECT 1 FROM rosters link
+        WHERE link.class_group_id = member.class_group_id AND link.subject_id = ANY(requested.subject_ids)
+          AND (link.participant_ids IS NULL OR (('admission:' || member.record_id::text) = ANY(link.participant_ids)
+            OR ('student:' || member.record_student_id::text) = ANY(link.participant_ids))))
+      AND NOT EXISTS (SELECT 1 FROM graded_participants grade
+        WHERE grade.subject_id = ANY(requested.subject_ids) AND (grade.participant_id = 'admission:' || member.record_id::text
+          OR grade.participant_id = 'student:' || member.record_student_id::text))
+  `, { type: QueryTypes.SELECT, replacements: { scopes: JSON.stringify(requested) }, transaction });
 }
 
 // Read saved outcomes, including pending/passed outcomes, before selecting failures.

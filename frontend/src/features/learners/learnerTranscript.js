@@ -77,7 +77,7 @@ export function transcriptDocumentDetails(transcript) {
 export function learnerTranscriptFilename(transcript, format = "word") {
   const parts = [transcript.learner.studentCode, transcript.learner.fullName]
     .map(sanitizeDocumentFilenamePart).filter(Boolean);
-  return `Bang-diem${parts.length ? `-${parts.join("-")}` : ""}.${format === "pdf" ? "pdf" : "docx"}`;
+  return `Bang-diem${parts.length ? `-${parts.join("-")}` : ""}.${format === "excel" ? "xlsx" : format === "pdf" ? "pdf" : "docx"}`;
 }
 
 export function openLearnerTranscript(scorecard, reservedTab) {

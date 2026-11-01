@@ -9,3 +9,5 @@ export const PERMISSIONS_KEY = "required_permissions";
 export const RequirePermissions = (...permissions: string[]) => SetMetadata(PERMISSIONS_KEY, permissions);
 export const ANY_PERMISSIONS_KEY = 'any_required_permissions';
 export const RequireAnyPermissions = (...permissions: string[]) => SetMetadata(ANY_PERMISSIONS_KEY, permissions);
+export const ACTION_PERMISSIONS_KEY = 'action_required_permissions';
+export const RequireActionPermissions = (permissions: Record<string, string>) => SetMetadata(ACTION_PERMISSIONS_KEY, permissions);

@@ -88,7 +88,7 @@ const ChangePassword = () => {
       </Paper>
   );
   return (
-    <FeatureLayout title="Đổi mật khẩu" group="Tài khoản & phân quyền" desc="Cập nhật mật khẩu đăng nhập cho tài khoản của bạn.">
+    <FeatureLayout title="Đổi mật khẩu" group="Tài khoản & phân quyền" desc="Cập nhật mật khẩu đăng nhập cho tài khoản của bạn." exportConfig={false}>
       {forced ? <Dialog open disableEscapeKeyDown aria-labelledby="password-settings-title" maxWidth={false}
         className="password-required-overlay" PaperProps={{ className: "password-required-dialog", "aria-modal": true }}>
         {panel}

@@ -43,6 +43,15 @@ const build = () => {
 };
 const query = { classGroupId: "g1", courseOfferingId: "o1" };
 
+it('tracks submitted approval stages and their submission times for dashboard requests', async () => {
+  const { service, sequelize } = build();
+  sequelize.query.mockResolvedValue([{ id: 'o1', mode: 'new', eligibility_status: 'submitted', result_status: 'not_available',
+    eligibilitySubmittedAt: '2026-10-29T01:00:00Z', resultSubmittedAt: null, heldIds: [], books: [] }]);
+  const tracking = await service.tracking([{ id: 'o1', status: 'completed' }]);
+  expect(tracking.get('o1')).toMatchObject({ eligibilityStatus: 'submitted', resultStatus: 'not_available', eligibilitySubmittedAt: '2026-10-29T01:00:00Z' });
+  expect(sequelize.query).toHaveBeenCalledWith(expect.stringContaining("w.eligibility_submission->>'at'"), expect.any(Object));
+});
+
 it.each(["group", "offering"] as const)("blocks grade writes before teaching completion for %s scope while keeping grades readable", async rosterScope => {
   const { service, offerings, books, sequelize } = build();
   offerings.findByPk.mockResolvedValue({ id: "o1", status: "active", subject: { program: "masters" } });

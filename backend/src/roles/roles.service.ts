@@ -1,6 +1,6 @@
 import { RolePermissionScope } from '../database/models/role-permission-scope.model.js';
 import { automaticInstitutionScopes } from '../auth/scheduling-scopes.js';
-import { PERMISSIONS } from "../auth/permissions.js";
+import { PERMISSIONS, permissionAssignableToRole } from "../auth/permissions.js";
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import { col, fn, Op } from "sequelize";
@@ -84,11 +84,11 @@ export class RolesService {
   async permissionsCatalog() {
     const permissions = await this.permissions.findAll({ order: [["sortOrder", "ASC"]] });
     const definitions = new Map(PERMISSIONS.map(permission => [permission.code, permission]));
-    const groups = new Map<string, Array<{ id: string; code: string; name: string; description: string | null }>>();
+    const groups = new Map<string, Array<{ id: string; code: string; name: string; description: string | null; assignableRoleCodes?: string[] }>>();
     for (const permission of permissions) {
       const value: any = permission.get({ plain: true });
       if (!groups.has(value.group)) groups.set(value.group, []);
-      groups.get(value.group)!.push({ id: value.id, code: value.code, name: definitions.get(value.code)?.name ?? value.name, description: definitions.get(value.code)?.description ?? value.description ?? null });
+      groups.get(value.group)!.push({ id: value.id, code: value.code, name: definitions.get(value.code)?.name ?? value.name, description: definitions.get(value.code)?.description ?? value.description ?? null, assignableRoleCodes: definitions.get(value.code)?.assignableRoleCodes });
     }
     return [...groups.entries()].map(([group, items]) => ({ group, permissions: items }));
   }
@@ -104,7 +104,7 @@ export class RolesService {
     if (await this.roles.findOne({ where: { code } })) throw new ConflictException("Mã vai trò đã tồn tại.");
 
     const permissionIds = [...new Set(dto.permissionIds ?? [])];
-    if (permissionIds.length) await this.assertPermissionsExist(permissionIds);
+    if (permissionIds.length) await this.assertPermissionsExist(permissionIds, code);
 
     const scoped = await this.prepareScopes(permissionIds, dto.schedulingScopes ?? {});
     const created = await this.sequelize.transaction(async (transaction) => {
@@ -156,7 +156,7 @@ export class RolesService {
     let permissionIds: string[] | undefined;
     if (dto.permissionIds) {
       permissionIds = [...new Set(dto.permissionIds)];
-      if (permissionIds.length) await this.assertPermissionsExist(permissionIds);
+      if (permissionIds.length) await this.assertPermissionsExist(permissionIds, role.code);
     }
 
     await this.sequelize.transaction(async (transaction) => {
@@ -193,7 +193,7 @@ export class RolesService {
     if (!role) throw new NotFoundException("Không tìm thấy vai trò.");
 
     const permissionIds = [...new Set(dto.permissionIds)];
-    if (permissionIds.length) await this.assertPermissionsExist(permissionIds);
+    if (permissionIds.length) await this.assertPermissionsExist(permissionIds, role.code);
 
     await this.sequelize.transaction(async (transaction) => {
       await this.administrationSafety.lock(transaction);
@@ -267,8 +267,12 @@ export class RolesService {
     if (scopes.length) await RolePermissionScope.bulkCreate(scopes.map(entry => ({ roleId, ...entry })), { transaction });
   }
 
-  private async assertPermissionsExist(permissionIds: string[]) {
+  private async assertPermissionsExist(permissionIds: string[], roleCode: string) {
     const found = await this.permissions.count({ where: { id: { [Op.in]: permissionIds } } });
+    const selected = await this.permissions.findAll({ where: { id: { [Op.in]: permissionIds } } });
+    if (selected.some(permission => !permissionAssignableToRole(permission.code, roleCode))) {
+      throw new BadRequestException('Quyền duyệt bảo lưu và chuyển chuyên ngành chỉ được cấp cho vai trò Quản trị hệ thống.');
+    }
     if (found !== permissionIds.length) throw new BadRequestException("Một số quyền không tồn tại.");
   }
 }

@@ -30,8 +30,9 @@ const mocks = (user = { role: "admin" }, permissions = ["scheduling.organize"]) 
 const reach = async () => {
   fireEvent.focus(await screen.findByRole("combobox", { name: "Chọn chuyên ngành" }));
   fireEvent.click(await screen.findByRole("option", { name: /Khai thác hàng hải/ }));
-  await screen.findByRole("option", { name: "2026" });
-  fireEvent.change(screen.getByRole("combobox", { name: "Khóa / Năm học" }), { target: { value: "2026" } });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Khóa / Năm học" })).not.toHaveAttribute("aria-disabled", "true"));
+  fireEvent.mouseDown(screen.getByRole("button", { name: "Khóa / Năm học" }));
+  fireEvent.click(await screen.findByRole("option", { name: "2026" }));
   fireEvent.click(await screen.findByRole("button", { name: /HP01.*Khai thác cảng/ }));
 };
 beforeEach(() => { accessFixture.permissions = ["scheduling.organize"]; jest.clearAllMocks(); sessionStorage.clear(); });
@@ -66,8 +67,9 @@ it.each(['major', 'another-major'])("omits internships from suggested courses an
   render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   fireEvent.focus(await screen.findByRole('combobox', { name: 'Chọn chuyên ngành' }));
   fireEvent.click(await screen.findByRole('option', { name: /Khai thác hàng hải/ }));
-  await screen.findByRole('option', { name: '2026' });
-  fireEvent.change(screen.getByRole('combobox', { name: 'Khóa / Năm học' }), { target: { value: '2026' } });
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Khóa / Năm học' })).not.toHaveAttribute('aria-disabled', 'true'));
+  fireEvent.mouseDown(screen.getByRole('button', { name: 'Khóa / Năm học' }));
+  fireEvent.click(await screen.findByRole('option', { name: '2026' }));
   expect(await screen.findByText('1 học phần hiện có thể tổ chức.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /HP01.*Khai thác cảng/ })).toBeInTheDocument();
   for (const code of ['TT01', 'TT02', 'TT03']) expect(screen.queryByRole('button', { name: new RegExp(code) })).not.toBeInTheDocument();
@@ -129,7 +131,7 @@ it("restores the scope, course, class and custom name after leaving and reopenin
   first.unmount();
   render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   await screen.findByText("HV001");
-  expect(screen.getByRole("combobox", { name: "Khóa / Năm học" })).toHaveValue("2026");
+  expect(screen.getByRole("button", { name: "Khóa / Năm học" })).toHaveTextContent("2026");
   expect(screen.getByRole("textbox", { name: "Tên lớp học phần" })).toHaveValue("Lớp đang soạn");
   expect(screen.getByRole("button", { name: /KTHH-2026.*Nhóm 1/ })).toHaveAttribute("aria-pressed", "true");
 });
@@ -199,17 +201,24 @@ it("shows each group's own major and submits mixed-major groups outside the work
   const maritimeGroup = { ...group, id: "maritime-group", code: "KTH2026.01", name: "Lớp hàng hải", majorId: maritime.id, major: maritime };
   // The catalog fallback must use this group's majorId, never the working scope.
   const computingGroup = { ...group, id: "computing-group", code: "CNT2026.02", name: "Lớp CNTT", majorId: computing.id };
+  const ownRetake = { ...group, id: "own-retake", code: "KTHH-HL", name: "Nhóm học lại", majorId: undefined, major, isRetake: true };
   axios.get.mockImplementation(async (url) => ({ data:
     url.endsWith("/auth/session") ? { user: { role: "admin" } }
       : url.includes("/system/majors") ? [major, maritime, computing]
         : url.includes("/scheduling/class-groups/options") ? [group]
-          : url.includes("/course-offering-candidates") ? { subjects: [{ subject, eligibleClassGroups: [group, maritimeGroup, computingGroup] }] }
+          : url.includes("/course-offering-candidates") ? { subjects: [{ subject, eligibleClassGroups: [maritimeGroup, computingGroup, group], retakeClassGroups: [ownRetake] }] }
+
             : [],
   }));
   render(<MemoryRouter useTransitions={false}><CourseOfferings /></MemoryRouter>);
   await reach();
   const maritimeButton = screen.getByRole("button", { name: /KTH2026.01 · Lớp hàng hải/ });
   const computingButton = screen.getByRole("button", { name: /CNT2026.02 · Lớp CNTT/ });
+  const groupButtons = within(maritimeButton.closest(".sl-create-group-list")).getAllByRole("button");
+  expect(groupButtons[0]).toHaveTextContent(group.code);
+  expect(groupButtons[1]).toHaveTextContent(ownRetake.code);
+  expect(groupButtons[2]).toBe(maritimeButton);
+  expect(groupButtons[3]).toBe(computingButton);
   expect(within(maritimeButton).getByText(maritime.name)).toBeInTheDocument();
   expect(within(computingButton).getByText(computing.name)).toBeInTheDocument();
   expect(within(computingButton).queryByText(major.name)).not.toBeInTheDocument();

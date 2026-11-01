@@ -1,3 +1,6 @@
+import AppSelect from "../../components/AppSelect";
+import InlineReportExport from "../../components/InlineReportExport";
+import { useReportExport } from "../../components/ReportExportContext";
 import { usePermissions } from "../accounts/usePermissions";
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -80,6 +83,11 @@ export default function CourseMatrix({ user }) {
 
   // Filter logic
   const filtered = useLoadOfferings(all, disciplineId, visibleMajorIds, majorId, year, scheduleState, query);
+  useReportExport(() => ({ title: "Ma trận lớp học phần", metadata: [["Khóa", year || "Tất cả"], ["Tìm kiếm", query || "Tất cả"], ["Phạm vi", `${filtered.length} lớp học phần phù hợp bộ lọc`]],
+    sections: [{ title: "Danh sách lớp học phần", headers: ["STT", "Mã học phần", "Học phần", "TC", "Lớp học phần", "Lớp/nhóm", "Khóa", "Số học viên", "Tình trạng xếp lịch", "Số buổi đã học"],
+      rows: sortCourseOfferings(filtered).map((offering, index) => [index + 1, offering.subject?.code, offering.subject?.name, offering.subject?.credits,
+        offeringTitle(offering), labelOf(offering), unique(groupsOf(offering).map(group => group.academicYear)).join(", "), offering.participantCount || 0,
+        scheduleCategory(offering) === "unscheduled" ? "Chưa xếp lịch" : "Đã xếp lịch", offering.sessionSummary?.heldCount || 0]) }] }), offerings.loading || !!offerings.error);
 
   // Cohorts calculation
   const allCohorts = useMemo(() => {
@@ -182,7 +190,7 @@ export default function CourseMatrix({ user }) {
 
           <div className="sl-matrix-filter-item">
             <label htmlFor="matrix-discipline-filter">Ngành</label>
-            <select
+            <AppSelect
               id="matrix-discipline-filter"
               className="sl-select"
               value={disciplineId}
@@ -190,12 +198,12 @@ export default function CourseMatrix({ user }) {
             >
               <option value="">Tất cả ngành</option>
               {disciplines.map((discipline) => <option key={discipline.id} value={discipline.id}>{disciplineOptionLabel(discipline)}</option>)}
-            </select>
+            </AppSelect>
           </div>
 
           <div className="sl-matrix-filter-item">
             <label htmlFor="matrix-major-filter">Chuyên ngành</label>
-            <select
+            <AppSelect
               id="matrix-major-filter"
               className="sl-select"
               value={majorId}
@@ -207,12 +215,12 @@ export default function CourseMatrix({ user }) {
                   {major.name}
                 </option>
               ))}
-            </select>
+            </AppSelect>
           </div>
 
           <div className="sl-matrix-filter-item">
             <label htmlFor="matrix-year-filter">Khóa / năm học</label>
-            <select
+            <AppSelect
               id="matrix-year-filter"
               className="sl-select"
               value={year}
@@ -220,12 +228,12 @@ export default function CourseMatrix({ user }) {
             >
               <option value="">Tất cả khóa</option>
               {allCohorts.map((cohort) => <option key={cohort} value={cohort}>Khóa {cohort}</option>)}
-            </select>
+            </AppSelect>
           </div>
 
           <div className="sl-matrix-filter-item">
             <label htmlFor="matrix-status-filter">Tình trạng lịch</label>
-            <select
+            <AppSelect
               id="matrix-status-filter"
               className="sl-select"
               value={scheduleState}
@@ -234,8 +242,9 @@ export default function CourseMatrix({ user }) {
               <option value="all">Tất cả tình trạng</option>
               <option value="scheduled">Đã xếp lịch</option>
               <option value="unscheduled">Chưa xếp lịch</option>
-            </select>
+            </AppSelect>
           </div>
+          <InlineReportExport height={42} />
         </div>
       </div>
 
@@ -552,17 +561,20 @@ function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, canDelete,
                                 <CrossCohortBadge cohorts={linkedCohorts} />
                                 <div className="sl-pivot-card-stats">
                                   <OfferingStatus offering={offering} />
-                                  {(canDelete || canEdit) && <OfferingDeleteButton offering={offering} className="sl-matrix-delete-link"
-                                    onDeleted={onChanged} onScheduleDeleted={onChanged} />}
-                                  {canEdit && (offering.canWriteSchedule ?? offering.scopeWritable) !== false && offering.status === "active" && (
-                                    <button
-                                      type="button"
-                                      className="sl-pivot-schedule-btn sl-matrix-schedule-link"
-                                      onClick={() => onSelectOffering(offering.id)}
-                                    >
-                                      {total ? "Xếp thêm →" : "Xếp lịch →"}
-                                    </button>
-                                  )}
+                                  <div className="sl-pivot-card-actions">
+                                    {(canDelete || canEdit) && <OfferingDeleteButton offering={offering} className="sl-matrix-delete-link"
+                                      onDeleted={onChanged} onScheduleDeleted={onChanged} />}
+                                    {canEdit && (offering.canWriteSchedule ?? offering.scopeWritable) !== false && offering.status === "active" && (
+                                      <button
+                                        type="button"
+                                        className="sl-pivot-schedule-btn sl-matrix-schedule-link"
+                                        onClick={() => onSelectOffering(offering.id)}
+                                      >
+                                        {total ? "Xếp thêm →" : "Xếp lịch →"}
+                                      </button>
+                                    )}
+                                  </div>
+
                                 </div>
                               </div>
                             );

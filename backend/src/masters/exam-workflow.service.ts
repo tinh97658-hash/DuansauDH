@@ -31,8 +31,10 @@ export class ExamWorkflowService {
     return state || {course_offering_id:id,mode:'new',eligibility_status:'draft',eligibility_version:0,result_status:'not_available',result_version:0};
   }
   publicState(s: any) {
+    const canReopen = s.mode==='new'&&['submitted','approved'].includes(s.eligibility_status)&&s.result_status!=='approved'&&s.eligibility_can_reopen===true;
     return {mode:s.mode,eligibility:{status:s.eligibility_status,version:s.eligibility_version,snapshotId:s.eligibility_snapshot_id||null,
-      canReopen:s.mode==='new'&&['submitted','approved'].includes(s.eligibility_status)&&s.result_status!=='approved'&&s.eligibility_can_reopen===true},
+      canReopen, reopenRequest:canReopen&&s.eligibility_status==='approved'&&s.eligibility_submission?.reopenRequest
+        ? {note:s.eligibility_submission.reopenRequest.note,at:s.eligibility_submission.reopenRequest.at}:null},
       final:{status:s.result_status,version:s.result_version},status:s.result_status==='not_available'?s.eligibility_status:s.result_status,
       version:s.eligibility_version};
   }
@@ -118,6 +120,7 @@ export class ExamWorkflowService {
   }
   async transition(dto:any,actor:any,phase:'eligibility'|'final',load:ExamRosterLoader) {
     await assertGradebookWorkflowAccess(actor,dto.action,this.rbac);
+    if (['request_reopen','reject_reopen'].includes(dto.action) && phase !== 'eligibility') throw new BadRequestException('Yêu cầu mở lại chỉ áp dụng cho tư cách thi.');
     if(!dto.note?.trim())throw new BadRequestException('Nhập lý do hoặc căn cứ xử lý.');
     await this.db.transaction(async transaction=>{
       await this.query('SELECT pg_advisory_xact_lock(21026)',{},transaction);
@@ -126,6 +129,22 @@ export class ExamWorkflowService {
       const version=phase==='eligibility'?state.eligibility_version:state.result_version;
       if(version!==dto.version)throw new ConflictException('Phiên bản quy trình đã thay đổi. Hãy tải lại.');
       this.requireRevision(await this.revision(id,transaction),dto.revision);
+      if (['request_reopen','reject_reopen'].includes(dto.action)) {
+        if (status !== 'approved' || state.result_status === 'approved') throw new ConflictException('Chỉ xin mở lại tư cách đã duyệt và chưa khóa kết quả.');
+        const sessions = await this.query(`SELECT id FROM course_exam_sessions WHERE course_offering_id=:id AND status<>'cancelled' LIMIT 1`, {id}, transaction);
+        if (sessions.length) throw new ConflictException('Đã có lịch thi, không thể xin mở lại tư cách.');
+        const pending = state.eligibility_submission?.reopenRequest;
+        if (dto.action === 'request_reopen' && pending) throw new ConflictException('Yêu cầu mở lại tư cách đang chờ admin xử lý.');
+        if (dto.action === 'reject_reopen' && !pending) throw new ConflictException('Không có yêu cầu mở lại tư cách chờ xử lý.');
+        const submission = {...state.eligibility_submission};
+        if (dto.action === 'request_reopen') submission.reopenRequest = {note:dto.note.trim(),actor:auditActor(actor),at:new Date().toISOString()};
+        else delete submission.reopenRequest;
+        await this.db.query(`UPDATE course_exam_workflows SET eligibility_submission=CAST(:submission AS jsonb),
+          eligibility_version=eligibility_version+1,updated_at=now() WHERE course_offering_id=:id`,
+          {transaction,replacements:{id,submission:JSON.stringify(submission)}});
+        await this.event(id,`eligibility.${dto.action}`,actor,dto.note,state,await this.state(id,transaction),transaction);
+        return;
+      }
       const expected=dto.action==='submit'?'draft':dto.action==='approve'?'submitted':null;
       if(expected?status!==expected:!['approved','submitted'].includes(status))throw new ConflictException('Thao tác không phù hợp trạng thái.');
       const next=dto.action==='submit'?'submitted':dto.action==='approve'?'approved':'draft';

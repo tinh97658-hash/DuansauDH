@@ -4,7 +4,7 @@ import OperationalDashboard from "../features/dashboard/OperationalDashboard";
 
 const ViewLoggedPage = () => {
   return (
-    <FeatureLayout hideHeader={true}>
+    <FeatureLayout hideHeader={true} exportConfig={false}>
       <OperationalDashboard />
     </FeatureLayout>
   );

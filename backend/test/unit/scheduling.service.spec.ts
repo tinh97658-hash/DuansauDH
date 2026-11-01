@@ -23,6 +23,7 @@ const buildService = () => {
   const individualStudents = { findAll: jest.fn().mockResolvedValue([]), bulkCreate: jest.fn().mockResolvedValue([]) };
   const admissionRecords = { findAll: jest.fn().mockResolvedValue([]) };
   const subjectRecognitions = { findAll: jest.fn().mockResolvedValue([]) };
+  const classScores = { get: jest.fn().mockResolvedValue({ rows: [] }) };
   const service = new SchedulingService(
     courseOfferings as never,
     offeringGroups as never,
@@ -40,9 +41,10 @@ const buildService = () => {
     individualStudents as never,
     admissionRecords as never,
     subjectRecognitions as never,
+    classScores as never,
   );
   return {
-    individualStudents, admissionRecords, subjectRecognitions, service, courseOfferings, offeringGroups, subjects,
+    individualStudents, admissionRecords, subjectRecognitions, classScores, service, courseOfferings, offeringGroups, subjects,
     packages: curriculumSubjects, classGroupElectives, classGroups, classGroupMembers, majors, staff,
     sequelize, rooms, lecturers, teachingSessions,
   };
@@ -278,6 +280,33 @@ describe("SchedulingService participant preview", () => {
 });
 
 describe("SchedulingService course-offering candidates", () => {
+  it('loads late learners once for multiple subjects without mixing their waiting groups', async () => {
+    const mocks = buildService();
+    const groups = [group('new'), group('late-a'), group('late-b')];
+    const second = { ...subject, id: 'subject-2', name: 'Second subject' };
+    mocks.majors.findOne.mockResolvedValue({ id: 'major-1' });
+    mocks.classGroups.findAll.mockResolvedValue(groups);
+    mocks.packages.findAll.mockResolvedValue(groups.flatMap(g => [subject, second].map(course => ({
+      curriculumId: g.curriculumId, subjectId: course.id, subject: course,
+    }))));
+    mocks.offeringGroups.findAll.mockResolvedValue([
+      { classGroupId: 'late-a', courseOffering: { subjectId: subject.id, status: 'active' } },
+      { classGroupId: 'late-b', courseOffering: { subjectId: second.id, status: 'active' } },
+    ]);
+    mocks.sequelize.query.mockImplementation(async (sql: string) => sql.includes('WITH requested AS MATERIALIZED') ? [
+      { scopeKey: `late-a:${subject.id}`, classGroupId: 'late-a', subjectId: subject.id,
+        participantId: 'admission:one', admissionRecordId: 'one', studyType: 'first_time' },
+      { scopeKey: `late-b:${second.id}`, classGroupId: 'late-b', subjectId: second.id,
+        participantId: 'admission:two', admissionRecordId: 'two', studyType: 'first_time' },
+    ] : []);
+    const result = await mocks.service.listCourseOfferingCandidates({ program: 'masters', majorId: 'major-1', academicYear: '2026' });
+    expect(result.subjects.find(row => row.subject.id === subject.id)?.retakeClassGroups)
+      .toEqual([expect.objectContaining({ id: 'late-a', memberCount: 1, unstudiedCount: 1 })]);
+    expect(result.subjects.find(row => row.subject.id === second.id)?.retakeClassGroups)
+      .toEqual([expect.objectContaining({ id: 'late-b', memberCount: 1, unstudiedCount: 1 })]);
+    expect(mocks.sequelize.query.mock.calls.filter(([sql]) => String(sql).includes('WITH requested AS MATERIALIZED'))).toHaveLength(1);
+  });
+
   it.each(['major-1', 'major-2'])("does not suggest internships for %s, including legacy names", async majorId => {
     const mocks = buildService();
     const selectedGroup = group('internship-scope', 'N01', majorId);
@@ -1022,6 +1051,35 @@ describe("SchedulingService persisted reads", () => {
     }));
   });
 
+  it("counts only current group learners with a numeric passing score from the complete score summary", async () => {
+    const mocks = buildService();
+    const selected = group("group-1");
+    const activeSubject = { ...subject, id: "active-subject" };
+    mocks.majors.findOne.mockResolvedValue({ id: "major-1" });
+    mocks.classGroups.findAll.mockResolvedValue([selected]);
+    mocks.subjects.findAll.mockResolvedValue([subject, activeSubject]);
+    mocks.packages.findAll.mockResolvedValue([officialPackage(selected.id)]);
+    mocks.offeringGroups.findAll.mockResolvedValue([{ classGroupId: selected.id, courseOfferingId: "completed" }]);
+    mocks.courseOfferings.findAll.mockResolvedValue([{ id: "completed", status: "completed", subject }]);
+    mocks.classGroupMembers.findAll.mockResolvedValue([
+      ...["passed", "failed", "ungraded", "exempt", "pending"].map(studentId => ({ classGroupId: selected.id, studentId })),
+      { classGroupId: selected.id, studentId: "passed" },
+    ]);
+    const score = (participantId: string, result: string, value: number | null) => ({
+      participantId: `student:${participantId}`, scores: { [subject.id]: { result, score: value } },
+    });
+    mocks.classScores.get.mockResolvedValue({ rows: [
+      score("passed", "passed", 8), score("passed", "passed", 8),
+      score("failed", "failed", 3), score("ungraded", "passed", null),
+      score("exempt", "exempt", 9), score("pending", "pending", 8),
+      score("former-member", "passed", 9),
+    ] });
+    const data = await mocks.service.getClassCurriculumProgress({ majorId: "major-1", academicYear: "2026" });
+    expect(data.classes[0].subjects[0].completion).toEqual({ passedCount: 1, totalCount: 5 });
+    expect(data.classes[0].subjects[1].completion).toBeNull();
+    expect(mocks.classScores.get).toHaveBeenCalledWith({ classGroupId: selected.id }, true);
+  });
+
   it("keeps the warning when another completed offering of the same canonical subject still lacks grades", async () => {
     const mocks = buildService();
     const selectedGroup = group("group-1");
@@ -1199,6 +1257,102 @@ describe("SchedulingService persisted reads", () => {
     }));
   });
 });
+describe("Course-offering conflict preloading", () => {
+  it('counts repeated calendar offerings in one scoped query', async () => {
+    const mocks = buildService();
+    mocks.teachingSessions.findAll.mockResolvedValue(Array.from({ length: 50 }, (_, index) => ({
+      id: `session-${index}`, courseOfferingId: 'a', sessionDate: '2026-10-26',
+      courseOffering: { id: 'a', subject, groupLinks: [] },
+    })));
+    mocks.sequelize.query.mockResolvedValue([{ id: 'a', participantCount: 12, write: true, organize: false }]);
+    await groupScopeStorage.run({ staffId: 'staff', restrictView: true, restrictEdit: true,
+      readOnly: false, schedulingAction: 'view' }, async () => {
+      const sessions: any[] = await mocks.service.listTeachingSessions({ from: '2026-10-26', to: '2026-11-01' });
+      expect(sessions).toHaveLength(50);
+      expect(sessions.every(session => session.courseOffering.participantCount === 12)).toBe(true);
+      expect(mocks.sequelize.query).toHaveBeenCalledTimes(1);
+      expect(mocks.sequelize.query.mock.calls[0][1]).toMatchObject({ replacements: { ids: ['a'] } });
+    });
+  });
+
+  it('preloads scoped date conflicts without fetching each offering roster', async () => {
+    const mocks = buildService();
+    mocks.courseOfferings.findByPk.mockResolvedValue({ id: 'a', subject, groupLinks: [] });
+    mocks.teachingSessions.findAll.mockResolvedValue(['planned', 'not_held'].map((status, index) => ({
+      id: `session-${index}`, status, courseOfferingId: 'b', sessionDate: '2026-10-26',
+      courseOffering: { id: 'b', subject, groupLinks: [] },
+    })));
+    mocks.sequelize.query.mockImplementation(async (sql: string) => sql.includes('app_schedule_offering_conflicts')
+      ? [{ offeringId: 'b', reason: 'STUDENT_CONFLICT' }]
+      : [{ id: 'b', participantCount: 12, write: true, organize: false }]);
+    await groupScopeStorage.run({ staffId: 'staff', restrictView: true, restrictEdit: true,
+      readOnly: false, schedulingAction: 'view' }, async () => {
+      const sessions: any[] = await mocks.service.listTeachingSessions({ from: '2026-10-26', to: '2026-10-26', conflictForOfferingId: 'a' });
+      expect(sessions[0].schedulingConflict).toBe('STUDENT_CONFLICT');
+      expect(sessions[1].schedulingConflict).toBeNull();
+      expect(mocks.classGroupMembers.findAll).not.toHaveBeenCalled();
+      expect(mocks.sequelize.query).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("preloads scoped conflicts without exposing private roster snapshots", async () => {
+    const mocks = buildService();
+    mocks.courseOfferings.findAll.mockResolvedValue([
+      { id: "a", subject, groupLinks: [], gradebookSnapshot: { private: true }, participantNotes: { private: true } },
+      { id: "b", subject, groupLinks: [] },
+    ]);
+    mocks.sequelize.query.mockImplementation(async (sql: string) => {
+      if (sql.includes("app_schedule_offering_conflicts")) return [
+        { offeringId: "a", otherId: "a", reason: "SAME_OFFERING" },
+        { offeringId: "a", otherId: "b", reason: "STUDENT_CONFLICT" },
+      ];
+      if (sql.includes("app_schedule_count")) return [
+        { id: 'a', participantCount: 15, write: true, organize: false },
+        { id: 'b', participantCount: 7, write: true, organize: false },
+      ];
+      return [];
+    });
+    await groupScopeStorage.run({ staffId: "staff", restrictView: true, restrictEdit: true,
+      readOnly: false, schedulingAction: "view" }, async () => {
+      const result: any[] = await mocks.service.listCourseOfferings({ program: "masters", includeConflicts: "true" });
+      expect(result[0].schedulingConflicts).toEqual({ a: "SAME_OFFERING", b: "STUDENT_CONFLICT" });
+      expect(result[0].participantCount).toBe(15);
+      expect(result[0]).not.toHaveProperty("gradebookSnapshot");
+      expect(result[0]).not.toHaveProperty("participantNotes");
+      expect(mocks.classGroupMembers.findAll).not.toHaveBeenCalled();
+    });
+  });
+
+  it("builds the graph in bulk while respecting withdrawn, recognized and snapshotted participants", async () => {
+    const mocks = buildService();
+    const make = (id: string, groupId: string, participantIds?: string[]) => ({
+      id, subjectId: subject.id, subject, status: "active",
+      groupLinks: [{ classGroupId: groupId, participantIds }],
+    });
+    const offerings = [make("a", "g1"), make("b", "g2"), make("c", "g3"),
+      make("d", "g4"), make("e", "g5", []), make("f", "g1", []),
+      { ...make("individual", "empty"), individualStudents: [{ admissionRecordId: "record-individual", admissionRecord: { studentId: "shared" } }] }];
+    mocks.courseOfferings.findAll.mockResolvedValue(offerings);
+    mocks.classGroupMembers.findAll.mockResolvedValue([1, 2, 3, 4, 5].map(n => ({
+      id: `member-${n}`, classGroupId: `g${n}`, studentId: "shared", admissionRecordId: `record-${n}`,
+    })));
+    mocks.sequelize.query.mockResolvedValue([{ offeringId: "c", participantId: "student:shared" }]);
+    mocks.subjectRecognitions.findAll.mockResolvedValue([{ admissionRecordId: "record-4", targetSubjectId: subject.id }]);
+    const result: any[] = await mocks.service.listCourseOfferings({ program: "masters", includeConflicts: "true" });
+    expect(result[0].schedulingConflicts).toEqual({ a: "SAME_OFFERING", b: "STUDENT_CONFLICT", f: "CLASS_GROUP_CONFLICT", individual: "STUDENT_CONFLICT" });
+    expect(result[1].schedulingConflicts.a).toBe("STUDENT_CONFLICT");
+    expect(result[2].schedulingConflicts).toEqual({ c: "SAME_OFFERING" });
+    expect(result[3].schedulingConflicts).toEqual({ d: "SAME_OFFERING" });
+    expect(result[4].schedulingConflicts).toEqual({ e: "SAME_OFFERING" });
+    expect(mocks.classGroupMembers.findAll).toHaveBeenCalledTimes(1);
+    expect(mocks.subjectRecognitions.findAll).toHaveBeenCalledTimes(1);
+    expect(mocks.subjects.findAll).toHaveBeenCalledTimes(1);
+    expect(mocks.courseOfferings.findByPk).not.toHaveBeenCalled();
+    expect(mocks.offeringGroups.findAll).not.toHaveBeenCalled();
+    expect(mocks.individualStudents.findAll).not.toHaveBeenCalled();
+  });
+});
+
 describe("Course-offering summaries", () => {
   it("does not expose persisted time suggestions through the API summary", async () => {
     const { service, courseOfferings, teachingSessions } = buildService();

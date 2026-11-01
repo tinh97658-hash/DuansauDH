@@ -1,11 +1,12 @@
 import { isSessionEndedInBusinessTimezone, isSessionStartedInBusinessTimezone } from "./scheduling-time.js";
 import { randomUUID } from "node:crypto";
 import { latestParticipantResults, retakeProgress } from "./class-course-progress.js";
+import { ClassScoreSummaryService } from "../reports/class-score-summary.service.js";
 import { QueryTypes } from "sequelize";
 import { excludeRecognizedExamParticipant } from "../masters/recognized-exam-participant.js";
 import { profileForeignLanguageExemptSql } from "../masters/foreign-language-exemption.js";
 import { commonWeekdays, isEarlierAcademicYear, readRetakes } from "./retake-policy.js";
-import { failedRetakeMembers, readRetakeResults, readLateUnstudiedMembers, readReturnedMembers, type RetakeResult } from "./retake-groups.js";
+import { failedRetakeMembers, readRetakeResults, readLateUnstudiedMembers, readLateUnstudiedMembersForScopes, readReturnedMembers, type RetakeResult } from "./retake-groups.js";
 import { availableParticipantSql, BLOCKED_STUDY_STATUSES, BUSINESS_DATE_SQL, notWithdrawnSql } from "../plan/study-leave-policy.js";
 import { BadRequestException, ForbiddenException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
@@ -79,6 +80,7 @@ export class SchedulingService {
     @InjectModel(CourseOfferingStudent) private readonly individualStudents: typeof CourseOfferingStudent,
     @InjectModel(AdmissionRecord) private readonly admissionRecords: typeof AdmissionRecord,
     @InjectModel(SubjectRecognition) private readonly subjectRecognitions: typeof SubjectRecognition,
+    private readonly classScores: ClassScoreSummaryService,
   ) {}
 
   private requireEnabledProgram(program: string) {
@@ -327,6 +329,7 @@ export class SchedulingService {
           code: subject.code || "",
           name: subject.name || "",
           status,
+          completion: null as { passedCount: number; totalCount: number } | null,
           needsGradeEntry: !!incompleteOffering,
           incompleteCourseOfferingId: incompleteOffering?.id || null,
           primaryCourseOfferingId: primaryOfferings[0]?.id || null,
@@ -364,9 +367,24 @@ export class SchedulingService {
       };
     });
 
-    return {
-      classes,
-    };
+    // Read all pages through the score summary's own attempt selection and grading
+    // rules, then count only learners still on this administrative group's roster.
+    for (const group of classes) {
+      const completed = group.subjects.filter(subject => subject.status === "completed" && subject.curriculumSubjectId);
+      if (!completed.length) continue;
+      const report = await this.classScores.get({ classGroupId: group.id }, true);
+      const members = new Set(progressMembers.filter(member => member.classGroupId === group.id)
+        .map(member => this.memberIdentity(member)));
+      for (const subject of completed) {
+        const passed = new Set(report.rows.filter(person => {
+          const grade = person.scores[subject.subjectId];
+          return members.has(person.participantId) && grade?.result === "passed"
+            && grade.score != null && Number.isFinite(Number(grade.score));
+        }).map(person => person.participantId));
+        subject.completion = { passedCount: passed.size, totalCount: members.size };
+      }
+    }
+    return { classes };
   }
 
   private sameSubjectAcrossMajors(left: Subject | any, right: Subject | any) {
@@ -547,16 +565,17 @@ export class SchedulingService {
    * của lớp: khi ghép lớp liên ngành, hai mã khác nhau vẫn là cùng một môn nên công nhận ở mã
    * này phải loại học viên khỏi sĩ số ở mã kia.
    */
-  private async attachParticipantCounts(offerings: Array<CourseOffering | any>, transaction?: Transaction) {
+  private async attachParticipantCounts(offerings: Array<CourseOffering | any>, transaction?: Transaction, conflictMembers?: Map<string, Set<string>>) {
     const scope = groupScopeStorage.getStore();
     if (scope?.staffId && scope.schedulingAction) {
       const ids = [...new Set(offerings.map(row => row.id).filter(Boolean))];
-      const capabilities = ids.length ? await this.sequelize.query<{ id: string; write: boolean; organize: boolean }>(
-        "SELECT id, app_schedule_allowed(id,'scheduling.write') AS write, app_schedule_allowed(id,'scheduling.organize') AS organize FROM course_offerings WHERE id IN (:ids)",
+      const capabilities = ids.length ? await this.sequelize.query<{ id: string; write: boolean; organize: boolean; participantCount: number }>(
+        "SELECT id, app_schedule_allowed(id,'scheduling.write') AS write, app_schedule_allowed(id,'scheduling.organize') AS organize, app_schedule_count(id) AS \"participantCount\" FROM course_offerings WHERE id IN (:ids)",
         { replacements: { ids }, type: QueryTypes.SELECT, transaction },
       ) : [];
       const byId = new Map(capabilities.map(row => [row.id, row]));
       for (const offering of offerings) {
+        this.setParticipantCount(offering, Number(byId.get(offering.id)?.participantCount ?? 0));
         const values = { canWriteSchedule: byId.get(offering.id)?.write === true,
           canOrganize: byId.get(offering.id)?.organize === true,
           scheduleWriteBlockedReason: byId.get(offering.id)?.write ? null : scope.readOnly ? 'READ_ONLY' : 'SCHEDULE_SCOPE_DENIED' };
@@ -565,6 +584,7 @@ export class SchedulingService {
           else offering[key] = value;
         }
       }
+      return offerings;
     } else if (scope?.staffId && (scope.restrictView || scope.restrictEdit || scope.readOnly)) {
       const ids = [...new Set(offerings.map(row => row.id).filter(Boolean))];
       const capabilities = !scope.readOnly && ids.length ? await this.sequelize.query<{ id: string; allowed: boolean }>(
@@ -577,19 +597,11 @@ export class SchedulingService {
         else offering.scopeWritable = writable.has(offering.id);
       }
     }
-    if (scope?.schedulingAction) {
-      for (const offering of offerings) {
-        const rows = await this.sequelize.query<{ count: number }>('SELECT app_schedule_count(:id) AS count', {
-          replacements: { id: offering.id }, type: QueryTypes.SELECT, transaction });
-        this.setParticipantCount(offering, Number(rows[0]?.count ?? 0));
-      }
-      return offerings;
-    }
     const withdrawn = await this.withdrawnIdentities(offerings.map(row => row.id).filter(Boolean), transaction);
     const groupIds = [...new Set(offerings.flatMap((offering) => (
       (offering.groupLinks || []).map((link: CourseOfferingClassGroup | any) => link.classGroupId || link.classGroup?.id)
     )).filter(Boolean))];
-    if (groupIds.length === 0) {
+    if (groupIds.length === 0 && !conflictMembers) {
       offerings.forEach((offering) => this.setParticipantCount(offering, 0));
       return offerings;
     }
@@ -639,14 +651,23 @@ export class SchedulingService {
     offerings.forEach((offering) => {
       const scope = effectiveScopes.get(offering.subjectId);
       const identities = new Set<string>();
+      const allIdentities = new Set<string>();
       for (const entry of offering.individualStudents || []) {
         if (withdrawn.has(`${offering.id}:${this.memberIdentity(entry)}`)) continue;
+        if (conflictMembers && !SchedulingService.isRecognizedFor(recognized, scope, entry.admissionRecordId)) allIdentities.add(this.memberIdentity(entry));
         if (offering.status !== "completed" && BLOCKED_STUDY_STATUSES.includes(entry.admissionRecord?.studyStatus)) continue;
         if (!SchedulingService.isRecognizedFor(recognized, scope, entry.admissionRecordId)) identities.add(this.memberIdentity(entry));
       }
       for (const link of offering.groupLinks || []) {
         const groupId = link.classGroupId || link.classGroup?.id;
         const groupMembers = byGroup.get(groupId) || [];
+        // Match the write-time conflict check, including snapshot, withdrawal and recognition rules.
+        if (conflictMembers) for (const member of groupMembers) {
+          const identity = this.memberIdentity(member);
+          if (withdrawn.has(`${offering.id}:${identity}`)) continue;
+          if (Array.isArray(link.participantIds) && !link.participantIds.includes(identity)) continue;
+          if (!SchedulingService.isRecognizedFor(recognized, scope, member.admissionRecordId)) allIdentities.add(identity);
+        }
         const groupIdentities = new Set(groupMembers
           .filter(member => !withdrawn.has(`${offering.id}:${this.memberIdentity(member)}`))
           .filter(member => offering.status === "completed" || !BLOCKED_STUDY_STATUSES.includes(member.admissionRecord?.studyStatus || ""))
@@ -662,7 +683,8 @@ export class SchedulingService {
         }
         for (const identity of groupIdentities) identities.add(identity);
       }
-      this.setParticipantCount(offering, identities.size);
+      this.setParticipantCount(offering, groupIds.length ? identities.size : 0);
+      conflictMembers?.set(offering.id, allIdentities);
     });
     return offerings;
   }
@@ -926,8 +948,8 @@ export class SchedulingService {
     return offerings;
   }
 
-  private async attachCourseOfferingMetadata(offerings: Array<CourseOffering | any>, transaction?: Transaction) {
-    await this.attachParticipantCounts(offerings, transaction);
+  private async attachCourseOfferingMetadata(offerings: Array<CourseOffering | any>, transaction?: Transaction, conflictMembers?: Map<string, Set<string>>) {
+    await this.attachParticipantCounts(offerings, transaction, conflictMembers);
     await this.attachSessionSummaries(offerings, transaction);
     offerings.forEach((offering) => {
       const allowedWeekdays = commonWeekdays([...(offering.groupLinks || []).map((link: any) => link.classGroup).filter(Boolean), { allowedWeekdays: offering.retakeWeekdays }]);
@@ -1082,9 +1104,23 @@ export class SchedulingService {
       }
     }
 
-    const retakeResults = [...stateByPair.values()].includes("completed")
-      ? await readRetakeResults(this.sequelize, groupIds, [...allScopeIds]) : [];
-    const returnedResults = await readReturnedMembers(this.sequelize, groupIds, [...allScopeIds]);
+    const studiedScopes = candidatePairs.filter(pair => stateByPair.has(`${pair.classGroupId}:${pair.logicalSubject.id}`))
+      .map(pair => ({ key: `${pair.classGroupId}:${pair.logicalSubject.id}`, groupIds: [pair.classGroupId],
+        subjectIds: [...(pairScope.get(`${pair.classGroupId}:${pair.logicalSubject.id}`) || [])] }));
+    const completedScopes = studiedScopes.filter(scope => stateByPair.get(scope.key) === "completed");
+    const [retakeResults, lateMembers, returnedResults] = await Promise.all([
+      completedScopes.length
+        ? readRetakeResults(this.sequelize, [...new Set(completedScopes.flatMap(scope => scope.groupIds))],
+          [...new Set(completedScopes.flatMap(scope => scope.subjectIds))]) : Promise.resolve([]),
+      readLateUnstudiedMembersForScopes(this.sequelize, studiedScopes),
+      readReturnedMembers(this.sequelize, groupIds, [...allScopeIds]),
+    ]);
+    const lateMembersByPair = new Map<string, RetakeResult[]>();
+    for (const { scopeKey, ...member } of lateMembers) {
+      const bucket = lateMembersByPair.get(scopeKey) || [];
+      bucket.push(member);
+      lateMembersByPair.set(scopeKey, bucket);
+    }
     const result = new Map<string, {
       subject: any;
       eligibleClassGroups: any[];
@@ -1107,9 +1143,8 @@ export class SchedulingService {
       const returned = [...new Map(returnedResults.filter(member => member.classGroupId === group.id && scope.has(member.subjectId)
         && !SchedulingService.isRecognizedFor(recognizedSet, scope, member.admissionRecordId))
         .map(member => [member.participantId, member])).values()];
-      const unstudied = status === "completed" || status === "active"
-        ? (await readLateUnstudiedMembers(this.sequelize, [group.id], [...scope]))
-          .filter(member => !SchedulingService.isRecognizedFor(recognizedSet, scope, member.admissionRecordId)) : [];
+      const unstudied = (lateMembersByPair.get(`${group.id}:${subject.id}`) || [])
+        .filter(member => !SchedulingService.isRecognizedFor(recognizedSet, scope, member.admissionRecordId));
       if (status === "completed") {
         row.completedClassGroups.push(summary);
         const failed = failedRetakeMembers(retakeResults, group.id, scope)
@@ -1346,8 +1381,61 @@ export class SchedulingService {
       include: this.offeringIncludes({ program }),
       order: [["createdAt", "DESC"]],
     });
-    await this.attachCourseOfferingMetadata(offerings);
+    const conflictMembers = query.includeConflicts === "true" ? new Map<string, Set<string>>() : undefined;
+    await this.attachCourseOfferingMetadata(offerings, undefined, conflictMembers);
+    if (conflictMembers) {
+      if (groupScopeStorage.getStore()?.schedulingAction) await this.attachScopedSchedulingConflicts(offerings);
+      else this.attachSchedulingConflicts(offerings, conflictMembers);
+    }
     return offerings.map(offering => this.publicCourseOffering(offering));
+  }
+
+  /** Build the conflict graph from the same bulk roster query used for counts. No query per selection. */
+  private async attachScopedSchedulingConflicts(offerings: Array<CourseOffering | any>) {
+    if (!offerings.length) return;
+    const rows = await this.sequelize.query<{ offeringId: string; otherId: string; reason: string }>(
+      'SELECT offering_id AS "offeringId", other_id AS "otherId", reason FROM app_schedule_offering_conflicts(ARRAY[:ids]::uuid[])',
+      { replacements: { ids: offerings.map(offering => offering.id) }, type: QueryTypes.SELECT },
+    );
+    const conflicts = new Map<string, Record<string, string>>();
+    for (const row of rows) {
+      const value = conflicts.get(row.offeringId) || {};
+      value[row.otherId] = row.reason;
+      conflicts.set(row.offeringId, value);
+    }
+    for (const offering of offerings) {
+      const value = conflicts.get(offering.id) || {};
+      if (typeof offering.setDataValue === "function") offering.setDataValue("schedulingConflicts", value);
+      else offering.schedulingConflicts = value;
+    }
+  }
+
+  private attachSchedulingConflicts(offerings: Array<CourseOffering | any>, members: Map<string, Set<string>>) {
+    const groups = new Map<string, Set<string>>();
+    const students = new Map<string, Set<string>>();
+    const conflicts = new Map<string, Record<string, string>>();
+    const index = (buckets: Map<string, Set<string>>, key: string, id: string) => {
+      if (!key) return;
+      const ids = buckets.get(key) || new Set<string>();
+      ids.add(id); buckets.set(key, ids);
+    };
+    for (const offering of offerings) {
+      conflicts.set(offering.id, { [offering.id]: "SAME_OFFERING" });
+      for (const link of offering.groupLinks || []) index(groups, link.classGroupId || link.classGroup?.id, offering.id);
+      for (const identity of members.get(offering.id) || []) index(students, identity, offering.id);
+    }
+    for (const [buckets, code] of [[groups, "CLASS_GROUP_CONFLICT"], [students, "STUDENT_CONFLICT"]] as const) {
+      for (const ids of buckets.values()) for (const id of ids) for (const other of ids) {
+        const reasons = conflicts.get(id)!;
+        if (!reasons[other]) reasons[other] = code;
+      }
+    }
+    for (const offering of offerings) {
+      const value = conflicts.get(offering.id);
+      if (typeof offering.setDataValue === "function") offering.setDataValue("schedulingConflicts", value);
+      else offering.schedulingConflicts = value;
+    }
+
   }
 
   async getCourseOffering(id: string) {
@@ -1677,7 +1765,50 @@ export class SchedulingService {
       order: [["sessionDate", "ASC"], ["startTime", "ASC"], ["id", "ASC"]],
     });
     await this.attachParticipantCounts(sessions.map((session) => session.courseOffering).filter(Boolean));
-    return sessions.map((session) => this.publicTeachingSession(session));
+    const conflicts = new Map<string, string>();
+    if (query.conflictForOfferingId) {
+      const target = await this.courseOfferings.findByPk(query.conflictForOfferingId, { include: this.offeringIncludes() });
+      if (!target) throw new NotFoundException("Không tìm thấy lớp học phần.");
+      this.requireEnabledProgram(target.subject.program);
+      const groupIds = target.groupLinks.map(link => link.classGroupId);
+      if (groupScopeStorage.getStore()?.schedulingAction) {
+        const ids = [...new Set([target.id, ...sessions.map(session => session.courseOfferingId)])];
+        const reasons = await this.sequelize.query<{ offeringId: string; reason: string }>(
+          'SELECT other_id AS "offeringId", reason FROM app_schedule_offering_conflicts(ARRAY[:ids]::uuid[]) WHERE offering_id=:target',
+          { replacements: { ids, target: target.id }, type: QueryTypes.SELECT },
+        );
+        const byOffering = new Map(reasons.map(row => [row.offeringId, row.reason]));
+        for (const session of sessions) {
+          const reason = byOffering.get(session.courseOfferingId);
+          if (session.status !== 'not_held' && reason) conflicts.set(session.id, reason);
+        }
+      } else {
+        const targetMembers = await this.offeringMemberIdentities(target.id, groupIds);
+        const membersByOffering = new Map<string, Set<string>>();
+        for (const session of sessions) {
+          if (session.status === "not_held") continue;
+          if (session.courseOfferingId === target.id) {
+            conflicts.set(session.id, "SAME_OFFERING");
+            continue;
+          }
+          const otherGroups = (session.courseOffering?.groupLinks || []).map(link => link.classGroupId);
+          if (otherGroups.some(id => groupIds.includes(id))) {
+            conflicts.set(session.id, "CLASS_GROUP_CONFLICT");
+            continue;
+          }
+          if (!targetMembers.size) continue;
+          let members = membersByOffering.get(session.courseOfferingId);
+          if (!members) {
+            members = await this.offeringMemberIdentities(session.courseOfferingId, otherGroups);
+            membersByOffering.set(session.courseOfferingId, members);
+          }
+          if ([...targetMembers].some(id => members!.has(id))) conflicts.set(session.id, "STUDENT_CONFLICT");
+        }
+      }
+    }
+    return sessions.map((session) => ({ ...this.publicTeachingSession(session),
+      ...(query.conflictForOfferingId ? { schedulingConflict: conflicts.get(session.id) || null } : {}),
+    }));
   }
 
   async listPendingTeachingSessions() {

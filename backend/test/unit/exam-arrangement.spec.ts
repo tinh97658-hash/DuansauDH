@@ -1,7 +1,15 @@
-import {validateExamArrangement} from '../../src/masters/exam-arrangement.js';
+import {validateExamArrangement,examRoomFits} from '../../src/masters/exam-arrangement.js';
 import {plainToInstance} from 'class-transformer';
 import {validate} from 'class-validator';
 import {SaveExamArrangementDto} from '../../src/masters/dto/exam-schedule.dto.js';
+
+it.each([30,31,32])('accepts %s simultaneous candidates for 30 seats',count=>{
+ expect(examRoomFits(30,count)).toBe(true);
+});
+it('rejects three extra candidates and unknown capacity',()=>{
+ expect(examRoomFits(30,33)).toBe(false);
+ expect(examRoomFits(null,31)).toBe(false);
+});
 
 const group=(count:number,extra:any={})=>({roundNo:1,startTime:'08:00',endTime:'09:00',candidates:Array.from({length:count},(_,i)=>`a${i}`),aliases:[],rows:[],label:'Lớp A / Triết',...extra});
 it('supports parallel different subjects and uses combined round capacity',()=>{

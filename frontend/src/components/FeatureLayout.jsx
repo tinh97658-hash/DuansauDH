@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Card, Chip, Typography } from "@mui/material";
 import ResponsiveAppBar from "./navbarNew";
 import Footer from "./footer";
+import PageExportBoundary from "./PageExportBoundary";
 
 /**
  * Layout dùng chung cho mọi trang chức năng.
@@ -16,6 +17,8 @@ const FeatureLayout = ({
   maxWidth,
   hideHeader = true,
   workspaceMode = false,
+  contentPadding = "10px 16px 20px",
+  exportConfig,
 }) => (
   <Box data-testid="feature-layout" data-feature-workspace={workspaceMode ? "true" : "false"} sx={{
     minHeight: "100vh", display: "flex", flexDirection: "column", bgcolor: "var(--canvas-bg, #F5F7F8)",
@@ -30,7 +33,7 @@ const FeatureLayout = ({
       data-feature-main="true"
       sx={{
         flex: 1, minHeight: 0, display: "flex", flexDirection: "column",
-        p: "10px 16px 20px", width: "100%", maxWidth: fluid ? "100%" : (maxWidth || 1400), mx: "auto",
+        p: contentPadding, width: "100%", maxWidth: fluid ? "100%" : (maxWidth || 1400), mx: "auto",
         ...(workspaceMode ? { "@media (min-width:761px)": { overflow: "hidden" } } : {}),
       }}
     >
@@ -64,6 +67,7 @@ const FeatureLayout = ({
       )}
 
       <Box data-testid="feature-content" data-feature-content="true" sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        <PageExportBoundary title={title || "Tổng quan công việc"} config={children ? exportConfig : false}>
         {children || (
           <Card variant="outlined" sx={{ borderRadius: "4px", borderColor: "#DFE4E8", bgcolor: "#FFFFFF", p: 3 }}>
             <Typography variant="body2" sx={{ color: "var(--text-secondary, #607486)", textAlign: "center" }}>
@@ -71,6 +75,7 @@ const FeatureLayout = ({
             </Typography>
           </Card>
         )}
+        </PageExportBoundary>
       </Box>
     </Box>
     {!workspaceMode && <Footer />}

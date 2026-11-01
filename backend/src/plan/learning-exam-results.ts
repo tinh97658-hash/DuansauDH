@@ -43,11 +43,14 @@ export async function learningExamResults(sequelize: Sequelize, admissionRecordI
   return rows.map(({ grade, eligibilityPolicy, sourceType, ...row }) => {
     if (!grade || isPriorLearning({ sourceType })) return row;
     const calculated = resolveSavedExamGrade(grade, eligibilityPolicy);
-    return { ...row, result: calculated.result, score: calculated.courseScore, ...(grade.studyLeaveFailure ? { studyLeaveFailure: true } : {}) };
+    return { ...row, result: calculated.result, score: calculated.courseScore,
+      ...(grade.studyLeaveFailure ? { studyLeaveFailure: true } : {}),
+      ...(grade.profileForeignLanguageExempt ? { profileForeignLanguageExempt: true } : {}),
+      ...(grade.examExempt ? { examExempt: true } : {}) };
   });
 }
 
-export function applyLearningExamResults(rows: any[], exams: { id: string; result: string; score: number | null; studyLeaveFailure?: boolean }[]) {
+export function applyLearningExamResults(rows: any[], exams: { id: string; result: string; score: number | null; studyLeaveFailure?: boolean; profileForeignLanguageExempt?: boolean; examExempt?: boolean }[]) {
   const byId = new Map(exams.map(exam => [exam.id, exam]));
   return rows.map(row => {
     const data = typeof row.toJSON === "function" ? row.toJSON() : row;
@@ -56,6 +59,8 @@ export function applyLearningExamResults(rows: any[], exams: { id: string; resul
     const result = exam?.result || "pending";
     return { ...data, result, score: exam?.score == null ? null : Number(exam.score),
       ...(exam?.studyLeaveFailure ? { studyLeaveFailure: true } : {}),
+      ...(exam?.profileForeignLanguageExempt ? { profileForeignLanguageExempt: true } : {}),
+      ...(exam?.examExempt ? { examExempt: true } : {}),
       status: ["passed", "failed", "exempt"].includes(result) ? "completed" : data.status === "completed" ? "studying" : data.status };
   });
 }

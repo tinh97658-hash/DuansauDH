@@ -5,10 +5,17 @@ import ClassScoreSummary from "../../pages/reports/classScoreSummary";
 import { createClassScoreWorkbook } from "../../pages/reports/classScoreSummaryExcel";
 import { downloadDocumentFile } from "../../utils/documentFiles";
 import { notifyGradebookSaved } from "../../utils/gradebookRevision";
+import { fetchClassTranscripts, generateTranscriptDocuments } from "../../features/learners/learnerTranscriptBatch";
+import { openLearnerTranscriptPdfPreview } from "../../features/learners/learnerTranscriptPdfPreview";
+import { normalizeLearnerTranscript } from "../../features/learners/learnerTranscript";
+import { packTranscriptZip } from "../../features/learners/learnerTranscriptZip";
+vi.mock("../../features/learners/learnerTranscriptBatch", () => ({ fetchClassTranscripts: vi.fn(), generateTranscriptDocuments: vi.fn() }));
+vi.mock("../../features/learners/learnerTranscriptPdfPreview", () => ({ openLearnerTranscriptPdfPreview: vi.fn() }));
+vi.mock("../../features/learners/learnerTranscriptZip", () => ({ packTranscriptZip: vi.fn() }));
 
 jest.mock("axios");
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
-jest.mock("../../utils/documentFiles", () => ({ downloadDocumentFile: jest.fn() }));
+jest.mock("../../utils/documentFiles", async () => ({ ...await vi.importActual("../../utils/documentFiles"), downloadDocumentFile: jest.fn() }));
 jest.mock("../../pages/reports/classScoreSummaryExcel", async (importOriginal) => ({
   ...await importOriginal(), createClassScoreWorkbook: jest.fn(),
 }));
@@ -31,6 +38,9 @@ beforeEach(() => {
   localStorage.clear();
   axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups } : reportFor(config.params.classGroupId) }));
   createClassScoreWorkbook.mockResolvedValue(new Blob(["xlsx"]));
+  generateTranscriptDocuments.mockResolvedValue([{ filename: "Bang-diem.docx", blob: new Blob(["word"]) }]);
+  packTranscriptZip.mockResolvedValue(new Blob(["zip"], { type: "application/zip" }));
+  openLearnerTranscriptPdfPreview.mockResolvedValue();
 });
 const mount = () => render(<MemoryRouter useTransitions={false}><ClassScoreSummary /></MemoryRouter>);
 const chooseFilter = (label, text) => {
@@ -110,6 +120,8 @@ it.each(["Nguyễn", "Không khớp"])("exports the whole selected class indepen
   const full = { ...reportFor("g1"), rows: [student,
     { ...student, participantId: "student:two", code: "HV002", fullName: "Trần Văn Bình" }], total: 2 };
   const matching = search === "Nguyễn" ? [student] : [];
+  const cards = full.rows.map(row => ({ student: row, group: full.group, subjects: [] }));
+  fetchClassTranscripts.mockResolvedValue({ classGroup: full.group, scorecards: cards });
   axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups }
     : url.endsWith("/export") ? full : { ...full, rows: config.params.search ? matching : full.rows,
       total: config.params.search ? matching.length : full.total, page: config.params.page, pageSize: 15 } }));
@@ -124,10 +136,10 @@ it.each(["Nguyễn", "Không khớp"])("exports the whole selected class indepen
   expect(screen.queryByText("HV002")).not.toBeInTheDocument();
   expect(axios.get.mock.calls.some(([url]) => url.endsWith("/export"))).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "Xuất file" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất điểm cả lớp" }));
-  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/export$/), { params: { classGroupId: "g1" } }));
-  await waitFor(() => expect(createClassScoreWorkbook).toHaveBeenCalledWith(full));
-  expect(axios.get.mock.calls.filter(([url]) => url.endsWith("/export"))).toHaveLength(1);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất bảng điểm cả lớp" }));
+  fireEvent.click(screen.getByRole("button", { name: "Xuất Word" }));
+  await waitFor(() => expect(generateTranscriptDocuments).toHaveBeenCalledWith(cards, "word", expect.any(Object)));
+  expect(fetchClassTranscripts).toHaveBeenCalledExactlyOnceWith("g1");
   await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled());
   expect(screen.getByLabelText("Tìm kiếm")).toHaveValue(search);
 });
@@ -167,13 +179,35 @@ it("loads only a page, requests the next page, and resets search to page one", a
 
 it("exports all students using a separate full-class request", async () => {
   const full = { ...reportFor("g1"), rows: [student, { ...student, participantId: "student:two", code: "HV002" }], total: 2 };
+  const cards = full.rows.map(row => ({ student: row, group: full.group, subjects: [] }));
+  fetchClassTranscripts.mockResolvedValue({ classGroup: full.group, scorecards: cards });
   axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups } : url.endsWith("/export") ? full : reportFor(config.params.classGroupId) }));
   mount();
   await screen.findByText("HV001");
   fireEvent.click(screen.getByRole("button", { name: "Xuất file" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất điểm cả lớp" }));
-  await waitFor(() => expect(createClassScoreWorkbook).toHaveBeenCalledWith(full));
-  expect(downloadDocumentFile).toHaveBeenCalledWith(expect.any(Blob), "Tong-hop-diem-CNTT2026.1.1.xlsx");
+  expect(screen.getAllByRole("menuitem")).toHaveLength(2);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất bảng điểm cả lớp" }));
+  expect(screen.queryByRole("button", { name: /Excel/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Xem trước PDF" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Xuất Word" }));
+  await waitFor(() => expect(generateTranscriptDocuments).toHaveBeenCalledWith(cards, "word", expect.any(Object)));
+  await waitFor(() => expect(downloadDocumentFile).toHaveBeenCalledWith(expect.any(Blob), "Bang-diem-CNTT2026.1.1-Word.zip"));
+  expect(createClassScoreWorkbook).not.toHaveBeenCalled();
+});
+
+it("previews the entire class using the same individual transcript PDF template", async () => {
+  const cards = ["Nguyễn Văn An", "Trần Văn Bình"].map((fullName, index) => ({ student: { ...student, fullName, participantId: `student:${index}` }, group: groups[0], subjects: [] }));
+  fetchClassTranscripts.mockResolvedValue({ classGroup: groups[0], scorecards: cards });
+  const tab = { close: vi.fn() };
+  vi.spyOn(window, "open").mockReturnValueOnce(tab);
+  mount(); await screen.findByText("HV001");
+  fireEvent.click(screen.getByRole("button", { name: "Xuất file" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất bảng điểm cả lớp" }));
+  fireEvent.click(screen.getByRole("button", { name: "Xem trước PDF" }));
+  expect(window.open).toHaveBeenCalledWith("about:blank", "_blank");
+  await waitFor(() => expect(openLearnerTranscriptPdfPreview).toHaveBeenCalledWith(cards.map(card => normalizeLearnerTranscript(card)), tab, expect.any(Object)));
+  expect(generateTranscriptDocuments).not.toHaveBeenCalled();
+  expect(downloadDocumentFile).not.toHaveBeenCalled();
 });
 
 it("discards a late response from the previously selected class", async () => {
@@ -193,7 +227,7 @@ it("shows missing curriculum and empty class states with export disabled", async
   expect(await screen.findByText(/Lớp chưa được gán chương trình đào tạo/)).toBeInTheDocument();
   expect(screen.getByText("Lớp chưa có học viên.")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Xuất file" }));
-  expect(screen.getByRole("menuitem", { name: "Xuất điểm cả lớp" })).toHaveAttribute("aria-disabled", "true");
+  expect(screen.getByRole("menuitem", { name: "Xuất bảng điểm cả lớp" })).toHaveAttribute("aria-disabled", "true");
 });
 
 it("retries a failed report without changing the selected class", async () => {

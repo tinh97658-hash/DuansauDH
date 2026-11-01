@@ -9,11 +9,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const isUniqueConstraint = error?.name === "SequelizeUniqueConstraintError";
     const isForeignKeyConstraint = error?.name === "SequelizeForeignKeyConstraintError";
     const isValidationError = error?.name === "SequelizeValidationError";
+    const constraint = error?.original?.constraint || error?.parent?.constraint;
+    const isLearnerCodeConflict = ["admission_records_code_reserved", "admission_records_code_unique", "learner_code_reservations_pkey"].includes(constraint);
+    const isLearnerCodeRequired = constraint === "admission_records_code_required";
     const status = error instanceof HttpException
       ? error.getStatus()
-      : isUniqueConstraint || isForeignKeyConstraint
+      : isUniqueConstraint || isForeignKeyConstraint || isLearnerCodeConflict
         ? HttpStatus.CONFLICT
-        : isValidationError
+        : isValidationError || isLearnerCodeRequired
           ? HttpStatus.BAD_REQUEST
         : error?.status || HttpStatus.INTERNAL_SERVER_ERROR;
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) this.logger.error(error?.message || String(error), error?.stack);
@@ -34,6 +37,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       if (status === HttpStatus.NOT_FOUND && /^Cannot\s+[A-Z]+\s+\//.test(String(message || ""))) {
         message = "Không tìm thấy đường dẫn yêu cầu";
       }
+    } else if (isLearnerCodeConflict) {
+      message = "Mã học viên đã được sử dụng. Vui lòng nhập mã khác; mã của hồ sơ cũ vẫn được giữ dù đã thôi học, bảo lưu hoặc bị xóa.";
+      code = "LEARNER_CODE_EXISTS";
+    } else if (isLearnerCodeRequired) {
+      message = "Mã học viên không được để trống khi sửa hồ sơ.";
     } else if (isUniqueConstraint) {
       message = "Dữ liệu đã tồn tại, vui lòng kiểm tra lại thông tin nhập.";
     } else if (isForeignKeyConstraint) {

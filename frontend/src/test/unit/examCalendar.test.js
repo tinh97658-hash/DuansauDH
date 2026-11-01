@@ -1,7 +1,7 @@
 import {examSessionsForPeriod,formatExamDate,validExamHours} from '../../features/exams/examCalendar';
 import {addDays,formatDateKey,getBusinessTodayKey,mondayOf} from '../../utils/schedulingCalendar';
 it('formats Vietnamese weeks independently of host timezone',()=>{
- expect(getBusinessTodayKey(new Date('2026-12-31T17:00:00Z'))).toBe('2027-01-01');const monday=formatDateKey(mondayOf('2027-01-01'));expect(formatExamDate(monday)).toBe('28/12/2026');expect(formatExamDate(formatDateKey(addDays(monday,6)))).toBe('03/01/2027');
+ expect(getBusinessTodayKey(new Date('2026-12-31T17:00:00Z'))).toBe('2027-01-01');const monday=formatDateKey(mondayOf('2027-01-01'));expect(formatExamDate(monday)).toBe('28/12/26');expect(formatExamDate(formatDateKey(addDays(monday,6)))).toBe('03/01/27');
 });
 const date='2026-10-21',session=(id,startTime,endTime)=>({id,startTime,endTime,examDate:date});
 it('groups different exact times into the same period without merging their identities',()=>{

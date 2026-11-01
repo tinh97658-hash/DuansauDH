@@ -1,7 +1,8 @@
 import React from "react";
 import { personNameParts } from "../../utils/personName";
 import { displayGradeDate } from "../../features/exams/gradebook";
-import { BRAND } from "../../config/branding";
+import { addExcelDocumentHeading, documentDateLine } from "../../utils/documentHeading";
+import { formatDateTime } from "../../utils/dateFormat";
 
 export const scoreSummaryColumns = (subjects) => [
   { key: "index", label: "STT", width: 48, minWidth: 40, align: "center" },
@@ -50,8 +51,7 @@ export async function createClassScoreWorkbook(report) {
     cell.alignment = { horizontal, vertical: "middle", wrapText: true };
     sheet.getRow(rowNumber).height = height;
   };
-  mergedLine(1, BRAND.university.toLocaleUpperCase("vi-VN"), { bold: true, size: 12, horizontal: "center", height: 22 });
-  mergedLine(2, BRAND.institute.toLocaleUpperCase("vi-VN"), { bold: true, size: 12, horizontal: "center", height: 22 });
+  addExcelDocumentHeading(sheet, columns.length, documentDateLine({ generatedAt: formatDateTime(new Date()) }));
   mergedLine(4, "TỔNG HỢP ĐIỂM CỦA LỚP", { bold: true, size: 16, horizontal: "center", height: 28 });
   const metadata = (row, label, value) => mergedLine(row, { richText: [
     { text: label, font: reportFont(11, { bold: true }) },
@@ -60,7 +60,7 @@ export async function createClassScoreWorkbook(report) {
   metadata(6, "Lớp:", report.group.code || report.group.name);
   metadata(7, "Năm vào trường:", report.group.academicYear);
   metadata(8, "CTĐT:", report.curriculum?.name);
-  [3, 5, 9].forEach(row => { sheet.getRow(row).height = 8; });
+  [5, 9].forEach(row => { sheet.getRow(row).height = 8; });
 
   const header = sheet.getRow(TABLE_HEADER_ROW);
   header.values = columns.map(column => column.label);

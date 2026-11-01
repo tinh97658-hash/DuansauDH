@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { TextEncoder, TextDecoder } from "util";
-import { createLearnerTranscriptPdf, transcriptPdfDefinition, TRANSCRIPT_PDF_FONTS } from "../../features/learners/learnerTranscriptPdf";
+import { createLearnerTranscriptPdf, createLearnerTranscriptsPdf, transcriptPdfDefinition, TRANSCRIPT_PDF_FONTS } from "../../features/learners/learnerTranscriptPdf";
 import { normalizeLearnerTranscript, transcriptDocumentDetails, transcriptMetadataRows, transcriptSubjectValues, TRANSCRIPT_HEADERS } from "../../features/learners/learnerTranscript";
 import { officialTranscriptScorecardFixture, longTranscriptScorecardFixture, missingMetadataTranscriptFixture, hardSpecTranscriptScorecardFixture, referenceTranscriptScorecardFixture } from "../fixtures/learnerTranscript.fixture";
 import { readTranscriptPdf, readTranscriptPdfLayout } from "../fixtures/readTranscriptPdf";
@@ -20,6 +20,15 @@ const renderedText = node => typeof node === "string" ? node : Array.isArray(nod
 const bufferOf = blob => new Promise((resolve, reject) => {
   const reader = new FileReader(); reader.onload = () => resolve(Buffer.from(reader.result)); reader.onerror = reject; reader.readAsArrayBuffer(blob);
 });
+
+it("combines selected learner PDFs with each learner starting on a separate page", async () => {
+  const transcripts = ["Học viên Một", "Học viên Hai"].map(fullName => normalizeLearnerTranscript({ ...missingMetadataTranscriptFixture, student: { ...missingMetadataTranscriptFixture.student, fullName } }));
+  const pages = await readTranscriptPdf(await bufferOf(await createLearnerTranscriptsPdf(transcripts)));
+  expect(pages.length).toBe(2);
+  expect(JSON.stringify(pages[0])).toContain("Học viên Một");
+  expect(JSON.stringify(pages[0])).not.toContain("Học viên Hai");
+  expect(JSON.stringify(pages[1])).toContain("Học viên Hai");
+}, 30000);
 
 it.each([[officialTranscriptScorecardFixture, 1], [longTranscriptScorecardFixture, 2], [missingMetadataTranscriptFixture, 1], [hardSpecTranscriptScorecardFixture, 1], [referenceTranscriptScorecardFixture, 1]])("creates a real Unicode PDF and uses the exact shared presentation", async (scorecard, minimumPages) => {
   const transcript = normalizeLearnerTranscript(scorecard);

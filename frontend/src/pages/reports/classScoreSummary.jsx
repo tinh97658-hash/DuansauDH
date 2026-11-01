@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
-import { Alert, Button, Chip, CircularProgress, Menu, MenuItem, Paper, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
+import { Alert, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Menu, MenuItem, Paper, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
 import FeatureLayout from "../../components/FeatureLayout";
 import ListPagination from "../../components/ListPagination";
 import ResizableTable from "../../components/ResizableTable";
@@ -11,12 +11,17 @@ import { disciplinesFromMajors, majorDisciplineId, majorsForDiscipline } from ".
 import { API_BASE_URL } from "../../config/http";
 import { personNameParts } from "../../utils/personName";
 import { displayGradeDate } from "../../features/exams/gradebook";
-import { downloadDocumentFile } from "../../utils/documentFiles";
-import { createClassScoreWorkbook, scoreSummaryColumns, scoreSummaryValue } from "./classScoreSummaryExcel";
+import { scoreSummaryColumns, scoreSummaryValue } from "./classScoreSummaryExcel";
 import LearnerTranscriptDialog from "../../features/learners/LearnerTranscriptDialog";
 import "./classScoreSummary.css";
 import { useSubjectCatalogRevision } from "../../utils/subjectCatalog";
 import { useGradebookRevision } from "../../utils/gradebookRevision";
+import { reserveReportPreview } from "../../utils/reportPreview";
+import { downloadDocumentFile, sanitizeDocumentFilenamePart } from "../../utils/documentFiles";
+import { fetchClassTranscripts, generateTranscriptDocuments } from "../../features/learners/learnerTranscriptBatch";
+import { normalizeLearnerTranscript } from "../../features/learners/learnerTranscript";
+import { openLearnerTranscriptPdfPreview } from "../../features/learners/learnerTranscriptPdfPreview";
+import { packTranscriptZip } from "../../features/learners/learnerTranscriptZip";
 
 const PAGE_SIZE = 15;
 const endpoint = `${API_BASE_URL}/reports/class-score-summary`;
@@ -44,6 +49,15 @@ export default function ClassScoreSummary() {
   const [page, setPage] = useState(1);
   const [exportAnchor, setExportAnchor] = useState(null);
   const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [classExportOpen, setClassExportOpen] = useState(false);
+  const exportRequest = useRef(null);
+  useEffect(() => () => {
+    if (exportRequest.current) {
+      exportRequest.current.active = false;
+      exportRequest.current.tab?.close();
+      exportRequest.current = null;
+    }
+  }, [classGroupId]);
 
   useEffect(() => {
     let active = true;
@@ -115,20 +129,37 @@ export default function ClassScoreSummary() {
     const choices = inDiscipline.filter(group => !major || (group.majorId || group.major?.id) === major);
     selectGroup(choices.find(group => group.id === classGroupId) || choices[0]);
   };
-  const exportExcel = async () => {
-    setExporting(true);
-    setError("");
+  const exportDocument = async format => {
+    if (exportRequest.current) return;
+    const request = { active: true };
+    exportRequest.current = request;
+    setExporting(true); setError("");
     try {
-      const { data } = await axios.get(`${endpoint}/export`, { params: { classGroupId } });
-      const blob = await createClassScoreWorkbook(data);
-      const code = (data.group.code || data.group.name).replace(/[<>:"/\\|?*]/g, "-");
-      downloadDocumentFile(blob, `Tong-hop-diem-${code}.xlsx`);
-    } catch (error) { setError(errorMessage(error, "Không xuất được file Excel.")); }
-    finally { setExporting(false); }
+      if (format === "pdf") request.tab = reserveReportPreview();
+      const data = await fetchClassTranscripts(classGroupId);
+      if (!request.active) return;
+      if (!data.scorecards.length) throw new Error("Lớp chưa có học viên để xuất bảng điểm.");
+      const unavailable = data.scorecards.find(card => card.unavailableReason);
+      if (unavailable) throw new Error(unavailable.unavailableReason);
+      const options = { isCancelled: () => !request.active };
+      if (format === "pdf") {
+        await openLearnerTranscriptPdfPreview(data.scorecards.map(card => normalizeLearnerTranscript(card)), request.tab, options);
+      } else {
+        const documents = await generateTranscriptDocuments(data.scorecards, "word", options);
+        if (!request.active) return;
+        const zip = await packTranscriptZip(documents, "word");
+        if (request.active) downloadDocumentFile(zip, `Bang-diem-${sanitizeDocumentFilenamePart(data.classGroup.code || classGroupId)}-Word.zip`);
+      }
+    } catch (failure) {
+      request.tab?.close();
+      if (request.active) setError(errorMessage(failure, "Không thể xuất bảng điểm."));
+    } finally {
+      if (request.active) { exportRequest.current = null; setExporting(false); }
+    }
   };
 
   return <FeatureLayout title="Tổng hợp điểm của lớp" group="BÁO CÁO">
-    <section className="css-report" aria-label="Tổng hợp điểm của lớp">
+    <section className="css-report" aria-label="Tổng hợp điểm của lớp" data-export-managed="true">
       <Paper variant="outlined" className="css-filters">
         <FilterSelectField label="Năm vào trường" value={year} disabled={loadingOptions || exporting || !groups.length} onChange={event => changeScope(event.target.value, disciplineId, majorId)}>
           {!years.length && <MenuItem value="">Chọn năm</MenuItem>}
@@ -153,7 +184,7 @@ export default function ClassScoreSummary() {
           {exporting ? "Đang xuất..." : "Xuất file"} <span aria-hidden="true"> ▼</span>
         </Button>
         <Menu id="class-score-export-menu" anchorEl={exportAnchor} open={!!exportAnchor} onClose={() => setExportAnchor(null)}>
-          <MenuItem disabled={!subjects.length} onClick={() => { setExportAnchor(null); exportExcel(); }}>Xuất điểm cả lớp</MenuItem>
+          <MenuItem disabled={!subjects.length} onClick={() => { setExportAnchor(null); setClassExportOpen(true); }}>Xuất bảng điểm cả lớp</MenuItem>
           <MenuItem onClick={() => { setExportAnchor(null); setTranscriptOpen(true); }}>Xuất bảng điểm cá nhân</MenuItem>
         </Menu>
       </Paper>
@@ -204,5 +235,14 @@ export default function ClassScoreSummary() {
       </Paper>
     </section>
     {transcriptOpen && <LearnerTranscriptDialog key={classGroupId} classGroupId={classGroupId} onClose={() => setTranscriptOpen(false)} />}
+    <Dialog open={classExportOpen} onClose={() => setClassExportOpen(false)} maxWidth="xs" fullWidth aria-labelledby="class-export-title" className="app-popup">
+      <DialogTitle id="class-export-title">Xuất bảng điểm cả lớp</DialogTitle>
+      <DialogContent>Mỗi học viên dùng mẫu bảng điểm cá nhân. PDF xem trước chung trong một file; Word tải gói ZIP chứa từng bảng điểm.</DialogContent>
+      <DialogActions>
+        <Button onClick={() => setClassExportOpen(false)}>Đóng</Button>
+        <Button variant="outlined" onClick={() => { setClassExportOpen(false); exportDocument("word"); }}>Xuất Word</Button>
+        <Button variant="contained" onClick={() => { setClassExportOpen(false); exportDocument("pdf"); }}>Xem trước PDF</Button>
+      </DialogActions>
+    </Dialog>
   </FeatureLayout>;
 }

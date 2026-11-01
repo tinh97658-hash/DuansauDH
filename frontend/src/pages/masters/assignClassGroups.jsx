@@ -21,6 +21,7 @@ import GroupWorkRounded from "@mui/icons-material/GroupWorkRounded";
 import PersonRounded from "@mui/icons-material/PersonRounded";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
+import InlineReportExport from "../../components/InlineReportExport";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import ConfirmDialog from "../../components/ConfirmDialog";
@@ -411,7 +412,7 @@ const AssignClassGroups = () => {
                 <MenuItem key={m.id} value={m.id}>{majorLabels.labels.get(m.id)}</MenuItem>
               ))}
           </FilterSelectField>
-
+          <InlineReportExport height={38} />
         </Stack>
       </Paper>
 

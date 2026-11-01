@@ -8,8 +8,8 @@ async function bytesOf(blob) {
 }
 
 export async function packTranscriptZip(documents, format) {
-  if (!["word", "pdf"].includes(format) || !documents.length) throw new Error("Không có bảng điểm hợp lệ để đóng gói.");
-  const extension = format === "pdf" ? "pdf" : "docx";
+  if (!["word", "pdf", "excel"].includes(format) || !documents.length) throw new Error("Không có bảng điểm hợp lệ để đóng gói.");
+  const extension = format === "excel" ? "xlsx" : format === "pdf" ? "pdf" : "docx";
   const used = new Set();
   for (const { filename, blob } of documents) {
     if (!filename || filename.length > 240 || /[\p{Cc}<>:"/\\|?*]/u.test(filename) || filename.includes("..")

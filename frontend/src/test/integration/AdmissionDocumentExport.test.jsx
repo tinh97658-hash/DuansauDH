@@ -144,11 +144,7 @@ it.each(["applications", "admitted-masters"])("%s list keeps the relevant row ac
   await screen.findAllByText(record.email);
   expect(screen.queryByRole("button", { name: /In \/ Xuất/ })).not.toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: /^Sửa hồ sơ / })).toHaveLength(2);
-  if (mode === "admitted-masters") {
-    expect(screen.queryByRole("button", { name: "Xóa hồ sơ" })).not.toBeInTheDocument();
-  } else {
-    expect(screen.getAllByRole("button", { name: "Xóa hồ sơ" })).toHaveLength(2);
-  }
+  expect(screen.queryByRole("button", { name: "Xóa hồ sơ" })).not.toBeInTheDocument();
   expect(window.open).not.toHaveBeenCalled();
   expect(axios.put).not.toHaveBeenCalled(); expect(axios.post).not.toHaveBeenCalled();
 });

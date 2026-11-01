@@ -1,9 +1,20 @@
 import React from "react";
 import { gradebookDocumentColumns } from "./gradebookLayout";
+import { gradebookColumns } from "./gradebook";
+import { examListDocumentMetadata } from "./examListExport";
+import SchedulePrintTemplate from "../scheduling/SchedulePrintTemplate";
 import "./gradebookPrint.css";
 
 export default function GradebookPrintTemplate({ document }) {
   const columns = gradebookDocumentColumns(document, document.kind === "exam-list");
+  if (document.kind === "exam-list") {
+    const catalog = gradebookColumns(true);
+    return <div className="sl-print-only exam-list-document"><SchedulePrintTemplate
+      schedule={document} metadata={examListDocumentMetadata(document)} tableLabel="Danh sách thi"
+      columns={columns.map((column, index) => ({ ...column, label: document.headers[index],
+        weight: column.width, fields: [index], center: catalog[index].align === "center" }))}
+    /></div>;
+  }
   const totalWidth = columns.reduce((sum, column) => sum + column.width, 0);
   return <article className="gradebook-document">
     <header><strong>{document.university}</strong><strong>{document.institute}</strong></header>

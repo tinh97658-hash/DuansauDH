@@ -5,11 +5,12 @@ import { Link, useSearchParams } from "react-router-dom";
 import { dashboardGradeScope } from "../../features/dashboard/navigation";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, ListSubheader, MenuItem, Paper, Stack, TableBody, TableCell, TableContainer, TableRow, TextField, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, ListSubheader, MenuItem, Paper, Stack, TableBody, TableCell, TableContainer, TableRow, TextField, Tooltip, Typography } from "@mui/material";
 import ListAltRounded from "@mui/icons-material/ListAltRounded";
 import SaveRounded from "@mui/icons-material/SaveRounded";
 import SettingsRounded from "@mui/icons-material/SettingsRounded";
 import GradeSettingsDialog from "../../features/exams/GradeSettingsDialog";
+import GradebookHistoryDialog from "../../features/exams/GradebookHistoryDialog";
 import FeatureLayout from "../../components/FeatureLayout";
 import FilterSelectField from "../../components/FilterSelectField";
 import FilterSearchField from "../../components/FilterSearchField";
@@ -19,7 +20,8 @@ import DocumentExportMenu from "../../components/DocumentExportMenu";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import AppDialog from "../../components/AppDialog";
 import { downloadDocumentFile } from "../../utils/documentFiles";
-import { buildGradebookDocument, createGradebookExcel, fetchAllGradebookRows, gradebookFilename, openGradebookPreview } from "../../features/exams/gradebookExport";
+import { fetchAllGradebookRows, gradebookFilename, openGradebookPreview } from "../../features/exams/gradebookExport";
+import { downloadReport } from "../../utils/reportExport";
 import { buildExamListDocument, createExamListExcel } from "../../features/exams/examListExport";
 import { API_BASE_URL } from "../../config/http";
 import { personNameParts } from "../../utils/personName";
@@ -40,20 +42,19 @@ const inputSx = {
 };
 const modes = { all: "Cả bảng điểm", exam: "DS thi" };
 const completionGroups = {
-  incomplete: { label: 'CẦN HOÀN THIỆN', order: 0 },
-  needs_lock: { label: 'CẦN KHÓA ĐIỂM', order: 1 },
-  completed: { label: 'ĐÃ HOÀN TẤT', order: 2 },
+  studying: { label: 'ĐANG HỌC', order: 0 },
+  incomplete: { label: 'CẦN HOÀN THIỆN', order: 1 },
+  needs_lock: { label: 'CẦN KHÓA ĐIỂM', order: 2 },
+  completed: { label: 'ĐÃ HOÀN TẤT', order: 3 },
 };
-const completionOf = offering => completionGroups[offering.gradebookCompletionStatus] ? offering.gradebookCompletionStatus : 'incomplete';
+const completionOf = offering => {
+  if (['needs_lock', 'completed'].includes(offering.gradebookCompletionStatus)) return offering.gradebookCompletionStatus;
+  return offering.status === 'completed' ? 'incomplete' : 'studying';
+};
 const PAGE_SIZE = 15;
 const EXAM_WARNING_ID = "exam-missing-component-scores";
 const EXAM_WARNING_CONTAINER = "exam-gradebook-warnings";
-const COMPLETION_WARNING_ID = "exam-teaching-not-completed";
 const COMPLETION_WARNING_MESSAGE = "Vui lòng xác nhận hoàn thành giảng dạy trước khi nhập điểm.";
-const showCompletionWarning = () => {
-  if (toast.isActive(COMPLETION_WARNING_ID)) toast.update(COMPLETION_WARNING_ID, { render: COMPLETION_WARNING_MESSAGE, autoClose: 5000 });
-  else toast.warn(COMPLETION_WARNING_MESSAGE, { toastId: COMPLETION_WARNING_ID, containerId: EXAM_WARNING_CONTAINER });
-};
 const subjectNameKey = subject => (subject?.name || "").normalize("NFC").trim().replace(/\s+/g, " ").toLocaleLowerCase("vi");
 const subjectKey = subject => subject?.id || subject?.code || "";
 const subjectLabel = subject => [subject?.code, subject?.name].filter(Boolean).join(" - ");
@@ -117,6 +118,16 @@ export default function ExamLists() {
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
   const [unassessedRows, setUnassessedRows] = useState(null);
+  const workflowReminderToast = useRef(null);
+  const completionWarningToast = useRef(null);
+  const showCompletionWarning = () => {
+    const id = completionWarningToast.current;
+    if (id !== null && toast.isActive(id)) toast.update(id, { render: COMPLETION_WARNING_MESSAGE, autoClose: 5000 });
+    else completionWarningToast.current = toast.warn(COMPLETION_WARNING_MESSAGE, { containerId: EXAM_WARNING_CONTAINER });
+  };
+  const dismissCompletionWarning = () => {
+    if (completionWarningToast.current !== null) toast.dismiss(completionWarningToast.current);
+  };
   const pendingExamWarning = useRef(false);
   const includeIds = Object.values(dirty).filter(isExamCandidate).map(row => row.participantId).join(",");
   const excludeIds = Object.values(dirty).filter(row => !isExamCandidate(row)).map(row => row.participantId).join(",");
@@ -129,6 +140,7 @@ export default function ExamLists() {
   const refreshOfferingCompletion = offering => {
     if (!offering) return;
     setSubjects(previous => previous.map(item => item.id === offering.id ? { ...item,
+      ...(offering.status ? { status: offering.status } : {}),
       ...(typeof offering.examGradesComplete === 'boolean' ? { examGradesComplete: offering.examGradesComplete } : {}),
       ...(offering.gradebookCompletionStatus ? { gradebookCompletionStatus: offering.gradebookCompletionStatus } : {}),
     } : item));
@@ -218,11 +230,12 @@ export default function ExamLists() {
   const selectedEntry = classChoices.find(entry => entry.key === `${groupId}:${offeringId}`);
   const year = selectedEntry?.group.academicYear || "";
   const teachingCompleted = (loadedOffering?.id === offeringId ? loadedOffering.status : selectedEntry?.offering.status) === "completed";
+  const studying = !!selectedEntry && completionOf(selectedEntry.offering) === "studying";
   useEffect(() => {
-    if (canSubmitGrades && offeringId && !teachingCompleted) showCompletionWarning();
-    else toast.dismiss(COMPLETION_WARNING_ID);
-    return () => toast.dismiss(COMPLETION_WARNING_ID);
-  }, [canSubmitGrades, offeringId, teachingCompleted]);
+    if (offeringId && studying) showCompletionWarning();
+    else dismissCompletionWarning();
+  }, [offeringId, studying]);
+  useEffect(() => () => dismissCompletionWarning(), []);
   const selectedName = subjectNameKey(selectedEntry?.subject);
   const offeringLabel = entry => {
     const classNames = (entry.offering.groupLinks || []).map(link => groups.find(group => group.id === link.classGroupId))
@@ -317,9 +330,9 @@ export default function ExamLists() {
     }
     finally { setSaving(false); }
   };
-  const exportGradebook = async (format) => {
+  const exportExamList = async (format) => {
     if (!groupId || !offeringId || !total || optionsLoading || loading || saving || exporting) return;
-    if (mode === "exam" && !examPrintReady) return;
+    if (mode !== "exam" || !examPrintReady) return;
     setExporting(true); setError("");
     let previewTab;
     try {
@@ -331,19 +344,15 @@ export default function ExamLists() {
       }
       const exported = await fetchAllGradebookRows(params => axios.get(`${API_BASE_URL}/masters/exam-lists`, { params }), {
         classGroupId: groupId, courseOfferingId: offeringId, rosterScope: "offering", mode, search,
-        ...(mode === "exam" ? { includeIds, excludeIds } : {}),
+        includeIds, excludeIds,
       }, () => workflow.status === "draft" ? dirtyRef.current : {});
-      if (mode === "exam") {
-        const document = buildExamListDocument(selectedGroup, selectedOffering, exported);
-        if (!document.rows.length) throw new Error("Không có học viên đủ tư cách và không miễn thi để in.");
-        if (format === "excel") downloadDocumentFile(await createExamListExcel(document), gradebookFilename(selectedGroup, selectedOffering, "DS-thi"));
-        else openGradebookPreview(document, previewTab);
-        return;
-      }
-      const document = buildGradebookDocument(selectedGroup, selectedOffering, exported);
-      if (format === "excel") downloadDocumentFile(await createGradebookExcel(document), gradebookFilename(selectedGroup, selectedOffering));
+      const document = buildExamListDocument(selectedGroup, selectedOffering, exported);
+      if (!document.rows.length) throw new Error("Không có học viên đủ tư cách và không miễn thi để in.");
+      if (format === "excel") downloadDocumentFile(await createExamListExcel(document), gradebookFilename(selectedGroup, selectedOffering, "DS-thi"));
+      else if (format === "word") await downloadReport({ title: document.title, metadata: [["Lớp", document.group], ["Học phần", document.subject]],
+        sections: [{ title: document.title, headers: document.headers, rows: document.rows }] }, "word");
       else openGradebookPreview(document, previewTab);
-    } catch (failure) { previewTab?.close(); setError(failure.response ? errorMessage(failure, "Không thể xuất bảng điểm.") : failure.message); }
+    } catch (failure) { previewTab?.close(); setError(failure.response ? errorMessage(failure, "Không thể xuất danh sách thi.") : failure.message); }
     finally { setExporting(false); }
   };
   const blank = mode === "exam";
@@ -352,8 +361,40 @@ export default function ExamLists() {
     ...column, header: <span className="exam-calculated-label">{column.key==='eligible'?(newWorkflow&&workflow.eligibility.status==='approved'?'Tư cách đã duyệt':'Tư cách dự kiến'):column.label}</span>,
   } : column);
   const busy = optionsLoading || loading;
+  let workflowReminder = '';
+  if (!error && !dirtyCount && teachingCompleted && totalRows > 0 && newWorkflow && loadedOffering?.id === offeringId) {
+    if (componentEditable && unassessedRows === 0) workflowReminder = 'Đã nhập đủ điểm thành phần. Vui lòng gửi duyệt tư cách thi để chốt danh sách dự thi.';
+    else if (workflow.eligibility.status === 'submitted') workflowReminder = 'Tư cách thi đang chờ duyệt. Vui lòng duyệt tư cách để chốt danh sách dự thi.';
+    else if (workflow.eligibility.status === 'approved' && workflow.final.status !== 'approved' && loadedOffering.examScheduling?.remainingCount > 0)
+      workflowReminder = 'Đã duyệt tư cách thi. Vui lòng xếp lịch thi cho danh sách đã duyệt.';
+  }
+  useEffect(() => {
+    if (workflowReminderToast.current && workflowReminderToast.current.offeringId !== offeringId) {
+      toast.clearWaitingQueue({ containerId: EXAM_WARNING_CONTAINER });
+      toast.dismiss(workflowReminderToast.current.id);
+      workflowReminderToast.current = null;
+    }
+    // Keep the current toast while refreshing so the next phase replaces it in place.
+    if (busy || saving) return;
+    if (!workflowReminder) {
+      if (workflowReminderToast.current) {
+        toast.clearWaitingQueue({ containerId: EXAM_WARNING_CONTAINER });
+        toast.dismiss(workflowReminderToast.current.id);
+      }
+      workflowReminderToast.current = null;
+    } else if (workflowReminderToast.current && toast.isActive(workflowReminderToast.current.id)) {
+      toast.update(workflowReminderToast.current.id, { render: workflowReminder, autoClose: 5000 });
+    } else {
+      toast.clearWaitingQueue({ containerId: EXAM_WARNING_CONTAINER });
+      workflowReminderToast.current = { offeringId, id: toast.warn(workflowReminder, { containerId: EXAM_WARNING_CONTAINER }) };
+    }
+  }, [workflowReminder, offeringId, revision, busy, saving]);
+  useEffect(() => () => {
+    toast.clearWaitingQueue({ containerId: EXAM_WARNING_CONTAINER });
+    if (workflowReminderToast.current) toast.dismiss(workflowReminderToast.current.id);
+  }, []);
 
-  return <FeatureLayout title="Danh sách thi, điểm thi" group="Quá trình học tập" maxWidth={1880}>
+  return <FeatureLayout title="Danh sách thi, điểm thi" group="Quá trình học tập" maxWidth={1880} exportConfig={false}>
     <Box className="exam-gradebook" data-exam-print-blocked={blank && !examPrintReady ? "true" : undefined}>
       <ToastContainer containerId={EXAM_WARNING_CONTAINER} enableMultiContainer position="top-right" autoClose={5000}
         newestOnTop limit={1} className="exam-warning-toast-container exam-no-print" toastClassName="exam-warning-toast"
@@ -393,6 +434,7 @@ export default function ExamLists() {
               ...(index === 0 || completionOf(offeringChoices[index - 1].offering) !== completionOf(entry.offering)
                 ? [<OfferingGroupHeader key={`heading-${entry.offering.id}`}>{completionGroups[completionOf(entry.offering)].label}</OfferingGroupHeader>] : []),
               <MenuItem key={entry.offering.id} value={entry.offering.id} className={completionOf(entry.offering)==='completed' ? 'exam-offering-completed' : ''}
+                onClick={() => { if (entry.offering.id === offeringId && completionOf(entry.offering) === 'studying') showCompletionWarning(); }}
                 sx={completionOf(entry.offering)==='completed' ? { color: '#8796a5', '&.Mui-selected': { color: '#526a82', bgcolor: '#edf3f8' } } : completionOf(entry.offering)==='needs_lock' ? { color: '#9a5b00' } : undefined}>{offeringLabel(entry)}</MenuItem>,
             ])}
           </FilterSelectField>
@@ -409,22 +451,27 @@ export default function ExamLists() {
       {newWorkflow&&mode==='exam'&&workflow.eligibility.status!=='approved'&&<Alert severity="info">DS thi chỉ hiển thị sau khi duyệt tư cách thi. Tư cách dự kiến chưa phải danh sách được phép xếp thi.</Alert>}
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} flexWrap="wrap" className="exam-workflow-toolbar">
       <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
-        <Chip label={legacyWorkflow?'Dữ liệu cũ — cần rà soát':({draft:'Tư cách nháp',submitted:'Tư cách chờ duyệt',approved:'DS thi đã duyệt'}[workflow.eligibility?.status]||'Đang tải quy trình')} />
+        <Stack direction="row" alignItems="center" gap={0.75} sx={{ flexShrink: 0 }}>
+          <Chip label={legacyWorkflow?'Dữ liệu cũ — cần rà soát':({draft:'Tư cách nháp',submitted:'Tư cách chờ duyệt',approved:'DS thi đã duyệt'}[workflow.eligibility?.status]||'Đang tải quy trình')} />
+          {newWorkflow&&workflow.eligibility.status==='approved'&&<Chip label={{not_available:'Chờ ca thi diễn ra',draft:'Kết quả nháp',submitted:'Kết quả chờ duyệt',approved:'Kết quả đã duyệt'}[workflow.final.status]} />}
+        </Stack>
         {newWorkflow&&workflow.eligibility.status!=='approved'&&<Typography variant="caption">Chưa đến giai đoạn nhập điểm thi.</Typography>}
         {newWorkflow&&canSubmitGrades&&componentEditable&&<Button disabled={busy||saving||dirtyCount>0||!teachingCompleted||!offeringId} onClick={()=>beginWorkflow('eligibility','submit')}>Gửi duyệt tư cách</Button>}
         {newWorkflow&&canApproveGrades&&workflow.eligibility.status==='submitted'&&<Button disabled={busy||saving||dirtyCount>0} onClick={()=>beginWorkflow('eligibility','approve')}>Duyệt tư cách</Button>}
-        {newWorkflow&&canApproveGrades&&workflow.eligibility.canReopen&&workflow.final.status!=='approved'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','reopen')}>Mở lại tư cách</Button>}
+        {newWorkflow&&canSubmitGrades&&!canApproveGrades&&workflow.eligibility.status==='approved'&&workflow.eligibility.canReopen&&!workflow.eligibility.reopenRequest&&workflow.final.status!=='approved'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','request_reopen')}>Xin mở lại tư cách</Button>}
+        {newWorkflow&&workflow.eligibility.reopenRequest&&<Typography variant="caption">Đang chờ duyệt mở lại tư cách: {workflow.eligibility.reopenRequest.note}</Typography>}
+        {newWorkflow&&canApproveGrades&&workflow.eligibility.canReopen&&workflow.final.status!=='approved'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','reopen')}>{workflow.eligibility.reopenRequest?'Duyệt mở lại tư cách':'Mở lại tư cách'}</Button>}
+        {newWorkflow&&canApproveGrades&&workflow.eligibility.reopenRequest&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','reject_reopen')}>Từ chối mở lại tư cách</Button>}
         {newWorkflow&&workflow.eligibility.status==='approved'&&<>
-          <Chip label={{not_available:'Chờ ca thi diễn ra',draft:'Kết quả nháp',submitted:'Kết quả chờ duyệt',approved:'Kết quả đã duyệt'}[workflow.final.status]} />
-          {can('gradebook.view')&&workflow.final.status!=='approved'&&loadedOffering?.id===offeringId&&loadedOffering.examScheduling?.candidateCount>0&&<Button component={Link} to={`/masters/exam-schedule?offeringId=${offeringId}`}>{loadedOffering.examScheduling.remainingCount>0?'Xếp lịch thi':'Xem lịch thi'}</Button>}
+          {can('gradebook.view')&&workflow.final.status!=='approved'&&loadedOffering?.id===offeringId&&loadedOffering.examScheduling?.candidateCount>0&&(loadedOffering.examScheduling.remainingCount>0||workflow.final.status==='not_available')&&<Button component={Link} to={`/masters/exam-schedule?offeringId=${offeringId}`}>{loadedOffering.examScheduling.remainingCount>0?'Xếp lịch thi':'Xem lịch thi'}</Button>}
           {canSubmitGrades&&workflow.final.status==='draft'&&<Button disabled={busy||saving||dirtyCount>0} onClick={()=>beginWorkflow('final','submit')}>Gửi duyệt kết quả</Button>}
           {canApproveGrades&&workflow.final.status==='submitted'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('final','approve')}>Duyệt kết quả</Button>}
           {canApproveGrades&&['submitted','approved'].includes(workflow.final.status)&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('final','reopen')}>Mở lại kết quả</Button>}
         </>}
         <Button disabled={!offeringId || saving} onClick={loadHistory}>Lịch sử điểm</Button>
       </Stack>
-          <DocumentExportMenu disabled={!groupId || !offeringId || !total || busy || saving || exporting || (blank && !examPrintReady)}
-            excelLabel="Excel (.xlsx)" pdfLabel="PDF / In" onExcel={() => exportGradebook("excel")} onPdf={() => exportGradebook("pdf")} />
+          {blank && <DocumentExportMenu disabled={!groupId || !offeringId || !total || busy || saving || exporting || !examPrintReady}
+            onWord={() => exportExamList("word")} excelLabel="Excel (.xlsx)" pdfLabel="PDF / In" onExcel={() => exportExamList("excel")} onPdf={() => exportExamList("pdf")} />}
       </Stack>
       <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} className="exam-view-toolbar">
         <Stack direction="row" flexWrap="wrap" gap={0.5} aria-label="Chế độ bảng điểm">
@@ -468,7 +515,7 @@ export default function ExamLists() {
                   const disabled = rowLocked || (['testScore','assignmentScore'].includes(key)?!componentEditable:key==='examScore'?!resultEditable||!row.examScoreEditable:true);
                   const cellClass = key === 'examScore' ? (disabled ? 'exam-derived-cell exam-score-locked' : 'exam-editable-cell') : calculatedColumns.has(key) ? 'exam-derived-cell' : undefined;
                   return <TableCell key={key} align="center" className={cellClass}>
-                  <TextField fullWidth size="small" value={blank ? "" : row[key]} disabled={disabled} InputProps={{ readOnly: ["courseScore", "grade4"].includes(key) }} error={!blank && numericScore(row[key]) !== null && (!Number.isFinite(numericScore(row[key])) || numericScore(row[key]) < 0 || numericScore(row[key]) > max)} onChange={["courseScore", "grade4"].includes(key) ? undefined : (event) => { const value = event.target.value; const score = numericScore(value); if (value === "" || (/^\d*(?:[.,]\d*)?$/.test(value) && Number.isFinite(score) && score >= 0 && score <= max)) edit(row.participantId, { [key]: value }); }} onBlur={calculatedColumns.has(key) ? undefined : () => formatInput(row.participantId, key)} inputProps={{ "aria-label": `${label} ${row.code}`, inputMode: "decimal" }} sx={inputSx} />
+                  <TextField fullWidth size="small" autoComplete="off" name={`grade-${offeringId}-${row.participantId}-${key}`} value={blank ? "" : row[key]} disabled={disabled} InputProps={{ readOnly: ["courseScore", "grade4"].includes(key) }} error={!blank && numericScore(row[key]) !== null && (!Number.isFinite(numericScore(row[key])) || numericScore(row[key]) < 0 || numericScore(row[key]) > max)} onChange={["courseScore", "grade4"].includes(key) ? undefined : (event) => { const value = event.target.value; const score = numericScore(value); if (value === "" || (/^\d*(?:[.,]\d*)?$/.test(value) && Number.isFinite(score) && score >= 0 && score <= max)) edit(row.participantId, { [key]: value }); }} onBlur={calculatedColumns.has(key) ? undefined : () => formatInput(row.participantId, key)} inputProps={{ "aria-label": `${label} ${row.code}`, inputMode: "decimal", autoCorrect: "off", autoCapitalize: "off", spellCheck: false }} sx={inputSx} />
                 </TableCell>;
                 })}
                 <TableCell className="exam-derived-cell"><TextField fullWidth size="small" value={blank ? "" : row.letterGrade} disabled={rowLocked || (row.eligible === false && !row.examExempt)} InputProps={{ readOnly: true }} inputProps={{ "aria-label": `Thang điểm chữ ${row.code}`, maxLength: 10 }} sx={inputSx} /></TableCell>
@@ -497,12 +544,12 @@ export default function ExamLists() {
       <details className="exam-rules-disclosure exam-no-print"><summary>Quy tắc tính điểm và tư cách thi</summary>
       <Typography sx={{ color: "#607486", fontSize: 11.5 }}>Tư cách dự kiến dùng điểm thành phần và cấu hình hiện hành. Điều kiện đạt so sánh điểm gốc của các thành phần và điểm học phần trước khi làm tròn với ngưỡng trong Cài đặt điểm số. Điểm hiển thị và quy đổi vẫn làm tròn như cũ. Sau khi duyệt, DS thi và điểm thành phần được lưu cố định. Chưa đến giai đoạn nhập điểm thi khi chưa có ca thi được xác nhận Đã diễn ra. Không đủ tư cách thi được giữ nguyên quyết định, không tự chuyển thành 0/F. Kết quả cuối được gửi duyệt và mở lại riêng. Các ô nền xanh xám được tính tự động. Nháy đúp mép tiêu đề để tự căn độ rộng cột.</Typography>
       </details>
-      {dirtyCount > 0 && !blank && <Alert severity="warning" sx={{ mt: 1 }} className="exam-no-print">Bạn có điểm chưa lưu. Bảng điểm Excel và PDF sử dụng các điểm vừa nhập.</Alert>}
+      {dirtyCount > 0 && !blank && <Alert severity="warning" sx={{ mt: 1 }} className="exam-no-print">Bạn có điểm chưa lưu.</Alert>}
       {settingsOpen && <GradeSettingsDialog canEdit={canEditPolicy} initialMajorId={majorId} initialYear={year} groups={groups} onClose={() => setSettingsOpen(false)} />}
       <AppDialog
         open={!!workflowAction}
         onClose={() => setWorkflowAction("")}
-        title={`${{submit:'Gửi duyệt',approve:'Duyệt',reopen:'Mở lại'}[workflowAction]} ${workflowPhase==='eligibility'?'tư cách thi':'kết quả cuối'}`}
+        title={`${{submit:'Gửi duyệt',approve:'Duyệt',reopen:'Mở lại',request_reopen:'Xin mở lại',reject_reopen:'Từ chối mở lại'}[workflowAction]} ${workflowPhase==='eligibility'?'tư cách thi':'kết quả cuối'}`}
         saving={saving}
         onConfirm={runWorkflow}
         confirmText="Xác nhận"
@@ -519,13 +566,7 @@ export default function ExamLists() {
           sx={{ "& .MuiInputBase-input:focus-visible": { outline: "none" } }}
         />
       </AppDialog>
-      <Dialog open={auditRows !== null} onClose={() => setAuditRows(null)} fullWidth maxWidth="md">
-        <DialogTitle>Lịch sử bảng điểm</DialogTitle><DialogContent>{(auditRows || []).map(event => <Box key={event.id} sx={{ mb: 2 }}>
-          <Typography>{event.createdAt} · {event.actor?.name} · {{ save: "Lưu điểm", submit: "Gửi duyệt", approve: "Duyệt và khóa", reopen: "Mở lại" }[event.action]}</Typography><Typography>{event.note}</Typography>
-          <details><summary>Kết quả tại thời điểm xử lý</summary>{(event.after?.snapshot?.rows || event.after?.grades || (Array.isArray(event.after) ? event.after : [])).map(row =>
-            <Typography key={row.participantId}>{row.code || row.fullName || row.participantId}: {row.courseScore ?? "—"} · {RESULT_LABELS[row.result]}</Typography>)}</details>
-        </Box>)}</DialogContent><DialogActions><Button onClick={() => setAuditRows(null)}>Đóng</Button></DialogActions>
-      </Dialog>
+      {auditRows !== null && <GradebookHistoryDialog events={auditRows} onClose={() => setAuditRows(null)} />}
       <ConfirmDialog
         open={Boolean(pendingChange)}
         onClose={() => setPendingChange(null)}

@@ -6,6 +6,8 @@ const ACTION_PERMISSIONS = {
   submit: "gradebook.submit",
   approve: "gradebook.approve",
   reopen: "gradebook.approve",
+  request_reopen: "gradebook.submit",
+  reject_reopen: "gradebook.approve",
 } as const;
 
 /** Shared by the HTTP guard and service so internal calls enforce the same rule. */

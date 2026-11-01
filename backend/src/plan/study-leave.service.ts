@@ -178,6 +178,21 @@ export class StudyLeaveService {
     return { ...(rows[0] || { total: 0, rows: [] }), page, pageSize };
   }
 
+  async findLearners(code?: string) {
+    const keyword = typeof code === 'string' ? code.trim().slice(0, 100) : '';
+    if (keyword.length < 3) return [];
+    return this.select(`SELECT record.id, record.code, record.full_name AS "fullName",
+      record.dob::text AS dob, record.major_name AS "majorName", record.academic_year AS "academicYear"
+      FROM admission_records record
+      WHERE record.code ILIKE :pattern AND record.training_level = 'Thạc sĩ'
+        AND record.study_status = 'Đang học' AND ${tuitionPaidSql('record')}
+        AND NOT EXISTS (SELECT 1 FROM study_leaves leave WHERE leave.admission_record_id = record.id
+          AND leave.status IN ('pending', 'approved'))
+      ORDER BY CASE WHEN lower(record.code) = lower(:code) THEN 0 ELSE 1 END, record.code, record.id LIMIT 20`, {
+      code: keyword, pattern: `%${keyword.replace(/[\\%_]/g, '\\$&')}%`,
+    });
+  }
+
   async request(recordId: string, dto: RequestStudyLeaveDto, actor: any) {
     this.requireNote(dto.reason); this.dates(dto.startDate, dto.endDate);
     if (dto.startDate < businessDate()) throw new BadRequestException('Ngày bắt đầu bảo lưu không được trước hôm nay.');

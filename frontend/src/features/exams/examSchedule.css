@@ -36,6 +36,28 @@
 .ep-heading-actions h1{flex:none}
 .ep-heading-actions>.sl-btn{white-space:nowrap}
 .scheduling-v20.v20-dialog.ep-arrangement-dialog{width:min(1280px,94vw);max-width:calc(100vw - 24px)}
+.ep-session-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;color:#173e75}
+.ep-session-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:0;padding:14px;border:1px solid #d7e1e9;background:#f8fafc}
+.ep-session-summary dt{color:#607486;font-size:12px;margin-bottom:5px}.ep-session-summary dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.ep-session-summary small,.ep-session-detail-table td>small{display:block;margin-top:5px;color:#607486;font-size:12px;font-weight:400}
+.ep-session-counts{color:#526a7e;font-size:13px}
+.ep-round-table .ep-session-detail-table{min-width:1120px;table-layout:auto}.ep-session-detail-table th,.ep-session-detail-table td{vertical-align:top}
+.ep-session-round-column{width:52px}.ep-session-time-column{width:104px}.ep-session-classes-column{width:1%}
+.ep-session-detail-table>:is(thead,tbody)>tr>:is(th,td):nth-child(3){width:1%}
+.ep-session-count-column,.ep-session-status-column{width:1%}.ep-session-actions-column{width:calc(316px - 2cm)}
+body :is(#root,.MuiDialog-root,.scheduling-v20) table.ep-session-detail-table>:is(thead,tbody)>tr>:is(th,td):is(:nth-child(5),:nth-child(6)){width:1%;padding-left:4px!important;padding-right:calc(4px + 4mm)!important;white-space:nowrap}
+.ep-session-row-actions{display:flex;flex-wrap:wrap;gap:4px;width:calc(300px - 2cm);min-width:0}.ep-session-row-actions .sl-btn{display:inline-flex;align-items:center;justify-content:center;font-family:inherit;font-size:12px;font-weight:650;line-height:1.2;white-space:nowrap;text-decoration:none}
+body .app-popup .ep-session-row-actions .sl-btn{font-size:12px!important;padding-inline:4px}
+.ep-session-row-actions a.sl-btn,.ep-session-row-actions a.sl-btn:visited{color:#344f60;text-decoration:none}
+.ep-session-view-actions{display:inline-flex;flex-wrap:nowrap;flex:none;gap:4px}
+.ep-learner-classes{display:inline-block}.ep-learner-class-line{display:block;white-space:nowrap}
+.ep-session-history{color:#697783;background:#f7f9fb}
+.ep-session-candidate-cell{background:#f4f8fb;padding:12px!important}.ep-session-candidate-cell h3{margin:0 0 10px;font-size:14px;color:#173e75}
+.ep-session-candidate-cell table{background:#fff}.ep-session-candidate-cell th:first-child,.ep-session-candidate-cell td:first-child{text-align:center;width:60px}
+.ep-inline-editor-actions{position:sticky;bottom:0;z-index:3;display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin-top:16px;padding:12px 0;border-top:1px solid #d7e1e9;background:#fff}
+.ep-inline-editor-actions>.ep-save-error{flex-basis:100%}
+.ep-unified-dialog .ep-inline-editor .v20-composer{overflow:visible;height:auto;min-height:0}
+@media(max-width:760px){.ep-session-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .ep-arrangement-dialog .v20-dialog-body{overflow:auto}
 body .app-popup .ep-arrangement-dialog .ep-candidate-warning{margin:12px 0;padding:12px 16px;border:1px solid #e9c46a;border-left:4px solid #d49a00;border-radius:4px;background:#fff8db;color:#785500;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
 body .app-popup .ep-arrangement-dialog .ep-candidate-warning strong{display:block;color:#785500}
@@ -77,3 +99,7 @@ body .app-popup .ep-arrangement-dialog .ep-resource-hint{margin:0;padding:10px 1
 .ep-arrangement-detail-table :is(th,td):nth-child(7){width:100px;white-space:nowrap;overflow-wrap:normal}
 @media(max-width:800px){.ep-arrangement-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.exam-planner .sl-schedule-head{grid-template-columns:1fr auto}.exam-planner .sl-week{grid-column:1/-1;grid-row:2;justify-self:center}}
 @media(max-width:480px){.ep-arrangement-fields{grid-template-columns:1fr}}
+.ep-detail-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.ep-detail-actions .sl-btn{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;font-family:inherit;font-size:inherit;font-weight:650;line-height:1.2;text-decoration:none;color:#344f60}
+.ep-arrangement-dialog .v20-dialog-foot{flex-wrap:wrap}
+.ep-arrangement-dialog .v20-dialog-foot .ep-save-error{flex:1 1 100%;margin:0;max-height:100px;overflow:auto;text-align:left;white-space:normal}

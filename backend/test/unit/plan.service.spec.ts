@@ -81,6 +81,23 @@ describe("PlanService admission major synchronization", () => {
 });
 
 describe("PlanService admission record pagination", () => {
+  it("applies the assigned-group filter before pagination and to every count", async () => {
+    const records = { findAndCountAll: jest.fn().mockResolvedValue({ rows: [], count: 0 }), count: jest.fn().mockResolvedValue(0) };
+    const service = new PlanService({} as never, {} as never, {} as never, {} as never, records as never, {} as never, {} as never, {} as never, {} as never, {} as never);
+    const groupId = "cd057d57-bac6-4256-ad7b-40995259b33d";
+    await service.listAdmissionRecords(undefined, "Thạc sĩ", "2026", undefined, undefined, "An", "2", "15", undefined, true, "learners", groupId);
+    const query = records.findAndCountAll.mock.calls[0][0] as any;
+    const groupFilter = query.where[Op.and].find((entry: any) => entry.val?.includes("membership.class_group_id"));
+    expect(groupFilter.val).toContain(groupId);
+    expect(groupFilter.val).toContain('membership.admission_record_id = "AdmissionRecord"."id"');
+    expect(groupFilter.val).toContain('membership.student_id = "AdmissionRecord"."student_id"');
+    expect(query.offset).toBe(15);
+    for (const [countQuery] of records.count.mock.calls as any) {
+      expect(countQuery.where[Op.and][0]).toBe(query.where);
+    }
+    await expect(service.listAdmissionRecords(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, "learners", "invalid-group")).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it("keeps admitted and studying learners together and excludes them from applications without losing the search filter", async () => {
     const records = { findAndCountAll: jest.fn().mockResolvedValue({ rows: [], count: 0 }), count: jest.fn().mockResolvedValue(0) };
     const service = new PlanService({} as never, {} as never, {} as never, {} as never, records as never, {} as never, {} as never, {} as never, {} as never, {} as never);

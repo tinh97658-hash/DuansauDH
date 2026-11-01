@@ -7,7 +7,7 @@ import { Staff } from '../database/models/staff.model.js';
 import { RbacService } from '../auth/rbac.service.js';
 import { ExamWorkflowService } from './exam-workflow.service.js';
 import { ConfirmExamDto, ExamScheduleQueryDto, ExamSessionActionDto, RescheduleExamDto, ScheduleExamDto, SaveExamArrangementDto } from './dto/exam-schedule.dto.js';
-import {activeExam, validateExamArrangement,externalInvigilatorKey} from './exam-arrangement.js';
+import {activeExam, validateExamArrangement,externalInvigilatorKey,examRoomFits} from './exam-arrangement.js';
 
 @Injectable()
 export class ExamScheduleService {
@@ -158,8 +158,8 @@ export class ExamScheduleService {
         await this.future(dto.examDate,g.startTime,tx);
       }
       const [room]=await this.query('SELECT * FROM rooms WHERE id= :id FOR SHARE',{id:dto.roomId},tx);
-      if(!room?.is_active||room.capacity==null||room.capacity<span.peak)
-        throw new ConflictException({code:'EXAM_ROOM_CAPACITY',message:`Phòng phải hoạt động và đủ ${span.peak} thí sinh thi đồng thời.`});
+      if(!room?.is_active||!examRoomFits(room.capacity,span.peak))
+        throw new ConflictException({code:'EXAM_ROOM_CAPACITY',message:`Phòng phải hoạt động, có sức chứa rõ ràng và chỉ được vượt tối đa 2 thí sinh so với số chỗ (thi đồng thời: ${span.peak} thí sinh).`});
       if(lecturerId){
         const [lecturer]=await this.query('SELECT active FROM lecturers WHERE id= :id FOR SHARE',{id:lecturerId},tx);
         if(!lecturer?.active)throw new BadRequestException('Vui lòng chọn giảng viên đang hoạt động để coi thi.');

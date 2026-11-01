@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { readLearnerTranscript, TRANSCRIPT_COLUMN_WIDTHS, TRANSCRIPT_TABLE_WIDTH, TRANSCRIPT_HEADERS,
   transcriptDocumentDetails, transcriptMetadataRows, transcriptSubjectValues } from "./learnerTranscript";
@@ -11,7 +11,6 @@ export default function LearnerTranscriptPreview() {
   const [document] = useState(() => readLearnerTranscript(params.get("preview")));
   const [pages, setPages] = useState(null);
   const firstSheet = useRef(null);
-  const printed = useRef(false);
   useLayoutEffect(() => {
     if (!document || !firstSheet.current) return;
     let active = true;
@@ -33,33 +32,12 @@ export default function LearnerTranscriptPreview() {
     else measure();
     return () => { active = false; };
   }, [document]);
-  useEffect(() => {
-    if (!document || !pages || printed.current) return;
-    let secondFrame;
-    const finish = () => {
-      window.sessionStorage.removeItem(`learner-transcript-preview:${params.get("preview")}`);
-      window.close();
-    };
-    window.addEventListener("afterprint", finish);
-    const firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        if (printed.current) return;
-        printed.current = true;
-        window.focus();
-        window.print();
-      });
-    });
-    return () => {
-      window.cancelAnimationFrame(firstFrame);
-      if (secondFrame != null) window.cancelAnimationFrame(secondFrame);
-      window.removeEventListener("afterprint", finish);
-    };
-  }, [document, pages, params]);
   const pageRows = pages || [document?.subjects.map((_, index) => index) || []];
   if (!document) return <p role="alert">Không tìm thấy dữ liệu in. Vui lòng đóng cửa sổ này và thử lại.</p>;
   const details = transcriptDocumentDetails(document);
   return <main className="transcript-preview transcript-print-document">
-    <style>{"@media screen { .transcript-print-document { visibility:hidden; background:#fff; } }"}</style>
+    <style>{"@media print { .transcript-preview-actions { display:none; } }"}</style>
+    <nav className="transcript-viewer-toolbar transcript-preview-actions"><button type="button" disabled={!pages} onClick={() => window.print()}>In / Lưu PDF</button></nav>
     <div className="transcript-viewer-canvas">
     {pageRows.map((indices, pageIndex) => <div className="transcript-page-frame" key={pageIndex}
       style={{ width: `${TRANSCRIPT_PAGE.width / 20 * 96 / 72}px`, height: `${TRANSCRIPT_PAGE.height / 20 * 96 / 72}px` }}>

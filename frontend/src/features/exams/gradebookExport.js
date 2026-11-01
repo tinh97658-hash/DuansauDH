@@ -1,6 +1,7 @@
 import { BRAND } from "../../config/branding";
 import { formatDateTime } from "../../utils/dateFormat";
 import { openDocumentPreview } from "../../utils/documentFiles";
+import { addExcelDocumentHeading } from "../../utils/documentHeading";
 import { draftOf, gradebookColumns, gradebookRowValues, visibleGradeRows } from "./gradebook";
 import { gradebookDocumentColumns } from "./gradebookLayout";
 
@@ -63,12 +64,11 @@ export async function createGradebookExcel(document) {
     cell.alignment = { horizontal, vertical: "middle", wrapText: true };
     sheet.getRow(row).height = Math.min(409, Math.max(minHeight, lineCount(text, columns.slice(0, endColumn).reduce((sum, column) => sum + column.width, 0), size) * (size + 3) + 6));
   };
-  heading(1, document.university, 12, true, 24);
-  heading(2, document.institute, 12, true, 24);
+  addExcelDocumentHeading(sheet, lastColumn, document.signingDate);
   heading(4, document.title, 16, true, 30);
   heading(6, `Lớp: ${document.group}`, 11, false, 24, "left", 4);
   heading(7, `Học phần: ${document.subject}`, 11, false, 30, "left", 4);
-  [3, 5, 8].forEach(row => { sheet.getRow(row).height = 8; });
+  [5, 8].forEach(row => { sheet.getRow(row).height = 8; });
   const border = Object.fromEntries(["top", "bottom", "left", "right"].map(side => [side, { style: "thin", color: { argb: "FF000000" } }]));
   [document.headers, ...document.rows].forEach((values, index) => {
     const row = sheet.getRow(GRADEBOOK_HEADER_ROW + index);

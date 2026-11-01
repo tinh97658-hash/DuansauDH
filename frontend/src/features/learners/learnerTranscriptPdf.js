@@ -136,3 +136,12 @@ export async function createLearnerTranscriptPdf(transcript) {
   const pdfMake = await renderer();
   return pdfMake.createPdf(transcriptPdfDefinition(transcript)).getBlob();
 }
+
+export async function createLearnerTranscriptsPdf(transcripts) {
+  if (!transcripts.length) throw new Error("Không có bảng điểm để xem trước.");
+  const definitions = transcripts.map(transcriptPdfDefinition);
+  const content = definitions.flatMap((definition, index) => index
+    ? [{ stack: definition.content, pageBreak: "before" }]
+    : definition.content);
+  return (await renderer()).createPdf({ ...definitions[0], content }).getBlob();
+}

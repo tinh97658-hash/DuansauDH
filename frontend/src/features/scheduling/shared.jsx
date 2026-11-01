@@ -25,7 +25,7 @@ export const normalize = (value) => String(value || "").normalize("NFD").replace
 export const groupsOf = (offering) => (offering?.groupLinks || []).map((link) => {
   const group = link.classGroup;
   return group && (link.studyRole ? link.studyRole === "retake" : Array.isArray(link.participantIds))
-    ? { ...group, isRetake: true, name: group.code || group.name, memberCount: group.memberCount ?? link.participantIds.length }
+    ? { ...group, isRetake: true, name: group.code || group.name, memberCount: group.memberCount ?? link.participantIds?.length }
     : group;
 }).filter(Boolean);
 export const labelOf = (offering) => groupsOf(offering).map((group) => group.code).join(" · ");

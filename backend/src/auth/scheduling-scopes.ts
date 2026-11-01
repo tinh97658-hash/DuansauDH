@@ -5,7 +5,7 @@ export const SCHEDULING_SCOPES = {
 } as const;
 export const INSTITUTION_PERMISSIONS = new Set([
   ...Object.keys(SCHEDULING_SCOPES), 'gradebook.view', 'gradebook.submit',
-  'gradebook.approve', 'gradebook.policy', 'studyleave.manage',
+  'gradebook.approve', 'gradebook.policy', 'studyleave.request', 'studyleave.approve',
 ]);
 export type SchedulingPermission = keyof typeof SCHEDULING_SCOPES;
 export interface ScopedGrant { roleId: string; permission: SchedulingPermission; scope: string }

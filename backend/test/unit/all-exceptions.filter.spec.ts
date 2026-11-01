@@ -3,6 +3,15 @@ import { jest } from "@jest/globals";
 import { AllExceptionsFilter } from "../../src/common/all-exceptions.filter.js";
 
 describe("AllExceptionsFilter conflict payload", () => {
+  it.each(['admission_records_code_reserved', 'admission_records_code_unique'])("explains a duplicate learner code: %s", constraint => {
+    const status = jest.fn().mockReturnThis();
+    const json = jest.fn();
+    const host = { switchToHttp: () => ({ getResponse: () => ({ status, json }) }) } as unknown as ArgumentsHost;
+    new AllExceptionsFilter().catch({ name: 'SequelizeUniqueConstraintError', original: { constraint } }, host);
+    expect(status).toHaveBeenCalledWith(409);
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({ code: 'LEARNER_CODE_EXISTS', message: expect.stringContaining('Mã học viên đã được sử dụng') }));
+  });
+
   it("preserves machine-readable scheduling conflict context", () => {
     const status = jest.fn().mockReturnThis();
     const json = jest.fn();

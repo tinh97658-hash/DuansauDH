@@ -42,6 +42,8 @@ import {
 } from "../../utils/disciplineScope";
 import FeatureLayout from "../../components/FeatureLayout";
 import DocumentExportMenu from "../../components/DocumentExportMenu";
+import { downloadReport } from "../../utils/reportExport";
+import { admissionFormReport } from "../../utils/reportSnapshot";
 import AdmissionPrintTemplate from "../../features/admission/AdmissionPrintTemplate";
 import { buildAdmissionDocument } from "../../features/admission/admissionDocument";
 import AppDialog from "../../components/AppDialog";
@@ -310,6 +312,8 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
   const [saving, setSaving] = useState(false);
   const { can } = usePermissions();
   const isAdmin = can("admission.manage");
+  const canRequestTransfer = can("majortransfer.request");
+  const canDecideTransfer = can("majortransfer.approve");
   const [record, setRecord] = useState(null);
   const showStudyTabs = returnPath === "/masters/admitted-records" || fromStudyManagement;
   const requestedTab = searchParams.get("tab");
@@ -591,11 +595,13 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
   const documentActions = {
     disabled: loading || saving || !formData,
     onWord: () => downloadAdmissionWord(buildAdmissionDocument(formData)),
+    onExcel: () => downloadReport(admissionFormReport(buildAdmissionDocument(formData)), "excel"),
     onPdf: () => openAdmissionPreview(buildAdmissionDocument(formData)),
     onError: (error) => toast.error(error.message || "Không thể xuất hồ sơ. Vui lòng thử lại."),
   };
 
   const submitTransfer = async () => {
+    if (!canRequestTransfer) return;
     if (!transferForm.toMajorId) return toast.error("Vui lòng chọn chuyên ngành mới.");
     setSaving(true);
     try {
@@ -610,6 +616,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
   };
 
   const openDecision = async (transfer, decision) => {
+    if (!canDecideTransfer) return;
     if (decision === "rejected") {
       const executeReject = async () => {
         setSaving(true);
@@ -641,6 +648,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
   };
 
   const submitDecision = async () => {
+    if (!canDecideTransfer) return;
     if (!decisionForm.toCurriculumId) return toast.error("Vui lòng chọn chương trình đào tạo mới.");
     setSaving(true);
     try {
@@ -947,7 +955,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
         </Stack>
 
         <Stack direction="row" spacing={1.2} alignItems="center">
-          <Button
+          {canRequestTransfer && <Button
             variant="outlined"
             size="small"
             startIcon={<SwapHorizRounded />}
@@ -960,7 +968,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
             sx={{ height: 34, textTransform: "none", fontWeight: 700 }}
           >
             Chuyển chuyên ngành
-          </Button>
+          </Button>}
 
           <DocumentExportMenu {...documentActions} />
 
@@ -1015,7 +1023,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
             </Tabs>
             {detailTab === "admission" && <AdmissionEvaluationPanel record={record} isAdmin={isAdmin} disabled={isDirty || saving} onBusyChange={setSaving} onDecided={fetchData} />}
             {detailTab === "grades" && <LearnerScorecard admissionRecordId={id} classGroupId={searchParams.get("classGroupId")} onClassChange={value => changeDetailScope("classGroupId", value)} />}
-            {detailTab === "leave" && <StudyLeavePanel record={record} isAdmin={isAdmin} disabled={isDirty || saving} onChanged={fetchData} />}
+            {detailTab === "leave" && <StudyLeavePanel record={record} isAdmin={fromStudyManagement && can("studyleave.approve")} canRequest={fromStudyManagement && can("studyleave.request")} disabled={isDirty || saving} onChanged={fetchData} />}
           <Box sx={{ display: detailTab === "profile" ? "block" : "none" }}>
           <Paper variant="outlined" sx={{ ...sectionCardSx, mb: 2 }}>
             <Typography sx={sectionTitleSx}>
@@ -1039,7 +1047,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                   </Box>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Chip size="small" label={item.status === "pending" ? "Chờ hội đồng" : item.status === "approved" ? "Đã duyệt" : "Từ chối"} color={item.status === "approved" ? "success" : item.status === "rejected" ? "error" : "warning"} />
-                    {item.status === "pending" && <>
+                    {item.status === "pending" && canDecideTransfer && <>
                       <Button size="small" variant="contained" onClick={() => openDecision(item, "approved")}>Duyệt</Button>
                       <Button size="small" color="error" onClick={() => openDecision(item, "rejected")}>Từ chối</Button>
                     </>}
@@ -1128,6 +1136,8 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                     onChange={(e) => setFormData((p) => ({ ...p, code: e.target.value }))}
                     sx={inputSx}
                     placeholder="HV26001"
+                    inputProps={{ maxLength: 50 }}
+                    helperText="Mã học viên phải duy nhất trong toàn hệ thống, kể cả mã của hồ sơ cũ."
                   />
                 </Box>
 

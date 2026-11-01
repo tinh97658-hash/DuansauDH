@@ -11,8 +11,9 @@ import {
 import AddRounded from "@mui/icons-material/AddRounded";
 import DeleteRounded from "@mui/icons-material/DeleteRounded";
 import EditRounded from "@mui/icons-material/EditRounded";
-import RefreshRounded from "@mui/icons-material/RefreshRounded";
 import FeatureLayout from "../../components/FeatureLayout";
+import InlineReportExport from "../../components/InlineReportExport";
+import { tableReport } from "../../utils/reportExport";
 import { usePermissions } from "../../features/accounts/usePermissions";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
@@ -173,18 +174,27 @@ export default function BridgeCourse() {
     finally { setSaving(false); }
   };
 
-  return <FeatureLayout title="Học bổ sung kiến thức" group="Thủ tục đầu vào" desc="Đăng ký, theo dõi tiến độ và kết quả học phần bổ sung kiến thức của học viên Thạc sĩ.">
+  return <FeatureLayout title="Học bổ sung kiến thức" group="Thủ tục đầu vào" desc="Đăng ký, theo dõi tiến độ và kết quả học phần bổ sung kiến thức của học viên Thạc sĩ."
+    exportConfig={{ placement: "inline", disabled: loading, getReport: () => tableReport("Học bổ sung kiến thức", columns, visible, (row, column) => ({
+      code: row.admissionRecord?.code, familyMiddle: personNameParts(row.admissionRecord).familyAndMiddle,
+      givenName: personNameParts(row.admissionRecord).givenName, major: row.admissionRecord?.major?.name || row.admissionRecord?.majorName,
+      subject: `${row.subject?.code || ""} - ${row.subject?.name || ""}`, credits: row.subject?.credits,
+      year: row.academicYear, status: (STATES[row.status] || STATES.assigned)[0], score: row.score, result: (RESULTS[row.result] || RESULTS.pending)[0],
+    })[column.key]) }}>
     <ToastContainer position="top-center" newestOnTop limit={3} />
-    <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ mb: 2 }}>
-      {[["Tổng đăng ký", summary.total, "#087da5"], ["Đã phân công", summary.assigned, "#667085"], ["Đang học", summary.studying, "#168bc2"], ["Đạt / miễn", summary.passed, "#168b63"], ["Không đạt", summary.failed, "#c0392b"]].map(([label, value, color]) => <Paper key={label} variant="outlined" sx={{ px: 2, py: 1.25, flex: 1, borderRadius: "6px" }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography variant="h5" fontWeight={700} sx={{ color }}>{value || 0}</Typography></Paper>)}
+    <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mb: 1.25 }}>
+      {[["Tổng đăng ký", summary.total, "#087da5"], ["Đã phân công", summary.assigned, "#667085"], ["Đang học", summary.studying, "#168bc2"], ["Đạt / miễn", summary.passed, "#168b63"], ["Không đạt", summary.failed, "#c0392b"]].map(([label, value, color]) => <Paper key={label} variant="outlined" sx={{ px: 1.5, py: .75, minHeight: 48, flex: 1, borderRadius: "6px" }}><Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: 11.5, lineHeight: 1.35 }}>{label}</Typography><Typography variant="h5" fontWeight={700} sx={{ color, fontSize: 18, lineHeight: 1.2 }}>{value || 0}</Typography></Paper>)}
     </Stack>
-    <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderColor: "#C6D5E1", borderRadius: "6px", boxShadow: "none" }}><Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="flex-end">
+    <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderColor: "#C6D5E1", borderRadius: "6px", boxShadow: "none" }}><Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap" alignItems="flex-end">
       <FilterSelectField label="Năm học" value={year} onChange={(e) => setYear(e.target.value)} sx={{ flex: "1 1 140px", minWidth: 140 }}>{YEARS.map((v) => <MenuItem key={v} value={v}>{v}</MenuItem>)}</FilterSelectField>
       <FilterSelectField label="Ngành" value={disciplineId} onChange={(e) => { setDisciplineId(e.target.value); setMajor("ALL"); }} sx={{ flex: "1 1 210px", minWidth: 210 }}><MenuItem value="">Tất cả ngành</MenuItem>{disciplines.map((item) => <MenuItem key={item.id} value={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}</FilterSelectField>
       <FilterSelectField label="Chuyên ngành" value={major} onChange={(e) => setMajor(e.target.value)} sx={{ flex: "1 1 210px", minWidth: 210 }}><MenuItem value="ALL">Tất cả chuyên ngành</MenuItem>{visibleMajors.map((m) => <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>)}</FilterSelectField>
       <FilterSelectField label="Trạng thái" value={status} onChange={(e) => setStatus(e.target.value)} sx={{ flex: "1 1 155px", minWidth: 155 }}><MenuItem value="ALL">Tất cả</MenuItem>{Object.entries(STATES).map(([k, v]) => <MenuItem key={k} value={k}>{v[0]}</MenuItem>)}</FilterSelectField>
       <FilterSearchField placeholder="Tìm học viên, học phần..." value={search} onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: 220, flex: 1 }} />
-      <Tooltip title="Tải lại"><IconButton onClick={load}><RefreshRounded /></IconButton></Tooltip>{admin && <Button variant="contained" startIcon={<AddRounded />} onClick={create} sx={{ height: 40, px: 2, bgcolor: "#0788B8", borderRadius: "4px", boxShadow: "none", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}>Đăng ký học phần</Button>}
+      <Stack direction="row" spacing={1} useFlexGap alignItems="center" sx={{ flexShrink: 0, maxWidth: "100%", flexWrap: "wrap" }}>
+        {admin && <Button variant="contained" startIcon={<AddRounded />} onClick={create} sx={{ height: 40, px: 2, bgcolor: "#0788B8", borderRadius: "4px", boxShadow: "none", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}>Đăng ký học phần</Button>}
+        <InlineReportExport />
+      </Stack>
     </Stack></Paper>
     {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
     <TableContainer component={Paper} variant="outlined" sx={{ borderColor: "#D7E4EE", borderRadius: "6px", overflow: "auto", boxShadow: "0 2px 8px rgba(23, 62, 117, 0.04)" }}>

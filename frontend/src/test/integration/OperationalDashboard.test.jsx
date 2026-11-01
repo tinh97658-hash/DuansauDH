@@ -29,6 +29,171 @@ const open = async () => {
 };
 beforeEach(() => { vi.clearAllMocks(); axios.get.mockResolvedValue({ data: fixture() }); });
 
+it('places both filters beside the summary cards and provides both training programs', async () => {
+  await open();
+  const filters = screen.getByRole('group', { name: 'Bộ lọc dashboard' });
+  const program = within(filters).getByRole('combobox', { name: 'Hệ đào tạo' });
+  expect(program).toHaveValue('masters');
+  expect(within(program).getAllByRole('option').map(option => option.textContent)).toEqual(['Thạc sĩ', 'Tiến sĩ']);
+  expect(filters.closest('.od-summary-row')).toContainElement(screen.getByRole('region', { name: 'Công việc theo quyền truy cập' }));
+  expect(document.querySelector('.od-header')).not.toContainElement(filters);
+});
+
+it('switches program with the selected year and shows doctoral placeholders instead of masters data or healthy zeros', async () => {
+  await open();
+  const data = fixture(); data.program = 'doctoral';
+  data.sources = Object.fromEntries(Object.keys(data.sources).map(key => [key, { status: 'not_implemented', message: 'Chức năng dành cho hệ Tiến sĩ chưa được triển khai.' }]));
+  axios.get.mockResolvedValue({ data });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Hệ đào tạo' }), { target: { value: 'doctoral' } });
+  await waitFor(() => expect(screen.getAllByText('Chức năng dành cho hệ Tiến sĩ chưa được triển khai.').length).toBeGreaterThan(0));
+  expect(axios.get).toHaveBeenLastCalledWith(expect.stringContaining('/dashboard/operational'), expect.objectContaining({ params: { year: '2026', program: 'doctoral' } }));
+  expect(screen.getByTestId('location')).toHaveTextContent('year=2026&program=doctoral');
+  expect(screen.getAllByRole('article')).toHaveLength(4);
+  expect(screen.getByText('Tiến sĩ · 2026')).toBeInTheDocument();
+  expect(screen.getByText('Lớp học phần tiến sĩ · 2026')).toBeInTheDocument();
+  expect(screen.queryByText('Công nghệ thông tin')).not.toBeInTheDocument();
+  expect(screen.queryByText('Không có cảnh báo')).not.toBeInTheDocument();
+  expect(screen.queryByText('Không có mục chờ xử lý')).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Phân nhóm' })).not.toBeInTheDocument();
+});
+
+it('uses the same cards, inbox and warnings when doctoral providers return live data', async () => {
+  await open();
+  const data = fixture(2); data.program = 'doctoral';
+  const item = { id: 'doctoral', title: 'Nhóm nghiên cứu sinh', detail: 'Tiến sĩ', href: '/doctoral/assign-class-groups?year=2026' };
+  data.sources.grouping.data = { count: 2, itemCount: 1, items: [item], href: item.href };
+  axios.get.mockResolvedValue({ data });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Hệ đào tạo' }), { target: { value: 'doctoral' } });
+  await waitFor(() => expect(screen.getByText('Nhóm nghiên cứu sinh')).toBeInTheDocument());
+  expect(screen.getAllByRole('article')).toHaveLength(4);
+  expect(within(screen.getByRole('article', { name: 'Học viên chưa phân nhóm' })).getByText('2')).toBeInTheDocument();
+  expect(within(screen.getByRole('article', { name: 'Học viên chưa phân nhóm' })).getByRole('link', { name: 'Phân nhóm' })).toHaveAttribute('href', item.href);
+});
+
+it('ignores late masters responses after switching to doctoral', async () => {
+  let finishMasters;
+  axios.get.mockImplementation((url, options) => options.params.program === 'masters'
+    ? new Promise(resolve => { finishMasters = resolve; })
+    : Promise.resolve({ data: { year: '2026', program: 'doctoral', permissions: {}, sources: {} } }));
+  await open();
+  fireEvent.change(screen.getByRole('combobox', { name: 'Hệ đào tạo' }), { target: { value: 'doctoral' } });
+  await waitFor(() => expect(screen.getByText('Chưa có tác vụ được giao')).toBeInTheDocument());
+  await act(async () => { finishMasters({ data: fixture(100) }); });
+  expect(screen.queryByText('100')).not.toBeInTheDocument();
+  expect(screen.getByRole('combobox', { name: 'Hệ đào tạo' })).toHaveValue('doctoral');
+});
+
+const approvalFixture = () => {
+  const data = fixture();
+  data.permissions = { ...permissions, approvals: true };
+  const metric = (id, title) => ({ count: 1, itemCount: 1, href: `/masters/exam-lists?year=2026&offeringId=${id}&groupId=g1`, items: [
+    { id, title, detail: 'Đã gửi duyệt 1 ngày trước', href: `/masters/exam-lists?year=2026&offeringId=${id}&groupId=g1` },
+  ] });
+  data.sources.approvals = { status: 'ready', data: { eligibilityApproval: metric('eligibility', 'Lớp chờ duyệt tư cách'), resultApproval: metric('final', 'Lớp chờ khóa điểm') } };
+  return data;
+};
+
+const learnerRequestFixture = () => {
+  const data = fixture();
+  data.permissions = { ...permissions, studyLeaveApproval: true, majorTransferApproval: true };
+  const metric = (href, title, detail) => ({ status: 'ready', data: { count: 1, itemCount: 1, href, items: [{ id: title, title, detail, href }] } });
+  data.sources.studyLeaveApproval = metric('/masters/study-leaves/hv1?tab=leave', 'Nguyễn Văn An · HV01', 'Bảo lưu chờ duyệt · Việc gia đình');
+  data.sources.majorTransferApproval = metric('/plan/admission-records/hv2?tab=profile', 'Trần Thị Bình · HV02', 'Kế toán → Quản trị kinh doanh');
+  return data;
+};
+
+it.each([
+  ['Chờ duyệt bảo lưu', 'Nguyễn Văn An', '/masters/study-leaves/hv1?tab=leave'],
+  ['Chờ duyệt chuyển chuyên ngành', 'Trần Thị Bình', '/plan/admission-records/hv2?tab=profile'],
+])('shows %s in the work inbox and opens the learner decision screen', async (title, learner, href) => {
+  axios.get.mockResolvedValue({ data: learnerRequestFixture() }); await open();
+  const queue = within(screen.getByRole('region', { name: 'VIỆC CẦN XỬ LÝ' })).getByRole('region', { name: title });
+  expect(queue).toHaveTextContent('1 yêu cầu');
+  expect(queue).toHaveTextContent('Duyệt / Từ chối');
+  expect(screen.queryByRole('article', { name: title })).not.toBeInTheDocument();
+  fireEvent.click(within(queue).getByRole('link', { name: new RegExp(learner) }));
+  expect(screen.getByTestId('location')).toHaveTextContent(href);
+});
+
+it('hides learner requests without decision grants even if a response contains request data', async () => {
+  const data = learnerRequestFixture(); data.permissions = { ...permissions };
+  axios.get.mockResolvedValue({ data }); await open();
+  expect(screen.queryByText(/Nguyễn Văn An/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Trần Thị Bình/)).not.toBeInTheDocument();
+});
+
+it('refreshes learner requests and removes resolved requests on focus', async () => {
+  axios.get.mockResolvedValue({ data: learnerRequestFixture() }); await open();
+  const data = learnerRequestFixture();
+  for (const key of ['studyLeaveApproval', 'majorTransferApproval']) data.sources[key].data = { count: 0, itemCount: 0, items: [], href: '/masters/study-leaves' };
+  axios.get.mockResolvedValue({ data });
+  await act(async () => { window.dispatchEvent(new Event('focus')); });
+  expect(screen.queryByRole('region', { name: 'Chờ duyệt bảo lưu' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'Chờ duyệt chuyển chuyên ngành' })).not.toBeInTheDocument();
+});
+
+it('retries a failed learner request queue without losing the other requests', async () => {
+  const data = learnerRequestFixture(); data.sources.studyLeaveApproval = { status: 'error' };
+  axios.get.mockResolvedValue({ data }); await open();
+  const queue = screen.getByRole('region', { name: 'Chờ duyệt bảo lưu' });
+  expect(within(queue).getByRole('alert')).toBeInTheDocument();
+  axios.get.mockResolvedValue({ data: learnerRequestFixture() });
+  await act(async () => { fireEvent.click(within(queue).getByRole('button', { name: 'Thử lại' })); });
+  expect(axios.get).toHaveBeenLastCalledWith(expect.stringContaining('/dashboard/operational'), expect.objectContaining({ params: { year: '2026', program: 'masters', section: 'studyLeaveApproval' } }));
+  expect(queue).toHaveTextContent('Nguyễn Văn An');
+  expect(screen.getByRole('region', { name: 'Chờ duyệt chuyển chuyên ngành' })).toHaveTextContent('Trần Thị Bình');
+});
+
+it('shows both approval queues to approvers and links directly to the submitted gradebooks', async () => {
+  const data = approvalFixture();
+  axios.get.mockResolvedValue({ data });
+  await open();
+  expect(screen.getAllByRole('article')).toHaveLength(4);
+  expect(screen.queryByRole('article', { name: 'Chờ duyệt tư cách thi' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('article', { name: 'Chờ duyệt khóa điểm' })).not.toBeInTheDocument();
+  const inbox = screen.getByRole('region', { name: 'VIỆC CẦN XỬ LÝ' });
+  const eligibility = within(inbox).getByRole('region', { name: 'Chờ duyệt tư cách thi' });
+  expect(eligibility).toHaveTextContent('1 lớp');
+  expect(within(eligibility).getByRole('link', { name: /Lớp chờ duyệt tư cách/ })).toHaveAttribute('href', data.sources.approvals.data.eligibilityApproval.href);
+  const results = within(inbox).getByRole('region', { name: 'Chờ duyệt khóa điểm' });
+  fireEvent.click(within(results).getByRole('link', { name: /Lớp chờ khóa điểm/ }));
+  expect(screen.getByTestId('location')).toHaveTextContent('/masters/exam-lists?year=2026&offeringId=final&groupId=g1');
+});
+
+it('hides approval notifications from staff without approval permission', async () => {
+  const data = approvalFixture(); data.permissions.approvals = false;
+  axios.get.mockResolvedValue({ data }); await open();
+  expect(screen.queryByRole('article', { name: 'Chờ duyệt tư cách thi' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Lớp chờ khóa điểm')).not.toBeInTheDocument();
+});
+
+it('shows eligibility reopening requests only in the work inbox and links to admin review', async () => {
+  const data = approvalFixture();
+  data.sources.approvals.data.eligibilityReopen = {count:1,itemCount:1,href:'/masters/exam-lists?year=2026&offeringId=reopen&groupId=g1',items:[{id:'reopen',title:'Lớp xin mở lại tư cách',detail:'Cần sửa điểm thành phần',href:'/masters/exam-lists?year=2026&offeringId=reopen&groupId=g1'}]};
+  axios.get.mockResolvedValue({data});await open();
+  const request = within(screen.getByRole('region',{name:'VIỆC CẦN XỬ LÝ'})).getByRole('region',{name:'Xin mở lại tư cách thi'});
+  expect(request).toHaveTextContent('Cần sửa điểm thành phần');
+  expect(screen.queryByRole('article',{name:'Xin mở lại tư cách thi'})).not.toBeInTheDocument();
+  fireEvent.click(within(request).getByRole('link',{name:/Lớp xin mở lại tư cách/}));
+  expect(screen.getByTestId('location')).toHaveTextContent('offeringId=reopen&groupId=g1');
+});
+
+it('refreshes requests sent from another device and removes approved requests without a page reload', async () => {
+  vi.useFakeTimers();
+  try {
+    await open();
+    axios.get.mockResolvedValue({ data: approvalFixture() });
+    await act(async () => { vi.advanceTimersByTime(30000); });
+    expect(screen.getByRole('region', { name: 'Chờ duyệt khóa điểm' })).toBeInTheDocument();
+    const cleared = approvalFixture();
+    Object.values(cleared.sources.approvals.data).forEach(metric => { metric.count = 0; metric.items = []; metric.itemCount = 0; });
+    axios.get.mockResolvedValue({ data: cleared });
+    await act(async () => { window.dispatchEvent(new Event('focus')); });
+    expect(screen.queryByRole('region', { name: 'Chờ duyệt khóa điểm' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Lớp chờ khóa điểm')).not.toBeInTheDocument();
+  } finally { vi.useRealTimers(); }
+});
+
 it("replaces the hero with a compact dashboard and keeps the existing layout chrome", async () => {
   await open();
   expect(screen.getByRole("heading", { name: "Bảng điều khiển công việc" })).toBeInTheDocument();
@@ -94,7 +259,7 @@ it("keeps other widgets usable when grades fail and retries only that source", a
   expect(within(grades).getByRole("alert")).toHaveTextContent("Chưa tải được dữ liệu.");
   axios.get.mockResolvedValue({ data: { year: "2026", permissions, sources: { grades: fixture().sources.grades } } });
   await act(async () => fireEvent.click(within(grades).getByRole("button", { name: "Thử lại" })));
-  expect(axios.get).toHaveBeenLastCalledWith(expect.stringContaining("/dashboard/operational"), expect.objectContaining({ params: { year: "2026", section: "grades" } }));
+  expect(axios.get).toHaveBeenLastCalledWith(expect.stringContaining("/dashboard/operational"), expect.objectContaining({ params: { year: "2026", program: "masters", section: "grades" } }));
   expect(within(grades).getByText("Không có lớp chờ nhập điểm thành phần")).toBeInTheDocument();
 });
 

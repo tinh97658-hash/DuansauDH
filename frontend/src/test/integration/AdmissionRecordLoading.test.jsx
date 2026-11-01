@@ -12,9 +12,9 @@ vi.mock('../../components/FeatureLayout', () => ({ default: ({ children }) => <d
 vi.mock('react-toastify', () => ({ ToastContainer: () => null, toast: { error: vi.fn(), success: vi.fn() } }));
 
 const record = { id: 'record', fullName: 'Nguyễn Văn A', code: 'HV001', majorId: 'major', trainingLevel: 'Thạc sĩ', documents: {} };
-const session = { authenticated: true, user: { role: 'admin' } };
+const session = { authenticated: true, user: { role: 'admin' }, access: { permissions: ['admission.view', 'admission.manage', 'studyleave.request', 'studyleave.approve'] } };
 const StudyManagementReturn = () => <p>Danh sách quản lý bảo lưu {useLocation().search}</p>;
-const mount = (entry = '/plan/admission-records/record') => render(<ThemeProvider theme={theme}><CssBaseline /><AuthSessionContext.Provider value={session}>
+const mount = (entry = '/plan/admission-records/record', auth = session) => render(<ThemeProvider theme={theme}><CssBaseline /><AuthSessionContext.Provider value={auth}>
   <MemoryRouter useTransitions={false} initialEntries={[entry]}><Routes>
     <Route path='/plan/admission-records/:id' element={<AdmissionRecordDetail />} />
     <Route path='/masters/admitted-records/:id' element={<AdmissionRecordDetail returnPath="/masters/admitted-records" />} />
@@ -31,6 +31,39 @@ beforeEach(() => {
     return { data: [] };
   });
 });
+
+it.each([false, true])('shows major transfer creation independently from approval: approval=%s', async approve => {
+  const reads = axios.get.getMockImplementation();
+  axios.get.mockImplementation(url => url.endsWith('/major-transfers')
+    ? Promise.resolve({ data: [{ id: 'transfer', status: 'pending', fromMajor: { name: 'CNTT' }, toMajor: { name: 'Kinh tế' } }] }) : reads(url));
+  mount('/plan/admission-records/record', { ...session, access: { permissions: ['admission.view', ...(approve ? ['majortransfer.approve'] : ['majortransfer.request'])] } });
+  await screen.findByText('CNTT → Kinh tế');
+  if (approve) {
+    expect(screen.queryByRole('button', { name: 'Chuyển chuyên ngành' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Duyệt' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Từ chối' })).toBeInTheDocument();
+  } else {
+    expect(screen.getByRole('button', { name: 'Chuyển chuyên ngành' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Duyệt' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Từ chối' })).not.toBeInTheDocument();
+  }
+});
+it.each([
+  '/masters/admitted-records/record?tab=leave',
+  '/masters/study-leaves/record?tab=leave',
+])('keeps pending leave details readable without approval buttons: %s', async entry => {
+  const reads = axios.get.getMockImplementation();
+  axios.get.mockImplementation(url => url.endsWith('/study-leaves')
+    ? Promise.resolve({ data: { leaves: [{ id: 'leave', status: 'pending', effectiveStatus: 'pending', reason: 'Điều trị', startDate: '2099-01-01', endDate: '2099-06-01', history: [{ action: 'requested', at: '2026-10-28T01:00:00Z', actor: 'Quản trị' }] }], affectedOfferings: [] } })
+    : reads(url));
+  mount(entry);
+  await screen.findByText('Lý do: Điều trị');
+  expect(screen.queryByRole('button', { name: 'Tạo yêu cầu bảo lưu' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Duyệt bảo lưu' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Từ chối' })).toBeNull();
+  expect(screen.getByText(/Tạo yêu cầu · Quản trị/)).toBeInTheDocument();
+});
+
 it('opens the leave tab from management and returns to the managed-profile list', async () => {
   mount('/masters/study-leaves/record?tab=leave&returnView=records');
   await waitFor(() => expect(screen.getByRole('tab', { name: 'Bảo lưu' })).toHaveAttribute('aria-selected', 'true'));

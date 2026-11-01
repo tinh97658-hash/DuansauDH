@@ -14,13 +14,13 @@ beforeEach(() => {
 });
 const students = [1,2].map(id => ({ ...officialTranscriptScorecardFixture, student: { ...officialTranscriptScorecardFixture.student, participantId: `student:${id}` } }));
 const bufferOf = blob => new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsArrayBuffer(blob); });
-it.each([[3,"word"],[3,"pdf"],[5,"word"],[5,"pdf"],[40,"word"],[40,"pdf"]])("packs exactly %s selected %s files from a 40-student dataset", async (count, format) => {
+it.each([[3,"word"],[3,"pdf"],[3,"excel"],[5,"word"],[5,"pdf"],[40,"word"],[40,"pdf"]])("packs exactly %s selected %s files from a 40-student dataset", async (count, format) => {
   const roster = Array.from({ length: 40 }, (_, id) => ({ ...officialTranscriptScorecardFixture, student: { ...officialTranscriptScorecardFixture.student, participantId: `student:${id}` } }));
   const selected = selectTranscriptScorecards(roster, new Set(roster.slice(0, count).map(card => card.student.participantId)));
   const documents = await generateTranscriptDocuments(selected, format);
   const zip = await JSZip.loadAsync(await bufferOf(await packTranscriptZip(documents, format)));
   expect(Object.keys(zip.files)).toHaveLength(count);
-  expect(Object.keys(zip.files).every(name => name.endsWith(format === "pdf" ? ".pdf" : ".docx"))).toBe(true);
+  expect(Object.keys(zip.files).every(name => name.endsWith(format === "excel" ? ".xlsx" : format === "pdf" ? ".pdf" : ".docx"))).toBe(true);
 });
 it("selects exactly requested identities and rejects missing or duplicate selected identities before generation", () => {
   expect(selectTranscriptScorecards(students, new Set(["student:2"]))).toEqual([students[1]]);

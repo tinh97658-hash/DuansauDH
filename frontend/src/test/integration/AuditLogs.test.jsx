@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import axios from "axios";
 import AuditLogs from "../../pages/system/auditLogs";
@@ -64,6 +64,22 @@ it("hiển thị nhật ký thao tác quản lý ở tab mặc định", async (
   expect(await screen.findByText("Tạo tài khoản")).toBeInTheDocument();
   expect(screen.getByRole("table", { name: "Nhật ký thao tác" })).toBeInTheDocument();
   expect(screen.getByText("Administrator (admin@example.com)")).toBeInTheDocument();
+  expect(screen.getByText("02/01/26 15:00:00")).toBeInTheDocument();
+});
+
+it("displays short dates in filters while sending full ISO dates to the API", async () => {
+  mount();
+  await screen.findByText("Tạo tài khoản");
+  const from = screen.getByRole("textbox", { name: "Từ ngày" });
+  const to = screen.getByRole("textbox", { name: "Đến ngày" });
+  fireEvent.change(from, { target: { value: "01/01/26" } });
+  fireEvent.change(to, { target: { value: "31/01/26" } });
+  expect(from).toHaveValue("01/01/26");
+  expect(to).toHaveValue("31/01/26");
+  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(
+    expect.stringContaining("/accounts/audit-logs"),
+    expect.objectContaining({ params: expect.objectContaining({ from: "2026-01-01", to: "2026-01-31" }) }),
+  ));
 });
 
 it("chuyển sang tab thay đổi dữ liệu và hiển thị vết thay đổi", async () => {
@@ -77,4 +93,5 @@ it("chuyển sang tab thay đổi dữ liệu và hiển thị vết thay đổi
   expect(screen.getByText("Nhân sự")).toBeInTheDocument();
   expect(screen.getByText('{"id":"s2"}')).toBeInTheDocument();
   expect(screen.getByText("admin@example.com")).toBeInTheDocument();
+  expect(screen.getByText("03/01/26 16:30:00")).toBeInTheDocument();
 });

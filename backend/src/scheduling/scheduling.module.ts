@@ -21,6 +21,7 @@ import { TeachingSession } from "../database/models/training/teaching-session.mo
 import { SubjectRecognition } from "../database/models/training/subject-recognition.model.js";
 import { SchedulingController } from "./scheduling.controller.js";
 import { SchedulingService } from "./scheduling.service.js";
+import { ClassScoreSummaryService } from "../reports/class-score-summary.service.js";
 
 @Module({
   imports: [SequelizeModule.forFeature([
@@ -41,7 +42,7 @@ import { SchedulingService } from "./scheduling.service.js";
     SubjectRecognition,
   ])],
   controllers: [SchedulingController],
-  providers: [SchedulingService, SchedulingWriteGuard, CourseOfferingWriteGuard, PermissionsGuard],
+  providers: [SchedulingService, ClassScoreSummaryService, SchedulingWriteGuard, CourseOfferingWriteGuard, PermissionsGuard],
   exports: [SchedulingService],
 })
 export class SchedulingModule {}

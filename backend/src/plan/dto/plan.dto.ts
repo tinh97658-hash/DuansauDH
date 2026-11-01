@@ -146,7 +146,7 @@ export class UpdateClassDto {
 
 // ===== Hồ sơ tuyển sinh (Admission Record) =====
 export class CreateAdmissionRecordDto {
-  @IsOptional() @IsString() code?: string;
+  @IsOptional() @IsString() @MaxLength(50) @Transform(trimUpper) code?: string;
   @IsOptional() @IsString() lastName?: string;
   @IsOptional() @IsString() firstName?: string;
   @IsString() @Transform(trim) fullName!: string;
@@ -199,7 +199,7 @@ export class CreateAdmissionRecordDto {
 }
 
 export class UpdateAdmissionRecordDto {
-  @IsOptional() @IsString() code?: string;
+  @IsOptional() @IsString() @MaxLength(50) @Transform(trimUpper) code?: string;
   @IsOptional() @IsString() lastName?: string;
   @IsOptional() @IsString() firstName?: string;
   @IsOptional() @IsString() @Transform(trim) fullName?: string;

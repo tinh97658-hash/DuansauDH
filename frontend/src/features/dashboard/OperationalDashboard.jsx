@@ -1,3 +1,4 @@
+import AppSelect from "../../components/AppSelect";
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import axios from "axios";
@@ -10,18 +11,27 @@ import CheckCircleOutline from "@mui/icons-material/CheckCircleOutline";
 import ArrowForwardOutlined from "@mui/icons-material/ArrowForwardOutlined";
 import RefreshOutlined from "@mui/icons-material/RefreshOutlined";
 import { API_BASE_URL } from "../../config/http";
+import { useGradebookRevision } from "../../utils/gradebookRevision";
 import "./operationalDashboard.css";
 
 const currentYear = new Date().getFullYear();
+const programLabels = { masters: "Thạc sĩ", doctoral: "Tiến sĩ" };
 const definitions = [
+  { key: "studyLeaveApproval", source: "studyLeaveApproval", inboxOnly: true, title: "Chờ duyệt bảo lưu", action: "Duyệt / Từ chối", unit: "yêu cầu", Icon: PendingActionsOutlined, tone: "amber" },
+  { key: "majorTransferApproval", source: "majorTransferApproval", inboxOnly: true, title: "Chờ duyệt chuyển chuyên ngành", action: "Duyệt / Từ chối", unit: "yêu cầu", Icon: AssignmentOutlined, tone: "violet" },
+  { key: "eligibilityReopen", permission: "approvals", source: "approvals", title: "Xin mở lại tư cách thi", action: "Duyệt mở lại", unit: "lớp", Icon: AssignmentOutlined, tone: "amber" },
+  { key: "eligibilityApproval", permission: "approvals", source: "approvals", title: "Chờ duyệt tư cách thi", healthyTitle: "Duyệt tư cách thi", action: "Duyệt tư cách", healthy: "Không có yêu cầu chờ duyệt tư cách thi", unit: "lớp", Icon: AssignmentOutlined, tone: "amber" },
+  { key: "resultApproval", permission: "approvals", source: "approvals", title: "Chờ duyệt khóa điểm", healthyTitle: "Duyệt khóa điểm", action: "Duyệt khóa điểm", healthy: "Không có yêu cầu chờ duyệt khóa điểm", unit: "lớp", Icon: AssignmentOutlined, tone: "violet" },
   { key: "grouping", source: "grouping", title: "Học viên chưa phân nhóm", healthyTitle: "Phân nhóm học viên", action: "Phân nhóm", healthy: "Không còn học viên chờ phân nhóm", unit: "học viên", Icon: GroupsOutlined, tone: "teal" },
   { key: "scheduling", source: "teaching", title: "Lớp chưa xếp lịch", healthyTitle: "Xếp lịch học", action: "Xếp lịch", healthy: "Không còn lớp chờ xếp lịch", unit: "lớp học phần", Icon: CalendarMonthOutlined, tone: "blue" },
   { key: "grades", source: "grades", title: "Chờ nhập điểm thành phần", healthyTitle: "Nhập điểm thành phần", action: "Nhập điểm", healthy: "Không có lớp chờ nhập điểm thành phần", unit: "lớp", Icon: AssignmentOutlined, tone: "violet" },
   { key: "progress", source: "teaching", title: "Tiến độ cần kiểm tra", healthyTitle: "Kiểm tra tiến độ", action: "Kiểm tra", healthy: "Không có buổi học chờ xác nhận", unit: "lớp có buổi chờ xác nhận", Icon: PendingActionsOutlined, tone: "amber" },
 ];
-const metricOf = (source, key) => source?.data?.[key] || source?.data;
+const metricOf = (source, key) => source?.data?.[key] || (source?.data && ["eligibilityReopen", "eligibilityApproval", "resultApproval"].includes(key)
+  ? { count: 0, itemCount: 0, items: [], href: "/masters/exam-lists" } : source?.data);
 
 function SourceState({ source, onRetry, compact = false }) {
+  if (source?.status === "not_implemented") return <p className="od-unavailable">{source.message || "Chức năng chưa được triển khai."}</p>;
   if (!source || source.status === "loading") return <div className={`od-loading${compact ? " od-loading-compact" : ""}`} role="status" aria-label="Đang tải công việc"><span /><span /></div>;
   if (source.status === "error") return <div className="od-source-error" role="alert"><span>Chưa tải được dữ liệu.</span><button type="button" onClick={onRetry}><RefreshOutlined />Thử lại</button></div>;
   return null;
@@ -72,7 +82,7 @@ function WorkCategory({ definition, source, onRetry }) {
   </section>;
 }
 
-function WarningPanel({ teachingSource, gradesSource, permissions, year, onRetry }) {
+function WarningPanel({ teachingSource, gradesSource, permissions, year, program, onRetry }) {
   const progress = permissions.progress && teachingSource?.status === "ready" ? teachingSource.data.progress : null;
   const groups = [
     ...(progress ? [{ key: 'teaching', title: 'BUỔI HỌC CHƯA XÁC NHẬN', items: progress.items }] : []),
@@ -81,8 +91,8 @@ function WarningPanel({ teachingSource, gradesSource, permissions, year, onRetry
   const count = new Set(groups.flatMap(group => group.items.map(item => item.id))).size;
   const groupHrefs = {
     teaching: progress?.href,
-    exam: `/masters/exam-schedule?${new URLSearchParams({ year })}`,
-    examGrades: `/masters/exam-lists?${new URLSearchParams({ year })}`,
+    exam: `/${program}/exam-schedule?${new URLSearchParams({ year })}`,
+    examGrades: `/${program}/exam-lists?${new URLSearchParams({ year })}`,
   };
   const ready = (!permissions.progress || teachingSource?.status === 'ready') && (!permissions.grades || gradesSource?.status === 'ready');
   return <aside className="od-panel od-warnings" aria-labelledby="od-warning-title">
@@ -106,36 +116,53 @@ function WarningPanel({ teachingSource, gradesSource, permissions, year, onRetry
 export default function OperationalDashboard() {
   const [params, setParams] = useSearchParams();
   const year = /^\d{4}$/.test(params.get("year") || "") ? params.get("year") : String(currentYear);
+  const program = params.get("program") === "doctoral" ? "doctoral" : "masters";
+  const programLabel = programLabels[program];
   const [revision, setRevision] = useState(0);
-  const [state, setState] = useState({ year, loading: true, permissions: null, sources: {}, error: false });
+  const gradebookRevision = useGradebookRevision();
+  const [state, setState] = useState({ year, program, loading: true, permissions: null, sources: {}, error: false });
   const generation = useRef(0);
   useEffect(() => {
     const request = ++generation.current;
     const controller = new AbortController();
-    setState({ year, loading: true, permissions: null, sources: {}, error: false });
-    axios.get(`${API_BASE_URL}/dashboard/operational`, { params: { year }, withCredentials: true, signal: controller.signal })
-      .then(({ data }) => { if (request === generation.current) setState({ ...data, year, loading: false, error: false }); })
-      .catch(() => { if (request === generation.current) setState({ year, loading: false, permissions: null, sources: {}, error: true }); });
+    setState(previous => previous.year === year && previous.program === program && previous.permissions
+      ? { ...previous, error: false } : { year, program, loading: true, permissions: null, sources: {}, error: false });
+    axios.get(`${API_BASE_URL}/dashboard/operational`, { params: { year, program }, withCredentials: true, signal: controller.signal })
+      .then(({ data }) => { if (request === generation.current) setState({ ...data, year, program, loading: false, error: false }); })
+      .catch(() => { if (request === generation.current) setState({ year, program, loading: false, permissions: null, sources: {}, error: true }); });
     return () => { controller.abort(); generation.current += 1; };
-  }, [year, revision]);
+  }, [year, program, revision, gradebookRevision]);
+
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState !== "hidden") setRevision(value => value + 1); };
+    const timer = window.setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, []);
 
   const retry = async (section) => {
     const request = generation.current;
     setState((previous) => ({ ...previous, sources: { ...previous.sources, [section]: { status: "loading" } } }));
     try {
-      const { data } = await axios.get(`${API_BASE_URL}/dashboard/operational`, { params: { year, section }, withCredentials: true });
+      const { data } = await axios.get(`${API_BASE_URL}/dashboard/operational`, { params: { year, program, section }, withCredentials: true });
       if (request === generation.current) setState((previous) => ({ ...previous, permissions: data.permissions, sources: { ...previous.sources, ...data.sources } }));
     } catch (error) {
       if (request === generation.current && [401, 403].includes(error.response?.status)) {
-        setState({ year, loading: false, permissions: null, sources: {}, error: true });
+        setState({ year, program, loading: false, permissions: null, sources: {}, error: true });
         return;
       }
       if (request === generation.current) setState((previous) => ({ ...previous, sources: { ...previous.sources, [section]: { status: "error" } } }));
     }
   };
-  const loading = state.loading || state.year !== year;
+  const loading = state.loading || state.year !== year || state.program !== program;
   const permissions = !loading && state.permissions;
-  const permitted = definitions.filter((definition) => permissions?.[definition.key]);
+  const permitted = definitions.filter((definition) => permissions?.[definition.permission || definition.key]);
+  const cards = permitted.filter((definition) => definition.source !== "approvals" && !definition.inboxOnly);
   const work = permitted.filter((definition) => definition.key !== "progress");
   const workHealthy = work.length > 0 && work.every((definition) => state.sources[definition.source]?.status === "ready" && metricOf(state.sources[definition.source], definition.key)?.count === 0);
   const overviewSource = state.sources.teaching;
@@ -145,24 +172,34 @@ export default function OperationalDashboard() {
 
   return <div className="operational-dashboard">
     <header className="od-header"><div><h1>Bảng điều khiển công việc</h1><p>Theo dõi các công việc cần xử lý và tình trạng nghiệp vụ theo năm tuyển sinh.</p></div>
-      <div className="od-header-controls"><span className="od-level">Thạc sĩ</span><label className="od-year">Năm tuyển sinh<select aria-label="Năm tuyển sinh" value={year} onChange={(event) => {
-        const next = new URLSearchParams(params); next.set("year", event.target.value); setParams(next);
-      }}>{years.map((value) => <option key={value}>{value}</option>)}</select></label></div>
     </header>
+    <div className="od-summary-row">
+      <div className="od-filters" role="group" aria-label="Bộ lọc dashboard">
+        <label className="od-filter">Hệ đào tạo<AppSelect aria-label="Hệ đào tạo" value={program} onChange={(event) => {
+          const next = new URLSearchParams(params); next.set("program", event.target.value); setParams(next);
+        }}>{Object.entries(programLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</AppSelect></label>
+        <label className="od-filter">Năm tuyển sinh<AppSelect aria-label="Năm tuyển sinh" value={year} onChange={(event) => {
+        const next = new URLSearchParams(params); next.set("year", event.target.value); setParams(next);
+      }}>{years.map((value) => <option key={value}>{value}</option>)}</AppSelect></label></div>
+      <div className="od-summary-content">
     {loading ? <div className="od-cards" aria-label="Đang tải tổng quan">{[0, 1, 2, 3].map((key) => <div key={key} className="od-card"><SourceState /></div>)}</div>
       : state.error ? <div className="od-panel od-page-error" role="alert"><WarningAmberOutlined /><span>Không thể tải tổng quan công việc.</span><button type="button" onClick={() => setRevision((value) => value + 1)}>Thử lại</button></div>
         : <>
-          {permitted.length > 0 && <section className="od-cards" aria-label="Công việc theo quyền truy cập" style={{ "--od-columns": Math.min(4, permitted.length), "--od-small-columns": Math.min(2, permitted.length) }}>{permitted.map((definition) => <ActionCard key={definition.key} definition={definition}
+          {cards.length > 0 && <section className="od-cards" aria-label="Công việc theo quyền truy cập" style={{ "--od-columns": Math.min(4, cards.length), "--od-small-columns": Math.min(2, cards.length) }}>{cards.map((definition) => <ActionCard key={definition.key} definition={definition}
             source={state.sources[definition.source]} onRetry={() => retry(definition.source)} />)}</section>}
+        </>}
+      </div>
+    </div>
+    {!loading && !state.error && <>
           {!permitted.length && <div className="od-panel od-no-access"><AssignmentOutlined /><div><h2>Chưa có tác vụ được giao</h2><p>Tài khoản hiện chưa có quyền xử lý các hàng đợi công việc này.</p></div></div>}
           {(work.length > 0 || showWarnings) && <div className={`od-main${showWarnings && work.length ? "" : " od-main-single"}`}>
-            {work.length > 0 && <section className="od-panel" aria-labelledby="od-work-title"><div className="od-panel-heading"><h2 id="od-work-title"><AssignmentOutlined aria-hidden="true" />VIỆC CẦN XỬ LÝ</h2><span>Thạc sĩ · {year}</span></div>
+            {work.length > 0 && <section className="od-panel" aria-labelledby="od-work-title"><div className="od-panel-heading"><h2 id="od-work-title"><AssignmentOutlined aria-hidden="true" />VIỆC CẦN XỬ LÝ</h2><span>{programLabel} · {year}</span></div>
               {workHealthy ? <div className="od-empty"><CheckCircleOutline /><strong>Không có mục chờ xử lý</strong><span>Mọi đầu việc trong phạm vi hiện tại đã hoàn thành.</span></div>
                 : work.map((definition) => <WorkCategory key={definition.key} definition={definition} source={state.sources[definition.source]} onRetry={() => retry(definition.source)} />)}
             </section>}
-            {showWarnings && <WarningPanel teachingSource={state.sources.teaching} gradesSource={state.sources.grades} permissions={permissions} year={year} onRetry={retry} />}
+            {showWarnings && <WarningPanel teachingSource={state.sources.teaching} gradesSource={state.sources.grades} permissions={permissions} year={year} program={program} onRetry={retry} />}
           </div>}
-          {permissions?.overview && <section className="od-panel od-overview" aria-labelledby="od-overview-title"><div className="od-panel-heading"><h2 id="od-overview-title">TÌNH HÌNH ĐÀO TẠO</h2><span>Lớp học phần thạc sĩ · {year}</span></div>
+          {permissions?.overview && <section className="od-panel od-overview" aria-labelledby="od-overview-title"><div className="od-panel-heading"><h2 id="od-overview-title">TÌNH HÌNH ĐÀO TẠO</h2><span>Lớp học phần {programLabel.toLocaleLowerCase("vi-VN")} · {year}</span></div>
             {overview ? <dl>{[["Lớp đang mở", overview.active], ["Đang giảng dạy", overview.inProgress], ["Chưa xếp buổi học", overview.unscheduled], ["Đã hoàn thành", overview.completed]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
               : <SourceState source={overviewSource} onRetry={() => retry("teaching")} />}
           </section>}

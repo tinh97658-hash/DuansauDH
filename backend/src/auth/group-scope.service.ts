@@ -9,6 +9,7 @@ import type { EffectiveAccess } from './rbac.service.js';
 export class GroupScopeService implements OnModuleInit {
   private readonly storage = groupScopeStorage;
   private readonly initialized = new WeakMap<object, Promise<unknown>>();
+  private readonly readQueues = new WeakMap<object, Promise<unknown>>();
 
   constructor(@InjectConnection() private readonly sequelize: Sequelize) {}
 
@@ -19,6 +20,13 @@ export class GroupScopeService implements OnModuleInit {
   }
 
   current() { return this.storage.getStore(); }
+
+  async withReadTransaction<T>(work: () => Promise<T>): Promise<T> {
+    const scope = this.current();
+    if (!scope || scope.readTransaction) return work();
+    return this.sequelize.transaction(transaction =>
+      this.storage.run({ ...scope, readTransaction: transaction }, work));
+  }
 
   configure(staffId: string, access: EffectiveAccess, schedulingView = false, schedulingAction?: GroupScopeContext['schedulingAction']) {
     const current = this.current();
@@ -109,10 +117,20 @@ export class GroupScopeService implements OnModuleInit {
           this.initialized.set(tx, initialized);
         }
         await initialized;
-        return query(sql, { ...options, transaction: tx });
+        const executeQuery = () => query(sql, { ...options, transaction: tx });
+        if (scope.readTransaction === tx) {
+          // Parallel service loaders share one PostgreSQL client in this request.
+          // Queue its statements explicitly rather than issuing overlapping queries.
+          const previous = this.readQueues.get(tx);
+          const result = previous ? previous.then(executeQuery) : executeQuery();
+          this.readQueues.set(tx, result.then(() => undefined, () => undefined));
+          return result;
+        }
+        return executeQuery();
       };
       try {
-        return options.transaction ? await execute(options.transaction) : await transaction(execute);
+        const activeTransaction = options.transaction || scope.readTransaction;
+        return activeTransaction ? await execute(activeTransaction) : await transaction(execute);
       } catch (error: any) {
         if (error?.original?.code === '42501' || error?.parent?.code === '42501') {
           throw new ForbiddenException('Dữ liệu nằm ngoài phạm vi nhóm được phân công hoặc vai trò đang bị khóa sửa.');

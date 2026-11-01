@@ -1,0 +1,16 @@
+body .app-date-field .MuiInputBase-root input.MuiInputBase-input{min-height:0;border:0;background:transparent;box-sizing:border-box}
+body .app-popup .app-date-field .MuiOutlinedInput-root{height:48px;min-height:48px;padding-top:0;padding-bottom:0}
+body .app-popup .app-date-field .MuiOutlinedInput-root input.MuiInputBase-input{height:100%;margin:0;padding:11px 12px}
+body .app-date-calendar{width:296px;max-width:calc(100vw - 24px);padding:12px;border:1px solid #b8c4cd;border-radius:0;color:#000;background:#fff;font:13px/1.5 var(--app-font-family,"Segoe UI",sans-serif)}
+.app-date-calendar-header{display:grid;grid-template-columns:28px 1fr 78px 28px;align-items:center;gap:4px;margin-bottom:10px}
+.app-date-calendar select{width:100%;height:32px;padding:3px;border:1px solid #b8c4cd;background:#fff;color:#000;font:inherit}
+.app-date-calendar button{height:32px;min-width:0;padding:0;border:0;border-radius:0;background:#fff;color:#000;font:inherit;cursor:pointer}
+.app-date-calendar button:disabled{color:#aaa;cursor:default}
+.app-date-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
+.app-date-calendar-grid>span{padding:5px 0;text-align:center;font-weight:600}
+.app-date-calendar-grid button.outside-month{color:#666}
+.app-date-calendar-grid button[aria-current="date"]{box-shadow:inset 0 0 0 1px #777}
+body .app-date-calendar button:not(:disabled):is(:hover,:focus-visible,[aria-pressed="true"]){background:var(--dropdown-highlight-bg,#777);color:var(--dropdown-highlight-text,#fff)}
+.app-date-calendar button:focus-visible,.app-date-calendar select:focus-visible{outline:2px solid #222;outline-offset:1px}
+.app-date-calendar-footer{display:flex;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid #ddd}
+.app-date-calendar-footer button{padding:0 10px}

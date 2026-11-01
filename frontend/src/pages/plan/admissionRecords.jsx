@@ -19,19 +19,20 @@ import AddPhotoAlternateRounded from "@mui/icons-material/AddPhotoAlternateRound
 import AddRounded from "@mui/icons-material/AddRounded";
 import CheckCircleRounded from "@mui/icons-material/CheckCircleRounded";
 import CloseRounded from "@mui/icons-material/CloseRounded";
-import DeleteRounded from "@mui/icons-material/DeleteRounded";
 import EditRounded from "@mui/icons-material/EditRounded";
 import PersonRounded from "@mui/icons-material/PersonRounded";
 import VisibilityRounded from "@mui/icons-material/VisibilityRounded";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
+import InlineReportExport from "../../components/InlineReportExport";
+import PageExportBoundary from "../../components/PageExportBoundary";
+import { collectReportPages, tableReport } from "../../utils/reportExport";
 import { preloadPage } from "../../utils/lazyPage";
 import ListPagination from "../../components/ListPagination";
 import ResizableTable from "../../components/ResizableTable";
 import AdmissionTuitionCheckbox from "../../features/admission/AdmissionTuitionCheckbox";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
-import ConfirmDialog from "../../components/ConfirmDialog";
 import { getSelectableMajors, normalizeMajorsResponse, selectMajorForLevel } from "../../utils/majors";
 import { personNameParts, nameInputError, normalizeNameInput } from "../../utils/personName";
 import { notifyGradebookSaved } from "../../utils/gradebookRevision";
@@ -205,7 +206,7 @@ const cellInputSx = {
   },
 };
 
-const EmbeddedList = ({ children }) => <>{children}</>;
+const EmbeddedList = ({ children, title, exportConfig }) => <PageExportBoundary title={title} config={exportConfig}>{children}</PageExportBoundary>;
 
 const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
   const navigate = useNavigate();
@@ -219,6 +220,8 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
   const [levelFilter, setLevelFilter] = useState(isMastersList ? "Thạc sĩ" : "ALL");
   const [disciplineFilter, setDisciplineFilter] = useState("");
   const [majorFilter, setMajorFilter] = useState("ALL");
+  const [classGroupFilter, setClassGroupFilter] = useState("");
+  const [classGroups, setClassGroups] = useState([]);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -245,7 +248,6 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
   const phoneError = /^[0-9]{10}$/.test(formData.phone || "") ? "" : "Số điện thoại bắt buộc gồm đúng 10 chữ số";
   const idCardError = /^[0-9]{13}$/.test(formData.idCard || "") ? "" : "CCCD bắt buộc gồm đúng 13 chữ số";
   const [formDisciplineId, setFormDisciplineId] = useState("");
-  const [deletingRecord, setDeletingRecord] = useState(null);
 
   const selectableMajors = useMemo(
     () => getSelectableMajors(majors, formData.trainingLevel),
@@ -275,7 +277,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
     && record.extraData?.tuitionPayment?.paid !== true && record.updatedAt);
   const selectedTuitionIds = new Set(selectedTuition.map((row) => row.admissionRecordId));
   const selectedOnPage = selectableTuitionRows.filter((row) => selectedTuitionIds.has(row.id)).length;
-  useEffect(() => { setSelectedTuition([]); }, [year, levelFilter, disciplineFilter, majorFilter, statusFilter, search, isMastersList]);
+  useEffect(() => { setSelectedTuition([]); }, [year, levelFilter, disciplineFilter, majorFilter, classGroupFilter, statusFilter, search, isMastersList]);
   const selectTuitionPage = (checked) => {
     const idsOnPage = new Set(selectableTuitionRows.map((row) => row.id));
     setSelectedTuition((previous) => [
@@ -342,6 +344,23 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
 
 
   // Load Records
+  useEffect(() => {
+    if (!isMastersList) return;
+    const controller = new AbortController();
+    axios.get(`${API_BASE_URL}/plan/classes?program=masters`, { withCredentials: true, signal: controller.signal })
+      .then(({ data }) => setClassGroups(Array.isArray(data) ? data : []))
+      .catch((error) => {
+        if (!controller.signal.aborted) toast.error(error.response?.data?.message || "Không thể tải danh sách lớp học viên");
+      });
+    return () => controller.abort();
+  }, [isMastersList]);
+
+  const visibleClassGroups = useMemo(() => classGroups.filter((group) =>
+    (!year || String(group.academicYear) === year)
+    && (majorFilter === "ALL" || group.majorId === majorFilter)
+    && (!disciplineFilter || visibleFilterMajors.some((major) => major.id === group.majorId))),
+  [classGroups, year, majorFilter, disciplineFilter, visibleFilterMajors]);
+
   const loadRecords = useCallback(async (signal) => {
     setLoading(true);
     try {
@@ -352,6 +371,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
       if (statusFilter !== "ALL") params.append("status", statusFilter);
       params.append("admissionStage", isStudyManagement ? "study-management" : isMastersList ? "learners" : "applications");
       if (isMastersList) params.append("includeGroup", "true");
+      if (isMastersList && classGroupFilter) params.append("classGroupId", classGroupFilter);
       if (disciplineFilter) params.append("disciplineId", disciplineFilter);
       if (debouncedSearch) params.append("search", debouncedSearch);
       params.append("page", String(page));
@@ -366,11 +386,13 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
       setStats(data?.stats || { total: 0, mastersCount: 0, doctoralCount: 0, eligibleCount: 0 });
     } catch (err) {
       if (axios.isCancel(err) || err.code === "ERR_CANCELED") return;
+      setRecords([]);
+      setPagination({ page, pageSize: PAGE_SIZE, total: 0, totalPages: 1 });
       toast.error(err.response?.data?.message || "Không thể tải danh sách hồ sơ tuyển sinh");
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, [year, levelFilter, majorFilter, statusFilter, disciplineFilter, debouncedSearch, page, isMastersList, isStudyManagement]);
+  }, [year, levelFilter, majorFilter, classGroupFilter, statusFilter, disciplineFilter, debouncedSearch, page, isMastersList, isStudyManagement]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -385,7 +407,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
 
   useEffect(() => {
     setPage(1);
-  }, [year, levelFilter, disciplineFilter, majorFilter, statusFilter, debouncedSearch]);
+  }, [year, levelFilter, disciplineFilter, majorFilter, classGroupFilter, statusFilter, debouncedSearch]);
 
   // Handle Photo Upload (Base64)
   const handlePhotoUpload = (e) => {
@@ -545,23 +567,37 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
     }
   };
 
-  // Delete Record
-  const handleDeleteRecord = async () => {
-    if (!deletingRecord) return;
-    try {
-      await axios.delete(`${API_BASE_URL}/plan/admission-records/${deletingRecord.id}`, { withCredentials: true });
-      toast.success(`Đã xóa hồ sơ "${deletingRecord.fullName}"`);
-      setDeletingRecord(null);
-      if (records.length === 1 && page > 1) setPage((current) => current - 1);
-      else await loadRecords();
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Không thể xóa hồ sơ");
-    }
-  };
 
+
+  const exportRecords = async () => {
+    const params = new URLSearchParams({ admissionStage: isStudyManagement ? "study-management" : isMastersList ? "learners" : "applications", pageSize: String(PAGE_SIZE) });
+    if (year) params.set("academicYear", year);
+    if (levelFilter !== "ALL") params.set("trainingLevel", levelFilter);
+    if (majorFilter !== "ALL") params.set("majorId", majorFilter);
+    if (statusFilter !== "ALL") params.set("status", statusFilter);
+    if (disciplineFilter) params.set("disciplineId", disciplineFilter);
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    if (isMastersList) params.set("includeGroup", "true");
+    if (isMastersList && classGroupFilter) params.set("classGroupId", classGroupFilter);
+    const allRows = await collectReportPages(async nextPage => {
+      params.set("page", String(nextPage));
+      const { data } = await axios.get(`${API_BASE_URL}/plan/admission-records?${params}`, { withCredentials: true });
+      return data;
+    });
+    return tableReport(isStudyManagement ? "Hồ sơ bảo lưu" : isMastersList ? "Danh sách học viên" : "Hồ sơ tuyển sinh", columns, allRows, (row, column) => {
+      if (column.key === "lastName") return personNameParts(row).familyAndMiddle;
+      if (column.key === "firstName") return personNameParts(row).givenName;
+      if (column.key === "major") return row.major?.name || majors.find(major => major.id === row.majorId)?.name;
+      if (column.key === "groupCode") return row.assignedGroup?.code;
+      if (column.key === "status") return row.studyStatus;
+      if (column.key === "tuition") return row.extraData?.tuitionPayment?.paid ? "Đã nộp" : "Chưa nộp";
+      return row[column.key];
+    }, [["Năm", year || "Tất cả"], ["Tìm kiếm", debouncedSearch || "Tất cả"], ["Phạm vi", `${allRows.length} hồ sơ phù hợp bộ lọc`]]);
+  };
 
   return (
     <ListLayout
+      exportConfig={{ disabled: loading || search.trim() !== debouncedSearch, getReport: exportRecords }}
       title={isStudyManagement ? "Hồ sơ bảo lưu" : isMastersList ? "Danh sách học viên" : "Nhập hồ sơ tuyển sinh"}
       group={isMastersList ? "Thủ tục đầu vào" : "Kế hoạch khóa mới"}
       desc={isMastersList
@@ -581,11 +617,12 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
           borderColor: "#C6D5E1",
           borderRadius: "10px",
           boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
+          overflowX: "auto",
         }}
       >
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems="flex-end" justifyContent="space-between">
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="flex-end" sx={{ width: { xs: "100%", md: "auto" }, flexGrow: 1 }} flexWrap="wrap">
-            <FilterSelectField disabled={saving} label="Năm" value={year} onChange={(e) => setYear(e.target.value)} sx={{ flex: "1 1 108px", minWidth: 108 }}>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems="flex-end" justifyContent="space-between" sx={{ minWidth: { md: 1400 } }}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="flex-end" sx={{ width: { xs: "100%", md: "auto" }, minWidth: 0, flex: "1 1 0%", flexWrap: { xs: "wrap", md: "nowrap" } }}>
+            <FilterSelectField disabled={saving} label="Năm" value={year} onChange={(e) => { setYear(e.target.value); setClassGroupFilter(""); }} sx={{ flex: "1 1 108px", minWidth: 108 }}>
                 {isStudyManagement && <MenuItem value="">Tất cả năm</MenuItem>}
                 {YEARS.map((y) => (
                   <MenuItem key={y} value={y} sx={{ fontSize: 12 }}>
@@ -613,6 +650,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                 onChange={(e) => {
                   setDisciplineFilter(e.target.value);
                   setMajorFilter("ALL");
+                  setClassGroupFilter("");
                 }}
               >
                 <MenuItem value="" sx={{ fontSize: 12 }}>Tất cả ngành</MenuItem>
@@ -623,12 +661,18 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                 ))}
             </FilterSelectField>
 
-            <FilterSelectField disabled={saving} label="Chuyên ngành" value={majorFilter} onChange={(e) => setMajorFilter(e.target.value)} sx={{ flex: "1 1 220px", minWidth: 220 }}>
+            <FilterSelectField disabled={saving} label="Chuyên ngành" value={majorFilter} onChange={(e) => { setMajorFilter(e.target.value); setClassGroupFilter(""); }} sx={{ flex: "1 1 220px", minWidth: 220 }}>
                 <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả chuyên ngành ({visibleFilterMajors.length})</MenuItem>
                 {visibleFilterMajors.map((m) => (
                   <MenuItem key={m.id} value={m.id} sx={{ fontSize: 12 }}>{m.name}</MenuItem>
                 ))}
             </FilterSelectField>
+
+            {isMastersList && <FilterSelectField disabled={saving} label="Mã nhóm" value={classGroupFilter}
+              onChange={(e) => setClassGroupFilter(e.target.value)} sx={{ flex: "1 1 180px", minWidth: 180 }}>
+              <MenuItem value="">Tất cả mã nhóm</MenuItem>
+              {visibleClassGroups.map((group) => <MenuItem key={group.id} value={group.id}>{group.code || group.name}</MenuItem>)}
+            </FilterSelectField>}
 
             <FilterSelectField disabled={saving} label="Trạng thái" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} sx={{ flex: "1 1 150px", minWidth: 150 }}>
                 <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả trạng thái</MenuItem>
@@ -643,8 +687,9 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 sx={{
-                  width: { xs: "100%", sm: 360 },
-                  flexGrow: 1,
+                  width: { xs: "100%", md: "auto" },
+                  minWidth: 220,
+                  flex: "2 1 220px",
                 }}
               />
             )}
@@ -655,8 +700,9 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 sx={{
-                  width: { xs: "100%", sm: 430 },
-                  flexGrow: 1,
+                  width: { xs: "100%", md: "auto" },
+                  minWidth: 220,
+                  flex: "2 1 220px",
                 }}
               />
             )}
@@ -675,6 +721,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                   fontSize: 12,
                   fontWeight: 700,
                   textTransform: "none",
+                  whiteSpace: "nowrap",
                   borderRadius: "8px",
                   boxShadow: "none",
                   "&:hover": { bgcolor: "#056A8F" },
@@ -683,6 +730,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                 Thêm hồ sơ mới
               </Button>
             )}
+            <InlineReportExport />
           </Stack>
         </Stack>
       </Paper>
@@ -893,13 +941,6 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                           </Tooltip>
                         )}
 
-                        {isAdmin && !isMastersList && (
-                          <Tooltip title="Xóa hồ sơ">
-                            <IconButton size="small" color="error" onClick={() => setDeletingRecord(r)}>
-                              <DeleteRounded sx={{ fontSize: 17, color: "#B52D2D" }} />
-                            </IconButton>
-                          </Tooltip>
-                        )}
                       </Stack>
                     </TableCell>
                   </TableRow>
@@ -1024,6 +1065,8 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                     fullWidth
                     sx={cellInputSx}
                     placeholder="VD: HV26001"
+                    inputProps={{ maxLength: 50 }}
+                    helperText={!formData.id ? "Để trống để tự cấp mã mới. Mã đã dùng cho hồ sơ khác không được sử dụng lại." : "Mã học viên phải duy nhất trong toàn hệ thống."}
                   />
                 </Box>
 
@@ -1584,22 +1627,6 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
         </DialogActions>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <ConfirmDialog
-        referenceStyle={false}
-        open={Boolean(deletingRecord)}
-        onClose={() => setDeletingRecord(null)}
-        onConfirm={handleDeleteRecord}
-        title="Xác nhận xóa hồ sơ"
-        content={(
-          <span>
-            Bạn có chắc chắn muốn xóa hồ sơ thí sinh <strong>{deletingRecord?.fullName}</strong> (Mã: <strong>{deletingRecord?.code}</strong>) không?
-          </span>
-        )}
-        confirmLabel="Xóa vĩnh viễn"
-        cancelLabel="Hủy"
-        confirmColor="error"
-      />
     </ListLayout>
   );
 };

@@ -11,7 +11,7 @@ export default function ListPagination({
 
   return (
     <Box className={className} sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", lg: "minmax(0, 1fr) auto minmax(0, 1fr)" }, alignItems: "center", gap: 1, minHeight: 48, px: 0.5, pb: 0.5 }}>
-      <Typography variant="caption" sx={{ color: "#607486", fontWeight: 600 }}>
+      <Typography variant="caption" data-export-pagination="true" sx={{ color: "#607486", fontWeight: 600 }}>
         Hiển thị {page * pageSize + 1}–{Math.min((page + 1) * pageSize, count)} trên {count} {recordLabel}
       </Typography>
       {totalPages > 1 && <Pagination

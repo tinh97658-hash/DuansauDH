@@ -27,9 +27,9 @@ export class GroupScopeInterceptor implements NestInterceptor {
       : /\/plan\/(study-leaves|admission-records\/[^/]+\/study-leaves)(\/|$)/.test(path) ? 'studyleave'
       : /\/masters\/(grading-policies|grading-rules)(\/|$)/.test(path) ? 'policy' : undefined;
     const academicPermission = academicDomain === 'gradebook'
-      ? (!write ? 'gradebook.view' : /\/workflow$/.test(path) && ['approve', 'reopen'].includes(request.body?.action) ? 'gradebook.approve' : 'gradebook.submit')
+      ? (!write ? 'gradebook.view' : /\/workflow$/.test(path) && ['approve', 'reopen', 'reject_reopen'].includes(request.body?.action) ? 'gradebook.approve' : 'gradebook.submit')
       : academicDomain === 'exam' ? (write ? 'scheduling.write' : 'scheduling.view')
-      : academicDomain === 'studyleave' ? 'studyleave.manage' : academicDomain === 'policy' ? 'gradebook.policy' : undefined;
+      : academicDomain === 'studyleave' ? (/\/actions$/.test(path) && request.body?.action !== 'request_extension' ? 'studyleave.approve' : 'studyleave.request') : academicDomain === 'policy' ? 'gradebook.policy' : undefined;
     const academic = { academicDomain, academicPermission };
     if (this.scope.current()) Object.assign(this.scope.current()!, academic);
     if (dataRoute && write && access.groupScope?.readOnly) {
@@ -38,12 +38,23 @@ export class GroupScopeInterceptor implements NestInterceptor {
     // Subscribe inside ALS: constructing an Observable alone does not propagate context.
     return new Observable(subscriber => {
       let subscription: { unsubscribe(): void } | undefined;
+      let cancelRead: (() => void) | undefined;
       this.scope.run(request.user.id, access, async () => {
         Object.assign(this.scope.current()!, academic);
         await this.scope.assertWriteReferences(request);
-        if (!subscriber.closed) subscription = next.handle().subscribe(subscriber);
+        if (subscriber.closed) return;
+        if (!write && (schedulingAction || academicDomain === 'gradebook' || academicDomain === 'exam')) {
+          await this.scope.withReadTransaction(() => new Promise<void>((resolve, reject) => {
+            if (subscriber.closed) { resolve(); return; }
+            cancelRead = () => reject(new Error('Read request cancelled'));
+            subscription = next.handle().subscribe({
+              next: value => subscriber.next(value), error: reject, complete: resolve,
+            });
+          }));
+          subscriber.complete();
+        } else subscription = next.handle().subscribe(subscriber);
       }, schedulingView, schedulingAction).catch(error => subscriber.error(error));
-      return () => subscription?.unsubscribe();
+      return () => { subscription?.unsubscribe(); cancelRead?.(); };
     });
   }
 }

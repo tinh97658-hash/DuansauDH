@@ -5,7 +5,8 @@ import {
 } from "@mui/material";
 import FeatureLayout from "../../components/FeatureLayout";
 import FilterSelectField from "../../components/FilterSelectField";
-import FilterSearchField from "../../components/FilterSearchField";
+import FilterDateField from "../../components/FilterDateField";
+import { formatDateTime } from "../../utils/dateFormat";
 import ResizableTable from "../../components/ResizableTable";
 import ListPagination from "../../components/ListPagination";
 import { listAuditLogs, listChangeLogs, listChangeLogTables } from "../../features/accounts/api";
@@ -30,11 +31,7 @@ const changeColumns = [
   { key: "payload", label: "Dữ liệu", width: 280, minWidth: 180 },
 ];
 
-const formatTime = (value) => {
-  if (!value) return "—";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("vi-VN");
-};
+const formatTime = formatDateTime;
 
 const renderActor = (person) => (person ? `${person.name || ""} (${person.email || ""})` : "—");
 const renderChangeActor = (log) => log.actorEmail || log.actorStaffId || "—";
@@ -58,12 +55,10 @@ const filterPaperSx = {
 };
 
 const DateFilter = ({ label, value, onChange }) => (
-  <FilterSearchField
+  <FilterDateField
     label={label}
-    type="date"
     value={value}
     onChange={onChange}
-    InputProps={{ startAdornment: false }}
     sx={{ width: { xs: "100%", md: 180 } }}
   />
 );
@@ -228,7 +223,7 @@ const AuditLogs = () => {
   const [tab, setTab] = useState(0);
 
   return (
-    <FeatureLayout title="Nhật ký thao tác" group="Tài khoản & phân quyền" desc="Theo dõi thao tác quản lý tài khoản/phân quyền và mọi thay đổi dữ liệu trong hệ thống.">
+    <FeatureLayout title="Nhật ký thao tác" group="Tài khoản & phân quyền" desc="Theo dõi thao tác quản lý tài khoản/phân quyền và mọi thay đổi dữ liệu trong hệ thống." exportConfig={false}>
       <Box sx={{ borderBottom: "1px solid #C6D5E1", mb: 1.5 }}>
         <Tabs value={tab} onChange={(_, next) => setTab(next)} variant="scrollable" allowScrollButtonsMobile>
           <Tab label="Thao tác quản lý" sx={{ textTransform: "none", fontWeight: 600 }} />

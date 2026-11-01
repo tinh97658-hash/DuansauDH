@@ -3,6 +3,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { Tooltip } from "@mui/material";
+import YearSelect from "./YearSelect";
 import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 import SwapVertRounded from "@mui/icons-material/SwapVertRounded";
 import ArrowUpwardRounded from "@mui/icons-material/ArrowUpwardRounded";
@@ -28,7 +29,7 @@ const SESSION_SORT_STATES = {
   desc: { next: "default", label: "Số buổi giảm dần", Icon: ArrowDownwardRounded },
 };
 
-const WEEK_SLOT_LIMIT = 3;
+const WEEK_SLOT_LIMIT = 4;
 const DAY_FOCUS_STATUS_LANES = [
   { key: "planned", label: "ĐÃ XẾP", symbol: "○" },
   { key: "held", label: "ĐÃ DIỄN RA", symbol: "✓" },
@@ -281,7 +282,7 @@ export default function Schedule({ user }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const canEdit = can("scheduling.write");
-  const offerings = useLoad(async () => rows(await api.get("/scheduling/course-offerings?program=masters")), []);
+  const offerings = useLoad(async () => rows(await api.get("/scheduling/course-offerings?program=masters&includeConflicts=true")), []);
   const majors = useLoad(async () => rows(await api.get("/system/majors?program=masters")), []);
   const disciplines = disciplinesFromMajors(majors.data || []);
   const visibleMajors = majorsForDiscipline(majors.data || [], disciplineId);
@@ -368,13 +369,17 @@ export default function Schedule({ user }) {
   const sessionsOn = (date, period) => visibleSessions.filter((session) => session.sessionDate === date && (!period || session.period === period));
   const slotState = (day, period) => {
     const date = formatDateKey(day);
+    // Conflict data always comes from the full week, independent of display filters.
+    const conflicts = selecting ? (sessions.data || []).filter((session) => session.status !== "not_held" && session.sessionDate === date && session.period === period && (selected.schedulingConflicts?.[session.courseOfferingId] || session.courseOfferingId === selected.id || groupsOf(session.courseOffering).some((group) => selectedGroupIds.has(group.id))))
+      .map(session => ({ ...session, schedulingConflict: selected.schedulingConflicts?.[session.courseOfferingId] })) : [];
     return {
       date,
       past: isSessionPast({ sessionDate: date, endTime: period === "MORNING" ? "12:00" : "23:59" }),
       started: isSessionStartedInBusinessTimezone({ sessionDate: date, startTime: periodTimes(period).startTime }, clock),
       incompatible: selecting && !selectedDays.includes(day.getDay()),
       items: sessionsOn(date, period),
-      occupied: selecting && (sessions.data || []).some((session) => session.status !== "not_held" && session.sessionDate === date && session.period === period && (session.courseOfferingId === selected.id || groupsOf(session.courseOffering).some((group) => selectedGroupIds.has(group.id)))),
+      conflicts,
+      occupied: conflicts.length > 0,
     };
   };
   const schedulingAvailability = ({ past, started, incompatible, occupied }) => {
@@ -385,6 +390,15 @@ export default function Schedule({ user }) {
     if (!schedulingAvailability(slot).enabled) return;
     if (isSessionStartedInBusinessTimezone({ sessionDate: slot.date, startTime: periodTimes(period).startTime })) return;
     setEditor({ offering: selected, date: slot.date, period });
+  };
+  const blockedSlot = (slot, period, part = "control") => {
+    if (!selecting || slot.past || (sessions.loading && !sessions.data)) return null;
+    const reason = sessions.error ? "Chưa kiểm tra được lịch" : slot.started ? "Buổi đã bắt đầu" : slot.incompatible ? "Không thuộc ngày học chung" : slot.occupied ? (slot.conflicts.every(row => row.courseOfferingId === selected.id) ? "Đã xếp học phần này" : "Trùng lịch học viên") : "";
+    if (!reason) return null;
+    const details = <div className="sl-conflict-tooltip"><strong>Không thể xếp {period === "MORNING" ? "sáng" : "chiều"} {vietnameseDate(slot.date)}</strong><p>{reason}</p>{!sessions.loading && !sessions.error && slot.conflicts.map(row => <div key={row.id}><b>{offeringTitle(row.courseOffering)}</b><span>{row.schedulingConflict === "STUDENT_CONFLICT" ? "Có học viên học trùng" : groupsOf(row.courseOffering).filter(group => selectedGroupIds.has(group.id)).map(group => group.code || group.name).join(", ")}</span></div>)}<p>{sessions.error ? "Vui lòng tải lại lịch trước khi xếp." : "Vui lòng chọn buổi khác."}</p></div>;
+    if (part === "details") return details;
+    const badge = <button type="button" className="sl-slot-blocked-reason" aria-disabled="true" onClick={event => { event.preventDefault(); event.stopPropagation(); }}><span aria-hidden="true">🔒 </span>{reason}</button>;
+    return part === "badge" ? badge : <Tooltip title={details} arrow placement="top" enterDelay={150}>{badge}</Tooltip>;
   };
   const addSessionButton = (day, period, existingSlot) => {
     const slot = existingSlot || slotState(day, period);
@@ -398,7 +412,7 @@ export default function Schedule({ user }) {
     <div className="sl-schedule-scope-fields">
       <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>1</b>NGÀNH</div><SearchSelect label="Ngành" value={disciplineId} placeholder="Tất cả ngành" options={[{ id: "", name: "Tất cả ngành" }, ...disciplines.map((item) => ({ ...item, name: item.name, code: "" }))]} onChange={(value) => changeScope(() => { setDiscipline(value); setMajor(""); setYear(""); })} /></div>
       <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>2</b>CHUYÊN NGÀNH</div><SearchSelect label="Chuyên ngành" value={majorId} placeholder="Tất cả chuyên ngành" options={[{ id: "", name: "Tất cả chuyên ngành" }, ...visibleMajors]} onChange={(value) => changeScope(() => { setMajor(value); setYear(""); })} /></div>
-      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>3</b>KHÓA / NĂM HỌC</div><select className={`sl-select sl-year-select${year ? "" : " sl-placeholder"}`} aria-label="Khóa / Năm" value={year} onChange={(event) => changeScope(() => setYear(event.target.value))}><option value="">Tất cả</option>{unique(all.flatMap(groupsOf).filter((group) => (!disciplineId || visibleMajorIds.has(group.majorId || group.major?.id)) && (!majorId || (group.majorId || group.major?.id) === majorId)).map((group) => group.academicYear)).sort((a, b) => b.localeCompare(a, "vi", { numeric: true })).map((value) => <option key={value}>{value}</option>)}</select></div>
+      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>3</b>KHÓA / NĂM HỌC</div><YearSelect className={`sl-select sl-year-select${year ? "" : " sl-placeholder"}`} label="Khóa / Năm" value={year} onChange={value => changeScope(() => setYear(value))} years={unique(all.flatMap(groupsOf).filter((group) => (!disciplineId || visibleMajorIds.has(group.majorId || group.major?.id)) && (!majorId || (group.majorId || group.major?.id) === majorId)).map((group) => group.academicYear)).sort((a, b) => b.localeCompare(a, "vi", { numeric: true }))} /></div>
     </div>
     {!canEdit && <div className="sl-attention">Chưa có quyền sửa lịch hoặc vai trò đang bị khóa chỉ xem. Quản trị viên cấu hình tại Vai trò & phân quyền.</div>}
     {dashboardQueue && <div className="sl-attention">{dashboardQueue === "unscheduled" ? "Đang xem lớp chưa có buổi học" : "Đang xem lớp có buổi chờ xác nhận"}<button type="button" className="sl-btn" onClick={() => { const next = new URLSearchParams(params); next.delete("queue"); setParams(next); }}>Bỏ lọc công việc</button></div>}
@@ -438,11 +452,11 @@ export default function Schedule({ user }) {
         const grouped = { planned: [], held: [], not: [] };
         items.forEach((session) => grouped[dayFocusStatusKey(session)].push(session));
         return <section className={`sl-day-focus-period ${past ? "sl-past" : ""} ${incompatible ? "sl-incompatible" : ""}`} aria-label={`${periodLabel} · ${items.length} lớp`} key={period}><header><h2>{periodLabel}</h2><span>{items.length} lớp</span></header><div className="sl-day-focus-period-body">
-          {sessions.loading ? <span className="v20-hint">Đang tải...</span> : <>
+          {sessions.loading && !sessions.data ? <span className="v20-hint">Đang tải...</span> : <>
             {!!items.length && <div className="sl-status-board" aria-label={`Trạng thái ${periodLabel}`}>{DAY_FOCUS_STATUS_LANES.map((lane) => <section className={`sl-status-lane sl-status-lane-${lane.key}`} aria-label={`${lane.label} · ${grouped[lane.key].length} lớp`} key={lane.key}><header><strong><i aria-hidden="true">{lane.symbol}</i>{lane.label}</strong><b>{grouped[lane.key].length}</b></header><div className="sl-status-lane-list">{grouped[lane.key].map(dayFocusSessionCard)}{!grouped[lane.key].length && <span className="sl-lane-empty">Không có lớp</span>}</div></section>)}</div>}
             {!items.length && <span className="sl-focus-empty">{past ? "Buổi đã qua" : "Chưa có lịch"}</span>}
           </>}
-          {incompatible && <span className="sl-focus-empty">Không thuộc ngày học chung</span>}
+          {blockedSlot(slot, period)}
           {addSessionButton(focusedDay, period, slot)}
         </div></section>;
       })}</div>
@@ -450,7 +464,7 @@ export default function Schedule({ user }) {
       const dateKey = formatDateKey(day);
       const isToday = dateKey === todayKey;
       const count = sessionsOn(dateKey).length;
-      return <button type="button" className={`sl-day ${isToday ? "sl-is-today" : ""}`} key={dateKey} aria-label={`Xem lịch ${vietnameseDate(dateKey)}: ${count} lớp`} onClick={() => setFocusedDate(dateKey)}><strong>{vietnameseWeekdayShort(day)}</strong><span>{vietnameseDayMonth(day)}</span><b>{count}</b>{isToday && <i className="sl-today-indicator" aria-label="Hôm nay" title="Hôm nay" />}</button>;
+      return <button type="button" className={`sl-day ${isToday ? "sl-is-today" : ""}`} key={dateKey} aria-label={`Xem lịch ${vietnameseDate(dateKey)}: ${count} lớp`} onClick={() => setFocusedDate(dateKey)}><strong>{vietnameseWeekdayShort(day)}</strong><span>{vietnameseDayMonth(day)}</span>{isToday && <i className="sl-today-indicator" aria-label="Hôm nay" title="Hôm nay" />}</button>;
     })}
       {["MORNING", "AFTERNOON"].map((period) => <React.Fragment key={period}><div className="sl-period"><span>{period === "MORNING" ? "SÁNG" : "CHIỀU"}</span></div>{weekDays.map((day) => {
         const slot = slotState(day, period);
@@ -461,15 +475,15 @@ export default function Schedule({ user }) {
           event.stopPropagation();
           if (availability.enabled) openSlotScheduler(slot, period);
         };
-        return <div key={date} className={`sl-slot ${past ? "sl-past" : ""} ${incompatible ? "sl-incompatible" : ""} ${availability.enabled ? "sl-slot-schedulable" : ""}`} onClickCapture={availability.visible ? handleSlotSelection : undefined}>
+        return <Tooltip key={date} title={blockedSlot(slot, period, "details") || ""} arrow placement="top" enterDelay={150}><div className={`sl-slot ${past ? "sl-past" : ""} ${incompatible ? "sl-incompatible" : ""} ${availability.enabled ? "sl-slot-schedulable" : ""}`} onClickCapture={availability.visible ? handleSlotSelection : undefined}>
           {availability.visible && <button type="button" className="sl-slot-schedule-target" aria-label={`Xếp ${period === "MORNING" ? "Sáng" : "Chiều"} ${date}`} disabled={!availability.enabled} />}
           <div className="v20-slot-items">
-          {sessions.loading ? <span className="v20-hint">Đang tải...</span> : items.slice(0, WEEK_SLOT_LIMIT).map((session) => sessionCard(session, true))}
+          {blockedSlot(slot, period, "badge")}
+          {sessions.loading && !sessions.data ? <span className="v20-hint">Đang tải...</span> : items.slice(0, WEEK_SLOT_LIMIT).map((session) => sessionCard(session, true))}
           {items.length > WEEK_SLOT_LIMIT && <WeekOverflowPreview date={date} dayLabel={vietnameseWeekdayShort(day)} period={period} hiddenSessions={items.slice(WEEK_SLOT_LIMIT)} onOpenDay={() => setFocusedDate(date)} />}
           {availability.visible && <span className={`v20-add-slot sl-week-slot-affordance${availability.enabled ? "" : " sl-disabled"}`} aria-hidden="true">+ Xếp buổi</span>}
           {!items.length && !selecting && !sessions.loading && <span className="v20-hint">{past ? "Buổi đã qua" : "Chưa có lịch"}</span>}
-          {incompatible && <span className="v20-hint">Không thuộc ngày học chung</span>}
-        </div></div>;
+        </div></div></Tooltip>;
       })}</React.Fragment>)}
     </div>}</div>
   </section>

@@ -2,6 +2,7 @@ import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { Alert, Box, Card, CardContent, CircularProgress, Grid, Paper, Typography } from "@mui/material";
 import profilePicture from "../images/profile-picture.jpg";
+import { useReportExport } from "./ReportExportContext";
 
 const labels = [
   ["regNo", "Mã học viên"], ["postalAddress", "Địa chỉ"], ["email", "Địa chỉ email"],
@@ -17,6 +18,9 @@ const displayValue = (value) => {
 const ProfileCard = ({ endpoint }) => {
   const [info, setInfo] = useState(null);
   const [error, setError] = useState("");
+  useReportExport(() => ({ title: "Hồ sơ cá nhân", metadata: [["Họ tên", info?.fullName || info?.name || ""]],
+    sections: [{ title: "Thông tin hồ sơ", headers: ["Thông tin", "Nội dung"],
+      rows: labels.filter(([key]) => info?.[key] !== undefined).map(([key, label]) => [label, displayValue(info[key])]) }] }), !info || !!error);
 
   useEffect(() => {
     let mounted = true;

@@ -38,6 +38,16 @@ const build = () => {
 };
 
 describe("RolesService", () => {
+  it.each(['create', 'update', 'setPermissions'])('rejects assigning approval permissions to non-admin roles via %s', async method => {
+    const { service, permissions, roles, rolePermissions } = build();
+    roles.findByPk.mockResolvedValue(roleRecord({ code: 'supervisor' }));
+    permissions.count.mockResolvedValue(1);
+    permissions.findAll.mockResolvedValue([{ id: 'approve', code: 'studyleave.approve' }]);
+    const dto = { code: 'new-role', name: 'Vai trò mới', permissionIds: ['approve'] };
+    const operation = method === 'create' ? service.create('actor', dto as any, {}) : method === 'update' ? service.update('actor', 'r1', dto as any, {}) : service.setPermissions('actor', 'r1', dto as any, {});
+    await expect(operation).rejects.toThrow('chỉ được cấp');
+    expect(rolePermissions.bulkCreate).not.toHaveBeenCalled();
+  });
   it('ignores obsolete client scope choices and derives scope from granted actions', async () => {
     const { service, permissions } = build();
     permissions.findAll.mockResolvedValue([{ id: 'schedule', code: 'scheduling.write' }]);

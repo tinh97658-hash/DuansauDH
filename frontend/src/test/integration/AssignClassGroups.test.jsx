@@ -35,8 +35,8 @@ const Navigation = () => {
   const navigate = useNavigate();
   return <><output data-testid="url">{location.search}</output><output data-testid="path">{location.pathname}</output><button onClick={() => navigate(-1)}>Browser Back</button><button onClick={() => navigate(1)}>Browser Forward</button><button onClick={() => navigate(`/?year=${year}&disciplineId=d1&majorId=m2`)}>External scope change</button></>;
 };
-const openPage = async (url = "/") => {
-  await act(async () => { render(<MemoryRouter useTransitions={false} initialEntries={[url]}><Navigation /><AuthSessionContext.Provider value={{ access: { permissions: ["masters.manage"] } }}><AssignClassGroups /></AuthSessionContext.Provider></MemoryRouter>); });
+const openPage = async (url = "/", permissions = ["masters.manage"], role = "admin") => {
+  await act(async () => { render(<MemoryRouter useTransitions={false} initialEntries={[url]}><Navigation /><AuthSessionContext.Provider value={{ user: { role }, access: { permissions } }}><AssignClassGroups /></AuthSessionContext.Provider></MemoryRouter>); });
 };
 const choose = async (label, option) => {
   fireEvent.mouseDown(screen.getByRole("button", { name: label, exact: true }));
@@ -63,6 +63,24 @@ describe("AssignClassGroups summary and assignment", () => {
     axios.delete.mockResolvedValue({ data: {} });
   });
   afterEach(cleanup);
+
+  it("keeps the same group overview and filters for a supervisor", async () => {
+    const overview = () => ({
+      heading: screen.getByRole('heading', { name: 'Học viên chờ phân nhóm' }).outerHTML,
+      summary: screen.getByRole('list', { name: 'Tổng quan phân nhóm' }).outerHTML,
+      filters: document.querySelector('.assignment-filters').outerHTML,
+    });
+    await openPage();
+    await screen.findByRole('button', { name: 'Hệ thống thông tin' });
+    const admin = overview();
+    cleanup();
+    await openPage('/', ['masters.view'], 'supervisor');
+    await screen.findByRole('button', { name: 'Hệ thống thông tin' });
+    // MUI generates fresh IDs on mount; compare the visible structure and styles.
+    const normalize = value => JSON.stringify(value).replace(/:r[\w]+:/g, ':id:');
+    expect(normalize(overview())).toEqual(normalize(admin));
+    expect(axios.post).not.toHaveBeenCalled();
+  });
 
   const duplicateMajors = () => {
     const rows = majors.map((major) => major.id === "m3" ? major : { ...major, name: "Khai thác hàng hải", code: major.id === "m1" ? "KTHH" : "KTHH2" });

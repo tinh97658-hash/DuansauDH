@@ -99,6 +99,7 @@ const ClassLists = lazyPage(() => import("./pages/reports/classLists"), ["/repor
 const CourseScores = lazyPage(() => import("./pages/reports/courseScores"), ["/reports/course-scores"]);
 const ClassScoreSummary = lazyPage(() => import("./pages/reports/classScoreSummary"), ["/reports/class-score-summary"]);
 const LearnerTranscriptPreview = lazyPage(() => import("./features/learners/LearnerTranscriptPreview"), ["/reports/learner-transcript/preview"]);
+const ReportPreview = lazyPage(() => import("./components/ReportPreview"), ["/reports/export-preview"]);
 const StudyLeaves = lazyPage(() => import("./pages/masters/studyLeaves"), ["/masters/study-leaves"]);
 const MinisterialReport = lazyPage(() => import("./pages/reports/ministerialReport"), ["/reports/ministerial-report"]);
 const TempScoreMasters = lazyPage(() => import("./pages/reports/tempScoreMasters"), ["/reports/temp-score-masters"]);
@@ -207,6 +208,7 @@ function App() {
               <Route path="reports/course-scores" element={<CourseScores />} />
               <Route path="reports/class-score-summary" element={<ClassScoreSummary />} />
               <Route path="reports/learner-transcript/preview" element={<LearnerTranscriptPreview />} />
+              <Route path="reports/export-preview" element={<ReportPreview />} />
               <Route path="reports/ministerial-report" element={<MinisterialReport />} />
               <Route path="reports/temp-score-masters" element={<TempScoreMasters />} />
               <Route path="reports/temp-score-doctoral" element={<TempScoreDoctoral />} />

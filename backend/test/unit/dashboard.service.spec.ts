@@ -46,15 +46,16 @@ function fixture() {
   const groups = { findAll: jest.fn().mockResolvedValue([{ id: "g1", majorId: "m1" }]) };
   const rbac = { effectiveAccess: jest.fn(async (actor) => ({ permissions: new Set(DEFAULT_ROLE_PERMISSIONS[actor.role] || []), roleCodes: [actor.role] })) };
   const gradebooks = { tracking: jest.fn().mockResolvedValue(new Map()) };
-  return { masters, scheduling, system, groups, rbac, gradebooks, service: new DashboardService(masters as any, scheduling as any, system as any, rbac as any, gradebooks as any) };
+  const requests = { query: jest.fn().mockResolvedValue([]) };
+  return { masters, scheduling, system, groups, rbac, gradebooks, requests, service: new DashboardService(masters as any, scheduling as any, system as any, rbac as any, gradebooks as any, requests as any) };
 }
 
 describe("operational dashboard permissions", () => {
   it("uses effective permissions without a hidden scheduling assignment requirement", () => {
-    expect(operationalPermissions(user(), new Set(DEFAULT_ROLE_PERMISSIONS[user().role]))).toEqual({ grouping: true, grades: true, scheduling: true, progress: true, overview: true });
+    expect(operationalPermissions(user(), new Set(DEFAULT_ROLE_PERMISSIONS[user().role]))).toEqual({ grouping: true, grades: true, approvals: true, studyLeaveApproval: true, majorTransferApproval: true, scheduling: true, progress: true, overview: true });
     expect(operationalPermissions(user("admin", false), new Set(DEFAULT_ROLE_PERMISSIONS[user("admin", false).role]))).toMatchObject({ scheduling: true, progress: true, grouping: true });
-    expect(operationalPermissions(user("supervisor", true), new Set(DEFAULT_ROLE_PERMISSIONS[user("supervisor", true).role]))).toEqual({ grouping: false, grades: false, scheduling: true, progress: true, overview: true });
-    expect(operationalPermissions(user("examiner", false), new Set(DEFAULT_ROLE_PERMISSIONS[user("examiner", false).role]))).toEqual({ grouping: false, grades: true, scheduling: true, progress: true, overview: true });
+    expect(operationalPermissions(user("supervisor", true), new Set(DEFAULT_ROLE_PERMISSIONS[user("supervisor", true).role]))).toEqual({ grouping: false, grades: false, approvals: false, studyLeaveApproval: false, majorTransferApproval: false, scheduling: true, progress: true, overview: true });
+    expect(operationalPermissions(user("examiner", false), new Set(DEFAULT_ROLE_PERMISSIONS[user("examiner", false).role]))).toEqual({ grouping: false, grades: true, approvals: false, studyLeaveApproval: false, majorTransferApproval: false, scheduling: true, progress: true, overview: true });
     expect(Object.values(operationalPermissions(Student.build({ role: "admin" }), new Set(DEFAULT_ROLE_PERMISSIONS.admin)))).not.toContain(true);
     expect(Object.values(operationalPermissions({ role: "admin", canManageScheduling: true }, new Set(DEFAULT_ROLE_PERMISSIONS.admin)))).not.toContain(true);
   });
@@ -83,10 +84,126 @@ describe("operational dashboard permissions", () => {
   it("rejects malformed years and unknown sections at the API boundary", async () => {
     expect(await validate(Object.assign(new OperationalDashboardQuery(), { year: "2026", section: "grades" }))).toHaveLength(0);
     expect((await validate(Object.assign(new OperationalDashboardQuery(), { year: "all", section: "tuition" }))).length).toBe(2);
+    expect(await validate(Object.assign(new OperationalDashboardQuery(), { year: "2026", program: "doctoral" }))).toHaveLength(0);
+    expect((await validate(Object.assign(new OperationalDashboardQuery(), { year: "2026", program: "invalid" }))).length).toBe(1);
+  });
+
+  it('keeps doctoral sections in the common contract without loading masters data or reporting healthy zeros', async () => {
+    const f = fixture();
+    const result = await f.service.operational(user(), '2026', undefined, 'doctoral');
+    expect(result.program).toBe('doctoral');
+    expect(Object.keys(result.sources).sort()).toEqual(['grouping', 'teaching', 'grades', 'approvals', 'studyLeaveApproval', 'majorTransferApproval'].sort());
+    for (const source of Object.values(result.sources)) {
+      expect(source).toMatchObject({ status: 'not_implemented' });
+      expect(source).not.toHaveProperty('data');
+    }
+    expect(f.masters.listEligibleStudents).not.toHaveBeenCalled();
+    expect(f.scheduling.listCourseOfferings).not.toHaveBeenCalled();
+    expect(f.gradebooks.tracking).not.toHaveBeenCalled();
+    expect(f.requests.query).not.toHaveBeenCalled();
+    const retry = await f.service.operational(user(), '2025', 'grades', 'doctoral');
+    expect(Object.keys(retry.sources)).toEqual(['grades']);
+  });
+
+  it('requires doctoral access and uses doctoral management grants for grouping', async () => {
+    const f = fixture();
+    f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['masters.view', 'masters.manage', 'scheduling.view', 'gradebook.view', 'gradebook.approve']), roleCodes: ['custom'] });
+    expect((await f.service.operational(user(), '2026', undefined, 'doctoral')).sources).toEqual({});
+    expect(operationalPermissions(user(), new Set(['doctoral.view', 'doctoral.manage']), false, 'doctoral')).toMatchObject({ grouping: true, grades: false });
+    expect(operationalPermissions(user(), new Set(['doctoral.view', 'masters.manage']), false, 'doctoral').grouping).toBe(false);
   });
 });
 
 describe("operational dashboard aggregation", () => {
+  it('shows scoped pending learner requests and links to the decision screens', async () => {
+    const f = fixture();
+    f.requests.query.mockResolvedValueOnce([{ id: 'leave', recordId: 'learner', fullName: 'Nguyễn Văn An', code: 'HV01', reason: 'Việc gia đình' }]);
+    const leave = await f.service.operational(user(), '2026', 'studyLeaveApproval');
+    expect(leave.sources.studyLeaveApproval.data).toMatchObject({ count: 1, items: [{
+      title: 'Nguyễn Văn An · HV01', detail: 'Bảo lưu chờ duyệt · Việc gia đình', href: '/masters/study-leaves/learner?tab=leave',
+    }] });
+    expect(f.requests.query).toHaveBeenCalledWith(expect.stringContaining("request.status = 'pending'"), expect.objectContaining({ replacements: { year: '2026' } }));
+    expect(f.requests.query.mock.calls[0][0]).toContain("record.academic_year = :year");
+    expect(f.requests.query.mock.calls[0][0]).toContain("extension->>'status' = 'pending'");
+    f.requests.query.mockResolvedValueOnce([{ id: 'transfer', recordId: 'learner', fullName: 'Nguyễn Văn An', code: 'HV01', fromMajor: 'Kế toán', toMajor: 'Quản trị kinh doanh' }]);
+    const transfer = await f.service.operational(user(), '2026', 'majorTransferApproval');
+    expect(transfer.sources.majorTransferApproval.data).toMatchObject({ count: 1, items: [{
+      detail: 'Kế toán → Quản trị kinh doanh', href: '/plan/admission-records/learner?tab=profile',
+    }] });
+    f.requests.query.mockResolvedValueOnce([]);
+    expect((await f.service.operational(user(), '2026', 'majorTransferApproval')).sources.majorTransferApproval.data.count).toBe(0);
+  });
+
+  it('requires decision and view grants and does not expose learner requests to read-only staff or requesters', async () => {
+    const f = fixture();
+    f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['plan.view', 'admission.view', 'studyleave.request', 'majortransfer.request']), roleCodes: ['custom'] });
+    expect((await f.service.operational(user(), '2026')).sources).toEqual({});
+    expect(f.requests.query).not.toHaveBeenCalled();
+    expect(operationalPermissions(user(), new Set(DEFAULT_ROLE_PERMISSIONS.admin), true)).toMatchObject({ studyLeaveApproval: false, majorTransferApproval: false });
+    expect(operationalPermissions(user(), new Set(['studyleave.approve', 'majortransfer.approve']))).toMatchObject({ studyLeaveApproval: false, majorTransferApproval: false });
+    f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['plan.view', 'admission.view', 'studyleave.approve']), roleCodes: ['custom'] });
+    const result = await f.service.operational(user(), '2026');
+    expect(result.sources.studyLeaveApproval.status).toBe('ready');
+    expect(result.sources.majorTransferApproval).toBeUndefined();
+  });
+
+  it('isolates learner request failures and supports retrying each queue', async () => {
+    const f = fixture();
+    f.requests.query.mockRejectedValueOnce(new Error('private database details')).mockResolvedValueOnce([]);
+    const result = await f.service.operational(user(), '2026');
+    expect(result.sources.studyLeaveApproval.status).toBe('error');
+    expect(result.sources.majorTransferApproval.status).toBe('ready');
+    expect(result.sources.grouping.status).toBe('ready');
+    expect(JSON.stringify(result)).not.toContain('private database details');
+    f.requests.query.mockClear();
+    await f.service.operational(user(), '2026', 'studyLeaveApproval');
+    expect(f.requests.query).toHaveBeenCalledTimes(1);
+  });
+  it('shows requests to reopen eligibility only while there are no exams preventing reopening', async () => {
+    const f = fixture();
+    f.scheduling.listCourseOfferings.mockResolvedValue(['requested','scheduled','locked'].map(id=>offering(id,{},'completed')));
+    const base = {eligibilityStatus:'approved',resultStatus:'not_available',eligibilityCanReopen:true,eligibilityReopenRequest:{note:'Sửa điểm',at:'2026-10-29T01:00:00Z'}};
+    f.gradebooks.tracking.mockResolvedValue(new Map([['requested',base],['scheduled',{...base,eligibilityCanReopen:false}],['locked',{...base,resultStatus:'approved'}]]));
+    const result = await f.service.operational(user(), '2026', 'approvals');
+    expect(result.sources.approvals.data.eligibilityReopen).toMatchObject({count:1,items:[{id:'requested',detail:'Sửa điểm'}]});
+  });
+  it('shows only submitted approvals and links each request to its scoped gradebook', async () => {
+    const f = fixture();
+    const ids = ['eligibility', 'final', 'draft', 'approved', 'legacy', 'cancelled'];
+    f.scheduling.listCourseOfferings.mockResolvedValue(ids.map(id => offering(id, {}, id === 'cancelled' ? 'cancelled' : 'completed')));
+    f.gradebooks.tracking.mockResolvedValue(new Map([
+      ['eligibility', { eligibilityStatus: 'submitted', resultStatus: 'not_available' }],
+      ['final', { eligibilityStatus: 'approved', resultStatus: 'submitted' }],
+      ['draft', { eligibilityStatus: 'draft', resultStatus: 'draft' }],
+      ['approved', { eligibilityStatus: 'approved', resultStatus: 'approved' }],
+      ['legacy', { legacy: true, eligibilityStatus: 'submitted', resultStatus: 'approved' }],
+      ['cancelled', { eligibilityStatus: 'submitted', resultStatus: 'submitted' }],
+    ]));
+    const result = await f.service.operational(user(), '2026', 'approvals');
+    expect(result.permissions.approvals).toBe(true);
+    const metrics = result.sources.approvals.data;
+    expect(metrics.eligibilityApproval.count).toBe(1);
+    expect(metrics.resultApproval.count).toBe(1);
+    expect(metrics.eligibilityApproval.items[0].href).toBe('/masters/exam-lists?year=2026&offeringId=eligibility&groupId=g1&majorId=m1');
+    expect(metrics.resultApproval.items[0].href).toContain('offeringId=final');
+    f.gradebooks.tracking.mockResolvedValue(new Map());
+    const cleared = await f.service.operational(user(), '2026', 'approvals');
+    expect(cleared.sources.approvals.data.resultApproval.count).toBe(0);
+  });
+
+  it('requires approval permission independently of entry permission and respects read-only scope', async () => {
+    const f = fixture();
+    f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['gradebook.view', 'gradebook.approve']), roleCodes: ['custom'] });
+    const result = await f.service.operational(user('custom'), '2026', 'approvals');
+    expect(result.permissions).toMatchObject({ approvals: true, grades: false });
+    expect(result.sources.approvals.status).toBe('ready');
+    expect(operationalPermissions(user(), new Set(['gradebook.view', 'gradebook.approve']), true).approvals).toBe(false);
+    f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['gradebook.view', 'gradebook.submit']), roleCodes: ['custom'] });
+    f.gradebooks.tracking.mockClear();
+    expect((await f.service.operational(user('custom'), '2026', 'approvals')).sources).toEqual({});
+    expect(f.gradebooks.tracking).not.toHaveBeenCalled();
+  });
+
   it('separates the three waiting stages, uses their own business dates and excludes entered/submitted/finished classes', async () => {
     jest.useFakeTimers({now:new Date('2026-10-21T10:00:00Z')});
     try {

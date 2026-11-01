@@ -64,6 +64,27 @@ async function chooseScope({ expectTable = true } = {}) {
 
 beforeEach(() => { jest.clearAllMocks(); mockData(); });
 
+it("shows passing learner counts only on completed subjects and keeps other statuses unchanged", async () => {
+  const classes = makeClasses();
+  classes[0].subjects = [
+    { ...baseSubjects[0], status: "completed", completion: { passedCount: 17, totalCount: 18 } },
+    { ...baseSubjects[1], status: "in_progress", completion: { passedCount: 2, totalCount: 18 } },
+  ];
+  classes[1].subjects = [
+    { ...baseSubjects[0], status: "completed", completion: { passedCount: 0, totalCount: 20 } },
+    { ...baseSubjects[1], status: "scheduled", completion: { passedCount: 1, totalCount: 20 } },
+  ];
+  mockData({ classes });
+  mount();
+  const table = await chooseScope();
+  expect(within(table).getByText("Hoàn thành 17/18")).toBeInTheDocument();
+  expect(within(table).getByText("Hoàn thành 0/20")).toBeInTheDocument();
+  expect(within(table).getByText("Đang học")).toBeInTheDocument();
+  expect(within(table).getByText("Đã xếp lịch")).toBeInTheDocument();
+  expect(within(table).queryByText("Đang học 2/18")).not.toBeInTheDocument();
+  expect(within(table).queryByText("Đã xếp lịch 1/20")).not.toBeInTheDocument();
+});
+
 it("passes scheduling authority to details and refreshes progress after completion", async () => {
   mount("", { user: { canManageScheduling: true } });
   const table = await chooseScope();

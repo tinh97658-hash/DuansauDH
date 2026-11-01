@@ -23,7 +23,7 @@ const errorMessage = error => {
   return Array.isArray(message) ? message.join('. ') : message || 'Không thể xử lý bảo lưu. Vui lòng thử lại.';
 };
 
-function OfferingTable({ rows, history = false }) {
+export function OfferingTable({ rows, history = false }) {
   return <Box sx={{ overflowX: 'auto' }}><Table size="small" aria-label={history ? 'Lịch sử dừng học phần' : 'Học phần dự kiến dừng'}>
     <TableHead><TableRow><TableCell>Học phần</TableCell><TableCell>Lớp</TableCell><TableCell>Xử lý</TableCell>{history && <TableCell>Điểm cũ để tra cứu</TableCell>}</TableRow></TableHead>
     <TableBody>{rows.map((item, index) => {
@@ -38,14 +38,14 @@ function OfferingTable({ rows, history = false }) {
   </Table></Box>;
 }
 
-export default function StudyLeavePanel({ record, isAdmin = false, disabled = false, onChanged }) {
+export default function StudyLeavePanel({ record, isAdmin = false, canRequest = false, disabled = false, onChanged }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [dialog, setDialog] = useState(null);
-  const [form, setForm] = useState({ note: '', startDate: today(), endDate: '' });
+  const [form, setForm] = useState({ note: '', endDate: '' });
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try { const response = await axios.get(`${API_BASE_URL}/plan/admission-records/${record.id}/study-leaves`, options); setData(response.data); }
@@ -53,10 +53,10 @@ export default function StudyLeavePanel({ record, isAdmin = false, disabled = fa
   }, [record.id]);
   useEffect(() => { load(); }, [load]);
   const open = (action, leave) => {
-    setError(''); setSuccess(''); setForm({ note: '', startDate: today(), endDate: '' }); setDialog({ action, leave });
+    setError(''); setSuccess(''); setForm({ note: '', endDate: '' }); setDialog({ action, leave });
   };
   const submit = async () => {
-    if (busy || disabled || invalid) return;
+    if (!(dialog?.action === 'request_extension' ? canRequest : isAdmin) || busy || disabled || invalid) return;
     setBusy(true); setError(''); setSuccess('');
     try {
       if (dialog.action === 'withdraw_unpaid') {
@@ -65,9 +65,7 @@ export default function StudyLeavePanel({ record, isAdmin = false, disabled = fa
         await onChanged?.();
         return;
       }
-      const response = dialog.action === 'request'
-        ? await axios.post(`${API_BASE_URL}/plan/admission-records/${record.id}/study-leaves`, { reason: form.note, startDate: form.startDate, endDate: form.endDate }, options)
-        : await axios.post(`${API_BASE_URL}/plan/study-leaves/${dialog.leave.id}/actions`, { action: dialog.action, note: form.note,
+      const response = await axios.post(`${API_BASE_URL}/plan/study-leaves/${dialog.leave.id}/actions`, { action: dialog.action, note: form.note,
           ...(dialog.action === 'request_extension' ? { endDate: form.endDate } : {}) }, options);
       setData(response.data); setDialog(null); setSuccess('Đã lưu xử lý bảo lưu.');
       await onChanged?.();
@@ -77,24 +75,19 @@ export default function StudyLeavePanel({ record, isAdmin = false, disabled = fa
   const tuitionPaid = record.extraData?.tuitionPayment?.paid === true;
   const canWithdrawUnpaid = record.trainingLevel === 'Thạc sĩ' && !tuitionPaid
     && ['Đã trúng tuyển', 'Đang học'].includes(record.studyStatus) && !openLeave;
-  const needsNote = dialog && !['approve', 'approve_extension'].includes(dialog.action);
-  const needsEnd = dialog && ['request', 'request_extension'].includes(dialog.action);
-  const minEndDate = dialog?.action === 'request'
-    ? (form.startDate ? formatDateKey(addDays(form.startDate, 1)) : undefined)
-    : dialog?.action === 'request_extension'
+  const needsNote = dialog && dialog.action !== 'approve_extension';
+  const needsEnd = dialog?.action === 'request_extension';
+  const minEndDate = dialog?.action === 'request_extension'
       ? [today(), formatDateKey(addDays(dialog.leave.endDate, 1))].sort().at(-1) : undefined;
-  const invalidEndDate = Boolean(dialog?.action === 'request' && form.startDate && form.endDate && form.endDate <= form.startDate);
   const invalid = !dialog || (needsNote && !form.note.trim()) || (needsEnd && !form.endDate)
-    || (dialog?.action === 'request' && (!form.startDate || form.startDate < today() || form.endDate <= form.startDate))
     || (dialog?.action === 'request_extension' && (form.endDate <= dialog.leave.endDate || form.endDate < today()));
   return <Stack spacing={2}>
     <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="h6">Bảo lưu và tiếp nhận học lại</Typography>
-      {isAdmin && record.studyStatus === 'Đang học' && (record.trainingLevel !== 'Thạc sĩ' || tuitionPaid) && !openLeave && data && <Button variant="contained" disabled={disabled || busy} onClick={() => open('request')}>Tạo yêu cầu bảo lưu</Button>}
       {isAdmin && canWithdrawUnpaid && data && <Button variant="outlined" color="error" disabled={disabled || busy || !record.updatedAt} onClick={() => open('withdraw_unpaid')}>Rút hồ sơ chưa nhập học</Button>}
     </Stack>
     {canWithdrawUnpaid && <Alert severity="warning">Chưa nộp học phí nên chưa nhập học, không được bảo lưu. Nếu muốn nghỉ, rút khỏi lớp và đưa hồ sơ về Nộp hồ sơ đầu vào để làm hồ sơ bình thường.</Alert>}
     <Alert severity="info">Duyệt bảo lưu sẽ rút học viên khỏi các lớp học phần chưa hoàn thành ngay và ghi nhận Không đạt cho mọi học phần đã ghép lớp, dù đã xếp lịch hay chưa. Giữ lớp hành chính và kết quả môn đã hoàn thành.</Alert>
-    {disabled && <Alert severity="warning">Lưu hoặc hủy thay đổi hồ sơ trước khi xử lý bảo lưu.</Alert>}
+    {isAdmin && disabled && <Alert severity="warning">Lưu hoặc hủy thay đổi hồ sơ trước khi xử lý bảo lưu.</Alert>}
     {error && !dialog && <Alert severity="error" action={<Button onClick={load} disabled={loading || busy}>Thử lại</Button>}>{error}</Alert>}{success && <Alert severity="success">{success}</Alert>}
     {loading ? <CircularProgress size={24} aria-label="Đang tải bảo lưu" /> : data?.leaves?.length ? data.leaves.map(leave => {
       const pendingExtension = leave.extensions?.find(item => item.status === 'pending');
@@ -106,10 +99,9 @@ export default function StudyLeavePanel({ record, isAdmin = false, disabled = fa
           <Typography variant="body2">Lý do: {leave.reason}</Typography>
           {leave.closedDate && <Typography variant="body2">Ngày kết thúc xử lý: {leaveDate(leave.closedDate)}</Typography>}
           {pendingExtension && <Alert severity="warning">Có yêu cầu gia hạn đến {leaveDate(pendingExtension.endDate)} đang chờ duyệt. Hạn hiện tại vẫn là {leaveDate(leave.endDate)}. Lý do: {pendingExtension.reason}</Alert>}
-          {isAdmin && <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ rowGap: 1 }}>
-            {leave.status === 'pending' && <><Button variant="contained" disabled={disabled || busy} onClick={() => open('approve', leave)}>Duyệt bảo lưu</Button><Button color="error" disabled={disabled || busy} onClick={() => open('reject', leave)}>Từ chối</Button></>}
-            {active && <><Button variant="contained" disabled={disabled || busy || (record.trainingLevel === 'Thạc sĩ' && !tuitionPaid)} onClick={() => open('resume', leave)}>Tiếp nhận học lại</Button>
-              {!pendingExtension && <Button variant="outlined" disabled={disabled || busy} onClick={() => open('request_extension', leave)}>Đề nghị gia hạn</Button>}
+          {(isAdmin || canRequest) && active && <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ rowGap: 1 }}>
+              {canRequest && !pendingExtension && <Button variant="outlined" disabled={disabled || busy} onClick={() => open('request_extension', leave)}>Đề nghị gia hạn</Button>}
+            {isAdmin && <><Button variant="contained" disabled={disabled || busy || (record.trainingLevel === 'Thạc sĩ' && !tuitionPaid)} onClick={() => open('resume', leave)}>Tiếp nhận học lại</Button>
               {pendingExtension && <><Button variant="outlined" disabled={disabled || busy} onClick={() => open('approve_extension', leave)}>Duyệt gia hạn</Button><Button disabled={disabled || busy} onClick={() => open('reject_extension', leave)}>Từ chối gia hạn</Button></>}
               <Button color="error" disabled={disabled || busy} onClick={() => open('withdraw', leave)}>Xác nhận thôi học</Button></>}
           </Stack>}
@@ -128,22 +120,18 @@ export default function StudyLeavePanel({ record, isAdmin = false, disabled = fa
       </Box>;
     }) : data && <Typography color="text.secondary">Học viên chưa có yêu cầu bảo lưu.</Typography>}
     <AppDialog open={Boolean(dialog)} onClose={() => { if (!busy) { setDialog(null); setError(''); } }}
-      title={dialog?.action === 'request' ? 'Tạo yêu cầu bảo lưu' : actionLabels[dialog?.action] || ''}
+      title={actionLabels[dialog?.action] || ''}
       onConfirm={submit} confirmText="Xác nhận" confirmDisabled={invalid || disabled} saving={busy}
       confirmColor={['withdraw', 'withdraw_unpaid'].includes(dialog?.action) ? 'error' : 'primary'}>
       <Stack spacing={2}>{error && <Alert severity="error">{error}</Alert>}
         {needsEnd && <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          {dialog?.action === 'request' && <PopupFormField label="Ngày bắt đầu bảo lưu" htmlFor="study-leave-start-date">
-            <DateField id="study-leave-start-date" fullWidth size="small" value={form.startDate} onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} inputProps={{ min: today() }} />
-          </PopupFormField>}
-          <PopupFormField label={dialog?.action === 'request' ? 'Ngày kết thúc bảo lưu' : 'Ngày kết thúc mới'} htmlFor="study-leave-end-date">
+          <PopupFormField label="Ngày kết thúc mới" htmlFor="study-leave-end-date">
             <DateField id="study-leave-end-date" fullWidth size="small" value={form.endDate}
-              min={minEndDate} error={invalidEndDate}
-              helperText={dialog?.action === 'request' ? 'Ngày kết thúc phải sau ngày bắt đầu bảo lưu ít nhất 1 ngày.' : 'Hạn mới phải sau hạn bảo lưu hiện tại.'}
+              min={minEndDate}
+              helperText="Hạn mới phải sau hạn bảo lưu hiện tại."
               onChange={e => setForm(p => ({ ...p, endDate: e.target.value }))} />
           </PopupFormField>
         </Stack>}
-        {dialog?.action === 'approve' && <><Alert severity="warning">Rút khỏi danh sách lớp ngay khi duyệt và ghi nhận Không đạt cho mọi học phần đã ghép lớp chưa hoàn thành, dù đã xếp lịch hay chưa. Trạng thái bảo lưu có hiệu lực từ {leaveDate(dialog.leave.startDate)}; khi quay lại phải học từ đầu.</Alert><OfferingTable rows={data?.affectedOfferings || []} /></>}
         {dialog?.action === 'resume' && <Alert severity="info">Tiếp nhận học lại từ hôm nay. Học viên sẽ chờ ghép lớp mới cho các môn đã dừng; các điểm cũ không chuyển sang lần học mới.</Alert>}
         {dialog?.action === 'withdraw' && <Alert severity="warning">Xác nhận quyết định thôi học từ hôm nay. Hồ sơ, lớp hành chính và lịch sử học vẫn được giữ.</Alert>}
         {dialog?.action === 'withdraw_unpaid' && <Alert severity="warning">Xác nhận nghỉ khi chưa nhập học: rút khỏi lớp học viên và các lượt học phần đang mở, đưa về Nộp hồ sơ đầu vào và mở lại xét tuyển. Thông tin hồ sơ và lịch sử vẫn được giữ. Thao tác này không tạo bảo lưu hoặc kết quả Không đạt.</Alert>}

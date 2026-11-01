@@ -15,6 +15,96 @@ const row = { id: 'leave', admissionRecordId: 'record', fullName: 'Nguyễn Văn
   extensions: [{ status: 'pending' }] };
 beforeEach(() => { jest.resetAllMocks(); axios.get.mockResolvedValue({ data: { rows: [row], total: 1 } }); });
 
+it('creates requests from management by selecting a learner code and refreshes the leave list', async () => {
+  const learner = { id: 'learner', code: 'HV001', fullName: 'Nguyễn Văn A', majorName: 'Công nghệ thông tin' };
+  axios.get.mockImplementation(async url => url.endsWith('/study-leaves/learners')
+    ? { data: [learner] } : { data: { rows: [row], total: 1 } });
+  axios.post.mockResolvedValue({ data: {} });
+  renderWithPermissions(<MemoryRouter useTransitions={false}><StudyLeaves /></MemoryRouter>, ['plan.view', 'studyleave.request', 'studyleave.approve']);
+  fireEvent.click(screen.getByRole('button', { name: 'Tạo yêu cầu bảo lưu' }));
+  const dialog = within(screen.getByRole('dialog'));
+  fireEvent.change(dialog.getByRole('combobox', { name: /Mã học viên/ }), { target: { value: 'HV001' } });
+  fireEvent.click(await screen.findByRole('option', { name: /HV001 — Nguyễn Văn A/ }));
+  expect(dialog.getByText('Công nghệ thông tin')).toBeInTheDocument();
+  fireEvent.change(dialog.getByLabelText('Ngày kết thúc bảo lưu'), { target: { value: '31/12/2099' } });
+  fireEvent.change(dialog.getByLabelText(/Lý do \/ thông tin quyết định/), { target: { value: 'Điều trị' } });
+  fireEvent.click(dialog.getByRole('button', { name: 'Xác nhận' }));
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/admission-records/learner/study-leaves'),
+    expect.objectContaining({ reason: 'Điều trị', endDate: '2099-12-31' }), { withCredentials: true }));
+  expect(await screen.findByText('Đã tạo yêu cầu bảo lưu cho Nguyễn Văn A (HV001).')).toBeInTheDocument();
+  expect(screen.queryByRole('dialog')).toBeNull();
+  await waitFor(() => expect(axios.get.mock.calls.filter(([url]) => url.endsWith('/plan/study-leaves')).length).toBeGreaterThan(1));
+});
+
+it('hides request creation without study leave management permission', async () => {
+  render(<MemoryRouter useTransitions={false}><StudyLeaves /></MemoryRouter>);
+  await screen.findByText('Nguyễn Văn A');
+  expect(screen.queryByRole('button', { name: 'Tạo yêu cầu bảo lưu' })).toBeNull();
+});
+
+const setupPending = (pendingStatus = 'pending') => {
+  const pending = { ...row, id: 'pending-leave', status: 'pending', extensions: [], reason: 'Điều trị' };
+  axios.get.mockImplementation(async url => url.includes('/admission-records/')
+    ? { data: { leaves: [{ ...pending, status: pendingStatus }], affectedOfferings: [{ courseOfferingId: 'offering', subjectName: 'Triết học', offeringName: 'Lớp Triết học' }] } }
+    : { data: { rows: [pending, row], total: 2 } });
+  return pending;
+};
+const mountWithDecisions = () => renderWithPermissions(<MemoryRouter useTransitions={false}><StudyLeaves /></MemoryRouter>, ['plan.view', 'studyleave.request', 'studyleave.approve']);
+
+it('allows request-only staff to create but hides approve and reject actions', async () => {
+  setupPending();
+  renderWithPermissions(<MemoryRouter useTransitions={false}><StudyLeaves /></MemoryRouter>, ['plan.view', 'studyleave.request']);
+  await screen.findAllByText('Nguyễn Văn A');
+  expect(screen.getByRole('button', { name: 'Tạo yêu cầu bảo lưu' })).toBeEnabled();
+  expect(screen.queryByRole('button', { name: 'Duyệt bảo lưu' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Từ chối' })).not.toBeInTheDocument();
+});
+
+it.each(['approve', 'reject'])('handles %s in the approval column with confirmation and refreshes the list', async action => {
+  setupPending();
+  axios.post.mockResolvedValue({ data: {} });
+  mountWithDecisions();
+  const headers = (await screen.findAllByRole('columnheader')).map(cell => cell.textContent);
+  expect(headers.slice(-3)).toEqual(['Quá hạn', 'Phê duyệt', 'Thao tác']);
+  const trigger = await screen.findByRole('button', { name: action === 'approve' ? 'Duyệt bảo lưu' : 'Từ chối' });
+  expect(within(trigger.closest('tr')).getAllByRole('cell')[5]).toContainElement(trigger);
+  expect(screen.getAllByRole('button', { name: 'Duyệt bảo lưu' })).toHaveLength(1);
+  fireEvent.click(trigger);
+  const dialog = within(screen.getByRole('dialog'));
+  await dialog.findByText('Lý do: Điều trị');
+  expect(axios.post).not.toHaveBeenCalled();
+  if (action === 'approve') {
+    expect(dialog.getByText('Triết học')).toBeInTheDocument();
+    expect(dialog.getByText(/Rút khỏi danh sách lớp ngay khi duyệt/)).toBeInTheDocument();
+  } else {
+    expect(dialog.getByRole('button', { name: 'Xác nhận' })).toBeDisabled();
+    fireEvent.change(dialog.getByLabelText(/Lý do \/ thông tin quyết định/), { target: { value: 'Thiếu quyết định' } });
+  }
+  fireEvent.click(dialog.getByRole('button', { name: 'Xác nhận' }));
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/study-leaves/pending-leave/actions'),
+    { action, note: action === 'approve' ? '' : 'Thiếu quyết định' }, { withCredentials: true }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  await waitFor(() => expect(axios.get.mock.calls.filter(([url]) => url.endsWith('/plan/study-leaves')).length).toBeGreaterThan(1));
+});
+
+it('hides pending approval actions without management permission', async () => {
+  setupPending();
+  render(<MemoryRouter useTransitions={false}><StudyLeaves /></MemoryRouter>);
+  await screen.findByText('Chờ duyệt');
+  expect(screen.queryByRole('button', { name: 'Duyệt bảo lưu' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Từ chối' })).toBeNull();
+});
+
+it('blocks approval when the request was already processed', async () => {
+  setupPending('approved');
+  mountWithDecisions();
+  fireEvent.click(await screen.findByRole('button', { name: 'Duyệt bảo lưu' }));
+  const dialog = within(screen.getByRole('dialog'));
+  await dialog.findByText('Yêu cầu đã được xử lý. Vui lòng tải lại danh sách.');
+  expect(dialog.getByRole('button', { name: 'Xác nhận' })).toBeDisabled();
+  expect(axios.post).not.toHaveBeenCalled();
+});
+
 it('shows overdue days, a pending extension and a direct link to the learner leave tab', async () => {
   render(<MemoryRouter useTransitions={false}><StudyLeaves /></MemoryRouter>);
   expect(await screen.findByText('Nguyễn Văn A')).toBeInTheDocument();

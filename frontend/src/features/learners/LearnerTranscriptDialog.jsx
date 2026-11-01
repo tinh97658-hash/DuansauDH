@@ -12,7 +12,7 @@ import { learnerTranscriptFilename, normalizeLearnerTranscript } from "./learner
 import { openLearnerTranscriptPdfPreview } from "./learnerTranscriptPdfPreview";
 import { createLearnerTranscriptWord } from "./learnerTranscriptWord";
 import { downloadDocumentFile, sanitizeDocumentFilenamePart } from "../../utils/documentFiles";
-import { createLearnerTranscriptPdf } from "./learnerTranscriptPdf";
+import { reserveReportPreview } from "../../utils/reportPreview";
 import { fetchClassTranscripts, generateTranscriptDocuments, selectTranscriptScorecards } from "./learnerTranscriptBatch";
 import { packTranscriptZip } from "./learnerTranscriptZip";
 import "./learnerTranscript.css";
@@ -49,7 +49,7 @@ export default function LearnerTranscriptDialog({ classGroupId, onClose }) {
 
   useEffect(() => () => {
     if (pending.current) { pending.current.active = false; pending.current.tab?.close(); pending.current = null; }
-    if (exportRequest.current) { exportRequest.current.active = false; exportRequest.current = null; }
+    if (exportRequest.current) { exportRequest.current.active = false; exportRequest.current.tab?.close(); exportRequest.current = null; }
   }, [classGroupId]);
 
   const students = roster?.students || [];
@@ -92,6 +92,7 @@ export default function LearnerTranscriptDialog({ classGroupId, onClose }) {
     exportRequest.current = request;
     setExporting(true); setExportError("");
     try {
+      if (format === "pdf" && selected.size === 1) request.tab = reserveReportPreview();
       if (selected.size > 1) {
         const selectedIds = new Set(selected);
         const data = await fetchClassTranscripts(classGroupId);
@@ -107,10 +108,14 @@ export default function LearnerTranscriptDialog({ classGroupId, onClose }) {
       const { data } = await axios.get(`${API_BASE_URL}/reports/learner-scorecard/${selectedStudent.admissionRecordId}`, { params: { classGroupId } });
       if (!request.active) return;
       const transcript = normalizeLearnerTranscript(data);
-      const generate = format === "pdf" ? createLearnerTranscriptPdf : createLearnerTranscriptWord;
-      const blob = await generate(transcript);
+      if (format === "pdf") {
+        await openLearnerTranscriptPdfPreview(transcript, request.tab, { isCancelled: () => !request.active });
+        return;
+      }
+      const blob = await createLearnerTranscriptWord(transcript);
       if (request.active) downloadDocumentFile(blob, learnerTranscriptFilename(transcript, format));
     } catch (failure) {
+      request.tab?.close();
       if (request.active) setExportError(message(failure));
     } finally {
       if (request.active) { exportRequest.current = null; setExporting(false); }
@@ -133,7 +138,7 @@ export default function LearnerTranscriptDialog({ classGroupId, onClose }) {
             <FormControlLabel className={`transcript-format-option${format === "word" ? " is-selected" : ""}`} value="word" control={<Radio size="small" />}
               label={<span className="transcript-format-label"><WordFileIcon className="transcript-file-icon transcript-file-icon-word" aria-hidden="true" focusable="false" />Word</span>} disabled={exporting} />
           </RadioGroup>
-          <p className="transcript-format-note">1 học viên: tải file trực tiếp · Nhiều học viên: tải gói ZIP</p>
+          <p className="transcript-format-note">Chọn nhiều học viên: tải thẳng gói ZIP · Chọn 1 học viên: PDF xem trước để in hoặc lưu, Word tải trực tiếp</p>
         </div>
         <div className="transcript-selection-controls">
           <FormControlLabel control={<Checkbox disabled={loading || !!error || !students.length || exporting}

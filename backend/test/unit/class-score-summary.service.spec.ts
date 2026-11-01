@@ -82,6 +82,22 @@ it.each([false, true])('maps a saved disqualification into class and personal re
     details: { examScore: null, courseScore: null, grade4: null, letterGrade: '', result: 'failed' } });
 });
 
+it.each([[false, false], [false, true], [true, false], [true, true]])('preserves saved language exemption in reports (finalized: %s, includeDetails: %s)', async (finalized, includeDetails) => {
+  const { service, sequelize } = build();
+  sequelize.query.mockReset()
+    .mockResolvedValueOnce([{ id: 'hp1', name: 'Tiếng Anh', credits: 3, isForeignLanguage: true }])
+    .mockResolvedValueOnce([{ total: 1, page: 1, rows: [{ participantId: 'student:one', isExemptForeignLanguage: true }] }])
+    .mockResolvedValueOnce([{ participantId: 'student:one', subjectId: 'hp1', score: null, result: 'passed', details: {
+      source: 'gradebook', workflowPhase: 'final', eligibilityFrozen: true, eligible: false, finalized,
+      examExempt: true, profileForeignLanguageExempt: true, courseScore: null, result: 'passed',
+    } }]);
+  const report = await service.get({ classGroupId: 'g1' }, false, { includeDetails });
+  expect(report.rows[0].scores.hp1).toMatchObject({ score: null, result: 'passed', profileForeignLanguageExempt: true,
+    examExempt: true, eligibilityFrozen: true });
+  if (includeDetails) expect(report.rows[0].scores.hp1.details).toMatchObject({ profileForeignLanguageExempt: true });
+  else expect(report.rows[0].scores.hp1).not.toHaveProperty('details');
+});
+
 it("opens the requested member class and scopes the scorecard to one learner", async () => {
   const { service, student, groups } = buildScorecard();
   const get = jest.spyOn(service, "get").mockResolvedValue({

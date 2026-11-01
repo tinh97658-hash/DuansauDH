@@ -68,6 +68,7 @@ export class SchedulingGroupSettingsDto {
 }
 
 export class ListCourseOfferingsQueryDto {
+  @IsOptional() @IsIn(["true", "false"]) includeConflicts?: string;
   @IsOptional() @IsIn(["masters", "doctoral"]) program = "masters";
   @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsString() @MaxLength(20) @Transform(trim) academicYear?: string;
@@ -85,6 +86,7 @@ export class AssignSchedulingManagerDto {
 }
 
 export class ListTeachingSessionsQueryDto {
+  @IsOptional() @IsUUID() conflictForOfferingId?: string;
   @IsDateString({}, { message: "from phải là ngày hợp lệ theo định dạng YYYY-MM-DD" })
   @Matches(datePattern, { message: "from phải theo định dạng YYYY-MM-DD" })
   from!: string;

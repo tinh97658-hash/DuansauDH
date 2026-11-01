@@ -21,6 +21,8 @@ import FilterSearchField from "./FilterSearchField";
 import ResizableTable from "./ResizableTable";
 import ListPagination from "./ListPagination";
 import { alphabeticalOptionGroups } from "../utils/optionGroups";
+import { tableReport } from "../utils/reportExport";
+import InlineReportExport from "./InlineReportExport";
 
 const buildEmptyForm = (parent, fields, sortable, activeField = "active") => {
   const form = { code: "", name: "", [activeField]: true };
@@ -344,6 +346,7 @@ const CatalogManager = ({
   };
 
   const toggleActive = async (row) => {
+    if (!isAdmin) return;
     const nextVal = !row[activeField];
     try {
       await axios.put(`${API_BASE_URL}${apiBase}/${row.id}`, { [activeField]: nextVal }, { withCredentials: true });
@@ -390,7 +393,18 @@ const CatalogManager = ({
   };
 
   return (
-    <FeatureLayout title={title} group={group} desc={desc}>
+    <FeatureLayout title={title} group={group} desc={desc} exportConfig={{ disabled: loading || !!error,
+      getReport: () => tableReport(title, columns, filtered, (row, column) => {
+        if (column.key === "lastName") return personNameParts(row).familyAndMiddle;
+        if (column.key === "firstName") return personNameParts(row).givenName;
+        if (column.key === "status") return row[activeField] ? activeStatusLabel || "Đang sử dụng" : "Ngừng sử dụng";
+        if (column.key.startsWith("parent:")) return parent.display ? parent.display(row) : row[parent.field];
+        if (column.key.startsWith("field:")) {
+          const field = tableFields.find(field => `field:${field.key}` === column.key);
+          return field.type === "multiline" ? row[field.key] : renderFieldValue(row, field);
+        }
+        return row[column.key];
+      }, [["Tìm kiếm", search || "Tất cả"], ["Phạm vi", `${filtered.length} bản ghi phù hợp bộ lọc`]]) }}>
       <ToastContainer position="top-center" newestOnTop limit={3} />
       <Paper
         variant="outlined"
@@ -403,7 +417,7 @@ const CatalogManager = ({
           boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
         }}
       >
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="flex-end">
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} useFlexGap alignItems="flex-end" sx={{ flexWrap: "wrap" }}>
           <FilterSearchField
             placeholder={showCode ? `Tìm theo ${codeLabel.toLowerCase()} hoặc tên...` : "Tìm theo tên..."}
             value={search}
@@ -431,6 +445,7 @@ const CatalogManager = ({
               {addButtonLabel || "Thêm mới"}
             </Button>
           )}
+          <InlineReportExport />
         </Stack>
       </Paper>
 
@@ -459,11 +474,11 @@ const CatalogManager = ({
                       size="small"
                       label={activeStatusLabel(Boolean(row[activeField]), row)}
                       color={row[activeField] ? "success" : "default"}
-                      sx={{ mr: isAdmin ? 1 : 0 }}
+                      sx={{ mr: 1 }}
                     />
                   )}
-                  {isAdmin || !showStatusBadge ? (
-                    <Tooltip title={row[activeField] ? "Đang hoạt động" : "Đã ẩn"}>
+                  <Tooltip title={row[activeField] ? "Đang hoạt động" : "Đã ẩn"}>
+                    <span>
                       <Switch
                         size="small"
                         disabled={!isAdmin}
@@ -475,10 +490,8 @@ const CatalogManager = ({
                             : `${row[activeField] ? "Vô hiệu hóa" : "Kích hoạt"} ${itemName} ${row.code || row.name}`,
                         }}
                       />
-                    </Tooltip>
-                  ) : !activeStatusLabel ? (
-                    <Chip size="small" label={row[activeField] ? "Hoạt động" : "Ẩn"} color={row[activeField] ? "success" : "default"} variant="outlined" />
-                  ) : null}
+                    </span>
+                  </Tooltip>
                 </TableCell>}
                 {showActions && (
                   <TableCell align="center" onDoubleClick={(event) => event.stopPropagation()}>

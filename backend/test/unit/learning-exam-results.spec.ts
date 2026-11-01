@@ -2,6 +2,14 @@ import { jest } from "@jest/globals";
 import { applyLearningExamResults, learningExamResults } from "../../src/plan/learning-exam-results.js";
 
 describe("Saved exam outcomes", () => {
+  it.each([false, true])('preserves exemption metadata in personal learning results (finalized: %s)', async finalized => {
+    const sequelize = { query: jest.fn<any>().mockResolvedValue([{ id: 'lr-1', sourceType: 'regular', result: 'passed', score: null,
+      grade: { eligibilityFrozen: true, eligible: false, examExempt: true, profileForeignLanguageExempt: true,
+        result: 'passed', courseScore: null, finalized } }]) };
+    const exams = await learningExamResults(sequelize as never, 'record-1');
+    expect(applyLearningExamResults([{ id: 'lr-1', sourceType: 'regular', status: 'studying' }], exams)[0])
+      .toMatchObject({ result: 'passed', score: null, status: 'completed', profileForeignLanguageExempt: true, examExempt: true });
+  });
   it.each([false, true])('maps saved disqualification into the personal learning result without a numerical mark (finalized: %s)', async finalized => {
     const sequelize = { query: jest.fn<any>().mockResolvedValue([{ id: 'lr-1', sourceType: 'regular', result: 'pending', score: null,
       grade: { workflowPhase: 'final', eligibilityFrozen: true, eligible: false, testScore: 3.9, assignmentScore: 5,

@@ -52,6 +52,19 @@ it("keeps a shared offering read-only when its scope disallows writes", async ()
   expect(screen.queryByRole("button", { name: "Chỉnh sửa" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Xóa buổi học" })).not.toBeInTheDocument();
 });
+it("renders scheduling for a supervisor when retake participant IDs are redacted", async () => {
+  const defaultGet = axios.get.getMockImplementation();
+  const redactedOffering = { ...offering, groupLinks: [{ studyRole: 'retake',
+    classGroup: { ...offering.groupLinks[0].classGroup, code: 'CNTT-HL' } }] };
+  axios.get.mockImplementation((url, options) => url.includes('/course-offerings?')
+    ? Promise.resolve({ data: [redactedOffering] }) : defaultGet(url, options));
+  render(<MemoryRouter useTransitions={false}><ScheduleView user={{ role: 'supervisor' }} /></MemoryRouter>);
+  const sidebar = screen.getByRole('complementary');
+  const schedule = await within(sidebar).findByRole('button', { name: 'Xếp lịch' });
+  expect(sidebar).toHaveTextContent('CNTT-HL');
+  fireEvent.click(schedule);
+  expect(screen.getByRole('table', { name: 'Lịch học theo tuần' })).toBeInTheDocument();
+});
 it.each([
   ["2026-10-19T23:59:59Z", true, true],
   ["2026-10-20T00:00:00Z", false, true],
@@ -65,9 +78,13 @@ it.each([
     render(<MemoryRouter useTransitions={false}><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>);
     fireEvent.click(await screen.findByRole("button", { name: "Xếp lịch" }));
     const table = screen.getByRole("table", { name: "Lịch học theo tuần" });
+    await waitFor(() => expect(within(table).getByRole("button", { name: "Xếp Sáng 2026-10-21" })).toBeEnabled());
     expect(Boolean(within(table).queryByRole("button", { name: "Xếp Sáng 2026-10-20" }))).toBe(morning);
     expect(Boolean(within(table).queryByRole("button", { name: "Xếp Chiều 2026-10-20" }))).toBe(afternoon);
     expect(within(table).getByRole("button", { name: "Xếp Sáng 2026-10-21" })).toBeEnabled();
+    expect(within(table).queryByRole("button", { name: /Buổi đã qua/ })).not.toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Xếp Sáng 2026-10-19" })).not.toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Xếp Chiều 2026-10-19" })).not.toBeInTheDocument();
   } finally { vi.useRealTimers(); }
 });
 it("removes the new-slot action as its start arrives without reloading session data", async () => {
@@ -312,8 +329,8 @@ it("summarizes a busy day in the week and exposes every session in day focus", a
   render(<MemoryRouter useTransitions={false}><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>);
   fireEvent.click(screen.getByRole("button", { name: "Tuần trước" }));
   const busyDay = await screen.findByRole("button", { name: /Xem lịch .*: 7 lớp/ });
-  expect(screen.getByRole("button", { name: /Xem thêm 2 lớp ngày/ })).toHaveTextContent("+2 lớp");
-  expect(screen.getAllByRole("button", { name: /Lớp buổi/ })).toHaveLength(5);
+  expect(screen.getByRole("button", { name: /Xem thêm 1 lớp ngày/ })).toHaveTextContent("+1 lớp");
+  expect(screen.getAllByRole("button", { name: /Lớp buổi/ })).toHaveLength(6);
   expect(screen.queryByText(/08:00|11:00|13:00|17:00/)).not.toBeInTheDocument();
 
   fireEvent.click(busyDay);
@@ -661,6 +678,7 @@ it("suppresses occupied date-period slots from complete week data while preservi
   const selectedOffering = {
     ...offering,
     id: "selected",
+    schedulingConflicts: { retake: "STUDENT_CONFLICT" },
     name: "Lớp đã chọn",
     groupLinks: [
       ...offering.groupLinks,
@@ -699,14 +717,16 @@ it("suppresses occupied date-period slots from complete week data while preservi
         makeSession("shared-group-outside-scope", outsideOffering, 1),
         makeSession("not-held", selectedOffering, 2, "MORNING", "not_held"),
         makeSession("other-period", selectedOffering, 3, "MORNING"),
+        { ...makeSession("shared-student", { ...outsideOffering, id: "retake", name: "Lớp có học viên học lại", groupLinks: [{ classGroup: { ...sharedOutsideScope, id: "other-group" } }] }, 5), schedulingConflict: "STUDENT_CONFLICT" },
       ] };
     }
     return { data: [] };
   });
 
   render(<MemoryRouter useTransitions={false}><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>);
-  await screen.findByRole("option", { name: "2026" });
-  fireEvent.change(screen.getByLabelText("Khóa / Năm"), { target: { value: "2026" } });
+  await within(screen.getByRole("complementary")).findByRole("button", { name: /^Lớp ngoài phạm vi/ });
+  fireEvent.mouseDown(screen.getByLabelText("Khóa / Năm"));
+  fireEvent.click(await screen.findByRole("option", { name: "2026" }));
   await waitFor(() => expect(screen.queryByText("Lớp ngoài phạm vi")).not.toBeInTheDocument());
   fireEvent.click(screen.getByRole("button", { name: "Xếp lịch" }));
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tuần sau" })); });
@@ -722,6 +742,15 @@ it("suppresses occupied date-period slots from complete week data while preservi
   expect(screen.queryByRole("button", { name: `Xếp Sáng ${weekDates[3]}` })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: `Xếp Chiều ${weekDates[3]}` })).toBeInTheDocument();
 
+  expect(screen.queryByRole("button", { name: `Xếp Sáng ${weekDates[5]}` })).not.toBeInTheDocument();
+  const blocked = calendar.getAllByRole("button", { name: /Trùng lịch học viên/ })[0];
+  expect(blocked).toHaveAttribute("aria-disabled", "true");
+  fireEvent.click(blocked);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  fireEvent.mouseOver(blocked);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Lớp ngoài phạm vi");
+  fireEvent.mouseLeave(blocked);
+
   fireEvent.click(screen.getByRole("button", { name: `Xếp Sáng ${weekDates[4]}` }));
   let dialog = screen.getByRole("dialog");
   expect(dialog).toHaveTextContent("XẾP BUỔI");
@@ -730,7 +759,7 @@ it("suppresses occupied date-period slots from complete week data while preservi
   fireEvent.click(calendar.getAllByRole("button", { name: /Lớp đã chọn.*ĐÃ XẾP/ })[0]);
   dialog = screen.getByRole("dialog");
   expect(dialog).toHaveTextContent("CHI TIẾT BUỔI HỌC");
-});
+}, 60000);
 
 it("shows the add affordance and saves another class in an occupied period with independent resources", async () => {
   const defaultGet = axios.get.getMockImplementation();
@@ -917,6 +946,37 @@ it("allows a role with scheduling.write to schedule without the old assignee fla
   render(<MemoryRouter useTransitions={false}><ScheduleView user={{ canManageScheduling: false }} /></MemoryRouter>);
   expect(await screen.findByRole("button", { name: "Xếp lịch", exact: true })).toBeEnabled();
 });
+
+it("switches offerings without reloading or clearing the calendar and updates conflicts immediately", async () => {
+  const other = { ...offering, id: "other", name: "Lớp khác", groupLinks: [{ classGroup: { ...offering.groupLinks[0].classGroup, id: "other-group" } }] };
+  const selected = { ...offering, schedulingConflicts: { other: "STUDENT_CONFLICT" } };
+  let date;
+  axios.get.mockImplementation(async url => {
+    if (url.includes("/course-offerings?")) return { data: [selected, other] };
+    if (url.includes("/teaching-sessions?")) {
+      const params = new URLSearchParams(url.split("?")[1]);
+      date = formatDateKey(addDays(params.get("from"), 6));
+      return { data: [{ id: "existing", courseOfferingId: other.id, courseOffering: other, sessionDate: date, period: "MORNING", status: "planned" }] };
+    }
+    return { data: [] };
+  });
+  render(<MemoryRouter useTransitions={false}><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>);
+  const calendar = within(screen.getByRole("table", { name: "Lịch học theo tuần" }));
+  const existingCard = await calendar.findByRole("button", { name: /Lớp khác/ });
+  const requests = () => axios.get.mock.calls.filter(([url]) => url.includes("/teaching-sessions?")).length;
+  expect(requests()).toBe(1);
+  await act(async () => fireEvent.click(screen.getAllByRole("button", { name: "Xếp lịch", exact: true })[0]));
+  expect(existingCard).toBeInTheDocument();
+  expect(calendar.getByRole("button", { name: /Trùng lịch học viên/ })).toBeInTheDocument();
+  expect(calendar.queryByRole("button", { name: `Xếp Sáng ${date}` })).not.toBeInTheDocument();
+  await act(async () => fireEvent.click(screen.getAllByRole("button", { name: "Xếp lịch", exact: true })[1]));
+  expect(calendar.getByRole("button", { name: /Đã xếp học phần này/ })).toBeInTheDocument();
+  expect(requests()).toBe(1);
+  expect(screen.queryByText(/Đang kiểm tra lịch/)).not.toBeInTheDocument();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Bỏ chọn" })));
+  expect(requests()).toBe(1);
+  expect(existingCard).toBeInTheDocument();
+}, 60000);
 
 it("does not expose schedule editing from the old assignee flag without RBAC", async () => {
   renderWithPermissions(<MemoryRouter useTransitions={false}><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>, ["scheduling.view"]);

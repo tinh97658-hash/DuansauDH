@@ -1,6 +1,5 @@
 import React,{useEffect,useState} from 'react';
 import axios from 'axios';
-import {Link} from 'react-router-dom';
 import {Modal,SearchSelect,normalize} from '../scheduling/shared';
 import LecturerPicker from '../scheduling/LecturerPicker';
 import {API_BASE_URL} from '../../config/http';
@@ -8,6 +7,7 @@ import {getBusinessTodayKey} from '../../utils/schedulingCalendar';
 import {formatExamDate,validExamHours} from './examCalendar';
 import {isExamPeriodClosed,useExamWallTime} from './examPeriodAvailability';
 import {examRoomReason,examStatus,overlappingExams,roomFloor} from './examPlanner';
+import ExamDialogLayout from './ExamDialogLayout';
 
 const errorText=e=>{const text=e.response?.data?.message;return Array.isArray(text)?text.join(' '):text||'Không thể tải tình trạng phòng. Hãy thử lại.';};
 const examUnitNames=new Set(['vien dao tao sdh','vien dao tao sau dai hoc']);
@@ -23,7 +23,7 @@ export function ExamPendingCards({sessions,onSelect,canWrite,saving,onHeld,onNot
 export function CandidateList({item}){
  return <details className="ep-candidates"><summary>Danh sách thí sinh ({item.candidateCount})</summary><ol>{(item.candidates||[]).map(c=><li key={c.participantId}>{c.code?`${c.code} · `:''}{c.fullName}</li>)}</ol></details>;
 }
-export function ExamEditor({session,offering,slot,rooms,lecturers=[],units=[],canWrite,saving,error,onClose,onSave,onCompose}){
+export function ExamEditor({session,offering,slot,rooms,lecturers=[],units=[],canWrite,saving,error,onClose,onSave,onCompose,embedded=false}){
  const wallTime=useExamWallTime();
  const [form,setForm]=useState({examDate:session?.examDate||slot.date,startTime:session?.startTime.slice(0,5)||slot.start,endTime:session?.endTime.slice(0,5)||slot.end,roomId:session?.roomId||'',lecturerId:session?.lecturerId||'',note:session?.note||''});
  const [unitId,setUnitId]=useState(()=>{const lecturer=lecturers.find(l=>l.id===session?.lecturerId);return lecturer&&units.some(unit=>unit.id===lecturer.unitId&&isExamUnit(unit))?lecturer.unitId:'';});
@@ -43,7 +43,7 @@ export function ExamEditor({session,offering,slot,rooms,lecturers=[],units=[],ca
  const valid=canWrite&&form.examDate&&!pastDate&&!periodClosed&&validTime&&room&&!reason&&lecturer?.active&&filteredLecturers.some(l=>l.id===form.lecturerId)&&!lecturerBusy&&!candidateConflicts.size&&!availability.loading&&!availability.error;
  const floors=[...new Set(rooms.map(roomFloor))].sort((a,b)=>(a??99)-(b??99));
  const change=(key,value)=>setForm(current=>({...current,[key]:value}));
- return <Modal wide className="sl-session-editor-dialog ep-editor" bodyClassName="sl-session-editor-body" title={session?'SỬA LỊCH THI':'XẾP LỊCH THI'} busy={saving} onClose={onClose} actions={<><button className="sl-btn" disabled={saving} onClick={onClose}>Hủy</button><button className="sl-btn sl-btn-primary" disabled={!valid||saving} onClick={()=>onSave(form,()=>setRetry(n=>n+1))}>{session?'Lưu lịch':'Xếp lịch'}</button></>}>
+ return <ExamDialogLayout embedded={embedded} wide className="sl-session-editor-dialog ep-editor" bodyClassName="sl-session-editor-body" title={session?'SỬA LỊCH THI':'XẾP LỊCH THI'} busy={saving} onClose={onClose} actions={<><button className="sl-btn" disabled={saving} onClick={onClose}>{embedded?'Hủy chỉnh sửa':'Hủy'}</button><button className="sl-btn sl-btn-primary" disabled={!valid||saving} onClick={()=>onSave(form,()=>setRetry(n=>n+1))}>{embedded?'Lưu thay đổi':session?'Lưu lịch':'Xếp lịch'}</button></>}>
   {error&&<div role="alert" className="v20-error">{error}</div>}
   <div className="v20-composer">
    <section className="sl-editor-info"><h4>THÔNG TIN CA THI</h4><strong>{item.name}</strong><p>{item.subjectName}</p>
@@ -77,24 +77,15 @@ export function ExamEditor({session,offering,slot,rooms,lecturers=[],units=[],ca
     {floors.map(floor=><div className="v20-room-floor" key={floor??'other'}><h4>{floor==null?'PHÒNG KHÁC':`TẦNG ${floor}`}</h4><div className="v20-room-grid">{rooms.filter(r=>roomFloor(r)===floor).map(r=>{const blocked=examRoomReason(r,count,conflicts),chosen=form.roomId===r.id;return <button key={r.id} aria-pressed={chosen} title={r.name} className={`v20-room ${chosen?'sl-on':''} ${blocked==='ĐÃ CÓ LỊCH'?'v20-busy':blocked?'v20-unavailable':''}`} disabled={!canWrite||saving||availability.loading||!!availability.error||!form.examDate||!!pastDate||!validTime||!!blocked} onClick={()=>change('roomId',r.id)}><strong>{r.code}</strong><span>{r.capacity==null?'Chưa có sức chứa':`${r.capacity} chỗ`}</span><small>{blocked|| (chosen?'ĐANG CHỌN':'TRỐNG')}</small></button>;})}</div></div>)}
    </section>
   </div>
- </Modal>;
+ </ExamDialogLayout>;
 }
-export function ExamDetail({session,canWrite,saving,onClose,onEdit,onCancel,onPending,onCompose}){
- return <Modal title="LỊCH THI" className="ep-detail" busy={saving} onClose={onClose} actions={<><button className="sl-btn" onClick={onClose}>Đóng</button>{canWrite&&session.status==='scheduled'&&session.canEdit!==false&&!session.pendingConfirmation&&<><button className="sl-btn sl-btn-danger" onClick={onCancel}>Hủy lịch</button><button className="sl-btn sl-btn-primary" onClick={onEdit}>Sửa lịch</button></>}{session.pendingConfirmation&&<button className="sl-btn sl-btn-primary" onClick={onPending}>Xác nhận ca thi</button>}</>}>
-  <h3>{session.name}</h3><p>{session.subjectName}</p><dl className="ep-detail-data"><dt>Ngày thi</dt><dd>{formatExamDate(session.examDate)}</dd><dt>Phòng</dt><dd>{session.roomCode} {session.roomName?`· ${session.roomName}`:''}</dd><dt>Giảng viên</dt><dd>{session.lecturerName||'Chưa phân công'}</dd><dt>Thí sinh</dt><dd>{session.candidateCount}</dd><dt>Trạng thái</dt><dd>{examStatus(session)}</dd></dl><CandidateList item={session}/>
-  {session.groups?.length>0&&<p>Lớp học viên: {session.groups.map(g=>g.code||g.name).join(', ')}</p>}
-  {session.externalUnitName&&<p>Đơn vị giám thị: {session.externalUnitName}</p>}
-  {onCompose&&canWrite&&<button className="sl-btn" disabled={saving} onClick={onCompose}>Xem / sửa buổi thi chung</button>}
-  {session.note&&<p>Ghi chú: {session.note}</p>}
-  <Link to={`/masters/exam-lists?offeringId=${session.courseOfferingId}&groupId=${session.classGroupId||session.groups?.[0]?.id||''}`}>Mở bảng điểm</Link>
- </Modal>;
-}
-export function ExamReasonDialog({action,session,saving,error,onClose,onConfirm}){
+export function ExamReasonDialog({action,session,saving,error,onClose,onConfirm,embedded=false}){
  const [note,setNote]=useState(''),cancel=action==='cancel';
- return <Modal title={cancel?'HỦY LỊCH THI':'KHÔNG DIỄN RA'} className="ep-reason" busy={saving} onClose={onClose} actions={<><button className="sl-btn" disabled={saving} onClick={onClose}>Quay lại</button><button className={`sl-btn ${cancel?'sl-btn-danger':'sl-btn-primary'}`} disabled={saving||!note.trim()} onClick={()=>onConfirm(note)}>{cancel?'Hủy lịch':'Xác nhận không diễn ra'}</button></>}>
-  <p>{session.name} · {formatExamDate(session.examDate)} · {timeRange(session)}</p>{error&&<div role="alert" className="v20-error">{error}</div>}
+ return <ExamDialogLayout embedded={embedded} title={cancel?'HỦY LỊCH THI':'KHÔNG DIỄN RA'} className="ep-reason" busy={saving} onClose={onClose} actions={<><button className="sl-btn" disabled={saving} onClick={onClose}>Quay lại</button><button className={`sl-btn ${cancel?'sl-btn-danger':'sl-btn-primary'}`} disabled={saving||!note.trim()} onClick={()=>onConfirm(note)}>{cancel?'Hủy lịch':'Xác nhận không diễn ra'}</button></>}>
+  {embedded&&<h3>{cancel?'Hủy lịch thi':'Xác nhận không diễn ra'}</h3>}
+  <p>{session.name}{embedded&&session.subjectName?` · ${session.subjectName}`:''} · {formatExamDate(session.examDate)} · {timeRange(session)}</p>{error&&<div role="alert" className="v20-error">{error}</div>}
   <label className="v20-field">{cancel?'Lý do hủy *':'Lý do không diễn ra *'}<textarea autoFocus aria-label={cancel?'Lý do hủy':'Lý do không diễn ra'} required maxLength={2000} value={note} disabled={saving} onChange={e=>setNote(e.target.value)}/></label>
- </Modal>;
+ </ExamDialogLayout>;
 }
 export function ExamListTable({sessions,onSelect,confirmation,canWrite,saving,onHeld,onNotHeld}){
  return <table className="v20-table ep-session-table"><thead><tr><th>Ngày / giờ</th><th>Lớp học phần</th><th>Học phần</th><th>Phòng</th><th>Thí sinh</th>{confirmation&&<th>Xác nhận</th>}</tr></thead><tbody>{sessions.map(s=><tr key={s.id} tabIndex={confirmation?undefined:0} onClick={confirmation?undefined:()=>onSelect(s)} onKeyDown={confirmation?undefined:e=>{if(e.target===e.currentTarget&&['Enter',' '].includes(e.key)){e.preventDefault();onSelect(s);}}}><td>{formatExamDate(s.examDate)}<small>{timeRange(s)}</small></td><td><button className="sl-btn sl-btn-link" onClick={e=>{e.stopPropagation();onSelect(s);}}>{s.name}</button></td><td>{s.subjectName}</td><td>{s.roomCode}</td><td>{s.candidateCount}</td>{confirmation&&<td><div className="sl-pending-actions"><button className="sl-btn" disabled={!canWrite||saving} onClick={()=>onNotHeld(s)}>Không diễn ra</button><button className="sl-btn sl-btn-primary" disabled={!canWrite||saving} onClick={()=>onHeld(s)}>✓ Đã diễn ra</button></div></td>}</tr>)}</tbody></table>;

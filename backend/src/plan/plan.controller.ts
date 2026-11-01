@@ -78,10 +78,11 @@ export class PlanController {
     @Query("excludeStatus") excludeStatus?: string,
     @Query("includeGroup") includeGroup?: string,
     @Query("admissionStage") admissionStage?: string,
+    @Query("classGroupId") classGroupId?: string,
   ) {
     return this.plan.listAdmissionRecords(
       majorId, trainingLevel, academicYear, status, disciplineId, search, page, pageSize,
-      excludeStatus, includeGroup === "true", admissionStage,
+      excludeStatus, includeGroup === "true", admissionStage, classGroupId,
     );
   }
 
@@ -112,13 +113,13 @@ export class PlanController {
   majorTransferHistory(@Param("id") id: string) { return this.majorTransfers.list(id); }
 
   @Post("admission-records/:id/major-transfers")
-  @RequirePermissions("admission.manage")
+  @RequirePermissions("majortransfer.request")
   requestMajorTransfer(@Param("id") id: string, @Body() dto: RequestMajorTransferDto) {
     return this.majorTransfers.request(id, dto);
   }
 
   @Put("major-transfers/:id/decision")
-  @RequirePermissions("admission.manage")
+  @RequirePermissions("majortransfer.approve")
   decideMajorTransfer(@Param("id") id: string, @Body() dto: DecideMajorTransferDto, @CurrentUser() actor: any) {
     return this.majorTransfers.decide(id, dto, actor);
   }

@@ -38,7 +38,7 @@ it("lands on only unscheduled offerings from the dashboard year and allows clear
   await screen.findByRole("button", { name: /^LỚP CHƯA CÓ LỊCH/ });
   expect(screen.queryByRole("button", { name: /^LỚP KHÓA CŨ/ })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /^LỚP ĐÃ CÓ LỊCH/ })).not.toBeInTheDocument();
-  expect(screen.getByRole("combobox", { name: "Khóa / Năm" })).toHaveValue("2026");
+  expect(screen.getByRole("combobox", { name: "Khóa / Năm" })).toHaveTextContent("2026");
   fireEvent.click(screen.getByRole("button", { name: "Bỏ lọc công việc" }));
   await screen.findByRole("button", { name: /^LỚP ĐÃ CÓ LỊCH/ });
 });

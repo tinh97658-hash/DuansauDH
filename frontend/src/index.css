@@ -20,6 +20,8 @@
   --secondary: #173E75;
   --dialog-title-bg: #b4cae6;
   --dialog-title-text: #000000;
+  --dropdown-highlight-bg: #777777;
+  --dropdown-highlight-text: #ffffff;
   --dialog-content-inset: 3mm;
   --success: #137B3B;
   --success-light: #E6F4EA;
@@ -53,6 +55,47 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  cursor: default;
+}
+
+/* Apply directly so controls cannot restore the caret through inheritance. */
+body,
+body * {
+  caret-color: transparent;
+}
+
+/* Only the active editable field may show a text caret, including in portals. */
+input:not([readonly]):not(:disabled):not([type="checkbox"]):not([type="radio"]):focus,
+textarea:not([readonly]):not(:disabled):focus,
+[contenteditable="true"]:focus-within,
+[contenteditable="true"]:focus-within *,
+[contenteditable=""]:focus-within,
+[contenteditable=""]:focus-within *,
+[contenteditable="plaintext-only"]:focus-within,
+[contenteditable="plaintext-only"]:focus-within * {
+  caret-color: auto;
+}
+
+body input[readonly],
+body textarea[readonly],
+body input:disabled,
+body textarea:disabled,
+body [contenteditable="false"],
+body [contenteditable="false"] * {
+  caret-color: transparent;
+}
+
+input:not([readonly]):not(:disabled):not([type="checkbox"]):not([type="radio"]),
+textarea:not([readonly]):not(:disabled),
+[contenteditable="true"],
+[contenteditable=""],
+[contenteditable="plaintext-only"] {
+  cursor: text;
+}
+
+input[readonly],
+textarea[readonly] {
+  cursor: default;
 }
 
 button,
@@ -83,6 +126,16 @@ code, kbd, samp, pre {
   [class^="ant-"], [class*=" ant-"]
 ) {
   font-family: var(--app-font-family) !important;
+}
+
+/* Shared by native replacements, MUI menus and searchable dropdowns in portals. */
+body :is(.MuiMenuItem-root, [role="listbox"] [role="option"]):not(:disabled):not([aria-disabled="true"]):not(.Mui-disabled):is(:hover, :focus, .Mui-focusVisible, .Mui-focused, .Mui-selected, [aria-selected="true"]) {
+  background-color: var(--dropdown-highlight-bg) !important;
+  color: var(--dropdown-highlight-text) !important;
+}
+
+body :is(.MuiMenuItem-root, [role="listbox"] [role="option"]):not(:disabled):not([aria-disabled="true"]):not(.Mui-disabled):is(:hover, :focus, .Mui-focusVisible, .Mui-focused, .Mui-selected, [aria-selected="true"]) :is(small, .MuiListItemText-primary, .MuiListItemText-secondary) {
+  color: inherit !important;
 }
 
 #root :where(h1, h2, h3, h4, h5, h6) {

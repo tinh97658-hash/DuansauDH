@@ -554,6 +554,7 @@ export class PlanService {
     excludeStatus?: string,
     includeGroup = false,
     admissionStage?: string,
+    classGroupId?: string,
   ) {
     const page = Math.max(1, Number.parseInt(pageParam || "1", 10) || 1);
     const pageSize = Math.min(100, Math.max(1, Number.parseInt(pageSizeParam || "20", 10) || 20));
@@ -578,6 +579,19 @@ export class PlanService {
           { studyStatus: { [Op.is]: null } },
         ] },
       ];
+    }
+
+    if (classGroupId) {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(classGroupId)) {
+        throw new BadRequestException("Lớp học viên không hợp lệ.");
+      }
+      where[Op.and] = [...(where[Op.and] || []), literal(`EXISTS (
+        SELECT 1 FROM class_group_members AS membership
+        JOIN class_groups AS learner_group ON learner_group.id = membership.class_group_id
+        WHERE membership.class_group_id = '${classGroupId}' AND learner_group.program = 'masters'
+          AND (membership.admission_record_id = "AdmissionRecord"."id"
+            OR membership.student_id = "AdmissionRecord"."student_id")
+      )`)];
     }
 
     const effectiveStatus = literal(learnerStudyStatusSql('"AdmissionRecord"'));

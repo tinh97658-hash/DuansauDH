@@ -12,7 +12,8 @@ async function run() {
   const migrator = new Umzug({
     migrations: { glob: join(__dirname, "migrations", "*.js").replace(/\\/g, "/") },
     context: sequelize.getQueryInterface(),
-    storage: new SequelizeStorage({ sequelize }),
+    // Keep the history table stable regardless of Sequelize naming defaults.
+    storage: new SequelizeStorage({ sequelize, tableName: "sequelize_meta" }),
     logger: console,
   });
   const command = process.argv[2] || "up";

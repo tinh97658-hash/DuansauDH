@@ -3,6 +3,9 @@ import { Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Alert, Box, Button, Chip, MenuItem, Paper, Stack, Tab, Tabs, TableBody, TableCell, TableContainer, TableRow, Typography } from '@mui/material';
 import FeatureLayout from '../../components/FeatureLayout';
+import InlineReportExport from '../../components/InlineReportExport';
+import { useReportExport } from '../../components/ReportExportContext';
+import { collectReportPages } from '../../utils/reportExport';
 import FilterSearchField from '../../components/FilterSearchField';
 import FilterSelectField from '../../components/FilterSelectField';
 import ListPagination from "../../components/ListPagination";
@@ -10,6 +13,9 @@ import ResizableTable from '../../components/ResizableTable';
 import { preloadPage } from '../../utils/lazyPage';
 import { API_BASE_URL } from '../../config/http';
 import { leaveDate, leaveStatusLabels } from '../../features/learners/StudyLeavePanel';
+import StudyLeaveRequestDialog from '../../features/learners/StudyLeaveRequestDialog';
+import StudyLeaveDecisionDialog from '../../features/learners/StudyLeaveDecisionDialog';
+import { usePermissions } from '../../features/accounts/usePermissions';
 import StudyManagementRecords from '../../features/learners/StudyManagementRecords';
 
 const COLUMNS = [
@@ -18,6 +24,7 @@ const COLUMNS = [
   { key: 'dates', label: 'Thời gian bảo lưu', width: 220, minWidth: 200 },
   { key: 'status', label: 'Trạng thái', width: 220, minWidth: 200, align: 'center' },
   { key: 'overdue', label: 'Quá hạn', width: 100, minWidth: 90, align: 'center' },
+  { key: 'approval', label: 'Phê duyệt', width: 220, minWidth: 210, align: 'center' },
   { key: 'actions', label: 'Thao tác', width: 140, minWidth: 120, align: 'center' },
 ];
 
@@ -37,6 +44,11 @@ export default function StudyLeaves() {
 }
 
 function StudyLeaveList() {
+  const { can } = usePermissions();
+  const [creating, setCreating] = useState(false);
+  const [decision, setDecision] = useState(null);
+  const [revision, setRevision] = useState(0);
+  const [success, setSuccess] = useState('');
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -44,6 +56,12 @@ function StudyLeaveList() {
   const [result, setResult] = useState({ rows: [], total: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  useReportExport(async () => {
+    const rows = await collectReportPages(async nextPage => (await axios.get(`${API_BASE_URL}/plan/study-leaves`, { withCredentials: true, params: { status, search: debouncedSearch, page: nextPage, pageSize: 20 } })).data);
+    return { title: 'Danh sách bảo lưu', metadata: [['Tìm kiếm', debouncedSearch || 'Tất cả'], ['Phạm vi', `${rows.length} đợt bảo lưu phù hợp bộ lọc`]],
+      sections: [{ title: 'Các đợt bảo lưu', headers: ['Mã HV', 'Học viên', 'Trình độ', 'Lớp', 'Bắt đầu', 'Kết thúc', 'Trạng thái', 'Số ngày quá hạn', 'Lý do'],
+        rows: rows.map(row => [row.code, row.fullName, row.trainingLevel, row.classCode, leaveDate(row.startDate), leaveDate(row.endDate), leaveStatusLabels[row.status] || row.status, row.overdueDays || 0, row.note]) }] };
+  }, loading || !!error || search !== debouncedSearch);
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 250);
     return () => clearTimeout(timer);
@@ -60,7 +78,7 @@ function StudyLeaveList() {
     };
     load();
     return () => { cancelled = true; };
-  }, [status, debouncedSearch, page]);
+  }, [status, debouncedSearch, page, revision]);
   return <>
     <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5, bgcolor: '#FFF', borderColor: '#C6D5E1', borderRadius: '10px', boxShadow: '0 2px 6px rgba(18, 59, 98, 0.07)' }}>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'flex-end' }}>
@@ -69,8 +87,21 @@ function StudyLeaveList() {
         <MenuItem value="">Tất cả</MenuItem>{Object.entries(leaveStatusLabels).map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
         <MenuItem value="extension_pending">Có gia hạn chờ duyệt</MenuItem>
       </FilterSelectField>
+      {can('studyleave.request') && <Button variant="contained" sx={{ flexShrink: 0, whiteSpace: 'nowrap', minHeight: 38 }}
+        onClick={() => { setSuccess(''); setCreating(true); }}>Tạo yêu cầu bảo lưu</Button>}
+      <InlineReportExport height={38} />
       </Stack>
     </Paper>
+    {creating && <StudyLeaveRequestDialog onClose={() => setCreating(false)} onCreated={learner => {
+      setCreating(false); setSuccess(`Đã tạo yêu cầu bảo lưu cho ${learner.fullName} (${learner.code}).`);
+      setStatus(''); setSearch(''); setDebouncedSearch(''); setPage(0); setRevision(value => value + 1);
+    }} />}
+    {success && <Alert severity="success" sx={{ mb: 1.5 }}>{success}</Alert>}
+    {decision && <StudyLeaveDecisionDialog key={`${decision.leave.id}-${decision.action}`} {...decision}
+      onClose={() => setDecision(null)} onDecided={() => {
+        setSuccess(`Đã ${decision.action === 'approve' ? 'duyệt' : 'từ chối'} bảo lưu cho ${decision.leave.fullName}.`);
+        setDecision(null); setRevision(value => value + 1);
+      }} />}
     <Alert severity="info" sx={{ mb: 1.5, fontSize: 12 }}>Sắp hết hạn: còn tối đa 30 ngày. Quá hạn vẫn chờ xử lý, chưa tự động thôi học.</Alert>
     {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
     <Paper variant="outlined" sx={{ borderColor: '#D7E4EE', borderRadius: '6px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(23, 62, 117, 0.04)' }}>
@@ -81,8 +112,12 @@ function StudyLeaveList() {
         <TableCell align="center"><Chip size="small" color={row.status === 'overdue' ? 'error' : row.status === 'expiring' ? 'warning' : 'default'} label={leaveStatusLabels[row.status] || row.status} />
           {row.extensions?.some(extension => extension.status === 'pending') && <Typography variant="caption" display="block">Có gia hạn chờ duyệt</Typography>}</TableCell>
         <TableCell align="center">{row.status === 'overdue' ? `${row.overdueDays} ngày` : '—'}</TableCell>
+        <TableCell align="center">{row.status === 'pending' && can('studyleave.approve') ? <Stack direction="row" spacing={1} justifyContent="center">
+          <Button size="small" variant="contained" disabled={loading} sx={{ whiteSpace: 'nowrap' }} onClick={() => { setSuccess(''); setDecision({ leave: row, action: 'approve' }); }}>Duyệt bảo lưu</Button>
+          <Button size="small" color="error" disabled={loading} sx={{ whiteSpace: 'nowrap' }} onClick={() => { setSuccess(''); setDecision({ leave: row, action: 'reject' }); }}>Từ chối</Button>
+        </Stack> : '—'}</TableCell>
         <TableCell align="center"><Button size="small" component={Link} to={`/masters/study-leaves/${row.admissionRecordId}?tab=leave`} onPointerEnter={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)} onFocus={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)}>Mở hồ sơ</Button></TableCell>
-      </TableRow>)}{!result.rows.length && <TableRow><TableCell colSpan={6} align="center" sx={{ py: 5, color: 'text.secondary' }}>{loading ? 'Đang tải…' : 'Không có hồ sơ bảo lưu phù hợp.'}</TableCell></TableRow>}</TableBody></ResizableTable>
+      </TableRow>)}{!result.rows.length && <TableRow><TableCell colSpan={7} align="center" sx={{ py: 5, color: 'text.secondary' }}>{loading ? 'Đang tải…' : 'Không có hồ sơ bảo lưu phù hợp.'}</TableCell></TableRow>}</TableBody></ResizableTable>
       </TableContainer>
       <ListPagination count={result.total} page={page} pageSize={20} onPageChange={setPage} recordLabel="học viên" />
     </Paper>

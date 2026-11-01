@@ -34,6 +34,23 @@ const ROLES = [
   },
 ];
 
+it('lets admin grant request permissions to supervisor while reserving approvals for admin', async () => {
+  const permissions = [
+    { id: 'request', code: 'studyleave.request', name: 'Tạo yêu cầu bảo lưu' },
+    { id: 'approve', code: 'studyleave.approve', name: 'Duyệt bảo lưu', assignableRoleCodes: ['admin'] },
+  ];
+  axios.get.mockImplementation(url => Promise.resolve({ data: String(url).endsWith('/roles/permissions') ? [{ group: 'Bảo lưu', permissions }] : [ROLES[1]] }));
+  axios.put.mockResolvedValue({ data: { message: 'Đã lưu' } });
+  mount(['role.view', 'role.manage']);
+  const request = await screen.findByRole('checkbox', { name: 'Tạo yêu cầu bảo lưu' });
+  expect(request).toBeEnabled();
+  expect(screen.getByRole('checkbox', { name: 'Duyệt bảo lưu' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Chọn tất cả Bảo lưu' }));
+  expect(request).toBeChecked();
+  fireEvent.click(screen.getByRole('button', { name: 'Lưu quyền' }));
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.stringContaining('/role-supervisor/permissions'), expect.objectContaining({ permissionIds: ['request'] }), expect.any(Object)));
+});
+
 const mount = (permissions) => render(
   <ThemeProvider theme={theme}>
     <CssBaseline />

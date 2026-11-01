@@ -5,6 +5,7 @@ import { InjectModel } from "@nestjs/sequelize";
 import { Permission } from "../database/models/permission.model.js";
 import { Role } from "../database/models/role.model.js";
 import { StaffRole } from "../database/models/staff-role.model.js";
+import { permissionAssignableToRole } from "./permissions.js";
 
 export interface EffectiveAccess {
   permissions: Set<string>;
@@ -62,10 +63,10 @@ export class RbacService {
     roleModels = roleModels.filter((role) => role.active === true);
     const permissions = new Set<string>();
     for (const role of roleModels) {
-      for (const permission of role.permissions ?? []) permissions.add(permission.code);
+      for (const permission of role.permissions ?? []) if (permissionAssignableToRole(permission.code, role.code)) permissions.add(permission.code);
     }
     const academicGrants = roleModels.flatMap(role => (role.permissions ?? [])
-      .filter(permission => INSTITUTION_PERMISSIONS.has(permission.code))
+      .filter(permission => INSTITUTION_PERMISSIONS.has(permission.code) && permissionAssignableToRole(permission.code, role.code))
       .map(permission => ({ roleId: role.id, permission: permission.code, scope: 'institution' as const })));
     const schedulingGrants: ScopedGrant[] = academicGrants
       .filter(grant => Object.hasOwn(SCHEDULING_SCOPES, grant.permission))

@@ -1,5 +1,6 @@
 .gradebook-preview { padding: 16px; background: #eef1f4; overflow: auto; }
 .gradebook-preview nav { margin-bottom: 12px; }
+.sl-schedule-preview .exam-list-document { display: block; width: 281mm; margin: 0 auto; }
 .gradebook-document { box-sizing: border-box; width: 281mm; margin: 0 auto; padding: 6mm; background: white; color: black; font: 11pt "Times New Roman", serif; }
 .gradebook-document header { width: 110mm; max-width: 100%; text-align: center; line-height: 1.5; }
 .gradebook-document header strong { display: block; font-size: 12pt; }
@@ -23,6 +24,7 @@
 #root .gradebook-document th { background: #f2f2f2 !important; }
 #root .gradebook-document td { background: white !important; }
 @media print {
+  .sl-schedule-preview .exam-list-document { width: 100%; margin: 0; }
   @page gradebook-report { size: A4 landscape; margin: 8mm; }
   body:has(.gradebook-preview) { margin: 0 !important; background: white; }
   body:has(.gradebook-preview) > #root { width: 100%; }

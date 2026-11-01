@@ -2,16 +2,20 @@ import React,{useEffect,useState} from 'react';
 import {useSearchParams} from 'react-router-dom';
 import axios from 'axios';
 import {Tooltip} from '@mui/material';
+import YearSelect from '../../features/scheduling/YearSelect';
 import FeatureLayout from '../../components/FeatureLayout';
+import DocumentExportMenu from '../../components/DocumentExportMenu';
+import {buildExamScheduleDocument} from '../../features/exams/examScheduleExport';
+import {createScheduleExcel,createScheduleWord,downloadScheduleFile,exportSchedule} from '../../features/scheduling/scheduleExport';
 import {usePermissions} from '../../features/accounts/usePermissions';
 import {API_BASE_URL} from '../../config/http';
 import {addDays,formatDateKey,getBusinessTodayKey,mondayOf} from '../../utils/schedulingCalendar';
 import {notifyGradebookSaved} from '../../utils/gradebookRevision';
 import {examPeriods,examSessionsForPeriod,formatExamDate} from '../../features/exams/examCalendar';
 import {examCardStatus,examOfferingLabel,examStatus,matchesExam,uniqueOptions} from '../../features/exams/examPlanner';
-import {ExamDetail,ExamEditor,ExamListTable,ExamPendingCards,ExamReasonDialog} from '../../features/exams/ExamPlannerDialogs';
+import {ExamEditor,ExamListTable,ExamPendingCards,ExamReasonDialog} from '../../features/exams/ExamPlannerDialogs';
 import ExamArrangementEditor from '../../features/exams/ExamArrangementEditor';
-import ExamArrangementDetail from '../../features/exams/ExamArrangementDetail';
+import ExamSessionDialog from '../../features/exams/ExamSessionDialog';
 import {collectExamArrangements} from '../../features/exams/examArrangement';
 import {isExamPeriodClosed,nextExamSlot,useExamWallTime} from '../../features/exams/examPeriodAvailability';
 import {Modal,SearchSelect} from '../../features/scheduling/shared';
@@ -44,28 +48,32 @@ export default function ExamSchedule(){
  const context=s=>({...offerings.find(o=>o.id===s.courseOfferingId),...s});
  const filteredSessions=data.sessions.filter(s=>matching(context(s)));
  const sessions=collectExamArrangements(data.sessions).filter(s=>s.isArrangement?s.members.some(g=>matching(context(g))):matching(context(s)));
+ const printSchedule=()=>buildExamScheduleDocument({week,end:last,sessions:filteredSessions.map(context)});
+ const downloadExport=async(format)=>{const snapshot=printSchedule();downloadScheduleFile(await (format==='docx'?createScheduleWord(snapshot):createScheduleExcel(snapshot)),`lich-thi-${week}-${last}.${format}`);};
  const queue=data.queue.filter(matching);
  const pending=filteredSessions.filter(s=>s.pendingConfirmation);
  const selected=data.queue.find(o=>o.id===offeringId&&matching(o));
  const changeFilter=(key,value)=>{setFilters(current=>({...current,[key]:value,...(key==='discipline'?{major:'',year:''}:key==='major'?{year:''}:{})}));setOfferingId('');};
  const openDetail=session=>{setAggregate(null);setPendingOpen(false);setDetail(session);setError('');};
- const mutate=async(action,target,note='',form,refreshAvailability)=>{if(!canWrite||saving)return;setSaving(true);setError('');
+ const mutate=async(action,target,note='',form,refreshAvailability,keepDetail=false)=>{if(!canWrite||saving)return false;setSaving(true);setError('');
   try{const base=`${API_BASE_URL}/masters/exam-sessions`,options={withCredentials:true};
    if(action==='save'){
-    const offering=editor.offering,payload={...form,courseOfferingId:offering.id,snapshotId:target?.snapshotId||offering.snapshotId,eligibilityVersion:offering.eligibilityVersion,...(target?{version:target.version}:{})};
+    const offering=editor?.offering||offerings.find(o=>o.id===target?.courseOfferingId),payload={...form,courseOfferingId:offering.id,snapshotId:target?.snapshotId||offering.snapshotId,eligibilityVersion:offering.eligibilityVersion,...(target?{version:target.version}:{})};
     if(target)await axios.put(`${base}/${target.id}`,payload,options);else await axios.post(base,payload,options);
    }else await axios.post(`${base}/${target.id}/${action==='cancel'?'cancel':'confirm'}`,{version:target.version,note,...(action==='cancel'?{}:{status:action})},options);
-   setEditor(null);setDetail(null);setReason(null);setOfferingId('');setRevision(n=>n+1);notifyGradebookSaved();
-  }catch(e){setError(errorText(e));refreshAvailability?.();}finally{setSaving(false);}
+   setEditor(null);if(!keepDetail)setDetail(null);setReason(null);setOfferingId('');setRevision(n=>n+1);notifyGradebookSaved();return true;
+  }catch(e){setError(errorText(e));refreshAvailability?.();return false;}finally{setSaving(false);}
  };
  const close=setter=>()=>{if(!saving){setter(null);setError('');}};
  const compose=(session,initial={})=>{if(!canWrite)return;const members=session?data.sessions.filter(s=>(s.arrangementId||s.id)===(session.arrangementId||session.id)):[];setDetail(null);setError('');setEditor({mode:'arrangement',members,initial:{...(!session?nextExamSlot():{}),...initial}});};
  const openEditor=(session,slot)=>{if(!session&&slot&&isExamPeriodClosed(slot.date,slot.period))return;if(session?.arrangementId&&(session.externalInvigilatorName||data.sessions.filter(s=>s.arrangementId===session.arrangementId).length>1)){compose(session);return;}const offering=offerings.find(o=>o.id===(session?.courseOfferingId||offeringId));if(!offering||!canWrite||(session?.examDate||slot?.date)<getBusinessTodayKey())return;setDetail(null);setError('');setEditor({session,slot,offering});};
- const saveArrangement=async(form,id,refresh)=>{if(!canWrite||saving)return;setSaving(true);setError('');try{
+ const saveArrangement=async(form,id,refresh,keepDetail=false)=>{if(!canWrite||saving)return false;setSaving(true);setError('');try{
   const url=`${API_BASE_URL}/masters/exam-arrangements`,options={withCredentials:true};
   if(id)await axios.put(`${url}/${id}`,form,options);else await axios.post(url,form,options);
-  setEditor(null);setDetail(null);setOfferingId('');setRevision(n=>n+1);notifyGradebookSaved();
- }catch(e){setError(errorText(e));refresh?.();}finally{setSaving(false);}};
+  if(keepDetail&&form.examDate)setWeek(formatDateKey(mondayOf(form.examDate)));
+  setEditor(null);if(!keepDetail)setDetail(null);setOfferingId('');setRevision(n=>n+1);notifyGradebookSaved();return true;
+ }catch(e){setError(errorText(e));refresh?.();return false;}finally{setSaving(false);}};
+ const detailMembers=detail?data.sessions.filter(s=>detail.arrangementId?s.arrangementId===detail.arrangementId:s.id===detail.id):[];
  if(!canView)return <FeatureLayout title="Xếp lịch thi"><div role="alert">Bạn không có quyền xem lịch thi.</div></FeatureLayout>;
  return <FeatureLayout title="Xếp lịch thi" maxWidth={1920} hideHeader workspaceMode><div className="scheduling-v20 v20-workspace v20-schedule-workspace">
   <section className={`sl-workspace sl-schedule-view exam-planner${sidebarCollapsed?' sl-sidebar-collapsed':''}`} aria-label="Không gian xếp lịch thi">
@@ -73,7 +81,7 @@ export default function ExamSchedule(){
     <div className="sl-scope"><div className="sl-eyebrow">PHẠM VI LÀM VIỆC</div><div className="sl-schedule-scope-fields">
      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>1</b>NGÀNH</div><SearchSelect label="Ngành" value={filters.discipline} placeholder="Tất cả ngành" options={[{id:'',name:'Tất cả ngành'},...disciplines]} onChange={value=>changeFilter('discipline',value)}/></div>
      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>2</b>CHUYÊN NGÀNH</div><SearchSelect label="Chuyên ngành" value={filters.major} placeholder="Tất cả chuyên ngành" options={[{id:'',name:'Tất cả chuyên ngành'},...majors]} onChange={value=>changeFilter('major',value)}/></div>
-     <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>3</b>KHÓA / NĂM HỌC</div><select className={`sl-select sl-year-select${filters.year?'':' sl-placeholder'}`} aria-label="Khóa / năm học" value={filters.year} onChange={e=>changeFilter('year',e.target.value)}><option value="">Tất cả</option>{years.map(year=><option key={year}>{year}</option>)}</select></div>
+     <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>3</b>KHÓA / NĂM HỌC</div><YearSelect className={`sl-select sl-year-select${filters.year?'':' sl-placeholder'}`} label="Khóa / năm học" value={filters.year} years={years} onChange={value=>changeFilter('year',value)}/></div>
     </div></div>
     <div className="sl-worklist"><div className="sl-search-wrap"><span aria-hidden="true">⌕</span><input className="sl-search" aria-label="Tìm kiếm" placeholder="Tìm lớp học phần..." value={filters.search} onChange={e=>changeFilter('search',e.target.value)}/></div>
      <div className="sl-card-scroll"><aside className="sl-section ep-queue" aria-label="Chưa xếp lịch"><h2><span>CHƯA XẾP LỊCH</span><b>{queue.length}</b></h2>
@@ -83,7 +91,7 @@ export default function ExamSchedule(){
     </div>
    </div></aside>
    <section className="sl-right ep-calendar" aria-label="Lịch thi tuần">
-    <div className="sl-schedule-head"><div className="ep-heading-actions"><h1>XẾP LỊCH THI</h1>{canWrite&&<button className="sl-btn sl-btn-primary" disabled={loading||saving} onClick={()=>compose(null,{offering:selected})}>+ Tạo buổi thi ghép</button>}</div><div className="sl-week"><button aria-label="Tuần trước" onClick={()=>setWeek(formatDateKey(addDays(week,-7)))}>‹</button><strong>{formatExamDate(week)} – {formatExamDate(last)}</strong><button aria-label="Tuần sau" onClick={()=>setWeek(formatDateKey(addDays(week,7)))}>›</button></div><div className="sl-actions"><button className="sl-btn sl-today" onClick={()=>setWeek(formatDateKey(mondayOf(getBusinessTodayKey())))}>Tuần này</button><button className="sl-pending" onClick={()=>{setError('');setPendingOpen(true);}}>{pending.length} chờ xác nhận</button></div></div>
+    <div className="sl-schedule-head"><div className="ep-heading-actions"><h1>XẾP LỊCH THI</h1>{canWrite&&<button className="sl-btn sl-btn-primary" disabled={loading||saving} onClick={()=>compose(null,{offering:selected})}>+ Tạo buổi thi ghép</button>}</div><div className="sl-week"><button aria-label="Tuần trước" onClick={()=>setWeek(formatDateKey(addDays(week,-7)))}>‹</button><strong>{formatExamDate(week)} – {formatExamDate(last)}</strong><button aria-label="Tuần sau" onClick={()=>setWeek(formatDateKey(addDays(week,7)))}>›</button></div><div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" disabled={loading||saving||!!error} onWord={()=>downloadExport('docx')} onExcel={()=>downloadExport('xlsx')} onPdf={()=>exportSchedule(printSchedule())} onError={e=>setError(e.message||'Không thể xuất lịch thi.')}/><button className="sl-btn sl-today" onClick={()=>setWeek(formatDateKey(mondayOf(getBusinessTodayKey())))}>Tuần này</button><button className="sl-pending" onClick={()=>{setError('');setPendingOpen(true);}}>{pending.length} chờ xác nhận</button></div></div>
     {selected&&<div className="sl-selected-strip"><span className="sl-selected-tag">ĐANG XẾP</span><strong className="sl-selected-offering" title={selected.name}>{examOfferingLabel(selected)}</strong><span className="sl-selected-meta">{selected.candidateCount} TS</span><button className="sl-btn sl-selected-clear" onClick={()=>setOfferingId('')}>Bỏ chọn</button></div>}
     {error&&!editor&&!reason&&<div role="alert" className="v20-error">{error}</div>}{!canWrite&&<div className="v20-hint">Chế độ chỉ xem — cần quyền xếp lịch để thay đổi ca thi.</div>}
     <div className="sl-calendar-wrap ep-calendar-scroll"><div className="sl-calendar ep-period-calendar" role="table" aria-label="Lịch thi theo tuần"><div className="sl-corner">BUỔI</div>
@@ -104,7 +112,11 @@ export default function ExamSchedule(){
    </section>
   </section>
   {editor&&(editor.mode==='arrangement'?<ExamArrangementEditor initial={editor.initial} members={editor.members} queue={data.queue} rooms={data.rooms} lecturers={data.lecturers} units={data.units} canWrite={canWrite} saving={saving} error={error} onClose={close(setEditor)} onSave={saveArrangement}/>:<ExamEditor session={editor.session} offering={editor.offering} slot={editor.slot} rooms={data.rooms} lecturers={data.lecturers} units={data.units} canWrite={canWrite} saving={saving} error={error} onClose={close(setEditor)} onSave={(form,refresh)=>mutate('save',editor.session,'',form,refresh)} onCompose={form=>compose(editor.session,{...form,offering:editor.offering})}/>)}
-  {detail&&(detail.isArrangement?<ExamArrangementDetail session={detail} canWrite={canWrite} saving={saving} onClose={close(setDetail)} onEdit={()=>compose(detail)} onSelect={openDetail}/>:<ExamDetail session={detail} canWrite={canWrite} saving={saving} onClose={close(setDetail)} onEdit={()=>openEditor(detail)} onCancel={()=>{setError('');setReason({action:'cancel',session:detail});}} onPending={()=>{setDetail(null);setPendingOpen(true);}} onCompose={detail.arrangementId?()=>compose(detail):undefined}/>)}
+  {detail&&<ExamSessionDialog key={detail.arrangementId||detail.id} members={detailMembers} queue={data.queue} rooms={data.rooms} lecturers={data.lecturers} units={data.units}
+   canWrite={canWrite} saving={saving} refreshing={loading} error={error} onClose={close(setDetail)} onClearError={()=>setError('')}
+   onSaveArrangement={(form,id,retry)=>saveArrangement(form,id,retry,true)}
+   onSaveSession={(session,form,retry)=>mutate('save',session,'',form,retry,true)}
+   onAction={(action,session,note)=>mutate(action,session,note,undefined,undefined,true)}/>}
   {aggregate&&<Modal wide className="ep-list-dialog" title={`CÁC CA THI · ${formatExamDate(aggregate.date)} · ${aggregate.periodLabel}`} onClose={close(setAggregate)} actions={<button className="sl-btn" onClick={close(setAggregate)}>Đóng</button>}><ExamListTable sessions={aggregate.sessions} onSelect={openDetail}/></Modal>}
   {pendingOpen&&<Modal wide className="sl-pending-drawer ep-pending-dialog" bodyClassName="sl-pending-body" title={`CA THI CHỜ XÁC NHẬN · ${pending.length}`} busy={saving} onClose={()=>{if(!saving)setPendingOpen(false);}}>
    {error&&!reason&&<div role="alert" className="v20-error">{error}</div>}{pending.length?<ExamPendingCards sessions={pending} onSelect={openDetail} canWrite={canWrite} saving={saving} onHeld={s=>mutate('held',s)} onNotHeld={s=>{setError('');setReason({action:'not_held',session:s});}}/>:<p>Không có ca thi chờ xác nhận.</p>}

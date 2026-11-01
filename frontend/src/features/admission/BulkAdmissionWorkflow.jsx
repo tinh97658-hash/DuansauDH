@@ -7,6 +7,8 @@ import AppDialog from "../../components/AppDialog";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import ListPagination from "../../components/ListPagination";
 import ResizableTable from "../../components/ResizableTable";
+import { useReportExport } from "../../components/ReportExportContext";
+import { tableReport } from "../../utils/reportExport";
 import { getMockConfirmResult } from "../../utils/confirmHelper";
 import { createScoreTemplate, EXCEL_MIME, parseScoreExcel, readExcelFile } from "./admissionExcel";
 
@@ -44,6 +46,14 @@ export default function BulkAdmissionWorkflow({ data, visibleRows, paginationKey
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const dirty = Object.keys(drafts).length > 0;
+  useReportExport(() => ({ pageOrientation: "landscape", ...tableReport("Điểm xét tuyển", BULK_ADMISSION_COLUMNS, visibleRows, (row, column) => {
+    if (column.key === "name") return row.fullName;
+    if (column.key === "major") return row.majorName;
+    if (column.key === "contact") return [row.phone, row.email].filter(Boolean).join("; ");
+    if (column.key === "condition") return row.stale ? "Cần xác minh lại" : row.meetsCutoff === true ? "Đủ điều kiện" : row.meetsCutoff === false ? "Chưa đạt ngưỡng" : "Chờ xét tuyển";
+    if (column.key === "status") return row.decision === "admitted" ? "Đã trúng tuyển" : row.decision === "rejected" ? "Không trúng tuyển" : "Chờ xét tuyển";
+    return row[column.key];
+  }, [["Đợt xét tuyển", data.round.name], ["Phạm vi", `${visibleRows.length} hồ sơ phù hợp bộ lọc`]]) }), busy || dirty || thresholdsDirty);
   useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
   useEffect(() => { onBusyChange?.(pending); }, [pending, onBusyChange]);
   useEffect(() => () => { onDirtyChange?.(false); }, [onDirtyChange]);

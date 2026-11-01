@@ -24,6 +24,7 @@ import SaveRounded from "@mui/icons-material/SaveRounded";
 import ClassRounded from "@mui/icons-material/ClassRounded";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
+import InlineReportExport from "../../components/InlineReportExport";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import SubjectSharingCheckbox from "../../components/SubjectSharingCheckbox";
@@ -1049,8 +1050,8 @@ const TrainingPlan = () => {
           boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
         }}
       >
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems="center" justifyContent="space-between">
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="flex-end" sx={{ width: { xs: "100%", md: "auto" }, flexGrow: 1 }}>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} useFlexGap alignItems="flex-end" justifyContent="space-between" sx={{ flexWrap: "wrap" }}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} useFlexGap alignItems="flex-end" sx={{ width: { xs: "100%", md: "auto" }, flexGrow: 1, minWidth: 0, flexWrap: "wrap" }}>
             <FilterSelectField label="Trình độ" sx={{ flex: "1 1 160px", minWidth: 160, width: { xs: "100%", sm: "auto" } }}
                 value={level}
                 onChange={(e) => setLevel(e.target.value)}
@@ -1085,7 +1086,7 @@ const TrainingPlan = () => {
                 ))}
             </FilterSelectField>
           </Stack>
-
+          <InlineReportExport height={38} />
         </Stack>
       </Paper>
 
@@ -1214,7 +1215,7 @@ const TrainingPlan = () => {
               overflow: "visible !important",
             }}
           >
-            <Table size="small" sx={{ minWidth: 1250, tableLayout: "fixed" }}>
+            <Table size="small" aria-label="Danh mục học phần" sx={{ minWidth: 1250, tableLayout: "fixed" }}>
               <TableHead>
                 <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", color: "#172B3A", fontWeight: 700, fontSize: 12, py: "8px", borderBottom: "2px solid #DFE4E8" } }}>
                   <TableCell sx={{ width: 44, textAlign: "center" }}>STT</TableCell>
@@ -1226,7 +1227,6 @@ const TrainingPlan = () => {
                   <TableCell sx={{ width: 120, textAlign: "center" }}>Học chung</TableCell>
                   <TableCell sx={{ width: 95, textAlign: "center" }}>Bài tập lớn</TableCell>
                   <TableCell sx={{ width: 90, textAlign: "center" }}>Bắt buộc</TableCell>
-                  <TableCell sx={{ width: 70, textAlign: "center" }}>Thứ tự</TableCell>
                   <TableCell sx={{ width: 90, textAlign: "center" }}>Trạng thái</TableCell>
                   {isAdmin && <TableCell sx={{ width: 110, textAlign: "center" }}>Thao tác</TableCell>}
                 </TableRow>
@@ -1235,7 +1235,7 @@ const TrainingPlan = () => {
               <TableBody>
                 {filteredSubjects.length === 0 && !isAddingSubject ? (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 12 : 11} align="center" sx={{ py: 5, color: "#607486" }}>
+                    <TableCell colSpan={isAdmin ? 11 : 10} align="center" sx={{ py: 5, color: "#607486" }}>
                       Chưa có học phần nào cho chuyên ngành <strong>{selectedMajor?.name}</strong>.
                       {isAdmin && (
                         <Box sx={{ mt: 1 }}>
@@ -1342,16 +1342,6 @@ const TrainingPlan = () => {
                               checked={editingSubjectForm.isRequired}
                               onChange={(e) => setEditingSubjectForm((p) => ({ ...p, isRequired: e.target.checked }))}
                               sx={{ p: 0.5 }}
-                            />
-                          </TableCell>
-                          <TableCell align="center">
-                            <TextField
-                              size="small"
-                              type="number"
-                              value={editingSubjectForm.sortOrder}
-                              onChange={(e) => setEditingSubjectForm((p) => ({ ...p, sortOrder: e.target.value }))}
-                              sx={{ ...cellInputSx, width: 55 }}
-                              inputProps={{ min: 0 }}
                             />
                           </TableCell>
                           <TableCell align="center">
@@ -1478,9 +1468,6 @@ const TrainingPlan = () => {
                               )}
                             </IconButton>
                           </Tooltip>
-                        </TableCell>
-                        <TableCell align="center" sx={{ color: "#607486", fontSize: 12 }}>
-                          {row.sortOrder ?? 0}
                         </TableCell>
                         <TableCell align="center">
                           {isAdmin ? (
@@ -1623,16 +1610,6 @@ const TrainingPlan = () => {
                       />
                     </TableCell>
                     <TableCell align="center">
-                      <TextField
-                        size="small"
-                        type="number"
-                        value={subjectDraft.sortOrder}
-                        onChange={(e) => setSubjectDraft((p) => ({ ...p, sortOrder: e.target.value }))}
-                        sx={{ ...cellInputSx, width: 55 }}
-                        inputProps={{ min: 0 }}
-                      />
-                    </TableCell>
-                    <TableCell align="center">
                       <Switch
                         size="small"
                         checked={subjectDraft.active}
@@ -1723,7 +1700,7 @@ const TrainingPlan = () => {
               </Stack>
 
               <TableContainer sx={{ maxHeight: 480, overflowY: "auto", border: "1px solid #D7E4EE", borderRadius: "8px", boxShadow: "none !important" }}>
-                <Table size="small" stickyHeader>
+                <Table size="small" stickyHeader aria-label="Chương trình đào tạo">
                   <TableHead>
                     <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", fontWeight: 700, fontSize: 11, py: "6px" } }}>
                       <TableCell>Chương trình đào tạo</TableCell>
@@ -2030,7 +2007,7 @@ const TrainingPlan = () => {
                   </Stack>
 
                   <TableContainer sx={{ border: "1px solid #D7E4EE", borderRadius: "8px", boxShadow: "none !important" }}>
-                    <Table size="small" sx={{ minWidth: 900, tableLayout: "fixed" }}>
+                    <Table size="small" aria-label="Danh mục học phần" sx={{ minWidth: 900, tableLayout: "fixed" }}>
                       <TableHead>
                         <TableRow sx={{ height: 42, "& th": { bgcolor: "#F0F4F8", color: "#172B3A", fontWeight: 700, fontSize: 13, py: "8px" } }}>
                           <TableCell sx={{ width: 36, textAlign: "center" }}>STT</TableCell>

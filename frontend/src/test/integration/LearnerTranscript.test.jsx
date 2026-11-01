@@ -15,7 +15,7 @@ jest.mock("axios");
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
 jest.mock("../../features/learners/learnerTranscriptPdfPreview", async (importOriginal) => ({ openLearnerTranscriptPdfPreview: jest.fn((await importOriginal()).openLearnerTranscriptPdfPreview) }));
 jest.mock("../../features/learners/learnerTranscriptWord", () => ({ createLearnerTranscriptWord: jest.fn() }));
-jest.mock("../../features/learners/learnerTranscriptPdf", () => ({ createLearnerTranscriptPdf: jest.fn() }));
+jest.mock("../../features/learners/learnerTranscriptPdf", () => ({ createLearnerTranscriptPdf: jest.fn(), createLearnerTranscriptsPdf: jest.fn(async () => new Blob(["pdf"], { type: "application/pdf" })) }));
 jest.mock("../../features/learners/learnerTranscriptBatch", async (importOriginal) => ({ fetchClassTranscripts: jest.fn(), generateTranscriptDocuments: jest.fn(), selectTranscriptScorecards: (await importOriginal()).selectTranscriptScorecards }));
 jest.mock("../../features/learners/learnerTranscriptZip", () => ({ packTranscriptZip: jest.fn() }));
 jest.mock("../../utils/documentFiles", async (importOriginal) => ({ ...await importOriginal(), downloadDocumentFile: jest.fn() }));
@@ -60,7 +60,7 @@ it("offers exactly summary Excel and personal transcript actions, loading roster
   await screen.findByText("HV001");
   expect(axios.get.mock.calls.some(([url]) => url.endsWith("/roster") || url.endsWith("/export"))).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "Xuất file" }));
-  expect(screen.getAllByRole("menuitem").map(item => item.textContent)).toEqual(["Xuất điểm cả lớp", "Xuất bảng điểm cá nhân"]);
+  expect(screen.getAllByRole("menuitem").map(item => item.textContent)).toEqual(["Xuất bảng điểm cả lớp", "Xuất bảng điểm cá nhân"]);
   fireEvent.click(screen.getByRole("menuitem", { name: "Xuất bảng điểm cá nhân" }));
   const dialog = await loadedDialog();
   expect(within(dialog).getAllByRole("checkbox")).toHaveLength(41);
@@ -136,7 +136,7 @@ it("enables both single and multiple selections without a separate whole-class m
   const exportButton = screen.getByRole("button", { name: "Xuất bảng điểm" });
   expect(exportButton).toBeDisabled();
   expect(screen.getByRole("radio", { name: "PDF" })).toBeEnabled();
-  expect(screen.getByText(/1 học viên: tải file trực tiếp/)).toBeInTheDocument();
+  expect(screen.getByText(/Chọn nhiều học viên: tải thẳng gói ZIP/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("checkbox", { name: /HV001/ }));
   expect(exportButton).toBeEnabled();
   fireEvent.click(screen.getByRole("checkbox", { name: /HV002/ }));
@@ -164,12 +164,14 @@ it("fetches a fresh single scorecard, normalizes it and downloads one Word file 
   await waitFor(() => expect(screen.getByRole("button", { name: "Xuất 1 bảng điểm" })).toBeEnabled());
 });
 
-it("downloads a single PDF from the format selector using the same dataset", async () => {
+it("previews a single PDF from the format selector without downloading or printing", async () => {
   await mountSmallDialog();
   fireEvent.click(screen.getByRole("radio", { name: "PDF" }));
   fireEvent.click(screen.getByRole("checkbox", { name: /HV001/ }));
   fireEvent.click(screen.getByRole("button", { name: "Xuất 1 bảng điểm" }));
-  await waitFor(() => expect(downloadDocumentFile).toHaveBeenCalledWith(expect.any(Blob), "Bang-diem-HV001-Nguyễn An.pdf"));
+  await waitFor(() => expect(tab.location.replace).toHaveBeenCalledWith("blob:transcript"));
+  expect(downloadDocumentFile).not.toHaveBeenCalled();
+  expect(window.print).not.toHaveBeenCalled();
   expect(createLearnerTranscriptPdf).toHaveBeenCalledWith(normalizeLearnerTranscript(scorecard));
 });
 
@@ -191,6 +193,9 @@ it.each(["word", "pdf"])("exports exactly 3 of 40 selected %s transcripts and ke
   fireEvent.click(screen.getByRole("button", { name: "Xuất 3 bảng điểm" }));
   await waitFor(() => expect(downloadDocumentFile).toHaveBeenCalledWith(expect.any(Blob), `Bang-diem-CLASS1-${format === "pdf" ? "PDF" : "Word"}.zip`));
   expect(generateTranscriptDocuments).toHaveBeenCalledWith(cards.slice(0, 3), format, expect.objectContaining({ isCancelled: expect.any(Function) }));
+  expect(packTranscriptZip).toHaveBeenCalledWith(expect.any(Array), format);
+  expect(openLearnerTranscriptPdfPreview).not.toHaveBeenCalled();
+  expect(window.open).not.toHaveBeenCalled();
   expect(fetchClassTranscripts.mock.calls).toEqual([["g1"], ["g1"]]);
   expect(axios.get.mock.calls.some(([url]) => url.includes("/learner-scorecard/"))).toBe(false);
   expect(screen.getByRole("status")).toHaveTextContent("Đã chọn 3 / 40");

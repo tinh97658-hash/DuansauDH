@@ -267,6 +267,20 @@ export const theme = createTheme({
           color: "#102333",
           fontSize: "12.5px",
           fontFamily: "inherit",
+          "&:hover, &.Mui-focusVisible, &.Mui-selected, &.Mui-selected:hover, &.Mui-selected.Mui-focusVisible": {
+            backgroundColor: "var(--dropdown-highlight-bg, #777777)",
+            color: "var(--dropdown-highlight-text, #ffffff)",
+          },
+        },
+      },
+    },
+    MuiAutocomplete: {
+      styleOverrides: {
+        option: {
+          "&.Mui-focused, &.Mui-focusVisible, &[aria-selected='true'], &[aria-selected='true'].Mui-focused": {
+            backgroundColor: "var(--dropdown-highlight-bg, #777777)",
+            color: "var(--dropdown-highlight-text, #ffffff)",
+          },
         },
       },
     },

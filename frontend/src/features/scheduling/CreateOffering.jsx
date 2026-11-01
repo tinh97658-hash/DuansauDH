@@ -1,6 +1,7 @@
 import { usePermissions } from "../accounts/usePermissions";
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import YearSelect from "./YearSelect";
 import successCircle from "../../assets/create-offering-success.svg";
 import { api, intersectDays, message, normalize, Notice, rows, SearchSelect, suggestOfferingName, unique, useLoad } from "./shared";
 import { isCommonMajor } from "../../utils/majorScope";
@@ -149,7 +150,8 @@ export default function CreateOffering({ user }) {
   })).filter((item) => item.label);
   const years = unique((groups.data || []).map((group) => group.academicYear)).sort((a, b) => b.localeCompare(a, "vi", { numeric: true }));
   const visibleGroups = eligible
-    .filter((group) => normalize(`${group.code} ${group.name} ${groupMajorName(group)} ${group.academicYear || ""}`).includes(normalize(groupQuery)));
+    .filter((group) => normalize(`${group.code} ${group.name} ${groupMajorName(group)} ${group.academicYear || ""}`).includes(normalize(groupQuery)))
+    .sort((a, b) => Number((b.majorId || b.major?.id) === majorId) - Number((a.majorId || a.major?.id) === majorId));
   const filteredSubjects = availableCandidates.filter((item) => normalize(`${item.subject.code} ${item.subject.name}`).includes(normalize(query)));
   const totalStudents = !groupIds.length ? 0 : preview.loading ? "…" : preview.error ? "—" : preview.data?.participantCount ?? 0;
 
@@ -244,14 +246,16 @@ export default function CreateOffering({ user }) {
           </div>
           <div className="sl-create-scope-field sl-create-scope-year">
             <div className="v20-scope-step"><b>3</b>KHÓA / NĂM HỌC</div>
-            <select className={`sl-create-year${year ? "" : " sl-placeholder"}`} aria-label="Khóa / Năm học" value={year} disabled={!majorId || groups.loading} onChange={(event) => changeScope(() => setYear(event.target.value))}><option value="">Chọn khóa / năm</option>{years.map((value) => <option key={value}>{value}</option>)}</select>
+            <YearSelect className={`sl-create-year${year ? "" : " sl-placeholder"}`} label="Khóa / Năm học" role="button"
+              value={year} years={years} placeholder="Chọn khóa / năm" disabled={!majorId || groups.loading}
+              onChange={value => changeScope(() => setYear(value))} />
             {groups.error && <Notice error={groups.error} />}
           </div>
         </div>
         {majorId && !groups.loading && !groups.error && !years.length && <Notice>Chưa có nhóm cho chuyên ngành này. <Link to="/masters/create-class-groups">Tạo nhóm học viên</Link></Notice>}
       </div>
       <div className="sl-worklist">
-        <div className="sl-create-subject-title"><div className="v20-scope-step"><b>4</b>HỌC PHẦN CÒN CẦN TỔ CHỨC</div><span>{filteredSubjects.length}</span></div>
+        <div className="sl-create-subject-title"><div className="v20-scope-step"><b>4</b>HỌC PHẦN CÒN CẦN TỔ CHỨC</div><span>{candidates.loading && majorId && year ? "…" : filteredSubjects.length}</span></div>
         <div className="sl-create-subject-search"><span>⌕</span><input aria-label="Tìm học phần" placeholder="Tìm học phần..." value={query} onChange={(event) => setQuery(event.target.value)} /></div>
         {candidates.loading && majorId && year ? <Notice>Đang tải học phần...</Notice> : candidates.error ? <Notice error={candidates.error} /> : majorId && year ? <div className="sl-create-subject-list">{filteredSubjects.map((item) => {
           // Liên ngành chỉ là quyền ghép nhóm; nhãn "Môn chung" dành cho khối kiến thức chung (KC).
@@ -272,7 +276,7 @@ export default function CreateOffering({ user }) {
       </div>
     </aside>
     <section className="sl-right">
-      {!subject ? <div className="v20-empty-guide"><div><div className="sl-guide-icon">◇</div><div className="sl-eyebrow">TẠO LỚP HỌC PHẦN</div><h2>{!majorId ? "Bắt đầu bằng Chuyên ngành" : !year ? "Chọn khóa để tiếp tục" : "Chọn Học phần để tổ chức lớp học phần"}</h2><p>{major?.name}{year ? ` · ${year}` : ""}</p>{year && <strong>{availableCandidates.length} học phần hiện có thể tổ chức.</strong>}</div></div> : <div className="sl-create-main">
+      {!subject ? <div className="v20-empty-guide"><div><div className="sl-guide-icon">◇</div><div className="sl-eyebrow">TẠO LỚP HỌC PHẦN</div><h2>{!majorId ? "Bắt đầu bằng Chuyên ngành" : !year ? "Chọn khóa để tiếp tục" : "Chọn Học phần để tổ chức lớp học phần"}</h2><p>{major?.name}{year ? ` · ${year}` : ""}</p>{year && <strong>{candidates.loading ? "Đang tải học phần..." : `${availableCandidates.length} học phần hiện có thể tổ chức.`}</strong>}</div></div> : <div className="sl-create-main">
         <div className="sl-create-name">
           <div className="sl-eyebrow">TẠO LỚP HỌC PHẦN</div>
           <div className="sl-create-name-field">

@@ -3,3 +3,10 @@ body .app-popup .account-editor-fields .account-editor-label{font-size:13px!impo
 .account-editor-fields .account-editor-label{text-transform:uppercase}
 .account-editor-fields .MuiOutlinedInput-root{min-height:36px;border-radius:0;font-size:13px}
 .account-editor-fields .MuiFormHelperText-root{margin:5px 0 0;font-size:12px}
+.account-credentials .MuiAlert-root{padding:10px 12px;background:#fff8e8;border:1px solid #ead9ad;color:#694517;font-size:13px;line-height:1.6}
+.account-credential-field>label{display:block;margin-bottom:7px;color:#354959;font-size:13px;font-weight:700;line-height:1.5}
+.account-credential-field .MuiOutlinedInput-root{height:44px;background:#f7f9fb;font-size:14px;color:#102333}
+.account-credential-field .MuiOutlinedInput-input{padding:11px 12px;min-width:0}
+.account-credential-password .MuiOutlinedInput-input{font-family:Consolas,"Courier New",monospace;font-size:15px;letter-spacing:.4px}
+.account-credential-password .MuiInputAdornment-root{height:28px;max-height:none;margin-left:8px;padding-left:8px;border-left:1px solid #c6d5e1}
+.account-credential-password .MuiIconButton-root{color:#00658a;padding:7px}

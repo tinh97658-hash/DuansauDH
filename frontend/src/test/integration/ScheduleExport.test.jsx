@@ -8,6 +8,7 @@ import { TextEncoder } from "util";
 import Schedule from "../../features/scheduling/Schedule";
 import SchedulePreview from "../../features/scheduling/SchedulePreview";
 import SchedulePrintTemplate from "../../features/scheduling/SchedulePrintTemplate";
+import { buildExamScheduleDocument } from "../../features/exams/examScheduleExport";
 import { buildScheduleDocument, createScheduleExcel, createScheduleWord, exportSchedule, readSchedulePreview, readScheduleReturnView, scheduleDocumentColumns, scheduleDocumentMetadata, scheduleExportRows } from "../../features/scheduling/scheduleExport";
 
 jest.mock("axios");
@@ -16,10 +17,10 @@ const snapshot = {
   week: "2026-10-05", end: "2026-10-11", discipline: "Công nghệ thông tin",
   major: "Khoa học máy tính", year: "2026",
   rows: [[1, "Khoa học máy tính", "CNTT-2026", "Cơ sở dữ liệu", "Nguyễn An",
-    "05/10/26", "Sáng", "A101", "Ghi chú tiếng Việt"]],
+    "Sáng T2", "A101", "Ghi chú tiếng Việt"]],
 };
-const specificHeaders = ["STT", "Chuyên ngành", "Lớp", "Học phần", "Giảng viên", "Ngày học", "Buổi", "Phòng học", "Ghi chú"];
-const specificValues = snapshot.rows[0];
+const specificHeaders = ["STT", "Lớp", "Học phần", "Giảng viên", "Thời gian", "Phòng học", "Ghi chú"];
+const specificValues = snapshot.rows[0].filter((_, index) => index !== 1);
 const documentTitle = "KẾ HOẠCH GIẢNG DẠY VÀ HỌC TẬP";
 const documentRange = "Từ ngày: 05/10/26 đến ngày 11/10/26 (Tuần 41 năm 2026)";
 const bufferOf = (blob) => new Promise((resolve, reject) => {
@@ -27,6 +28,40 @@ const bufferOf = (blob) => new Promise((resolve, reject) => {
   reader.onload = () => resolve(reader.result);
   reader.onerror = reject;
   reader.readAsArrayBuffer(blob);
+});
+
+it("exports exam data with the exam heading in PDF, Word and Excel using the shared layout", async () => {
+  global.TextEncoder = TextEncoder;
+  const exam = buildExamScheduleDocument({ week: snapshot.week, end: snapshot.end, sessions: [{
+    examDate: snapshot.week, startTime: "08:00:00", endTime: "10:00:00",
+    groups: [{ code: "CNTT-2026" }], subjectName: "Cơ sở dữ liệu", lecturerName: "Nguyễn An", roomCode: "A101",
+  }, {
+    examDate: snapshot.week, startTime: "07:00", endTime: "08:00", status: "cancelled",
+    subjectName: "Môn đã hủy", roomCode: "CANCELLED_ROOM",
+  }] });
+  expect(exam.sessionCount).toBe(1);
+  expect(exam.rows).toHaveLength(1);
+  expect(exam.rows[0][0]).toBe(1);
+  render(<SchedulePrintTemplate schedule={exam} />);
+  expect(screen.getByRole("heading", { name: "LỊCH THI KẾT THÚC HỌC PHẦN" })).toBeInTheDocument();
+  expect(screen.getByText("08h00 sáng T2")).toBeInTheDocument();
+  expect(screen.queryByText("Môn đã hủy")).not.toBeInTheDocument();
+  expect(buildExamScheduleDocument({ week: snapshot.week, end: snapshot.end, sessions: [{
+    examDate: "2026-10-11", startTime: "14:00", endTime: "15:15",
+  }] }).rows[0][5]).toBe("14h00 chiều CN");
+  exportSchedule(exam);
+  expect(readSchedulePreview(previewId())).toMatchObject(exam);
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.load(await bufferOf(await createScheduleExcel(exam)));
+  expect(book.getWorksheet("Lịch thi").getRow(1).values.join(" ")).toContain("LỊCH THI KẾT THÚC HỌC PHẦN");
+  expect(book.getWorksheet("Lịch thi").getCell("E5").value).toBe("08h00 sáng T2");
+  expect(JSON.stringify(book.getWorksheet("Lịch thi").getSheetValues())).not.toContain("CANCELLED_ROOM");
+  const zip = await JSZip.loadAsync(await bufferOf(await createScheduleWord(exam)));
+  const xml = await zip.file("word/document.xml").async("string");
+  expect(xml).toContain("LỊCH THI KẾT THÚC HỌC PHẦN");
+  expect(xml).toContain("A101");
+  expect(xml).toContain("08h00 sáng T2");
+  expect(xml).not.toContain("CANCELLED_ROOM");
 });
 let tab;
 const originalRevokeUrl = URL.revokeObjectURL;
@@ -102,6 +137,7 @@ it("reports missing or corrupt preview data instead of loading another week", ()
 });
 
 it.each([
+  [9, [1, snapshot.major, "CNTT-2026", "Cơ sở dữ liệu", "Nguyễn An", "05/10/26", "Sáng", "A101", "Ghi chú tiếng Việt"]],
   [10, [1, "05/10/26", "Sáng", snapshot.discipline, snapshot.major, "Cơ sở dữ liệu", "CNTT-2026", "Nguyễn An", "A101", "Ghi chú tiếng Việt"]],
   [15, [1, "05/10/26", "Sáng", "08:00 - 11:00", "00123", "Cơ sở dữ liệu", "SEED_TEST_2026: MERGED",
     "CNTT-2026", snapshot.discipline, snapshot.major, "Nguyễn An", "A101", 30, "Đã xếp", "Ghi chú tiếng Việt"]],
@@ -123,7 +159,7 @@ it("joins the existing major catalog to every participating class and synchroniz
   const before = JSON.stringify(inputs);
   const data = buildScheduleDocument(inputs);
   expect(data).toMatchObject({ disciplineId: "parent-a", discipline: "Ngành A", major: first.name, majorId: first.id });
-  expect(data.rows).toEqual([[1, `${first.name}, ${second.name}`, "LOP 2026.1, LOP 2026.2", "Học phần ghép", "Nguyễn An", "05/10/26", "Sáng", "Phòng thực hành", "Ghi chú buổi học"]]);
+  expect(data.rows).toEqual([[1, `${first.name}, ${second.name}`, "LOP 2026.1, LOP 2026.2", "Học phần ghép", "Nguyễn An", "Sáng T2", "Phòng thực hành", "Ghi chú buổi học"]]);
   expect(scheduleDocumentColumns(data).map((column) => column.label)).toEqual(specificHeaders);
   expect(JSON.stringify(inputs)).toBe(before);
   expect(JSON.stringify(data.rows)).not.toMatch(/SEED_TEST_2026|07:00|12:00|planned/);
@@ -151,19 +187,19 @@ it("creates a readable XLSX without filter labels and with unchanged table value
   expect(sheet.getCell("E9").value).toBe("Cán bộ phụ trách");
   expect(sheet.getCell("E5").font.name).toBe("Times New Roman");
   expect(sheet.getCell("E5").alignment.wrapText).toBe(true);
-  expect(sheet.getCell("F5").alignment.wrapText).not.toBe(true);
-  expect(sheet.getCell("H5").alignment).toMatchObject({ horizontal: "center", vertical: "middle" });
-  expect(sheet.getColumn(4).width).toBeGreaterThanOrEqual(30);
+  expect(sheet.getCell("F5").alignment.wrapText).toBe(true);
+  expect(sheet.getCell("F5").alignment).toMatchObject({ horizontal: "center", vertical: "middle" });
+  expect(sheet.getColumn(3).width).toBeGreaterThanOrEqual(30);
   expect(sheet.getColumn(2).width).toBeGreaterThanOrEqual(12);
   expect(sheet.views[0].ySplit).toBe(4);
-  expect(sheet.autoFilter).toBe("A4:I5");
-  expect(sheet.model.merges).toEqual(expect.arrayContaining(["A1:D1", "E1:I1", "A3:I3", "A6:I6"]));
+  expect(sheet.autoFilter).toBe("A4:G5");
+  expect(sheet.model.merges).toEqual(expect.arrayContaining(["A1:D1", "E1:G1", "A3:G3", "A6:G6"]));
   expect(sheet.getCell("A6").alignment.horizontal).toBe("right");
   expect(sheet.getCell("D4").border.bottom).toMatchObject({ style: "thin", color: { argb: "FF000000" } });
   expect(sheet.getCell("D5").border.bottom.style).toBe("thin");
   expect(sheet.getCell("D4").fill.fgColor.argb).toBe("FFDCE6F1");
   expect(sheet.getCell("D4").alignment).toMatchObject({ horizontal: "center", vertical: "middle" });
-  expect(sheet.pageSetup).toMatchObject({ paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: "4:4", printArea: "A1:I12" });
+  expect(sheet.pageSetup).toMatchObject({ paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: "4:4", printArea: "A1:G12" });
   expect(sheet.pageSetup.margins.left).toBeCloseTo(0.3);
   expect(sheet.model.merges.some((range) => /\b[A-Z]+[45]\b/.test(range))).toBe(false);
   expect(sheet.headerFooter.oddFooter).toContain("BM.04-QT.SĐH.03");
@@ -182,11 +218,11 @@ it("creates a genuine DOCX with official headings, no filter labels, full table 
   expect(tables).toHaveLength(3);
   const dataRows = tables[1].getElementsByTagName("w:tr");
   const cells = Array.from(dataRows[1].getElementsByTagName("w:tc"), (cell) => cell.textContent);
-  expect(cells).toHaveLength(9);
+  expect(cells).toHaveLength(7);
   expect(cells).toEqual(specificValues.map(String));
   expect(Array.from(dataRows[0].getElementsByTagName("w:tc"), (cell) => cell.textContent)).toEqual(specificHeaders);
   const widths = Array.from(tables[1].getElementsByTagName("w:gridCol"), (column) => Number(column.getAttribute("w:w")));
-  expect(widths).toHaveLength(9);
+  expect(widths).toHaveLength(7);
   expect(widths.reduce((sum, width) => sum + width, 0)).toBe(16838 - 908);
   expect(tables[1].getElementsByTagName("w:tblLayout")[0].getAttribute("w:type")).toBe("fixed");
   expect(Array.from(tables[1].getElementsByTagName("w:sz")).every((size) => size.getAttribute("w:val") === "21")).toBe(true);
@@ -206,13 +242,13 @@ it.each([
   ["one discipline", snapshot.discipline, "Tất cả chuyên ngành"],
   ["one major", snapshot.discipline, snapshot.major],
   ["one major without a discipline filter", "Tất cả ngành", snapshot.major],
-])("uses the same nine ordered columns for %s in Preview, Word and Excel", async (_, discipline, major) => {
+])("uses the same seven ordered columns for %s in Preview, Word and Excel", async (_, discipline, major) => {
   const row = [...snapshot.rows[0]];
   row[2] = "CNTT 2025.1.1, CNTT 2025.2.1";
   row[1] = "Khoa học máy tính, Hệ thống thông tin";
   const schedule = { ...snapshot, discipline, major, rows: [row] };
   const expectedHeaders = specificHeaders;
-  const expectedValues = row;
+  const expectedValues = row.filter((_, index) => index !== 1);
   const { container } = render(<SchedulePrintTemplate schedule={schedule} />);
   const table = screen.getByRole("table");
   expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(expectedHeaders);
@@ -245,7 +281,7 @@ it("uses every actual ClassGroup and its Major/Discipline without exposing the i
   render(<SchedulePrintTemplate schedule={schedule} />);
   const table = screen.getByRole("table");
   expect(within(table).getAllByRole("cell").map((cell) => cell.textContent)).toEqual([
-    "1", "Khoa học máy tính", "CNTT 2025.1.1, CNTT 2025.2.1", "Cơ sở dữ liệu", "Nguyễn An", "05/10/26", "Sáng", "A101", "Lịch học ghép",
+    "1", "CNTT 2025.1.1, CNTT 2025.2.1", "Cơ sở dữ liệu", "Nguyễn An", "Sáng T2", "A101", "Lịch học ghép",
   ]);
   expect(table).not.toHaveTextContent("SEED_TEST_2026: MERGED");
 });
@@ -279,7 +315,8 @@ it.each(["Xuất Word", "Xuất Excel", "Xuất PDF"])("%s uses the selected wee
   fireEvent.click(screen.getByRole("option", { name: snapshot.discipline }));
   fireEvent.focus(screen.getByRole("combobox", { name: "Chuyên ngành" }));
   fireEvent.click(screen.getByRole("option", { name: snapshot.major }));
-  fireEvent.change(screen.getByLabelText("Khóa / Năm"), { target: { value: "2026" } });
+  fireEvent.mouseDown(screen.getByLabelText("Khóa / Năm"));
+  fireEvent.click(screen.getByRole("option", { name: "2026" }));
   fireEvent.click(screen.getByRole("button", { name: "Tuần sau" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled());
   const previous = URL.createObjectURL;
@@ -327,7 +364,7 @@ it.each(["Xuất Word", "Xuất Excel", "Xuất PDF"])("%s uses the selected wee
   URL.createObjectURL = previous;
   const lastQuery = new URL(axios.get.mock.calls.filter(([url]) => url.includes("/teaching-sessions?" )).pop()[0], "http://localhost").searchParams;
   if (format === "Xuất PDF") expect(data).toMatchObject({ week: lastQuery.get("from"), end: lastQuery.get("to"), discipline: snapshot.discipline, major: snapshot.major, year: "2026" });
-  if (format === "Xuất PDF") { expect(data.rows).toHaveLength(1); expect(data.rows[0][3]).toBe("Cơ sở dữ liệu"); expect(data.rows[0]).toHaveLength(9); }
+  if (format === "Xuất PDF") { expect(data.rows).toHaveLength(1); expect(data.rows[0][3]).toBe("Cơ sở dữ liệu"); expect(data.rows[0]).toHaveLength(8); }
   expect(window.print).not.toHaveBeenCalled();
   expect(axios.post).not.toHaveBeenCalled();
   expect(axios.put).not.toHaveBeenCalled();
@@ -339,7 +376,7 @@ it.each(["Xuất Word", "Xuất Excel", "Xuất PDF"])("%s uses the selected wee
     await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled());
     expect(screen.getByRole("combobox", { name: "Ngành" })).toHaveValue(discipline.name);
     expect(screen.getByRole("combobox", { name: "Chuyên ngành" })).toHaveValue(major.name);
-    expect(screen.getByLabelText("Khóa / Năm")).toHaveValue("2026");
+    expect(screen.getByLabelText("Khóa / Năm")).toHaveTextContent("2026");
     expect(readScheduleReturnView()).toBeNull();
     const restoredQuery = new URL(axios.get.mock.calls.filter(([url]) => url.includes("/teaching-sessions?")).pop()[0], "http://localhost");
     expect(restoredQuery.searchParams.get("from")).toBe(lastQuery.get("from"));

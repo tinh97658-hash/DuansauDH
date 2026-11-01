@@ -1,4 +1,5 @@
-import React, { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import React, { useContext, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { ReportExportContext } from "./ReportExportContext";
 import { createPortal } from "react-dom";
 import { ReactComponent as WordFileIcon } from "../assets/icons/filetype-docx.svg";
 import { ReactComponent as ExcelFileIcon } from "../assets/icons/filetype-xlsx.svg";
@@ -6,6 +7,11 @@ import { ReactComponent as PdfFileIcon } from "../assets/icons/filetype-pdf.svg"
 import "./documentExportMenu.css";
 
 export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, showFileIcons = true, disabled = false, className = "", label = "Xuất file", excelLabel = "Xuất Excel", pdfLabel = "Xuất PDF" }) {
+  const reportExport = useContext(ReportExportContext);
+  onWord ||= reportExport ? () => reportExport.exportFormat("word") : undefined;
+  onExcel ||= reportExport ? () => reportExport.exportFormat("excel") : undefined;
+  onPdf ||= reportExport ? () => reportExport.exportFormat("pdf") : undefined;
+  const [exportError, setExportError] = useState("");
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const root = useRef(null);
@@ -45,13 +51,14 @@ export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, sh
   }, [open]);
 
   const select = async (action) => {
+    setExportError("");
     setOpen(false);
     trigger.current?.focus();
     try {
       const result = action();
       if (result && typeof result.then === "function") { setBusy(true); await result; }
     }
-    catch (error) { onError?.(error); }
+    catch (error) { if (onError) onError(error); else setExportError(error.message || "Không thể xuất file."); }
     finally { setBusy(false); }
   };
   const keyDown = (event) => {
@@ -67,13 +74,14 @@ export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, sh
     }
   };
 
-  return <div className="document-export" ref={root} onKeyDown={keyDown}
+  return <div className="document-export" data-document-export="true" ref={root} onKeyDown={keyDown}
     onBlur={(event) => { if (!root.current?.contains(event.relatedTarget) && !menu.current?.contains(event.relatedTarget)) setOpen(false); }}>
     <button ref={trigger} type="button" className={`document-export-trigger ${className}`} aria-label={label}
       aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined}
       aria-busy={busy} disabled={disabled || busy} onClick={() => setOpen(!open)}>
       {busy ? "Đang xuất…" : label} <span aria-hidden="true">▼</span>
     </button>
+    {exportError && <span role="alert" className="document-export-error">{exportError}</span>}
     {open && !disabled && createPortal(<div ref={menu} id={menuId} role="menu" aria-label={label} className="document-export-options" style={position}>
       {items.map(({ name, action, Icon, format }) => <button key={format} type="button" role="menuitem" onClick={() => select(action)}>
         {showFileIcons && <Icon className={`document-export-icon document-export-icon-${format}`} width="20" height="20" aria-hidden="true" focusable="false" />}

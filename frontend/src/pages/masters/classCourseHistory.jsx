@@ -1,3 +1,4 @@
+import AppSelect from "../../components/AppSelect";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useSearchParams } from "react-router-dom";
@@ -5,6 +6,7 @@ import { Alert, Box, CircularProgress, Tooltip } from "@mui/material";
 import SearchRounded from "@mui/icons-material/SearchRounded";
 import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 import FeatureLayout from "../../components/FeatureLayout";
+import InlineReportExport from "../../components/InlineReportExport";
 import OfferingDetails from "../../features/scheduling/OfferingDetails";
 import { Modal } from "../../features/scheduling/shared";
 import { useAuthSession } from "../../context/AuthSession";
@@ -29,7 +31,7 @@ const statusInfo = {
 };
 
 function SelectFilter({ label, value, onChange, children, disabled }) {
-  return <label className="tp-filter tp-select-filter"><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>{children}</select></label>;
+  return <label className="tp-filter tp-select-filter"><span>{label}</span><AppSelect value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>{children}</AppSelect></label>;
 }
 
 function YearMultiSelect({ years, value, onChange, disabled }) {
@@ -67,6 +69,8 @@ function YearMultiSelect({ years, value, onChange, disabled }) {
 function StatusBadge({ subject, offering, onOpen }) {
   const { status, needsGradeEntry, activeRetakeCount = 0, waitingRetakeCount = 0 } = subject;
   const info = statusInfo[status] || statusInfo.not_started;
+  const label = status === "completed" && subject.completion
+    ? `${info.label} ${subject.completion.passedCount}/${subject.completion.totalCount}` : info.label;
   const warn = status === "completed" && needsGradeEntry === true;
   const warnings = [
     ...(warn ? [{ text: "Hãy nhập điểm môn học", tone: "grade" }] : []),
@@ -75,13 +79,13 @@ function StatusBadge({ subject, offering, onOpen }) {
   ];
   const canOpen = Boolean(offering || subject.offerings?.length);
   const content = <>
-    <span>{info.label}</span>
+    <span>{label}</span>
     {warnings.map(warning => <Tooltip key={warning.text} title={warning.text} describeChild arrow placement="top" enterDelay={0} enterNextDelay={0}>
       <span className={`tp-warning tp-${warning.tone}-warning`} role="img" aria-label={warning.text} tabIndex={canOpen ? undefined : 0}><WarningAmberRounded aria-hidden="true" /></span>
     </Tooltip>)}
   </>;
   return <span className="tp-status-cell">
-    {canOpen ? <button type="button" className={`tp-status tp-status-button tp-${info.tone}`} onClick={onOpen} aria-label={`Xem chi tiết: ${info.label}`}>{content}</button>
+    {canOpen ? <button type="button" className={`tp-status tp-status-button tp-${info.tone}`} onClick={onOpen} aria-label={`Xem chi tiết: ${label}`}>{content}</button>
       : <span className={`tp-status tp-${info.tone}`}>{content}</span>}
   </span>;
 }
@@ -270,6 +274,7 @@ export default function ClassCourseHistory() {
           {Object.entries(statusInfo).map(([value, info]) => <option value={value} key={value}>{info.label}</option>)}
         </SelectFilter>
         <label className="tp-filter"><span>Tìm kiếm</span><div className="tp-search"><SearchRounded /><input aria-label="Tìm kiếm" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm mã, học phần, giảng viên..." disabled={!report} /></div></label>
+        <InlineReportExport height={38} />
       </section>
 
       {error && <Alert severity="error">{error}</Alert>}

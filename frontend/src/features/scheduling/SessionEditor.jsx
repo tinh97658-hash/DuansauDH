@@ -1,3 +1,4 @@
+import AppSelect from "../../components/AppSelect";
 import { usePermissions } from "../accounts/usePermissions";
 import DateField from "../../components/DateField";
 import React, { useEffect, useState } from "react";
@@ -27,7 +28,8 @@ export default function SessionEditor({ session, offering, date, period, user, o
     return { lecturers: rows(lecturers), units: rows(units), rooms: historicalRoom && !availableRooms.some(room => room.id === historicalRoom.id)
       ? [...availableRooms, { ...historicalRoom, isActive: false }] : availableRooms, offering: detail, offeringSessions: Array.isArray(offeringSessions) ? offeringSessions : [] };
   }, [offering.id, session?.id, session?.room]);
-  const availability = useLoad(async () => rows(await api.get(`/scheduling/teaching-sessions?${new URLSearchParams({ from: form.sessionDate, to: form.sessionDate })}`)), [form.sessionDate]);
+  const availability = useLoad(async () => rows(await api.get(`/scheduling/teaching-sessions?${new URLSearchParams({ from: form.sessionDate, to: form.sessionDate, conflictForOfferingId: offering.id })}`)), [form.sessionDate, offering.id]);
+
   const currentOffering = catalog.data?.offering || offering;
   const sessionForPeriod = session ? { ...session, endTime: periodTimes(session.period).endTime } : null;
   const future = session?.status === "planned" && !isSessionPast(sessionForPeriod);
@@ -38,7 +40,7 @@ export default function SessionEditor({ session, offering, date, period, user, o
   const validTime = isPeriodTimeConsistent(form.period, form.startTime, form.endTime);
   const conflicts = (availability.data || []).filter((row) => row.id !== session?.id && row.status !== "not_held" && row.period === form.period);
   const ownGroups = new Set(groupsOf(currentOffering).map((group) => group.id));
-  const classConflict = conflicts.find((row) => row.courseOfferingId === offering.id || groupsOf(row.courseOffering).some((group) => ownGroups.has(group.id)));
+  const classConflict = conflicts.find((row) => row.schedulingConflict || row.courseOfferingId === offering.id || groupsOf(row.courseOffering).some((group) => ownGroups.has(group.id)));
   const lecturers = catalog.data?.lecturers || [];
   const rooms = catalog.data?.rooms || [];
   const recommendedUnit = recommendedUnitForOffering(currentOffering);
@@ -102,7 +104,7 @@ export default function SessionEditor({ session, offering, date, period, user, o
     <header className="sl-editor-hero"><div><div className="sl-eyebrow">{!session ? "XẾP BUỔI" : editing ? "CHỈNH SỬA LỊCH" : "CHI TIẾT BUỔI HỌC"} · {vietnameseDate(form.sessionDate)} · {periodLabel}</div><h2>{offeringTitle(currentOffering)}</h2><p>{subjectLabel(currentOffering)} · {groupsOf(currentOffering).length} lớp/nhóm · {currentOffering.participantCount ?? "…"} học viên</p></div><div className="sl-editor-hero-actions"><span>Đã diễn ra {currentOffering.sessionSummary?.heldCount || 0} buổi</span><button className="sl-drawer-close" aria-label="Đóng chi tiết buổi học" disabled={saving} onClick={onClose}>×</button></div></header>
     <div className="sl-editor-notices">{error && <Notice error={error} />}{catalog.error && <Notice error={catalog.error} />}{availability.error && <Notice error={availability.error} />}{suggestClosing && <Notice>Đã học được {currentOffering.sessionSummary.heldCount} buổi, bạn có muốn đóng lớp không?</Notice>}{pending && <div className="sl-attention">Buổi học đã kết thúc · Chờ xác nhận kết quả diễn ra.</div>}</div>
     <div className="v20-composer"><div className="sl-editor-info"><h4>THÔNG TIN BUỔI HỌC</h4><strong className="sl-editor-date">{vietnameseDate(form.sessionDate)} · {periodLabel}</strong>
-      <div className="sl-editor-hidden-controls"><label>Ngày học<DateField size="small" inputProps={{ "aria-label": "Ngày học", min: getBusinessTodayKey() }} value={form.sessionDate} disabled={!editable || saving} onChange={(event) => { setField("sessionDate", event.target.value); }} /></label><label>Buổi<select aria-label="Buổi" value={form.period} disabled={!editable || saving} onChange={(event) => setField("period", event.target.value)}><option value="MORNING">Sáng</option><option value="AFTERNOON">Chiều</option></select></label></div>
+      <div className="sl-editor-hidden-controls"><label>Ngày học<DateField size="small" inputProps={{ "aria-label": "Ngày học", min: getBusinessTodayKey() }} value={form.sessionDate} disabled={!editable || saving} onChange={(event) => { setField("sessionDate", event.target.value); }} /></label><label>Buổi<AppSelect aria-label="Buổi" value={form.period} disabled={!editable || saving} onChange={(event) => setField("period", event.target.value)}><option value="MORNING">Sáng</option><option value="AFTERNOON">Chiều</option></AppSelect></label></div>
       <label className="v20-field sl-unit-field">Đơn vị<SearchSelect label="Đơn vị" value={selectedUnitId} options={[{ id: "", name: "Tất cả đơn vị" }, ...units]} placeholder="Nhập để tìm đơn vị..." disabled={!editable || lecturerLocked || catalog.loading || !!catalog.error || saving} onChange={selectUnit} /></label>
       <label className="v20-field">Giảng viên<LecturerPicker key={selectedUnitId} value={form.lecturerId} lecturers={filteredLecturers} offering={currentOffering} conflicts={conflicts} locked={lecturerLocked} disabled={!editable || catalog.loading || !!catalog.error || saving} onChange={selectLecturer} />{recommendedUnit?.name && <small className="sl-teaching-unit-hint">Ngành đề xuất: {recommendedUnit.name}</small>}</label>
       {!catalog.loading && !catalog.error && !lecturers.some((row) => row.active !== false) && <Notice>Chưa có giảng viên đang hoạt động. Khai báo tại Hệ thống → Giảng viên.</Notice>}

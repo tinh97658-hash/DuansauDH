@@ -89,7 +89,7 @@ describeDb('Grouped exam reservations on PostgreSQL',()=>{
   const people=(prefix:string,n:number)=>Array.from({length:n},(_,i)=>prefix+i);
   const a=await offering(people('cap_a',15)),b=await offering(people('cap_b',9)),c=await offering(people('cap_a',18)),d=await offering(people('cap_b',12));
   await expect(service.saveArrangement(null,payload([a,b,{...c,roundNo:2,startTime:'09:15',endTime:'10:15'},{...d,roundNo:2,startTime:'09:15',endTime:'10:45'}]),actor)).resolves.toBeDefined();
-  const e=await offering(people('cap_e',20)),f=await offering(people('cap_f',11));
+  const e=await offering(people('cap_e',20)),f=await offering(people('cap_f',13));
   await expect(service.saveArrangement(null,payload([e,f],{examDate:'2099-05-05'}),actor)).rejects.toMatchObject({response:{code:'EXAM_ROOM_CAPACITY'}});
  });
  it('reserves breaks between rounds and serializes competing room bookings',async()=>{
