@@ -1,11 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import axios from 'axios';
-import { Alert, Button, FormControl, InputLabel, MenuItem, Select, Stack, Typography } from '@mui/material';
+import { Alert, Button, FormControl, MenuItem, Select, Stack, Typography } from '@mui/material';
 import AppDialog from '../../components/AppDialog';
+import PopupFormField from '../../components/PopupFormField';
 import { API_BASE_URL } from '../../config/http';
 import { usePermissions } from './usePermissions';
 
 export function ResponsibleStaffSelect({ value, onChange, disabled = false }) {
+  const selectId = useId();
+  const labelId = `${selectId}-label`;
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -19,13 +22,14 @@ export function ResponsibleStaffSelect({ value, onChange, disabled = false }) {
   }, []);
   return <Stack spacing={1}>
     {error && <Alert severity="error">{error}</Alert>}
+    <PopupFormField label={<span id={labelId}>Chuyên viên phụ trách *</span>} htmlFor={selectId}>
     <FormControl fullWidth size="small" required>
-      <InputLabel id="responsible-staff-label">Chuyên viên phụ trách</InputLabel>
-      <Select labelId="responsible-staff-label" label="Chuyên viên phụ trách" value={value || ''}
+      <Select id={selectId} labelId={labelId} value={value || ''}
         disabled={disabled || loading || Boolean(error)} onChange={event => onChange(event.target.value)}>
         {staff.map(person => <MenuItem key={person.id} value={person.id}>{person.name} — {person.email}</MenuItem>)}
       </Select>
     </FormControl>
+    </PopupFormField>
   </Stack>;
 }
 

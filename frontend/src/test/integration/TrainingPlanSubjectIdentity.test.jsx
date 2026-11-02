@@ -68,6 +68,31 @@ const configureReads = (
   });
 };
 
+describe('Subject independent-code duplicate validation', () => {
+  beforeEach(() => { jest.clearAllMocks(); });
+  const existing = { ...root, id: 'local', majorId: major.id, codeNumber: 102, codeText: 'EF' };
+  const enter = async (codeNumber, codeText) => {
+    configureReads([existing]);
+    await act(async () => { render(<TrainingPlan />); });
+    await clickAndWait(screen.getByRole('button', { name: 'Thêm dòng mới' }));
+    fireEvent.change(screen.getByPlaceholderText('Mã số (101)'), { target: { value: String(codeNumber) } });
+    fireEvent.change(screen.getByPlaceholderText('Mã chữ (CS01)'), { target: { value: codeText } });
+    fireEvent.change(screen.getByPlaceholderText('Nhập tên học phần...'), { target: { value: 'A separate name' } });
+    await clickAndWait(screen.getByRole('button', { name: 'Lưu & Thêm tiếp (Enter)' }));
+  };
+  it('rejects the entire normalized pair locally before posting, even with a different name', async () => {
+    await enter(102, ' ef ');
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('mã số 102 và mã chữ EF đã tồn tại'));
+    expect(axios.post).not.toHaveBeenCalled();
+  });
+  it.each([[102, 'GH'], [103, 'EF']])('rejects repeating either code: %s/%s', async (number, text) => {
+    axios.post.mockResolvedValue({ data: { ...existing, id: 'new', codeNumber: number, codeText: text } });
+    await enter(number, text);
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('đã tồn tại'));
+    expect(axios.post).not.toHaveBeenCalled();
+  });
+});
+
 describe('Training Plan draft scope', () => {
   beforeEach(() => { jest.clearAllMocks(); });
 

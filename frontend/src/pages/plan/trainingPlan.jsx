@@ -1,7 +1,7 @@
 import { usePermissions } from "../../features/accounts/usePermissions";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress,
@@ -32,6 +32,7 @@ import AppDialog from "../../components/AppDialog";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { getMockConfirmResult } from "../../utils/confirmHelper";
 import { notifySubjectCatalogChanged, useSubjectCatalogRevision } from "../../utils/subjectCatalog";
+import { findSubjectCodeConflict, subjectDuplicateMessage } from "../../utils/subjectIdentity";
 import { disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline } from "../../utils/disciplineScope";
 import {
   compactClassCodes, countGroupClasses, groupCurriculumsByYear,
@@ -504,6 +505,15 @@ const TrainingPlan = () => {
       return;
     }
 
+    const identities = [
+      { ...subjectDraft, majorId, program: level },
+      ...(counterpartCodes || []).map(item => ({ ...item, program: level })),
+    ];
+    for (const identity of identities) {
+      const conflict = findSubjectCodeConflict([...programSubjects, ...subjects], identity);
+      if (conflict) return toast.error(subjectDuplicateMessage(identity, conflict));
+    }
+
     if (!skipSharingPrompt
       && !["TT", "TN"].includes(subjectDraft.subjectType)
       && !/^(?:thuc tap\b|de an tot nghiep\b)/.test(normalizeSubjectName(subjectDraft.name))
@@ -629,6 +639,11 @@ const TrainingPlan = () => {
     if (!editingSubjectForm.codeNumber) return toast.error("Vui lòng nhập mã học phần số");
     if (!editingSubjectForm.codeText?.trim()) return toast.error("Vui lòng nhập mã học phần chữ");
     if (!editingSubjectForm.name?.trim()) return toast.error("Vui lòng nhập tên học phần");
+    const identity = { ...editingSubjectForm, majorId, program: level };
+    const conflict = findSubjectCodeConflict([...programSubjects, ...subjects], identity, editingSubjectId);
+    if (conflict) {
+      return toast.error(subjectDuplicateMessage(identity, conflict));
+    }
 
     const payload = {
       codeNumber: Number(editingSubjectForm.codeNumber),
@@ -1036,7 +1051,6 @@ const TrainingPlan = () => {
       desc="Lập và quản lý kế hoạch đào tạo theo từng chuyên ngành: danh mục học phần, CTĐT theo khóa (khối kiến thức, bắt buộc/tự chọn) và lớp học — mỗi lớp chọn CTĐT mà lớp theo học."
       maxWidth={1440}
     >
-      <ToastContainer position="top-right" newestOnTop autoClose={2500} limit={3} />
 
       {/* 1. TOP TOOLBAR: LEVEL, DISCIPLINE & MAJOR */}
       <Paper

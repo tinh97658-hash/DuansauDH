@@ -1,0 +1,6 @@
+/* Keep the catalog's original Toastify light surface, spacing, close and progress styling. */
+.app-toast.Toastify__toast--success { color: var(--toastify-color-success); }
+.app-toast.Toastify__toast--error { color: var(--toastify-color-error); }
+.app-toast.Toastify__toast--warning { color: var(--toastify-color-warning); }
+.app-toast.Toastify__toast--warning .Toastify__toast-body > div:last-child { color: #A56615; }
+.app-toast .Toastify__close-button { color: currentColor; }

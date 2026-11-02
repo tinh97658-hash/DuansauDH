@@ -2,6 +2,35 @@ import { calculateExamEligibility, calculateExamGrade, resolveSavedExamGrade } f
 
 const emptyResult = { examScore: null, courseScore: null, grade4: null, letterGrade: '', attemptScores: [], result: 'pending' };
 
+// One primary next action, shared by the dashboard and gradebook options.
+// Null component completeness means insufficient evidence, not missing marks.
+export function gradebookStage(offering: any, state: any = {}) {
+  if (offering.status === 'active') return 'teaching';
+  if (offering.status !== 'completed') return 'review';
+  if (state.mode === 'legacy_preserved') {
+    return state.legacyGradebookStatus === 'approved' && state.legacyGradebookSnapshot?.rows?.length
+      ? 'completed' : 'review';
+  }
+  if (state.result_status === 'approved') return 'completed';
+  if (state.result_status === 'submitted') return 'result_pending';
+  if (state.eligibility_status === 'submitted') return 'eligibility_pending';
+  if (state.eligibility_status === 'approved') {
+    if (!Array.isArray(state.approvedRows) || !state.approvedRows.length) return 'review';
+    if (state.approvedRows.some((row: any) => row.eligible == null
+      && !row.examExempt && !row.profileForeignLanguageExempt && !row.studyLeaveFailure)) return 'review';
+    const candidates = state.approvedRows.filter((row: any) => row.eligible === true && !row.examExempt);
+    const held = new Set(state.heldIds || []);
+    // A partly held offering still needs exams for its remaining candidates.
+    // Sets prevent duplicate assignments across sessions inflating completion.
+    if (candidates.some((row: any) => !held.has(row.participantId))) return 'awaiting_exam';
+    const rows = resolveApprovedExamRows(state.approvedRows, state.books || [], state.heldIds || [], state);
+    return unresolvedExamRows(rows).length ? 'exam_missing' : 'result_ready';
+  }
+  if (state.componentsEntered === true) return 'eligibility_ready';
+  if (state.componentsEntered === false) return 'components_missing';
+  return 'review';
+}
+
 export function gradebookCompletionStatus(state: any, examGradesComplete: boolean) {
   const locked = state.mode === 'legacy_preserved'
     ? state.legacyGradebookStatus === 'approved' : state.result_status === 'approved';

@@ -6,7 +6,7 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { PROFILE_CATEGORIES, profileCategoryLabel } from "../../features/admission/profileCategories";
 import { isStudyManagementStatus, studyManagementStatuses, studyManagementStatusLabel } from "../../features/admission/studyManagement";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
   Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions,
@@ -605,7 +605,6 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
         : "Quản lý hồ sơ thí sinh đang dự tuyển, nhập liệu theo form A4 và xuất phiếu hồ sơ chi tiết."}
       maxWidth={1880}
     >
-      <ToastContainer position="top-right" newestOnTop autoClose={2500} limit={3} />
 
       {/* 1. TOP FILTER BAR */}
       <Paper

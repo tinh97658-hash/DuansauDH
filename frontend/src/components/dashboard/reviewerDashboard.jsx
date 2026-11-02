@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Button, Card, CardContent, TextField } from "@mui/material";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 
 const ReviewerDashboard = () => {
   const { state } = useLocation();
@@ -19,7 +19,6 @@ const ReviewerDashboard = () => {
     <p className="text-muted">Nhập nhận xét chuyên môn và kết luận đánh giá.</p>
     <TextField label="Nội dung nhận xét" placeholder="Nhập nhận xét tại đây" multiline rows={12} fullWidth value={comment} onChange={(event) => setComment(event.target.value)} />
     <Button variant="contained" color="success" onClick={submit} disabled={submitting || !comment.trim()} sx={{ mt: 3 }}>{submitting ? "Đang gửi..." : "Gửi nhận xét"}</Button>
-    <ToastContainer position="top-center" />
   </CardContent></Card>;
 };
 export default ReviewerDashboard;

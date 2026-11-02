@@ -1,7 +1,7 @@
 import { usePermissions } from "../features/accounts/usePermissions";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress,
@@ -405,7 +405,6 @@ const CatalogManager = ({
         }
         return row[column.key];
       }, [["Tìm kiếm", search || "Tất cả"], ["Phạm vi", `${filtered.length} bản ghi phù hợp bộ lọc`]]) }}>
-      <ToastContainer position="top-center" newestOnTop limit={3} />
       <Paper
         variant="outlined"
         sx={{
@@ -639,7 +638,7 @@ const CatalogManager = ({
         loading={saving}
         content={`Bạn có chắc muốn xóa ${itemName} ${deleting?.name || ""}${showCode && deleting?.code ? ` (mã ${deleting?.code})` : ""} không?`}
       />
-    
+
   </FeatureLayout>
   );
 };

@@ -1,3 +1,5 @@
+import { renderToastHost } from "../renderToastHost";
+beforeEach(renderToastHost);
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import axios from "axios";
 import GradeSettingsDialog from "../../features/exams/GradeSettingsDialog";

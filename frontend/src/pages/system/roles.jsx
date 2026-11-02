@@ -12,6 +12,7 @@ import FeatureLayout from "../../components/FeatureLayout";
 import AppDialog from "../../components/AppDialog";
 import PopupFormField from "../../components/PopupFormField";
 import ConfirmDialog from "../../components/ConfirmDialog";
+import { notify } from "../../utils/notify";
 import { usePermissions } from "../../features/accounts/usePermissions";
 import { createRole, deleteRole, listPermissionCatalog, listRoles, setRolePermissions, updateRole } from "../../features/accounts/rolesApi";
 
@@ -26,7 +27,6 @@ const Roles = () => {
   const [catalog, setCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState(null);
 
   const [selectedId, setSelectedId] = useState(null);
   const [checked, setChecked] = useState(() => new Set());
@@ -88,11 +88,11 @@ const Roles = () => {
     try {
       const ids = allPermissions.filter((permission) => assignable(permission) && checked.has(permission.code)).map((permission) => permission.id);
       const result = await setRolePermissions(selectedRole.id, ids, groupScope);
-      setNotice({ type: "success", message: result.message || "Cập nhật quyền cho vai trò thành công." });
+      notify.success(result.message || "Cập nhật quyền cho vai trò thành công.");
       await load();
       await session?.refresh?.();
     } catch (failure) {
-      setError(failure.response?.data?.message || failure.message || "Không thể cập nhật quyền.");
+      notify.error(failure.response?.data?.message || "Không thể cập nhật quyền.");
     } finally {
       setSaving(false);
     }
@@ -120,17 +120,17 @@ const Roles = () => {
         const payload = { name: roleForm.name.trim(), description: roleForm.description.trim() };
         if (!editingRole.isSystem) payload.active = editingRole.active !== false;
         const result = await updateRole(editingRole.id, payload);
-        setNotice({ type: "success", message: result.message || "Cập nhật vai trò thành công." });
+        notify.success(result.message || "Cập nhật vai trò thành công.");
       } else {
         const result = await createRole({ code: roleForm.code.trim().toLowerCase(), name: roleForm.name.trim(), description: roleForm.description.trim() });
-        setNotice({ type: "success", message: result.message || "Tạo vai trò thành công." });
+        notify.success(result.message || "Tạo vai trò thành công.");
         if (result.data?.id) setSelectedId(result.data.id);
       }
       setRoleDialogOpen(false);
       await load();
       await session?.refresh?.();
     } catch (failure) {
-      setRoleFormError(failure.response?.data?.message || "Không thể lưu vai trò.");
+      notify.error(failure.response?.data?.message || "Không thể lưu vai trò.");
     } finally {
       setSaving(false);
     }
@@ -141,13 +141,13 @@ const Roles = () => {
     setError("");
     try {
       await deleteRole(deleteTarget.id);
-      setNotice({ type: "success", message: "Đã xóa vai trò." });
+      notify.success("Đã xóa vai trò.");
       setDeleteTarget(null);
       if (selectedId === deleteTarget.id) setSelectedId(null);
       await load();
       await session?.refresh?.();
     } catch (failure) {
-      setError(failure.response?.data?.message || "Không thể xóa vai trò.");
+      notify.error(failure.response?.data?.message || "Không thể xóa vai trò.");
     } finally {
       setSaving(false);
     }
@@ -158,10 +158,11 @@ const Roles = () => {
     setError("");
     try {
       await updateRole(role.id, { active: role.active === false });
+      notify.success(role.active === false ? "Đã kích hoạt vai trò." : "Đã tạm ẩn vai trò.");
       await load();
       await session?.refresh?.();
     } catch (failure) {
-      setError(failure.response?.data?.message || "Không thể cập nhật trạng thái vai trò.");
+      notify.error(failure.response?.data?.message || "Không thể cập nhật trạng thái vai trò.");
     } finally {
       setSaving(false);
     }
@@ -188,7 +189,6 @@ const Roles = () => {
     <FeatureLayout title="Vai trò & phân quyền" group="Tài khoản & phân quyền" desc="Tạo vai trò tùy chỉnh và tick chọn quyền theo từng nhóm nghiệp vụ."
       exportConfig={false}>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {notice && <Alert severity={notice.type} onClose={() => setNotice(null)} sx={{ mb: 2 }}>{notice.message}</Alert>}
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}><CircularProgress /></Box>
       ) : (

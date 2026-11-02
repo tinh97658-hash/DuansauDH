@@ -1,3 +1,4 @@
+import { notify } from "../../utils/notify";
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
@@ -48,7 +49,6 @@ function StudyLeaveList() {
   const [creating, setCreating] = useState(false);
   const [decision, setDecision] = useState(null);
   const [revision, setRevision] = useState(0);
-  const [success, setSuccess] = useState('');
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -88,18 +88,18 @@ function StudyLeaveList() {
         <MenuItem value="extension_pending">Có gia hạn chờ duyệt</MenuItem>
       </FilterSelectField>
       {can('studyleave.request') && <Button variant="contained" sx={{ flexShrink: 0, whiteSpace: 'nowrap', minHeight: 38 }}
-        onClick={() => { setSuccess(''); setCreating(true); }}>Tạo yêu cầu bảo lưu</Button>}
+        onClick={() => {  setCreating(true); }}>Tạo yêu cầu bảo lưu</Button>}
       <InlineReportExport height={38} />
       </Stack>
     </Paper>
     {creating && <StudyLeaveRequestDialog onClose={() => setCreating(false)} onCreated={learner => {
-      setCreating(false); setSuccess(`Đã tạo yêu cầu bảo lưu cho ${learner.fullName} (${learner.code}).`);
+      setCreating(false); notify.success(`Đã tạo yêu cầu bảo lưu cho ${learner.fullName} (${learner.code}).`);
       setStatus(''); setSearch(''); setDebouncedSearch(''); setPage(0); setRevision(value => value + 1);
     }} />}
-    {success && <Alert severity="success" sx={{ mb: 1.5 }}>{success}</Alert>}
+
     {decision && <StudyLeaveDecisionDialog key={`${decision.leave.id}-${decision.action}`} {...decision}
       onClose={() => setDecision(null)} onDecided={() => {
-        setSuccess(`Đã ${decision.action === 'approve' ? 'duyệt' : 'từ chối'} bảo lưu cho ${decision.leave.fullName}.`);
+        notify.success(`Đã ${decision.action === 'approve' ? 'duyệt' : 'từ chối'} bảo lưu cho ${decision.leave.fullName}.`);
         setDecision(null); setRevision(value => value + 1);
       }} />}
     <Alert severity="info" sx={{ mb: 1.5, fontSize: 12 }}>Sắp hết hạn: còn tối đa 30 ngày. Quá hạn vẫn chờ xử lý, chưa tự động thôi học.</Alert>
@@ -113,8 +113,8 @@ function StudyLeaveList() {
           {row.extensions?.some(extension => extension.status === 'pending') && <Typography variant="caption" display="block">Có gia hạn chờ duyệt</Typography>}</TableCell>
         <TableCell align="center">{row.status === 'overdue' ? `${row.overdueDays} ngày` : '—'}</TableCell>
         <TableCell align="center">{row.status === 'pending' && can('studyleave.approve') ? <Stack direction="row" spacing={1} justifyContent="center">
-          <Button size="small" variant="contained" disabled={loading} sx={{ whiteSpace: 'nowrap' }} onClick={() => { setSuccess(''); setDecision({ leave: row, action: 'approve' }); }}>Duyệt bảo lưu</Button>
-          <Button size="small" color="error" disabled={loading} sx={{ whiteSpace: 'nowrap' }} onClick={() => { setSuccess(''); setDecision({ leave: row, action: 'reject' }); }}>Từ chối</Button>
+          <Button size="small" variant="contained" disabled={loading} sx={{ whiteSpace: 'nowrap' }} onClick={() => {  setDecision({ leave: row, action: 'approve' }); }}>Duyệt bảo lưu</Button>
+          <Button size="small" color="error" disabled={loading} sx={{ whiteSpace: 'nowrap' }} onClick={() => {  setDecision({ leave: row, action: 'reject' }); }}>Từ chối</Button>
         </Stack> : '—'}</TableCell>
         <TableCell align="center"><Button size="small" component={Link} to={`/masters/study-leaves/${row.admissionRecordId}?tab=leave`} onPointerEnter={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)} onFocus={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)}>Mở hồ sơ</Button></TableCell>
       </TableRow>)}{!result.rows.length && <TableRow><TableCell colSpan={7} align="center" sx={{ py: 5, color: 'text.secondary' }}>{loading ? 'Đang tải…' : 'Không có hồ sơ bảo lưu phù hợp.'}</TableCell></TableRow>}</TableBody></ResizableTable>

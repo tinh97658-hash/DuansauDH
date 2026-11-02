@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Card, CardContent } from "@mui/material";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
-import { ToastContainer, toast } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 const FileUploader = () => {
@@ -33,7 +33,6 @@ const FileUploader = () => {
       <input id="submission-file" className="form-control" type="file" required onChange={(event) => setFile(event.target.files[0])} />
       <button type="submit" className="btn btn-primary mt-4" disabled={submitting}>{submitting ? "Đang nộp..." : "Nộp báo cáo"}</button>
     </form>
-    <ToastContainer position="top-center" />
   </CardContent></Card>;
 };
 export default FileUploader;

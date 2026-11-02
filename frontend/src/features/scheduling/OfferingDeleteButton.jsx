@@ -2,6 +2,7 @@ import { usePermissions } from "../accounts/usePermissions";
 import React, { useState } from "react";
 import { Alert } from "@mui/material";
 import { api, message, Modal, Notice, offeringTitle } from "./shared";
+import { notify } from "../../utils/notify";
 
 const scheduleWarning = "Vui lòng xóa lịch học trước khi xóa lớp học phần";
 
@@ -21,11 +22,12 @@ export default function OfferingDeleteButton({ offering, disabled = false, class
     try {
       await api.delete(`/scheduling/course-offerings/${offering.id}${removingSchedule ? "/teaching-sessions" : ""}`);
       setDialog(null);
+      notify.success(removingSchedule ? "Đã xóa lịch học." : "Đã xóa lớp học phần.");
       if (removingSchedule) onScheduleDeleted?.();
       else onDeleted?.();
     } catch (failure) {
       if (failure?.response?.data?.code === "OFFERING_HAS_SCHEDULE") setDialog("warning");
-      else setError(message(failure));
+      else notify.error(message(failure));
     } finally { setSaving(false); }
   };
   return <>

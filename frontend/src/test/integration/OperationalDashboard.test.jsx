@@ -29,6 +29,41 @@ const open = async () => {
 };
 beforeEach(() => { vi.clearAllMocks(); axios.get.mockResolvedValue({ data: fixture() }); });
 
+it("distinguishes pending sessions from warning classes and gives each warning group a badge", async () => {
+  const data = fixture();
+  data.sources.teaching.data.progress = { count: 7, itemCount: 3, href: "/masters/schedule?year=2026", items: [5, 1, 1].map((count, i) => ({
+    id: `p${i}`, title: `Lớp ${i + 1}`, count, detail: `${count} buổi chưa xác nhận`, href: `/masters/schedule?offeringId=p${i}`,
+  })) };
+  data.sources.grades.data.warningGroups = [{ key: "exam", title: "CHỜ TỔ CHỨC THI", items: [0, 1, 2, 3].map(i => ({ id: `e${i}`, title: `Thi ${i}`, href: "/masters/exam-schedule" })) }];
+  axios.get.mockResolvedValue({ data });
+  await open();
+  const card = screen.getByRole("article", { name: "Tiến độ cần kiểm tra" });
+  expect(within(card).getByText("7")).toBeInTheDocument();
+  expect(within(card).getByText("buổi chờ xác nhận")).toBeInTheDocument();
+  const panel = screen.getByRole("complementary", { name: "CẢNH BÁO" });
+  expect(within(panel).getByText("7 lớp")).toHaveClass("od-warning-badge");
+  expect(within(panel).getByText("4 lớp")).toHaveClass("od-warning-badge");
+  expect(within(panel).getByText("7 buổi")).toHaveClass("od-warning-badge");
+});
+
+it("retains the session total when warning items are truncated", async () => {
+  const data = fixture();
+  data.sources.teaching.data.progress = { count: 7, itemCount: 3, href: "/masters/schedule?year=2026", items: [5, 1, 1].map((count, i) => ({
+    id: `p${i}`, title: `Lớp ${i + 1}`, count, detail: `${count} buổi chưa xác nhận`, href: `/masters/schedule?offeringId=p${i}`,
+  })) };
+  data.sources.grades.data.warningGroups = [{ key: "exam", title: "CHỜ TỔ CHỨC THI", items: [0, 1, 2, 3].map(i => ({ id: `e${i}`, title: `Thi ${i}`, href: "/masters/exam-schedule" })) }];
+  data.sources.teaching.data.progress.items = data.sources.teaching.data.progress.items.slice(0, 1);
+  axios.get.mockResolvedValue({ data });
+  await open();
+  const card = screen.getByRole("article", { name: "Tiến độ cần kiểm tra" });
+  expect(within(card).getByText("7")).toBeInTheDocument();
+  expect(within(card).getByText("buổi chờ xác nhận")).toBeInTheDocument();
+  const panel = screen.getByRole("complementary", { name: "CẢNH BÁO" });
+  expect(within(panel).getByText("5 lớp")).toHaveClass("od-warning-badge");
+  expect(within(panel).getByText("4 lớp")).toHaveClass("od-warning-badge");
+  expect(within(panel).getByText("7 buổi")).toHaveClass("od-warning-badge");
+});
+
 it('places both filters beside the summary cards and provides both training programs', async () => {
   await open();
   const filters = screen.getByRole('group', { name: 'Bộ lọc dashboard' });
@@ -334,7 +369,7 @@ it.each([5, 12])("shows every scoped teaching warning and counts the displayed %
   const warnings = screen.getByRole("complementary", { name: "CẢNH BÁO" });
   expect(within(warnings).getAllByRole("listitem")).toHaveLength(total);
   expect(within(warnings).getAllByRole("listitem").map((li) => li.querySelector("strong").textContent)).toEqual(Array.from({length:total},(_,i)=>`Lớp cảnh báo ${i+1}`));
-  expect(within(warnings).getByText(`${total} lớp`)).toBeInTheDocument();
+  expect(within(warnings).getAllByText(`${total} lớp`)).toHaveLength(2);
   expect(within(warnings).getAllByTitle(detail.trim())).toHaveLength(total);
   const all = within(warnings).getByRole("link", { name: 'Xem tất cả' });
   expect(all).toHaveAttribute("href", data.sources.teaching.data.progress.href);
@@ -378,6 +413,6 @@ it('counts a class only once across warning groups and keeps each group CTA scop
  const data=fixture();const shared={id:'same-class',title:'Lớp có nhiều cảnh báo',detail:'Thi xong 1 ngày trước',href:'/masters/exam-lists?year=2026&offeringId=same-class'};
  data.sources.teaching.data.progress={count:1,items:[{...shared,detail:'1 buổi đã qua giờ, chưa xác nhận'}],href:'/masters/schedule?year=2026&queue=pending-confirmation'};
  data.sources.grades.data.warningGroups=[{key:'examGrades',title:'CHỜ NHẬP ĐIỂM THI',items:[shared]}];axios.get.mockResolvedValue({data});await open();
- const panel=screen.getByRole('complementary',{name:'CẢNH BÁO'});expect(within(panel).getByText('1 lớp')).toBeInTheDocument();expect(within(panel).getAllByRole('listitem')).toHaveLength(2);
+  const panel=screen.getByRole('complementary',{name:'CẢNH BÁO'});expect(within(panel).getAllByText('1 lớp')).toHaveLength(3);expect(within(panel).getAllByRole('listitem')).toHaveLength(2);
  const exam=within(panel).getByRole('region',{name:'CHỜ NHẬP ĐIỂM THI'});fireEvent.click(within(exam).getByRole('link',{name:'Xem tất cả'}));expect(screen.getByTestId('location')).toHaveTextContent('/masters/exam-lists?year=2026');
 });

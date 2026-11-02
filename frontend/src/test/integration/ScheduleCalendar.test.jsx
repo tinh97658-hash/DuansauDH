@@ -1,3 +1,5 @@
+import { renderToastHost } from "../renderToastHost";
+beforeEach(renderToastHost);
 import { renderWithPermissions } from "../renderWithPermissions";
 const render = (ui, options) => renderWithPermissions(ui, ["scheduling.view", "scheduling.write", "scheduling.organize"], options);
 import React from "react";
@@ -809,7 +811,10 @@ it("retains the editor and reports a server conflict instead of claiming success
   fireEvent.click(screen.getByRole("button", { name: "Chỉnh sửa" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "Lưu buổi học" })).toBeEnabled());
   fireEvent.click(screen.getByRole("button", { name: "Lưu buổi học" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("Phòng học đã có lịch"); expect(saved).not.toHaveBeenCalled();
+  const conflict = await screen.findByText("Phòng học đã có lịch");
+  expect(conflict.closest('.Toastify__toast')).toHaveClass('Toastify__toast--error');
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  expect(saved).not.toHaveBeenCalled();
 });
 it("confirms an ended session through the API without edit controls", async () => {
   const saved = jest.fn();

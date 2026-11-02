@@ -1,3 +1,4 @@
+import { notify } from "../../utils/notify";
 import { usePermissions } from "../accounts/usePermissions";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -330,7 +331,7 @@ export default function Schedule({ user }) {
   const confirmation = async (session, result) => {
     setSaving(true); setError("");
     try { await api.put(`/scheduling/teaching-sessions/${session.id}/confirmation`, { status: result }); refresh(); }
-    catch (failure) { setError(message(failure)); }
+    catch (failure) { notify.error(message(failure)); }
     finally { setSaving(false); }
   };
   const sessionStatusKey = (session) => session.status === "held" ? "held" : session.status === "not_held" ? "not" : isSessionPast({ ...session, endTime: session.period === "MORNING" ? "12:00" : "23:59" }) ? "wait" : "planned";
@@ -435,7 +436,7 @@ export default function Schedule({ user }) {
     </article>;
   })}{!listed.length && <Notice>Không có lớp học phần trong phạm vi đã chọn.</Notice>}</section>}</div></div></div></aside>
   <section className="sl-right"><div className="sl-schedule-head"><h1>XẾP LỊCH</h1><div className="sl-week"><button aria-label="Tuần trước" onClick={() => changeWeek(formatDateKey(addDays(week, -7)))}>‹</button><strong>{vietnameseDate(week)} — {vietnameseDate(end)}</strong><button aria-label="Tuần sau" onClick={() => changeWeek(formatDateKey(addDays(week, 7)))}>›</button></div>
-    <div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" label="Xuất file" disabled={sessions.loading || !!sessions.error || majors.loading || !!majors.error || offerings.loading || !!offerings.error} showFileIcons onWord={downloadWord} onExcel={downloadExcel} onPdf={openPdfPreview} onError={(failure) => setError(message(failure))} /><button className="sl-btn sl-today" disabled={week === currentWeek && !focusedDate} onClick={() => changeWeek(currentWeek)}>Tuần này</button>{canEdit && <button className="sl-pending" onClick={() => setPendingOpen(true)}>{pending.loading ? "…" : pending.data?.length ?? "—"} chờ xác nhận</button>}</div>
+    <div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" label="Xuất file" disabled={sessions.loading || !!sessions.error || majors.loading || !!majors.error || offerings.loading || !!offerings.error} showFileIcons onWord={downloadWord} onExcel={downloadExcel} onPdf={openPdfPreview} onError={(failure) => notify.error(message(failure))} /><button className="sl-btn sl-today" disabled={week === currentWeek && !focusedDate} onClick={() => changeWeek(currentWeek)}>Tuần này</button>{canEdit && <button className="sl-pending" onClick={() => setPendingOpen(true)}>{pending.loading ? "…" : pending.data?.length ?? "—"} chờ xác nhận</button>}</div>
   </div>{selecting && <div className="sl-selected-strip"><span className="sl-selected-tag">ĐANG XẾP</span><strong className="sl-selected-offering" title={offeringTitle(selected)}>{offeringTitle(selected)}</strong><span className="sl-selected-meta">{selected.subject?.code ? `${selected.subject.code} · ` : ""}{groupsOf(selected).length} lớp/nhóm · {selected.participantCount ?? 0} HV</span><button type="button" className="sl-btn sl-selected-clear" onClick={() => setSelected("")}>Bỏ chọn</button></div>}
     {sessions.error && <Notice error={sessions.error} />}{error && <Notice error={error} />}
     <div className={`sl-calendar-wrap ${selecting ? "sl-selecting" : ""}`} aria-busy={sessions.loading}>{focusedDay ? <section className="sl-day-focus" aria-label={`Lịch ngày ${vietnameseDate(focusedDate)}`}>

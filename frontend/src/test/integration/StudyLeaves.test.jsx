@@ -1,3 +1,5 @@
+import { renderToastHost } from "../renderToastHost";
+beforeEach(renderToastHost);
 import React from 'react';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';

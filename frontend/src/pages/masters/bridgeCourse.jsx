@@ -1,7 +1,7 @@
 import DateField from "../../components/DateField";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
   Alert, Box, Button, Chip, CircularProgress,
@@ -181,7 +181,6 @@ export default function BridgeCourse() {
       subject: `${row.subject?.code || ""} - ${row.subject?.name || ""}`, credits: row.subject?.credits,
       year: row.academicYear, status: (STATES[row.status] || STATES.assigned)[0], score: row.score, result: (RESULTS[row.result] || RESULTS.pending)[0],
     })[column.key]) }}>
-    <ToastContainer position="top-center" newestOnTop limit={3} />
     <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mb: 1.25 }}>
       {[["Tổng đăng ký", summary.total, "#087da5"], ["Đã phân công", summary.assigned, "#667085"], ["Đang học", summary.studying, "#168bc2"], ["Đạt / miễn", summary.passed, "#168b63"], ["Không đạt", summary.failed, "#c0392b"]].map(([label, value, color]) => <Paper key={label} variant="outlined" sx={{ px: 1.5, py: .75, minHeight: 48, flex: 1, borderRadius: "6px" }}><Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: 11.5, lineHeight: 1.35 }}>{label}</Typography><Typography variant="h5" fontWeight={700} sx={{ color, fontSize: 18, lineHeight: 1.2 }}>{value || 0}</Typography></Paper>)}
     </Stack>
@@ -371,6 +370,6 @@ export default function BridgeCourse() {
         Bạn có chắc muốn xóa học phần <strong>{deleting?.subject?.name}</strong> của <strong>{deleting?.admissionRecord?.fullName}</strong> không?
       </Typography>
     </ConfirmDialog>
-  
+
   </FeatureLayout>;
 }

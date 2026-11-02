@@ -5,6 +5,8 @@ import axios from "axios";
 import Roles from "../../pages/system/roles";
 import theme from "../../theme";
 import { AuthSessionContext } from "../../context/AuthSession";
+import AppToaster from "../../components/AppToaster";
+import { toast } from "react-toastify";
 
 vi.mock("axios", () => ({
   default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn(), defaults: {} },
@@ -54,6 +56,7 @@ it('lets admin grant request permissions to supervisor while reserving approvals
 const mount = (permissions) => render(
   <ThemeProvider theme={theme}>
     <CssBaseline />
+    <AppToaster />
     <AuthSessionContext.Provider value={{ access: { superadmin: false, permissions, roles: [] } }}>
       <Roles />
     </AuthSessionContext.Provider>
@@ -67,6 +70,19 @@ beforeEach(() => {
     return Promise.resolve({ data: [] });
   });
 });
+afterEach(() => { toast.dismiss(); toast.clearWaitingQueue(); });
+
+it("shows permission-save feedback once as a toast", async () => {
+  mount(["role.view", "role.manage"]);
+  await screen.findByRole("checkbox", { name: "Quản lý tài khoản" });
+  axios.put.mockResolvedValueOnce({ data: { message: "Cập nhật quyền cho vai trò thành công." } });
+  fireEvent.click(screen.getByRole("button", { name: "Lưu quyền" }));
+  const feedback = await screen.findByText("Cập nhật quyền cho vai trò thành công.");
+  expect(feedback.closest(".Toastify__toast")).toHaveClass("Toastify__toast--success");
+  expect(feedback.closest(".Toastify__toast")).toHaveClass("Toastify__toast-theme--light", "app-toast");
+  expect(feedback.closest(".MuiAlert-root")).toBeNull();
+  expect(screen.getAllByText("Cập nhật quyền cho vai trò thành công.")).toHaveLength(1);
+});
 
 it("hiển thị và lưu ma trận quyền admin như mọi vai trò khác", async () => {
   mount(["role.view", "role.manage"]);
@@ -75,6 +91,7 @@ it("hiển thị và lưu ma trận quyền admin như mọi vai trò khác", as
   fireEvent.click(manage);
   axios.put.mockResolvedValue({ data: { message: "Đã lưu" } });
   fireEvent.click(screen.getByRole("button", { name: "Lưu quyền" }));
+  expect(screen.queryByText("XÁC NHẬN THAY ĐỔI QUYỀN")).not.toBeInTheDocument();
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(
     expect.stringContaining("/roles/role-admin/permissions"),
     { permissionIds: ["perm-view"], restrictGroupView: false, restrictGroupEdit: false, groupReadOnly: false }, { withCredentials: true },

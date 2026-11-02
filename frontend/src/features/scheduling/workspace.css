@@ -649,7 +649,8 @@
 .sl-pivot-credits-cell{width:48px;color:#5f748c;font-weight:500;text-align:center}
 .sl-pivot-cell-offerings{display:flex;flex-direction:column;gap:6px}
 .sl-pivot-cell-offerings-single-year{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}
-.sl-pivot-mini-card{position:relative;height:104px;display:flex;flex-direction:column;gap:3px;padding:8px;overflow:hidden;border:1px solid #d9e4ec;border-radius:0;background:#fff;transition:border-color .15s ease}
+.sl-pivot-mini-card{position:relative;min-height:104px;display:flex;flex-direction:column;gap:3px;padding:8px;overflow:hidden;border:1px solid #d9e4ec;border-radius:0;background:#fff;transition:border-color .15s ease}
+.sl-pivot-mini-card> :not(.sl-pivot-card-detail-trigger){flex-shrink:0}
 .sl-pivot-mini-card:hover{border-color:#9ab7c8}
 .sl-pivot-card-title{display:block;overflow:hidden;color:#123b63;font-size:13px;font-weight:600;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}
 .sl-pivot-card-groups{display:block;overflow:hidden;color:#5f748c;font-size:12px;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}

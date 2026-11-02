@@ -1,3 +1,4 @@
+import { notify } from "../../utils/notify";
 import { usePermissions } from "../accounts/usePermissions";
 import React, { useState } from "react";
 import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
@@ -18,7 +19,6 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
-  const [success, setSuccess] = useState("");
   const value = detail.data || offering;
   const canManage = can("scheduling.write") && (value.canWriteSchedule ?? value.scopeWritable) !== false;
   const canNotes = can("scheduling.organize") && (value.canOrganize ?? value.scopeWritable) !== false;
@@ -49,21 +49,21 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
   });
 
   const mutate = async (action, done) => {
-    setSaving(true); setError(""); setSuccess("");
+    setSaving(true); setError("");
     try { await action(); if (done) done(); }
-    catch (failure) { setError(message(failure)); if (completing) unresolved.reload(); }
+    catch (failure) { notify.error(message(failure)); if (completing) unresolved.reload(); }
     finally { setSaving(false); }
   };
   const saveNotes = () => mutate(() => api.put(`/scheduling/course-offerings/${offering.id}/roster-notes`, {
     participantNotes: (roster.data?.participants || []).map((row) => ({ participantId: row.id, note: (notes[row.id] !== undefined ? notes[row.id] : row.note || "").trim() })).filter((row) => row.note),
-  }), () => { setSuccess("Đã lưu ghi chú."); roster.reload(); setNotes({}); });
+  }), () => { notify.success("Đã lưu ghi chú."); roster.reload(); setNotes({}); });
   return <Modal wide hideHeader className="sl-offering-drawer" bodyClassName="sl-offering-body" title="CHI TIẾT LỚP HỌC PHẦN" busy={saving} onClose={onClose} actions={<>
     {(canNotes || canManage) && <OfferingDeleteButton offering={value} disabled={saving || detail.loading || sessions.loading || !!detail.error || !!sessions.error}
       onDeleted={() => { onSaved?.(); onClose(); }} onScheduleDeleted={() => { detail.reload(); sessions.reload(); unresolved.reload(); onSaved?.(); }} />}
     {canManage && value.status === "active" && <>{onSelect && <button className="sl-btn" onClick={() => onSelect(value)}>Xếp lịch / Xếp thêm</button>}<button className="sl-btn sl-btn-primary" disabled={saving || detail.loading || !!detail.error || unresolved.loading || !!unresolved.error || !summary.heldCount} onClick={() => { setError(""); unresolved.reload(); setCompleting(true); }}>Xác nhận hoàn thành giảng dạy</button></>}
   </>}>
     <header className="sl-offering-hero"><div><div className="sl-eyebrow">LỚP HỌC PHẦN</div><h2>{offeringTitle(value)}</h2><strong>{subjectLabel(value)}</strong><p>{groupsOf(value).length} lớp/nhóm · {value.participantCount ?? 0} học viên</p></div><div className="sl-offering-hero-actions"><button className="sl-drawer-close" aria-label="Đóng" disabled={saving} onClick={onClose}>×</button><span className={`sl-state ${value.status === "completed" ? "sl-complete" : "sl-progress"}`}>{value.status === "completed" ? "HOÀN THÀNH" : "ĐANG DẠY"}</span></div></header>
-    <div className={`sl-offering-content ${activeTab === "people" ? "sl-offering-content-people" : ""}`}>{detail.error && <Notice error={detail.error} />}{error && <Notice error={error} />}{success && <Notice>{success}</Notice>}
+    <div className={`sl-offering-content ${activeTab === "people" ? "sl-offering-content-people" : ""}`}>{detail.error && <Notice error={detail.error} />}{error && <Notice error={error} />}
       {value.scheduleWriteBlockedReason && <Notice>{value.scheduleWriteBlockedReason === 'READ_ONLY' ? 'Vai trò đang bật Chỉ xem: không thể sửa lịch hoặc hoàn thành giảng dạy.' : 'Bạn được xem lớp này nhưng chưa có quyền thao tác lịch trong phạm vi của lớp.'}</Notice>}
       {value.status === "completed" && <p>Học viên có kết quả Không đạt được tự động tổng hợp thành nhóm Học lại theo lớp gốc tại Tạo lớp học phần.</p>}
       <div className="sl-offering-tabs" role="tablist" aria-label="Nội dung lớp học phần">

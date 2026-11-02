@@ -5,13 +5,13 @@ import { ReactComponent as WordFileIcon } from "../assets/icons/filetype-docx.sv
 import { ReactComponent as ExcelFileIcon } from "../assets/icons/filetype-xlsx.svg";
 import { ReactComponent as PdfFileIcon } from "../assets/icons/filetype-pdf.svg";
 import "./documentExportMenu.css";
+import { notify } from "../utils/notify";
 
 export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, showFileIcons = true, disabled = false, className = "", label = "Xuất file", excelLabel = "Xuất Excel", pdfLabel = "Xuất PDF" }) {
   const reportExport = useContext(ReportExportContext);
   onWord ||= reportExport ? () => reportExport.exportFormat("word") : undefined;
   onExcel ||= reportExport ? () => reportExport.exportFormat("excel") : undefined;
   onPdf ||= reportExport ? () => reportExport.exportFormat("pdf") : undefined;
-  const [exportError, setExportError] = useState("");
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const root = useRef(null);
@@ -51,14 +51,13 @@ export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, sh
   }, [open]);
 
   const select = async (action) => {
-    setExportError("");
     setOpen(false);
     trigger.current?.focus();
     try {
       const result = action();
       if (result && typeof result.then === "function") { setBusy(true); await result; }
     }
-    catch (error) { if (onError) onError(error); else setExportError(error.message || "Không thể xuất file."); }
+    catch (error) { if (onError) onError(error); else notify.error(error.message || "Không thể xuất file."); }
     finally { setBusy(false); }
   };
   const keyDown = (event) => {
@@ -81,7 +80,6 @@ export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, sh
       aria-busy={busy} disabled={disabled || busy} onClick={() => setOpen(!open)}>
       {busy ? "Đang xuất…" : label} <span aria-hidden="true">▼</span>
     </button>
-    {exportError && <span role="alert" className="document-export-error">{exportError}</span>}
     {open && !disabled && createPortal(<div ref={menu} id={menuId} role="menu" aria-label={label} className="document-export-options" style={position}>
       {items.map(({ name, action, Icon, format }) => <button key={format} type="button" role="menuitem" onClick={() => select(action)}>
         {showFileIcons && <Icon className={`document-export-icon document-export-icon-${format}`} width="20" height="20" aria-hidden="true" focusable="false" />}

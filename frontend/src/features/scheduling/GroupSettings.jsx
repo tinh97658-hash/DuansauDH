@@ -1,6 +1,7 @@
 import AppSelect from "../../components/AppSelect";
 import React, { useState } from "react";
 import { api, message, Modal, Notice } from "./shared";
+import { notify } from "../../utils/notify";
 
 export default function GroupSettings({ groups, onClose, onSaved }) {
   const [id, setId] = useState(groups[0]?.id || "");
@@ -10,8 +11,8 @@ export default function GroupSettings({ groups, onClose, onSaved }) {
   const [error, setError] = useState("");
   const save = async () => {
     setSaving(true); setError("");
-    try { await api.put(`/scheduling/groups/${id}/settings`, { allowedWeekdays: days, groupType: type }); onSaved(); }
-    catch (failure) { setError(message(failure)); }
+    try { await api.put(`/scheduling/groups/${id}/settings`, { allowedWeekdays: days, groupType: type }); notify.success("Đã lưu cấu hình nhóm."); onSaved(); }
+    catch (failure) { notify.error(message(failure)); }
     finally { setSaving(false); }
   };
   return <Modal title="Ngày học và loại nhóm" busy={saving} onClose={onClose} actions={<><button className="sl-btn" disabled={saving} onClick={onClose}>Hủy</button><button className="sl-btn sl-btn-primary" disabled={saving || !id || !days.length} onClick={save}>Lưu cấu hình nhóm</button></>}>

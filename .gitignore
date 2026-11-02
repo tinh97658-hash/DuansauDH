@@ -49,3 +49,11 @@ Thumbs.db
 /TRANSCRIPT-EXPORT-CONTINUOUS-IMPLEMENTATION.md
 /frontend/public/fonts/transcript/NotoSerif-*.ttf
 /frontend/public/fonts/transcript/OFL.txt
+
+# Local audit workspaces, disposable databases and browser verification artifacts
+/.audit-db0f26c/
+/.ui-verification/
+/.next-verification/
+/.rollback-verification/
+/.dashboard-verification/
+/.antigravity-qa/

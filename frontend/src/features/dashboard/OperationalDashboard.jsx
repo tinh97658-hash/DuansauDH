@@ -25,7 +25,7 @@ const definitions = [
   { key: "grouping", source: "grouping", title: "Học viên chưa phân nhóm", healthyTitle: "Phân nhóm học viên", action: "Phân nhóm", healthy: "Không còn học viên chờ phân nhóm", unit: "học viên", Icon: GroupsOutlined, tone: "teal" },
   { key: "scheduling", source: "teaching", title: "Lớp chưa xếp lịch", healthyTitle: "Xếp lịch học", action: "Xếp lịch", healthy: "Không còn lớp chờ xếp lịch", unit: "lớp học phần", Icon: CalendarMonthOutlined, tone: "blue" },
   { key: "grades", source: "grades", title: "Chờ nhập điểm thành phần", healthyTitle: "Nhập điểm thành phần", action: "Nhập điểm", healthy: "Không có lớp chờ nhập điểm thành phần", unit: "lớp", Icon: AssignmentOutlined, tone: "violet" },
-  { key: "progress", source: "teaching", title: "Tiến độ cần kiểm tra", healthyTitle: "Kiểm tra tiến độ", action: "Kiểm tra", healthy: "Không có buổi học chờ xác nhận", unit: "lớp có buổi chờ xác nhận", Icon: PendingActionsOutlined, tone: "amber" },
+  { key: "progress", source: "teaching", title: "Tiến độ cần kiểm tra", healthyTitle: "Kiểm tra tiến độ", action: "Kiểm tra", healthy: "Không có buổi học chờ xác nhận", unit: "buổi chờ xác nhận", Icon: PendingActionsOutlined, tone: "amber" },
 ];
 const metricOf = (source, key) => source?.data?.[key] || (source?.data && ["eligibilityReopen", "eligibilityApproval", "resultApproval"].includes(key)
   ? { count: 0, itemCount: 0, items: [], href: "/masters/exam-lists" } : source?.data);
@@ -85,7 +85,7 @@ function WorkCategory({ definition, source, onRetry }) {
 function WarningPanel({ teachingSource, gradesSource, permissions, year, program, onRetry }) {
   const progress = permissions.progress && teachingSource?.status === "ready" ? teachingSource.data.progress : null;
   const groups = [
-    ...(progress ? [{ key: 'teaching', title: 'BUỔI HỌC CHƯA XÁC NHẬN', items: progress.items }] : []),
+    ...(progress ? [{ key: 'teaching', title: 'BUỔI HỌC CHƯA XÁC NHẬN', items: progress.items, count: progress.count, unit: 'buổi' }] : []),
     ...(permissions.grades && gradesSource?.status === 'ready' ? (gradesSource.data.warningGroups || []).filter(group => ['exam', 'examGrades'].includes(group.key)) : []),
   ];
   const count = new Set(groups.flatMap(group => group.items.map(item => item.id))).size;
@@ -103,7 +103,7 @@ function WarningPanel({ teachingSource, gradesSource, permissions, year, program
       {ready && count === 0
       ? <div className="od-warning-healthy"><CheckCircleOutline aria-hidden="true" /><div><strong>Không có cảnh báo</strong><p>Chưa phát hiện vấn đề cần xử lý.</p></div></div>
       : groups.filter(group => group.items.length > 0).map(group => <section className="od-warning-group" key={group.key} aria-label={group.title}>
-        <h3>{group.title}<span>{group.items.length}</span></h3>
+        <h3>{group.title}<span className="od-warning-badge">{group.count ?? group.items.length} {group.unit || 'lớp'}</span></h3>
         <ul className="od-warning-list">{group.items.map((item) => <li key={item.id}><Link to={item.href} aria-label={[item.title, item.detail].filter(Boolean).join(". ")}>
           <span className="od-warning-icon"><WarningAmberOutlined aria-hidden="true" /></span>
           <span className="od-item-copy"><strong title={item.title}>{item.title}</strong><small title={item.detail}>{item.detail}</small></span><ArrowForwardOutlined aria-hidden="true" />

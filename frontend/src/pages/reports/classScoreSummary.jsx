@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { notify } from "../../utils/notify";
 import axios from "axios";
 import { Link } from "react-router-dom";
 import { Alert, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Menu, MenuItem, Paper, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
@@ -152,7 +153,7 @@ export default function ClassScoreSummary() {
       }
     } catch (failure) {
       request.tab?.close();
-      if (request.active) setError(errorMessage(failure, "Không thể xuất bảng điểm."));
+      if (request.active) notify.error(errorMessage(failure, "Không thể xuất bảng điểm."));
     } finally {
       if (request.active) { exportRequest.current = null; setExporting(false); }
     }

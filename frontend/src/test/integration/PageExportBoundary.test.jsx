@@ -5,9 +5,13 @@ import DocumentExportMenu from "../../components/DocumentExportMenu";
 import InlineReportExport from "../../components/InlineReportExport";
 import { useReportExport } from "../../components/ReportExportContext";
 import { downloadReport } from "../../utils/reportExport";
+import AppToaster from "../../components/AppToaster";
+import { toast } from "react-toastify";
 
 vi.mock("../../utils/reportExport", async () => ({ ...await vi.importActual("../../utils/reportExport"), downloadReport: vi.fn() }));
 beforeEach(() => { vi.clearAllMocks(); downloadReport.mockResolvedValue(); vi.spyOn(window, "open").mockReturnValue({ close: vi.fn() }); });
+beforeEach(() => { render(<AppToaster />); });
+afterEach(() => { toast.dismiss(); toast.clearWaitingQueue(); });
 const table = <table><thead><tr><th>Mã HV</th><th>Họ tên</th></tr></thead><tbody><tr><td>HV001</td><td>Nguyễn An</td></tr></tbody></table>;
 
 it("adds all three formats to a data page and exports its visible snapshot", async () => {

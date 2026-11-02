@@ -1,3 +1,5 @@
+import { renderToastHost } from "../renderToastHost";
+beforeEach(renderToastHost);
 import React from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import axios from 'axios';
@@ -120,7 +122,9 @@ it('keeps a rejected action open with the server explanation and prevents repeat
   fireEvent.click(within(dialog).getByRole('button', { name: 'Xác nhận' }));
   expect(within(dialog).getByRole('button', { name: /Xác nhận/ })).toBeDisabled();
   reject({ response: { data: { message: 'Đợt bảo lưu đã kết thúc. Hãy tải lại.' } } });
-  expect(await within(dialog).findByText('Đợt bảo lưu đã kết thúc. Hãy tải lại.')).toBeInTheDocument();
+  const message = await screen.findByText('Đợt bảo lưu đã kết thúc. Hãy tải lại.');
+  expect(message.closest('.Toastify__toast')).toHaveClass('Toastify__toast--error');
+  expect(dialog).toBeInTheDocument();
   expect(axios.post).toHaveBeenCalledTimes(1);
 });
 

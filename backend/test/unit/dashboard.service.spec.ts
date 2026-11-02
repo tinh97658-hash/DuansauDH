@@ -212,8 +212,8 @@ describe("operational dashboard aggregation", () => {
       f.scheduling.listCourseOfferings.mockResolvedValue(cases.map(id=>({...offering(id,{},'completed'),groupLinks:[{classGroup:{id:'g1',code:'QTKD 2026.1.1',academicYear:'2026',majorId:'m1'}}]})));
       const base={componentsEntered:true,componentsApproved:false,examCompleted:false,examGradesComplete:false,candidateCount:2,completedTeachingAt:'2026-09-01T00:00:00Z',componentScoreApprovedAt:'2026-10-12T00:00:00Z',examCompletedAt:'2026-10-14T00:00:00Z'};
       f.gradebooks.tracking.mockResolvedValue(new Map([
-        ['components',{...base,componentsEntered:false,completedTeachingAt:'2026-10-09T00:00:00Z'}],['entered',base],['submitted',base],
-        ['exam',{...base,componentsApproved:true}],['exam-grades',{...base,componentsApproved:true,examCompleted:true}],
+        ['components',{...base,gradebookStage:'components_missing',componentsEntered:false,completedTeachingAt:'2026-10-09T00:00:00Z'}],['entered',base],['submitted',base],
+        ['exam',{...base,gradebookStage:'awaiting_exam',componentsApproved:true}],['exam-grades',{...base,gradebookStage:'exam_missing',componentsApproved:true,examCompleted:true}],
         ['finished',{...base,componentsApproved:true,examCompleted:true,examGradesComplete:true}],['legacy',{...base,legacy:true,componentsEntered:false}],
       ]));
       const {warningGroups,items,count}= (await f.service.operational(user(),'2026','grades')).sources.grades.data;
@@ -249,14 +249,23 @@ describe("operational dashboard aggregation", () => {
     expect(f.scheduling.listCourseOfferings).toHaveBeenCalledWith({ program: "masters", academicYear: "2026" });
     expect(result.sources.teaching.data).toMatchObject({
       scheduling: { count: 1, href: "/masters/schedule?year=2026&queue=unscheduled" },
-      progress: { count: 1, items: [{ id: "pending", count: 2, href: "/masters/schedule?year=2026&offeringId=pending&queue=pending-confirmation" }] },
+      progress: { count: 2, itemCount: 1, items: [{ id: "pending", count: 2, href: "/masters/schedule?year=2026&offeringId=pending&queue=pending-confirmation" }] },
       overview: { active: 3, inProgress: 1, unscheduled: 1, completed: 1 },
     });
+  });
+  it.each([[0, 0, 0], [7], [2, 3, 2]])("sums pending sessions while preserving class counts: %j", async (...counts) => {
+    const f = fixture();
+    f.scheduling.listCourseOfferings.mockResolvedValue(counts.map((count, index) => offering(`p${index}`, { totalCount: count, pendingCount: count })));
+    const result = await f.service.operational(user(), "2026", "teaching");
+    expect(result.sources.teaching.data.progress).toMatchObject({
+      count: counts.reduce((sum, count) => sum + count, 0), itemCount: counts.filter(count => count > 0).length,
+    });
+    expect(result.sources.teaching.data.progress.items.map(item => item.count)).toEqual(counts.filter(count => count > 0).sort((a, b) => b - a));
   });
   it("counts component-entry offerings rather than generic administrative-group grade progress", async () => {
     const f = fixture();
     f.scheduling.listCourseOfferings.mockResolvedValue(['completed','second','third'].map(id=>offering(id,{},'completed')));
-    f.gradebooks.tracking.mockResolvedValue(new Map(['completed','second','third'].map(id=>[id,{componentsEntered:false,completedTeachingAt:'2026-10-20T00:00:00Z'}])));
+    f.gradebooks.tracking.mockResolvedValue(new Map(['completed','second','third'].map(id=>[id,{gradebookStage:'components_missing',componentsEntered:false,completedTeachingAt:'2026-10-20T00:00:00Z'}])));
     const result = await f.service.operational(user("examiner", false), "2026");
     expect(result.sources.grades).toMatchObject({ status: "ready", data: { count: 3, itemCount: 3 } });
     expect(result.sources.grades.data.items.map((item:any)=>item.id)).toEqual(['completed','second','third']);

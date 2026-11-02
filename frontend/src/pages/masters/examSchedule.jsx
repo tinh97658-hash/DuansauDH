@@ -1,6 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import {useSearchParams} from 'react-router-dom';
 import axios from 'axios';
+import { notify } from '../../utils/notify';
 import {Tooltip} from '@mui/material';
 import YearSelect from '../../features/scheduling/YearSelect';
 import FeatureLayout from '../../components/FeatureLayout';
@@ -62,7 +63,7 @@ export default function ExamSchedule(){
     if(target)await axios.put(`${base}/${target.id}`,payload,options);else await axios.post(base,payload,options);
    }else await axios.post(`${base}/${target.id}/${action==='cancel'?'cancel':'confirm'}`,{version:target.version,note,...(action==='cancel'?{}:{status:action})},options);
    setEditor(null);if(!keepDetail)setDetail(null);setReason(null);setOfferingId('');setRevision(n=>n+1);notifyGradebookSaved();return true;
-  }catch(e){setError(errorText(e));refreshAvailability?.();return false;}finally{setSaving(false);}
+  }catch(e){notify.error(errorText(e));refreshAvailability?.();return false;}finally{setSaving(false);}
  };
  const close=setter=>()=>{if(!saving){setter(null);setError('');}};
  const compose=(session,initial={})=>{if(!canWrite)return;const members=session?data.sessions.filter(s=>(s.arrangementId||s.id)===(session.arrangementId||session.id)):[];setDetail(null);setError('');setEditor({mode:'arrangement',members,initial:{...(!session?nextExamSlot():{}),...initial}});};
@@ -72,7 +73,7 @@ export default function ExamSchedule(){
   if(id)await axios.put(`${url}/${id}`,form,options);else await axios.post(url,form,options);
   if(keepDetail&&form.examDate)setWeek(formatDateKey(mondayOf(form.examDate)));
   setEditor(null);if(!keepDetail)setDetail(null);setOfferingId('');setRevision(n=>n+1);notifyGradebookSaved();return true;
- }catch(e){setError(errorText(e));refresh?.();return false;}finally{setSaving(false);}};
+ }catch(e){notify.error(errorText(e));refresh?.();return false;}finally{setSaving(false);}};
  const detailMembers=detail?data.sessions.filter(s=>detail.arrangementId?s.arrangementId===detail.arrangementId:s.id===detail.id):[];
  if(!canView)return <FeatureLayout title="Xếp lịch thi"><div role="alert">Bạn không có quyền xem lịch thi.</div></FeatureLayout>;
  return <FeatureLayout title="Xếp lịch thi" maxWidth={1920} hideHeader workspaceMode><div className="scheduling-v20 v20-workspace v20-schedule-workspace">

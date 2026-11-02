@@ -5,6 +5,7 @@ import AppDialog from '../../components/AppDialog';
 import PopupFormField from '../../components/PopupFormField';
 import { API_BASE_URL } from '../../config/http';
 import { leaveDate, OfferingTable } from './StudyLeavePanel';
+import { notify } from '../../utils/notify';
 
 const errorMessage = error => {
   const value = error.response?.data?.message;
@@ -36,7 +37,7 @@ export default function StudyLeaveDecisionDialog({ leave, action, onClose, onDec
     try {
       await axios.post(`${API_BASE_URL}/plan/study-leaves/${leave.id}/actions`, { action, note }, { withCredentials: true });
     } catch (e) {
-      setError(errorMessage(e)); submitting.current = false; setBusy(false);
+      notify.error(errorMessage(e)); submitting.current = false; setBusy(false);
       return;
     }
     onDecided();

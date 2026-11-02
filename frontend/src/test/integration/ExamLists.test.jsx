@@ -1,4 +1,6 @@
-import { MemoryRouter } from "react-router-dom";
+import { renderToastHost } from "../renderToastHost";
+beforeEach(renderToastHost);
+import { MemoryRouter, createMemoryRouter, RouterProvider, Link } from "react-router-dom";
 import { AuthSessionContext } from "../../context/AuthSession";
 import { act, fireEvent, render as renderUi, screen, waitFor, within } from "@testing-library/react";
 import { createTheme, ThemeProvider } from "@mui/material";
@@ -9,6 +11,7 @@ import ExamLists from "../../pages/masters/examLists";
 import { draftOf, isExamCandidate } from "../../features/exams/gradebook";
 import { calculateExamEligibility, clonePolicy } from "../../features/exams/gradingPolicy";
 import { notifySubjectCatalogChanged } from "../../utils/subjectCatalog";
+import UnsavedChangesGuard from "../../components/UnsavedChangesGuard";
 
 jest.mock("axios");
 jest.setTimeout(60000);
@@ -93,12 +96,12 @@ it.each([
  if(editable){fireEvent.change(input,{target:{value:'8.0'}});expect(input).toHaveValue('8.0');fireEvent.change(input,{target:{value:'11'}});expect(input).toHaveValue('8.0');fireEvent.click(screen.getByRole('button',{name:'Cập nhật cả bảng'}));await waitFor(()=>expect(axios.put).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/),expect.objectContaining({rows:expect.arrayContaining([expect.objectContaining({participantId:'student:one',examScore:8})])})));}
 });
 
-it("closes a rejected eligibility submission and shows the red error above the unchanged gradebook", async () => {
+it("closes a rejected eligibility submission and shows an error toast with the unchanged gradebook", async () => {
   const message = "Chưa đủ điểm thành phần để gửi duyệt tư cách.";
   let rejectSubmission;
   axios.post.mockImplementationOnce(() => new Promise((resolve, reject) => { rejectSubmission = reject; }));
   render(<ExamLists />);
-  const score = await screen.findByLabelText("Điểm kiểm tra HV001");
+  const score = await screen.findByLabelText("Điểm kiểm tra HV001", {}, { timeout: 10000 });
   const originalScore = score.value;
   fireEvent.click(screen.getByRole("button", { name: "Gửi duyệt tư cách" }));
   const dialog = await screen.findByRole("dialog");
@@ -107,10 +110,9 @@ it("closes a rejected eligibility submission and shows the red error above the u
   expect(dialog).toBeInTheDocument();
   await act(async () => { rejectSubmission({ response: { status: 400, data: { message } } }); });
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-  const alert = screen.getByRole("alert");
+  const alert = await screen.findByText(message);
   expect(alert).toHaveTextContent(message);
-  expect(alert).toHaveClass("MuiAlert-standardError");
-  expect(alert.compareDocumentPosition(document.querySelector(".exam-table-container")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(alert.closest(".Toastify__toast")).toHaveClass("Toastify__toast--error");
   expect(screen.getByText("Tư cách nháp")).toBeInTheDocument();
   expect(screen.getByLabelText("Điểm kiểm tra HV001")).toHaveValue(originalScore);
   expect(screen.getByRole("button", { name: "Gửi duyệt tư cách" })).toBeEnabled();
@@ -145,7 +147,7 @@ it("preserves eligibility submit, approve, approved DS and reopen in the gradebo
     const dialog = await screen.findByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText('Lý do hoặc căn cứ'), { target: { value: 'Đã đối chiếu hồ sơ' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Xác nhận' }));
-    await screen.findByText(expected);
+    await screen.findByText(expected, {}, { timeout: 10000 });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   };
   await transition('Gửi duyệt tư cách', 'Tư cách chờ duyệt');
@@ -713,13 +715,58 @@ it('separates studying and teaching-completed offerings while preserving grade l
  await waitFor(()=>expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/),expect.objectContaining({params:expect.objectContaining({courseOfferingId:'done'})})));
 });
 
+it("uses ConfirmDialog for router navigation while grades are unsaved", async () => {
+  const router = createMemoryRouter([{ element: <UnsavedChangesGuard />, children: [
+    { path: "/grade", element: <AuthSessionContext.Provider value={{ access: { permissions: testPermissions } }}><ThemeProvider theme={testTheme}><ExamLists /><Link to="/other">Menu kiểm thử</Link></ThemeProvider></AuthSessionContext.Provider> },
+    { path: "/other", element: <h1>Trang khác</h1> },
+  ] }], { initialEntries: ["/grade"] });
+  renderUi(<RouterProvider router={router} />);
+  const input = await screen.findByLabelText("Điểm kiểm tra HV001", {}, { timeout: 10000 });
+  fireEvent.change(input, { target: { value: "7" } });
+  fireEvent.click(screen.getByText("Menu kiểm thử"));
+  const dialog = await screen.findByRole("dialog"); expect(dialog).toHaveTextContent("CÓ ĐIỂM CHƯA LƯU");
+  fireEvent.click(within(dialog).getByText("Ở lại")); expect(input).toHaveValue("7");
+  expect(axios.put).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText("Menu kiểm thử")); fireEvent.click(await screen.findByText("Bỏ thay đổi và tiếp tục"));
+  await screen.findByText("Trang khác");
+});
+
+it("keeps the class and draft on stay and switches classes only after discarding", async () => {
+  const get = axios.get.getMockImplementation();
+  axios.get.mockImplementation(async (url, config) => {
+    const response = await get(url, config);
+    if (url.endsWith('/options')) response.data.courseOfferings.push({
+      ...response.data.courseOfferings[0], id: 'o2', name: 'Lớp thứ hai',
+    });
+    return response;
+  });
+  render(<ExamLists />);
+  fireEvent.change(await screen.findByLabelText('Điểm kiểm tra HV001'), { target: { value: '7' } });
+  const chooseOther = () => {
+    fireEvent.mouseDown(screen.getByLabelText('Tên lớp học phần'));
+    fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: /Lớp thứ hai/ }));
+  };
+  chooseOther();
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Ở lại' }));
+  expect(screen.getByLabelText('Tên lớp học phần')).toHaveTextContent('Lớp An toàn thông tin');
+  expect(screen.getByLabelText('Điểm kiểm tra HV001')).toHaveValue('7');
+  expect(axios.get.mock.calls.some(([, config]) => config?.params?.courseOfferingId === 'o2')).toBe(false);
+  chooseOther();
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Bỏ thay đổi và tiếp tục' }));
+  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), {
+    params: expect.objectContaining({ classGroupId: 'g1', courseOfferingId: 'o2' }),
+  }));
+  expect(screen.getByLabelText('Tên lớp học phần')).toHaveTextContent('Lớp thứ hai');
+  await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument());
+});
+
 it("keeps unsaved grades until a filter change is confirmed", async () => {
   render(<ExamLists />);
   fireEvent.change(await screen.findByLabelText("Điểm kiểm tra HV001"), { target: { value: "7" } });
   fireEvent.mouseDown(screen.getByLabelText("Chuyên ngành"));
   fireEvent.click(within(screen.getByRole("listbox")).getByText("Tất cả chuyên ngành"));
   const dialog = await screen.findByRole("dialog");
-  expect(within(dialog).getByText("Có điểm chưa lưu")).toBeInTheDocument();
+  expect(within(dialog).getByText("CÓ ĐIỂM CHƯA LƯU")).toBeInTheDocument();
   expect(screen.getByLabelText("Điểm kiểm tra HV001")).toHaveValue("7");
   fireEvent.click(within(dialog).getByRole("button", { name: "Ở lại" }));
   expect(screen.getByLabelText("Chuyên ngành")).toHaveTextContent("Công nghệ thông tin");

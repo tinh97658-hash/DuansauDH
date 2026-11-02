@@ -2,6 +2,7 @@
 .exam-workspace-controls{margin-bottom:8px;border:1px solid #d7e4ee;background:#fff}
 .exam-workflow-toolbar,.exam-view-toolbar{padding:6px 10px;min-height:44px}
 .exam-workflow-toolbar{border-bottom:1px solid #e2eaf0}
+.exam-workflow-info{margin-left:auto;max-width:100%;min-width:0;text-align:right;overflow-wrap:anywhere}
 .exam-workspace-controls .MuiButton-root{min-height:30px;border-radius:0;font-size:12px;box-shadow:none}
 .exam-workspace-controls .MuiChip-root{border-radius:0;font-size:12px}
 .exam-empty-scope{padding:28px 20px;color:#607486;text-align:center}
@@ -12,20 +13,6 @@
 .exam-rules-disclosure>p{padding:0 12px 10px;line-height:1.6}
 .exam-gradebook .exam-table-container { --control-radius: 0px; }
 .exam-print-sheet { display: none; }
-.exam-warning-toast-container { width: min(380px, calc(100vw - 24px)); }
-.exam-warning-toast {
-  background: #fff8e1;
-  color: #704b00;
-  border: 1px solid #f0d483;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.5;
-  box-shadow: 0 3px 12px rgba(70, 52, 0, .18);
-}
-.exam-warning-toast .Toastify__toast-icon svg { fill: #d99c00; }
-.exam-warning-toast .Toastify__close-button { color: #704b00; }
-.exam-warning-progress { background: #e5ad16; }
 @media screen {
   body #root .exam-gradebook table > thead > tr > th:has(.exam-calculated-label) {
     background: #e2ebf3 !important;
@@ -61,3 +48,35 @@
   .exam-gradebook fieldset { border: 0 !important; }
   .exam-gradebook .MuiPaper-root { box-shadow: none !important; border-radius: 0 !important; }
 }
+.exam-stage-menu {
+  --dropdown-highlight-bg: #eef6fc;
+  --dropdown-highlight-text: #193b56;
+}
+.exam-stage-menu .exam-stage-header {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 8px 12px; font-size: 12px; line-height: 1.5; font-weight: 700;
+  color: #193b56; background: #f1f6fa; border-top: 1px solid #dce6ee;
+  white-space: normal;
+}
+.exam-stage-menu .exam-stage-header:first-child { border-top: 0; }
+.exam-stage-header .exam-stage-count { color: #718092; font-weight: 400; flex-shrink: 0; }
+.exam-stage-menu .exam-stage-option {
+  display: flex; gap: 12px; padding: 8px 12px 8px 32px;
+  font-size: 13px; color: #193b56; background: white; min-height: 40px;
+}
+.exam-stage-menu .exam-stage-option:hover { background: #eef6fc; }
+.exam-stage-menu .exam-stage-option.Mui-selected {
+  --dropdown-highlight-bg: #e6f2fa;
+  background: #e6f2fa; color: #193b56;
+}
+.exam-stage-menu .exam-stage-option.Mui-focusVisible {
+  background: var(--dropdown-highlight-bg);
+  outline: 2px solid #4386b4; outline-offset: -2px;
+}
+.exam-stage-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.exam-stage-badge { flex-shrink: 0; max-width: 58%; white-space: normal; padding: 3px 7px; border-radius: 5px; font-size: 11px; line-height: 1.4; }
+.exam-stage-teal { background: #e9f3f3; color: #386a70; }
+.exam-stage-warm { background: #fff4df; color: #946412; }
+.exam-stage-neutral { background: #eef2f5; color: #5b6d7f; }
+.exam-stage-blue { background: #eaf2ff; color: #326298; }
+.exam-stage-green { background: #e9f5ed; color: #37764c; }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useConfirmGradeLeave, useDiscardUnsavedGrades } from "./UnsavedChangesGuard";
 import AdminPanelSettingsOutlined from "@mui/icons-material/AdminPanelSettingsOutlined";
 import AccountBalanceOutlined from "@mui/icons-material/AccountBalanceOutlined";
 import AddTaskOutlined from "@mui/icons-material/AddTaskOutlined";
@@ -175,6 +176,8 @@ const tabForPath = (path) => (tabs.find(([id]) => ribbons[id].some(section => se
   || tabs.find(([id]) => path === `/${id}` || path.startsWith(`/${id}/`)))?.[0] || "system";
 
 const RibbonHeader = () => {
+  const confirmLeave = useConfirmGradeLeave();
+  const discardUnsaved = useDiscardUnsavedGrades();
   const navigate = useNavigate();
   const location = useLocation();
   const session = useAuthSession();
@@ -210,12 +213,14 @@ const RibbonHeader = () => {
   const visibleTabs = tabs.filter(([id]) => ribbons[id].some(section => section.actions.some(canSee)));
   const selectedTab = visibleTabs.some(([id]) => id === activeTab) ? activeTab : visibleTabs[0]?.[0];
   const runAction = async (item) => {
+    if (item.action === "logout" && loggingOut) return;
     if (item.action !== "logout") return navigate(item.route);
-    if (loggingOut) return;
+    if (!await confirmLeave()) return;
     setLoggingOut(true);
     setLogoutError("");
     try {
       await axios.post(`${API_BASE_URL}/user/logout`, {}, { withCredentials: true });
+      discardUnsaved();
       navigate("/login", { replace: true });
     } catch {
       setLogoutError("Không thể đăng xuất. Vui lòng thử lại.");

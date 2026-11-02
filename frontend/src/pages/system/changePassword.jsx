@@ -7,6 +7,7 @@ import "./changePassword.css";
 import FeatureLayout from "../../components/FeatureLayout";
 import { useAuthSession } from "../../context/AuthSession";
 import { changeOwnPassword } from "../../features/accounts/api";
+import { notify } from "../../utils/notify";
 
 const ChangePassword = () => {
   const navigate = useNavigate();
@@ -14,7 +15,6 @@ const ChangePassword = () => {
   const forced = Boolean(session?.user?.mustChangePassword);
   const [values, setValues] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const logout = async () => {
@@ -24,7 +24,7 @@ const ChangePassword = () => {
       await axios.post(`${API_BASE_URL}/user/logout`, {}, { withCredentials: true });
       navigate("/login", { replace: true });
     } catch {
-      setError("Không thể đăng xuất. Vui lòng thử lại.");
+      notify.error("Không thể đăng xuất. Vui lòng thử lại.");
     } finally { setLoggingOut(false); }
   };
 
@@ -46,11 +46,11 @@ const ChangePassword = () => {
     try {
       await changeOwnPassword({ currentPassword: values.currentPassword, newPassword: values.newPassword });
       setValues({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      setSuccess("Đổi mật khẩu thành công.");
+      notify.success("Đổi mật khẩu thành công.");
       if (typeof session?.refresh === "function") await session.refresh();
       navigate("/", { replace: true });
     } catch (failure) {
-      setError(failure.response?.data?.message || "Không thể đổi mật khẩu. Vui lòng thử lại.");
+      notify.error(failure.response?.data?.message || "Không thể đổi mật khẩu. Vui lòng thử lại.");
     } finally {
       setSaving(false);
     }
@@ -65,7 +65,6 @@ const ChangePassword = () => {
         <div className="password-settings-body">
           {forced && <Alert severity="warning">Đây là lần đăng nhập đầu tiên (hoặc mật khẩu vừa được đặt lại). Vui lòng đổi mật khẩu trước khi sử dụng các chức năng khác.</Alert>}
           {error && <Alert severity="error">{error}</Alert>}
-          {success && <Alert severity="success">{success}</Alert>}
           <div className="password-settings-field">
             <label htmlFor="current-password">Mật khẩu hiện tại</label>
             <TextField id="current-password" type="password" value={values.currentPassword} onChange={setField("currentPassword")} fullWidth size="small" autoComplete="current-password" autoFocus={forced} disabled={saving || loggingOut} />

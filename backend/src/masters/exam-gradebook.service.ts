@@ -27,7 +27,7 @@ import { isDeepStrictEqual } from "node:util";
 import { RbacService } from "../auth/rbac.service.js";
 import { assertGradebookWorkflowAccess } from "./gradebook-workflow-access.js";
 import { ExamWorkflowService } from './exam-workflow.service.js';
-import { gradebookCompletionStatus, legacyExamGradesComplete, resolveApprovedExamRows, unresolvedExamRows } from './exam-tracking.js';
+import { gradebookStage, gradebookCompletionStatus, legacyExamGradesComplete, resolveApprovedExamRows, unresolvedExamRows } from './exam-tracking.js';
 
 export const emptyExamGrade = (participantId: string): CourseExamGrade => ({
   participantId, eligible: null, examExempt: false, testScore: null, assignmentScore: null,
@@ -63,10 +63,10 @@ export class ExamGradebookService {
       order: [["createdAt", "DESC"]],
     });
     const byId = new Map(groups.map(group => [group.id, group]));
-    const tracking = this.workflow ? await this.tracking(courseOfferings.map(offering => typeof offering.get === 'function' ? offering.get({ plain: true }) : offering)) : new Map();
+    const tracking = this.workflow ? await this.tracking(courseOfferings.map(offering => typeof offering.get === 'function' ? offering.get({ plain: true }) : offering), true) : new Map();
     return { groups, courseOfferings: courseOfferings.map(offering => {
       const value = typeof offering.get === "function" ? offering.get({ plain: true }) : offering;
-      return { ...value, gradebookCompletionStatus: tracking.get(value.id)?.gradebookCompletionStatus || 'incomplete', examGradesComplete: tracking.get(value.id)?.examGradesComplete === true, groupLinks: value.groupLinks.map((link: any) => ({ ...link,
+      return { ...value, gradebookStage: value.status === 'active' ? 'teaching' : tracking.get(value.id)?.gradebookStage || 'review', gradebookCompletionStatus: tracking.get(value.id)?.gradebookCompletionStatus || 'incomplete', examGradesComplete: tracking.get(value.id)?.examGradesComplete === true, groupLinks: value.groupLinks.map((link: any) => ({ ...link,
         subject: byId.has(link.classGroupId) ? examSubjectForGroup(byId.get(link.classGroupId), value.subject) : value.subject,
       })) };
     }) };
@@ -102,19 +102,19 @@ export class ExamGradebookService {
       const examCompleted = candidates.length > 0 && candidates.every((row: any) => held.has(row.participantId));
       const examGradesComplete = state.mode === 'legacy_preserved'
         ? legacyExamGradesComplete(state.legacyGradebookStatus, state.legacyGradebookSnapshot)
-        : examCompleted && !unresolvedExamRows(resolveApprovedExamRows(state.approvedRows, state.books, state.heldIds, state)).length;
-      let componentsEntered = approved || state.eligibility_status === 'submitted';
+        : approved && state.approvedRows.length > 0 && !unresolvedExamRows(resolveApprovedExamRows(state.approvedRows, state.books, state.heldIds, state)).length;
+      let componentsEntered: boolean | null = approved || state.eligibility_status === 'submitted' ? true : null;
       if (includeComponents && !componentsEntered && state.mode !== 'legacy_preserved') {
         const offering = completed.find(offering => offering.id === state.id);
         const groupId = offering?.groupLinks?.[0]?.classGroupId || offering?.groupLinks?.[0]?.classGroup?.id;
         if (groupId) {
           const book = await this.get({ classGroupId: groupId, courseOfferingId: state.id, rosterScope: 'offering', page: 1, pageSize: 15 });
-          componentsEntered = book.totalRows > 0 && book.unassessedRows === 0;
-          // Empty rosters do not have an entry task.
-          if (!book.totalRows) componentsEntered = true;
+          componentsEntered = book.totalRows > 0 && Number(book.unassessedRows) === 0;
+          // Empty rosters cannot prove readiness to submit eligibility.
+          if (!book.totalRows) componentsEntered = null;
         }
       }
-      result.set(state.id, { componentsEntered, componentsApproved: approved, examCompleted, examGradesComplete,
+      result.set(state.id, { gradebookStage: gradebookStage({ status: 'completed' }, { ...state, componentsEntered }), componentsEntered, componentsApproved: approved, examCompleted, examGradesComplete,
         eligibilityStatus: state.eligibility_status,
         resultStatus: state.mode === 'legacy_preserved' ? state.legacyGradebookStatus : state.result_status,
         eligibilitySubmittedAt: state.eligibilitySubmittedAt,
@@ -172,20 +172,21 @@ export class ExamGradebookService {
     const state=this.workflow?await this.workflow.state(offering.id,transaction):null;
     if(state?.mode==='new'&&state.eligibility_status==='approved'){
       const all=await this.workflow!.approvedRows(offering.id,state,transaction);
-      const assigned = await this.workflow!.query(`SELECT DISTINCT c.participant_id FROM course_exam_sessions es
+      const assigned = await this.workflow!.query(`SELECT DISTINCT c.participant_id, es.status FROM course_exam_sessions es
         JOIN course_exam_session_candidates c ON c.session_id=es.id
         WHERE es.course_offering_id=:id AND es.eligibility_snapshot_id=:snapshot AND es.status IN ('scheduled','held')`,
         {id:offering.id,snapshot:state.eligibility_snapshot_id},transaction);
       const assignedIds = new Set(assigned.map(row=>row.participant_id));
       const candidates = all.filter((row:any)=>row.eligible===true&&!row.examExempt);
       const examScheduling = {candidateCount:candidates.length,remainingCount:candidates.filter((row:any)=>!assignedIds.has(row.participantId)).length};
-      const examGradesComplete = candidates.length > 0 && !unresolvedExamRows(all).length;
+      const examGradesComplete = all.length > 0 && !unresolvedExamRows(all).length;
+      const stage = gradebookStage(offering, { ...state, approvedRows: all, books: [{ grades: all }], heldIds: assigned.filter(row => row.status === 'held').map(row => row.participant_id) });
       const scoped=query.rosterScope==='offering'?all:all.filter((r:any)=>r.classGroupId===group.id);
       const search=(query.search||'').trim().toLocaleLowerCase('vi');
       const rows=scoped.filter((r:any)=>(query.mode!=='exam'||(r.eligible===true&&!r.examExempt))&&(!search||`${r.code} ${r.fullName}`.toLocaleLowerCase('vi').includes(search)));
       const pageSize=Math.min(15,Math.max(1,query.pageSize||15)),page=Math.min(query.page||1,Math.max(1,Math.ceil(rows.length/pageSize)));
       return {group:{id:group.id,name:group.name,code:group.code,academicYear:group.academicYear},
-        offering:{...(typeof offering.get==='function'?offering.get({plain:true}):offering),examScheduling,examGradesComplete,gradebookCompletionStatus:gradebookCompletionStatus(state,examGradesComplete)},workflow:this.workflow!.publicState(state),
+        offering:{...(typeof offering.get==='function'?offering.get({plain:true}):offering),examScheduling,examGradesComplete,gradebookStage:stage,gradebookCompletionStatus:gradebookCompletionStatus(state,examGradesComplete)},workflow:this.workflow!.publicState(state),
         revision:await this.workflow!.revision(offering.id,transaction),total:rows.length,totalRows:scoped.length,unassessedRows:0,page,pageSize,
         eligibilityPolicy:all[0]?.eligibilityPolicy||LEGACY_GRADING_POLICY,rows:rows.slice((page-1)*pageSize,page*pageSize)};
     }
@@ -286,7 +287,7 @@ export class ExamGradebookService {
     } });
     return {
       group: { id: group.id, name: group.name, code: group.code, academicYear: group.academicYear },
-      offering: { ...(typeof offering.get === 'function' ? offering.get({ plain: true }) : offering), ...(state?.mode === 'new' ? { examGradesComplete: false, gradebookCompletionStatus: 'incomplete' } : {}) },
+      offering: { ...(typeof offering.get === 'function' ? offering.get({ plain: true }) : offering), ...(state?.mode === 'new' ? { examGradesComplete: false, gradebookCompletionStatus: 'incomplete' } : {}), ...(shared && state?.mode !== 'legacy_preserved' ? { gradebookStage: gradebookStage(offering, { ...state, legacyGradebookStatus: offering.gradebookStatus, legacyGradebookSnapshot: offering.gradebookSnapshot, componentsEntered: result.totalRows > 0 ? Number(result.unassessedRows) === 0 : null }) } : {}) },
       workflow: state?this.workflow!.publicState(state):{ status: offering.gradebookStatus || "draft", version: offering.gradebookVersion || 0 },
       revision: result.revision, total: state?.mode==='new'&&query.mode==='exam'?0:result.total, totalRows: result.totalRows, unassessedRows: result.unassessedRows, page: result.page, pageSize,
       eligibilityPolicy: currentPolicy,

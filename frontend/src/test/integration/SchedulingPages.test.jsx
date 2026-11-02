@@ -1,3 +1,5 @@
+import { renderToastHost } from "../renderToastHost";
+beforeEach(renderToastHost);
 const accessFixture = vi.hoisted(() => ({ permissions: ["scheduling.organize"] }));
 vi.mock("../../features/accounts/usePermissions", () => ({ usePermissions: () => ({ can: permission => accessFixture.permissions.includes(permission) }) }));
 import React from "react";

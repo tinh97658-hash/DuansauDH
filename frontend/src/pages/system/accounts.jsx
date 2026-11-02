@@ -28,6 +28,7 @@ import {
 } from "../../features/accounts/api";
 import { listRoles } from "../../features/accounts/rolesApi";
 import { ACCOUNT_STATUS_LABELS, roleLabel } from "../../features/accounts/constants";
+import { notify } from "../../utils/notify";
 
 const columns = [
   { key: "lastName", label: "Họ đệm", width: 200, minWidth: 120 },
@@ -50,7 +51,6 @@ const Accounts = () => {
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -143,7 +143,7 @@ const Accounts = () => {
     try {
       if (editing) {
         const result = await updateAccount(editing.id, { name, email, roleIds: form.roleIds, primaryRoleId });
-        setNotice({ type: "success", message: result.message || "Cập nhật tài khoản thành công." });
+        notify.success(result.message || "Cập nhật tài khoản thành công.");
       } else {
         const payload = { name, email, roleIds: form.roleIds, primaryRoleId };
         if (!form.autoPassword) {
@@ -152,12 +152,12 @@ const Accounts = () => {
         }
         const result = await createAccount(payload);
         if (result.generatedPassword) setCredentials({ email, password: result.generatedPassword });
-        setNotice({ type: "success", message: result.message || "Tạo tài khoản thành công." });
+        notify.success(result.message || "Tạo tài khoản thành công.");
       }
       setEditorOpen(false);
       await load();
     } catch (failure) {
-      setFormError(failure.response?.data?.message || "Không thể lưu tài khoản.");
+      notify.error(failure.response?.data?.message || "Không thể lưu tài khoản.");
     } finally {
       setSaving(false);
     }
@@ -168,10 +168,10 @@ const Accounts = () => {
     setError("");
     try {
       await action();
-      setNotice({ type: "success", message: successMessage });
+      notify.success(successMessage);
       await load();
     } catch (failure) {
-      setError(failure.response?.data?.message || "Thao tác không thành công. Vui lòng thử lại.");
+      notify.error(failure.response?.data?.message || "Thao tác không thành công. Vui lòng thử lại.");
     } finally {
       setBusy(false);
       setStatusTarget(null);
@@ -188,18 +188,19 @@ const Accounts = () => {
     try {
       const result = await resetAccountPassword(resetTarget.id, resetForm.auto ? undefined : resetForm.password);
       if (result.generatedPassword) setCredentials({ email: resetTarget.email, password: result.generatedPassword });
-      setNotice({ type: "success", message: result.message || "Đặt lại mật khẩu thành công." });
+      notify.success(result.message || "Đặt lại mật khẩu thành công.");
       setResetTarget(null);
       await load();
     } catch (failure) {
-      setResetError(failure.response?.data?.message || "Không thể đặt lại mật khẩu.");
+      notify.error(failure.response?.data?.message || "Không thể đặt lại mật khẩu.");
     } finally {
       setBusy(false);
     }
   };
 
   const copyPassword = async () => {
-    try { await navigator.clipboard?.writeText(credentials?.password || ""); setNotice({ type: "success", message: "Đã sao chép mật khẩu." }); } catch { /* clipboard may be unavailable */ }
+    try { await navigator.clipboard.writeText(credentials?.password || ""); notify.success("Đã sao chép mật khẩu."); }
+    catch { notify.error("Không thể sao chép. Vui lòng chọn và sao chép mật khẩu trong hộp thoại."); }
   };
 
   const editorRoleOptions = roles.filter((role) => role.active !== false);
@@ -237,7 +238,6 @@ const Accounts = () => {
       </Paper>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {notice && <Alert severity={notice.type} onClose={() => setNotice(null)} sx={{ mb: 2 }}>{notice.message}</Alert>}
       {canAssign && (
         <Alert severity="info" sx={{ mb: 2 }}>
           Người phụ trách tổ chức lớp và xếp lịch hiện tại: <strong>{scheduleHolder ? scheduleHolder.name : "chưa phân công"}</strong>. Phân công mới chuyển trách nhiệm từ người cũ. Quyền tạo lớp và sửa lịch được cấp riêng trong Vai trò & phân quyền.
@@ -344,14 +344,14 @@ const Accounts = () => {
         saving={busy}
         maxWidth="xs"
       >
-        <Stack spacing={1.5}>
+        <Stack spacing={1.5} className="account-editor-fields">
           {resetError && <Alert severity="error">{resetError}</Alert>}
           <Typography sx={{ fontSize: 13.5 }}>Đặt lại mật khẩu cho <strong>{resetTarget?.email}</strong>. Người dùng sẽ bị đăng xuất và phải đổi mật khẩu ở lần đăng nhập kế tiếp.</Typography>
           <FormControlLabel
             control={<Checkbox size="small" checked={resetForm.auto} onChange={(event) => setResetForm((previous) => ({ ...previous, auto: event.target.checked }))} disabled={busy} />}
             label={<Typography sx={{ fontSize: 13 }}>Sinh mật khẩu mới tự động</Typography>}
           />
-          {!resetForm.auto && <TextField label="Mật khẩu mới" value={resetForm.password} onChange={(event) => setResetForm((previous) => ({ ...previous, password: event.target.value }))} fullWidth size="small" disabled={busy} helperText="Tối thiểu 8 ký tự." />}
+          {!resetForm.auto && <div className="account-editor-field"><label htmlFor="account-reset-password">Mật khẩu mới</label><TextField id="account-reset-password" type="password" autoComplete="new-password" value={resetForm.password} onChange={(event) => setResetForm((previous) => ({ ...previous, password: event.target.value }))} fullWidth size="small" disabled={busy} helperText="Tối thiểu 8 ký tự." /></div>}
         </Stack>
       </AppDialog>
 

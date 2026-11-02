@@ -1,3 +1,4 @@
+import { notify } from "../../utils/notify";
 import DateField from "../../components/DateField";
 import { formatDate, formatDateTime } from "../../utils/dateFormat";
 import { addDays, formatDateKey } from "../../utils/schedulingCalendar";
@@ -43,7 +44,6 @@ export default function StudyLeavePanel({ record, isAdmin = false, canRequest = 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [dialog, setDialog] = useState(null);
   const [form, setForm] = useState({ note: '', endDate: '' });
   const load = useCallback(async () => {
@@ -53,23 +53,23 @@ export default function StudyLeavePanel({ record, isAdmin = false, canRequest = 
   }, [record.id]);
   useEffect(() => { load(); }, [load]);
   const open = (action, leave) => {
-    setError(''); setSuccess(''); setForm({ note: '', endDate: '' }); setDialog({ action, leave });
+    setError('');  setForm({ note: '', endDate: '' }); setDialog({ action, leave });
   };
   const submit = async () => {
     if (!(dialog?.action === 'request_extension' ? canRequest : isAdmin) || busy || disabled || invalid) return;
-    setBusy(true); setError(''); setSuccess('');
+    setBusy(true); setError('');
     try {
       if (dialog.action === 'withdraw_unpaid') {
         await axios.post(`${API_BASE_URL}/plan/admission-records/${record.id}/withdraw-unpaid`, { note: form.note, updatedAt: record.updatedAt }, options);
-        setDialog(null); setSuccess('Đã rút khỏi lớp và đưa về Nộp hồ sơ đầu vào.');
+        setDialog(null); notify.success('Đã rút khỏi lớp và đưa về Nộp hồ sơ đầu vào.');
         await onChanged?.();
         return;
       }
       const response = await axios.post(`${API_BASE_URL}/plan/study-leaves/${dialog.leave.id}/actions`, { action: dialog.action, note: form.note,
           ...(dialog.action === 'request_extension' ? { endDate: form.endDate } : {}) }, options);
-      setData(response.data); setDialog(null); setSuccess('Đã lưu xử lý bảo lưu.');
+      setData(response.data); setDialog(null); notify.success('Đã lưu xử lý bảo lưu.');
       await onChanged?.();
-    } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
+    } catch (e) { notify.error(errorMessage(e)); } finally { setBusy(false); }
   };
   const openLeave = data?.leaves?.find(leave => ['pending', 'approved'].includes(leave.status));
   const tuitionPaid = record.extraData?.tuitionPayment?.paid === true;
@@ -88,7 +88,7 @@ export default function StudyLeavePanel({ record, isAdmin = false, canRequest = 
     {canWithdrawUnpaid && <Alert severity="warning">Chưa nộp học phí nên chưa nhập học, không được bảo lưu. Nếu muốn nghỉ, rút khỏi lớp và đưa hồ sơ về Nộp hồ sơ đầu vào để làm hồ sơ bình thường.</Alert>}
     <Alert severity="info">Duyệt bảo lưu sẽ rút học viên khỏi các lớp học phần chưa hoàn thành ngay và ghi nhận Không đạt cho mọi học phần đã ghép lớp, dù đã xếp lịch hay chưa. Giữ lớp hành chính và kết quả môn đã hoàn thành.</Alert>
     {isAdmin && disabled && <Alert severity="warning">Lưu hoặc hủy thay đổi hồ sơ trước khi xử lý bảo lưu.</Alert>}
-    {error && !dialog && <Alert severity="error" action={<Button onClick={load} disabled={loading || busy}>Thử lại</Button>}>{error}</Alert>}{success && <Alert severity="success">{success}</Alert>}
+    {error && !dialog && <Alert severity="error" action={<Button onClick={load} disabled={loading || busy}>Thử lại</Button>}>{error}</Alert>}
     {loading ? <CircularProgress size={24} aria-label="Đang tải bảo lưu" /> : data?.leaves?.length ? data.leaves.map(leave => {
       const pendingExtension = leave.extensions?.find(item => item.status === 'pending');
       const active = leave.status === 'approved' && leave.effectiveStatus !== 'scheduled';

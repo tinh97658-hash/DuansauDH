@@ -5,6 +5,8 @@ import axios from "axios";
 import Accounts from "../../pages/system/accounts";
 import theme from "../../theme";
 import { AuthSessionContext } from "../../context/AuthSession";
+import AppToaster from "../../components/AppToaster";
+import { toast } from "react-toastify";
 
 vi.mock("axios", () => ({
   default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn(), defaults: {} },
@@ -32,6 +34,7 @@ const ALL_PERMISSIONS = ["account.view", "account.manage", "account.password.res
 const mount = (permissions) => render(
   <ThemeProvider theme={theme}>
     <CssBaseline />
+    <AppToaster />
     <AuthSessionContext.Provider value={{ access: { superadmin: false, permissions, roles: [] } }}>
       <Accounts />
     </AuthSessionContext.Provider>
@@ -44,6 +47,31 @@ beforeEach(() => {
     if (String(url).endsWith("/accounts")) return Promise.resolve({ data: ACCOUNTS });
     return Promise.resolve({ data: [] });
   });
+});
+afterEach(() => { toast.dismiss(); toast.clearWaitingQueue(); });
+
+it("keeps the reset password label outside the masked input", async () => {
+  mount(ALL_PERMISSIONS);
+  fireEvent.click(await screen.findByRole("button", { name: "Đặt lại mật khẩu an@example.com" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Sinh mật khẩu mới tự động" }));
+  const password = screen.getByLabelText("Mật khẩu mới");
+  expect(password).toHaveAttribute("type", "password");
+  expect(password.labels[0]).not.toHaveClass("MuiInputLabel-root");
+  fireEvent.click(screen.getByRole("button", { name: "Đặt lại" }));
+  expect(await screen.findByText("Mật khẩu mới phải có ít nhất 8 ký tự.")).toBeInTheDocument();
+  expect(axios.post).not.toHaveBeenCalled();
+});
+
+it("reports a backend rejection once in an error toast without an inline banner", async () => {
+  const message = "Phải giữ ít nhất một nhân sự đang hoạt động có đủ quyền xem/quản lý tài khoản và vai trò.";
+  axios.post.mockRejectedValueOnce({ response: { data: { message } } });
+  mount(ALL_PERMISSIONS);
+  fireEvent.click(await screen.findByRole("button", { name: "Buộc đăng xuất an@example.com" }));
+  fireEvent.click(screen.getByRole("button", { name: "Buộc đăng xuất" }));
+  const feedback = await screen.findByText(message);
+  expect(feedback.closest(".Toastify__toast")).toHaveClass("Toastify__toast--error");
+  expect(feedback.closest(".MuiAlert-root")).toBeNull();
+  expect(screen.getAllByText(message)).toHaveLength(1);
 });
 
 it("liệt kê tài khoản nhân sự và mở các thao tác quản trị cho người có quyền", async () => {

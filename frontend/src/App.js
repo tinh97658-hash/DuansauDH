@@ -1,10 +1,12 @@
 import "./App.css";
 import React, { Suspense } from "react";
 import { lazyPage } from "./utils/lazyPage";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { createBrowserRouter, createRoutesFromElements, RouterProvider, Navigate, Route } from "react-router-dom";
 import { ThemeProvider, CssBaseline, Box, CircularProgress } from "@mui/material";
 import theme from "./theme";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AppToaster from "./components/AppToaster";
+import UnsavedChangesGuard from "./components/UnsavedChangesGuard";
 
 const PageLoader = () => (
   <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
@@ -107,13 +109,8 @@ const TempScoreDoctoral = lazyPage(() => import("./pages/reports/tempScoreDoctor
 const DiplomaAppendixMasters = lazyPage(() => import("./pages/reports/diplomaAppendixMasters"), ["/reports/diploma-appendix-masters"]);
 const DiplomaAppendixDoctoral = lazyPage(() => import("./pages/reports/diplomaAppendixDoctoral"), ["/reports/diploma-appendix-doctoral"]);
 
-function App() {
-  return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <BrowserRouter useTransitions={false}>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
+const router = createBrowserRouter(createRoutesFromElements(
+  <Route element={<UnsavedChangesGuard />}>
             <Route path="/login" element={<Login />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route element={<ProtectedRoute />}>
@@ -216,11 +213,15 @@ function App() {
               <Route path="reports/diploma-appendix-doctoral" element={<DiplomaAppendixDoctoral />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
-    </ThemeProvider>
-  );
+  </Route>
+));
+
+function App() {
+  return <ThemeProvider theme={theme}>
+    <CssBaseline />
+    <AppToaster />
+    <Suspense fallback={<PageLoader />}><RouterProvider router={router} /></Suspense>
+  </ThemeProvider>;
 }
 
 export default App;

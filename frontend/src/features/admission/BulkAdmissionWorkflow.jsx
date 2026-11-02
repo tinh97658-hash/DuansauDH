@@ -1,3 +1,4 @@
+import { notify } from "../../utils/notify";
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { Alert, Button, Checkbox, Chip, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
@@ -44,7 +45,6 @@ export default function BulkAdmissionWorkflow({ data, visibleRows, paginationKey
   const [pending, setBusy] = useState(false);
   const busy = pending || loading;
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const dirty = Object.keys(drafts).length > 0;
   useReportExport(() => ({ pageOrientation: "landscape", ...tableReport("Điểm xét tuyển", BULK_ADMISSION_COLUMNS, visibleRows, (row, column) => {
     if (column.key === "name") return row.fullName;
@@ -65,10 +65,10 @@ export default function BulkAdmissionWorkflow({ data, visibleRows, paginationKey
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
   const run = async (action) => {
-    setBusy(true); setError(""); setSuccess("");
+    setBusy(true); setError("");
     try { await action(); }
     catch (err) {
-      setError(err.response?.data?.message || err.message || "Không thể thực hiện thao tác.");
+      notify.error(err.response?.data?.message || err.message || "Không thể thực hiện thao tác.");
       if (err.response?.status === 409) setPreview(null);
     } finally { setBusy(false); }
   };
@@ -79,7 +79,7 @@ export default function BulkAdmissionWorkflow({ data, visibleRows, paginationKey
       return { admissionRecordId: id, score: Number(value), version: row.version };
     });
     await axios.put(`${API_BASE_URL}/plan/admission-rounds/${data.round.id}/scores`, { rows }, options);
-    await onRefresh(); setDrafts({}); setSuccess(`Đã lưu điểm của ${rows.length} hồ sơ. Bấm Xét tuyển để xem danh sách đạt ngưỡng.`);
+    await onRefresh(); setDrafts({}); notify.success(`Đã lưu điểm của ${rows.length} hồ sơ. Bấm Xét tuyển để xem danh sách đạt ngưỡng.`);
   });
   const evaluate = () => run(async () => {
     const response = await axios.post(`${API_BASE_URL}/plan/admission-rounds/${data.round.id}/preview`, {}, options);
@@ -89,7 +89,7 @@ export default function BulkAdmissionWorkflow({ data, visibleRows, paginationKey
   });
   const confirm = () => run(async () => {
     const response = await axios.post(`${API_BASE_URL}/plan/admission-rounds/${data.round.id}/confirm`, { previewToken: preview.previewToken, admissionRecordIds: selected }, options);
-    setPreview(null); await onRefresh(); setSuccess(`Đã duyệt ${response.data.admittedCount} hồ sơ sang trạng thái Đã trúng tuyển.`);
+    setPreview(null); await onRefresh(); notify.success(`Đã duyệt ${response.data.admittedCount} hồ sơ sang trạng thái Đã trúng tuyển.`);
   });
   const downloadTemplate = () => run(async () => {
     const buffer = await createScoreTemplate(data.round, visibleRows);
@@ -98,7 +98,7 @@ export default function BulkAdmissionWorkflow({ data, visibleRows, paginationKey
     link.href = url; link.download = `Mau_diem_xet_tuyen_${data.round.id}.xlsx`;
     document.body.appendChild(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setSuccess(`Đã tải file mẫu với ${visibleRows.length} hồ sơ đang hiển thị. Điền cột Tổng điểm rồi chọn Import từ file Excel.`);
+    notify.success(`Đã tải file mẫu với ${visibleRows.length} hồ sơ đang hiển thị. Điền cột Tổng điểm rồi chọn Import từ file Excel.`);
   });
   const importFile = (event) => {
     const file = event.target.files?.[0]; event.target.value = "";
@@ -108,7 +108,7 @@ export default function BulkAdmissionWorkflow({ data, visibleRows, paginationKey
       const imported = await parseScoreExcel(buffer, data.round.id, data.rows);
       await axios.put(`${API_BASE_URL}/plan/admission-rounds/${data.round.id}/scores`, { rows: imported.rows }, options);
       await onRefresh(); setDrafts({});
-      setSuccess(`Đã import và lưu điểm ${imported.rows.length} hồ sơ.${imported.skippedCount ? ` Bỏ qua ${imported.skippedCount} dòng chưa điền điểm hoặc đã duyệt giữ nguyên điểm.` : ""} Bấm Xét tuyển để xem danh sách đạt ngưỡng.`);
+      notify.success(`Đã import và lưu điểm ${imported.rows.length} hồ sơ.${imported.skippedCount ? ` Bỏ qua ${imported.skippedCount} dòng chưa điền điểm hoặc đã duyệt giữ nguyên điểm.` : ""} Bấm Xét tuyển để xem danh sách đạt ngưỡng.`);
     });
   };
   const handleRecordClick = (event, to) => {
@@ -125,7 +125,7 @@ export default function BulkAdmissionWorkflow({ data, visibleRows, paginationKey
 
   return <Stack spacing={2}>
     {error && <Alert severity="error">{error}</Alert>}
-    {success && <Alert severity="success">{success}</Alert>}
+
     <Paper variant="outlined" sx={{ p: 2, borderRadius: "6px" }}>
       <Stack spacing={1.5}>
         <Typography fontWeight={700}>Nhập điểm hồ sơ và xét tuyển</Typography>
@@ -160,7 +160,7 @@ export default function BulkAdmissionWorkflow({ data, visibleRows, paginationKey
               <TableCell sx={{ whiteSpace: "nowrap" }}><Typography variant="body2">{row.phone || "—"}</Typography>{row.email && <Typography variant="caption" color="text.secondary">{row.email}</Typography>}</TableCell>
               <TableCell align="center">{admin && row.decision === "pending" ? <TextField size="small" type="number" value={drafts[row.admissionRecordId] ?? row.total ?? ""} disabled={busy} inputProps={{ min: 0, max: 20, step: 0.01, "aria-label": `Điểm ${row.code || row.fullName}` }} sx={{ width: 85, "& .MuiOutlinedInput-root": { borderRadius: "4px" } }} onChange={(event) => {
                 const value = event.target.value;
-                setDrafts((previous) => { const next = { ...previous }; if (value === String(row.total ?? "") && !row.stale) delete next[row.admissionRecordId]; else next[row.admissionRecordId] = value; return next; }); setSuccess("");
+                setDrafts((previous) => { const next = { ...previous }; if (value === String(row.total ?? "") && !row.stale) delete next[row.admissionRecordId]; else next[row.admissionRecordId] = value; return next; });
               }} /> : row.total ?? "—"}</TableCell>
               <TableCell align="center">{row.cutoff ?? "Chưa nhập"}</TableCell>
               <TableCell align="center"><Chip size="small" label={drafts[row.admissionRecordId] !== undefined ? "Chưa lưu điểm" : row.stale ? "Cần xác minh lại" : row.meetsCutoff === true ? "Đủ điều kiện" : row.meetsCutoff === false ? "Chưa đạt ngưỡng" : row.total == null ? "Chưa nhập điểm" : "Chờ xét tuyển"} color={drafts[row.admissionRecordId] === undefined && !row.stale && row.meetsCutoff === true ? "success" : "default"} sx={{ borderRadius: "4px" }} /></TableCell>

@@ -1,25 +1,46 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import axios from "axios";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { createMemoryRouter, RouterProvider, useLocation } from "react-router-dom";
 import RibbonHeader from "../../components/RibbonHeader";
 import { AuthSessionContext } from "../../context/AuthSession";
 import { API_BASE_URL } from "../../config/http";
+import UnsavedChangesGuard, { useUnsavedGrades } from "../../components/UnsavedChangesGuard";
 
 jest.mock("axios", () => ({ post: jest.fn(), defaults: {} }));
 const Location = () => <output data-testid="route">{useLocation().pathname}</output>;
-const renderPage = (forced = false) => render(<MemoryRouter useTransitions={false} initialEntries={["/system/change-password"]}><Location /><Routes>
-  <Route path="/login" element={<h1>Login page</h1>} />
-  <Route path="*" element={<AuthSessionContext.Provider value={{ authenticated: true, user: { role: "custom", mustChangePassword: forced }, access: { permissions: [], roles: [] } }}><RibbonHeader /></AuthSessionContext.Provider>} />
-</Routes></MemoryRouter>);
+const RibbonPage = ({ forced, dirty }) => {
+  useUnsavedGrades(dirty);
+  return <AuthSessionContext.Provider value={{ authenticated: true, user: { role: "custom", mustChangePassword: forced }, access: { permissions: [], roles: [] } }}><RibbonHeader /></AuthSessionContext.Provider>;
+};
+const renderPage = (forced = false, dirty = false) => render(<RouterProvider router={createMemoryRouter([{
+  element: <><Location /><UnsavedChangesGuard /></>, children: [
+    { path: "/login", element: <h1>Login page</h1> },
+    { path: "*", element: <RibbonPage forced={forced} dirty={dirty} /> },
+  ],
+}], { initialEntries: ["/system/change-password"] })} />);
 
 describe("Ribbon current-session POST logout", () => {
   beforeEach(() => { jest.clearAllMocks(); });
+  it.each([
+    ["Thông tin về đơn vị", "/system/unit-info"], ["Về trang chủ", "/"],
+  ])("confirms unsaved grades before navigating with %s", async (label, destination) => {
+    renderPage(false, true); fireEvent.click(screen.getByRole("button", { name: label }));
+    fireEvent.click(await screen.findByText("Ở lại")); expect(screen.getByTestId("route")).toHaveTextContent("/system/change-password");
+    fireEvent.click(screen.getByRole("button", { name: label })); fireEvent.click(await screen.findByText("Bỏ thay đổi và tiếp tục"));
+    await waitFor(() => expect(screen.getByTestId("route").textContent).toBe(destination));
+  });
+  it("cancels logout before POST when confirmation is declined", async () => {
+    axios.post.mockResolvedValue({ status: 204 }); renderPage(false, true);
+    fireEvent.click(screen.getByRole("button", { name: "Thoát chương trình" })); fireEvent.click(await screen.findByText("Ở lại")); expect(axios.post).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Thoát chương trình" })); fireEvent.click(await screen.findByText("Bỏ thay đổi và tiếp tục"));
+    expect(await screen.findByRole("heading", { name: "Login page" })).toBeInTheDocument();
+  });
   it.each([false, true])("permissionless Staff, forced password=%s, POSTs with credentials before navigation", async forced => {
     let complete;
     axios.post.mockImplementation(() => new Promise(resolve => { complete = resolve; }));
     renderPage(forced);const button = screen.getByRole("button", { name: "Thoát chương trình" });
     fireEvent.click(button);
-    expect(axios.post).toHaveBeenCalledWith(`${API_BASE_URL}/user/logout`, {}, { withCredentials: true });
+    await waitFor(() => expect(axios.post).toHaveBeenCalledWith(`${API_BASE_URL}/user/logout`, {}, { withCredentials: true }));
     expect(button).toBeDisabled();expect(screen.getByTestId("route")).toHaveTextContent("/system/change-password");
     await act(async () => { complete({ status: 204 }); });
     expect(await screen.findByRole("heading", { name: "Login page" })).toBeInTheDocument();

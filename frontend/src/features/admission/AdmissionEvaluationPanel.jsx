@@ -1,5 +1,6 @@
 import { formatDate, formatDateTime } from "../../utils/dateFormat";
 import React, { useCallback, useEffect, useState } from "react";
+import { notify } from "../../utils/notify";
 import axios from "axios";
 import { Alert, Box, Button, Chip, CircularProgress, Paper, Stack, TextField, Typography } from "@mui/material";
 import AppDialog from "../../components/AppDialog";
@@ -32,7 +33,6 @@ export default function AdmissionEvaluationPanel({ record, isAdmin = false, disa
   const [decision, setDecision] = useState(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
-  const [success, setSuccess] = useState("");
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
@@ -49,7 +49,7 @@ export default function AdmissionEvaluationPanel({ record, isAdmin = false, disa
     && !hasStudyWorkflow;
   const confirmDecision = async () => {
     if (busy || disabled || !decision || !note.trim()) return;
-    setBusy(true); onBusyChange?.(true); setError(""); setSuccess("");
+    setBusy(true); onBusyChange?.(true); setError("");
     try {
       await axios.post(`${API_BASE_URL}/plan/admission-records/${record.id}/evaluation/decision`, {
         decision, version: evaluation.version, note: note.trim(),
@@ -57,16 +57,15 @@ export default function AdmissionEvaluationPanel({ record, isAdmin = false, disa
       setDecision(null);
       await load();
       await onDecided?.();
-      setSuccess("Đã cập nhật kết quả xét tuyển và trạng thái hồ sơ.");
+      notify.success("Đã cập nhật kết quả xét tuyển và trạng thái hồ sơ.");
     } catch (err) {
-      setError(err.response?.data?.message || "Không thể phê duyệt xét tuyển.");
-      if (err.response?.status === 409) { setDecision(null); await load(); setError(err.response?.data?.message); }
+      notify.error(err.response?.data?.message || "Không thể phê duyệt xét tuyển.");
+      if (err.response?.status === 409) { setDecision(null); await load(); }
     } finally { setBusy(false); onBusyChange?.(false); }
   };
-  const openDecision = (value) => { setNote(""); setDecision(value); setError(""); setSuccess(""); };
+  const openDecision = (value) => { setNote(""); setDecision(value); setError(""); };
   if (loading) return <Box sx={{ py: 4, textAlign: "center" }}><CircularProgress size={28} /></Box>;
   return <Stack spacing={2}>
-    {success && <Alert severity="success">{success}</Alert>}
     {error && <Alert severity="error" action={<Button onClick={load}>Tải lại</Button>}>{error}</Alert>}
     <Paper variant="outlined" sx={{ p: 2.5 }}>
       <Typography fontWeight={800} color="#173E75" mb={2}>KẾT QUẢ XÉT TUYỂN</Typography>

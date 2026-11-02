@@ -1,3 +1,5 @@
+import { renderToastHost } from "../renderToastHost";
+beforeEach(renderToastHost);
 import React from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -77,7 +79,7 @@ it("shows backend errors, associates the helper and resets the form", async () =
   expect(await screen.findByText("Mật khẩu hiện tại không đúng.")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Nhập lại" }));
   fields.forEach(field => expect(field).toHaveValue(""));
-  expect(screen.queryByText("Mật khẩu hiện tại không đúng.")).not.toBeInTheDocument();
+  expect(screen.getByText("Mật khẩu hiện tại không đúng.").closest('.Toastify__toast')).toHaveClass('Toastify__toast--error');
 });
 
 it("cảnh báo và đổi mật khẩu cho nhân sự còn mật khẩu khởi tạo", async () => {

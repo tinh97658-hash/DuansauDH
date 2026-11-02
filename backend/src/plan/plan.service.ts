@@ -6,7 +6,7 @@ import { STUDY_MANAGEMENT_STATUSES } from "./admission-values.js";
 import { AdmissionEvaluationService } from "./admission-evaluation.service.js";
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
-import { col, fn, Op, literal, where as sqlWhere } from "sequelize";
+import { col, fn, Op, literal, UniqueConstraintError, where as sqlWhere } from "sequelize";
 import { learnerStudyStatusSql } from "./learner-study-status.js";
 import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
@@ -153,12 +153,14 @@ export class PlanService {
   }
 
   async createSubject(dto: CreateSubjectDto) {
+    dto = { ...dto, codeText: dto.codeText.trim().toUpperCase() };
     const program = dto.program || "masters";
     if (dto.canonicalSubjectId && dto.allowCrossMajor) {
       throw new BadRequestException("Học phần alias không thể đồng thời là học phần gốc dùng chung liên ngành.");
     }
-    return this.sequelize.transaction(async (transaction) => {
+    return this.subjectIdentityTransaction(async (transaction) => {
       await this.requireMajorForProgram(dto.majorId, program, transaction);
+      await this.assertSubjectCodePairAvailable(dto, transaction);
       const sharedMajorIds = await this.validateSharedMajorIds(dto.sharedMajorIds || [], dto.majorId, program, transaction);
       dto.allowCrossMajor = sharedMajorIds.length > 0;
       await this.validateSubjectIdentityTarget(
@@ -182,13 +184,17 @@ export class PlanService {
   }
 
   async updateSubject(id: string, dto: UpdateSubjectDto) {
-    return this.sequelize.transaction(async (transaction) => {
+    if (dto.codeText !== undefined) dto = { ...dto, codeText: dto.codeText.trim().toUpperCase() };
+    return this.subjectIdentityTransaction(async (transaction) => {
       await lockTrainingStructure(this.sequelize, transaction);
       const subject = await this.subjects.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!subject) throw new NotFoundException("Không tìm thấy học phần.");
       const majorId = dto.majorId || subject.majorId;
       const program = dto.program || subject.program;
       await this.requireMajorForProgram(majorId, program, transaction);
+      await this.assertSubjectCodePairAvailable({
+        program, majorId, codeNumber: dto.codeNumber ?? subject.codeNumber, codeText: dto.codeText ?? subject.codeText,
+      }, transaction, id);
       const sharedMajorIds = await this.validateSharedMajorIds(
         dto.sharedMajorIds ?? subject.sharedMajorIds ?? [], majorId, program, transaction,
       );
@@ -261,8 +267,7 @@ export class PlanService {
 
       return this.subjects.findByPk(id, {
         include: [
-          { model: Staff, as: "responsibleStaff", attributes: ["id", "name", "email", "status"] },
-        { model: Major, as: "major", attributes: ["id", "name"] },
+          { model: Major, as: "major", attributes: ["id", "name"] },
           { model: Subject, as: "canonicalSubject" },
         ],
         transaction,
@@ -271,19 +276,20 @@ export class PlanService {
   }
 
   async createSharedSubjects(dto: CreateSharedSubjectsDto) {
-    const source = dto.source;
+    const source = { ...dto.source, codeText: dto.source.codeText.trim().toUpperCase() };
     const program = source.program || "masters";
     const definitions = [
       { majorId: source.majorId, codeNumber: source.codeNumber, codeText: source.codeText },
-      ...dto.counterparts,
+      ...dto.counterparts.map(item => ({ ...item, codeText: item.codeText.trim().toUpperCase() })),
     ];
     const majorIds = definitions.map((item) => item.majorId);
     if (new Set(majorIds).size !== majorIds.length) {
       throw new BadRequestException("Mỗi chuyên ngành chỉ được khai báo một mã học phần.");
     }
 
-    return this.sequelize.transaction(async (transaction) => {
+    return this.subjectIdentityTransaction(async (transaction) => {
       for (const majorId of majorIds) await this.requireMajorForProgram(majorId, program, transaction);
+      for (const definition of definitions) await this.assertSubjectCodePairAvailable({ ...definition, program }, transaction);
       const created: Subject[] = [];
       for (const definition of definitions) {
         const sharedMajorIds = majorIds.filter((id) => id !== definition.majorId);
@@ -306,13 +312,13 @@ export class PlanService {
   }
 
   async createSubjectFromExisting(dto: CreateSubjectFromExistingDto) {
-    const source = dto.source;
+    const source = { ...dto.source, codeText: dto.source.codeText.trim().toUpperCase() };
     const program = source.program || "masters";
-    return this.sequelize.transaction(async (transaction) => {
+    return this.subjectIdentityTransaction(async (transaction) => {
       await lockTrainingStructure(this.sequelize, transaction);
       await this.requireMajorForProgram(source.majorId, program, transaction);
       const existingSubjectIds = dto.existingSubjectIds || [];
-      const counterparts = dto.counterparts || [];
+      const counterparts = (dto.counterparts || []).map(item => ({ ...item, codeText: item.codeText.trim().toUpperCase() }));
       if (existingSubjectIds.length === 0 && counterparts.length === 0) {
         throw new BadRequestException("Vui lòng chọn ít nhất một chuyên ngành học chung.");
       }
@@ -349,8 +355,8 @@ export class PlanService {
         throw new BadRequestException("Học phần học chung phải cùng tên, cùng số tín chỉ và cùng bậc đào tạo.");
       }
 
-      for (const counterpart of counterparts) {
-      }
+      await this.assertSubjectCodePairAvailable(source, transaction);
+      for (const counterpart of counterparts) await this.assertSubjectCodePairAvailable({ ...counterpart, program }, transaction);
       const payload = this.pick(source, [
         "codeNumber", "codeText", "name", "majorId", "program", "credits",
         "majorAssignment", "subjectType", "isRequired", "sortOrder", "active",
@@ -394,6 +400,32 @@ export class PlanService {
         createdCounterparts,
       };
     });
+  }
+
+  private async subjectIdentityTransaction<T>(work: (transaction: Transaction) => Promise<T>): Promise<T> {
+    try {
+      return await this.sequelize.transaction(work);
+    } catch (error) {
+      const constraint = (error as { original?: { constraint?: string } }).original?.constraint;
+      if (error instanceof UniqueConstraintError && ["subjects_code_number_unique", "subjects_code_text_unique", "subjects_identity_unique"].includes(constraint || "")) {
+        const code = constraint === "subjects_code_number_unique" ? "mã số" : constraint === "subjects_code_text_unique" ? "mã chữ" : "mã số và mã chữ";
+        throw new ConflictException(`Học phần trùng ${code} trong chuyên ngành và bậc đào tạo này. Vui lòng sử dụng mã khác.`);
+      }
+      throw error;
+    }
+  }
+
+  private async assertSubjectCodePairAvailable(
+    identity: { majorId: string; program?: string; codeNumber: number; codeText?: string | null },
+    transaction: Transaction, excludeId?: string,
+  ) {
+    const codeText = identity.codeText?.trim().toUpperCase();
+    if (codeText == null || identity.codeNumber == null) return;
+    const scope = { majorId: identity.majorId, program: identity.program || "masters", ...(excludeId ? { id: { [Op.ne]: excludeId } } : {}) };
+    const numberDuplicate = await this.subjects.findOne({ where: { ...scope, codeNumber: identity.codeNumber }, attributes: ["id"], transaction });
+    const textDuplicate = await this.subjects.findOne({ where: { ...scope, [Op.and]: sqlWhere(fn("upper", fn("btrim", col("code_text"))), codeText) }, attributes: ["id"], transaction });
+    const codes = [numberDuplicate && `mã số ${identity.codeNumber}`, textDuplicate && `mã chữ ${codeText}`].filter(Boolean).join(" và ");
+    if (codes) throw new ConflictException(`Học phần có ${codes} đã tồn tại trong chuyên ngành này. Vui lòng sử dụng mã khác.`);
   }
 
   private async validateSharedMajorIds(ids: string[], ownMajorId: string, program: string, transaction: Transaction) {

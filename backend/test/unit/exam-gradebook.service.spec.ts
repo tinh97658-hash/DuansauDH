@@ -43,6 +43,23 @@ const build = () => {
 };
 const query = { classGroupId: "g1", courseOfferingId: "o1" };
 
+it('shares authoritative component stages between tracking and options without writing data', async () => {
+  const { service, sequelize, groups, offerings } = build();
+  const offering = { id: 'o1', status: 'completed', groupLinks: [{ classGroupId: 'g1' }] };
+  (service as any).workflow = {};
+  groups.findAll.mockResolvedValue([]);
+  offerings.findAll.mockResolvedValue([offering]);
+  sequelize.query.mockResolvedValue([{ id: 'o1', mode: 'new', eligibility_status: 'draft', heldIds: [], books: [] }]);
+  const get = jest.spyOn(service, 'get').mockResolvedValue({ totalRows: 5, unassessedRows: 1 } as never);
+  expect((await service.tracking([offering], true)).get('o1').gradebookStage).toBe('components_missing');
+  expect((await service.options()).courseOfferings[0].gradebookStage).toBe('components_missing');
+  get.mockResolvedValue({ totalRows: 5, unassessedRows: 0 } as never);
+  expect((await service.options()).courseOfferings[0].gradebookStage).toBe('eligibility_ready');
+  get.mockResolvedValue({ totalRows: 0, unassessedRows: 0 } as never);
+  expect((await service.options()).courseOfferings[0].gradebookStage).toBe('review');
+  expect(get).toHaveBeenCalledWith(expect.objectContaining({ rosterScope: 'offering' }));
+});
+
 it('tracks submitted approval stages and their submission times for dashboard requests', async () => {
   const { service, sequelize } = build();
   sequelize.query.mockResolvedValue([{ id: 'o1', mode: 'new', eligibility_status: 'submitted', result_status: 'not_available',
@@ -220,7 +237,7 @@ it("provides majors and linked course classes for gradebook filters", async () =
   offerings.findAll.mockResolvedValue([offering]);
 
   expect(await service.options()).toEqual({ groups: [group], courseOfferings: [{ ...offering,
-    examGradesComplete: false, gradebookCompletionStatus: 'incomplete',
+    gradebookStage: 'review', examGradesComplete: false, gradebookCompletionStatus: 'incomplete',
     groupLinks: [{ classGroupId: "g1", subject: offering.subject }],
   }] });
   expect(groups.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { program: "masters" }, attributes: expect.arrayContaining(["majorId"]), include: expect.arrayContaining([expect.objectContaining({ as: "major", attributes: ["id", "name"] })]) }));

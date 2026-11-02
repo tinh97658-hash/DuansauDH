@@ -1,3 +1,4 @@
+import { notify } from "../../utils/notify";
 import { usePermissions } from "../../features/accounts/usePermissions";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
@@ -5,12 +6,13 @@ import { Link, useSearchParams } from "react-router-dom";
 import { dashboardGradeScope } from "../../features/dashboard/navigation";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, ListSubheader, MenuItem, Paper, Stack, TableBody, TableCell, TableContainer, TableRow, TextField, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, MenuItem, Paper, Stack, TableBody, TableCell, TableContainer, TableRow, TextField, Tooltip, Typography } from "@mui/material";
 import ListAltRounded from "@mui/icons-material/ListAltRounded";
 import SaveRounded from "@mui/icons-material/SaveRounded";
 import SettingsRounded from "@mui/icons-material/SettingsRounded";
 import GradeSettingsDialog from "../../features/exams/GradeSettingsDialog";
 import GradebookHistoryDialog from "../../features/exams/GradebookHistoryDialog";
+import GradebookStageNotice from "../../features/exams/GradebookStageNotice";
 import FeatureLayout from "../../components/FeatureLayout";
 import FilterSelectField from "../../components/FilterSelectField";
 import FilterSearchField from "../../components/FilterSearchField";
@@ -29,6 +31,11 @@ import { displayGradeDate, draftOf, formatAttemptScores, formatScore, gradebookC
 import "../../features/exams/gradebook.css";
 import { useSubjectCatalogRevision } from "../../utils/subjectCatalog";
 import { notifyGradebookSaved } from "../../utils/gradebookRevision";
+import { useUnsavedGrades, UNSAVED_GRADE_MESSAGE } from "../../components/UnsavedChangesGuard";
+import { hasGradeChanges } from "../../utils/gradebookNavigation";
+
+import { stageOf, sortOfferingChoices } from "../../features/exams/offeringStages";
+import { offeringOptions, useOfferingMenu } from "../../features/exams/OfferingOptions";
 
 const panelSx = { borderColor: "#D7E4EE", borderRadius: 0, bgcolor: "#fff", boxShadow: "none" };
 const inputSx = {
@@ -41,16 +48,6 @@ const inputSx = {
   "& input": { px: 0.75, py: 0.5, textAlign: "center" },
 };
 const modes = { all: "Cả bảng điểm", exam: "DS thi" };
-const completionGroups = {
-  studying: { label: 'ĐANG HỌC', order: 0 },
-  incomplete: { label: 'CẦN HOÀN THIỆN', order: 1 },
-  needs_lock: { label: 'CẦN KHÓA ĐIỂM', order: 2 },
-  completed: { label: 'ĐÃ HOÀN TẤT', order: 3 },
-};
-const completionOf = offering => {
-  if (['needs_lock', 'completed'].includes(offering.gradebookCompletionStatus)) return offering.gradebookCompletionStatus;
-  return offering.status === 'completed' ? 'incomplete' : 'studying';
-};
 const PAGE_SIZE = 15;
 const EXAM_WARNING_ID = "exam-missing-component-scores";
 const EXAM_WARNING_CONTAINER = "exam-gradebook-warnings";
@@ -64,16 +61,14 @@ const showMissingScoresWarning = () => {
   else toast.warn(message, { toastId: EXAM_WARNING_ID, containerId: EXAM_WARNING_CONTAINER });
 };
 const calculatedColumns = new Set(["eligible", "courseScore", "grade4", "letter", "attempts", "result"]);
-function OfferingGroupHeader({ children }) {
-  return <ListSubheader role="presentation" sx={{ fontSize: 10.5, lineHeight: '30px', fontWeight: 700, bgcolor: '#f8fafc', color: '#607486' }}>{children}</ListSubheader>;
-}
-OfferingGroupHeader.muiSkipListHighlight = true;
+
 const errorMessage = (error, fallback) => {
   const message = error.response?.data?.message;
   return Array.isArray(message) ? message.join(" ") : message || fallback;
 };
 
 export default function ExamLists() {
+  const offeringMenu = useOfferingMenu();
   const [entryParams] = useSearchParams();
   const { can } = usePermissions();
   const catalogRevision = useSubjectCatalogRevision();
@@ -110,6 +105,7 @@ export default function ExamLists() {
   const [yearFilter, setYearFilter] = useState("");
   const [groupId, setGroupId] = useState(""), [offeringId, setOfferingId] = useState("");
   const [rows, setRows] = useState([]), [revision, setRevision] = useState(0), [dirty, setDirty] = useState({});
+  const savedRows = useRef(new Map());
   const [mode, setMode] = useState("all"), [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0), [totalRows, setTotalRows] = useState(0);
@@ -133,7 +129,7 @@ export default function ExamLists() {
   const excludeIds = Object.values(dirty).filter(row => !isExamCandidate(row)).map(row => row.participantId).join(",");
   const examIncludeIds = mode === "exam" ? includeIds : "", examExcludeIds = mode === "exam" ? excludeIds : "";
   const [optionsLoading, setOptionsLoading] = useState(true), [loading, setLoading] = useState(false), [saving, setSaving] = useState(false);
-  const [error, setError] = useState(""), [success, setSuccess] = useState(""), [pendingChange, setPendingChange] = useState(null);
+  const [error, setError] = useState(""), [pendingChange, setPendingChange] = useState(null);
   const canSubmitGrades = can("gradebook.submit");
   const canApproveGrades = can("gradebook.approve");
   const canEditPolicy = can("gradebook.policy");
@@ -141,11 +137,13 @@ export default function ExamLists() {
     if (!offering) return;
     setSubjects(previous => previous.map(item => item.id === offering.id ? { ...item,
       ...(offering.status ? { status: offering.status } : {}),
+      ...(offering.gradebookStage ? { gradebookStage: offering.gradebookStage } : {}),
       ...(typeof offering.examGradesComplete === 'boolean' ? { examGradesComplete: offering.examGradesComplete } : {}),
       ...(offering.gradebookCompletionStatus ? { gradebookCompletionStatus: offering.gradebookCompletionStatus } : {}),
     } : item));
   };
   const dirtyCount = Object.keys(dirty).length;
+  useUnsavedGrades(dirtyCount > 0);
 
   useEffect(() => {
     let active = true;
@@ -181,6 +179,7 @@ export default function ExamLists() {
         refreshOfferingCompletion(data.offering);
         const refreshedDirty = { ...dirtyRef.current };
         setRows(data.rows.map(row => {
+          savedRows.current.set(row.participantId, draftOf(row));
           const draft = row.profileForeignLanguageExempt || row.studyLeaveFailure || (data.workflow && data.workflow.status !== "draft") ? undefined : dirtyRef.current[row.participantId];
           if (row.profileForeignLanguageExempt || row.studyLeaveFailure) delete refreshedDirty[row.participantId];
           const merged = { ...row, ...draft, studyStatus: row.studyStatus, studyLeaveFailure: row.studyLeaveFailure, eligibilityPolicy: row.eligibilityPolicy, profileForeignLanguageExempt: row.profileForeignLanguageExempt };
@@ -204,7 +203,9 @@ export default function ExamLists() {
     if (!dirtyCount) return undefined;
     const warn = (event) => { event.preventDefault(); event.returnValue = ""; };
     window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
+    return () => {
+      window.removeEventListener("beforeunload", warn);
+    };
   }, [dirtyCount]);
 
   useEffect(() => {
@@ -225,12 +226,11 @@ export default function ExamLists() {
     .map(group => group.academicYear).filter(Boolean))].sort().reverse();
   const visibleClasses = classChoices.filter(({ group }) => (!majorId || group.majorId === majorId)
     && (!yearFilter || group.academicYear === yearFilter));
-  const offeringChoices = [...new Map(visibleClasses.map(entry => [entry.offering.id, entry])).values()]
-    .sort((a, b) => completionGroups[completionOf(a.offering)].order - completionGroups[completionOf(b.offering)].order);
+  const offeringChoices = sortOfferingChoices([...new Map(visibleClasses.map(entry => [entry.offering.id, entry])).values()]);
   const selectedEntry = classChoices.find(entry => entry.key === `${groupId}:${offeringId}`);
   const year = selectedEntry?.group.academicYear || "";
   const teachingCompleted = (loadedOffering?.id === offeringId ? loadedOffering.status : selectedEntry?.offering.status) === "completed";
-  const studying = !!selectedEntry && completionOf(selectedEntry.offering) === "studying";
+  const studying = !!selectedEntry && stageOf(selectedEntry.offering).group === 0;
   useEffect(() => {
     if (offeringId && studying) showCompletionWarning();
     else dismissCompletionWarning();
@@ -240,7 +240,8 @@ export default function ExamLists() {
   const offeringLabel = entry => {
     const classNames = (entry.offering.groupLinks || []).map(link => groups.find(group => group.id === link.classGroupId))
       .filter(Boolean).map(group => group.code || group.name);
-    const name = entry.offering.name || entry.subject?.name || "Lớp học phần";
+    const duplicate = offeringChoices.filter(item => item.offering.name === entry.offering.name && item.group.id === entry.group.id).length > 1;
+    const name = (duplicate ? `${entry.offering.name} [${entry.offering.id.slice(0, 8)}]` : entry.offering.name) || entry.subject?.name || "Lớp học phần";
     return classNames.length && !classNames.every(value => name.includes(value)) ? `${name} — ${classNames.join(" + ")}` : name;
   };
   const linkedGroups = (selectedEntry?.offering.groupLinks || []).map(link => groups.find(group => group.id === link.classGroupId)).filter(Boolean);
@@ -269,7 +270,7 @@ export default function ExamLists() {
   };
   const examPrintRows = mode === "exam" && examPrintReady ? pageRows : [];
   const requestChange = (change) => { if (dirtyCount) setPendingChange(() => change); else change(); };
-  const selectClass = (entry) => { pendingExamWarning.current = false; toast.dismiss(EXAM_WARNING_ID); setDirty({}); dirtyRef.current = {}; setSuccess(""); setPage(1); setGroupId(entry?.group.id || ""); setOfferingId(entry?.offering.id || ""); };
+  const selectClass = (entry) => { pendingExamWarning.current = false; toast.dismiss(EXAM_WARNING_ID); setDirty({}); dirtyRef.current = {};  setPage(1); setGroupId(entry?.group.id || ""); setOfferingId(entry?.offering.id || ""); };
   const edit = (id, patch) => {
     if (!workflowEditable) return;
     if (!canSubmitGrades || !teachingCompleted) { if (canSubmitGrades) showCompletionWarning(); return; }
@@ -279,7 +280,14 @@ export default function ExamLists() {
     const apply = row => ["testScore", "assignmentScore", "examScore", "examExempt"].some(key => key in patch) ? updateGradeDraft(row, patch) : { ...row, ...patch };
     setRows((current) => current.map((row) => row.participantId === id ? apply(row) : row));
     const row = dirty[id] || rows.find(item => item.participantId === id);
-    setDirty((current) => ({ ...current, [id]: apply(row) })); setSuccess("");
+    const changed = apply(row);
+    setDirty((current) => {
+      const next = { ...current };
+      if (hasGradeChanges(savedRows.current.get(id), changed)) next[id] = changed;
+      else delete next[id];
+      dirtyRef.current = next;
+      return next;
+    });
   };
   const formatInput = (id, key) => {
     const format = row => ({ ...row, [key]: formatScore(row[key]) });
@@ -287,7 +295,7 @@ export default function ExamLists() {
     setDirty(current => current[id] ? { ...current, [id]: format(current[id]) } : current);
   };
   const runWorkflow = async () => {
-    setSaving(true); setError(""); setSuccess("");
+    setSaving(true); setError("");
     try {
       await axios.post(`${API_BASE_URL}/masters/exam-lists/${workflowPhase}/workflow`, { classGroupId: groupId, courseOfferingId: offeringId,
         rosterScope: "offering", revision, version: workflow[workflowPhase==='final'?'final':'eligibility'].version, action: workflowAction, note: workflowNote });
@@ -295,13 +303,13 @@ export default function ExamLists() {
       notifyGradebookSaved();
     } catch (failure) {
       if (workflowPhase === 'eligibility' && workflowAction === 'submit') setWorkflowAction("");
-      setError(errorMessage(failure, "Không thể xử lý bảng điểm."));
+      notify.error(errorMessage(failure, "Không thể xử lý bảng điểm."));
     }
     finally { setSaving(false); }
   };
   const loadHistory = async () => {
     try { const { data } = await axios.get(`${API_BASE_URL}/masters/exam-lists/history`, { params: { classGroupId: groupId, courseOfferingId: offeringId } }); setAuditRows(data); }
-    catch (failure) { setError(errorMessage(failure, "Không tải được lịch sử.")); }
+    catch (failure) { notify.error(errorMessage(failure, "Không tải được lịch sử.")); }
   };
   const save = async () => {
     if (!canSubmitGrades || !teachingCompleted) { if (canSubmitGrades) showCompletionWarning(); return; }
@@ -310,23 +318,23 @@ export default function ExamLists() {
       const invalid = rowError(row);
       if (invalid) { setError(`${row.code || row.fullName}: ${invalid}`); return; }
     }
-    setSaving(true); setError(""); setSuccess("");
+    setSaving(true); setError("");
     try {
       const { data } = await axios.put(`${API_BASE_URL}/masters/exam-lists`, {
         classGroupId: groupId, courseOfferingId: offeringId, rosterScope: "offering", revision, rows: changed.map(gradePayload),
         page, pageSize: PAGE_SIZE, mode, search,
       });
-      setRows(data.rows.map(row => ({ ...draftOf(row), savedEligibility: row.eligible }))); setRevision(data.revision); setDirty({}); dirtyRef.current = {};
+      setRows(data.rows.map(row => { const saved = draftOf(row); savedRows.current.set(row.participantId, saved); return { ...saved, savedEligibility: row.eligible }; })); setRevision(data.revision); setDirty({}); dirtyRef.current = {};
       refreshOfferingCompletion(data.offering);
       setTotal(data.total); setTotalRows(data.totalRows); setPage(data.page);
       setUnassessedRows(data.unassessedRows ?? null);
-      setSuccess(`Đã cập nhật bảng điểm cho ${changed.length} học viên.`);
+      notify.success(`Đã cập nhật bảng điểm cho ${changed.length} học viên.`);
       notifyGradebookSaved();
     } catch (failure) {
       if (failure.response?.data?.code === "TEACHING_NOT_COMPLETED") {
         setLoadedOffering({ id: offeringId, status: "active" });
         showCompletionWarning();
-      } else setError(errorMessage(failure, "Không thể lưu bảng điểm. Các điểm vừa nhập vẫn được giữ trên màn hình."));
+      } else notify.error(errorMessage(failure, "Không thể lưu bảng điểm. Các điểm vừa nhập vẫn được giữ trên màn hình."));
     }
     finally { setSaving(false); }
   };
@@ -352,7 +360,7 @@ export default function ExamLists() {
       else if (format === "word") await downloadReport({ title: document.title, metadata: [["Lớp", document.group], ["Học phần", document.subject]],
         sections: [{ title: document.title, headers: document.headers, rows: document.rows }] }, "word");
       else openGradebookPreview(document, previewTab);
-    } catch (failure) { previewTab?.close(); setError(failure.response ? errorMessage(failure, "Không thể xuất danh sách thi.") : failure.message); }
+    } catch (failure) { previewTab?.close(); notify.error(failure.response ? errorMessage(failure, "Không thể xuất danh sách thi.") : failure.message); }
     finally { setExporting(false); }
   };
   const blank = mode === "exam";
@@ -397,8 +405,8 @@ export default function ExamLists() {
   return <FeatureLayout title="Danh sách thi, điểm thi" group="Quá trình học tập" maxWidth={1880} exportConfig={false}>
     <Box className="exam-gradebook" data-exam-print-blocked={blank && !examPrintReady ? "true" : undefined}>
       <ToastContainer containerId={EXAM_WARNING_CONTAINER} enableMultiContainer position="top-right" autoClose={5000}
-        newestOnTop limit={1} className="exam-warning-toast-container exam-no-print" toastClassName="exam-warning-toast"
-        progressClassName="exam-warning-progress" />
+        newestOnTop limit={1} className="exam-warning-toast-container exam-no-print" toastClassName="app-toast exam-warning-toast"
+         />
       <Paper variant="outlined" sx={{ ...panelSx, p: 1, mb: 1 }} className="exam-no-print">
         <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="flex-end">
           <FilterSelectField label="Chuyên ngành" value={majorId} disabled={optionsLoading || saving || exporting} sx={{ flex: "0 1 240px", minWidth: 180 }} onChange={(event) => {
@@ -426,17 +434,13 @@ export default function ExamLists() {
           <FilterSelectField label="Tên lớp học phần" value={offeringChoices.some(entry => entry.offering.id === offeringId) ? offeringId : ""}
             disabled={optionsLoading || saving || exporting || !offeringChoices.length} sx={{ flex: "1 1 500px", minWidth: 260 }}
             selectSx={{ height: 38, "& .MuiSelect-select": { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", py: 0, pr: "34px !important" } }}
-            MenuProps={{ PaperProps: { sx: { maxWidth: "calc(100vw - 32px)", "& .MuiMenuItem-root": { whiteSpace: "normal", overflowWrap: "anywhere" } } } }}
+            inputRef={offeringMenu.inputRef} MenuProps={offeringMenu.menuProps}
             renderValue={value => { const entry = offeringChoices.find(entry => entry.offering.id === value); return entry ? offeringLabel(entry) : 'Chưa có lớp học phần'; }}
             onChange={(event) => { const value = event.target.value; requestChange(() => selectClass(offeringChoices.find(entry => entry.offering.id === value))); }}>
             {!offeringChoices.length && <MenuItem value="">Chưa có lớp học phần</MenuItem>}
-            {offeringChoices.flatMap((entry, index) => [
-              ...(index === 0 || completionOf(offeringChoices[index - 1].offering) !== completionOf(entry.offering)
-                ? [<OfferingGroupHeader key={`heading-${entry.offering.id}`}>{completionGroups[completionOf(entry.offering)].label}</OfferingGroupHeader>] : []),
-              <MenuItem key={entry.offering.id} value={entry.offering.id} className={completionOf(entry.offering)==='completed' ? 'exam-offering-completed' : ''}
-                onClick={() => { if (entry.offering.id === offeringId && completionOf(entry.offering) === 'studying') showCompletionWarning(); }}
-                sx={completionOf(entry.offering)==='completed' ? { color: '#8796a5', '&.Mui-selected': { color: '#526a82', bgcolor: '#edf3f8' } } : completionOf(entry.offering)==='needs_lock' ? { color: '#9a5b00' } : undefined}>{offeringLabel(entry)}</MenuItem>,
-            ])}
+            {offeringOptions(offeringChoices, offeringLabel, entry => {
+              if (entry.offering.id === offeringId && stageOf(entry.offering).group === 0) showCompletionWarning();
+            })}
           </FilterSelectField>
           <FilterSelectField label="Môn" value={subjectKey(selectedEntry?.subject)} disabled sx={{ flex: "0 1 220px", minWidth: 180 }}>
             <MenuItem value={subjectKey(selectedEntry?.subject)}>{selectedEntry ? subjectLabel(selectedEntry.subject) : "Chưa có môn học"}</MenuItem>
@@ -450,16 +454,14 @@ export default function ExamLists() {
       {legacyWorkflow&&<Alert severity="info">Bảng điểm cũ được bảo toàn, chỉ xem trong quy trình mới. Cần rà soát trước khi chuyển đổi; không tự suy diễn danh sách thi hoặc ca thi đã diễn ra.</Alert>}
       {newWorkflow&&mode==='exam'&&workflow.eligibility.status!=='approved'&&<Alert severity="info">DS thi chỉ hiển thị sau khi duyệt tư cách thi. Tư cách dự kiến chưa phải danh sách được phép xếp thi.</Alert>}
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} flexWrap="wrap" className="exam-workflow-toolbar">
-      <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
-        <Stack direction="row" alignItems="center" gap={0.75} sx={{ flexShrink: 0 }}>
+      <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap" sx={{ flex: '1 1 400px', minWidth: 0, maxWidth: '100%' }}>
+        <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap" sx={{ minWidth: 0, maxWidth: '100%' }}>
           <Chip label={legacyWorkflow?'Dữ liệu cũ — cần rà soát':({draft:'Tư cách nháp',submitted:'Tư cách chờ duyệt',approved:'DS thi đã duyệt'}[workflow.eligibility?.status]||'Đang tải quy trình')} />
           {newWorkflow&&workflow.eligibility.status==='approved'&&<Chip label={{not_available:'Chờ ca thi diễn ra',draft:'Kết quả nháp',submitted:'Kết quả chờ duyệt',approved:'Kết quả đã duyệt'}[workflow.final.status]} />}
         </Stack>
-        {newWorkflow&&workflow.eligibility.status!=='approved'&&<Typography variant="caption">Chưa đến giai đoạn nhập điểm thi.</Typography>}
         {newWorkflow&&canSubmitGrades&&componentEditable&&<Button disabled={busy||saving||dirtyCount>0||!teachingCompleted||!offeringId} onClick={()=>beginWorkflow('eligibility','submit')}>Gửi duyệt tư cách</Button>}
         {newWorkflow&&canApproveGrades&&workflow.eligibility.status==='submitted'&&<Button disabled={busy||saving||dirtyCount>0} onClick={()=>beginWorkflow('eligibility','approve')}>Duyệt tư cách</Button>}
         {newWorkflow&&canSubmitGrades&&!canApproveGrades&&workflow.eligibility.status==='approved'&&workflow.eligibility.canReopen&&!workflow.eligibility.reopenRequest&&workflow.final.status!=='approved'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','request_reopen')}>Xin mở lại tư cách</Button>}
-        {newWorkflow&&workflow.eligibility.reopenRequest&&<Typography variant="caption">Đang chờ duyệt mở lại tư cách: {workflow.eligibility.reopenRequest.note}</Typography>}
         {newWorkflow&&canApproveGrades&&workflow.eligibility.canReopen&&workflow.final.status!=='approved'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','reopen')}>{workflow.eligibility.reopenRequest?'Duyệt mở lại tư cách':'Mở lại tư cách'}</Button>}
         {newWorkflow&&canApproveGrades&&workflow.eligibility.reopenRequest&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','reject_reopen')}>Từ chối mở lại tư cách</Button>}
         {newWorkflow&&workflow.eligibility.status==='approved'&&<>
@@ -469,9 +471,13 @@ export default function ExamLists() {
           {canApproveGrades&&['submitted','approved'].includes(workflow.final.status)&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('final','reopen')}>Mở lại kết quả</Button>}
         </>}
         <Button disabled={!offeringId || saving} onClick={loadHistory}>Lịch sử điểm</Button>
-      </Stack>
           {blank && <DocumentExportMenu disabled={!groupId || !offeringId || !total || busy || saving || exporting || !examPrintReady}
             onWord={() => exportExamList("word")} excelLabel="Excel (.xlsx)" pdfLabel="PDF / In" onExcel={() => exportExamList("excel")} onPdf={() => exportExamList("pdf")} />}
+      </Stack>
+      <Stack className="exam-workflow-info" spacing={0.25}>
+        <GradebookStageNotice offering={selectedEntry?.offering} />
+        {newWorkflow&&workflow.eligibility.reopenRequest&&<Typography variant="caption">Đang chờ duyệt mở lại tư cách: {workflow.eligibility.reopenRequest.note}</Typography>}
+      </Stack>
       </Stack>
       <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} className="exam-view-toolbar">
         <Stack direction="row" flexWrap="wrap" gap={0.5} aria-label="Chế độ bảng điểm">
@@ -491,7 +497,6 @@ export default function ExamLists() {
       {blank && !busy && !examPrintReady && dirtyCount > 0 && <Alert severity="info" sx={{ mb: 1.5 }} className="exam-no-print">
         Cập nhật cả bảng để lưu tư cách trước khi in danh sách thi.
       </Alert>}
-      {success && <Alert severity="success" sx={{ mb: 1.5 }} className="exam-no-print">{success}</Alert>}
       <Paper variant="outlined" sx={{ ...panelSx, overflow: "hidden" }}>
         {busy ? <Box sx={{ py: 4, textAlign: "center" }}><CircularProgress size={30} aria-label="Đang tải bảng điểm" /></Box> : !groupId || !offeringId ? <Box className="exam-empty-scope" role="status">
           <Typography component="h1">Chưa chọn lớp học phần</Typography>
@@ -570,8 +575,8 @@ export default function ExamLists() {
       <ConfirmDialog
         open={Boolean(pendingChange)}
         onClose={() => setPendingChange(null)}
-        title="Có điểm chưa lưu"
-        content={`Bạn đã chỉnh sửa ${dirtyCount} học viên. Chuyển lựa chọn sẽ bỏ các thay đổi này.`}
+        title="CÓ ĐIỂM CHƯA LƯU"
+        content={UNSAVED_GRADE_MESSAGE}
         cancelText="Ở lại"
         confirmText="Bỏ thay đổi và tiếp tục"
         severity="warning"
@@ -579,6 +584,7 @@ export default function ExamLists() {
           const change = pendingChange;
           setPendingChange(null);
           setDirty({});
+          dirtyRef.current = {};
           change();
         }}
       />

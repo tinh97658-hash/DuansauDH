@@ -55,6 +55,30 @@ const createDto = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("PlanService Subject logical identity", () => {
+  it("rejects a duplicate pair before creating a catalog record", async () => {
+    const { service, subjects } = buildService();
+    subjects.findOne.mockResolvedValue(subject());
+    await expect(service.createSubject(createDto({ codeText: " hp101 " }))).rejects.toMatchObject({ status: 409 });
+    expect(subjects.create).not.toHaveBeenCalled();
+  });
+
+  it("checks edits against other records and normalizes the stored letter code", async () => {
+    const { service, subjects } = buildService();
+    const current = subject(); subjects.findByPk.mockResolvedValue(current);
+    await service.updateSubject(current.id, { codeText: " hp01 " });
+    expect(subjects.findOne).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ majorId: current.majorId, program: "masters", codeNumber: 1 }),
+    }));
+    expect(current.update).toHaveBeenCalledWith(expect.objectContaining({ codeText: "HP01" }), expect.any(Object));
+  });
+
+  it("does not create any shared counterparts when the source pair already exists", async () => {
+    const { service, subjects } = buildService();
+    subjects.findOne.mockResolvedValue(subject());
+    await expect(service.createSharedSubjects({ source: createDto(), counterparts: [{ majorId: "major-3", codeNumber: 101, codeText: "HP101" }] } as any))
+      .rejects.toMatchObject({ status: 409 });
+    expect(subjects.create).not.toHaveBeenCalled();
+  });
   it.each([{ credits: 5 }, { isRequired: false }, { name: "Changed" }, { canonicalSubjectId: "root" }])(
     "blocks catalog edits affecting a used curriculum: %j", async patch => {
       const { service, subjects, sequelize } = buildService();

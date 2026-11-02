@@ -2,6 +2,7 @@ import AppSelect from "../../components/AppSelect";
 import { usePermissions } from "../accounts/usePermissions";
 import DateField from "../../components/DateField";
 import React, { useEffect, useState } from "react";
+import { notify } from "../../utils/notify";
 import { api, groupsOf, message, Modal, Notice, offeringTitle, rows, SearchSelect, subjectLabel, useLoad } from "./shared";
 import { getBusinessTodayKey, getRoomFloor, isPeriodTimeConsistent, isSessionPast, isSessionStartedInBusinessTimezone, periodTimes, vietnameseDate } from "../../utils/schedulingCalendar";
 import { shouldSuggestClosing } from "./sessionWarning";
@@ -69,7 +70,7 @@ export default function SessionEditor({ session, offering, date, period, user, o
   const mutate = async (action) => {
     setSaving(true); setError("");
     try { await action(); onSaved(); }
-    catch (failure) { setError(message(failure)); availability.reload(); }
+    catch (failure) { notify.error(message(failure)); availability.reload(); }
     finally { setSaving(false); }
   };
   const save = () => {

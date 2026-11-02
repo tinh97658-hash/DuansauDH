@@ -5,6 +5,7 @@ import AppDialog from '../../components/AppDialog';
 import PopupFormField from '../../components/PopupFormField';
 import DateField from '../../components/DateField';
 import { API_BASE_URL } from '../../config/http';
+import { notify } from '../../utils/notify';
 import { formatDate } from '../../utils/dateFormat';
 import { addDays, formatDateKey } from '../../utils/schedulingCalendar';
 
@@ -56,7 +57,7 @@ export default function StudyLeaveRequestDialog({ onClose, onCreated }) {
         reason: form.note, startDate: form.startDate, endDate: form.endDate,
       }, { withCredentials: true });
     } catch (e) {
-      setError(message(e)); submitting.current = false; setBusy(false);
+      notify.error(message(e)); submitting.current = false; setBusy(false);
       return;
     }
     onCreated(learner);

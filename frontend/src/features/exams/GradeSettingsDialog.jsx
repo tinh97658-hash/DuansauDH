@@ -1,3 +1,4 @@
+import { notify } from "../../utils/notify";
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Alert, Button, Chip, CircularProgress, MenuItem, Paper, Stack, TableBody, TableCell, TableContainer, TableRow, TextField, Typography } from "@mui/material";
@@ -41,7 +42,6 @@ export default function GradeSettingsDialog({ initialMajorId = "", initialYear =
   const [policyReload, setPolicyReload] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [success, setSuccess] = useState("");
   const [editor, setEditor] = useState(null);
   const [sharedPolicy, setSharedPolicy] = useState(null);
   const [sharedDraft, setSharedDraft] = useState(null);
@@ -123,7 +123,7 @@ export default function GradeSettingsDialog({ initialMajorId = "", initialYear =
       else next[scope] = { subjectId: subject.id, name: subject.name, year, policy };
       return next;
     });
-    setSaveError(""); setSuccess("");
+    setSaveError("");
   };
   const savePolicies = async () => {
     const entries = Object.values(drafts);
@@ -132,7 +132,7 @@ export default function GradeSettingsDialog({ initialMajorId = "", initialYear =
       if (invalid) { setSaveError(`${entry.name} (${entry.year}): ${invalid}`); return; }
     }
     if (sharedDraft && policyError(sharedDraft)) { setSaveError(policyError(sharedDraft)); return; }
-    setSaving(true); setSaveError(""); setSuccess("");
+    setSaving(true); setSaveError("");
     try {
       const { data: saved } = await axios.put(`${API_BASE_URL}/masters/grading-policies`, { rows: entries.map(entry => {
         const { version, rulesVersion, ...policy } = numericPolicy({ ...common, version: entry.policy.version, weights: entry.policy.weights });
@@ -141,11 +141,11 @@ export default function GradeSettingsDialog({ initialMajorId = "", initialYear =
       setPolicies(current => ({ ...current, ...Object.fromEntries(saved.map(row => [`${row.year}:${row.subjectId}`, row.policy])) }));
       setDrafts({});
       if (sharedDraft) { setSharedPolicy({ ...numericPolicy(sharedDraft), version: sharedPolicy.version + 1 }); setSharedDraft(null); }
-      setSuccess(`Đã lưu cấu hình${sharedDraft ? " chung" : ""}${saved.length ? ` và tỷ trọng ${saved.length} môn` : ""}. Các điểm đã cập nhật trước đó giữ nguyên cách tính cũ.`);
+      notify.success(`Đã lưu cấu hình${sharedDraft ? " chung" : ""}${saved.length ? ` và tỷ trọng ${saved.length} môn` : ""}. Các điểm đã cập nhật trước đó giữ nguyên cách tính cũ.`);
       announcePolicyChange();
     } catch (failure) {
       const message = failure.response?.data?.message;
-      setSaveError(Array.isArray(message) ? message.join(" ") : message || "Không thể lưu cấu hình. Các thay đổi đang nhập vẫn được giữ lại.");
+      notify.error(message || "Không thể lưu cấu hình. Các thay đổi đang nhập vẫn được giữ lại.");
     } finally { setSaving(false); }
   };
   const requestClose = () => { if (dirtyCount) setConfirmClose(true); else onClose(); };
@@ -190,11 +190,11 @@ export default function GradeSettingsDialog({ initialMajorId = "", initialYear =
     {policyLoadError && <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => setPolicyReload(value => value + 1)}>Thử lại cấu hình</Button>}>{policyLoadError}</Alert>}
     {saveError && <Alert severity="error">{saveError}</Alert>}
     {sharedError && <Alert severity="error" action={<Button onClick={() => setPolicyReload(value => value + 1)}>Thử lại</Button>}>{sharedError}</Alert>}
-    {success && <Alert severity="success">{success}</Alert>}
+
     {!year && <Alert severity="info">Chọn một năm cụ thể để cấu hình cách tính điểm.</Alert>}
     {editor && <Paper id="grading-policy-panel" variant="outlined" sx={{ p: 1.5, borderRadius: "4px", flex: 1, minHeight: 0, overflow: "auto" }}>
       <GradingPolicyEditor key={editor} policy={common} mode={editor} shared readOnly={sharedLocked}
-        onApply={policy => { setSharedDraft(JSON.stringify(numericPolicy(policy)) === JSON.stringify(numericPolicy(sharedPolicy)) ? null : policy); setSaveError(""); setSuccess(""); }} />
+        onApply={policy => { setSharedDraft(JSON.stringify(numericPolicy(policy)) === JSON.stringify(numericPolicy(sharedPolicy)) ? null : policy); setSaveError("");  }} />
     </Paper>}
     {!editor && <TableContainer sx={{ flex: 1, minHeight: 0 }}>
       <ResizableTable columns={columns} storageKey="masters-grade-settings-columns" freezeThrough="code" aria-label="Học phần theo chuyên ngành">

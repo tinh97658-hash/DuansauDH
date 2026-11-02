@@ -104,7 +104,7 @@ export class DashboardService {
     return {
       ...(permissions.scheduling ? { scheduling: { count: unscheduled.length, itemCount: unscheduled.length,
         href: href("/masters/schedule", { year, queue: "unscheduled" }), items: unscheduled.slice(0, 5).map(item) } } : {}),
-      ...(permissions.progress ? { progress: { count: pending.length, itemCount: pending.length,
+      ...(permissions.progress ? { progress: { count: pending.reduce((sum, offering) => sum + Number(offering.sessionSummary.pendingCount), 0), itemCount: pending.length,
         href: href("/masters/schedule", { year, queue: "pending-confirmation" }),
         items: pending.map((offering) => ({ ...item(offering),
           count: Number(offering.sessionSummary.pendingCount), unit: "buổi",
@@ -132,9 +132,9 @@ export class DashboardService {
       const state = tracking.get(offering.id);
       if (!state || state.legacy) continue;
       let index: number, at: string | Date | null, milestone: string;
-      if (!state.componentsEntered) { index = 0; at = state.completedTeachingAt; milestone = 'Hoàn thành môn học'; }
-      else if (state.componentsApproved && state.candidateCount > 0 && !state.examCompleted) { index = 1; at = state.componentScoreApprovedAt; milestone = 'Điểm thành phần được duyệt'; }
-      else if (state.examCompleted && !state.examGradesComplete) { index = 2; at = state.examCompletedAt; milestone = 'Thi xong'; }
+      if (state.gradebookStage === 'components_missing') { index = 0; at = state.completedTeachingAt; milestone = 'Hoàn thành môn học'; }
+      else if (state.gradebookStage === 'awaiting_exam') { index = 1; at = state.componentScoreApprovedAt; milestone = 'Điểm thành phần được duyệt'; }
+      else if (state.gradebookStage === 'exam_missing') { index = 2; at = state.examCompletedAt; milestone = 'Thi xong'; }
       else continue;
       const group = scopeGroup(offering, year);
       const days = businessCalendarDaysSince(at);

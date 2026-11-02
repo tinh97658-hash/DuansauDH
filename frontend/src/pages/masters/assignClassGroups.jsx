@@ -3,7 +3,7 @@ import GroupResponsibleStaff from "../../features/accounts/GroupResponsibleStaff
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useSearchParams } from "react-router-dom";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress,
@@ -365,7 +365,6 @@ const AssignClassGroups = () => {
       desc="Phân bổ và sắp xếp học viên Thạc sĩ vào nhóm theo chuyên ngành."
       maxWidth={1880}
     >
-      <ToastContainer position="top-center" newestOnTop limit={3} />
       {createScope && createScope.key === scopeKey && <ClassGroupCreateDialog
         majors={majors}
         initialValues={{ academicYear: createScope.year, majorId: createScope.majorId }}

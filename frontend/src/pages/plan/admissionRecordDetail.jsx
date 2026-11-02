@@ -11,7 +11,7 @@ import { RESULT_LABELS } from "../../features/exams/gradebook";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress,
@@ -824,7 +824,6 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
       desc="Chỉnh sửa toàn bộ thông tin hồ sơ tuyển sinh trực tiếp trên một trang và xuất Word hoặc PDF khổ A4."
       maxWidth={1260}
     >
-      <ToastContainer position="top-right" newestOnTop autoClose={2500} limit={3} />
 
       {/* ========================================================================= */}
       {/* 1. TOP HEADER TOOLBAR (SCREEN ONLY)                                       */}

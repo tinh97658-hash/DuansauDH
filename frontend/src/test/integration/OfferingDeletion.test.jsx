@@ -1,3 +1,5 @@
+import { renderToastHost } from "../renderToastHost";
+beforeEach(renderToastHost);
 import { renderWithPermissions } from "../renderWithPermissions";
 const render = (ui, options) => renderWithPermissions(ui, ["scheduling.organize", "scheduling.write"], options);
 import React from "react";
