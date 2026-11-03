@@ -1,8 +1,7 @@
 import AppSelect from "../../components/AppSelect";
 import { usePermissions } from "../accounts/usePermissions";
 import DateField from "../../components/DateField";
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import LightbulbOutlined from "@mui/icons-material/LightbulbOutlined";
+import React, { useEffect, useState } from "react";
 import { notify } from "../../utils/notify";
 import { api, groupsOf, message, Modal, Notice, offeringTitle, rows, SearchSelect, subjectLabel, useLoad } from "./shared";
 import { getBusinessTodayKey, getRoomFloor, isPeriodTimeConsistent, isSessionPast, isSessionStartedInBusinessTimezone, periodTimes, vietnameseDate } from "../../utils/schedulingCalendar";
@@ -10,8 +9,6 @@ import { shouldSuggestClosing } from "./sessionWarning";
 import { recommendedUnitForOffering } from "../../utils/lecturerQualification";
 
 import LecturerPicker from "./LecturerPicker";
-import { previousRoomSession } from "./previousRoom";
-import "./previousRoom.css";
 
 const ROOM_CAPACITY_DEFICIT_LIMIT = 10;
 export default function SessionEditor({ session, offering, date, period, user, onClose, onSaved, onViewOffering }) {
@@ -24,9 +21,7 @@ export default function SessionEditor({ session, offering, date, period, user, o
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [unitFilter, setUnitFilter] = useState(null);
-  const roomListRef = useRef(null);
-  const previousRoomRef = useRef(null);
-  const roomScrollContext = useRef({ handled: false, interacted: false });
+  const [roomManuallySelected, setRoomManuallySelected] = useState(false);
   const catalog = useLoad(async () => {
     const [lecturers, units, rooms, detail, offeringSessions] = await Promise.all([api.get("/system/lecturers"), api.get("/system/units"), api.get("/system/rooms"), api.get(`/scheduling/course-offerings/${offering.id}`), api.get(`/scheduling/course-offerings/${offering.id}/teaching-sessions`)]);
     const availableRooms = rows(rooms);
@@ -35,8 +30,7 @@ export default function SessionEditor({ session, offering, date, period, user, o
     return { lecturers: rows(lecturers), units: rows(units), rooms: historicalRoom && !availableRooms.some(room => room.id === historicalRoom.id)
       ? [...availableRooms, { ...historicalRoom, isActive: false }] : availableRooms, offering: detail, offeringSessions: Array.isArray(offeringSessions) ? offeringSessions : [] };
   }, [offering.id, session?.id, session?.room]);
-  const availability = useLoad(async () => ({ sessionDate: form.sessionDate, courseOfferingId: offering.id,
-    sessions: rows(await api.get(`/scheduling/teaching-sessions?${new URLSearchParams({ from: form.sessionDate, to: form.sessionDate, conflictForOfferingId: offering.id })}`)) }), [form.sessionDate, offering.id]);
+  const availability = useLoad(async () => rows(await api.get(`/scheduling/teaching-sessions?${new URLSearchParams({ from: form.sessionDate, to: form.sessionDate, conflictForOfferingId: offering.id })}`)), [form.sessionDate, offering.id]);
 
   const currentOffering = catalog.data?.offering || offering;
   const sessionForPeriod = session ? { ...session, endTime: periodTimes(session.period).endTime } : null;
@@ -46,8 +40,7 @@ export default function SessionEditor({ session, offering, date, period, user, o
   const suggestClosing = !session && shouldSuggestClosing(currentOffering);
   const editable = canManage && editing && (!session || future);
   const validTime = isPeriodTimeConsistent(form.period, form.startTime, form.endTime);
-  const availabilityMatches = availability.data?.sessionDate === form.sessionDate && availability.data?.courseOfferingId === offering.id;
-  const conflicts = (availabilityMatches ? availability.data.sessions : []).filter((row) => row.id !== session?.id && row.status !== "not_held" && row.period === form.period);
+  const conflicts = (availability.data || []).filter((row) => row.id !== session?.id && row.status !== "not_held" && row.period === form.period);
   const ownGroups = new Set(groupsOf(currentOffering).map((group) => group.id));
   const classConflict = conflicts.find((row) => row.schedulingConflict || row.courseOfferingId === offering.id || groupsOf(row.courseOffering).some((group) => ownGroups.has(group.id)));
   const lecturers = catalog.data?.lecturers || [];
@@ -65,33 +58,23 @@ export default function SessionEditor({ session, offering, date, period, user, o
   }, [assignedSession?.lecturerId]);
   const roomFloor = (room) => getRoomFloor(room.code) ?? (Number(String(room.code || "").match(/^[^0-9]*([0-9])/)?.[1] || NaN) || null);
   const roomReason = (room) => room.isActive === false ? "Ngừng sử dụng" : room.capacity == null ? "Chưa có sức chứa" : (currentOffering.participantCount || 0) - room.capacity >= ROOM_CAPACITY_DEFICIT_LIMIT ? "Không đủ chỗ" : conflicts.some((row) => row.roomId === room.id) ? "Đang bận" : "";
-  const previousSession = !catalog.loading && !catalog.error && catalog.data?.offering?.id === offering.id
-    ? previousRoomSession(catalog.data.offeringSessions, { id: session?.id, courseOfferingId: offering.id,
-      sessionDate: form.sessionDate, period: form.period }, rooms) : null;
-  const roomScrollKey = `${offering.id}:${session?.id || "new"}:${form.sessionDate}:${form.period}`;
-  useLayoutEffect(() => {
-    roomScrollContext.current = { handled: false, interacted: false };
-    if (roomListRef.current?.scrollTop) roomListRef.current.scrollTop = 0;
-  }, [roomScrollKey]);
-  useLayoutEffect(() => {
-    const context = roomScrollContext.current;
-    if (context.handled || context.interacted || catalog.loading || catalog.error || availability.loading
-      || (!availabilityMatches && !availability.error)) return;
-    context.handled = true;
-    const list = roomListRef.current;
-    const target = previousRoomRef.current;
-    if (!list || !target || !previousSession || !list.contains(target)) return;
-    const listBounds = list.getBoundingClientRect();
-    const targetBounds = target.getBoundingClientRect();
-    const visibleTop = listBounds.top + list.clientTop;
-    if (targetBounds.top >= visibleTop && targetBounds.bottom <= visibleTop + list.clientHeight) return;
-    // Scroll this container directly so neither the page nor the left column moves.
-    const top = list.scrollTop + targetBounds.top - visibleTop - Math.max(0, (list.clientHeight - targetBounds.height) / 2);
-    list.scrollTop = Math.max(0, Math.min(top, list.scrollHeight - list.clientHeight));
-  }, [roomScrollKey, previousSession, catalog.loading, catalog.error, availability.loading, availability.error, availabilityMatches]);
-  const markRoomInteraction = () => { roomScrollContext.current.interacted = true; };
+  const firstRoomSession = [...(catalog.data?.offeringSessions || [])]
+    .filter(row => row.roomId && row.status !== "not_held" && (!row.courseOfferingId || row.courseOfferingId === offering.id))
+    .sort((left, right) => {
+      const slot = row => `${String(row.sessionDate || "9999-12-31").slice(0, 10)}T${row.startTime || periodTimes(row.period).startTime}`;
+      return slot(left).localeCompare(slot(right)) || String(left.id || "").localeCompare(String(right.id || ""));
+    })[0];
+  const suggestedRoom = rooms.find(room => room.id === firstRoomSession?.roomId);
+  const suggestedRoomReason = firstRoomSession ? suggestedRoom ? roomReason(suggestedRoom) : "Phòng không còn trong danh mục" : "";
+  const suggestedRoomId = suggestedRoom && !suggestedRoomReason && validTime ? suggestedRoom.id : "";
+  useEffect(() => {
+    // Suggest only for a new session, after checking the target slot. A manual
+    // choice remains the user's choice when notes, dates or availability refresh.
+    if (session || roomManuallySelected || !editable || catalog.loading || availability.loading || catalog.error || availability.error) return;
+    setForm(current => current.roomId === suggestedRoomId ? current : { ...current, roomId: suggestedRoomId });
+  }, [session, roomManuallySelected, editable, catalog.loading, catalog.error, availability.loading, availability.error, suggestedRoomId]);
   const floors = [...new Set(rooms.map(roomFloor))].sort((a, b) => (a ?? 99) - (b ?? 99));
-  const setField = (name, value) => { setForm((current) => ({ ...current, [name]: value, ...(name === "period" ? periodTimes(value) : {}) })); setError(""); };
+  const setField = (name, value) => { if (name === "roomId") setRoomManuallySelected(true); setForm((current) => ({ ...current, [name]: value, ...(name === "period" ? periodTimes(value) : {}) })); setError(""); };
   const selectUnit = (unitId) => {
     setUnitFilter(unitId);
     if (unitId && selectedLecturer?.unitId !== unitId) setField("lecturerId", "");
@@ -137,19 +120,23 @@ export default function SessionEditor({ session, offering, date, period, user, o
   </>}>
     <header className="sl-editor-hero"><div><div className="sl-eyebrow">{!session ? "XẾP BUỔI" : editing ? "CHỈNH SỬA LỊCH" : "CHI TIẾT BUỔI HỌC"} · {vietnameseDate(form.sessionDate)} · {periodLabel}</div><h2>{offeringTitle(currentOffering)}</h2><p>{subjectLabel(currentOffering)} · {groupsOf(currentOffering).length} lớp/nhóm · {currentOffering.participantCount ?? "…"} học viên</p></div><div className="sl-editor-hero-actions"><span>Đã diễn ra {currentOffering.sessionSummary?.heldCount || 0} buổi</span><button className="sl-drawer-close" aria-label="Đóng chi tiết buổi học" disabled={saving} onClick={onClose}>×</button></div></header>
     <div className="sl-editor-notices">{error && <Notice error={error} />}{catalog.error && <Notice error={catalog.error} />}{availability.error && <Notice error={availability.error} />}{suggestClosing && <Notice>Đã học được {currentOffering.sessionSummary.heldCount} buổi, bạn có muốn đóng lớp không?</Notice>}{pending && <div className="sl-attention">Buổi học đã kết thúc · Chờ xác nhận kết quả diễn ra.</div>}</div>
-    <div className="v20-composer" onPointerDownCapture={markRoomInteraction} onKeyDownCapture={markRoomInteraction} onWheelCapture={markRoomInteraction} onTouchStartCapture={markRoomInteraction}><div className="sl-editor-info"><h4>THÔNG TIN BUỔI HỌC</h4><strong className="sl-editor-date">{vietnameseDate(form.sessionDate)} · {periodLabel}</strong>
+    <div className="v20-composer"><div className="sl-editor-info"><h4>THÔNG TIN BUỔI HỌC</h4><strong className="sl-editor-date">{vietnameseDate(form.sessionDate)} · {periodLabel}</strong>
       <div className="sl-editor-hidden-controls"><label>Ngày học<DateField size="small" inputProps={{ "aria-label": "Ngày học", min: getBusinessTodayKey() }} value={form.sessionDate} disabled={!editable || saving} onChange={(event) => { setField("sessionDate", event.target.value); }} /></label><label>Buổi<AppSelect aria-label="Buổi" value={form.period} disabled={!editable || saving} onChange={(event) => setField("period", event.target.value)}><option value="MORNING">Sáng</option><option value="AFTERNOON">Chiều</option></AppSelect></label></div>
       <label className="v20-field sl-unit-field">Đơn vị<SearchSelect label="Đơn vị" value={selectedUnitId} options={[{ id: "", name: "Tất cả đơn vị" }, ...units]} placeholder="Nhập để tìm đơn vị..." disabled={!editable || lecturerLocked || catalog.loading || !!catalog.error || saving} onChange={selectUnit} /></label>
       <label className="v20-field">Giảng viên<LecturerPicker key={selectedUnitId} value={form.lecturerId} lecturers={filteredLecturers} offering={currentOffering} conflicts={conflicts} locked={lecturerLocked} disabled={!editable || catalog.loading || !!catalog.error || saving} onChange={selectLecturer} />{recommendedUnit?.name && <small className="sl-teaching-unit-hint">Ngành đề xuất: {recommendedUnit.name}</small>}</label>
       {!catalog.loading && !catalog.error && !lecturers.some((row) => row.active !== false) && <Notice>Chưa có giảng viên đang hoạt động. Khai báo tại Hệ thống → Giảng viên.</Notice>}
       <label className="v20-field">Ghi chú<textarea aria-label="Ghi chú buổi học" placeholder="Nhập ghi chú..." maxLength={2000} value={form.note} disabled={!editable || saving} onChange={(event) => setField("note", event.target.value)} /></label>
       {classConflict && <Notice error={`Lớp / nhóm đang bận: ${classConflict.courseOffering?.subject?.name || "Buổi học khác"} · ${classConflict.period === "MORNING" ? "Sáng" : "Chiều"}`} />}
-    </div><section className="sl-editor-rooms"><header className="sl-room-heading"><div><h4>PHÒNG HỌC TOÀN VIỆN</h4><p className="v20-hint">Tình trạng theo {vietnameseDate(form.sessionDate)} · {periodLabel}</p></div>
-    </header><div className="sl-room-list" ref={roomListRef} onScroll={() => { if (roomListRef.current?.scrollTop) markRoomInteraction(); }}>
+    </div><section className="sl-editor-rooms"><h4>PHÒNG HỌC TOÀN VIỆN</h4><p className="v20-hint">Tình trạng theo {vietnameseDate(form.sessionDate)} · {periodLabel}</p>
+      {!session && firstRoomSession && !catalog.loading && !catalog.error && <div className={`sl-room-suggestion${suggestedRoomReason ? " sl-room-suggestion-unavailable" : ""}`} role="status">
+        <strong>Phòng đề xuất: {suggestedRoom?.code || firstRoomSession.room?.code || "Phòng của buổi đầu tiên"}</strong>
+        <span>{availability.loading ? "Đang kiểm tra phòng cho buổi học này..." : availability.error ? "Chưa kiểm tra được tình trạng phòng. Vui lòng thử lại." : suggestedRoomReason
+          ? `${suggestedRoomReason}. Vui lòng chọn phòng khác cho buổi này.` : "Theo phòng của buổi học đầu tiên. Bạn vẫn có thể chọn phòng khác."}</span>
+      </div>}
       {(catalog.loading || availability.loading) && <Notice>Đang kiểm tra phòng và giảng viên...</Notice>}
-      {floors.map((floor) => <div className="v20-room-floor" key={floor ?? "other"}><h4>{floor == null ? "PHÒNG KHÁC" : `TẦNG ${floor}`}</h4><div className="v20-room-grid">{rooms.filter((room) => roomFloor(room) === floor).map((room) => { const reason = roomReason(room); const isPrevious = room.id === previousSession?.roomId; return <button key={room.id} ref={isPrevious ? previousRoomRef : undefined} aria-pressed={form.roomId === room.id} className={`v20-room ${form.roomId === room.id ? "sl-on" : ""} ${reason === "Đang bận" ? "v20-busy" : reason ? "v20-unavailable" : ""} ${isPrevious ? "sl-room-previous" : ""}`} disabled={!editable || saving || !validTime || availability.loading || !!availability.error || !!reason} onClick={() => setField("roomId", room.id)}><strong>{room.code}</strong><span>{room.capacity == null ? "Chưa khai báo sức chứa" : `${room.capacity} chỗ`}</span><small>{roomStateLabel(room)}{isPrevious && <i className="sl-room-previous-label"><LightbulbOutlined aria-hidden="true" />Buổi trước</i>}</small></button>; })}</div></div>)}
+      {floors.map((floor) => <div className="v20-room-floor" key={floor ?? "other"}><h4>{floor == null ? "PHÒNG KHÁC" : `TẦNG ${floor}`}</h4><div className="v20-room-grid">{rooms.filter((room) => roomFloor(room) === floor).map((room) => { const reason = roomReason(room); return <button key={room.id} aria-pressed={form.roomId === room.id} className={`v20-room ${form.roomId === room.id ? "sl-on" : ""} ${reason === "Đang bận" ? "v20-busy" : reason ? "v20-unavailable" : ""}`} disabled={!editable || saving || !validTime || availability.loading || !!availability.error || !!reason} onClick={() => setField("roomId", room.id)}><strong>{room.code}</strong><span>{room.capacity == null ? "Chưa khai báo sức chứa" : `${room.capacity} chỗ`}</span><small>{roomStateLabel(room)}</small></button>; })}</div></div>)}
       {!catalog.loading && !rooms.length && <Notice>Chưa có phòng học. Quản trị viên khai báo tại Hệ thống → Phòng học.</Notice>}
-    </div></section></div>
+    </section></div>
     {deleting && <Modal title="Xóa buổi học" busy={saving} onClose={() => setDeleting(false)} actions={<><button className="sl-btn" disabled={saving} onClick={() => setDeleting(false)}>Hủy</button><button className="sl-btn sl-btn-danger" disabled={saving} onClick={() => mutate(() => api.delete(`/scheduling/teaching-sessions/${session.id}`))}>Xác nhận xóa</button></>}><p>Xóa buổi học ngày {vietnameseDate(session.sessionDate)} khỏi lịch?</p>{error && <Notice error={error} />}</Modal>}
   </Modal>;
 }

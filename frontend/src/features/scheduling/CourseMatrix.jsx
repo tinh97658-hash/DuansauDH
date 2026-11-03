@@ -83,8 +83,11 @@ export default function CourseMatrix({ user }) {
 
   // Filter logic
   const filtered = useLoadOfferings(all, disciplineId, visibleMajorIds, majorId, year, scheduleState, query);
-  useReportExport(() => ({ title: "Ma trận lớp học phần", metadata: [["Khóa", year || "Tất cả"], ["Tìm kiếm", query || "Tất cả"], ["Phạm vi", `${filtered.length} lớp học phần phù hợp bộ lọc`]],
-    sections: [{ title: "Danh sách lớp học phần", headers: ["STT", "Mã học phần", "Học phần", "TC", "Lớp học phần", "Lớp/nhóm", "Khóa", "Số học viên", "Tình trạng xếp lịch", "Số buổi đã học"],
+  const offeringMajorIds = new Set(filtered.flatMap(groupsOf).map((group) => group.majorId || group.major?.id));
+  const reportMajors = visibleMajors.filter((major) => majorId ? major.id === majorId : offeringMajorIds.has(major.id));
+  const reportScope = reportMajors.map((major) => major.code ? `${major.name} (${major.code})` : major.name).join(", ");
+  useReportExport(() => ({ title: "Ma trận lớp học phần", metadata: [["Khóa", year || "Tất cả"], ["Tìm kiếm", query || "Tất cả"], ["Phạm vi", reportScope || "Không có chuyên ngành phù hợp"]],
+    sections: [{ title: "Danh sách lớp học phần", headers: ["STT", "Mã HP", "Học phần", "TC", "Lớp học phần", "Lớp/nhóm", "Khóa", "Số HV", "Tình trạng xếp lịch", "Số buổi đã học"],
       rows: sortCourseOfferings(filtered).map((offering, index) => [index + 1, offering.subject?.code, offering.subject?.name, offering.subject?.credits,
         offeringTitle(offering), labelOf(offering), unique(groupsOf(offering).map(group => group.academicYear)).join(", "), offering.participantCount || 0,
         scheduleCategory(offering) === "unscheduled" ? "Chưa xếp lịch" : "Đã xếp lịch", offering.sessionSummary?.heldCount || 0]) }] }), offerings.loading || !!offerings.error);

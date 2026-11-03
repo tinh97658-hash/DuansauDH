@@ -62,11 +62,11 @@ beforeEach(async () => {
 it("shows a compact no-scope state without score columns in either view", async () => {
   axios.get.mockResolvedValue({ data: { groups: [], courseOfferings: [] } });
   render(<ExamLists />);
-  expect(await screen.findByText("Chưa chọn lớp học phần")).toBeInTheDocument();
+  expect((await screen.findAllByText("Chưa chọn lớp học phần")).length).toBeGreaterThan(0);
   expect(screen.queryByRole("columnheader")).not.toBeInTheDocument();
   expect(screen.queryByRole("table", { hidden: true })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
-  expect(screen.getByText("Chưa chọn lớp học phần")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách thi" }));
+  expect(screen.getAllByText("Chưa chọn lớp học phần").length).toBeGreaterThan(0);
   expect(screen.queryByRole("table", { hidden: true })).not.toBeInTheDocument();
 });
 
@@ -76,7 +76,7 @@ it("keeps headers for a valid empty roster and discloses the unchanged rules", a
   expect(await screen.findByText("Không có học viên phù hợp với danh sách đang chọn.")).toBeInTheDocument();
   expect(screen.getAllByRole("columnheader")).toHaveLength(16);
   expect(screen.getByText("Không có học viên phù hợp với danh sách đang chọn.")).toBeInTheDocument();
-  expect(screen.getByText("0 / 0 học viên")).toBeInTheDocument();
+  expect(screen.getByText("0/0 học viên")).toBeInTheDocument();
   const disclosure = screen.getByText("Quy tắc tính điểm và tư cách thi").closest("details");
   expect(disclosure).not.toHaveAttribute("open");
   fireEvent.click(screen.getByText("Quy tắc tính điểm và tư cách thi"));
@@ -156,7 +156,7 @@ it("preserves eligibility submit, approve, approved DS and reopen in the gradebo
   expect((await screen.findByText('Đã duyệt tư cách thi. Vui lòng xếp lịch thi cho danh sách đã duyệt.')).closest('.Toastify__toast').id).toBe(reminderId);
   expect(screen.queryByText(/Tư cách thi đang chờ duyệt/)).not.toBeInTheDocument();
   expect(warn).toHaveBeenCalledTimes(1);
-  fireEvent.click(screen.getByRole('button', { name: 'DS thi' }));
+  fireEvent.click(screen.getByRole('button', { name: "Danh sách thi" }));
   expect(await screen.findByRole('cell', { name: 'HV001' })).toBeInTheDocument();
   await transition('Mở lại tư cách', 'Tư cách nháp');
   expect(await screen.findByText(/Vui lòng gửi duyệt tư cách thi/)).toBeInTheDocument();
@@ -436,7 +436,7 @@ it.each(['final', 'locked'])('shows a confirmed ineligible learner as failed and
  expect(await screen.findByLabelText('Kết quả điểm HV001')).toHaveValue('failed');
  expect(screen.getByLabelText('Điểm thi hết môn HV001')).toBeDisabled();
  expect(screen.getByLabelText('Điểm học phần HV001')).toHaveValue('');
- fireEvent.click(screen.getByRole('button', {name:'DS thi'}));
+ fireEvent.click(screen.getByRole('button', {name: "Danh sách thi"}));
  await waitFor(()=>expect(screen.queryByRole('cell', {name:'HV001'})).not.toBeInTheDocument());
 });
 
@@ -602,10 +602,10 @@ it("downloads only the exam tab's columns and searched students", async () => {
   const click = jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function () { downloads.push(this.download); });
   const exportExamExcel = async () => {
     const count = URL.createObjectURL.mock.calls.length;
-    const button = await screen.findByRole("button", { name: "Xuất file" });
+    const button = await screen.findByRole("button", { name: "Xuất báo cáo" });
     await waitFor(() => expect(button).toBeEnabled());
     fireEvent.click(button);
-    fireEvent.click(screen.getByRole("menuitem", { name: "Excel (.xlsx)" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Excel (.xlsx)" }));
     await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(count + 1));
     const blob = URL.createObjectURL.mock.calls[count][0];
     const buffer = await new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsArrayBuffer(blob); });
@@ -616,15 +616,15 @@ it("downloads only the exam tab's columns and searched students", async () => {
     render(<ExamLists />);
     await screen.findByText("HV001");
     expect(screen.queryByRole("button", { name: "Xuất CSV" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled();
-    fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
+    expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Danh sách thi" }));
     const examSheet = await exportExamExcel();
-    expect(examSheet.getRow(4).values.slice(1)).toEqual(screen.getAllByRole("columnheader").map(cell => cell.textContent.replace('Tư cách đã duyệt','Tư cách')));
+    expect(examSheet.getRow(4).values.slice(1)).toEqual(screen.getAllByRole("columnheader").map(cell => cell.textContent.replace(/^(Tư cách đã duyệt|Đã duyệt)$/, 'Tư cách')));
     expect(examSheet.rowCount).toBe(13);
     expect(examSheet.getCell("B5").value).toBe("HV001");
     expect(examSheet.getCell("B6").value).toBe("HV003");
     expect(examSheet.getCell("I4").value).toBe("Ghi chú");
-    expect(examSheet.getCell("A4").fill.fgColor.argb).toBe("FFDCE6F1");
+    expect(examSheet.getCell("A4").fill.fgColor.argb).toBe("FFFFFFFF");
     expect(examSheet.pageSetup).toMatchObject({ paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1 });
     expect(downloads[0]).toBe("DS-thi-N01-HP01.xlsx");
     expect(screen.queryByRole("button", { name: "Xuất CSV" })).not.toBeInTheDocument();
@@ -861,7 +861,7 @@ it("shows blank exam sheets without clearing drafts and keeps supervisors read-o
   render(<ExamLists />);
   expect(await screen.findByLabelText("Điểm học phần HV001")).toBeDisabled();
   expect(screen.getByRole("button", { name: "Cập nhật cả bảng" })).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách thi" }));
   await screen.findByLabelText("Ghi chú HV001");
   expect(screen.queryByLabelText("Điểm học phần HV001")).not.toBeInTheDocument();
   for (const label of ["Điểm kiểm tra", "Điểm BTL/TL/KT", "Điểm thi hết môn", "Điểm học phần", "Thang điểm 4", "Thang điểm chữ", "Điểm các lần thi hết môn"]) {
@@ -877,9 +877,9 @@ it("shows blank exam sheets without clearing drafts and keeps supervisors read-o
 it("does not put an unsaved component preview into the approved DS thi",async()=>{
  render(<ExamLists/>);await screen.findByLabelText("Điểm kiểm tra HV001");
  for(const label of ["Điểm kiểm tra","Điểm BTL/TL/KT"])fireEvent.change(screen.getByLabelText(`${label} HV001`),{target:{value:"6"}});
- fireEvent.click(screen.getByRole("button",{name:"DS thi"}));await waitFor(()=>expect(axios.get).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({params:expect.objectContaining({mode:"exam"})})));
+ fireEvent.click(screen.getByRole("button",{name: "Danh sách thi"}));await waitFor(()=>expect(axios.get).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({params:expect.objectContaining({mode:"exam"})})));
  await waitFor(()=>expect(screen.queryByLabelText("Ghi chú HV001")).not.toBeInTheDocument());
- expect(screen.getByRole("button",{name:"Xuất file"})).toBeDisabled();expect(axios.put).not.toHaveBeenCalled();
+ expect(screen.getByRole("button",{name:"Xuất báo cáo"})).toBeDisabled();expect(axios.put).not.toHaveBeenCalled();
 });
 
 it("blocks exam exports if even one student elsewhere in the class is not assessed", async () => {
@@ -887,17 +887,17 @@ it("blocks exam exports if even one student elsewhere in the class is not assess
   setup("admin", roster);
   render(<ExamLists />);
   await screen.findByLabelText("\u0110i\u1ec3m ki\u1ec3m tra HV1");
-  fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
-  await waitFor(()=>expect(screen.getByRole("button", {name:"Xuất file"})).toBeDisabled());
-  expect(screen.getByRole("button", { name: "Xuất file" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách thi" }));
+  await waitFor(()=>expect(screen.getByRole("button", {name:"Xuất báo cáo"})).toBeDisabled());
+  expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeDisabled();
   const warning = await screen.findByText("Hãy nhập đủ điểm thành phần cho tất cả học viên!");
   expect(warning.closest('[role="alert"]')).toBeInTheDocument();
   expect(warning.closest(".Toastify__toast")).toHaveClass("exam-warning-toast");
   expect(warning.closest(".Toastify__toast-container")).toHaveClass("Toastify__toast-container--top-right");
   expect(within(screen.getByTestId("exam-print-table")).getAllByRole("row", { hidden: true })).toHaveLength(1);
   fireEvent.change(screen.getByRole("textbox", { name: "Tìm kiếm" }), { target: { value: "HV1" } });
-  await waitFor(()=>expect(screen.getByRole("button", {name:"Xuất file"})).toBeDisabled());
-  expect(screen.getByRole("button", { name: "Xuất file" })).toBeDisabled();
+  await waitFor(()=>expect(screen.getByRole("button", {name:"Xuất báo cáo"})).toBeDisabled());
+  expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeDisabled();
   expect(screen.getByText("Hãy nhập đủ điểm thành phần cho tất cả học viên!")).toBeInTheDocument();
 });
 
@@ -909,12 +909,12 @@ it("shows the missing-score toast on click while the exam list is still loading"
   axios.get.mockImplementation((url, config) => config?.params?.mode === "exam"
     ? new Promise(resolve => { finishRequest = () => resolve({ data: paged([{ ...savedRow }], config.params) }); })
     : original(url, config));
-  fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách thi" }));
   expect(await screen.findByText("Hãy nhập đủ điểm thành phần cho tất cả học viên!")).toBeInTheDocument();
   expect(screen.getByLabelText("Đang tải bảng điểm")).toBeInTheDocument();
   await act(async () => finishRequest());
   expect(screen.getByText("Hãy nhập đủ điểm thành phần cho tất cả học viên!")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Xuất file" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeDisabled();
 });
 
 it("shows eligible pending and failed examinees, excluding exemptions and failed prerequisites", async () => {
@@ -926,13 +926,13 @@ it("shows eligible pending and failed examinees, excluding exemptions and failed
   ]);
   render(<ExamLists />);
   await screen.findByLabelText("\u0110i\u1ec3m ki\u1ec3m tra HV001");
-  fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách thi" }));
   await screen.findByLabelText("T\u01b0 c\u00e1ch thi HV001");
   expect(screen.getByLabelText("T\u01b0 c\u00e1ch thi HV001")).toBeDisabled();
   expect(screen.queryByText("HV002")).not.toBeInTheDocument();
   expect(screen.queryByText("HV003")).not.toBeInTheDocument();
   expect(screen.getAllByText("HV004").length).toBeGreaterThan(0);
-  expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeEnabled();
 });
 
 it("requests only 15 students per page and saves drafts from different pages together", async () => {
@@ -983,8 +983,29 @@ it("returns to the first page when searching or changing the list mode", async (
   fireEvent.change(screen.getByRole("textbox", { name: "Tìm kiếm" }), { target: { value: "" } });
   fireEvent.click(await screen.findByRole("button", { name: /^Trang 2$/ }));
   await screen.findByLabelText("Điểm kiểm tra HV016");
-  fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách thi" }));
   expect(await screen.findByText("Hiển thị 1–15 trên 22 học viên")).toBeInTheDocument();
+});
+
+it("exports the full offering signing sheet even when the gradebook search hides learners", async () => {
+  const roster = Array.from({ length: 31 }, (_, i) => ({ ...savedRow, participantId: `student:${i + 1}`, code: `HV${String(i + 1).padStart(3, "0")}`,
+    fullName: `Học viên ${i + 1}`, testScore: 8, assignmentScore: 9, examScore: 8, finalized: true, result: "passed" }));
+  setup("admin", roster, "locked");
+  const replace = jest.fn();
+  const open = jest.spyOn(window, "open").mockReturnValue({ sessionStorage, location: { replace }, close: jest.fn() });
+  try {
+    render(<ExamLists />); await screen.findByText("HV001");
+    fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: "HV001" } });
+    const menu = screen.getByRole("button", { name: "Xuất báo cáo" });
+    await waitFor(() => expect(menu).toBeEnabled());
+    fireEvent.click(menu); fireEvent.click(screen.getByRole("menuitem", { name: "Xuất PDF (.pdf)" }));
+    await waitFor(() => expect(replace).toHaveBeenCalledOnce());
+    const id = new URL(replace.mock.calls[0][0], "http://localhost").searchParams.get("preview");
+    const doc = JSON.parse(sessionStorage.getItem(`subject-signing-preview:${id}`));
+    expect(doc.kind).toBe("subject-signing"); expect(doc.rows).toHaveLength(31); expect(doc.rows[30][1]).toBe("Học viên 31");
+    expect(doc.rows[0].slice(2, 11)).toEqual(Array(9).fill(""));
+    expect(axios.put).not.toHaveBeenCalled();
+  } finally { open.mockRestore(); }
 });
 
 it("exports all 30 approved exam candidates to PDF and reflects the current search", async () => {
@@ -995,18 +1016,18 @@ it("exports all 30 approved exam candidates to PDF and reflects the current sear
   const snapshot = () => JSON.parse(sessionStorage.getItem(`gradebook-preview:${new URL(replace.mock.calls[replace.mock.calls.length - 1][0], "http://localhost").searchParams.get("preview")}`));
   try {
     render(<ExamLists />);
-    expect(screen.queryByRole("button", { name: "Xuất file" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeDisabled();
     await screen.findByLabelText("Điểm kiểm tra HV001");
-    fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
-    const menu = screen.getByRole("button", { name: "Xuất file" });
+    fireEvent.click(screen.getByRole("button", { name: "Danh sách thi" }));
+    const menu = screen.getByRole("button", { name: "Xuất báo cáo" });
     await waitFor(() => expect(menu).toBeEnabled());
-    fireEvent.click(menu); fireEvent.click(screen.getByRole("menuitem", { name: "PDF / In" }));
+    fireEvent.click(menu); fireEvent.click(screen.getByRole("menuitem", { name: "Xuất PDF (.pdf)" }));
     await waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
     expect(snapshot().rows).toHaveLength(30); expect(snapshot().rows[29][1]).toBe("HV030");
     await waitFor(() => expect(menu).toBeEnabled());
     fireEvent.change(screen.getByRole("textbox", { name: "Tìm kiếm" }), { target: { value: "HV030" } });
     await screen.findByLabelText("Ghi chú HV030");
-    fireEvent.click(menu); fireEvent.click(screen.getByRole("menuitem", { name: "PDF / In" }));
+    fireEvent.click(menu); fireEvent.click(screen.getByRole("menuitem", { name: "Xuất PDF (.pdf)" }));
     await waitFor(() => expect(replace).toHaveBeenCalledTimes(2));
     expect(snapshot().rows).toHaveLength(1); expect(snapshot().rows[0][1]).toBe("HV030");
     expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ search: "HV030", mode: "exam", page: 1, pageSize: 15 }) });
@@ -1018,8 +1039,8 @@ it("disables controls while exporting and reports revision changes without produ
   setup("admin", Array.from({ length: 30 }, (_, i) => ({ ...savedRow, participantId: `student:${i}`, code: `HV${i}`, testScore: 6, assignmentScore: 6 })), "waiting");
   render(<ExamLists />);
   await screen.findByLabelText("Điểm kiểm tra HV0");
-  fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
-  await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách thi" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeEnabled());
   let finish;
   axios.get.mockImplementation((_url, { params }) => params.page === 1
     ? new Promise(resolve => { finish = resolve; })
@@ -1027,11 +1048,11 @@ it("disables controls while exporting and reports revision changes without produ
   const replace = jest.fn(), close = jest.fn();
   const open = jest.spyOn(window, "open").mockReturnValue({ sessionStorage, location: { replace }, close });
   try {
-    const menu = screen.getByRole("button", { name: "Xuất file" });
-    fireEvent.click(menu); fireEvent.click(screen.getByRole("menuitem", { name: "PDF / In" }));
+    const menu = screen.getByRole("button", { name: "Xuất báo cáo" });
+    fireEvent.click(menu); fireEvent.click(screen.getByRole("menuitem", { name: "Xuất PDF (.pdf)" }));
     await waitFor(() => expect(menu).toBeDisabled());
     expect(screen.getByRole("textbox", { name: "Tìm kiếm" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "DS thi" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Danh sách thi" })).toBeDisabled();
     finish({ data: { revision: 1, total: 30, totalRows: 30, unassessedRows: 0, page: 1, rows: [savedRow] } });
     expect(await screen.findByText("Bảng điểm đã thay đổi trong lúc xuất. Vui lòng xuất lại.")).toBeInTheDocument();
     await waitFor(() => expect(menu).toBeEnabled()); expect(replace).not.toHaveBeenCalled(); expect(close).toHaveBeenCalledTimes(1);
@@ -1042,19 +1063,19 @@ it("disables gradebook export while saving and disables export in empty DS thi",
   setup("admin", []);
   const view = render(<ExamLists />);
   await screen.findByText("Không có học viên phù hợp với danh sách đang chọn.");
-  expect(screen.queryByRole("button", { name: "Xuất file" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeDisabled();
   view.unmount(); setup();
   render(<ExamLists />);
   fireEvent.change(await screen.findByLabelText("Điểm kiểm tra HV001"), { target: { value: "7" } });
   let finish;
   axios.put.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
   fireEvent.click(screen.getByRole("button", { name: "Cập nhật cả bảng" }));
-  expect(screen.getByRole("button", { name: "Xuất file" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeDisabled();
   finish({ data: { ...data, revision: 1 } });
   await screen.findByText("Đã cập nhật bảng điểm cho 1 học viên.");
-  expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled();
-  fireEvent.click(screen.getByRole("button", { name: "DS thi" }));
-  expect(screen.getByRole("button", { name: "Xuất file" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách thi" }));
+  expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeDisabled();
 });
 
 it("opens the exact dashboard gradebook scope instead of the first available class", async () => {

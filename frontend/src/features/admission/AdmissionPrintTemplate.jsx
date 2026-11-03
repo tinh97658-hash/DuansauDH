@@ -45,7 +45,7 @@ export default function AdmissionPrintTemplate({ document }) {
           <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontWeight: 700, mt: 0.3, color: "#1E293B", lineHeight: 1.2 }}>
             {document.masthead[2]}
           </Typography>
-          <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontStyle: "italic", color: "#475569", lineHeight: 1.2 }}>
+          <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontStyle: "normal", color: "#475569", lineHeight: 1.2 }}>
             Số HS: <strong>{document.displayCode}</strong>
           </Typography>
         </Box>
@@ -57,7 +57,7 @@ export default function AdmissionPrintTemplate({ document }) {
           <Typography sx={{ fontFamily: "inherit", fontSize: "12px", fontWeight: 700, borderBottom: "1.2px solid #000", display: "inline-block", pb: 0.1, lineHeight: 1.25 }}>
             {document.nationalHeading[1]}
           </Typography>
-          <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontStyle: "italic", mt: 0.3, color: "#475569", lineHeight: 1.2 }}>
+          <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontStyle: "normal", mt: 0.3, color: "#475569", lineHeight: 1.2 }}>
             {document.dateLine}
           </Typography>
         </Box>
@@ -69,7 +69,7 @@ export default function AdmissionPrintTemplate({ document }) {
       <Typography sx={{ fontFamily: "inherit", fontSize: "17px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.4px", lineHeight: 1.2 }}>
         {document.title}
       </Typography>
-      <Typography sx={{ fontFamily: "inherit", fontSize: "12px", fontStyle: "italic", fontWeight: 600, color: "#334155", lineHeight: 1.2 }}>
+      <Typography sx={{ fontFamily: "inherit", fontSize: "12px", fontStyle: "normal", fontWeight: 600, color: "#334155", lineHeight: 1.2 }}>
         {document.subtitle}
       </Typography>
     </Box>
@@ -96,7 +96,7 @@ export default function AdmissionPrintTemplate({ document }) {
         ) : (
           <Box sx={{ p: 0.5 }}>
             <PersonRounded sx={{ fontSize: 24, color: "#94A3B8", mb: 0.3 }} />
-            <Typography sx={{ fontFamily: "inherit", fontSize: "9.5px", fontStyle: "italic", color: "#64748B", lineHeight: 1.15 }}>
+            <Typography sx={{ fontFamily: "inherit", fontSize: "9.5px", fontStyle: "normal", color: "#64748B", lineHeight: 1.15 }}>
               Ảnh 3x4<br />(Đóng dấu giáp lai)
             </Typography>
           </Box>
@@ -182,36 +182,36 @@ export default function AdmissionPrintTemplate({ document }) {
     {/* Section V: Signatures */}
     <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1.1fr 1fr", textAlign: "center", pt: 0.5, pageBreakInside: "avoid", breakInside: "avoid" }}>
       <Box>
-        <Typography sx={{ fontFamily: "inherit", fontSize: "11px", fontStyle: "italic", color: "#334155", lineHeight: 1.2 }}>
+        <Typography sx={{ fontFamily: "inherit", fontSize: "11px", fontStyle: "normal", color: "#334155", lineHeight: 1.2 }}>
           {document.signatures[0].date}
         </Typography>
         <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12px", textTransform: "uppercase", mt: 0.2, lineHeight: 1.2 }}>
           {document.signatures[0].title}
         </Typography>
-        <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontStyle: "italic", lineHeight: 1.2 }}>{document.signatures[0].instruction}</Typography>
+        <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontStyle: "normal", lineHeight: 1.2 }}>{document.signatures[0].instruction}</Typography>
         <Box sx={{ height: 42 }} />
         <Typography sx={{ fontFamily: "inherit", fontWeight: 700, textTransform: "uppercase", fontSize: "12px" }}>{document.signatures[0].name}</Typography>
       </Box>
 
       <Box>
-        <Typography sx={{ fontFamily: "inherit", fontSize: "11px", fontStyle: "italic", color: "#334155", lineHeight: 1.2 }}>
+        <Typography sx={{ fontFamily: "inherit", fontSize: "11px", fontStyle: "normal", color: "#334155", lineHeight: 1.2 }}>
           {document.signatures[1].date}
         </Typography>
         <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12px", textTransform: "uppercase", mt: 0.2, lineHeight: 1.2 }}>
           {document.signatures[1].title}
         </Typography>
-        <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontStyle: "italic", lineHeight: 1.2 }}>{document.signatures[1].instruction}</Typography>
+        <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontStyle: "normal", lineHeight: 1.2 }}>{document.signatures[1].instruction}</Typography>
         <Box sx={{ height: 42 }} />
       </Box>
 
       <Box>
-        <Typography sx={{ fontFamily: "inherit", fontSize: "11px", fontStyle: "italic", color: "#334155", lineHeight: 1.2 }}>
+        <Typography sx={{ fontFamily: "inherit", fontSize: "11px", fontStyle: "normal", color: "#334155", lineHeight: 1.2 }}>
           {document.signatures[2].date}
         </Typography>
         <Typography sx={{ fontFamily: "inherit", fontWeight: 700, fontSize: "12px", textTransform: "uppercase", mt: 0.2, lineHeight: 1.2 }}>
           {document.signatures[2].title}
         </Typography>
-        <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontStyle: "italic", lineHeight: 1.2 }}>{document.signatures[2].instruction}</Typography>
+        <Typography sx={{ fontFamily: "inherit", fontSize: "10.5px", fontStyle: "normal", lineHeight: 1.2 }}>{document.signatures[2].instruction}</Typography>
         <Box sx={{ height: 42 }} />
       </Box>
     </Box>

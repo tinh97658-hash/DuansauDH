@@ -6,7 +6,12 @@ import { Alert, Box, CircularProgress, Tooltip } from "@mui/material";
 import SearchRounded from "@mui/icons-material/SearchRounded";
 import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 import FeatureLayout from "../../components/FeatureLayout";
-import InlineReportExport from "../../components/InlineReportExport";
+import DocumentExportMenu from "../../components/DocumentExportMenu";
+import ClassProgressExportDialog from "../../features/scheduling/ClassProgressExportDialog";
+import { downloadReport } from "../../utils/reportExport";
+import { reserveReportPreview } from "../../utils/reportPreview";
+import { buildClassProgressReport } from "../../features/scheduling/classProgressReport";
+import { downloadClassProgressBatch } from "../../features/scheduling/classProgressBatchExport";
 import OfferingDetails from "../../features/scheduling/OfferingDetails";
 import { Modal } from "../../features/scheduling/shared";
 import { useAuthSession } from "../../context/AuthSession";
@@ -105,6 +110,11 @@ export default function ClassCourseHistory() {
   const session = useAuthSession();
   const [revision, setRevision] = useState(0);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [classGroupId, setClassGroupId] = useState(searchParams.get("groupId") || "");
+  const [exportFormat, setExportFormat] = useState("");
+  const [exportClassIds, setExportClassIds] = useState([]);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
   const [majors, setMajors] = useState([]);
   const [groups, setGroups] = useState([]);
   const [majorId, setMajorId] = useState(searchParams.get("majorId") || "");
@@ -212,10 +222,15 @@ export default function ClassCourseHistory() {
     if (disciplineId) next.set("disciplineId", disciplineId); else next.delete("disciplineId");
     if (majorId) next.set("majorId", majorId); else next.delete("majorId");
     if (academicYears.length) next.set("year", academicYears.join(",")); else next.delete("year");
+    if (classGroupId) next.set("groupId", classGroupId); else next.delete("groupId");
     if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
-  }, [academicYears, disciplineId, loadingCatalog, majorId, searchParams, setSearchParams, visibleMajors]);
+  }, [academicYears, classGroupId, disciplineId, loadingCatalog, majorId, searchParams, setSearchParams, visibleMajors]);
 
-  const classes = useMemo(() => report?.classes || [], [report]);
+  const availableClasses = useMemo(() => report?.classes || [], [report]);
+  const classes = useMemo(() => classGroupId ? availableClasses.filter(group => group.id === classGroupId) : availableClasses, [availableClasses, classGroupId]);
+  useEffect(() => {
+    if (report && !loadingReport && classGroupId && !availableClasses.some(group => group.id === classGroupId)) setClassGroupId("");
+  }, [availableClasses, classGroupId, loadingReport, report]);
   const subjectRows = useMemo(() => {
     const rows = new Map();
     classes.forEach((classGroup) => (classGroup.subjects || []).forEach((subject) => {
@@ -249,8 +264,36 @@ export default function ClassCourseHistory() {
   };
 
   const curriculumLabels = [...new Set(classes.map((classGroup) => classGroup.curriculum?.code).filter(Boolean))];
+  const exportDisabled = loadingCatalog || loadingReport || !!error || !visibleSubjects.length || exporting;
+  const selectedExportClasses = classes.filter(group => exportClassIds.includes(group.id));
+  const beginExport = format => {
+    setExportClassIds(classGroupId ? [classGroupId] : classes.length === 1 ? [classes[0].id] : []);
+    setExportError(""); setExportFormat(format);
+  };
+  const exportSelectedClass = async (targetClasses = selectedExportClasses, format = exportFormat, closeAfterExport = true) => {
+    if (!targetClasses.length || exportDisabled || !format) return;
+    let reservedTab;
+    setExporting(true); setExportError("");
+    try {
+      const documents = targetClasses.map(group => {
+        const document = buildClassProgressReport({ classes: [group], visibleSubjects, catalogGroups: groups,
+          major: majors.find(item => item.id === majorId), discipline: disciplines.find(item => item.id === disciplineId) });
+        if (!document.sections.length) throw new Error(`Lớp ${group.code || group.name} không có học phần phù hợp với bộ lọc. Vui lòng bỏ chọn lớp này hoặc đổi bộ lọc.`);
+        document.filename = `Theo-doi-tien-do-${group.code || group.name || group.id}`;
+        return document;
+      });
+      if (documents.length > 1) await downloadClassProgressBatch(documents, format);
+      else {
+        if (format === "pdf") reservedTab = reserveReportPreview();
+        await downloadReport(documents[0], format, reservedTab ? { reservedTab } : undefined);
+      }
+      if (closeAfterExport) setExportFormat("");
+    } catch (failure) {
+      reservedTab?.close(); setExportError(failure.message || "Không thể xuất báo cáo. Vui lòng thử lại.");
+    } finally { setExporting(false); }
+  };
 
-  return <FeatureLayout title="Theo dõi tiến độ">
+  return <FeatureLayout title="Theo dõi tiến độ" exportConfig={false}>
     <div className="tp-page">
       <section className="tp-filters" aria-label="Bộ lọc tiến độ">
         <SelectFilter label="Ngành" value={disciplineId} onChange={(value) => {
@@ -269,12 +312,18 @@ export default function ClassCourseHistory() {
           {visibleMajors.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
         </SelectFilter>
         <YearMultiSelect years={years} value={academicYears} onChange={(value) => { setAcademicYears(value); setSelectedOffering(null); setError(""); }} disabled={!majorId || !years.length} />
+        <SelectFilter label="Lớp học viên" value={classGroupId} onChange={setClassGroupId} disabled={loadingReport || !availableClasses.length}>
+          <option value="">Tất cả lớp</option>
+          {availableClasses.map(group => <option value={group.id} key={group.id}>{group.code || group.name}</option>)}
+        </SelectFilter>
         <SelectFilter label="Trạng thái" value={status} onChange={setStatus} disabled={!report}>
           <option value="all">Tất cả</option>
           {Object.entries(statusInfo).map(([value, info]) => <option value={value} key={value}>{info.label}</option>)}
         </SelectFilter>
         <label className="tp-filter"><span>Tìm kiếm</span><div className="tp-search"><SearchRounded /><input aria-label="Tìm kiếm" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm mã, học phần, giảng viên..." disabled={!report} /></div></label>
-        <InlineReportExport height={38} />
+        <div className="page-export-inline" data-export-exclude="true" style={{ "--export-control-height": "38px" }}>
+          <DocumentExportMenu disabled={exportDisabled} onWord={() => beginExport("word")} onExcel={() => beginExport("excel")} onPdf={() => beginExport("pdf")} />
+        </div>
       </section>
 
       {error && <Alert severity="error">{error}</Alert>}
@@ -322,6 +371,12 @@ export default function ClassCourseHistory() {
         </span>
       </button>)}</div>
     </Modal>}
+    {!!exportFormat && <ClassProgressExportDialog classes={classes} selectedIds={exportClassIds}
+      onSelectionChange={ids => { setExportClassIds(ids); setExportError(""); }}
+      format={exportFormat} onFormatChange={value => { setExportFormat(value); setExportError(""); }}
+      exporting={exporting} error={exportError} disabled={exportDisabled}
+      onClose={() => setExportFormat("")} onExport={() => exportSelectedClass()}
+      onPreview={group => exportSelectedClass([group], "pdf", false)} />}
     {selectedOffering && <OfferingDetails key={selectedOffering.id} offering={selectedOffering} user={session?.user || {}} onClose={() => setSelectedOffering(null)} onSaved={() => setRevision((value) => value + 1)} />}
   </FeatureLayout>;
 }

@@ -16,7 +16,7 @@ it("previews only qualified non-exempt students with exam-list columns", () => {
     openGradebookPreview(document);
     const url = replace.mock.calls[0][0];
     render(<MemoryRouter useTransitions={false} initialEntries={[url]}><GradebookPreview /></MemoryRouter>);
-    expect(screen.getByRole("table", { name: "Danh sách thi" })).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Danh sách thi" })).toHaveClass("document-report-table");
     expect(screen.getByRole("heading", { name: "LỊCH THI KẾT THÚC HỌC PHẦN" })).toBeInTheDocument();
     expect(screen.getByText("Viện trưởng Viện ĐTSĐH")).toBeInTheDocument();
     expect(screen.getByText("Cán bộ phụ trách")).toBeInTheDocument();

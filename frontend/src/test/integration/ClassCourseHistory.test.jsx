@@ -4,6 +4,11 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import axios from "axios";
 import ClassCourseHistory from "../../pages/masters/classCourseHistory";
 import { AuthSessionContext } from "../../context/AuthSession";
+import { downloadReport } from "../../utils/reportExport";
+import { downloadClassProgressBatch } from "../../features/scheduling/classProgressBatchExport";
+
+vi.mock("../../utils/reportExport", () => ({ downloadReport: vi.fn() }));
+vi.mock("../../features/scheduling/classProgressBatchExport", () => ({ downloadClassProgressBatch: vi.fn() }));
 
 vi.mock("axios");
 jest.mock("@mui/icons-material", () => ({
@@ -12,7 +17,7 @@ jest.mock("@mui/icons-material", () => ({
   CheckCircleRounded: () => null,
   ErrorOutlineRounded: () => null,
 }));
-jest.mock("../../components/FeatureLayout", () => ({ default: function Layout({ children }) { return <div>{children}</div>; } }));
+vi.mock(import("../../components/FeatureLayout"), () => ({ default: function Layout({ children }) { return <div>{children}</div>; } }));
 jest.mock("../../features/scheduling/OfferingDetails", () => ({
   default: function Details({ offering, onClose, user, onSaved }) {
     return <div role="dialog" aria-label="Chi tiết lớp học phần"><span>{offering.name}</span><button onClick={onClose}>Đóng</button>{user?.canManageScheduling && <button onClick={onSaved}>Xác nhận hoàn thành giảng dạy</button>}</div>;
@@ -62,7 +67,112 @@ async function chooseScope({ expectTable = true } = {}) {
   return null;
 }
 
-beforeEach(() => { jest.clearAllMocks(); mockData(); });
+beforeEach(() => { jest.clearAllMocks(); downloadReport.mockResolvedValue(); downloadClassProgressBatch.mockResolvedValue(); mockData(); });
+
+it("exports the selected classes through the progress form with the current subject filter", async () => {
+  mount(); await chooseScope();
+  fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: "Hệ phân tán" } });
+  fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Word (.docx)" }));
+  const dialog = screen.getByRole("dialog");
+  fireEvent.click(within(dialog).getByRole("checkbox", { name: "CNT2027.02 Khóa 2027" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Xuất 1 báo cáo" }));
+  await waitFor(() => expect(downloadReport).toHaveBeenCalledTimes(1));
+  const report = downloadReport.mock.calls[0][0];
+  expect(report.template).toBe("class-progress");
+  expect(report.sections).toHaveLength(1);
+  expect(report.sections.every(section => section.rows.length === 1 && section.rows[0][1] === "Hệ phân tán")).toBe(true);
+  expect(report.sections[0].metadata.map(([label]) => label)).not.toContain("Tìm kiếm");
+});
+
+it.each([["word", "Word (.docx)"], ["excel", "Excel (.xlsx)"], ["pdf", "PDF (.pdf)"]])("requires one class per %s export instead of exporting all classes", async (format, label) => {
+  const reservedTab = { close: vi.fn() };
+  const open = vi.spyOn(window, "open").mockReturnValue(reservedTab);
+  try {
+    mount(); await chooseScope();
+    fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: `Xuất ${label}` }));
+    const dialog = screen.getByRole("dialog");
+    const confirm = within(dialog).getByRole("button", { name: "Xuất báo cáo" });
+    expect(confirm).toBeDisabled();
+    expect(downloadReport).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: "CNT2027.02 Khóa 2027" }));
+    fireEvent.click(confirm);
+    await waitFor(() => expect(downloadReport).toHaveBeenCalledTimes(1));
+    const [report, actualFormat, options] = downloadReport.mock.calls[0];
+    expect(actualFormat).toBe(format);
+    expect(report.sections.map(section => section.title)).toEqual(["CNT2027.02"]);
+    expect(report.filename).toContain("CNT2027.02");
+    if (format === "pdf") expect(options.reservedTab).toBe(reservedTab);
+    else expect(open).not.toHaveBeenCalled();
+  } finally { open.mockRestore(); }
+});
+
+it("prefills the class selected in the page filter and allows cancelling without exporting", async () => {
+  mount(); await chooseScope();
+  fireEvent.change(screen.getByLabelText("Lớp học viên"), { target: { value: "group-2027-2" } });
+  fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Excel (.xlsx)" }));
+  const dialog = screen.getByRole("dialog");
+  expect(within(dialog).getByRole("checkbox", { name: "CNT2027.02 Khóa 2027" })).toBeChecked();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Đóng" }));
+  expect(downloadReport).not.toHaveBeenCalled();
+});
+
+it.each([["word", "Word (.docx)"], ["excel", "Excel (.xlsx)"], ["pdf", "PDF (.pdf)"]])("exports multiple selected classes as separate %s files in a ZIP", async (format, label) => {
+  mount(); await chooseScope();
+  fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: `Xuất ${label}` }));
+  const dialog = screen.getByRole("dialog");
+  fireEvent.click(within(dialog).getByRole("checkbox", { name: "Chọn tất cả lớp" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Xuất 2 báo cáo" }));
+  await waitFor(() => expect(downloadClassProgressBatch).toHaveBeenCalledTimes(1));
+  const [documents, actualFormat] = downloadClassProgressBatch.mock.calls[0];
+  expect(actualFormat).toBe(format);
+  expect(documents).toHaveLength(2);
+  expect(documents.map(document => document.sections.map(section => section.title))).toEqual([["CNT2027.01"], ["CNT2027.02"]]);
+  expect(new Set(documents.map(document => document.filename)).size).toBe(2);
+  expect(downloadReport).not.toHaveBeenCalled();
+});
+
+it("keeps selected classes while searching and lets users change the export format in the dialog", async () => {
+  mount(); await chooseScope();
+  fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Word (.docx)" }));
+  const dialog = screen.getByRole("dialog");
+  expect(within(dialog).getByRole("radio", { name: "Word" })).toBeChecked();
+  fireEvent.click(within(dialog).getByRole("checkbox", { name: "CNT2027.01 Khóa 2027" }));
+  fireEvent.change(within(dialog).getByRole("textbox", { name: "Tìm lớp cần xuất" }), { target: { value: "2027.02" } });
+  expect(within(dialog).queryByRole("checkbox", { name: "CNT2027.01 Khóa 2027" })).not.toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole("checkbox", { name: "CNT2027.02 Khóa 2027" }));
+  expect(within(dialog).getByRole("status")).toHaveTextContent("Đã chọn 2 / 2 lớp");
+  fireEvent.click(within(dialog).getByRole("radio", { name: "Excel" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Xuất 2 báo cáo" }));
+  await waitFor(() => expect(downloadClassProgressBatch).toHaveBeenCalledTimes(1));
+  expect(downloadClassProgressBatch.mock.calls[0][1]).toBe("excel");
+});
+
+it("previews one class without exporting the selection or closing the dialog", async () => {
+  const tab = { close: vi.fn() };
+  const open = vi.spyOn(window, "open").mockReturnValue(tab);
+  try {
+    mount(); await chooseScope();
+    fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Word (.docx)" }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Xem trước CNT2027.02" }));
+    await waitFor(() => expect(downloadReport).toHaveBeenCalledTimes(1));
+    expect(downloadReport.mock.calls[0][0].sections.map(section => section.title)).toEqual(["CNT2027.02"]);
+    expect(downloadReport.mock.calls[0][1]).toBe("pdf");
+    expect(downloadReport.mock.calls[0][2]).toEqual({ reservedTab: tab });
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Đóng" })).toBeEnabled());
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(within(dialog).getByRole("status")).toHaveTextContent("Đã chọn 0 / 2 lớp");
+    expect(within(dialog).getByRole("radio", { name: "Word" })).toBeChecked();
+    expect(downloadClassProgressBatch).not.toHaveBeenCalled();
+  } finally { open.mockRestore(); }
+});
 
 it("shows passing learner counts only on completed subjects and keeps other statuses unchanged", async () => {
   const classes = makeClasses();

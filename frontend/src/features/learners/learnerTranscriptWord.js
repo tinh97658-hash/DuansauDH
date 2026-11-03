@@ -96,7 +96,7 @@ export async function createLearnerTranscriptWord(transcript) {
           spacing: { before: 0, after: 0, line: dxa(L.bodyLine), lineRule: LineRuleType.EXACT },
           children: [run(`${details.gpa.label}: `, { bold: false }), run(details.gpa.value, { bold: true })] })] }),
       new TableCell({ width: { size: dxa(L.signatureRight), type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP,
-        children: [paragraph(details.issueDate, { right: true, italic: true, before: L.dateOffset, keepNext: true })] }),
+        children: [paragraph(details.issueDate, { center: true, italic: false, before: L.dateOffset, keepNext: true })] }),
     ] })],
   });
   const signatureWidths = [dxa(L.signatureLeft), width - dxa(L.signatureLeft + L.signatureRight), dxa(L.signatureRight)];

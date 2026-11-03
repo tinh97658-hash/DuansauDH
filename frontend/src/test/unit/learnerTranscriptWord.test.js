@@ -107,7 +107,8 @@ it.each([transcriptScorecardFixture, longTranscriptScorecardFixture, officialTra
   expect(nodes(rows[0], "vAlign").every(node => node.getAttributeNS(W, "val") === "top")).toBe(true);
   expect(contents(xml)).toContain(`${details.gpa.label}: —`);
   expect(contents(xml)).toContain(details.issueDate);
-  expect(nodes(xml, "i").some(node => node.parentNode.parentNode.textContent === details.issueDate)).toBe(true);
+  expect(nodes(xml, "i").filter(node => node.parentNode.parentNode.textContent === details.issueDate)
+    .every(node => node.getAttributeNS(W, "val") === "false")).toBe(true);
   details.signatures.flatMap(signature => signature.roles).forEach(role => expect(contents(tables[3])).toContain(role));
   expect(nodes(tables[3], "cantSplit")).toHaveLength(1);
   expect(contents(xml)).not.toContain("Phạm Trung Minh");

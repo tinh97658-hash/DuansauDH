@@ -592,6 +592,64 @@ it("prefills and locks the lecturer after the first course-offering session", as
   expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/teaching-sessions"), expect.objectContaining({ lecturerId: "assigned", roomId: "r" }), { withCredentials: true });
 });
 
+const mockRoomHistory = (history, { busy = [], catalogRooms = rooms } = {}) => {
+  const originalGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation((url, options) => url.endsWith('/course-offerings/offering/teaching-sessions') ? Promise.resolve({ data: history })
+    : url.includes('/teaching-sessions?') ? Promise.resolve({ data: busy })
+      : url.includes('/system/rooms') ? Promise.resolve({ data: catalogRooms }) : originalGet(url, options));
+};
+const firstRoomSession = { id: 'first-room-session', courseOfferingId: offering.id, sessionDate: '2099-01-01', period: 'MORNING', startTime: '07:00', roomId: 'r', lecturerId: 'l', status: 'held' };
+
+it('suggests the room of the earliest session rather than the latest room and saves that default', async () => {
+  mockRoomHistory([{ ...firstRoomSession, id: 'later', sessionDate: '2099-01-03', roomId: 'tolerated' }, firstRoomSession]);
+  const saved = jest.fn();
+  render(<SessionEditor offering={offering} date="2099-01-05" period="MORNING" onClose={jest.fn()} onSaved={saved} />);
+  const room = await screen.findByRole('button', { name: /301.*40 chỗ/ });
+  await waitFor(() => expect(room).toHaveAttribute('aria-pressed', 'true'), { timeout: 5000 });
+  expect(screen.getByText('Phòng đề xuất: 301')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Lưu buổi học' }));
+  await waitFor(() => expect(saved).toHaveBeenCalled());
+  expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/teaching-sessions'), expect.objectContaining({ roomId: 'r', lecturerId: 'l' }), { withCredentials: true });
+});
+
+it('keeps a manually chosen alternative room when other session fields change', async () => {
+  mockRoomHistory([firstRoomSession]);
+  render(<SessionEditor offering={offering} date="2099-01-05" period="MORNING" onClose={jest.fn()} onSaved={jest.fn()} />);
+  await waitFor(() => expect(screen.getByRole('button', { name: /301.*40 chỗ/ })).toHaveAttribute('aria-pressed', 'true'), { timeout: 5000 });
+  const alternative = screen.getByRole('button', { name: /303.*11 chỗ/ });
+  fireEvent.click(alternative);
+  fireEvent.change(screen.getByLabelText('Ghi chú buổi học'), { target: { value: 'Buổi này đổi phòng' } });
+  fireEvent.change(screen.getByLabelText('Buổi'), { target: { value: 'AFTERNOON' } });
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Lưu buổi học' })).toBeEnabled());
+  expect(alternative).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: /301.*40 chỗ/ })).toHaveAttribute('aria-pressed', 'false');
+  fireEvent.click(screen.getByRole('button', { name: 'Lưu buổi học' }));
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ roomId: 'tolerated', period: 'AFTERNOON' }), { withCredentials: true }));
+});
+
+it.each(['busy', 'small', 'inactive'])('does not preselect the first room when it is %s in the target slot', async reason => {
+  const first = reason === 'small' ? { ...firstRoomSession, roomId: 'small' } : firstRoomSession;
+  mockRoomHistory([first], { busy: reason === 'busy' ? [{ id: 'other-session', roomId: 'r', lecturerId: 'other', period: 'MORNING', status: 'planned' }] : [],
+    catalogRooms: reason === 'inactive' ? rooms.map(room => room.id === 'r' ? { ...room, isActive: false } : room) : rooms });
+  render(<SessionEditor offering={offering} date="2099-01-05" period="MORNING" onClose={jest.fn()} onSaved={jest.fn()} />);
+  await screen.findByText(/Vui lòng chọn phòng khác cho buổi này/);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Lưu buổi học' })).toBeEnabled());
+  expect(document.querySelector('.v20-room[aria-pressed="true"]')).toBeNull();
+  const alternative = screen.getByRole('button', { name: /303.*11 chỗ/ });
+  fireEvent.click(alternative);
+  expect(alternative).toHaveAttribute('aria-pressed', 'true');
+});
+
+it('preserves the saved room when editing an existing session', async () => {
+  mockRoomHistory([firstRoomSession]);
+  render(<SessionEditor session={{ ...firstRoomSession, id: 'existing', sessionDate: '2099-01-05', roomId: 'tolerated', status: 'planned' }}
+    offering={offering} onClose={jest.fn()} onSaved={jest.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Chỉnh sửa' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Lưu buổi học' })).toBeEnabled());
+  expect(screen.getByRole('button', { name: /303.*11 chỗ/ })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.queryByText(/Phòng đề xuất:/)).not.toBeInTheDocument();
+});
+
 it("places the unit selector above lecturers, filters by unit ID and clears an incompatible selection", async () => {
   const units = [{ id: "construction", name: "Khoa Công trình", active: true }, { id: "mechanical", name: "Viện Cơ khí", active: true },
     { id: "empty", name: "Đơn vị chưa có giảng viên", active: true }];

@@ -10,7 +10,7 @@ export default function SchedulePrintTemplate({ schedule, metadata: customMetada
   return <div className="sl-print-sheet">
     <header className="sl-print-header"><div>{metadata.institution.map((text, index) => index === 1 ? <strong key={text}>{text}</strong> : <span key={text}>{text}</span>)}</div><div><h1>{metadata.title}</h1><p className="sl-print-range">{metadata.range}</p></div></header>
     <p className="sl-print-notice">{metadata.notice}</p>
-    <table aria-label={tableLabel}>
+    <table className="document-report-table" aria-label={tableLabel}>
       <colgroup>{columns.map((column) => <col key={column.key} style={{ width: `${column.weight / totalWeight * 100}%` }} />)}</colgroup>
       <thead><tr>{columns.map((column) => <th key={column.key} scope="col" className={column.nowrap ? "sl-print-nowrap" : undefined}>{column.label}</th>)}</tr></thead>
       <tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{columns.map((column) =>

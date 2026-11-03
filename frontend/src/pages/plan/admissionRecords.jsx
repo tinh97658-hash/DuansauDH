@@ -584,20 +584,25 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
       const { data } = await axios.get(`${API_BASE_URL}/plan/admission-records?${params}`, { withCredentials: true });
       return data;
     });
-    return tableReport(isStudyManagement ? "Hồ sơ bảo lưu" : isMastersList ? "Danh sách học viên" : "Hồ sơ tuyển sinh", columns, allRows, (row, column) => {
+    const report = tableReport(isStudyManagement ? "Hồ sơ bảo lưu" : isMastersList ? "Danh sách học viên" : "Hồ sơ tuyển sinh", columns, allRows, (row, column) => {
       if (column.key === "lastName") return personNameParts(row).familyAndMiddle;
       if (column.key === "firstName") return personNameParts(row).givenName;
-      if (column.key === "major") return row.major?.name || majors.find(major => major.id === row.majorId)?.name;
-      if (column.key === "groupCode") return row.assignedGroup?.code;
-      if (column.key === "status") return row.studyStatus;
+      if (column.key === "major") return row.majorName || row.major?.name || majors.find(major => major.id === row.majorId)?.name || "—";
+      if (column.key === "groupCode") return row.assignedGroup?.code || "—";
+      if (column.key === "dob") return formatDate(row.dob);
+      if (column.key === "gender") return row.gender || "Nam";
+      if (column.key === "trainingLevel") return row.trainingLevel || "Thạc sĩ";
+      if (column.key === "status") return (isStudyManagement ? studyManagementStatusLabel(row.studyStatus) : row.studyStatus) || "Nộp hồ sơ";
       if (column.key === "tuition") return row.extraData?.tuitionPayment?.paid ? "Đã nộp" : "Chưa nộp";
+      if (["code", "email", "idCard", "academicYear", "phone"].includes(column.key)) return row[column.key] || "—";
       return row[column.key];
     }, [["Năm", year || "Tất cả"], ["Tìm kiếm", debouncedSearch || "Tất cả"], ["Phạm vi", `${allRows.length} hồ sơ phù hợp bộ lọc`]]);
+    return { ...report, excelLayout: "single-table" };
   };
 
   return (
     <ListLayout
-      exportConfig={{ disabled: loading || search.trim() !== debouncedSearch, getReport: exportRecords }}
+      exportConfig={{ formats: ["excel"], disabled: loading || search.trim() !== debouncedSearch, getReport: exportRecords }}
       title={isStudyManagement ? "Hồ sơ bảo lưu" : isMastersList ? "Danh sách học viên" : "Nhập hồ sơ tuyển sinh"}
       group={isMastersList ? "Thủ tục đầu vào" : "Kế hoạch khóa mới"}
       desc={isMastersList

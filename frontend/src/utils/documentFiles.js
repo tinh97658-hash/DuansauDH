@@ -19,7 +19,7 @@ export function openDocumentPreview({ prefix, path, snapshot, fallbackToCurrentT
   } else if (fallbackToCurrentTab) {
     window.location.assign(url);
   } else {
-    throw new Error("Trình duyệt đã chặn tab xem trước. Vui lòng cho phép mở tab mới và chọn Xuất PDF lại.");
+    throw new Error("Trình duyệt đã chặn tab xem trước. Vui lòng cho phép mở tab mới và chọn Xuất PDF (.pdf) lại.");
   }
 }
 

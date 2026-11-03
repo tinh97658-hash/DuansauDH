@@ -5,6 +5,7 @@ import { cleanup, fireEvent, screen, within, waitFor } from "@testing-library/re
 import { MemoryRouter, useLocation } from "react-router-dom";
 import axios from "axios";
 import CourseMatrixPage from "../../pages/masters/courseMatrix";
+import { ReportExportContext } from "../../components/ReportExportContext";
 
 jest.mock("axios");
 jest.mock("../../components/FeatureLayout", () => function FeatureLayout({ children }) { return <div>{children}</div>; });
@@ -83,6 +84,32 @@ async function openMatrix() {
 
 beforeEach(() => jest.clearAllMocks());
 afterEach(cleanup);
+
+it("exports the major scope from the filters while preserving shared offerings", async () => {
+  const shared = offering({ id: "shared" });
+  shared.groupLinks.push({ classGroup: { id: "other-group", majorId: "major-2", academicYear: "2030" } });
+  mockRequests([shared]);
+  let reportProvider;
+  const registerReport = (provider) => { reportProvider = provider; };
+  render(
+    <MemoryRouter useTransitions={false}>
+      <ReportExportContext.Provider value={{ registerReport }}>
+        <CourseMatrixPage />
+      </ReportExportContext.Provider>
+    </MemoryRouter>
+  );
+  await screen.findByRole("region", { name: "Khóa 2030" });
+  const getReport = () => reportProvider.current.getReport();
+  expect(getReport().metadata).toContainEqual(["Phạm vi", "Khai thác hàng hải (KTHH), Quản trị kinh doanh (QTKD)"]);
+
+  fireEvent.change(screen.getByLabelText("Chuyên ngành"), { target: { value: major.id } });
+  expect(getReport().metadata).toContainEqual(["Phạm vi", "Khai thác hàng hải (KTHH)"]);
+  expect(getReport().sections[0].rows).toHaveLength(1);
+
+  fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: "không có kết quả" } });
+  expect(getReport().metadata).toContainEqual(["Phạm vi", "Khai thác hàng hải (KTHH)"]);
+  expect(getReport().sections[0].rows).toHaveLength(0);
+});
 
 it.each([1, 2, 3, 4])("shows and evenly fills only %i actual cohort columns", async (count) => {
   const offerings = Array.from({ length: count }, (_, index) => offering({

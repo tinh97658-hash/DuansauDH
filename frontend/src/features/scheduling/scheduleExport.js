@@ -2,6 +2,7 @@ import { formatDate } from "../../utils/dateFormat";
 import { groupsOf } from "./shared";
 import { downloadDocumentFile, openDocumentPreview } from "../../utils/documentFiles";
 import { majorDisciplineId } from "../../utils/disciplineScope";
+import { mmToPoints, pointsToExcelWidth, excelRowHeight } from "../../utils/documentLayout";
 
 const PERIOD_LABELS = {
   MORNING: "Sáng",
@@ -190,9 +191,9 @@ export async function createScheduleExcel(schedule) {
   const metadata = scheduleDocumentMetadata(schedule);
   const valuesFor = (row) => columns.map((column) => row[column.fields[0]]);
   const values = schedule.rows.map(valuesFor);
-  sheet.columns = columns.map((column, index) => ({
-    width: column.nowrap ? values.reduce((width, row) => Math.max(width, String(row[index]).length + 2), column.excelWidth) : column.excelWidth,
-  }));
+  const totalWeight = columns.reduce((sum, column) => sum + column.weight, 0);
+  const physicalWidths = columns.map(column => mmToPoints(281) * column.weight / totalWeight);
+  sheet.columns = physicalWidths.map(width => ({ width: pointsToExcelWidth(width) }));
   // Split by physical column widths so the two masthead blocks stay balanced in all scopes.
   const halfWidth = sheet.columns.reduce((sum, column) => sum + column.width, 0) / 2;
   let leftEnd = 1, usedWidth = 0, bestDistance = Infinity;
@@ -213,57 +214,56 @@ export async function createScheduleExcel(schedule) {
   mergedHeading(1, leftEnd + 1, columns.length, metadata.title, { bold: true, size: 14 });
   mergedHeading(2, leftEnd + 1, columns.length, metadata.range, { size: 11 });
   sheet.getRow(2).height = 32;
-  mergedHeading(3, 1, columns.length, metadata.notice, { horizontal: "left", italic: true, size: 11 });
+  mergedHeading(3, 1, columns.length, metadata.notice, { horizontal: "left", italic: false, size: 11 });
   sheet.getRow(3).height = 32;
   const header = sheet.addRow(columns.map((column) => column.label));
-  header.font = { name: "Times New Roman", size: 11, bold: true };
+  header.font = { name: "Times New Roman", size: 10.5, bold: true };
   header.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
   header.height = 28;
   const border = (color) => Object.fromEntries(["top", "bottom", "left", "right"].map((side) => [side, { style: "thin", color: { argb: color } }]));
   header.eachCell((cell) => {
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCE6F1" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } };
     cell.border = border("FF000000");
   });
   const firstDataRow = header.number + 1;
   values.forEach((cells) => {
     const row = sheet.addRow(cells);
-    row.font = { name: "Times New Roman", size: 11 };
+    row.font = { name: "Times New Roman", size: 10.5 };
     row.eachCell({ includeEmpty: true }, (cell, column) => {
       cell.alignment = { vertical: "middle", horizontal: columns[column - 1].center ? "center" : "left", wrapText: !columns[column - 1].nowrap };
       cell.border = border("FF000000");
     });
-    row.height = Math.min(409, Math.max(22, ...cells.map((value, index) => columns[index].nowrap ? 22
-      : String(value).split(/\r?\n/).reduce((lines, line) => lines + Math.max(1, Math.ceil(line.length / (sheet.getColumn(index + 1).width - 2))), 0) * 16 + 6)));
+    row.height = excelRowHeight(cells, physicalWidths, 10.5, 4.5, 18);
   });
   if (!values.length) {
     const empty = mergedHeading(firstDataRow, 1, columns.length, metadata.empty, { size: 11 });
     empty.border = border("FF000000");
   }
   const totalRow = firstDataRow + Math.max(1, values.length);
-  mergedHeading(totalRow, 1, columns.length, metadata.total, { horizontal: "right", italic: true, size: 11 });
+  mergedHeading(totalRow, 1, columns.length, metadata.total, { horizontal: "right", italic: false, size: 11 });
   metadata.duty.forEach((text, index) => mergedHeading(totalRow + 1 + index, 1, columns.length, text, { horizontal: "left", size: 11 }));
   const signatureRow = totalRow + 3;
   metadata.signatures.forEach((text, index) => {
     const from = index === 0 ? 1 : leftEnd + 1;
     const to = index === 0 ? leftEnd : columns.length;
     mergedHeading(signatureRow, from, to, text, { bold: true, size: 11 });
-    mergedHeading(signatureRow + 1, from, to, metadata.signaturePrompt, { italic: true, size: 11 });
+    mergedHeading(signatureRow + 1, from, to, metadata.signaturePrompt, { italic: false, size: 11 });
   });
   // Reserve space for handwritten signatures; no stored person's name is assumed.
   sheet.getRow(signatureRow + 2).height = 30;
   sheet.getRow(signatureRow + 3).height = 30;
-  sheet.views = [{ state: "frozen", ySplit: firstDataRow - 1 }];
+  sheet.views = [{ state: "frozen", ySplit: firstDataRow - 1, showGridLines: false }];
   // Keep the table header and all session rows unmerged for filtering and sorting.
   sheet.autoFilter = { from: { row: header.number, column: 1 }, to: { row: header.number + values.length, column: columns.length } };
   sheet.pageSetup = { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: `${header.number}:${header.number}` };
-  sheet.pageSetup.margins = { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.15, footer: 0.15 };
+  sheet.pageSetup.margins = { left: 8 / 25.4, right: 8 / 25.4, top: 8 / 25.4, bottom: 14 / 25.4, header: 0, footer: 4 / 25.4 };
   sheet.pageSetup.printArea = `A1:${sheet.getColumn(columns.length).letter}${signatureRow + 3}`;
   sheet.headerFooter.oddFooter = `&L&"Times New Roman,Bold"&8${metadata.footer[0]}&R${metadata.footer[1]}`;
   sheet.headerFooter.evenFooter = sheet.headerFooter.oddFooter;
   return new Blob([await book.xlsx.writeBuffer()], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 }
 
-export async function createScheduleWord(schedule) {
+export async function createScheduleWord(schedule, { metadata: customMetadata, columns: customColumns } = {}) {
   const { AlignmentType, BorderStyle, Document, Footer, Packer, PageOrientation, Paragraph, Table, TableCell, TableRow, TableLayoutType, TextRun, VerticalAlign, WidthType } = await import("docx");
   const paragraph = (text, options = {}) => new Paragraph({
     alignment: options.center ? AlignmentType.CENTER : options.right ? AlignmentType.RIGHT : AlignmentType.LEFT,
@@ -272,7 +272,7 @@ export async function createScheduleWord(schedule) {
     children: options.children || [new TextRun({ text: String(text), bold: !!options.bold, italics: !!options.italic, size: options.size || 24 })],
   });
   const contentWidth = 16838 - 2 * 454;
-  const metadata = scheduleDocumentMetadata(schedule);
+  const metadata = customMetadata || scheduleDocumentMetadata(schedule);
   const masthead = new Table({
     width: { size: contentWidth, type: WidthType.DXA },
     columnWidths: [contentWidth / 2, contentWidth / 2],
@@ -288,7 +288,7 @@ export async function createScheduleWord(schedule) {
       ] }),
     ] })],
   });
-  const columns = scheduleDocumentColumns(schedule);
+  const columns = customColumns || scheduleDocumentColumns(schedule);
   const totalWeight = columns.reduce((sum, column) => sum + column.weight, 0);
   const columnWidths = columns.map((column) => Math.floor(contentWidth * column.weight / totalWeight));
   columnWidths[columnWidths.length - 1] += contentWidth - columnWidths.reduce((sum, width) => sum + width, 0);
@@ -298,7 +298,7 @@ export async function createScheduleWord(schedule) {
     children: columns.map((column, index) => new TableCell({
       width: { size: columnWidths[index], type: WidthType.DXA },
       verticalAlign: VerticalAlign.CENTER,
-      shading: heading ? { fill: "DCE6F1" } : undefined,
+      shading: heading ? { fill: "FFFFFF" } : undefined,
       children: (heading ? [{ text: column.label }] : scheduleDocumentCell(values, column)).map((part) =>
         paragraph(part.text, { bold: heading, center: heading || column.center, size: 21, after: 0, keepNext: heading })),
     })),
@@ -319,7 +319,7 @@ export async function createScheduleWord(schedule) {
     rows: [new TableRow({ cantSplit: true, children: metadata.signatures.map((title) => new TableCell({
       width: { size: 50, type: WidthType.PERCENTAGE },
       children: [paragraph(title, { center: true, bold: true, size: 22, keepNext: true }),
-        paragraph(metadata.signaturePrompt, { center: true, italic: true, size: 22, after: 900 })],
+        paragraph(metadata.signaturePrompt, { center: true, italic: false, size: 22, after: 900 })],
     })) })],
   });
   const formFooter = new Table({
@@ -336,12 +336,12 @@ export async function createScheduleWord(schedule) {
   const doc = new Document({
     styles: { default: { document: { run: { font: "Times New Roman", size: 22 } } } },
     sections: [{
-      properties: { page: { size: { width: 11906, height: 16838, orientation: PageOrientation.LANDSCAPE }, margin: { top: 454, bottom: 680, left: 454, right: 454, footer: 227 } } },
+      properties: { page: { size: { width: 11906, height: 16838, orientation: PageOrientation.LANDSCAPE }, margin: { top: 454, bottom: 794, left: 454, right: 454, footer: 227 } } },
       footers: { default: new Footer({ children: [formFooter] }) },
       children: [masthead,
-        paragraph(metadata.notice, { italic: true, size: 22, before: 100, after: 240, keepNext: true }), table,
+        paragraph(metadata.notice, { italic: false, size: 22, before: 100, after: 240, keepNext: true }), table,
         ...(!schedule.rows.length ? [paragraph(metadata.empty)] : []),
-        paragraph(metadata.total, { right: true, italic: true, size: 22, before: 100 }),
+        paragraph(metadata.total, { right: true, italic: false, size: 22, before: 100 }),
         ...metadata.duty.map((text) => paragraph(text, { size: 22, keepNext: true })),
         signatures],
     }],

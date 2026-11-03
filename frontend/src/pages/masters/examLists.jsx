@@ -26,7 +26,8 @@ import AppDialog from "../../components/AppDialog";
 import { downloadDocumentFile } from "../../utils/documentFiles";
 import { buildGradebookDocument, createGradebookExcel, fetchAllGradebookRows, gradebookFilename, openGradebookPreview } from "../../features/exams/gradebookExport";
 import { downloadReport } from "../../utils/reportExport";
-import { buildExamListDocument, createExamListExcel } from "../../features/exams/examListExport";
+import { buildExamListDocument, createExamListExcel, createExamListWord } from "../../features/exams/examListExport";
+import { buildSubjectSigningDocument, createSubjectSigningExcel, createSubjectSigningWord, openSubjectSigningPreview, subjectSigningFilename } from "../../features/exams/subjectSigningExport";
 import { API_BASE_URL } from "../../config/http";
 import { personNameParts } from "../../utils/personName";
 import { displayGradeDate, draftOf, formatAttemptScores, formatScore, gradebookColumns, gradebookRowValues, gradePayload, isExamCandidate, numericScore, RESULT_LABELS, rowError, SCORE_FIELDS, updateGradeDraft, visibleGradeRows } from "../../features/exams/gradebook";
@@ -361,6 +362,7 @@ export default function ExamLists() {
         : buildGradebookDocument(selectedGroup, selectedOffering, exported);
       if (!document.rows.length) throw new Error(isExamList ? "Không có học viên đủ tư cách và không miễn thi để in." : "Không có dữ liệu bảng điểm để xuất.");
       if (format === "excel") downloadDocumentFile(await (isExamList ? createExamListExcel(document) : createGradebookExcel(document)), gradebookFilename(selectedGroup, selectedOffering, isExamList ? "DS-thi" : undefined));
+      else if (format === "word" && isExamList) downloadDocumentFile(await createExamListWord(document), gradebookFilename(selectedGroup, selectedOffering, "DS-thi").replace(/\.xlsx$/, ".docx"));
       else if (format === "word") await downloadReport({ title: document.title, metadata: [["Lớp", document.group], ["Học phần", document.subject]],
         sections: [{ title: document.title, headers: document.headers, rows: document.rows }] }, "word");
       else openGradebookPreview(document, previewTab);
@@ -368,6 +370,26 @@ export default function ExamLists() {
     finally { setExporting(false); }
   };
   const blank = mode === "exam";
+  const exportSigningSheet = async format => {
+    if (!groupId || !offeringId || !totalRows || busy || saving || exporting || dirtyCount || blank) return;
+    setExporting(true); setError("");
+    let previewTab;
+    try {
+      if (format === "pdf") {
+        previewTab = window.open("about:blank", "_blank");
+        if (!previewTab) throw new Error("Trình duyệt đã chặn tab xem trước. Vui lòng cho phép mở tab mới và thử lại.");
+        previewTab.opener = null;
+      }
+      const exported = await fetchAllGradebookRows(params => axios.get(`${API_BASE_URL}/masters/exam-lists`, { params }), {
+        classGroupId: groupId, courseOfferingId: offeringId, rosterScope: "offering", mode: "all", search: "",
+      });
+      if (!exported.length) throw new Error("Lớp học phần chưa có học viên để xuất phiếu ký.");
+      const document = buildSubjectSigningDocument(linkedGroups.length ? linkedGroups : [selectedGroup], selectedOffering, exported);
+      if (format === "pdf") openSubjectSigningPreview(document, previewTab);
+      else downloadDocumentFile(await (format === "word" ? createSubjectSigningWord(document) : createSubjectSigningExcel(document)), subjectSigningFilename(document, format));
+    } catch (failure) { previewTab?.close(); notify.error(failure.response ? errorMessage(failure, "Không thể xuất phiếu ký.") : failure.message); }
+    finally { setExporting(false); }
+  };
   const locked = !workflowEditable || !canSubmitGrades || !teachingCompleted || saving || exporting || blank;
   const columnWidths = { index: 44, code: 112, lastName: 180, firstName: 90, dob: 104, gender: 72,
     eligible: blank ? 104 : 124, exempt: 76, testScore: 96, assignmentScore: 112, examScore: 112,
@@ -495,8 +517,12 @@ export default function ExamLists() {
           {!blank&&canApproveGrades&&['submitted','approved'].includes(workflow.final.status)&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('final','reopen')}>Mở lại kết quả</Button>}
         </>}
         {!blank && <Button startIcon={<HistoryRounded />} disabled={!offeringId || saving} onClick={loadHistory}>Lịch sử điểm</Button>}
-          <DocumentExportMenu disabled={!groupId || !offeringId || !total || busy || saving || exporting || (blank && !examPrintReady)}
-            onWord={() => exportFile("word")} excelLabel="Excel (.xlsx)" pdfLabel="PDF / In" onExcel={() => exportFile("excel")} onPdf={() => exportFile("pdf")} />
+          <DocumentExportMenu label={blank ? "Xuất báo cáo" : "Xuất bảng điểm"} disabled={!groupId || !offeringId || !total || busy || saving || exporting || (blank && !examPrintReady)}
+            onWord={() => exportFile("word")} onExcel={() => exportFile("excel")} onPdf={() => exportFile("pdf")} />
+          {!blank && <Tooltip title={dirtyCount ? "Lưu các điểm đang chỉnh sửa trước khi xuất phiếu ký" : "Xuất theo mẫu BM.02-QT.SDH.03 cho toàn bộ lớp học phần"}><span>
+            <DocumentExportMenu label="Xuất báo cáo" disabled={!groupId || !offeringId || !totalRows || busy || saving || exporting || !!dirtyCount}
+              onWord={() => exportSigningSheet("word")} onExcel={() => exportSigningSheet("excel")} onPdf={() => exportSigningSheet("pdf")} />
+          </span></Tooltip>}
           {!blank && <Button startIcon={<SaveRounded />} disabled={!workflowEditable || !canSubmitGrades || !teachingCompleted || !dirtyCount || saving || exporting || busy} onClick={save}>{saving ? "Đang lưu..." : "Cập nhật cả bảng"}</Button>}
           <Tooltip title="Cài đặt điểm số">
             <span><IconButton aria-label="Cài đặt điểm số" disabled={optionsLoading} onClick={() => setSettingsOpen(true)} size="small"

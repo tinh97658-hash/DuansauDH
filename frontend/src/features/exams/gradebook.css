@@ -13,6 +13,7 @@
 .exam-toolbar-status .exam-student-count{color:#607486;white-space:nowrap}
 .exam-toolbar-status .exam-status-warning{color:#946412}
 .exam-tool-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px;margin-left:auto;max-width:100%;min-width:0}
+.exam-gradebook .exam-tool-actions .document-export-trigger{min-height:32px;padding-block:5px;font-size:12px;line-height:20px}
 .exam-gradebook .exam-tool-actions .MuiButton-root{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:5px 10px;border:1px solid #b4c6d5;border-radius:0;background:#fff;color:#354959;font-size:12px;font-weight:500;line-height:1.5;white-space:nowrap;box-shadow:none}
 .exam-gradebook .exam-tool-actions .MuiButton-root:hover{border-color:#86a9c1;background:#f0f6fa}
 .exam-gradebook .exam-tool-actions .MuiButton-root.Mui-disabled,.exam-gradebook .exam-tool-actions .document-export-trigger:disabled{border-color:#dce4eb;background:#f8fafc;color:#8b99a7}

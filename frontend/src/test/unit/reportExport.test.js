@@ -6,6 +6,7 @@ import ExcelJS from "exceljs";
 import { collectReportPages, createReportExcel, createReportPdf, createReportWord, normalizeReport, reportOrientation, reportPdfDefinition, reportPrintSections, tableReport } from "../../utils/reportExport";
 import { readTranscriptPdf } from "../fixtures/readTranscriptPdf";
 import { reportColumnWidths } from "../../utils/reportTableLayout";
+import { excelWidthToPoints, reportPageWidth, pointsToTwips } from "../../utils/documentLayout";
 
 const original = { fetch: global.fetch, TextEncoder: global.TextEncoder, TextDecoder: global.TextDecoder };
 beforeAll(() => {
@@ -19,6 +20,16 @@ afterAll(() => Object.assign(global, original));
 const bytesOf = blob => new Promise((resolve, reject) => {
   const reader = new FileReader(); reader.onload = () => resolve(Buffer.from(reader.result)); reader.onerror = reject; reader.readAsArrayBuffer(blob);
 });
+const logicalCells = row => {
+  const cells = [];
+  row.eachCell(cell => { if (!cell.isMerged || cell.master.address === cell.address) cells.push(cell); });
+  return cells;
+};
+const cellWidth = (sheet, cell) => {
+  let end = cell.col;
+  while (end < sheet.columnCount && sheet.getCell(cell.row, end + 1).master.address === cell.address) end++;
+  return Array.from({ length: end - cell.col + 1 }, (_, index) => excelWidthToPoints(sheet.getColumn(cell.col + index).width)).reduce((sum, value) => sum + value, 0);
+};
 const report = () => normalizeReport(tableReport("Danh sách học viên", [
   { key: "index", label: "STT" }, { key: "name", label: "Họ tên" }, { key: "dob", label: "Ngày sinh" },
   { key: "phone", label: "Điện thoại" }, { key: "score", label: "Điểm" }, { key: "actions", label: "Thao tác" },
@@ -41,16 +52,17 @@ it("creates a genuine XLSX with Vietnamese headings, short dates, numeric zero a
   expect(sheet.getCell("A1").value).toBe("BỘ XÂY DỰNG");
   expect(sheet.getCell("A2").value).toBe("TRƯỜNG ĐẠI HỌC HÀNG HẢI VIỆT NAM");
   expect(sheet.getCell("A3").value).toBe("VIỆN ĐÀO TẠO SAU ĐẠI HỌC");
-  expect(sheet.getCell("C1").value).toBe("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM");
-  expect(sheet.getCell("C2").value).toBe("Độc lập - Tự do - Hạnh phúc");
-  expect(sheet.getCell("C3").value).toBe("Hải Phòng, ngày 31/10/26");
+  expect(logicalCells(sheet.getRow(1))[1].value).toBe("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM");
+  expect(logicalCells(sheet.getRow(2))[1].value).toBe("Độc lập - Tự do - Hạnh phúc");
+  expect(logicalCells(sheet.getRow(3))[1].value).toBe("Hải Phòng, ngày 31/10/26");
   const row = sheet.getRow(sheet.rowCount);
-  expect(row.values.slice(1)).toEqual([1, "Nguyễn Thị Ánh", "03/02/95", "0901234567", 0]);
+  expect(logicalCells(row).map(cell => cell.value)).toEqual([1, "Nguyễn Thị Ánh", "03/02/95", "0901234567", 0]);
   expect(sheet.getRow(sheet.rowCount - 1).values).not.toContain("Thao tác");
   expect(sheet.views[0].state).toBe("frozen");
-  expect(sheet.getColumn(1).width).toBe(6);
+  expect(excelWidthToPoints(sheet.getColumn(1).width)).toBeCloseTo(32);
   expect(sheet.getColumn(1).width).toBeLessThan(sheet.getColumn(2).width);
   expect(row.getCell(1).alignment).toMatchObject({ horizontal: "center", vertical: "middle" });
+  logicalCells(sheet.getRow(sheet.rowCount - 1)).forEach(cell => expect(cell.fill.fgColor.argb).toBe("FFFFFFFF"));
 });
 
 it("creates a genuine Word document with institution headings and the same dataset", async () => {
@@ -59,6 +71,8 @@ it("creates a genuine Word document with institution headings and the same datas
   for (const text of ["NGUYỄN", "03/02/95", "0901234567", "HÀNG HẢI", "BỘ XÂY DỰNG", "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", "Độc lập - Tự do - Hạnh phúc", "Hải Phòng, ngày 31/10/26"]) expect(xml.toUpperCase()).toContain(text.toUpperCase());
   expect(xml).not.toContain("Xóa");
   expect(xml).toContain("w:tblHeader");
+  expect(xml).not.toContain('w:fill="DCE7F1"');
+  expect(xml).toContain('w:fill="FFFFFF"');
   const dataTable = xml.match(/<w:tbl>.*?<\/w:tbl>/g)[1];
   const widths = [...dataTable.matchAll(/<w:gridCol w:w="(\d+)"/g)].map(match => Number(match[1]));
   expect(widths[0]).toBe(640);
@@ -76,6 +90,18 @@ it("uses a compact centered serial column in generated PDFs even when it is not 
   expect(table.widths).toEqual(["*", 32, "*"]);
   expect(table.body[0][1].alignment).toBe("center");
   expect(table.body[1][1].alignment).toBe("center");
+  expect(table.body[0].every(cell => cell.fillColor === "#FFFFFF")).toBe(true);
+});
+
+it("preserves the original standalone PDF page geometry, metadata, section heading and footer", () => {
+  const definition = reportPdfDefinition(report());
+  expect(definition.pageMargins).toEqual([28, 28, 28, 36]);
+  expect(definition.content.some(node => node.text === `Ngày xuất: ${report().generatedAt}`)).toBe(true);
+  expect(definition.content.some(node => node.text === "Danh sách học viên" && node.bold)).toBe(true);
+  expect(definition.footer(1, 3).text).toBe("Trang 1 / 3");
+  const table = definition.content.find(node => node.table);
+  expect(table.table.widths).toEqual([32, "*", "*", "*", "*"]);
+  expect(table.layout.paddingLeft(0)).toBe(2.83);
 });
 
 it("reserves only the needed width for academic years and gives the remaining space to text in all formats", async () => {
@@ -87,9 +113,13 @@ it("reserves only the needed width for academic years and gives the remaining sp
   const book = new ExcelJS.Workbook();
   await book.xlsx.load(await bytesOf(await createReportExcel(report)));
   const sheet = book.worksheets[0];
-  expect(sheet.getColumn(2).width).toBe(6);
-  expect(sheet.getColumn(3).width).toBeGreaterThan(30);
-  expect(sheet.lastRow.getCell(2).alignment).toMatchObject({ horizontal: "center", vertical: "middle" });
+  const dataCells = logicalCells(sheet.lastRow);
+  // Narrow data columns must not squeeze either official heading block.
+  expect(cellWidth(sheet, logicalCells(sheet.getRow(1))[0])).toBeCloseTo(reportPageWidth(false) / 2, 1);
+  expect(cellWidth(sheet, logicalCells(sheet.getRow(1))[1])).toBeCloseTo(reportPageWidth(false) / 2, 1);
+  expect(cellWidth(sheet, dataCells[1])).toBeCloseTo(30);
+  expect(cellWidth(sheet, dataCells[2])).toBeGreaterThan(400);
+  expect(dataCells[1].alignment).toMatchObject({ horizontal: "center", vertical: "middle" });
   const zip = await JSZip.loadAsync(await bytesOf(await createReportWord(report)));
   const xml = await zip.file("word/document.xml").async("string");
   const dataTable = xml.match(/<w:tbl>.*?<\/w:tbl>/g)[1];
@@ -108,6 +138,42 @@ it("creates a real PDF with Vietnamese text and multiple pages", async () => {
   expect(JSON.stringify(parsed)).toContain("Nguyễn Thị Ánh");
   for (const text of ["BỘ XÂY DỰNG", "CỘNG HÒA XÃ HỘI", "Độc lập - Tự do - Hạnh phúc", "31/10/26"]) expect(JSON.stringify(parsed)).toContain(text);
 }, 30000);
+
+it("creates a standalone progress PDF with class metadata and signing roles", async () => {
+  const document = normalizeReport({ title: "THEO DÕI TIẾN ĐỘ HỌC TẬP", template: "class-progress",
+    sections: [{ title: "CNTT 2026.1.1", academicYear: "2026", metadata: [["Lớp", "CNTT 2026.1.1"], ["Khóa", "2026"]],
+      headers: ["STT", "Học Phần", "Mã số", "Số tín chỉ", "Tiến độ", "Ghi chú"],
+      rows: [[1, "Triết học", "HPTH", 3, "Chưa tổ chức", ""]], summary: "Số học phần hoàn thành: 0/1" }] });
+  const pdf = await bytesOf(await createReportPdf(document));
+  expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+  const pages = await readTranscriptPdf(pdf);
+  expect(pages).toHaveLength(1);
+  for (const text of ["CNTT 2026.1.1", "Triết học", "CHUYÊN VIÊN"]) expect(JSON.stringify(pages)).toContain(text);
+}, 30000);
+
+it("keeps matrix code, credits and learner counts narrow across Word, Excel and PDF", async () => {
+  const document = normalizeReport({ title: "Ma trận lớp học phần", sections: [{ title: "Danh sách lớp học phần",
+    headers: ["STT", "Mã HP", "Học phần", "TC", "Lớp học phần", "Lớp/nhóm", "Khóa", "Số HV", "Tình trạng xếp lịch", "Số buổi đã học"],
+    rows: [[1, "CNTT14", "Siêu dữ liệu nâng cao", 2, "Lớp Siêu dữ liệu nâng cao - CNTT 2026.1.1", "CNTT 2026.1.1", "2026", 18, "Đã xếp lịch", 1]] }] });
+  const section = document.sections[0];
+  const widths = reportColumnWidths(section, 774);
+  for (const index of [1, 3, 7]) expect(widths[index]).toBeLessThan(widths[2] / 2);
+  expect(widths[3]).toBeLessThan(widths[1]);
+  const definition = reportPdfDefinition(document);
+  const table = definition.content.find(node => node.table).table;
+  expect(table.widths[1]).toBe(widths[1]);
+  expect(table.widths[3]).toBe(widths[3]);
+  expect(table.widths[7]).toBe(widths[7]);
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.load(await bytesOf(await createReportExcel(document)));
+  const sheet = book.worksheets[0], dataCells = logicalCells(sheet.lastRow);
+  for (const col of [1, 3, 7]) expect(cellWidth(sheet, dataCells[col])).toBeLessThan(cellWidth(sheet, dataCells[2]));
+  const zip = await JSZip.loadAsync(await bytesOf(await createReportWord(document)));
+  const xml = await zip.file("word/document.xml").async("string");
+  const dataTable = xml.match(/<w:tbl>.*?<\/w:tbl>/g)[1];
+  const wordWidths = [...dataTable.matchAll(/<w:gridCol w:w="(\d+)"/g)].map(match => Number(match[1]));
+  for (const index of [1, 3, 7]) expect(wordWidths[index]).toBeLessThan(wordWidths[2] / 2);
+});
 
 it("collects all filtered pages and rejects incomplete or changed lists", async () => {
   const requested = [];
@@ -138,7 +204,7 @@ it("keeps all admission-score columns within a fixed landscape Word table", asyn
   const tables = xml.match(/<w:tbl>.*?<\/w:tbl>/g);
   const gridWidths = [...tables[1].matchAll(/<w:gridCol w:w="(\d+)"/g)].map(match => Number(match[1]));
   expect(gridWidths).toHaveLength(headers.length);
-  expect(gridWidths.reduce((sum, value) => sum + value, 0)).toBeLessThanOrEqual(15398);
+  expect(gridWidths.reduce((sum, value) => sum + value, 0)).toBe(pointsToTwips(reportPageWidth(true)));
   for (const header of headers) expect(xml).toContain(header);
   expect(xml).toContain("mau-hs26-2410-111@example.com");
 });
