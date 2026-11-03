@@ -87,7 +87,13 @@ const Login = () => {
     event.preventDefault();
     if (submitting) return;
 
-    if (!values.email || !values.password) {
+    // Autofill/password managers may update the inputs without firing React's onChange.
+    const formData = new FormData(event.currentTarget);
+    const credentials = {
+      email: String(formData.get("email") || "").trim(),
+      password: String(formData.get("password") || ""),
+    };
+    if (!credentials.email || !credentials.password) {
       setStatusState({
         message: "Vui lòng nhập đầy đủ email công vụ và mật khẩu quản trị.",
         code: "400_BAD_INPUT",
@@ -104,7 +110,7 @@ const Login = () => {
     });
 
     try {
-      await axios.post("/user/login", values, { withCredentials: true });
+      await axios.post("/user/login", credentials, { withCredentials: true });
       setStatusState({
         message: "Xác thực thành công. Đang chuyển hướng vào Viện SĐH Portal...",
         code: "200_OK",
