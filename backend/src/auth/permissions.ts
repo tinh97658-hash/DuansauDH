@@ -89,6 +89,7 @@ export const PERMISSIONS: PermissionDefinition[] = [
 
   // ===== Báo cáo & thống kê =====
   { code: "reports.view", group: "Báo cáo & thống kê", name: "Xem báo cáo", description: "Xem báo cáo, bảng tổng hợp và bảng điểm cá nhân trong phạm vi dữ liệu được phép." },
+  { code: "reports.payments.manage", group: "Báo cáo & thống kê", name: "Cập nhật thanh toán giảng viên", description: "Đánh dấu hoặc bỏ đánh dấu thanh toán cho từng giảng viên và lớp học phần." },
   { code: "reports.export", group: "Báo cáo & thống kê", name: "Phát hành, xuất báo cáo", description: "Phát hành bảng điểm hoặc xuất báo cáo. Cấp thêm quyền xem báo cáo để sử dụng giao diện; xuất dữ liệu vẫn tuân theo giới hạn nhóm." },
 
   // ===== Hướng dẫn & phản biện =====

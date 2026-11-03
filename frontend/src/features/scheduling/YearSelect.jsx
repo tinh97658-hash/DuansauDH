@@ -15,8 +15,7 @@ export default function YearSelect({ label, value, years, onChange, placeholder 
     sx={{ "& .MuiSelect-select": { display: "flex", alignItems: "center", boxSizing: "border-box", height: "100%", minHeight: 0, padding: 0, background: "transparent" },
       "&.Mui-focused": { borderColor: "var(--primary)", boxShadow: "0 0 0 1px var(--primary)" } }}
     MenuProps={{ anchorEl: () => root.current, anchorOrigin: {vertical: "bottom", horizontal: "left"}, transformOrigin: {vertical: "top", horizontal: "left"},
-      PaperProps: { style: { width: menuWidth, minWidth: menuWidth, maxWidth: menuWidth }, sx: { borderRadius: 0, border: "1px solid #b9cad8",
-      "& .MuiMenuItem-root.Mui-selected, & .MuiMenuItem-root.Mui-selected:hover, & .MuiMenuItem-root.Mui-selected.Mui-focusVisible, & .MuiMenuItem-root:hover, & .MuiMenuItem-root.Mui-focusVisible": { bgcolor: "#777777", color: "#ffffff" } } } }}>
+      PaperProps: { style: { width: menuWidth, minWidth: menuWidth, maxWidth: menuWidth }, sx: { borderRadius: 0, border: "1px solid var(--dropdown-border, #b9cad8)" } } }}>
     <MenuItem value="">{placeholder}</MenuItem>
     {years.map(year => <MenuItem key={year} value={year}>{year}</MenuItem>)}
   </Select>;

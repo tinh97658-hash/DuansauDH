@@ -156,6 +156,7 @@ export const ribbons = {
   ],
   reports: [
     group("BÁO CÁO CHUNG", [
+      action("Thanh toán giảng viên", "/reports/lecturer-payments", TableChartOutlined, "#168b7c", { permissions: ["reports.view"] }),
       action("Danh sách lớp", "/reports/class-lists", GroupsOutlined, "#168bc2", { permissions: ["reports.view"] }),
       action("Bảng điểm môn học", "/reports/course-scores", TableChartOutlined, "#c0792a", { permissions: ["reports.view"] }),
       action("Báo cáo gửi Bộ", "/reports/ministerial-report", SendOutlined, "#7b5fac", { permissions: ["reports.view"] }),

@@ -1,0 +1,35 @@
+/* Shared rules include portal menus, which sit outside #root and page containers. */
+body :is(.MuiMenu-paper, .MuiAutocomplete-paper, .document-export-options, .tp-year-menu, .sl-combo-list, .sl-lecturer-popover) {
+  background:#fff; color:var(--text-primary); box-sizing:border-box; overflow-x:hidden;
+  border:1px solid var(--dropdown-border); border-radius:var(--control-radius);
+}
+body :is(.MuiMenu-list, .MuiAutocomplete-listbox) { box-sizing:border-box; max-width:100%; padding:4px 0; }
+body .MuiMenu-list { width:100% !important; }
+body :is(.MuiMenuItem-root, [role="listbox"] [role="option"], .document-export-options [role="menuitem"], .tp-year-option) {
+  min-width:0; min-height:34px; padding:8px 12px; white-space:normal; overflow-wrap:anywhere;
+  background-color:#fff; color:var(--text-primary); font-family:var(--app-font-family); font-size:12.5px;
+}
+body :is(.MuiMenuItem-root, [role="listbox"] [role="option"], .document-export-options [role="menuitem"], .tp-year-option):not(:disabled):not([aria-disabled="true"]):not(.Mui-disabled):not(.disabled):is(:hover, :focus-visible, .Mui-focusVisible, .Mui-focused, :focus-within) {
+  background-color:var(--dropdown-hover-bg) !important; color:var(--text-primary) !important;
+}
+body :is(.MuiMenuItem-root, [role="listbox"] [role="option"], .tp-year-option):not(:disabled):not([aria-disabled="true"]):not(.Mui-disabled):not(.disabled):is(.Mui-selected, [aria-selected="true"], :has(input:checked)) {
+  background-color:var(--dropdown-selected-bg) !important; color:var(--primary-dark) !important; font-weight:600;
+}
+body :is(.MuiMenuItem-root, [role="option"], .tp-year-option):is(.Mui-disabled, [aria-disabled="true"], .disabled) {
+  background-color:#fff !important; color:var(--text-muted) !important; cursor:not-allowed;
+}
+body :is(.MuiMenuItem-root, [role="option"]):is(:hover, .Mui-selected, [aria-selected="true"], .Mui-focused, .Mui-focusVisible) :is(small, .MuiListItemText-primary, .MuiListItemText-secondary) { color:inherit !important; }
+body :is(#root, .MuiDialog-root, .app-popup) :is(select[data-app-select], .sl-combo>input, .sl-lecturer-trigger, .tp-year-trigger):not(:disabled),
+body :is(#root, .MuiDialog-root, .app-popup) .MuiInputBase-root:has(.MuiSelect-select):not(.Mui-disabled),
+body :is(#root, .MuiDialog-root, .app-popup) .MuiAutocomplete-root .MuiOutlinedInput-root:not(.Mui-disabled) { background-color:#fff; color:var(--text-primary); }
+body :is(#root, .MuiDialog-root, .app-popup) :is(select[data-app-select], .sl-combo>input, .sl-lecturer-trigger, .tp-year-trigger):not(:disabled) { border-color:var(--dropdown-border); }
+body :is(#root, .MuiDialog-root, .app-popup) :is(.MuiOutlinedInput-root:has(.MuiSelect-select), .MuiAutocomplete-root .MuiOutlinedInput-root):not(.Mui-disabled) .MuiOutlinedInput-notchedOutline { border-color:var(--dropdown-border) !important; }
+body :is(#root, .MuiDialog-root, .app-popup) :is(select[data-app-select], .sl-combo>input, .sl-lecturer-trigger, .tp-year-trigger):not(:disabled):hover { border-color:#9FB5C6; }
+body :is(#root, .MuiDialog-root, .app-popup) :is(.MuiOutlinedInput-root:has(.MuiSelect-select), .MuiAutocomplete-root .MuiOutlinedInput-root):not(.Mui-disabled):hover .MuiOutlinedInput-notchedOutline { border-color:#9FB5C6 !important; }
+body :is(#root, .MuiDialog-root, .app-popup) :is(select[data-app-select], .sl-combo>input, .sl-lecturer-trigger, .tp-year-trigger):is(:focus-visible, [aria-expanded="true"]) { border-color:var(--primary); outline:none; box-shadow:none; }
+body :is(#root, .MuiDialog-root, .app-popup) :is(.MuiOutlinedInput-root:has(.MuiSelect-select), .MuiAutocomplete-root .MuiOutlinedInput-root).Mui-focused .MuiOutlinedInput-notchedOutline { border-color:var(--primary) !important; border-width:1px; }
+body :is(#root, .MuiDialog-root, .app-popup) :is(.MuiInputBase-root:has(.MuiSelect-select), .MuiAutocomplete-root .MuiOutlinedInput-root).Mui-focused { box-shadow:none; }
+body :is(#root, .MuiDialog-root, .app-popup) .MuiSelect-select:focus { background-color:transparent; }
+body .tp-year-menu { width:100%; left:0; right:auto; }
+body .sl-combo-list { width:100% !important; min-width:100% !important; max-width:100% !important; left:0 !important; right:auto !important; box-sizing:border-box; overflow-x:hidden; }
+body .sl-lecturer-popover { width:100%; max-width:100%; left:0; right:auto; }

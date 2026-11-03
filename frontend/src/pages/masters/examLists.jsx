@@ -10,6 +10,8 @@ import { Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, MenuI
 import ListAltRounded from "@mui/icons-material/ListAltRounded";
 import SaveRounded from "@mui/icons-material/SaveRounded";
 import SettingsRounded from "@mui/icons-material/SettingsRounded";
+import CalendarMonthOutlined from "@mui/icons-material/CalendarMonthOutlined";
+import HistoryRounded from "@mui/icons-material/HistoryRounded";
 import GradeSettingsDialog from "../../features/exams/GradeSettingsDialog";
 import GradebookHistoryDialog from "../../features/exams/GradebookHistoryDialog";
 import GradebookStageNotice from "../../features/exams/GradebookStageNotice";
@@ -22,7 +24,7 @@ import DocumentExportMenu from "../../components/DocumentExportMenu";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import AppDialog from "../../components/AppDialog";
 import { downloadDocumentFile } from "../../utils/documentFiles";
-import { fetchAllGradebookRows, gradebookFilename, openGradebookPreview } from "../../features/exams/gradebookExport";
+import { buildGradebookDocument, createGradebookExcel, fetchAllGradebookRows, gradebookFilename, openGradebookPreview } from "../../features/exams/gradebookExport";
 import { downloadReport } from "../../utils/reportExport";
 import { buildExamListDocument, createExamListExcel } from "../../features/exams/examListExport";
 import { API_BASE_URL } from "../../config/http";
@@ -47,7 +49,7 @@ const inputSx = {
   },
   "& input": { px: 0.75, py: 0.5, textAlign: "center" },
 };
-const modes = { all: "Cả bảng điểm", exam: "DS thi" };
+const modes = { all: "Bảng điểm", exam: "Danh sách thi" };
 const PAGE_SIZE = 15;
 const EXAM_WARNING_ID = "exam-missing-component-scores";
 const EXAM_WARNING_CONTAINER = "exam-gradebook-warnings";
@@ -338,9 +340,10 @@ export default function ExamLists() {
     }
     finally { setSaving(false); }
   };
-  const exportExamList = async (format) => {
+  const exportFile = async (format) => {
     if (!groupId || !offeringId || !total || optionsLoading || loading || saving || exporting) return;
-    if (mode !== "exam" || !examPrintReady) return;
+    const isExamList = mode === "exam";
+    if (isExamList && !examPrintReady) return;
     setExporting(true); setError("");
     let previewTab;
     try {
@@ -352,23 +355,37 @@ export default function ExamLists() {
       }
       const exported = await fetchAllGradebookRows(params => axios.get(`${API_BASE_URL}/masters/exam-lists`, { params }), {
         classGroupId: groupId, courseOfferingId: offeringId, rosterScope: "offering", mode, search,
-        includeIds, excludeIds,
+        ...(isExamList ? { includeIds, excludeIds } : {}),
       }, () => workflow.status === "draft" ? dirtyRef.current : {});
-      const document = buildExamListDocument(selectedGroup, selectedOffering, exported);
-      if (!document.rows.length) throw new Error("Không có học viên đủ tư cách và không miễn thi để in.");
-      if (format === "excel") downloadDocumentFile(await createExamListExcel(document), gradebookFilename(selectedGroup, selectedOffering, "DS-thi"));
+      const document = isExamList ? buildExamListDocument(selectedGroup, selectedOffering, exported)
+        : buildGradebookDocument(selectedGroup, selectedOffering, exported);
+      if (!document.rows.length) throw new Error(isExamList ? "Không có học viên đủ tư cách và không miễn thi để in." : "Không có dữ liệu bảng điểm để xuất.");
+      if (format === "excel") downloadDocumentFile(await (isExamList ? createExamListExcel(document) : createGradebookExcel(document)), gradebookFilename(selectedGroup, selectedOffering, isExamList ? "DS-thi" : undefined));
       else if (format === "word") await downloadReport({ title: document.title, metadata: [["Lớp", document.group], ["Học phần", document.subject]],
         sections: [{ title: document.title, headers: document.headers, rows: document.rows }] }, "word");
       else openGradebookPreview(document, previewTab);
-    } catch (failure) { previewTab?.close(); notify.error(failure.response ? errorMessage(failure, "Không thể xuất danh sách thi.") : failure.message); }
+    } catch (failure) { previewTab?.close(); notify.error(failure.response ? errorMessage(failure, isExamList ? "Không thể xuất danh sách thi." : "Không thể xuất bảng điểm.") : failure.message); }
     finally { setExporting(false); }
   };
   const blank = mode === "exam";
   const locked = !workflowEditable || !canSubmitGrades || !teachingCompleted || saving || exporting || blank;
-  const columns = gradebookColumns(blank).map(column => calculatedColumns.has(column.key) ? {
-    ...column, header: <span className="exam-calculated-label">{column.key==='eligible'?(newWorkflow&&workflow.eligibility.status==='approved'?'Tư cách đã duyệt':'Tư cách dự kiến'):column.label}</span>,
-  } : column);
+  const columnWidths = { index: 44, code: 112, lastName: 180, firstName: 90, dob: 104, gender: 72,
+    eligible: blank ? 104 : 124, exempt: 76, testScore: 96, assignmentScore: 112, examScore: 112,
+    courseScore: 100, grade4: 76, letter: 92, attempts: 152, result: 136, notes: 360 };
+  const columns = gradebookColumns(blank).map(column => {
+    const label = column.key === 'eligible'
+      ? (newWorkflow && workflow.eligibility.status === 'approved' ? (blank ? 'Đã duyệt' : 'Tư cách đã duyệt') : 'Tư cách dự kiến')
+      : column.label;
+    return { ...column, width: columnWidths[column.key],
+      minWidth: column.key === 'index' ? 40 : column.key === 'notes' ? 240 : Math.min(columnWidths[column.key], column.minWidth || 72),
+      stretch: blank ? column.key === 'notes' : column.key === 'lastName',
+      ...(calculatedColumns.has(column.key) ? { header: <span className="exam-calculated-label">{label}</span> } : {}),
+      ...(['letter', 'attempts', 'result'].includes(column.key) ? { align: 'center' } : {}),
+    };
+  });
   const busy = optionsLoading || loading;
+  const eligibilityLabel = { draft: 'Tư cách nháp', submitted: 'Chờ duyệt tư cách', approved: 'Đã duyệt' }[workflow.eligibility?.status] || 'Đang tải quy trình';
+  const needsLockNotice = newWorkflow && selectedEntry?.offering.gradebookCompletionStatus === 'needs_lock' && workflow.final.status !== 'approved';
   let workflowReminder = '';
   if (!error && !dirtyCount && teachingCompleted && totalRows > 0 && newWorkflow && loadedOffering?.id === offeringId) {
     if (componentEditable && unassessedRows === 0) workflowReminder = 'Đã nhập đủ điểm thành phần. Vui lòng gửi duyệt tư cách thi để chốt danh sách dự thi.';
@@ -450,53 +467,45 @@ export default function ExamLists() {
       </Paper>
 
       <div className="exam-workspace-controls exam-no-print">
-      {newWorkflow&&selectedEntry?.offering.gradebookCompletionStatus==='needs_lock'&&workflow.final.status!=='approved'&&<Alert severity="warning">{workflow.final.status==='submitted'?'Đã lưu đủ điểm thi hết môn. Kết quả đang chờ duyệt để khóa điểm.':'Đã lưu đủ điểm thi hết môn. Cần gửi duyệt và duyệt kết quả để khóa điểm.'}</Alert>}
-      {legacyWorkflow&&<Alert severity="info">Bảng điểm cũ được bảo toàn, chỉ xem trong quy trình mới. Cần rà soát trước khi chuyển đổi; không tự suy diễn danh sách thi hoặc ca thi đã diễn ra.</Alert>}
-      {newWorkflow&&mode==='exam'&&workflow.eligibility.status!=='approved'&&<Alert severity="info">DS thi chỉ hiển thị sau khi duyệt tư cách thi. Tư cách dự kiến chưa phải danh sách được phép xếp thi.</Alert>}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} flexWrap="wrap" className="exam-workflow-toolbar">
-      <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap" sx={{ flex: '1 1 400px', minWidth: 0, maxWidth: '100%' }}>
-        <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap" sx={{ minWidth: 0, maxWidth: '100%' }}>
-          <Chip label={legacyWorkflow?'Dữ liệu cũ — cần rà soát':({draft:'Tư cách nháp',submitted:'Tư cách chờ duyệt',approved:'DS thi đã duyệt'}[workflow.eligibility?.status]||'Đang tải quy trình')} />
-          {newWorkflow&&workflow.eligibility.status==='approved'&&<Chip label={{not_available:'Chờ ca thi diễn ra',draft:'Kết quả nháp',submitted:'Kết quả chờ duyệt',approved:'Kết quả đã duyệt'}[workflow.final.status]} />}
-        </Stack>
+      <div className="exam-main-toolbar">
+        <div className="exam-mode-switch" role="group" aria-label="Chế độ bảng điểm">
+          {Object.entries(modes).map(([key, label]) => <Button key={key} startIcon={<ListAltRounded />} disabled={saving || exporting} variant={mode === key ? "contained" : "outlined"} aria-pressed={mode === key} onClick={() => selectMode(key)}>{label}</Button>)}
+        </div>
+        <div className="exam-toolbar-status">
+          {busy ? <Typography role="status">Đang tải...</Typography> : !selectedEntry ? <Typography role="status">Chưa chọn lớp học phần</Typography> : <>
+            {legacyWorkflow ? <Typography role="status" title="Bảng điểm cũ được bảo toàn, chỉ xem trong quy trình mới. Cần rà soát trước khi chuyển đổi; không tự suy diễn danh sách thi hoặc ca thi đã diễn ra.">Dữ liệu cũ · Chỉ xem</Typography>
+              : blank ? <Typography role="status" title={newWorkflow && workflow.eligibility.status !== 'approved' ? 'Danh sách thi chỉ hiển thị sau khi duyệt tư cách thi. Tư cách dự kiến chưa phải danh sách được phép xếp thi.' : undefined}>{eligibilityLabel} · {total}/{totalRows} học viên</Typography>
+                : needsLockNotice ? <Typography role="status" className="exam-status-warning" title="Đã lưu đủ điểm thi hết môn. Cần gửi duyệt và duyệt kết quả để khóa điểm.">{workflow.final.status === 'submitted' ? 'Chờ duyệt / khóa điểm' : 'Đủ điểm thi · Cần gửi duyệt kết quả'}</Typography>
+                  : <GradebookStageNotice offering={selectedEntry?.offering} />}
+            {(!blank || legacyWorkflow) && <Typography className="exam-student-count">{total}/{totalRows} học viên</Typography>}
+            {newWorkflow && workflow.eligibility.reopenRequest && <Typography variant="caption" title={workflow.eligibility.reopenRequest.note}>Chờ duyệt mở lại tư cách</Typography>}
+          </>}
+          {dirtyCount > 0 && <Chip size="small" color="warning" variant="outlined" label={`${dirtyCount} học viên chưa lưu`} title={blank ? 'Chuyển sang Bảng điểm và cập nhật cả bảng để lưu thay đổi trước khi in danh sách thi.' : undefined} />}
+        </div>
+        <div className="exam-tool-actions">
         {newWorkflow&&canSubmitGrades&&componentEditable&&<Button disabled={busy||saving||dirtyCount>0||!teachingCompleted||!offeringId} onClick={()=>beginWorkflow('eligibility','submit')}>Gửi duyệt tư cách</Button>}
         {newWorkflow&&canApproveGrades&&workflow.eligibility.status==='submitted'&&<Button disabled={busy||saving||dirtyCount>0} onClick={()=>beginWorkflow('eligibility','approve')}>Duyệt tư cách</Button>}
         {newWorkflow&&canSubmitGrades&&!canApproveGrades&&workflow.eligibility.status==='approved'&&workflow.eligibility.canReopen&&!workflow.eligibility.reopenRequest&&workflow.final.status!=='approved'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','request_reopen')}>Xin mở lại tư cách</Button>}
         {newWorkflow&&canApproveGrades&&workflow.eligibility.canReopen&&workflow.final.status!=='approved'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','reopen')}>{workflow.eligibility.reopenRequest?'Duyệt mở lại tư cách':'Mở lại tư cách'}</Button>}
         {newWorkflow&&canApproveGrades&&workflow.eligibility.reopenRequest&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','reject_reopen')}>Từ chối mở lại tư cách</Button>}
         {newWorkflow&&workflow.eligibility.status==='approved'&&<>
-          {can('gradebook.view')&&workflow.final.status!=='approved'&&loadedOffering?.id===offeringId&&loadedOffering.examScheduling?.candidateCount>0&&(loadedOffering.examScheduling.remainingCount>0||workflow.final.status==='not_available')&&<Button component={Link} to={`/masters/exam-schedule?offeringId=${offeringId}`}>{loadedOffering.examScheduling.remainingCount>0?'Xếp lịch thi':'Xem lịch thi'}</Button>}
-          {canSubmitGrades&&workflow.final.status==='draft'&&<Button disabled={busy||saving||dirtyCount>0} onClick={()=>beginWorkflow('final','submit')}>Gửi duyệt kết quả</Button>}
-          {canApproveGrades&&workflow.final.status==='submitted'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('final','approve')}>Duyệt kết quả</Button>}
-          {canApproveGrades&&['submitted','approved'].includes(workflow.final.status)&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('final','reopen')}>Mở lại kết quả</Button>}
+          {can('gradebook.view')&&workflow.final.status!=='approved'&&loadedOffering?.id===offeringId&&loadedOffering.examScheduling?.candidateCount>0&&(loadedOffering.examScheduling.remainingCount>0||workflow.final.status==='not_available')&&<Button startIcon={<CalendarMonthOutlined />} component={Link} to={`/masters/exam-schedule?offeringId=${offeringId}`}>{loadedOffering.examScheduling.remainingCount>0?'Xếp lịch thi':'Xem lịch thi'}</Button>}
+          {!blank&&canSubmitGrades&&workflow.final.status==='draft'&&<Button disabled={busy||saving||dirtyCount>0} onClick={()=>beginWorkflow('final','submit')}>Gửi duyệt kết quả</Button>}
+          {!blank&&canApproveGrades&&workflow.final.status==='submitted'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('final','approve')}>Duyệt kết quả</Button>}
+          {!blank&&canApproveGrades&&['submitted','approved'].includes(workflow.final.status)&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('final','reopen')}>Mở lại kết quả</Button>}
         </>}
-        <Button disabled={!offeringId || saving} onClick={loadHistory}>Lịch sử điểm</Button>
-          {blank && <DocumentExportMenu disabled={!groupId || !offeringId || !total || busy || saving || exporting || !examPrintReady}
-            onWord={() => exportExamList("word")} excelLabel="Excel (.xlsx)" pdfLabel="PDF / In" onExcel={() => exportExamList("excel")} onPdf={() => exportExamList("pdf")} />}
-      </Stack>
-      <Stack className="exam-workflow-info" spacing={0.25}>
-        <GradebookStageNotice offering={selectedEntry?.offering} />
-        {newWorkflow&&workflow.eligibility.reopenRequest&&<Typography variant="caption">Đang chờ duyệt mở lại tư cách: {workflow.eligibility.reopenRequest.note}</Typography>}
-      </Stack>
-      </Stack>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} className="exam-view-toolbar">
-        <Stack direction="row" flexWrap="wrap" gap={0.5} aria-label="Chế độ bảng điểm">
-          {Object.entries(modes).map(([key, label]) => <Button key={key} startIcon={<ListAltRounded />} disabled={saving || exporting} variant={mode === key ? "contained" : "outlined"} aria-pressed={mode === key} onClick={() => selectMode(key)} sx={{ boxShadow: "none", ...(mode === key ? { bgcolor: "#173E75" } : { bgcolor: "#fff" }) }}>{label}</Button>)}
-        </Stack>
-        <Stack direction="row" flexWrap="wrap" gap={0.75} alignItems="center">
-          <Button variant="contained" startIcon={<SaveRounded />} disabled={!workflowEditable || !canSubmitGrades || !teachingCompleted || !dirtyCount || saving || exporting || busy} onClick={save} sx={{ bgcolor: "#0788B8", boxShadow: "none" }}>{saving ? "Đang lưu..." : "Cập nhật cả bảng"}</Button>
+        {!blank && <Button startIcon={<HistoryRounded />} disabled={!offeringId || saving} onClick={loadHistory}>Lịch sử điểm</Button>}
+          <DocumentExportMenu disabled={!groupId || !offeringId || !total || busy || saving || exporting || (blank && !examPrintReady)}
+            onWord={() => exportFile("word")} excelLabel="Excel (.xlsx)" pdfLabel="PDF / In" onExcel={() => exportFile("excel")} onPdf={() => exportFile("pdf")} />
+          {!blank && <Button startIcon={<SaveRounded />} disabled={!workflowEditable || !canSubmitGrades || !teachingCompleted || !dirtyCount || saving || exporting || busy} onClick={save}>{saving ? "Đang lưu..." : "Cập nhật cả bảng"}</Button>}
           <Tooltip title="Cài đặt điểm số">
             <span><IconButton aria-label="Cài đặt điểm số" disabled={optionsLoading} onClick={() => setSettingsOpen(true)} size="small"
               sx={{ color: "#173E75", width: 34, height: 34, "&:hover": { bgcolor: "#EDF4FA" } }}><SettingsRounded fontSize="small" /></IconButton></span>
           </Tooltip>
-          <Chip size="small" label={`${total} / ${totalRows} học viên`} sx={{ bgcolor: "#EDF4FA", color: "#173E75" }} />{dirtyCount > 0 && <Chip size="small" color="warning" variant="outlined" label={`${dirtyCount} học viên chưa lưu`} />}
-        </Stack>
-      </Stack>
+        </div>
+      </div>
       </div>
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
-      {blank && !busy && !examPrintReady && dirtyCount > 0 && <Alert severity="info" sx={{ mb: 1.5 }} className="exam-no-print">
-        Cập nhật cả bảng để lưu tư cách trước khi in danh sách thi.
-      </Alert>}
       <Paper variant="outlined" sx={{ ...panelSx, overflow: "hidden" }}>
         {busy ? <Box sx={{ py: 4, textAlign: "center" }}><CircularProgress size={30} aria-label="Đang tải bảng điểm" /></Box> : !groupId || !offeringId ? <Box className="exam-empty-scope" role="status">
           <Typography component="h1">Chưa chọn lớp học phần</Typography>
@@ -507,10 +516,10 @@ export default function ExamLists() {
               const name = personNameParts(row);
               const rowLocked = locked || !!row.profileForeignLanguageExempt || !!row.studyLeaveFailure;
               return <TableRow key={row.participantId} hover sx={{ "& td": { fontSize: 12.5, py: 0.75, borderColor: "#E2EBF2" }, ...(dirty[row.participantId] ? { bgcolor: "#FFFDF5" } : {}) }}>
-                <TableCell align="center">{pageStart + index + 1}</TableCell><TableCell sx={{ fontWeight: 600 }}>{row.code || "—"}
+                <TableCell align="center">{pageStart + index + 1}</TableCell><TableCell sx={{ fontWeight: 500 }}>{row.code || "—"}
                   {["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn"].includes(row.studyStatus) && <Typography component="span" variant="caption" display="block" sx={{ color: "#B86216", fontWeight: 500, fontSize: 11, whiteSpace: "nowrap" }}>{row.studyStatus}</Typography>}
                 </TableCell>
-                <TableCell title={name.familyAndMiddle}>{name.familyAndMiddle}</TableCell><TableCell>{name.givenName}</TableCell>
+                <TableCell title={name.familyAndMiddle}>{name.familyAndMiddle}</TableCell><TableCell title={name.givenName}>{name.givenName}</TableCell>
                 <TableCell align="center">{displayGradeDate(row.dob)}</TableCell><TableCell align="center">{row.gender || "—"}</TableCell>
                 <TableCell align="center" className="exam-derived-cell"><Checkbox size="small" disabled checked={row.eligible === true} inputProps={{ "aria-label": `Tư cách thi ${row.code}` }} sx={{ "&.Mui-checked.Mui-disabled": { color: "#0788B8" } }} />
                   {row.eligible !== true && <Typography variant="caption" component="div">{row.examExempt ? "Miễn thi" : row.eligible === false ? "Không đủ tư cách" : "Chưa đủ điểm"}</Typography>}

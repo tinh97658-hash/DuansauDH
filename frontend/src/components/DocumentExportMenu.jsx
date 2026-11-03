@@ -1,11 +1,13 @@
 import React, { useContext, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { ReportExportContext } from "./ReportExportContext";
 import { createPortal } from "react-dom";
+import PrintOutlined from "@mui/icons-material/PrintOutlined";
 import { ReactComponent as WordFileIcon } from "../assets/icons/filetype-docx.svg";
 import { ReactComponent as ExcelFileIcon } from "../assets/icons/filetype-xlsx.svg";
 import { ReactComponent as PdfFileIcon } from "../assets/icons/filetype-pdf.svg";
 import "./documentExportMenu.css";
 import { notify } from "../utils/notify";
+import { dropdownMenuGeometry } from "../utils/dropdownGeometry";
 
 export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, showFileIcons = true, disabled = false, className = "", label = "Xuất file", excelLabel = "Xuất Excel", pdfLabel = "Xuất PDF" }) {
   const reportExport = useContext(ReportExportContext);
@@ -27,12 +29,8 @@ export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, sh
 
   useLayoutEffect(() => {
     if (!open || !menu.current) return;
-    const anchor = trigger.current.getBoundingClientRect();
-    const height = menu.current.offsetHeight;
-    setPosition({
-      top: anchor.bottom + height + 4 <= window.innerHeight ? anchor.bottom + 4 : Math.max(4, anchor.top - height - 4),
-      left: Math.max(4, Math.min(anchor.right - menu.current.offsetWidth, window.innerWidth - menu.current.offsetWidth - 4)),
-    });
+    const geometry = dropdownMenuGeometry(trigger.current);
+    if (geometry) setPosition(geometry);
   }, [open]);
 
   useEffect(() => {
@@ -78,6 +76,7 @@ export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, sh
     <button ref={trigger} type="button" className={`document-export-trigger ${className}`} aria-label={label}
       aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined}
       aria-busy={busy} disabled={disabled || busy} onClick={() => setOpen(!open)}>
+      <PrintOutlined className="document-export-print-icon" aria-hidden="true" />
       {busy ? "Đang xuất…" : label} <span aria-hidden="true">▼</span>
     </button>
     {open && !disabled && createPortal(<div ref={menu} id={menuId} role="menu" aria-label={label} className="document-export-options" style={position}>

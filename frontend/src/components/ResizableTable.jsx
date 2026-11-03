@@ -16,8 +16,9 @@ export default function ResizableTable({ columns, storageKey, children, freezeTh
   const baseWidthOf = (column) => Math.max(column.minWidth || 60, Math.min(1000,
     Number.isFinite(widths[column.key]) ? widths[column.key] : column.width || column.minWidth || 120));
   const baseWidth = columns.reduce((sum, column) => sum + baseWidthOf(column), 0);
-  const flexibleColumns = columns.filter(column => !Number.isFinite(widths[column.key]));
-  const stretchKeys = new Set((flexibleColumns.length ? flexibleColumns : columns).map(column => column.key));
+  const stretchableColumns = columns.filter(column => column.stretch !== false);
+  const flexibleColumns = stretchableColumns.filter(column => !Number.isFinite(widths[column.key]));
+  const stretchKeys = new Set((flexibleColumns.length ? flexibleColumns : stretchableColumns).map(column => column.key));
   const extraWidth = Math.max(0, availableWidth - baseWidth) / (stretchKeys.size || 1);
   const widthOf = column => baseWidthOf(column) + (stretchKeys.has(column.key) ? extraWidth : 0);
   const setWidth = (column, width) => setWidths((previous) => ({

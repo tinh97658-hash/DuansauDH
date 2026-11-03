@@ -1,4 +1,6 @@
 import { createTheme } from "@mui/material/styles";
+import { dropdownMenuStyles } from "./utils/dropdownGeometry";
+import DropdownPopper from "./components/DropdownPopper";
 
 export const APP_FONT_FAMILY = '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif';
 export const TABLE_BORDER_COLOR = "#687C8E";
@@ -235,11 +237,24 @@ export const theme = createTheme({
     },
     MuiSelect: {
       styleOverrides: {
+        icon: { color: '#526576' },
         select: {
           paddingTop: 6,
           paddingBottom: 6,
           fontSize: 13,
+          '&:focus': { backgroundColor: 'transparent' },
         },
+      },
+    },
+    MuiMenu: {
+      styleOverrides: {
+        root: ({ ownerState }) => ({ '& .MuiMenu-paper': dropdownMenuStyles(ownerState?.anchorEl) }),
+        paper: {
+          border: '1px solid var(--dropdown-border, #B9CBD8)', borderRadius: 0,
+          backgroundColor: '#fff', color: '#102333', overflowX: 'hidden',
+          maxHeight: 'min(360px, calc(100dvh - 32px))',
+        },
+        list: { paddingTop: 4, paddingBottom: 4, boxSizing: 'border-box' },
       },
     },
     MuiInputLabel: {
@@ -267,19 +282,28 @@ export const theme = createTheme({
           color: "#102333",
           fontSize: "12.5px",
           fontFamily: "inherit",
-          "&:hover, &.Mui-focusVisible, &.Mui-selected, &.Mui-selected:hover, &.Mui-selected.Mui-focusVisible": {
-            backgroundColor: "var(--dropdown-highlight-bg, #777777)",
-            color: "var(--dropdown-highlight-text, #ffffff)",
+          whiteSpace: 'normal', overflowWrap: 'anywhere', minHeight: 34, padding: '8px 12px',
+          "&:hover, &.Mui-focusVisible": {
+            backgroundColor: "var(--dropdown-hover-bg, #EAF2F8)", color: "#102333",
+          },
+          "&.Mui-selected, &.Mui-selected:hover, &.Mui-selected.Mui-focusVisible": {
+            backgroundColor: "var(--dropdown-selected-bg, #DCE7F1)", color: "#004D6B", fontWeight: 600,
           },
         },
       },
     },
     MuiAutocomplete: {
+      defaultProps: { PopperComponent: DropdownPopper },
       styleOverrides: {
+        paper: { maxHeight: 'var(--app-dropdown-max-height, 360px)', overflowY: 'auto' },
+        listbox: { maxHeight: 'var(--app-dropdown-max-height, 360px)' },
         option: {
-          "&.Mui-focused, &.Mui-focusVisible, &[aria-selected='true'], &[aria-selected='true'].Mui-focused": {
-            backgroundColor: "var(--dropdown-highlight-bg, #777777)",
-            color: "var(--dropdown-highlight-text, #ffffff)",
+          whiteSpace: 'normal', overflowWrap: 'anywhere', minHeight: 34, padding: '8px 12px',
+          "&.Mui-focused, &.Mui-focusVisible": {
+            backgroundColor: "var(--dropdown-hover-bg, #EAF2F8)", color: "#102333",
+          },
+          "&[aria-selected='true'], &[aria-selected='true'].Mui-focused": {
+            backgroundColor: "var(--dropdown-selected-bg, #DCE7F1)", color: "#004D6B", fontWeight: 600,
           },
         },
       },

@@ -23,7 +23,7 @@ export default function AppSelect({ children, onMouseDown, onKeyDown, onPointerD
     setOpen(false);
   };
   return <>
-    <select {...props} ref={control} aria-haspopup="listbox" aria-expanded={open && !props.disabled}
+    <select {...props} data-app-select="true" ref={control} aria-haspopup="listbox" aria-expanded={open && !props.disabled}
       aria-controls={open ? menuId : undefined}
       onMouseDown={event => {
         onMouseDown?.(event);
@@ -40,7 +40,9 @@ export default function AppSelect({ children, onMouseDown, onKeyDown, onPointerD
     {open && !props.disabled && <Menu open anchorEl={control.current} onClose={() => setOpen(false)}
       anchorOrigin={{ vertical: "bottom", horizontal: "left" }} transformOrigin={{ vertical: "top", horizontal: "left" }}
       MenuListProps={{ id: menuId, role: "listbox", "aria-label": props["aria-label"] || control.current?.labels?.[0]?.textContent }}
-      PaperProps={{ style: { minWidth: control.current?.getBoundingClientRect().width }, sx: { borderRadius: 0 } }}>
+      PaperProps={{ style: { width: control.current?.getBoundingClientRect().width,
+        minWidth: control.current?.getBoundingClientRect().width, maxWidth: control.current?.getBoundingClientRect().width,
+        boxSizing: 'border-box' }, sx: { borderRadius: 0 } }}>
       {optionsOf(children).map((option, index) => {
         const value = option.props.value ?? option.props.children;
         const selected = String(value) === String(control.current?.value ?? props.value ?? props.defaultValue ?? "");

@@ -99,6 +99,7 @@ const DoctoralGraduationDocs = lazyPage(() => import("./pages/doctoral/graduatio
 // ===== BÁO CÁO =====
 const ClassLists = lazyPage(() => import("./pages/reports/classLists"), ["/reports/class-lists"]);
 const CourseScores = lazyPage(() => import("./pages/reports/courseScores"), ["/reports/course-scores"]);
+const LecturerPayments = lazyPage(() => import("./pages/reports/lecturerPayments"), ["/reports/lecturer-payments"]);
 const ClassScoreSummary = lazyPage(() => import("./pages/reports/classScoreSummary"), ["/reports/class-score-summary"]);
 const LearnerTranscriptPreview = lazyPage(() => import("./features/learners/LearnerTranscriptPreview"), ["/reports/learner-transcript/preview"]);
 const ReportPreview = lazyPage(() => import("./components/ReportPreview"), ["/reports/export-preview"]);
@@ -203,6 +204,7 @@ const router = createBrowserRouter(createRoutesFromElements(
               {/* BÁO CÁO */}
               <Route path="reports/class-lists" element={<ClassLists />} />
               <Route path="reports/course-scores" element={<CourseScores />} />
+              <Route path="reports/lecturer-payments" element={<LecturerPayments />} />
               <Route path="reports/class-score-summary" element={<ClassScoreSummary />} />
               <Route path="reports/learner-transcript/preview" element={<LearnerTranscriptPreview />} />
               <Route path="reports/export-preview" element={<ReportPreview />} />

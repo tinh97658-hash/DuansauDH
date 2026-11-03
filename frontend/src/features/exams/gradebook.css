@@ -1,10 +1,27 @@
 .exam-gradebook { width: 100%; min-width: 0; }
-.exam-workspace-controls{margin-bottom:8px;border:1px solid #d7e4ee;background:#fff}
-.exam-workflow-toolbar,.exam-view-toolbar{padding:6px 10px;min-height:44px}
-.exam-workflow-toolbar{border-bottom:1px solid #e2eaf0}
-.exam-workflow-info{margin-left:auto;max-width:100%;min-width:0;text-align:right;overflow-wrap:anywhere}
-.exam-workspace-controls .MuiButton-root{min-height:30px;border-radius:0;font-size:12px;box-shadow:none}
+.exam-workspace-controls{margin-bottom:6px;border:1px solid #d7e4ee;background:#fff}
+.exam-main-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:7px 10px;min-height:46px}
+.exam-mode-switch{display:inline-flex;flex:0 0 auto}
+.exam-gradebook .exam-mode-switch .MuiButton-root{width:132px;min-height:32px;border:1px solid #b4c6d5;border-radius:0;padding:5px 10px;font-size:12px;font-weight:500;white-space:nowrap;box-shadow:none}
+.exam-gradebook .exam-mode-switch .MuiButton-root+.MuiButton-root{margin-left:-1px}
+.exam-gradebook .exam-mode-switch .MuiButton-root[aria-pressed="true"]{position:relative;z-index:1;border-color:#173e75;background:#173e75;color:#fff}
+.exam-gradebook .exam-mode-switch .MuiButton-root[aria-pressed="false"]{background:#fff;color:#173e75}
+.exam-gradebook .exam-mode-switch .MuiButton-root[aria-pressed="false"]:hover{background:#f0f6fa}
+.exam-gradebook .exam-mode-switch .MuiButton-root.Mui-disabled{opacity:.6}
+.exam-toolbar-status{display:flex;align-items:center;flex:1 1 170px;flex-wrap:wrap;gap:4px 8px;min-width:0;color:#526a82}
+.exam-toolbar-status .MuiTypography-root{margin:0;font-size:12px;line-height:1.4;overflow-wrap:anywhere}
+.exam-toolbar-status .exam-student-count{color:#607486;white-space:nowrap}
+.exam-toolbar-status .exam-status-warning{color:#946412}
+.exam-tool-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px;margin-left:auto;max-width:100%;min-width:0}
+.exam-gradebook .exam-tool-actions .MuiButton-root{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:5px 10px;border:1px solid #b4c6d5;border-radius:0;background:#fff;color:#354959;font-size:12px;font-weight:500;line-height:1.5;white-space:nowrap;box-shadow:none}
+.exam-gradebook .exam-tool-actions .MuiButton-root:hover{border-color:#86a9c1;background:#f0f6fa}
+.exam-gradebook .exam-tool-actions .MuiButton-root.Mui-disabled,.exam-gradebook .exam-tool-actions .document-export-trigger:disabled{border-color:#dce4eb;background:#f8fafc;color:#8b99a7}
+.exam-gradebook .exam-tool-actions .MuiIconButton-root{width:32px;height:32px;border:1px solid #b4c6d5;border-radius:0;background:#fff;color:#354959}
+.exam-gradebook .exam-tool-actions .MuiIconButton-root:hover{border-color:#86a9c1;background:#f0f6fa}
+.exam-gradebook .exam-tool-actions .MuiIconButton-root.Mui-disabled{border-color:#dce4eb;color:#8b99a7}
+.exam-mode-switch .MuiButton-root:focus-visible,.exam-tool-actions .MuiButton-root:focus-visible,.exam-tool-actions .MuiIconButton-root:focus-visible{outline:2px solid #173e75;outline-offset:2px}
 .exam-workspace-controls .MuiChip-root{border-radius:0;font-size:12px}
+@media(max-width:760px){.exam-toolbar-status{flex:1 1 180px}.exam-tool-actions{flex-basis:100%;justify-content:flex-start;margin-left:0}.exam-main-toolbar{gap:8px}}
 .exam-empty-scope{padding:28px 20px;color:#607486;text-align:center}
 .exam-empty-scope h1{margin:0 0 5px;color:#173e75;font-size:15px;font-weight:700}
 .exam-empty-scope p{font-size:12.5px}
@@ -14,6 +31,9 @@
 .exam-gradebook .exam-table-container { --control-radius: 0px; }
 .exam-print-sheet { display: none; }
 @media screen {
+  .exam-gradebook .exam-table-container th{white-space:normal;line-height:1.4;vertical-align:middle}
+  .exam-gradebook .exam-table-container td{vertical-align:middle}
+  .exam-gradebook .exam-table-container td:nth-child(14),.exam-gradebook .exam-table-container td:nth-child(15),.exam-gradebook .exam-table-container td:nth-child(16){text-align:center}
   body #root .exam-gradebook table > thead > tr > th:has(.exam-calculated-label) {
     background: #e2ebf3 !important;
   }

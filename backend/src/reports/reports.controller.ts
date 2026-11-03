@@ -1,4 +1,7 @@
-import { Body, Controller, Get, Post, Param, ParseUUIDPipe, Query, UseGuards } from "@nestjs/common";
+import { LecturerPaymentService } from "./lecturer-payment.service.js";
+import { LecturerPaymentQueryDto, UpdateLecturerPaymentDto } from "./dto/lecturer-payment.dto.js";
+import { SchedulingService } from "../scheduling/scheduling.service.js";
+import { Body, Controller, Get, Post, Put, Param, ParseUUIDPipe, Query, UseGuards } from "@nestjs/common";
 import { ReportsService } from "./reports.service.js";
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
 import { CurrentUser } from "../common/auth-user.js";
@@ -11,7 +14,36 @@ import { ClassScoreRosterQueryDto, ClassScoreSummaryQueryDto, LearnerScorecardQu
 @UseGuards(AuthenticatedGuard, PermissionsGuard)
 @RequirePermissions("reports.view")
 export class ReportsController {
-  constructor(private readonly reports: ReportsService, private readonly scoreSummary: ClassScoreSummaryService) {}
+  constructor(
+    private readonly reports: ReportsService,
+    private readonly scoreSummary: ClassScoreSummaryService,
+    private readonly payments: LecturerPaymentService,
+    private readonly scheduling: SchedulingService,
+  ) {}
+
+  @Get("lecturer-payments/options")
+  paymentOptions() { return this.payments.options(); }
+
+  @Get("lecturer-payments/export") @RequirePermissions("reports.view", "reports.export")
+  exportPayments(@Query() query: LecturerPaymentQueryDto) { return this.payments.list(query); }
+
+  @Get("lecturer-payments")
+  lecturerPayments(@Query() query: LecturerPaymentQueryDto) { return this.payments.list(query); }
+
+  @Put("lecturer-payments/:offeringId/:lecturerId") @RequirePermissions("reports.view", "reports.payments.manage")
+  updatePayment(@Param("offeringId", ParseUUIDPipe) offeringId: string,
+    @Param("lecturerId", ParseUUIDPipe) lecturerId: string, @Body() dto: UpdateLecturerPaymentDto,
+    @CurrentUser() actor: any) { return this.payments.update(offeringId, lecturerId, dto.paid, actor.id); }
+
+  // Use the existing detail loaders under report permissions and existing group data scope.
+  @Get("lecturer-payments/offerings/:id")
+  paymentOffering(@Param("id", ParseUUIDPipe) id: string) { return this.scheduling.getCourseOffering(id); }
+  @Get("lecturer-payments/offerings/:id/roster")
+  paymentRoster(@Param("id", ParseUUIDPipe) id: string) { return this.scheduling.getCourseOfferingRoster(id); }
+  @Get("lecturer-payments/offerings/:id/teaching-sessions")
+  paymentSessions(@Param("id", ParseUUIDPipe) id: string) { return this.scheduling.listTeachingSessionsForOffering(id); }
+  @Get("lecturer-payments/offerings/:id/unresolved-teaching-sessions")
+  paymentUnresolved(@Param("id", ParseUUIDPipe) id: string) { return this.scheduling.listUnresolvedTeachingSessions(id); }
 
   @Post("learner-scorecard/:admissionRecordId/issue") @RequirePermissions("reports.export")
   issue(@Param("admissionRecordId", ParseUUIDPipe) id: string, @Body() dto: ClassScoreRosterQueryDto, @CurrentUser() actor: any) {

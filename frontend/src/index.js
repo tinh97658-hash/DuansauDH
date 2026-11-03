@@ -4,6 +4,7 @@ import "bootstrap/dist/css/bootstrap.css";
 import "./index.css";
 import "./styles/tables.css";
 import "./styles/dialogs.css";
+import "./styles/dropdowns.css";
 import "./config/http";
 import App from "./App";
 

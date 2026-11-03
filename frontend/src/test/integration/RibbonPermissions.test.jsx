@@ -14,7 +14,7 @@ const routesByPermission = {
   "masters.view": ["bridge-course", "create-class-groups", "assign-class-groups", "english-exam", "english-scores", "english-certification", "final-defense", "graduation-docs"].map(s => "/masters/" + s),
   "scheduling.view": ["course-offerings", "schedule", "course-matrix"].map(s => "/masters/" + s),
   "gradebook.view": ["/masters/exam-lists", "/masters/exam-schedule"],
-  "reports.view": ["/reports/class-score-summary", ...["class-lists", "course-scores", "ministerial-report", "temp-score-masters", "temp-score-doctoral", "diploma-appendix-masters", "diploma-appendix-doctoral"].map(s => "/reports/" + s)],
+  "reports.view": ["/reports/lecturer-payments", "/reports/class-score-summary", ...["class-lists", "course-scores", "ministerial-report", "temp-score-masters", "temp-score-doctoral", "diploma-appendix-masters", "diploma-appendix-doctoral"].map(s => "/reports/" + s)],
   "doctoral.view": ["admission-scores", "create-class-groups", "assign-class-groups", "exam-eligibility", "exam-scores", "exam-lists", "overview-topics", "university-workshops", "faculty-defense", "closed-review", "university-defense", "graduation-docs"].map(s => "/doctoral/" + s),
 };
 const expected = new Map(Object.entries(routesByPermission).flatMap(([permission, routes]) => routes.map(route => [route, [permission]])));
@@ -56,8 +56,8 @@ describe("Ribbon read/navigation permission contracts", () => {
     expect(calendar).toHaveAttribute("aria-current", "page");
     expect(group.querySelectorAll(".ribbon-action")).toHaveLength(3);
   });
-  it("classifies all 63 actions against the independent contract", () => {
-    expect(items).toHaveLength(63);expect(expected.size).toBe(63);
+  it("classifies all 64 actions against the independent contract", () => {
+    expect(items).toHaveLength(64);expect(expected.size).toBe(64);
     for (const item of items) {
       expect(expected.has(item.route)).toBe(true);
       if (item.route === '/masters/exam-schedule') expect(item.anyPermissions).toEqual(['gradebook.view','scheduling.view']);

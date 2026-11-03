@@ -7,12 +7,12 @@ import { vietnameseDate, vietnameseDayLabel, isSessionPast } from "../../utils/s
 import { personNameParts } from "../../utils/personName";
 import OfferingDeleteButton from "./OfferingDeleteButton";
 
-export default function OfferingDetails({ offering, user, onClose, onSaved, onOpenSession, onSelect }) {
+export default function OfferingDetails({ offering, user, onClose, onSaved, onOpenSession, onSelect, readBasePath = "/scheduling/course-offerings", readOnly = false }) {
   const { can } = usePermissions();
-  const detail = useLoad(() => api.get(`/scheduling/course-offerings/${offering.id}`), [offering.id]);
-  const roster = useLoad(() => api.get(`/scheduling/course-offerings/${offering.id}/roster`), [offering.id]);
-  const sessions = useLoad(async () => rows(await api.get(`/scheduling/course-offerings/${offering.id}/teaching-sessions`)), [offering.id]);
-  const unresolved = useLoad(async () => rows(await api.get(`/scheduling/course-offerings/${offering.id}/unresolved-teaching-sessions`)), [offering.id]);
+  const detail = useLoad(() => api.get(`${readBasePath}/${offering.id}`), [offering.id, readBasePath]);
+  const roster = useLoad(() => api.get(`${readBasePath}/${offering.id}/roster`), [offering.id, readBasePath]);
+  const sessions = useLoad(async () => rows(await api.get(`${readBasePath}/${offering.id}/teaching-sessions`)), [offering.id, readBasePath]);
+  const unresolved = useLoad(async () => rows(await api.get(`${readBasePath}/${offering.id}/unresolved-teaching-sessions`)), [offering.id, readBasePath]);
   const [activeTab, setActiveTab] = useState("schedule");
   const [sessionFilter, setSessionFilter] = useState("all");
   const [notes, setNotes] = useState({});
@@ -20,8 +20,8 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
   const value = detail.data || offering;
-  const canManage = can("scheduling.write") && (value.canWriteSchedule ?? value.scopeWritable) !== false;
-  const canNotes = can("scheduling.organize") && (value.canOrganize ?? value.scopeWritable) !== false;
+  const canManage = !readOnly && can("scheduling.write") && (value.canWriteSchedule ?? value.scopeWritable) !== false;
+  const canNotes = !readOnly && can("scheduling.organize") && (value.canOrganize ?? value.scopeWritable) !== false;
   const summary = value.sessionSummary || {};
   const allSessions = sessions.data || [];
 
