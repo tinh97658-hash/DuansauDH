@@ -17,12 +17,12 @@ export async function createScoreTemplate(round, rows) {
     item.getCell(1).numFmt = "@";
     item.getCell(6).numFmt = "@";
     item.getCell(8).numFmt = "0.##";
-    item.getCell(8).fill = { type: "pattern", pattern: "solid", fgColor: { argb: row.decision === "pending" ? "FFFFF2CC" : "FFE2E8F0" } };
+    item.getCell(8).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } };
     item.getCell(8).dataValidation = { type: "decimal", operator: "between", allowBlank: true, formulae: [0, 20],
       showErrorMessage: true, errorTitle: "Điểm không hợp lệ", error: "Nhập điểm từ 0 đến 20.", showInputMessage: true, promptTitle: "Nhập tổng điểm", prompt: "Chỉ điền hoặc sửa điểm ở cột này." };
   });
-  sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
-  sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF173E75" } };
+  sheet.getRow(1).font = { bold: true, color: { argb: "FF000000" } };
+  sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } };
   sheet.autoFilter = { from: "A1", to: `K${rows.length + 1}` };
   const instructions = book.addWorksheet("Hướng dẫn");
   instructions.getColumn(1).width = 110;

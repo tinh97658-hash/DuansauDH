@@ -5,14 +5,14 @@
 .report-landscape .report-print-sheet{width:297mm;min-height:210mm}
 .report-document-heading{display:grid;grid-template-columns:1fr 1fr;gap:16px;text-align:center;font-size:10pt;font-weight:bold;margin-bottom:18px;break-inside:avoid}
 .report-underlined{text-decoration:underline;text-underline-offset:3px}
-.report-document-heading p{margin:5px 0 0;font-weight:normal;font-style:italic}
+.report-document-heading p{margin:5px 0 0;font-weight:normal;font-style:normal}
 .report-print-sheet h1{text-align:center;font-size:15pt;text-transform:uppercase;margin:12px 0}
 #root .report-print-sheet :is(h1,h2,table){font-family:"Times New Roman",serif!important;color:#000}
 .report-metadata{margin:4px 0}.report-print-section h2{font-size:11pt;margin:14px 0 6px;break-after:avoid}
 .report-print-section+.report-print-section{margin-top:14px}
-.report-print-sheet table{width:100%;max-width:100%;min-width:0;table-layout:fixed;border-collapse:collapse;border:1px solid #718292;font-size:10pt}
-.report-print-sheet :is(th,td){min-width:0;padding:5px;border:1px solid #718292;vertical-align:top;overflow-wrap:anywhere;word-break:break-word;white-space:pre-wrap;color:#000}
-.report-print-sheet th{background:#dce7f1;font-weight:bold}.report-print-sheet thead{display:table-header-group}
+.report-print-sheet table{width:100%;max-width:100%;min-width:0;table-layout:fixed;border-collapse:collapse;border:1px solid #000;font-size:10pt}
+.report-print-sheet :is(th,td){min-width:0;padding:5px;border:1px solid #000;vertical-align:top;overflow-wrap:anywhere;word-break:break-word;white-space:pre-wrap;color:#000}
+.report-print-sheet th{background:#fff;font-weight:bold}.report-print-sheet thead{display:table-header-group}
 .report-print-sheet .report-serial-cell{text-align:center;vertical-align:middle;white-space:nowrap;overflow-wrap:normal;word-break:normal;padding:4px}
 .report-print-sheet .report-year-cell{text-align:center;vertical-align:middle;padding-left:1mm;padding-right:1mm;word-break:normal;overflow-wrap:normal}
 .report-print-sheet .report-course-table{table-layout:auto}
@@ -25,4 +25,9 @@
 .report-print-sheet .report-score-table th{white-space:nowrap;overflow-wrap:normal}
 .report-print-sheet .report-score-compact{width:1%;overflow-wrap:normal}
 .report-print-sheet td.report-score-compact{white-space:nowrap}
+.report-print-sheet .report-group-table{table-layout:auto}
+.report-print-sheet .report-group-compact{width:1%;padding-left:1.5mm;padding-right:1.5mm;white-space:nowrap;overflow-wrap:normal;word-break:normal}
+.report-print-sheet .report-matrix-table{table-layout:auto}
+.report-print-sheet .report-matrix-compact{width:1%;padding-left:4px;padding-right:4px;white-space:nowrap;overflow-wrap:normal;word-break:normal;text-align:center;vertical-align:middle}
+.report-print-sheet .report-short-cell{white-space:nowrap;overflow-wrap:normal;word-break:normal;text-align:center;vertical-align:middle}
 @media print{html:has(.report-preview),body:has(.report-preview),#root:has(.report-preview){height:auto!important;max-height:none!important;overflow:visible!important}.report-preview{padding:0;background:white;min-height:0;height:auto;overflow:visible}.report-preview-actions{display:none!important}.report-print-sheet,.report-landscape .report-print-sheet{width:100%;min-height:0;max-width:none;padding:1px;margin:0;overflow:visible}.report-print-sheet tr{break-inside:avoid}.report-print-sheet thead{display:table-header-group}.report-print-sheet table{break-inside:auto}}

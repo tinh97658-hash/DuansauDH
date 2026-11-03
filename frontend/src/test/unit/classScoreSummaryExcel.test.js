@@ -74,7 +74,8 @@ it("uses a formal masthead, merged title, separate metadata and notes after the 
   expect(sheet.getCell("A73").value).toContain("Ô trống: chưa có điểm");
   expect(sheet.getCell("A74").value).toContain("MT: miễn thi");
   expect(sheet.getCell("A75").value).toContain("Điểm học phần đã lưu gần nhất");
-  expect(sheet.getCell("A75").font).toMatchObject({ name: "Times New Roman", italic: true, size: 10 });
+  expect(sheet.getCell("A75").font).toMatchObject({ name: "Times New Roman", size: 10 });
+  expect(sheet.getCell("A75").font.italic).not.toBe(true);
   expect(sheet.getCell("A75").border).toEqual({});
   expect(JSON.stringify(report)).toBe(before);
 });
@@ -89,9 +90,9 @@ it.each([15, 25])("round-trips a %i-subject report with full borders, sensible w
   for (let column = 1; column <= count + 6; column += 1) {
     expect(sheet.getColumn(column).width).toBe(widths[column - 1] || 12);
     const header = sheet.getCell(10, column);
-    expect(header.font).toMatchObject({ name: "Times New Roman", size: 10, bold: true, color: { argb: "FF173A5E" } });
+    expect(header.font).toMatchObject({ name: "Times New Roman", size: 10, bold: true, color: { argb: "FF000000" } });
     expect(header.alignment).toMatchObject({ wrapText: true, horizontal: "center", vertical: "middle" });
-    expect(header.fill.fgColor.argb).toBe("FFEAF4FB");
+    expect(header.fill.fgColor.argb).toBe("FFFFFFFF");
     for (let row = 10; row <= 70; row += 1) {
       const cell = sheet.getCell(row, column);
       expect(cell.font.name).toBe("Times New Roman");
@@ -123,11 +124,11 @@ it.each([15, 25])("round-trips a %i-subject report with full borders, sensible w
   expect(sheet.pageSetup.margins).toMatchObject({ left: 0.4, right: 0.4, top: 0.5, bottom: 0.5 });
 });
 
-it.each([3, 25])("does not extend the blue header fill past the last subject for %i subjects", async (count) => {
+it.each([3, 25])("does not extend the header fill past the last subject for %i subjects", async (count) => {
   const sheet = await loadSheet(sampleReport(count, 4));
   const lastColumn = 6 + count;
   expect(sheet.getRow(10).fill?.pattern || "none").toBe("none");
-  expect(sheet.getCell(10, lastColumn).fill.fgColor.argb).toBe("FFEAF4FB");
+  expect(sheet.getCell(10, lastColumn).fill.fgColor.argb).toBe("FFFFFFFF");
   expect(sheet.getCell(10, lastColumn).border.right.style).toBe("thin");
   for (const column of [lastColumn + 1, lastColumn + 10, 16384]) {
     expect(sheet.getCell(10, column).value).toBeNull();

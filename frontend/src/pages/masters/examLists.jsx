@@ -23,8 +23,8 @@ import ConfirmDialog from "../../components/ConfirmDialog";
 import AppDialog from "../../components/AppDialog";
 import { downloadDocumentFile } from "../../utils/documentFiles";
 import { fetchAllGradebookRows, gradebookFilename, openGradebookPreview } from "../../features/exams/gradebookExport";
-import { downloadReport } from "../../utils/reportExport";
-import { buildExamListDocument, createExamListExcel } from "../../features/exams/examListExport";
+import { buildExamListDocument, createExamListExcel, createExamListWord } from "../../features/exams/examListExport";
+import { buildSubjectSigningDocument, createSubjectSigningExcel, createSubjectSigningWord, openSubjectSigningPreview, subjectSigningFilename } from "../../features/exams/subjectSigningExport";
 import { API_BASE_URL } from "../../config/http";
 import { personNameParts } from "../../utils/personName";
 import { displayGradeDate, draftOf, formatAttemptScores, formatScore, gradebookColumns, gradebookRowValues, gradePayload, isExamCandidate, numericScore, RESULT_LABELS, rowError, SCORE_FIELDS, updateGradeDraft, visibleGradeRows } from "../../features/exams/gradebook";
@@ -357,13 +357,32 @@ export default function ExamLists() {
       const document = buildExamListDocument(selectedGroup, selectedOffering, exported);
       if (!document.rows.length) throw new Error("Không có học viên đủ tư cách và không miễn thi để in.");
       if (format === "excel") downloadDocumentFile(await createExamListExcel(document), gradebookFilename(selectedGroup, selectedOffering, "DS-thi"));
-      else if (format === "word") await downloadReport({ title: document.title, metadata: [["Lớp", document.group], ["Học phần", document.subject]],
-        sections: [{ title: document.title, headers: document.headers, rows: document.rows }] }, "word");
+      else if (format === "word") downloadDocumentFile(await createExamListWord(document), gradebookFilename(selectedGroup, selectedOffering, "DS-thi").replace(/\.xlsx$/, ".docx"));
       else openGradebookPreview(document, previewTab);
     } catch (failure) { previewTab?.close(); notify.error(failure.response ? errorMessage(failure, "Không thể xuất danh sách thi.") : failure.message); }
     finally { setExporting(false); }
   };
   const blank = mode === "exam";
+  const exportSigningSheet = async format => {
+    if (!groupId || !offeringId || !totalRows || busy || saving || exporting || dirtyCount || blank) return;
+    setExporting(true); setError("");
+    let previewTab;
+    try {
+      if (format === "pdf") {
+        previewTab = window.open("about:blank", "_blank");
+        if (!previewTab) throw new Error("Trình duyệt đã chặn tab xem trước. Vui lòng cho phép mở tab mới và thử lại.");
+        previewTab.opener = null;
+      }
+      const exported = await fetchAllGradebookRows(params => axios.get(`${API_BASE_URL}/masters/exam-lists`, { params }), {
+        classGroupId: groupId, courseOfferingId: offeringId, rosterScope: "offering", mode: "all", search: "",
+      });
+      if (!exported.length) throw new Error("Lớp học phần chưa có học viên để xuất phiếu ký.");
+      const document = buildSubjectSigningDocument(linkedGroups.length ? linkedGroups : [selectedGroup], selectedOffering, exported);
+      if (format === "pdf") openSubjectSigningPreview(document, previewTab);
+      else downloadDocumentFile(await (format === "word" ? createSubjectSigningWord(document) : createSubjectSigningExcel(document)), subjectSigningFilename(document, format));
+    } catch (failure) { previewTab?.close(); notify.error(failure.response ? errorMessage(failure, "Không thể xuất phiếu ký.") : failure.message); }
+    finally { setExporting(false); }
+  };
   const locked = !workflowEditable || !canSubmitGrades || !teachingCompleted || saving || exporting || blank;
   const columns = gradebookColumns(blank).map(column => calculatedColumns.has(column.key) ? {
     ...column, header: <span className="exam-calculated-label">{column.key==='eligible'?(newWorkflow&&workflow.eligibility.status==='approved'?'Tư cách đã duyệt':'Tư cách dự kiến'):column.label}</span>,
@@ -472,7 +491,7 @@ export default function ExamLists() {
         </>}
         <Button disabled={!offeringId || saving} onClick={loadHistory}>Lịch sử điểm</Button>
           {blank && <DocumentExportMenu disabled={!groupId || !offeringId || !total || busy || saving || exporting || !examPrintReady}
-            onWord={() => exportExamList("word")} excelLabel="Excel (.xlsx)" pdfLabel="PDF / In" onExcel={() => exportExamList("excel")} onPdf={() => exportExamList("pdf")} />}
+            onWord={() => exportExamList("word")} onExcel={() => exportExamList("excel")} onPdf={() => exportExamList("pdf")} />}
       </Stack>
       <Stack className="exam-workflow-info" spacing={0.25}>
         <GradebookStageNotice offering={selectedEntry?.offering} />
@@ -484,6 +503,10 @@ export default function ExamLists() {
           {Object.entries(modes).map(([key, label]) => <Button key={key} startIcon={<ListAltRounded />} disabled={saving || exporting} variant={mode === key ? "contained" : "outlined"} aria-pressed={mode === key} onClick={() => selectMode(key)} sx={{ boxShadow: "none", ...(mode === key ? { bgcolor: "#173E75" } : { bgcolor: "#fff" }) }}>{label}</Button>)}
         </Stack>
         <Stack direction="row" flexWrap="wrap" gap={0.75} alignItems="center">
+          {!blank && <Tooltip title={dirtyCount ? "Lưu các điểm đang chỉnh sửa trước khi xuất phiếu ký" : "Xuất theo mẫu BM.02-QT.SDH.03 cho toàn bộ lớp học phần"}><span>
+            <DocumentExportMenu label="Xuất báo cáo" disabled={!groupId || !offeringId || !totalRows || busy || saving || exporting || !!dirtyCount}
+              onWord={() => exportSigningSheet("word")} onExcel={() => exportSigningSheet("excel")} onPdf={() => exportSigningSheet("pdf")} />
+          </span></Tooltip>}
           <Button variant="contained" startIcon={<SaveRounded />} disabled={!workflowEditable || !canSubmitGrades || !teachingCompleted || !dirtyCount || saving || exporting || busy} onClick={save} sx={{ bgcolor: "#0788B8", boxShadow: "none" }}>{saving ? "Đang lưu..." : "Cập nhật cả bảng"}</Button>
           <Tooltip title="Cài đặt điểm số">
             <span><IconButton aria-label="Cài đặt điểm số" disabled={optionsLoading} onClick={() => setSettingsOpen(true)} size="small"

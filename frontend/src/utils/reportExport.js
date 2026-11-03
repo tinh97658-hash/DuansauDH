@@ -1,9 +1,12 @@
 import { BRAND } from "../config/branding";
 import { formatDate, formatDateTime } from "./dateFormat";
 import { downloadDocumentFile, sanitizeDocumentFilenamePart } from "./documentFiles";
-import { DOCUMENT_INSTITUTION, DOCUMENT_NATIONAL_HEADING, documentDateLine, addExcelDocumentHeading } from "./documentHeading";
+import { DOCUMENT_INSTITUTION, DOCUMENT_NATIONAL_HEADING, documentDateLine } from "./documentHeading";
 import { openReportPreview } from "./reportPreview";
-import { isReportSerialColumn, reportColumnWidths, reportSerialWidth, reportCompactColumn, reportCompactWidth } from "./reportTableLayout";
+import { reportColumnWidths, reportSerialWidth, reportCompactColumn, reportCompactWidth, singleTableExcelLayout } from "./reportTableLayout";
+import { classProgressPdfDefinition } from "../features/scheduling/classProgressReport";
+import { REPORT_LAYOUT as L, reportPageWidth, mmToPoints, pointsToTwips, excelRowHeight, sameDocumentTitle, createExcelForm } from "./documentLayout";
+import { measureReportPrintLayout } from "./reportPrintLayout";
 
 export function reportText(value) {
   if (value == null) return "";
@@ -29,7 +32,7 @@ export function tableReport(title, columns, rows, valueOf = (row, column) => row
 export function normalizeReport(input, now = new Date()) {
   if (!input?.title) throw new Error("Chưa có thông tin để xuất file.");
   const sections = (input.sections || []).filter(section => section.headers?.length && section.rows?.length).map(section => ({
-    title: String(section.title || input.title), headers: section.headers.map(reportText),
+    ...section, title: String(section.title || input.title), headers: section.headers.map(reportText),
     rows: section.rows.map(row => section.headers.map((_, index) => reportText(row[index]))),
   }));
   if (!sections.length) throw new Error("Không có dữ liệu phù hợp để xuất file.");
@@ -55,66 +58,78 @@ export async function collectReportPages(load, rowsOf = data => data.rows || dat
   return rows;
 }
 
-export async function createReportExcel(report) {
+export async function createReportExcel(report, { printLayout } = {}) {
+  if (report.template === "class-progress") return (await import("../features/scheduling/classProgressReport")).createClassProgressExcel(report);
   const module = await import("exceljs");
   const book = new (module.default || module).Workbook();
   book.creator = BRAND.institute;
-  for (const [index, section] of report.sections.entries()) {
-    const name = (section.title.replace(/[\\/*?:[\]]/g, " ").slice(0, 25) || "Dữ liệu") + (index ? ` ${index + 1}` : "");
-    const sheet = book.addWorksheet(name, { pageSetup: { paperSize: 9, orientation: reportOrientation(report), fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
-    const width = section.headers.length;
-    sheet.columns = section.headers.map((header, column) => ({ width: Math.min(45, Math.max(12, String(header).length + 3,
-      ...section.rows.slice(0, 100).map(row => Math.min(40, String(row[column] ?? "").length)))) }));
-    addExcelDocumentHeading(sheet, width, documentDateLine(report));
-    section.headers.forEach((label, index) => {
-      if (!reportCompactColumn(label)) return;
-      const serialColumn = sheet.getColumn(index + 1);
-      const compactWidth = isReportSerialColumn(label) ? Math.max(6, String(section.rows.length).length + 3) : Math.max(6, reportCompactWidth(section, index) / 5);
-      const spare = Math.max(0, serialColumn.width - compactWidth);
-      const others = section.headers.map((header, column) => !reportCompactColumn(header) ? column + 1 : null).filter(Boolean);
-      serialColumn.width = compactWidth;
-      others.forEach(column => { sheet.getColumn(column).width += spare / others.length; });
+  const singleTable = report.excelLayout === "single-table";
+  const printSections = singleTable ? report.sections : reportPrintSections(report);
+  // Keep successive tables in one document, including wide tables split by the
+  // print template. Independent grids preserve each table's column proportions.
+  {
+    const landscape = reportOrientation(report) === "landscape";
+    const measured = singleTable ? printSections.map(section => singleTableExcelLayout(section, L.table)) : printLayout || await measureReportPrintLayout(report, landscape);
+    const width = singleTable ? Math.max(reportPageWidth(landscape), ...measured.map(section => section.widths.reduce((sum, value) => sum + value, 0))) : reportPageWidth(landscape);
+    const layouts = printSections.map((section, index) => {
+      const columns = measured?.[index]?.widths;
+      const total = columns?.reduce((sum, value) => sum + value, 0);
+      return total > 0 ? columns.map(value => value * width / total) : reportColumnWidths(section, width);
     });
-    for (const line of [report.title, ...report.metadata.map(([label, value]) => `${label}: ${value}`), `Ngày xuất: ${report.generatedAt}`, section.title]) {
-      const row = sheet.addRow([line]);
-      if (width > 1) sheet.mergeCells(row.number, 1, row.number, width);
-      row.font = { name: "Times New Roman", size: 11, bold: row.number <= 3 };
-      row.alignment = { wrapText: true, vertical: "middle" };
-    }
-    const header = sheet.addRow(section.headers);
-    header.height = 32;
-    header.eachCell(cell => {
-      cell.font = { name: "Times New Roman", size: 11, bold: true };
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCE7F1" } };
-      cell.alignment = { wrapText: true, vertical: "middle", horizontal: "center" };
-    });
-    for (const values of section.rows) {
-      const row = sheet.addRow(values);
-      row.eachCell({ includeEmpty: true }, (cell, column) => {
-        cell.font = { name: "Times New Roman", size: 11 };
-        cell.alignment = reportCompactColumn(section.headers[column - 1]) ? { horizontal: "center", vertical: "middle", wrapText: !isReportSerialColumn(section.headers[column - 1]) } : { vertical: "top", wrapText: true };
-        cell.border = Object.fromEntries(["top", "bottom", "left", "right"].map(side => [side, { style: "thin", color: { argb: "FFB4C0CB" } }]));
+    const stops = layouts.flatMap(widths => widths.reduce((edges, value) => [...edges, edges[edges.length - 1] + value], [0]));
+    const { sheet, edges, put, finish } = createExcelForm(book, "Báo cáo", { widths: [width / 2, width / 2], stops, fontSize: L.body,
+      landscape, margins: { left: L.margin / 25.4, right: L.margin / 25.4, top: L.margin / 25.4, bottom: L.margin / 25.4, header: 0, footer: 0 } });
+    DOCUMENT_INSTITUTION.forEach((line, index) => put(index + 1, edges[0], width / 2, line, { bold: true, size: L.heading, horizontal: "center", underline: index === 1 }));
+    DOCUMENT_NATIONAL_HEADING.forEach((line, index) => put(index + 1, width / 2, width, line, { bold: true, size: L.heading, horizontal: "center", underline: index === 1 }));
+    put(3, width / 2, width, documentDateLine(report), { size: L.heading, horizontal: "center" });
+    sheet.getRow(4).height = 13.5;
+    put(5, 0, width, report.title.toUpperCase(), { bold: true, size: L.title, horizontal: "center", height: 35 });
+    let row = 6;
+    report.metadata.forEach(([label, value]) => put(row++, 0, width, { richText: [{ text: `${label}: `, font: { bold: true } }, { text: String(value) }] }));
+    const border = Object.fromEntries(["top", "bottom", "left", "right"].map(side => [side, { style: "thin", color: { argb: "FF000000" } }]));
+    let firstHeader;
+    printSections.forEach((section, index) => {
+      if (!sameDocumentTitle(section.title, report.title)) put(row++, 0, width, section.title, { bold: true, height: 25 });
+      firstHeader ??= row;
+      const widths = layouts[index], columns = widths.reduce((values, value) => [...values, values[values.length - 1] + value], [0]);
+      [section.headers, ...section.rows].forEach((values, rowIndex) => {
+        const metric = measured?.[index];
+        const height = (rowIndex === 0 ? metric?.headerHeight : metric?.rowHeights[rowIndex - 1]) || excelRowHeight(values, widths, L.table);
+        values.forEach((value, column) => {
+          const cell = put(row, columns[column], columns[column + 1], value, {
+            size: L.table, bold: rowIndex === 0, horizontal: rowIndex === 0 ? "center" : metric?.cells[column]?.align || (reportCompactColumn(section.headers[column]) ? "center" : "left"), height, exactHeight: !!metric, border,
+          });
+          if (reportCompactColumn(section.headers[column]) || rowIndex === 0) cell.alignment.vertical = "middle";
+          if (rowIndex > 0 && metric?.cells[column]) {
+            cell.alignment.vertical = metric.cells[column].vertical === "middle" ? "middle" : "top";
+            cell.alignment.wrapText = metric.cells[column].wrap;
+          }
+          if (rowIndex === 0) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } };
+          if (singleTable && rowIndex === 0) cell.alignment.wrapText = false;
+        });
+        row++;
       });
-    }
-    sheet.views = [{ state: "frozen", ySplit: header.number }];
-    sheet.autoFilter = { from: { row: header.number, column: 1 }, to: { row: header.number, column: width } };
-    sheet.pageSetup.printTitlesRow = `${header.number}:${header.number}`;
-    sheet.headerFooter.oddFooter = "&L" + BRAND.institute + "&RTrang &P / &N";
+      if (index < printSections.length - 1) sheet.getRow(row++).height = 10.5;
+    });
+    finish(row - 1, printSections.length === 1 ? firstHeader : undefined);
+    sheet.views = [{ state: "frozen", ySplit: firstHeader, showGridLines: false }];
+    return new Blob([await book.xlsx.writeBuffer()], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   }
-  return new Blob([await book.xlsx.writeBuffer()], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 }
 
-export async function createReportWord(report) {
-  const { AlignmentType, BorderStyle, Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType, PageOrientation, TableLayoutType, VerticalAlign } = await import("docx");
-  const paragraph = (text, bold = false, center = false) => new Paragraph({
-    alignment: center ? AlignmentType.CENTER : AlignmentType.LEFT, spacing: { after: 120 },
-    children: [new TextRun({ text: String(text), bold })],
+export async function createReportWord(report, { printLayout } = {}) {
+  if (report.template === "class-progress") return (await import("../features/scheduling/classProgressReport")).createClassProgressWord(report);
+  const { AlignmentType, BorderStyle, Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType, PageOrientation, TableLayoutType, VerticalAlign, HeightRule } = await import("docx");
+  const paragraph = (text, bold = false, center = false, size = L.body, after = 60) => new Paragraph({
+    alignment: center ? AlignmentType.CENTER : AlignmentType.LEFT, spacing: { after, line: Math.round(size * L.line * 20) },
+    children: [new TextRun({ text: String(text), bold, size: size * 2 })],
   });
   const sections = reportPrintSections(report);
   const landscape = reportOrientation(report) === "landscape";
-  const width = landscape ? 15398 : 10466;
+  const measured = printLayout || await measureReportPrintLayout(report, landscape);
+  const width = pointsToTwips(reportPageWidth(landscape));
   const headingLine = (text, underline = false, italic = false) => new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 30 },
-    children: [new TextRun({ text, bold: !italic, italics: italic, size: 20, underline: underline ? { type: "single" } : undefined })] });
+    children: [new TextRun({ text, bold: !italic, italics: false, size: 20, underline: underline ? { type: "single" } : undefined })] });
   const masthead = new Table({ width: { size: width, type: WidthType.DXA },
     columnWidths: [Math.floor(width / 2), Math.ceil(width / 2)],
     borders: Object.fromEntries(["top", "bottom", "left", "right", "insideHorizontal", "insideVertical"].map(side => [side, { style: BorderStyle.NIL }])),
@@ -122,25 +137,31 @@ export async function createReportWord(report) {
       new TableCell({ children: DOCUMENT_INSTITUTION.map((line, index) => headingLine(line, index === 1)) }),
       new TableCell({ children: [...DOCUMENT_NATIONAL_HEADING.map((line, index) => headingLine(line, index === 1)), headingLine(documentDateLine(report), false, true)] }),
     ] })] });
-  const content = [masthead, paragraph(report.title.toUpperCase(), true, true), ...report.metadata.map(([label, value]) => paragraph(`${label}: ${value}`)), paragraph(`Ngày xuất: ${report.generatedAt}`)];
-  for (const section of sections) {
-    content.push(paragraph(section.title, true));
-    const columnWidths = reportColumnWidths(section, width, reportSerialWidth(section) * 20);
+  const content = [masthead, paragraph(report.title.toUpperCase(), true, true, L.title, 180), ...report.metadata.map(([label, value]) => new Paragraph({
+    spacing: { after: 60, line: 297 }, children: [new TextRun({ text: `${label}: `, bold: true }), new TextRun(String(value))],
+  }))];
+  for (const [sectionIndex, section] of sections.entries()) {
+    if (!sameDocumentTitle(section.title, report.title)) content.push(paragraph(section.title, true));
+    const metric = measured?.[sectionIndex];
+    const measuredWidth = metric?.widths.reduce((sum, value) => sum + value, 0);
+    const columnWidths = measuredWidth > 0 ? metric.widths.map(value => Math.round(value * width / measuredWidth)) : reportColumnWidths(section, width, reportSerialWidth(section) * 20);
+    columnWidths[columnWidths.length - 1] += width - columnWidths.reduce((sum, value) => sum + value, 0);
     const cell = (value, column, header = false) => new TableCell({
       width: { size: columnWidths[column], type: WidthType.DXA },
-      verticalAlign: reportCompactColumn(section.headers[column]) ? VerticalAlign.CENTER : undefined,
-      margins: reportCompactColumn(section.headers[column]) ? { left: 57, right: 57 } : undefined,
-      shading: header ? { fill: "DCE7F1" } : undefined, children: [paragraph(value, header, reportCompactColumn(section.headers[column]))],
+      verticalAlign: metric?.cells[column]?.vertical === "middle" || !metric && reportCompactColumn(section.headers[column]) ? VerticalAlign.CENTER : undefined,
+      margins: metric?.cells[column]?.padding ? Object.fromEntries(Object.entries(metric.cells[column].padding).map(([side, points]) => [side, pointsToTwips(points)])) : { left: 75, right: 75, top: 75, bottom: 75 },
+      shading: header ? { fill: "FFFFFF" } : undefined, children: [paragraph(value, header, header || (metric ? metric.cells[column]?.align === "center" : reportCompactColumn(section.headers[column])), L.table, 0)],
     });
     content.push(new Table({ width: { size: width, type: WidthType.DXA }, layout: TableLayoutType.FIXED,
       columnWidths,
-      borders: Object.fromEntries(["top", "bottom", "left", "right", "insideHorizontal", "insideVertical"].map(side => [side, { style: BorderStyle.SINGLE, size: 4, color: "B4C0CB" }])),
-      rows: [new TableRow({ tableHeader: true, children: section.headers.map((value, column) => cell(value, column, true)) }),
-        ...section.rows.map(row => new TableRow({ children: row.map((value, column) => cell(value, column)) }))],
+      borders: Object.fromEntries(["top", "bottom", "left", "right", "insideHorizontal", "insideVertical"].map(side => [side, { style: BorderStyle.SINGLE, size: 4, color: "000000" }])),
+      rows: [new TableRow({ tableHeader: true, ...(metric?.headerHeight ? { height: { value: pointsToTwips(metric.headerHeight), rule: HeightRule.ATLEAST } } : {}), children: section.headers.map((value, column) => cell(value, column, true)) }),
+        ...section.rows.map((row, index) => new TableRow({ cantSplit: true, ...(metric?.rowHeights[index] ? { height: { value: pointsToTwips(metric.rowHeights[index]), rule: HeightRule.ATLEAST } } : {}), children: row.map((value, column) => cell(value, column)) }))],
     }));
   }
-  const doc = new Document({ styles: { default: { document: { run: { font: "Times New Roman", size: 21 } } } },
-    sections: [{ properties: { page: { size: { width: 11906, height: 16838, orientation: landscape ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT }, margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children: content }] });
+  const margin = pointsToTwips(mmToPoints(L.margin));
+  const doc = new Document({ styles: { default: { document: { run: { font: "Times New Roman", size: L.body * 2 } } } },
+    sections: [{ properties: { page: { size: { width: 11906, height: 16838, orientation: landscape ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT }, margin: { top: margin, bottom: margin, left: margin, right: margin } } }, children: content }] });
   return Packer.toBlob(doc);
 }
 
@@ -166,6 +187,7 @@ async function reportPdfRenderer() {
 }
 
 export function reportPdfDefinition(report) {
+  if (report.template === "class-progress") return classProgressPdfDefinition(report);
   const sections = reportPrintSections(report);
   return { pageSize: "A4", pageOrientation: reportOrientation(report),
     pageMargins: [28, 28, 28, 36], defaultStyle: { font: "ReportSerif", fontSize: 10 },
@@ -173,14 +195,14 @@ export function reportPdfDefinition(report) {
       { columns: [
         { width: "*", stack: DOCUMENT_INSTITUTION.map((text, index) => ({ text, bold: true, alignment: "center", decoration: index === 1 ? "underline" : undefined })) },
         { width: "*", stack: [...DOCUMENT_NATIONAL_HEADING.map((text, index) => ({ text, bold: true, alignment: "center", decoration: index === 1 ? "underline" : undefined })),
-          { text: documentDateLine(report), italics: true, alignment: "center", margin: [0, 4, 0, 0] }] },
+          { text: documentDateLine(report), italics: false, alignment: "center", margin: [0, 4, 0, 0] }] },
       ], columnGap: 16, margin: [0, 0, 0, 12], unbreakable: true },
       { text: report.title.toUpperCase(), bold: true, fontSize: 15, alignment: "center", margin: [0, 0, 0, 12] },
       ...report.metadata.map(([label, value]) => ({ text: `${label}: ${value}`, margin: [0, 0, 0, 4] })),
       { text: `Ngày xuất: ${report.generatedAt}`, margin: [0, 0, 0, 8] },
       ...sections.flatMap(section => [{ text: section.title, bold: true, margin: [0, 8, 0, 6] },
-        { table: { headerRows: 1, widths: section.headers.map((header, index) => reportCompactColumn(header) ? reportCompactWidth(section, index) : "*"), body: [section.headers.map(text => ({ text: String(text), bold: true, fillColor: "#DCE7F1", alignment: reportCompactColumn(text) ? "center" : "left" })),
-          ...section.rows.map(row => row.map((text, column) => ({ text: String(text), alignment: reportCompactColumn(section.headers[column]) ? "center" : "left" }))) ] }, layout: { hLineColor: () => "#B4C0CB", vLineColor: () => "#B4C0CB", hLineWidth: () => .5, vLineWidth: () => .5,
+        { table: { headerRows: 1, widths: section.headers.map((header, index) => reportCompactColumn(header) ? reportCompactWidth(section, index) : "*"), body: [section.headers.map(text => ({ text: String(text), bold: true, fillColor: "#FFFFFF", alignment: reportCompactColumn(text) ? "center" : "left" })),
+          ...section.rows.map(row => row.map((text, column) => ({ text: String(text), alignment: reportCompactColumn(section.headers[column]) ? "center" : "left" }))) ] }, layout: { hLineColor: () => "#000000", vLineColor: () => "#000000", hLineWidth: () => .5, vLineWidth: () => .5,
             paddingLeft: index => reportCompactColumn(section.headers[index]) ? 2.83 : 4, paddingRight: index => reportCompactColumn(section.headers[index]) ? 2.83 : 4 } }]),
     ], footer: (page, count) => ({ text: `Trang ${page} / ${count}`, alignment: "right", margin: [28, 8, 28, 0], fontSize: 9 }) };
 }

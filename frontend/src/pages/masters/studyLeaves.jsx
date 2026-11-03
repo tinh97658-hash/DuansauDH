@@ -36,7 +36,7 @@ export default function StudyLeaves() {
       <Tab value="leaves" id="study-leaves-tab" aria-controls="study-leaves-panel" label="Các đợt bảo lưu" />
       <Tab value="records" id="study-records-tab" aria-controls="study-records-panel" label="Hồ sơ bảo lưu" />
     </Tabs>;
-  return <FeatureLayout title="Quản lý bảo lưu" group="Đào tạo Thạc sĩ">
+  return <FeatureLayout title="Quản lý bảo lưu" group="Đào tạo Thạc sĩ" exportConfig={{ formats: ["excel"] }}>
     {viewTabs}
     <Box role="tabpanel" id={view === 'leaves' ? 'study-leaves-panel' : 'study-records-panel'} aria-labelledby={view === 'leaves' ? 'study-leaves-tab' : 'study-records-tab'}>
       {view === 'leaves' ? <StudyLeaveList /> : <StudyManagementRecords />}

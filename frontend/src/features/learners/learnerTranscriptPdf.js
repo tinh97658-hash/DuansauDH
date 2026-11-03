@@ -103,7 +103,7 @@ export function transcriptPdfDefinition(transcript) {
         { columns: [
           { width: width - L.signatureRight, text: [...text(details.gpa.label + ": ").text, ...text(details.gpa.value, "bold").text],
             margin: [0, -F.baselineShift * L.bodyFont, 0, F.baselineShift * L.bodyFont] },
-          { width: L.signatureRight, ...text(details.issueDate, "italic"), alignment: "right",
+          { width: L.signatureRight, ...text(details.issueDate), alignment: "center",
             margin: [0, P.dateOffset - P.gpaOffset - F.baselineShift * L.bodyFont, 0, F.baselineShift * L.bodyFont] },
         ], margin: [L.metadataIndent, P.gpaOffset, 0, 0] },
         blank(P.roleOffset - P.dateOffset - L.bodyLine),

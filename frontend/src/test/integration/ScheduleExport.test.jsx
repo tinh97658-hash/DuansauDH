@@ -43,6 +43,7 @@ it("exports exam data with the exam heading in PDF, Word and Excel using the sha
   expect(exam.rows).toHaveLength(1);
   expect(exam.rows[0][0]).toBe(1);
   render(<SchedulePrintTemplate schedule={exam} />);
+  expect(screen.getByRole("table")).toHaveClass("document-report-table");
   expect(screen.getByRole("heading", { name: "LỊCH THI KẾT THÚC HỌC PHẦN" })).toBeInTheDocument();
   expect(screen.getByText("08h00 sáng T2")).toBeInTheDocument();
   expect(screen.queryByText("Môn đã hủy")).not.toBeInTheDocument();
@@ -197,10 +198,10 @@ it("creates a readable XLSX without filter labels and with unchanged table value
   expect(sheet.getCell("A6").alignment.horizontal).toBe("right");
   expect(sheet.getCell("D4").border.bottom).toMatchObject({ style: "thin", color: { argb: "FF000000" } });
   expect(sheet.getCell("D5").border.bottom.style).toBe("thin");
-  expect(sheet.getCell("D4").fill.fgColor.argb).toBe("FFDCE6F1");
+  expect(sheet.getCell("D4").fill.fgColor.argb).toBe("FFFFFFFF");
   expect(sheet.getCell("D4").alignment).toMatchObject({ horizontal: "center", vertical: "middle" });
   expect(sheet.pageSetup).toMatchObject({ paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: "4:4", printArea: "A1:G12" });
-  expect(sheet.pageSetup.margins.left).toBeCloseTo(0.3);
+  expect(sheet.pageSetup.margins.left).toBeCloseTo(8 / 25.4);
   expect(sheet.model.merges.some((range) => /\b[A-Z]+[45]\b/.test(range))).toBe(false);
   expect(sheet.headerFooter.oddFooter).toContain("BM.04-QT.SĐH.03");
 });
@@ -297,7 +298,7 @@ it("handles empty schedules in preview and both document formats", async () => {
   }
 });
 
-it.each(["Xuất Word", "Xuất Excel", "Xuất PDF"])("%s uses the selected week, discipline, major and year without changing scheduling", async (format) => {
+it.each(["Xuất Excel (.xlsx)", "Xuất Word (.docx)", "Xuất PDF (.pdf)"])("%s uses the selected week, discipline, major and year without changing scheduling", async (format) => {
   const discipline = { id: "discipline", name: snapshot.discipline };
   const major = { id: "major", name: snapshot.major, disciplineId: discipline.id, discipline };
   const group = { id: "group", code: "CNTT-2026", academicYear: "2026", majorId: major.id, major };
@@ -310,7 +311,7 @@ it.each(["Xuất Word", "Xuất Excel", "Xuất PDF"])("%s uses the selected wee
         period: "MORNING", status: "planned", startTime: "08:00", endTime: "11:00",
       })) : [] }));
   const mounted = render(<MemoryRouter useTransitions={false}><Schedule user={{ canManageScheduling: false }} /></MemoryRouter>);
-  await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeEnabled());
   fireEvent.focus(screen.getByRole("combobox", { name: "Ngành" }));
   fireEvent.click(screen.getByRole("option", { name: snapshot.discipline }));
   fireEvent.focus(screen.getByRole("combobox", { name: "Chuyên ngành" }));
@@ -318,22 +319,22 @@ it.each(["Xuất Word", "Xuất Excel", "Xuất PDF"])("%s uses the selected wee
   fireEvent.mouseDown(screen.getByLabelText("Khóa / Năm"));
   fireEvent.click(screen.getByRole("option", { name: "2026" }));
   fireEvent.click(screen.getByRole("button", { name: "Tuần sau" }));
-  await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeEnabled());
   const previous = URL.createObjectURL;
   const createUrl = jest.fn(() => "blob:schedule");
   URL.createObjectURL = createUrl;
   const click = jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-  fireEvent.click(screen.getByRole("button", { name: "Xuất file" }));
+  fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
   const menu = screen.getByRole("menu");
-  expect(within(menu).getAllByRole("menuitem").map((item) => item.querySelector("span").textContent)).toEqual(["Xuất Word", "Xuất Excel", "Xuất PDF"]);
+  expect(within(menu).getAllByRole("menuitem").map((item) => item.querySelector("span").textContent)).toEqual(["Xuất Excel (.xlsx)", "Xuất Word (.docx)", "Xuất PDF (.pdf)"]);
   within(menu).getAllByRole("menuitem").forEach((item, index) => {
-    expect(item.querySelector("svg")).toHaveClass(`document-export-icon-${["word", "excel", "pdf"][index]}`);
+    expect(item.querySelector("svg")).toHaveClass(`document-export-icon-${["excel", "word", "pdf"][index]}`);
     expect(item.querySelector("svg")).toHaveAttribute("width", "20");
   });
   expect(window.open).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("menuitem", { name: format }));
   let data;
-  if (format === "Xuất PDF") {
+  if (format === "Xuất PDF (.pdf)") {
     data = readSchedulePreview(previewId());
     expect(click).not.toHaveBeenCalled();
   } else {
@@ -343,7 +344,7 @@ it.each(["Xuất Word", "Xuất Excel", "Xuất PDF"])("%s uses the selected wee
       expect(window.sessionStorage.length).toBe(0);
       const blob = createUrl.mock.calls[0][0];
       let text;
-      if (format === "Xuất Excel") {
+      if (format === "Xuất Excel (.xlsx)") {
         const book = new ExcelJS.Workbook();
         await book.xlsx.load(await bufferOf(blob));
         const sheet = book.getWorksheet("Lịch học");
@@ -358,22 +359,22 @@ it.each(["Xuất Word", "Xuất Excel", "Xuất PDF"])("%s uses the selected wee
       expect(text).toContain("Cơ sở dữ liệu");
       expect(text).not.toContain("Ngoài phạm vi");
       expect(text).not.toMatch(/Ngành:|Chuyên ngành:|Khóa \/ Năm học:/);
-      await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled());
+      await waitFor(() => expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeEnabled());
     } finally { URL.createObjectURL = previous; }
   }
   URL.createObjectURL = previous;
   const lastQuery = new URL(axios.get.mock.calls.filter(([url]) => url.includes("/teaching-sessions?" )).pop()[0], "http://localhost").searchParams;
-  if (format === "Xuất PDF") expect(data).toMatchObject({ week: lastQuery.get("from"), end: lastQuery.get("to"), discipline: snapshot.discipline, major: snapshot.major, year: "2026" });
-  if (format === "Xuất PDF") { expect(data.rows).toHaveLength(1); expect(data.rows[0][3]).toBe("Cơ sở dữ liệu"); expect(data.rows[0]).toHaveLength(8); }
+  if (format === "Xuất PDF (.pdf)") expect(data).toMatchObject({ week: lastQuery.get("from"), end: lastQuery.get("to"), discipline: snapshot.discipline, major: snapshot.major, year: "2026" });
+  if (format === "Xuất PDF (.pdf)") { expect(data.rows).toHaveLength(1); expect(data.rows[0][3]).toBe("Cơ sở dữ liệu"); expect(data.rows[0]).toHaveLength(8); }
   expect(window.print).not.toHaveBeenCalled();
   expect(axios.post).not.toHaveBeenCalled();
   expect(axios.put).not.toHaveBeenCalled();
   expect(within(screen.getByRole("table", { name: "Lịch học theo tuần" })).getAllByRole("button", { name: /Cơ sở dữ liệu/ })).toHaveLength(1);
-  if (format === "Xuất PDF") {
+  if (format === "Xuất PDF (.pdf)") {
     expect(readScheduleReturnView()).toMatchObject({ disciplineId: discipline.id, majorId: major.id, year: "2026", week: lastQuery.get("from") });
     mounted.unmount();
     render(<MemoryRouter useTransitions={false}><Schedule user={{ canManageScheduling: false }} /></MemoryRouter>);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Xuất file" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeEnabled());
     expect(screen.getByRole("combobox", { name: "Ngành" })).toHaveValue(discipline.name);
     expect(screen.getByRole("combobox", { name: "Chuyên ngành" })).toHaveValue(major.name);
     expect(screen.getByLabelText("Khóa / Năm")).toHaveTextContent("2026");

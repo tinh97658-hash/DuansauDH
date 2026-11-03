@@ -55,7 +55,7 @@ it.each([[officialTranscriptScorecardFixture, 1], [longTranscriptScorecardFixtur
     expect(renderedText(table.body[3][5])).toBe("Miễn thi");
   }
   expect(TRANSCRIPT_HEADERS).toEqual(["STT", "Học Phần", "Mã số", "Số tín chỉ", "Điểm", "Ghi chú"]);
-  expect(definition.content[8].stack[0].columns[1]).toMatchObject({ alignment: "right" });
+  expect(definition.content[8].stack[0].columns[1]).toMatchObject({ alignment: "center" });
   expect(JSON.stringify(definition.content)).not.toContain("UNDERGRAD");
   expect(definition.content[8].unbreakable).toBe(true);
   expect(renderedText(definition.content[8].stack[0].columns[0]).split(": ")[1]).toBe("—");

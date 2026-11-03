@@ -6,9 +6,11 @@ import { ReactComponent as ExcelFileIcon } from "../assets/icons/filetype-xlsx.s
 import { ReactComponent as PdfFileIcon } from "../assets/icons/filetype-pdf.svg";
 import "./documentExportMenu.css";
 import { notify } from "../utils/notify";
+import { ExportDownloadIcon, ExportChevronIcon } from "./ReportExportIcons";
 
-export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, showFileIcons = true, disabled = false, className = "", label = "Xuất file", excelLabel = "Xuất Excel", pdfLabel = "Xuất PDF" }) {
+export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, formats, showFileIcons = true, disabled = false, className = "", label = "Xuất báo cáo", excelLabel = "Xuất Excel (.xlsx)", pdfLabel = "Xuất PDF (.pdf)" }) {
   const reportExport = useContext(ReportExportContext);
+  const allowedFormats = formats || reportExport?.formats || ["word", "excel", "pdf"];
   onWord ||= reportExport ? () => reportExport.exportFormat("word") : undefined;
   onExcel ||= reportExport ? () => reportExport.exportFormat("excel") : undefined;
   onPdf ||= reportExport ? () => reportExport.exportFormat("pdf") : undefined;
@@ -20,10 +22,10 @@ export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, sh
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const menuId = useId();
   const items = [
-    ...(onWord ? [{ name: "Xuất Word", action: onWord, Icon: WordFileIcon, format: "word" }] : []),
     ...(onExcel ? [{ name: excelLabel, action: onExcel, Icon: ExcelFileIcon, format: "excel" }] : []),
+    ...(onWord ? [{ name: "Xuất Word (.docx)", action: onWord, Icon: WordFileIcon, format: "word" }] : []),
     ...(onPdf ? [{ name: pdfLabel, action: onPdf, Icon: PdfFileIcon, format: "pdf" }] : []),
-  ];
+  ].filter(item => allowedFormats.includes(item.format));
 
   useLayoutEffect(() => {
     if (!open || !menu.current) return;
@@ -78,7 +80,7 @@ export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, sh
     <button ref={trigger} type="button" className={`document-export-trigger ${className}`} aria-label={label}
       aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined}
       aria-busy={busy} disabled={disabled || busy} onClick={() => setOpen(!open)}>
-      {busy ? "Đang xuất…" : label} <span aria-hidden="true">▼</span>
+      <ExportDownloadIcon /><span>{busy ? "Đang xuất…" : label}</span><ExportChevronIcon />
     </button>
     {open && !disabled && createPortal(<div ref={menu} id={menuId} role="menu" aria-label={label} className="document-export-options" style={position}>
       {items.map(({ name, action, Icon, format }) => <button key={format} type="button" role="menuitem" onClick={() => select(action)}>

@@ -42,9 +42,8 @@ import {
 } from "../../utils/disciplineScope";
 import FeatureLayout from "../../components/FeatureLayout";
 import DocumentExportMenu from "../../components/DocumentExportMenu";
-import { downloadReport } from "../../utils/reportExport";
-import { admissionFormReport } from "../../utils/reportSnapshot";
-import AdmissionPrintTemplate from "../../features/admission/AdmissionPrintTemplate";
+import { downloadDocumentFile } from "../../utils/documentFiles";
+import { createAdmissionExcel } from "../../features/admission/admissionDocumentExport";
 import { buildAdmissionDocument } from "../../features/admission/admissionDocument";
 import AppDialog from "../../components/AppDialog";
 import PopupFormField from "../../components/PopupFormField";
@@ -52,7 +51,6 @@ import ConfirmDialog from "../../components/ConfirmDialog";
 import { getMockConfirmResult } from "../../utils/confirmHelper";
 import { useSubjectCatalogRevision } from "../../utils/subjectCatalog";
 import { notifyGradebookSaved, useGradebookRevision } from "../../utils/gradebookRevision";
-import { downloadAdmissionWord, openAdmissionPreview } from "../../features/admission/admissionDocumentExport";
 
 const DOCUMENT_ITEMS = [
   { key: "docDecision", label: "Quyết định cử đi học" },
@@ -593,10 +591,12 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
   };
 
   const documentActions = {
+    formats: ["excel"],
     disabled: loading || saving || !formData,
-    onWord: () => downloadAdmissionWord(buildAdmissionDocument(formData)),
-    onExcel: () => downloadReport(admissionFormReport(buildAdmissionDocument(formData)), "excel"),
-    onPdf: () => openAdmissionPreview(buildAdmissionDocument(formData)),
+    onExcel: async () => {
+      const document = buildAdmissionDocument(formData);
+      downloadDocumentFile(await createAdmissionExcel(document), document.filename.replace(/\.docx$/i, ".xlsx"));
+    },
     onError: (error) => toast.error(error.message || "Không thể xuất hồ sơ. Vui lòng thử lại."),
   };
 
@@ -821,7 +821,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
     <FeatureLayout
       title={record ? `Hồ sơ: ${record.fullName}` : "Chi tiết hồ sơ tuyển sinh"}
       group="Kế hoạch khóa mới"
-      desc="Chỉnh sửa toàn bộ thông tin hồ sơ tuyển sinh trực tiếp trên một trang và xuất Word hoặc PDF khổ A4."
+      desc="Chỉnh sửa toàn bộ thông tin hồ sơ tuyển sinh trực tiếp trên một trang và xuất Excel."
       maxWidth={1260}
     >
 
@@ -1990,13 +1990,6 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
       </AppDialog>
 
 
-
-      {/* ========================================================================= */}
-      {/* 3. HIDDEN PRINT CONTAINER (EXACT 210mm x 297mm A4 TEMPLATE FOR PRINT / PDF)*/}
-      {/* ========================================================================= */}
-      {formData && <div className="a4-print-only-container" style={{ display: "none" }}>
-        <AdmissionPrintTemplate document={buildAdmissionDocument(formData)} />
-      </div>}
 
       {/* ========================================================================= */}
       {/* 4. UNSAVED CHANGES CONFIRMATION DIALOG                                    */}

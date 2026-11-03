@@ -8,20 +8,20 @@
 .gradebook-document p { margin: 2mm 0; overflow-wrap: anywhere; }
 .gradebook-document table { width: calc(100% - 1px); table-layout: fixed; border-collapse: collapse; border: 1px solid black; font-size: 9pt; }
 .gradebook-document th, .gradebook-document td { border: 1px solid black; padding: 3px 2px; text-align: center; vertical-align: middle; white-space: normal; overflow-wrap: normal; word-break: normal; }
-.gradebook-document th { background: #f2f2f2; color: black; font-weight: bold; }
+.gradebook-document th { background: #fff; color: black; font-weight: bold; }
 .gradebook-document td.name { text-align: left; }
 .gradebook-document td.nowrap { white-space: nowrap; overflow-wrap: normal; }
 .gradebook-document thead { display: table-header-group; }
 .gradebook-document tr { break-inside: avoid; }
 .gradebook-document footer { break-inside: avoid; margin-top: 4mm; }
-.gradebook-document .signing-date { text-align: right; font-style: italic; }
-.gradebook-document .signature-roles { display: flex; justify-content: space-around; text-align: center; padding-top: 3mm; min-height: 24mm; }
+.gradebook-document .signing-date { width:50%;margin-left:auto;text-align:center;font-style:normal; }
+.gradebook-document .signature-roles { display:grid;grid-template-columns:1fr 1fr;text-align:center;padding-top:3mm;min-height:24mm; }
 /* Keep document typography and table borders independent of the global UI theme. */
 #root .gradebook-document, #root .gradebook-document * { font-family: "Times New Roman", serif !important; color: black !important; }
 #root .gradebook-document h1 { font-size: 16pt; font-weight: bold; }
 #root .gradebook-document table { font-size: 9pt; }
 #root .gradebook-document table :is(th, td) { border: 1px solid black !important; padding: 3px 2px !important; font-size: 9pt !important; line-height: 1.2; }
-#root .gradebook-document th { background: #f2f2f2 !important; }
+#root .gradebook-document th { background: #fff !important; }
 #root .gradebook-document td { background: white !important; }
 @media print {
   .sl-schedule-preview .exam-list-document { width: 100%; margin: 0; }

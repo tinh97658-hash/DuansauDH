@@ -30,7 +30,7 @@ const CLASS_GROUP_COLUMNS = [
   { key: "code", label: "Mã nhóm", width: 150, minWidth: 100 },
   { key: "major", label: "Ngành học", width: 220, minWidth: 150 },
   { key: "curriculum", label: "Chương trình đào tạo", width: 260, minWidth: 180 },
-  { key: "responsibleStaff", label: "Chuyên viên phụ trách", width: 220, minWidth: 180 },
+  { key: "responsibleStaff", label: "CV phụ trách", width: 220, minWidth: 180 },
   { key: "year", label: "Năm học", width: 100, minWidth: 80, align: "center" },
   { key: "students", label: "Sĩ số", width: 160, minWidth: 120 },
   { key: "status", label: "Trạng thái", width: 120, minWidth: 100, align: "center" },

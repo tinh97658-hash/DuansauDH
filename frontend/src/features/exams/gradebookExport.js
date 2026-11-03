@@ -1,7 +1,7 @@
 import { BRAND } from "../../config/branding";
 import { formatDateTime } from "../../utils/dateFormat";
 import { openDocumentPreview } from "../../utils/documentFiles";
-import { addExcelDocumentHeading } from "../../utils/documentHeading";
+import { mmToPoints, pointsToExcelWidth, excelRowHeight } from "../../utils/documentLayout";
 import { draftOf, gradebookColumns, gradebookRowValues, visibleGradeRows } from "./gradebook";
 import { gradebookDocumentColumns } from "./gradebookLayout";
 
@@ -54,7 +54,9 @@ export async function createGradebookExcel(document) {
   const lastColumn = document.headers.length;
   const columns = gradebookDocumentColumns(document);
   const font = (size = 11, bold = false) => ({ name: "Times New Roman", size, bold, color: { argb: "FF000000" } });
-  sheet.columns = columns.map(column => ({ width: column.width, style: { font: font() } }));
+  const totalWeight = columns.reduce((sum, column) => sum + column.width, 0);
+  const physicalWidths = columns.map(column => mmToPoints(281) * column.width / totalWeight);
+  sheet.columns = physicalWidths.map(width => ({ width: pointsToExcelWidth(width), style: { font: font(9) } }));
   const lineCount = (text, width, size) => String(text ?? "").split(/\r?\n/).reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / Math.max(1, width * 0.85 * 11 / size))), 0);
   const heading = (row, text, size, bold, minHeight, horizontal = "center", endColumn = lastColumn) => {
     sheet.mergeCells(row, 1, row, endColumn);
@@ -64,33 +66,47 @@ export async function createGradebookExcel(document) {
     cell.alignment = { horizontal, vertical: "middle", wrapText: true };
     sheet.getRow(row).height = Math.min(409, Math.max(minHeight, lineCount(text, columns.slice(0, endColumn).reduce((sum, column) => sum + column.width, 0), size) * (size + 3) + 6));
   };
-  addExcelDocumentHeading(sheet, lastColumn, document.signingDate);
+  heading(1, document.university, 12, true, 18, "center", 7);
+  heading(2, document.institute, 12, true, 18, "center", 7);
   heading(4, document.title, 16, true, 30);
-  heading(6, `Lớp: ${document.group}`, 11, false, 24, "left", 4);
-  heading(7, `Học phần: ${document.subject}`, 11, false, 30, "left", 4);
+  heading(6, `Lớp: ${document.group}`, 11, false, 24, "left");
+  heading(7, `Học phần: ${document.subject}`, 11, false, 30, "left");
   [5, 8].forEach(row => { sheet.getRow(row).height = 8; });
   const border = Object.fromEntries(["top", "bottom", "left", "right"].map(side => [side, { style: "thin", color: { argb: "FF000000" } }]));
   [document.headers, ...document.rows].forEach((values, index) => {
     const row = sheet.getRow(GRADEBOOK_HEADER_ROW + index);
-    row.height = index === 0 ? 60 : Math.min(409, Math.max(22, ...values.map((value, column) => columns[column].nowrap ? 22 : lineCount(value, columns[column].width, 11) * 14 + 6)));
+    row.height = excelRowHeight(values, physicalWidths, 9, 4.5, 16);
     for (let column = 1; column <= lastColumn; column++) {
       const cell = row.getCell(column);
       // Plain string values cannot become Excel formulas; drafts remain verbatim.
       cell.value = values[column - 1] ?? "";
-      cell.font = font(index === 0 ? 10 : 11, index === 0);
+      cell.font = font(9, index === 0);
       cell.alignment = { horizontal: index > 0 && [3, 4].includes(column) ? "left" : "center", vertical: "middle", wrapText: index === 0 || !columns[column - 1].nowrap,
         ...(index > 0 && columns[column - 1].nowrap ? { shrinkToFit: true } : {}) };
       cell.border = border;
-      if (index === 0) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F2F2" } };
+      if (index === 0) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } };
     }
   });
   sheet.views = [{ state: "frozen", xSplit: 4, ySplit: GRADEBOOK_HEADER_ROW, topLeftCell: `E${GRADEBOOK_HEADER_ROW + 1}`, showGridLines: false }];
   sheet.autoFilter = { from: { row: GRADEBOOK_HEADER_ROW, column: 1 }, to: { row: GRADEBOOK_HEADER_ROW + document.rows.length, column: lastColumn } };
+  const signatureRow = GRADEBOOK_HEADER_ROW + document.rows.length + 2;
+  const signature = (row, from, to, value, bold = false) => {
+    sheet.mergeCells(row, from, row, to);
+    const cell = sheet.getCell(row, from);
+    cell.value = value; cell.font = font(11, bold);
+    cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    sheet.getRow(row).height = 22;
+  };
+  const half = Math.floor(lastColumn / 2);
+  signature(signatureRow, half + 1, lastColumn, document.signingDate);
+  signature(signatureRow + 1, 1, half, "VIỆN TRƯỞNG", true);
+  signature(signatureRow + 1, half + 1, lastColumn, "PHỤ TRÁCH LỚP", true);
+  sheet.getRow(signatureRow + 2).height = 54;
   sheet.pageSetup = {
-    paperSize: 9, orientation: "landscape", scale: 100, fitToPage: false, fitToWidth: 0, fitToHeight: 0,
-    printTitlesRow: `${GRADEBOOK_HEADER_ROW}:${GRADEBOOK_HEADER_ROW}`, printTitlesColumn: "A:D",
-    printArea: `A1:${sheet.getColumn(lastColumn).letter}${GRADEBOOK_HEADER_ROW + document.rows.length}`,
-    margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.15, footer: 0.15 },
+    paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+    printTitlesRow: `${GRADEBOOK_HEADER_ROW}:${GRADEBOOK_HEADER_ROW}`,
+    printArea: `A1:${sheet.getColumn(lastColumn).letter}${signatureRow + 2}`,
+    margins: { left: 8 / 25.4, right: 8 / 25.4, top: 8 / 25.4, bottom: 8 / 25.4, header: 0, footer: 0 },
   };
   return new Blob([await book.xlsx.writeBuffer()], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 }

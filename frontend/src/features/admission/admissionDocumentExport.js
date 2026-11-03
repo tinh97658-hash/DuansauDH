@@ -1,4 +1,5 @@
 import { downloadDocumentFile, openDocumentPreview } from "../../utils/documentFiles";
+import { createExcelForm, mmToPoints } from "../../utils/documentLayout";
 
 const PREVIEW_PREFIX = "admission-preview:";
 export function openAdmissionPreview(document) {
@@ -70,23 +71,23 @@ export async function createAdmissionWord(data) {
     Array.from({ length: Math.ceil(fields.length / 2) }, (_, index) => [fields[index * 2], fields[index * 2 + 1]].map((item) => item ? [field(item)] : [paragraph("")])));
   const photo = data.photo
     ? new Paragraph({ children: [new ImageRun({ ...await photoForWord(data.photo), transformation: { width: 90, height: 120 }, altText: { name: "Ảnh 3x4", title: "Ảnh hồ sơ", description: data.fullName } })] })
-    : paragraph("Ảnh 3x4\n(Đóng dấu giáp lai)", { center: true, italic: true, size: 16 });
+    : paragraph("Ảnh 3x4\n(Đóng dấu giáp lai)", { center: true, italic: false, size: 16 });
   const content = [
     table([Math.round(width * 1.1 / 2.1), width - Math.round(width * 1.1 / 2.1)], [[
-      [...data.masthead.map((line, index) => paragraph(line, { bold: true, center: true, size: index === 1 ? 18 : 17 })), paragraph(`Số HS: ${data.displayCode}`, { center: true, italic: true, size: 16 })],
-      [...data.nationalHeading.map((line) => paragraph(line, { bold: true, center: true, size: 17 })), paragraph(data.dateLine, { center: true, italic: true, size: 16 })],
+      [...data.masthead.map((line, index) => paragraph(line, { bold: true, center: true, size: index === 1 ? 18 : 17 })), paragraph(`Số HS: ${data.displayCode}`, { center: true, italic: false, size: 16 })],
+      [...data.nationalHeading.map((line) => paragraph(line, { bold: true, center: true, size: 17 })), paragraph(data.dateLine, { center: true, italic: false, size: 16 })],
     ]]),
     paragraph(data.title, { bold: true, center: true, size: 25, before: 140, after: 40, keepNext: true }),
-    paragraph(data.subtitle, { italic: true, center: true, size: 18, after: 100, keepNext: true }),
+    paragraph(data.subtitle, { italic: false, center: true, size: 18, after: 100, keepNext: true }),
     table([1530, width - 1530], [[[photo], [heading(data.sections[0].title), fieldsTable(data.sections[0].fields, width - 1530), field(data.sections[0].extra)]]]),
     ...data.sections.slice(1).flatMap((section) => [heading(section.title), fieldsTable(section.fields), ...(section.extra ? [field(section.extra)] : [])]),
     heading(data.checklistTitle),
     table([2608, 2608, 2608, width - 7824], Array.from({ length: Math.ceil(data.documents.length / 4) }, (_, index) =>
       data.documents.slice(index * 4, index * 4 + 4).map((item) => [paragraph(`${item.checked ? "☑" : "☐"} ${item.label}`, { size: 17 })]))),
     table([3365, 3702, width - 7067], [data.signatures.map((signature) => [
-      paragraph(signature.date, { center: true, italic: true, size: 16, before: 100 }),
+      paragraph(signature.date, { center: true, italic: false, size: 16, before: 100 }),
       paragraph(signature.title, { center: true, bold: true, size: 18 }),
-      paragraph(signature.instruction, { center: true, italic: true, size: 16, after: 630 }),
+      paragraph(signature.instruction, { center: true, italic: false, size: 16, after: 630 }),
       paragraph(signature.name.toUpperCase(), { center: true, bold: true, size: 18 }),
     ])]),
   ];
@@ -99,4 +100,67 @@ export async function createAdmissionWord(data) {
 
 export async function downloadAdmissionWord(document) {
   downloadDocumentFile(await createAdmissionWord(document), document.filename);
+}
+
+export async function createAdmissionExcel(data) {
+  const module = await import("exceljs");
+  const book = new (module.default || module).Workbook();
+  const width = mmToPoints(184), photoWidth = 80;
+  const personalMid = photoWidth + (width - photoWidth) * 1.2 / 2.2;
+  const mid = width * 1.2 / 2.2, headingMid = width * 1.1 / 2.1;
+  const signatureStops = [width / 3.1, width * 2.1 / 3.1];
+  const { sheet, put, columnAt, finish } = createExcelForm(book, "Hồ sơ tuyển sinh", {
+    widths: Array(12).fill(width / 12), stops: [photoWidth, personalMid, mid, headingMid, ...signatureStops], fontSize: 9,
+    margins: { left: 13 / 25.4, right: 13 / 25.4, top: 10 / 25.4, bottom: 10 / 25.4, header: 0, footer: 0 },
+  });
+  data.masthead.forEach((line, index) => put(index + 1, 0, headingMid, line, { bold: true, horizontal: "center", size: index === 1 ? 9 : 8.5, underline: index === 1 }));
+  data.nationalHeading.forEach((line, index) => put(index + 1, headingMid, width, line, { bold: true, horizontal: "center", size: 8.5, underline: index === 1 }));
+  put(3, headingMid, width, data.dateLine, { size: 8, horizontal: "center" });
+  put(4, 0, headingMid, `Số HS: ${data.displayCode}`, { size: 8, horizontal: "center" });
+  put(5, 0, width, data.title, { bold: true, size: 12.5, horizontal: "center", height: 25 });
+  put(6, 0, width, data.subtitle, { horizontal: "center", height: 20 });
+  const fieldValue = field => ({ richText: [{ text: `${field.label} `, font: { bold: true } },
+    { text: field.uppercase ? field.value.toUpperCase() : field.value, font: { bold: !!field.bold } }] });
+  let row = 7;
+  const photoStart = row;
+  for (const [sectionIndex, section] of data.sections.entries()) {
+    const from = sectionIndex === 0 ? photoWidth : 0, split = sectionIndex === 0 ? personalMid : mid;
+    put(row++, from, width, section.title, { bold: true, size: 9.375, height: 22 });
+    for (let index = 0; index < section.fields.length; index += 2) {
+      section.fields.slice(index, index + 2).forEach((field, column) => put(row, column ? split : from, column ? width : split, fieldValue(field), { height: 16 }));
+      row++;
+    }
+    if (section.extra) put(row++, from, width, fieldValue(section.extra), { height: 18 });
+    if (sectionIndex === 0) {
+      const lastPhotoColumn = columnAt(photoWidth) - 1;
+      sheet.mergeCells(photoStart, 1, row - 1, lastPhotoColumn);
+      if (data.photo) {
+        const photo = await photoForWord(data.photo);
+        if (!["png", "jpg", "gif"].includes(photo.type)) throw new Error("Vui lòng dùng ảnh PNG hoặc JPEG để xuất hồ sơ Excel.");
+        const imageId = book.addImage({ buffer: photo.data, extension: photo.type === "jpg" ? "jpeg" : photo.type });
+        sheet.addImage(imageId, { tl: { col: 0, row: photoStart - 1 }, ext: { width: 90, height: 120 }, editAs: "oneCell" });
+      } else {
+        sheet.getCell(photoStart, 1).value = "Ảnh 3x4\n(Đóng dấu giáp lai)";
+        sheet.getCell(photoStart, 1).alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      }
+    }
+    sheet.getRow(row++).height = 12;
+  }
+  put(row++, 0, width, data.checklistTitle, { bold: true, size: 9.375, height: 22 });
+  for (let index = 0; index < data.documents.length; index += 4) {
+    data.documents.slice(index, index + 4).forEach((item, column) => put(row, width * column / 4, width * (column + 1) / 4,
+      `${item.checked ? "☑" : "☐"} ${item.label}`, { size: 8.625, height: 20 }));
+    row++;
+  }
+  sheet.getRow(row++).height = 12;
+  data.signatures.forEach((signature, index) => {
+    const from = index === 0 ? 0 : signatureStops[index - 1], to = index === 2 ? width : signatureStops[index];
+    put(row, from, to, signature.date, { size: 8.25, horizontal: "center" });
+    put(row + 1, from, to, signature.title, { size: 9, bold: true, horizontal: "center" });
+    put(row + 2, from, to, signature.instruction, { size: 7.875, horizontal: "center" });
+    if (index === 0) put(row + 4, from, to, signature.name.toUpperCase(), { size: 9, bold: true, horizontal: "center" });
+  });
+  sheet.getRow(row + 3).height = 31.5;
+  finish(row + 4);
+  return new Blob([await book.xlsx.writeBuffer()], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 }

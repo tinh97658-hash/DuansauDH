@@ -36,7 +36,7 @@ export default function PageExportBoundary({ title, config, children }) {
     return () => observer.disconnect();
   }, []);
   const disabled = provider.current?.current?.disabled || config?.disabled || (!provider.current && !config?.getReport && !hasData);
-  return <ReportExportContext.Provider value={config === false ? null : { exportFormat, registerReport, disabled,
+  return <ReportExportContext.Provider value={config === false ? null : { exportFormat, registerReport, disabled, formats: config?.formats,
     onError: failure => notify.error(failure.message || "Không thể xuất file. Vui lòng thử lại.") }}>
     <div className="page-export-boundary">
       {config !== false && config?.placement !== "inline" && !hasMenu && <div className="page-export-toolbar" data-export-exclude="true"

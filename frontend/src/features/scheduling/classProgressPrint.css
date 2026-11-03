@@ -1,0 +1,23 @@
+.class-progress-print{padding:16px;min-height:100vh;background:#e9edf1;color:#000}
+.progress-print-actions{display:flex;align-items:center;gap:16px;max-width:794px;margin:0 auto 16px;font:13px/1.5 "Segoe UI",sans-serif}
+.progress-print-actions button{padding:8px 16px;border:1px solid #17658b;background:#17658b;color:white;cursor:pointer}
+.progress-form-sheet{width:595.5pt;max-width:100%;min-height:842pt;box-sizing:border-box;margin:0 auto 16px;padding:23.75pt 28.3pt 34pt 42.5pt;background:#fff;font:12pt/14.25pt "Times New Roman",serif;color:#000}
+#root .progress-form-sheet :is(h1,table){font-family:"Times New Roman",serif!important;color:#000}
+.progress-form-number{margin:0 0 17.17pt;padding-left:4.05pt}
+.progress-form-sheet h1{margin:0 0 25.04pt;text-align:center;font-size:14pt;line-height:16.5pt;font-weight:700}
+.progress-form-fields{margin:0 0 3.73pt 4.05pt}
+.progress-form-field-row{display:grid;grid-template-columns:243.36pt minmax(0,1fr);min-height:16.56pt;break-inside:avoid}
+.progress-form-field-row>div{padding-right:5pt;overflow-wrap:break-word}
+.progress-form-sheet table{width:100%;min-width:0;max-width:100%;table-layout:fixed;border-collapse:collapse;font-size:12pt;line-height:14.25pt}
+.progress-form-sheet :is(th,td){padding:0 1.44pt;border:.75pt solid #000;white-space:normal;overflow-wrap:break-word;word-break:normal;vertical-align:top;text-align:center;color:#000}
+.progress-form-sheet th{height:16.5pt;font-weight:700;background:white;white-space:nowrap;vertical-align:middle}
+.progress-form-sheet td:nth-child(2){text-align:left}
+.progress-form-sheet tbody tr{height:14.15pt}
+.progress-form-sheet thead{display:table-header-group}
+.progress-form-sheet tr{break-inside:avoid}
+.progress-form-signoff{break-inside:avoid;padding-top:1.02pt}
+.progress-form-summary{display:grid;grid-template-columns:1fr 1fr;align-items:start;gap:0;margin-top:8pt}
+.progress-form-summary p{margin:0}
+.progress-form-date{padding-top:0;text-align:center;font-style:normal}
+.progress-form-signatures{display:grid;grid-template-columns:1fr 1fr;align-items:start;text-align:center;margin-top:8pt;font-weight:700;min-height:83pt}
+@media print{html:has(.class-progress-print),body:has(.class-progress-print),#root:has(.class-progress-print){height:auto!important;max-height:none!important;overflow:visible!important}.class-progress-print{padding:0;min-height:0;background:white}.progress-print-actions{display:none!important}.progress-form-sheet{width:auto;max-width:none;min-height:0;padding:3.75pt 0 0;margin:0;break-before:page}.progress-form-sheet:first-of-type{break-before:auto}.progress-form-signoff{padding-bottom:55.5pt}}

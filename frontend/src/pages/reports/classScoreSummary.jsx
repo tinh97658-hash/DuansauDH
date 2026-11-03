@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { notify } from "../../utils/notify";
 import axios from "axios";
 import { Link } from "react-router-dom";
-import { Alert, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Menu, MenuItem, Paper, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
+import { Alert, Button, Chip, CircularProgress, Menu, MenuItem, Paper, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
 import FeatureLayout from "../../components/FeatureLayout";
 import ListPagination from "../../components/ListPagination";
 import ResizableTable from "../../components/ResizableTable";
@@ -12,17 +12,16 @@ import { disciplinesFromMajors, majorDisciplineId, majorsForDiscipline } from ".
 import { API_BASE_URL } from "../../config/http";
 import { personNameParts } from "../../utils/personName";
 import { displayGradeDate } from "../../features/exams/gradebook";
-import { scoreSummaryColumns, scoreSummaryValue } from "./classScoreSummaryExcel";
+import { createClassScoreWorkbook, scoreSummaryColumns, scoreSummaryValue } from "./classScoreSummaryExcel";
+import { ExportDownloadIcon, ExportChevronIcon } from "../../components/ReportExportIcons";
+import { ReactComponent as ExcelFileIcon } from "../../assets/icons/filetype-xlsx.svg";
+import { ReactComponent as WordFileIcon } from "../../assets/icons/filetype-docx.svg";
+import "../../components/documentExportMenu.css";
 import LearnerTranscriptDialog from "../../features/learners/LearnerTranscriptDialog";
 import "./classScoreSummary.css";
 import { useSubjectCatalogRevision } from "../../utils/subjectCatalog";
 import { useGradebookRevision } from "../../utils/gradebookRevision";
-import { reserveReportPreview } from "../../utils/reportPreview";
 import { downloadDocumentFile, sanitizeDocumentFilenamePart } from "../../utils/documentFiles";
-import { fetchClassTranscripts, generateTranscriptDocuments } from "../../features/learners/learnerTranscriptBatch";
-import { normalizeLearnerTranscript } from "../../features/learners/learnerTranscript";
-import { openLearnerTranscriptPdfPreview } from "../../features/learners/learnerTranscriptPdfPreview";
-import { packTranscriptZip } from "../../features/learners/learnerTranscriptZip";
 
 const PAGE_SIZE = 15;
 const endpoint = `${API_BASE_URL}/reports/class-score-summary`;
@@ -50,12 +49,10 @@ export default function ClassScoreSummary() {
   const [page, setPage] = useState(1);
   const [exportAnchor, setExportAnchor] = useState(null);
   const [transcriptOpen, setTranscriptOpen] = useState(false);
-  const [classExportOpen, setClassExportOpen] = useState(false);
   const exportRequest = useRef(null);
   useEffect(() => () => {
     if (exportRequest.current) {
       exportRequest.current.active = false;
-      exportRequest.current.tab?.close();
       exportRequest.current = null;
     }
   }, [classGroupId]);
@@ -130,29 +127,18 @@ export default function ClassScoreSummary() {
     const choices = inDiscipline.filter(group => !major || (group.majorId || group.major?.id) === major);
     selectGroup(choices.find(group => group.id === classGroupId) || choices[0]);
   };
-  const exportDocument = async format => {
+  const exportDocument = async () => {
     if (exportRequest.current) return;
     const request = { active: true };
     exportRequest.current = request;
     setExporting(true); setError("");
     try {
-      if (format === "pdf") request.tab = reserveReportPreview();
-      const data = await fetchClassTranscripts(classGroupId);
+      const { data } = await axios.get(`${endpoint}/export`, { params: { classGroupId } });
       if (!request.active) return;
-      if (!data.scorecards.length) throw new Error("Lớp chưa có học viên để xuất bảng điểm.");
-      const unavailable = data.scorecards.find(card => card.unavailableReason);
-      if (unavailable) throw new Error(unavailable.unavailableReason);
-      const options = { isCancelled: () => !request.active };
-      if (format === "pdf") {
-        await openLearnerTranscriptPdfPreview(data.scorecards.map(card => normalizeLearnerTranscript(card)), request.tab, options);
-      } else {
-        const documents = await generateTranscriptDocuments(data.scorecards, "word", options);
-        if (!request.active) return;
-        const zip = await packTranscriptZip(documents, "word");
-        if (request.active) downloadDocumentFile(zip, `Bang-diem-${sanitizeDocumentFilenamePart(data.classGroup.code || classGroupId)}-Word.zip`);
-      }
+      if (!data.rows.length) throw new Error("Lớp chưa có học viên để xuất bảng điểm.");
+      const workbook = await createClassScoreWorkbook(data);
+      if (request.active) downloadDocumentFile(workbook, `Tong-hop-diem-${sanitizeDocumentFilenamePart(data.group.code || classGroupId)}.xlsx`);
     } catch (failure) {
-      request.tab?.close();
       if (request.active) notify.error(errorMessage(failure, "Không thể xuất bảng điểm."));
     } finally {
       if (request.active) { exportRequest.current = null; setExporting(false); }
@@ -179,14 +165,14 @@ export default function ClassScoreSummary() {
           {classes.map(group => <MenuItem key={group.id} value={group.id}>{group.code || group.name}{group.major?.name ? ` — ${group.major.name}` : ""}</MenuItem>)}
         </FilterSelectField>
         <FilterSearchField placeholder="Tìm theo mã HV, họ tên..." value={search} disabled={loadingOptions || exporting} inputProps={{ maxLength: 200 }} onChange={event => { setSearch(event.target.value); setPage(1); }} />
-        <Button className="css-export" variant="contained" color="primary" aria-haspopup="menu"
+        <Button className="css-export document-export-trigger" variant="outlined" aria-haspopup="menu" startIcon={<ExportDownloadIcon />} endIcon={<ExportChevronIcon />} aria-busy={exporting}
           aria-controls={exportAnchor ? "class-score-export-menu" : undefined} aria-expanded={!!exportAnchor}
           onClick={event => setExportAnchor(event.currentTarget)} disabled={busy || exporting || !classGroupId || search.trim() !== debouncedSearch}>
-          {exporting ? "Đang xuất..." : "Xuất file"} <span aria-hidden="true"> ▼</span>
+          {exporting ? "Đang xuất..." : "Xuất báo cáo"}
         </Button>
-        <Menu id="class-score-export-menu" anchorEl={exportAnchor} open={!!exportAnchor} onClose={() => setExportAnchor(null)}>
-          <MenuItem disabled={!subjects.length} onClick={() => { setExportAnchor(null); setClassExportOpen(true); }}>Xuất bảng điểm cả lớp</MenuItem>
-          <MenuItem onClick={() => { setExportAnchor(null); setTranscriptOpen(true); }}>Xuất bảng điểm cá nhân</MenuItem>
+        <Menu id="class-score-export-menu" className="report-export-action-menu" anchorEl={exportAnchor} open={!!exportAnchor} onClose={() => setExportAnchor(null)}>
+          <MenuItem disabled={!subjects.length} onClick={() => { setExportAnchor(null); exportDocument(); }}><ExcelFileIcon className="document-export-icon document-export-icon-excel" aria-hidden="true" />Xuất bảng điểm cả lớp</MenuItem>
+          <MenuItem onClick={() => { setExportAnchor(null); setTranscriptOpen(true); }}><WordFileIcon className="document-export-icon document-export-icon-word" aria-hidden="true" />Xuất bảng điểm cá nhân</MenuItem>
         </Menu>
       </Paper>
       {(optionsError || error) && <Alert severity="error" action={<Button color="inherit" size="small" disabled={busy || exporting} onClick={() => optionsError ? setOptionsReload(value => value + 1) : setReload(value => value + 1)}>Thử lại</Button>}>{optionsError || error}</Alert>}
@@ -236,14 +222,5 @@ export default function ClassScoreSummary() {
       </Paper>
     </section>
     {transcriptOpen && <LearnerTranscriptDialog key={classGroupId} classGroupId={classGroupId} onClose={() => setTranscriptOpen(false)} />}
-    <Dialog open={classExportOpen} onClose={() => setClassExportOpen(false)} maxWidth="xs" fullWidth aria-labelledby="class-export-title" className="app-popup">
-      <DialogTitle id="class-export-title">Xuất bảng điểm cả lớp</DialogTitle>
-      <DialogContent>Mỗi học viên dùng mẫu bảng điểm cá nhân. PDF xem trước chung trong một file; Word tải gói ZIP chứa từng bảng điểm.</DialogContent>
-      <DialogActions>
-        <Button onClick={() => setClassExportOpen(false)}>Đóng</Button>
-        <Button variant="outlined" onClick={() => { setClassExportOpen(false); exportDocument("word"); }}>Xuất Word</Button>
-        <Button variant="contained" onClick={() => { setClassExportOpen(false); exportDocument("pdf"); }}>Xem trước PDF</Button>
-      </DialogActions>
-    </Dialog>
   </FeatureLayout>;
 }

@@ -2,16 +2,16 @@
 .sl-print-header{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6mm;text-align:center;font-size:12pt;line-height:1.2}
 .sl-print-header strong,.sl-print-header span{display:block;margin:0 0 1mm}.sl-print-header strong{font-size:12pt;font-weight:700}
 .sl-print-sheet h1{margin:0 0 1mm;text-align:center;font-family:inherit;font-size:14pt;line-height:1.2;font-weight:700}.sl-print-range{margin:0;text-align:center;font-size:11pt}
-.sl-print-notice{min-height:7mm;margin:3mm 0 2mm;font-style:italic}
-.sl-print-sheet table{width:calc(100% - 1px);border:1px solid #000;border-collapse:collapse;table-layout:fixed;font-family:inherit;font-size:10.5pt;line-height:1.2}.sl-print-sheet th,.sl-print-sheet td{padding:3px 4px;border:1px solid #000;vertical-align:middle;word-break:normal;overflow-wrap:anywhere;hyphens:none;white-space:normal;text-transform:none}.sl-print-sheet th{background:#dce6f1!important;color:#000;font-weight:700;text-align:center;vertical-align:middle;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sl-print-notice{min-height:7mm;margin:3mm 0 2mm;font-style:normal}
+.sl-print-sheet table{width:calc(100% - 1px);border:1px solid #000;border-collapse:collapse;table-layout:fixed;font-family:inherit;font-size:10.5pt;line-height:1.2}.sl-print-sheet th,.sl-print-sheet td{padding:3px 4px;border:1px solid #000;vertical-align:middle;word-break:normal;overflow-wrap:anywhere;hyphens:none;white-space:normal;text-transform:none}.sl-print-sheet th{background:#fff!important;color:#000;font-weight:700;text-align:center;vertical-align:middle;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .sl-print-sheet .sl-print-nowrap{white-space:nowrap;overflow-wrap:normal;word-break:normal}.sl-print-centered{text-align:center}
 .sl-print-empty{text-align:center;padding:12px!important}
-.sl-print-total{margin:2mm 0;text-align:right;font-style:italic}
+.sl-print-total{margin:2mm 0;text-align:right;font-style:normal}
 .sl-print-signoff{break-inside:avoid;page-break-inside:avoid}
 .sl-print-duty p{min-height:5mm;margin:0}
 .sl-print-signatures{display:grid;grid-template-columns:1fr 1fr;gap:6mm;margin:1mm 0 5mm;text-align:center}
 .sl-print-signatures b,.sl-print-signatures i{display:block}
-.sl-print-signatures i{margin-top:6mm;min-height:18mm}
+.sl-print-signatures i{margin-top:6mm;min-height:18mm;font-style:normal}
 .sl-print-sheet .sl-print-form-footer{display:flex!important;justify-content:space-between;gap:5mm;margin-top:auto;padding-top:1mm;border-top:1px solid #000;font-size:8pt;font-weight:bold}
 
 /* The application forces its UI font on headings/tables; scope this override to the document. */
@@ -19,7 +19,7 @@
 #root .sl-print-sheet table{font-size:10.5pt;line-height:1.2}
 #root .sl-print-only .sl-print-sheet :is(th,td){padding:3px 4px!important;border:1px solid #000!important;font-size:10.5pt!important;line-height:1.2;color:#000!important}
 #root .sl-print-sheet th.sl-print-nowrap{white-space:nowrap}
-#root .sl-print-sheet th{background:#dce6f1!important}
+#root .sl-print-sheet th{background:#fff!important}
 #root .sl-print-sheet td{background:#fff!important}
 #root .sl-print-sheet .sl-print-empty{padding:12px!important}
 .sl-schedule-preview{min-height:100vh;padding:16px;background:#eef1f4;overflow:auto}

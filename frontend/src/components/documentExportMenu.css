@@ -1,10 +1,21 @@
 .document-export{display:inline-block;position:relative;flex-shrink:0}
-.document-export-trigger{display:inline-flex;align-items:center;gap:8px;min-height:32px;padding:6px 12px;border:1px solid #0788b8;border-radius:4px;background:#0788b8;color:#fff;font:inherit;font-size:12px;font-weight:700;white-space:nowrap;cursor:pointer}
-.document-export-trigger:disabled{opacity:.6;cursor:default}
-.document-export-trigger:focus-visible,.document-export-options button:focus-visible{outline:2px solid #173e75;outline-offset:2px}
-.document-export-options{--dropdown-highlight-bg:#edf4fa;--dropdown-highlight-text:#173e75;position:fixed;min-width:150px;padding:4px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;box-shadow:0 4px 14px #172b3a26;z-index:1500}
-.document-export-options button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:0;border-radius:3px;background:#fff;color:#173e75;font:inherit;font-size:13px;text-align:left;white-space:nowrap;cursor:pointer}
-.document-export-icon{width:20px;height:20px;flex:none;fill:currentColor}.document-export-icon-word{color:#185abd}.document-export-icon-excel{color:#107c41}.document-export-icon-pdf{color:#c62828}
+button.document-export-trigger{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:38px;padding:8px 12px;border:1px solid #cfd6df;border-radius:6px;background:#fff;color:#283442;box-shadow:0 1px 2px #172b3a05;font:inherit;font-size:13px;font-weight:600;line-height:20px;letter-spacing:normal;text-transform:none;white-space:nowrap;cursor:pointer;transition:background .15s,border-color .15s,box-shadow .15s}
+button.document-export-trigger:hover:not(:disabled){border-color:#aebccb;background:#f8fafc;box-shadow:0 2px 5px #172b3a0a}
+button.document-export-trigger[aria-expanded="true"]{border-color:#9eafc0;background:#f5f8fb}
+button.document-export-trigger:disabled{opacity:.5;cursor:default;box-shadow:none}
+.report-export-download,.report-export-chevron{flex:none}
+.document-export-trigger .MuiButton-startIcon,.document-export-trigger .MuiButton-endIcon{margin:0}
+.report-export-chevron{margin-left:2px;transition:transform .15s}
+[aria-expanded="true"] .report-export-chevron{transform:rotate(180deg)}
+.document-export-trigger:focus-visible,.document-export-options button:focus-visible{outline:2px solid #168ab6;outline-offset:2px}
+.document-export-options{--dropdown-highlight-bg:#f1f5f9;--dropdown-highlight-text:#1e293b;position:fixed;min-width:224px;padding:6px;border:1px solid #e0e5eb;border-radius:10px;background:#fff;box-shadow:0 8px 28px #172b3a1c,0 2px 6px #172b3a0a;z-index:1500}
+.document-export-options button{display:flex;align-items:center;gap:11px;width:100%;min-height:42px;padding:10px 12px;border:0;border-radius:6px;background:#fff;color:#283442;font:inherit;font-size:13px;font-weight:500;line-height:20px;text-align:left;white-space:nowrap;cursor:pointer}
+.document-export-icon{width:20px;height:20px;flex:none;fill:currentColor}
+.document-export-icon-word{color:#2563b8}.document-export-icon-excel{color:#21804a}.document-export-icon-pdf{color:#c43c38}
 .document-export-options button:hover,.document-export-options button:focus{background:var(--dropdown-highlight-bg);color:var(--dropdown-highlight-text)}
 .document-export-error{display:block;max-width:360px;margin-top:6px;color:#b52d2d;font-size:12px;white-space:normal}
-@media print{.document-export,.document-export-options{display:none!important}}
+.report-export-action-menu .MuiPaper-root{min-width:252px;border:1px solid #e0e5eb;border-radius:10px;box-shadow:0 8px 28px #172b3a1c,0 2px 6px #172b3a0a}
+.report-export-action-menu .MuiMenu-list{padding:6px}
+.report-export-action-menu .MuiMenuItem-root{gap:11px;min-height:42px;padding:10px 12px;border-radius:6px;color:#283442;font-size:13px;font-weight:500;line-height:20px}
+.report-export-action-menu .MuiMenuItem-root:hover,.report-export-action-menu .MuiMenuItem-root.Mui-focusVisible{background:#f1f5f9}
+@media print{.document-export,.document-export-options,.document-export-trigger,.report-export-action-menu{display:none!important}}

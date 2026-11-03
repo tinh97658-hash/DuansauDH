@@ -106,7 +106,7 @@
 .transcript-summary-band { width:517.3pt; display:grid; grid-template-columns:minmax(0,263.8pt) minmax(0,253.5pt); align-items:start; margin:3.75pt 0 6pt; font-size:12pt; }
 .transcript-gpa { margin:0; }
 .transcript-signoff { break-inside:avoid; page-break-inside:avoid; }
-.transcript-issue-date { text-align:center; font-style:italic; margin:0; }
+.transcript-issue-date { text-align:center; font-style:normal; margin:0; }
 .transcript-signatures { width:517.3pt; display:grid; grid-template-columns:165pt 253.5pt; justify-content:space-between; gap:0; text-align:center; }
 .transcript-signature-roles { min-height:27pt; font-weight:700; line-height:13.5pt; }
 .transcript-signature-name { min-height:68.25pt; padding-top:54.75pt; box-sizing:border-box; display:flex; align-items:flex-end; justify-content:center; margin:0; font-weight:700; }

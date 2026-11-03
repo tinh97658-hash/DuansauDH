@@ -64,9 +64,9 @@ export async function createClassScoreWorkbook(report) {
 
   const header = sheet.getRow(TABLE_HEADER_ROW);
   header.values = columns.map(column => column.label);
-  header.font = reportFont(10, { bold: true, color: { argb: "FF173A5E" } });
+  header.font = reportFont(10, { bold: true, color: { argb: "FF000000" } });
   for (let column = 1; column <= columns.length; column += 1) {
-    header.getCell(column).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEAF4FB" } };
+    header.getCell(column).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } };
   }
   header.alignment = { wrapText: true, horizontal: "center", vertical: "middle" };
   header.height = 60;
@@ -102,7 +102,7 @@ export async function createClassScoreWorkbook(report) {
   const policy = report.scorePolicy || "Ô trống: chưa có điểm; MT: miễn thi. Điểm học phần đã lưu gần nhất, gồm kết quả cá nhân đã hoàn thành.";
   const notes = ["Ghi chú:", ...policy.split(/;\s*(?=MT)|\.\s+(?=Ô trống|MT|Điểm học phần)/)];
   notes.forEach((note, index) => {
-    mergedLine(tableLastRow + 2 + index, note, { size: 10, italic: true, bold: index === 0, height: 18 });
+    mergedLine(tableLastRow + 2 + index, note, { size: 10, italic: false, bold: index === 0, height: 18 });
   });
   sheet.autoFilter = { from: { row: TABLE_HEADER_ROW, column: 1 }, to: { row: TABLE_HEADER_ROW, column: columns.length } };
   sheet.pageSetup = { paperSize: 9, orientation: "landscape", fitToPage: false, scale: 100, fitToWidth: 0, fitToHeight: 0,

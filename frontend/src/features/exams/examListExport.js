@@ -1,7 +1,8 @@
 import { BRAND } from "../../config/branding";
 import { gradebookColumns, gradebookRowValues, isExamCandidate } from "./gradebook";
 import { gradebookDocumentColumns } from "./gradebookLayout";
-import { scheduleDocumentMetadata } from "../scheduling/scheduleExport";
+import { createScheduleWord, scheduleDocumentMetadata } from "../scheduling/scheduleExport";
+import { mmToPoints, pointsToExcelWidth, excelRowHeight } from "../../utils/documentLayout";
 
 export const EXAM_LIST_HEADER_ROW = 4;
 
@@ -26,6 +27,15 @@ export function examListDocumentMetadata(document) {
   };
 }
 
+export function createExamListWord(document) {
+  const catalog = gradebookColumns(true);
+  return createScheduleWord(document, { metadata: examListDocumentMetadata(document),
+    columns: gradebookDocumentColumns(document, true).map((column, index) => ({ ...column,
+      label: document.headers[index], weight: column.width, fields: [index], center: catalog[index].align === "center",
+    })),
+  });
+}
+
 export async function createExamListExcel(document) {
   const module = await import("exceljs");
   const book = new (module.default || module).Workbook();
@@ -34,7 +44,9 @@ export async function createExamListExcel(document) {
   const catalog = gradebookColumns(true);
   const metadata = examListDocumentMetadata(document);
   const font = (size = 11, bold = false) => ({ name: "Times New Roman", size, bold, color: { argb: "FF000000" } });
-  sheet.columns = columns.map(column => ({ width: column.width, style: { font: font() } }));
+  const totalWidth = columns.reduce((sum, column) => sum + column.width, 0);
+  const physicalWidths = columns.map(column => mmToPoints(281) * column.width / totalWidth);
+  sheet.columns = physicalWidths.map(width => ({ width: pointsToExcelWidth(width), style: { font: font(10.5) } }));
   // Match the schedule's two balanced masthead blocks using actual column widths.
   const halfWidth = columns.reduce((sum, column) => sum + column.width, 0) / 2;
   let leftEnd = 1, usedWidth = 0, bestDistance = Infinity;
@@ -58,35 +70,34 @@ export async function createExamListExcel(document) {
   heading(2, 1, leftEnd, document.institute, { bold: true, height: 32 });
   heading(1, leftEnd + 1, columns.length, metadata.title, { bold: true, size: 14 });
   heading(2, leftEnd + 1, columns.length, `Lớp: ${document.group}`, { size: 11, height: 32 });
-  heading(3, 1, columns.length, `Học phần: ${document.subject}`, { horizontal: "left", italic: true, size: 11, height: 32 });
+  heading(3, 1, columns.length, `Học phần: ${document.subject}`, { horizontal: "left", italic: false, size: 11, height: 32 });
 
   const border = Object.fromEntries(["top", "bottom", "left", "right"].map(side => [side, { style: "thin", color: { argb: "FF000000" } }]));
   [document.headers, ...document.rows].forEach((values, index) => {
     const row = sheet.getRow(EXAM_LIST_HEADER_ROW + index);
-    row.height = Math.min(409, Math.max(index === 0 ? 28 : 22, ...values.map((value, column) =>
-      index > 0 && columns[column].nowrap ? 22 : lineCount(value, columns[column].width) * 16 + 6)));
+    row.height = excelRowHeight(values, physicalWidths, 10.5, 4.5, index === 0 ? 28 : 18);
     for (let column = 1; column <= columns.length; column++) {
       const cell = row.getCell(column);
       cell.value = values[column - 1] ?? "";
-      cell.font = font(11, index === 0);
+      cell.font = font(10.5, index === 0);
       cell.alignment = {
         vertical: "middle", horizontal: index === 0 ? "center" : catalog[column - 1].align || "left",
         wrapText: index === 0 || !columns[column - 1].nowrap,
         ...(index > 0 && columns[column - 1].nowrap ? { shrinkToFit: true } : {}),
       };
       cell.border = border;
-      if (index === 0) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCE6F1" } };
+      if (index === 0) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } };
     }
   });
   const lastRow = EXAM_LIST_HEADER_ROW + document.rows.length;
-  heading(lastRow + 1, 1, columns.length, metadata.total, { horizontal: "right", italic: true, size: 11 });
+  heading(lastRow + 1, 1, columns.length, metadata.total, { horizontal: "right", italic: false, size: 11 });
   metadata.duty.forEach((text, index) => heading(lastRow + 2 + index, 1, columns.length, text, { horizontal: "left", size: 11 }));
   const signatureRow = lastRow + 4;
   metadata.signatures.forEach((text, index) => {
     const from = index === 0 ? 1 : leftEnd + 1;
     const to = index === 0 ? leftEnd : columns.length;
     heading(signatureRow, from, to, text, { bold: true, size: 11 });
-    heading(signatureRow + 1, from, to, metadata.signaturePrompt, { italic: true, size: 11 });
+    heading(signatureRow + 1, from, to, metadata.signaturePrompt, { italic: false, size: 11 });
   });
   sheet.getRow(signatureRow + 2).height = 30;
   sheet.getRow(signatureRow + 3).height = 30;
@@ -96,7 +107,7 @@ export async function createExamListExcel(document) {
     paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0,
     printTitlesRow: `${EXAM_LIST_HEADER_ROW}:${EXAM_LIST_HEADER_ROW}`,
     printArea: `A1:${sheet.getColumn(columns.length).letter}${signatureRow + 3}`,
-    margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.15, footer: 0.15 },
+    margins: { left: 8 / 25.4, right: 8 / 25.4, top: 8 / 25.4, bottom: 14 / 25.4, header: 0, footer: 4 / 25.4 },
   };
   sheet.headerFooter.oddFooter = `&L&"Times New Roman,Bold"&8${metadata.footer[0]}&R${metadata.footer[1]}`;
   sheet.headerFooter.evenFooter = sheet.headerFooter.oddFooter;

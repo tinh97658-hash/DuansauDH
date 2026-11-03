@@ -31,12 +31,12 @@ it('exports the filtered exam week through the shared PDF preview',async()=>{
  const tab={sessionStorage:{setItem:vi.fn()},location:{replace:vi.fn()},close:vi.fn()};
  const popup=vi.spyOn(window,'open').mockReturnValue(tab);
  try{
-  renderPage(['gradebook.view']);await waitFor(()=>expect(screen.getByRole('button',{name:'Xuất file'})).toBeEnabled());
+  renderPage(['gradebook.view']);await waitFor(()=>expect(screen.getByRole('button',{name:'Xuất báo cáo'})).toBeEnabled());
   fireEvent.change(screen.getByRole('textbox',{name:'Tìm kiếm'}),{target:{value:'Quản trị'}});
-  fireEvent.click(screen.getByRole('button',{name:'Xuất file'}));
-  expect(screen.getByRole('menuitem',{name:'Xuất Word'})).toBeInTheDocument();
-  expect(screen.getByRole('menuitem',{name:'Xuất Excel'})).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('menuitem',{name:'Xuất PDF'}));
+  fireEvent.click(screen.getByRole('button',{name:'Xuất báo cáo'}));
+  expect(screen.getByRole('menuitem',{name:'Xuất Word (.docx)'})).toBeInTheDocument();
+  expect(screen.getByRole('menuitem',{name:'Xuất Excel (.xlsx)'})).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('menuitem',{name:'Xuất PDF (.pdf)'}));
   const snapshot=JSON.parse(tab.sessionStorage.setItem.mock.calls[0][1]);
   expect(snapshot).toMatchObject({kind:'exam',week:date,end:'2026-10-25',sessionCount:1});
   expect(snapshot.rows[0]).toContain('Quản trị');

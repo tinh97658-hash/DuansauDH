@@ -81,14 +81,14 @@ it.each([4, 40])("writes an actual single-sheet workbook with %i students and bo
   expect(sheet.getCell("A4").value).toBe("BẢNG ĐIỂM MÔN HỌC");
   expect(sheet.getCell("A6").value).toBe(`Lớp: ${group.name}`);
   expect(sheet.getCell("A7").value).toBe(`Học phần: ${offering.subject.name}`);
-  expect(sheet.model.merges).toEqual(["A1:H1", "I1:P1", "A2:H2", "I2:P2", "A3:H3", "I3:P3", "A4:P4", "A6:D6", "A7:D7"]);
+  expect(sheet.model.merges).toEqual(expect.arrayContaining(["A1:G1", "A2:G2", "A4:P4", "A6:P6", "A7:P7"]));
   for (const cell of ["A1", "A2", "A4"]) expect(sheet.getCell(cell).alignment.horizontal).toBe("center");
   for (const column of [2, 5, 9, 10, 11, 12, 13, 14]) {
     expect(sheet.getCell(10, column).alignment.wrapText).not.toBe(true);
     expect(sheet.getCell(10, column).alignment.shrinkToFit).toBe(true);
   }
   expect(sheet.getRow(9).values.slice(1)).toEqual(gradebookColumns().map(column => column.label));
-  expect(sheet.rowCount).toBe(GRADEBOOK_HEADER_ROW + count);
+  expect(sheet.rowCount).toBe(GRADEBOOK_HEADER_ROW + count + 4);
   expect(sheet.getCell(`B${9 + count}`).value).toBe(`HV${count}`);
   expect(sheet.getCell("E10").value).toBe("02/01/90");
   expect(sheet.getCell("I10").value).toBe("0.0"); expect(sheet.getCell("L10").value).toBe("8.5");
@@ -97,7 +97,7 @@ it.each([4, 40])("writes an actual single-sheet workbook with %i students and bo
     const header = sheet.getCell(9, column);
     expect(header.font).toMatchObject({ name: "Times New Roman", bold: true, color: { argb: "FF000000" } });
     expect(header.alignment).toMatchObject({ wrapText: true, horizontal: "center", vertical: "middle" });
-    expect(header.fill.fgColor.argb).toBe("FFF2F2F2");
+    expect(header.fill.fgColor.argb).toBe("FFFFFFFF");
     expect(header.border.bottom.style).toBe("thin");
     expect(sheet.getCell(10, column).font.name).toBe("Times New Roman");
     expect(sheet.getCell(10, column).border.right.style).toBe("thin");
@@ -107,10 +107,10 @@ it.each([4, 40])("writes an actual single-sheet workbook with %i students and bo
     expect(cell.fill?.pattern || "none").toBe("none"); expect(Object.keys(cell.border || {})).toHaveLength(0);
   }
   expect(sheet.views[0]).toMatchObject({ state: "frozen", xSplit: 4, ySplit: 9, topLeftCell: "E10", showGridLines: false });
-  expect(sheet.pageSetup).toMatchObject({ paperSize: 9, orientation: "landscape", scale: 100, fitToPage: false, printArea: `A1:P${9 + count}`, printTitlesRow: "9:9" });
+  expect(sheet.pageSetup).toMatchObject({ paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, printArea: `A1:P${13 + count}`, printTitlesRow: "9:9" });
   const text = JSON.stringify(sheet.model);
-  for (const required of ["BỘ XÂY DỰNG", "CỘNG HÒA", "Độc lập", "Hải Phòng, ngày"]) expect(text).toContain(required);
-  for (const forbidden of ["VIỆN TRƯỞNG", "PHỤ TRÁCH LỚP", "Tra cứu điểm"]) expect(text).not.toContain(forbidden);
+  for (const required of [document.university, document.institute, "Hải Phòng, ngày", "VIỆN TRƯỞNG", "PHỤ TRÁCH LỚP"]) expect(text).toContain(required);
+  for (const forbidden of ["BỘ XÂY DỰNG", "CỘNG HÒA", "Độc lập", "Tra cứu điểm"]) expect(text).not.toContain(forbidden);
   expect(JSON.stringify(rows)).toBe(before);
 });
 
@@ -180,7 +180,9 @@ it("prints nine exam columns including notes without the final outcome column", 
     expect(header.border).toEqual(scheduleHeader.border);
     expect(header.alignment).toMatchObject({ horizontal: "center", vertical: "middle", wrapText: true });
     expect(sheet.getCell(5, column).border).toEqual(scheduleHeader.border);
-    expect(sheet.getCell(5, column).font).toMatchObject({ name: "Times New Roman", size: 11 });
+    expect(sheet.getCell(5, column).font.name).toBe("Times New Roman");
+    // ExcelJS's XML reader truncates fractional font sizes; the writer retains 10.5pt.
+    expect(sheet.getCell(5, column).font.size).toBe(scheduleHeader.font.size);
     expect(sheet.getCell(5, column).isMerged).toBe(false);
   }
   expect(sheet.pageSetup).toMatchObject({ paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0,

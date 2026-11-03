@@ -21,6 +21,7 @@ export default function SessionEditor({ session, offering, date, period, user, o
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [unitFilter, setUnitFilter] = useState(null);
+  const [roomManuallySelected, setRoomManuallySelected] = useState(false);
   const catalog = useLoad(async () => {
     const [lecturers, units, rooms, detail, offeringSessions] = await Promise.all([api.get("/system/lecturers"), api.get("/system/units"), api.get("/system/rooms"), api.get(`/scheduling/course-offerings/${offering.id}`), api.get(`/scheduling/course-offerings/${offering.id}/teaching-sessions`)]);
     const availableRooms = rows(rooms);
@@ -57,8 +58,23 @@ export default function SessionEditor({ session, offering, date, period, user, o
   }, [assignedSession?.lecturerId]);
   const roomFloor = (room) => getRoomFloor(room.code) ?? (Number(String(room.code || "").match(/^[^0-9]*([0-9])/)?.[1] || NaN) || null);
   const roomReason = (room) => room.isActive === false ? "Ngừng sử dụng" : room.capacity == null ? "Chưa có sức chứa" : (currentOffering.participantCount || 0) - room.capacity >= ROOM_CAPACITY_DEFICIT_LIMIT ? "Không đủ chỗ" : conflicts.some((row) => row.roomId === room.id) ? "Đang bận" : "";
+  const firstRoomSession = [...(catalog.data?.offeringSessions || [])]
+    .filter(row => row.roomId && row.status !== "not_held" && (!row.courseOfferingId || row.courseOfferingId === offering.id))
+    .sort((left, right) => {
+      const slot = row => `${String(row.sessionDate || "9999-12-31").slice(0, 10)}T${row.startTime || periodTimes(row.period).startTime}`;
+      return slot(left).localeCompare(slot(right)) || String(left.id || "").localeCompare(String(right.id || ""));
+    })[0];
+  const suggestedRoom = rooms.find(room => room.id === firstRoomSession?.roomId);
+  const suggestedRoomReason = firstRoomSession ? suggestedRoom ? roomReason(suggestedRoom) : "Phòng không còn trong danh mục" : "";
+  const suggestedRoomId = suggestedRoom && !suggestedRoomReason && validTime ? suggestedRoom.id : "";
+  useEffect(() => {
+    // Suggest only for a new session, after checking the target slot. A manual
+    // choice remains the user's choice when notes, dates or availability refresh.
+    if (session || roomManuallySelected || !editable || catalog.loading || availability.loading || catalog.error || availability.error) return;
+    setForm(current => current.roomId === suggestedRoomId ? current : { ...current, roomId: suggestedRoomId });
+  }, [session, roomManuallySelected, editable, catalog.loading, catalog.error, availability.loading, availability.error, suggestedRoomId]);
   const floors = [...new Set(rooms.map(roomFloor))].sort((a, b) => (a ?? 99) - (b ?? 99));
-  const setField = (name, value) => { setForm((current) => ({ ...current, [name]: value, ...(name === "period" ? periodTimes(value) : {}) })); setError(""); };
+  const setField = (name, value) => { if (name === "roomId") setRoomManuallySelected(true); setForm((current) => ({ ...current, [name]: value, ...(name === "period" ? periodTimes(value) : {}) })); setError(""); };
   const selectUnit = (unitId) => {
     setUnitFilter(unitId);
     if (unitId && selectedLecturer?.unitId !== unitId) setField("lecturerId", "");
@@ -112,6 +128,11 @@ export default function SessionEditor({ session, offering, date, period, user, o
       <label className="v20-field">Ghi chú<textarea aria-label="Ghi chú buổi học" placeholder="Nhập ghi chú..." maxLength={2000} value={form.note} disabled={!editable || saving} onChange={(event) => setField("note", event.target.value)} /></label>
       {classConflict && <Notice error={`Lớp / nhóm đang bận: ${classConflict.courseOffering?.subject?.name || "Buổi học khác"} · ${classConflict.period === "MORNING" ? "Sáng" : "Chiều"}`} />}
     </div><section className="sl-editor-rooms"><h4>PHÒNG HỌC TOÀN VIỆN</h4><p className="v20-hint">Tình trạng theo {vietnameseDate(form.sessionDate)} · {periodLabel}</p>
+      {!session && firstRoomSession && !catalog.loading && !catalog.error && <div className={`sl-room-suggestion${suggestedRoomReason ? " sl-room-suggestion-unavailable" : ""}`} role="status">
+        <strong>Phòng đề xuất: {suggestedRoom?.code || firstRoomSession.room?.code || "Phòng của buổi đầu tiên"}</strong>
+        <span>{availability.loading ? "Đang kiểm tra phòng cho buổi học này..." : availability.error ? "Chưa kiểm tra được tình trạng phòng. Vui lòng thử lại." : suggestedRoomReason
+          ? `${suggestedRoomReason}. Vui lòng chọn phòng khác cho buổi này.` : "Theo phòng của buổi học đầu tiên. Bạn vẫn có thể chọn phòng khác."}</span>
+      </div>}
       {(catalog.loading || availability.loading) && <Notice>Đang kiểm tra phòng và giảng viên...</Notice>}
       {floors.map((floor) => <div className="v20-room-floor" key={floor ?? "other"}><h4>{floor == null ? "PHÒNG KHÁC" : `TẦNG ${floor}`}</h4><div className="v20-room-grid">{rooms.filter((room) => roomFloor(room) === floor).map((room) => { const reason = roomReason(room); return <button key={room.id} aria-pressed={form.roomId === room.id} className={`v20-room ${form.roomId === room.id ? "sl-on" : ""} ${reason === "Đang bận" ? "v20-busy" : reason ? "v20-unavailable" : ""}`} disabled={!editable || saving || !validTime || availability.loading || !!availability.error || !!reason} onClick={() => setField("roomId", room.id)}><strong>{room.code}</strong><span>{room.capacity == null ? "Chưa khai báo sức chứa" : `${room.capacity} chỗ`}</span><small>{roomStateLabel(room)}</small></button>; })}</div></div>)}
       {!catalog.loading && !rooms.length && <Notice>Chưa có phòng học. Quản trị viên khai báo tại Hệ thống → Phòng học.</Notice>}

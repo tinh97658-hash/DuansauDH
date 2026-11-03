@@ -24,6 +24,9 @@ it("mẫu .xlsx giữ mã có số 0 đầu, họ tên, ngành và điểm hiệ
   expect(sheet.getCell("G2").value).toBe(row.email);
   expect(sheet.rowCount).toBe(2);
   expect(sheet.getColumn(10).hidden).toBe(true);
+  expect(sheet.getCell("A1").fill.fgColor.argb).toBe("FFFFFFFF");
+  expect(sheet.getCell("A1").font.color.argb).toBe("FF000000");
+  expect(sheet.getCell("H2").fill.fgColor.argb).toBe("FFFFFFFF");
 });
 it("điền rồi import ngược, hỗ trợ nhiều ngành, dấu phẩy thập phân và điểm 0", async () => {
   const buffer = await filled((sheet) => { sheet.getCell("H2").value = "16,5"; sheet.getCell("H3").value = 0; });

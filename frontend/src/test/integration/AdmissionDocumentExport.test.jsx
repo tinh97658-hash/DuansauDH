@@ -4,6 +4,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { TextEncoder } from "util";
 import JSZip from "jszip";
+import ExcelJS from "exceljs";
 import axios from "axios";
 import { toast } from "react-toastify";
 import AdmissionRecordDetail from "../../pages/plan/admissionRecordDetail";
@@ -149,28 +150,75 @@ it.each(["applications", "admitted-masters"])("%s list keeps the relevant row ac
   expect(axios.put).not.toHaveBeenCalled(); expect(axios.post).not.toHaveBeenCalled();
 });
 
-it("both detail dropdowns export the current unsaved form, and blocked PDF tabs leave it intact", async () => {
+it("both detail dropdowns only export Excel and preserve the current unsaved form", async () => {
   render(<MemoryRouter useTransitions={false} initialEntries={["/plan/admission-records/record"]}><Routes><Route path="/plan/admission-records/:id" element={<AdmissionRecordDetail />} /></Routes></MemoryRouter>);
   await screen.findByDisplayValue(record.fullName);
   const input = screen.getByDisplayValue(record.fullName);
   fireEvent.change(input, { target: { value: "Tên đang chỉnh sửa" } });
-  const triggers = screen.getAllByRole("button", { name: "Xuất file", exact: true });
+  const triggers = screen.getAllByRole("button", { name: "Xuất báo cáo", exact: true });
   expect(triggers).toHaveLength(2);
-  fireEvent.click(triggers[0]);
-  for (const format of ["word", "pdf"]) expect(document.querySelector(`.document-export-icon-${format}`)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Word" }));
-  await waitFor(() => expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledTimes(1), { timeout: 10000 });
+  for (const [index, trigger] of triggers.entries()) {
+    fireEvent.click(trigger);
+    expect(screen.getAllByRole("menuitem")).toHaveLength(1);
+    expect(screen.queryByRole("menuitem", { name: "Xuất Word (.docx)" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Xuất PDF (.pdf)" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Excel (.xlsx)" }));
+    await waitFor(() => expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledTimes(index + 1), { timeout: 10000 });
+    const workbook = await JSZip.loadAsync(await bufferOf(URL.createObjectURL.mock.calls[index][0]));
+    expect(workbook.file("xl/workbook.xml")).not.toBeNull();
+    const strings = await workbook.file("xl/sharedStrings.xml").async("string");
+    expect(strings).toContain("TÊN ĐANG CHỈNH SỬA");
+    await waitFor(() => expect(trigger).toBeEnabled());
+  }
   expect(window.open).not.toHaveBeenCalled(); expect(sessionStorage.length).toBe(0);
-  const xml = await docxXml(URL.createObjectURL.mock.calls[0][0]);
-  expect(xml.documentElement.textContent).toContain("TÊN ĐANG CHỈNH SỬA");
-  fireEvent.click(triggers[1]);
-  for (const format of ["word", "pdf"]) expect(document.querySelector(`.document-export-icon-${format}`)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất PDF" }));
-  expect(readAdmissionPreview(previewId()).fullName).toBe("Tên đang chỉnh sửa");
-  await waitFor(() => expect(triggers[1]).toBeEnabled());
-  window.open.mockReturnValue(null);
-  fireEvent.click(triggers[1]); fireEvent.click(screen.getByRole("menuitem", { name: "Xuất PDF" }));
-  await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("Trình duyệt đã chặn tab")));
   expect(input).toHaveValue("Tên đang chỉnh sửa"); expect(window.print).not.toHaveBeenCalled();
   expect(axios.put).not.toHaveBeenCalled(); expect(axios.post).not.toHaveBeenCalled();
+});
+
+it.each(["applications", "admitted-masters"])("exports %s only as Excel with every field on the same learner row", async mode => {
+  const admitted = mode === "admitted-masters";
+  const exportedRecords = [
+    { ...record, assignedGroup: { code: "CNTT 2026.1.1" }, major: null, majorName: "Công nghệ thông tin", extraData: { tuitionPayment: { paid: true } } },
+    { ...record, id: "other", code: "HV002", assignedGroup: { code: "CNTT 2026.1.2" }, extraData: { tuitionPayment: { paid: false } } },
+  ];
+  const originalGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation(async (url, options) => {
+    if (url.includes("/admission-records?")) {
+      const page = Number(new URL(url, "http://localhost").searchParams.get("page") || 1);
+      return { data: { data: [exportedRecords[page - 1]], pagination: { total: 2, totalPages: 2 }, stats: {} } };
+    }
+    return originalGet(url, options);
+  });
+  render(<MemoryRouter useTransitions={false}><AdmissionRecords mode={mode} embedded /></MemoryRouter>);
+  await screen.findAllByText(record.email);
+  const trigger = screen.getByRole("button", { name: "Xuất báo cáo", exact: true });
+  await waitFor(() => expect(trigger).toBeEnabled());
+  fireEvent.click(trigger);
+  expect(screen.getAllByRole("menuitem")).toHaveLength(1);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Excel (.xlsx)" }));
+  await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(1), { timeout: 10000 });
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.load(await bufferOf(URL.createObjectURL.mock.calls[0][0]));
+  expect(book.worksheets).toHaveLength(1);
+  const sheet = book.worksheets[0];
+  const logicalValues = row => {
+    const values = [];
+    row.eachCell(cell => { if (!cell.isMerged || cell.master.address === cell.address) values.push(cell.value); });
+    return values;
+  };
+  let header;
+  const exportedRows = [];
+  sheet.eachRow(row => {
+    const values = logicalValues(row);
+    if (values[0] === "STT") header = values;
+    if (typeof values[0] === "number") exportedRows.push(values);
+    expect(values.some(value => typeof value === "string" && /Phần \d+\//.test(value))).toBe(false);
+  });
+  expect(header).toEqual(["STT", "Mã HV", ...(admitted ? ["Mã nhóm"] : []), "Họ đệm", "Tên", "Email", "Ngày sinh", "Giới tính", "Số CMND/CCCD", "Năm nhập học", "Trình độ", "Ngành", "Điện thoại", ...(admitted ? ["Học phí"] : []), "Trạng thái"]);
+  expect(exportedRows).toEqual(exportedRecords.map((row, index) => [
+    index + 1, row.code, ...(admitted ? [row.assignedGroup.code] : []), "Nguyễn Văn", "An", row.email, "03/02/95", row.gender, row.idCard,
+    row.academicYear, row.trainingLevel, row.majorName, row.phone, ...(admitted ? [index === 0 ? "Đã nộp" : "Chưa nộp"] : []), row.studyStatus,
+  ]));
+  expect(axios.get.mock.calls.some(([url]) => url.includes("/admission-records?") && new URL(url, "http://localhost").searchParams.get("page") === "2")).toBe(true);
+  expect(window.open).not.toHaveBeenCalled();
 });
