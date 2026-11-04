@@ -115,6 +115,30 @@ describe("operational dashboard permissions", () => {
 });
 
 describe("operational dashboard aggregation", () => {
+  it('loads course offerings once per dashboard request and refreshes them on the next request', async () => {
+    const f = fixture();
+    const first = await f.service.operational(user(), '2026');
+    expect(first.sources.teaching.status).toBe('ready');
+    expect(first.sources.grades.status).toBe('ready');
+    expect(first.sources.approvals.status).toBe('ready');
+    expect(f.scheduling.listCourseOfferings).toHaveBeenCalledTimes(1);
+    await f.service.operational(user(), '2025');
+    expect(f.scheduling.listCourseOfferings).toHaveBeenCalledTimes(2);
+    expect(f.scheduling.listCourseOfferings).toHaveBeenLastCalledWith({ program: 'masters', academicYear: '2025' });
+  });
+  it('retries a failed shared offering load on the next request without failing unrelated queues', async () => {
+    const f = fixture();
+    f.scheduling.listCourseOfferings.mockRejectedValueOnce(new Error('database unavailable'));
+    const failed = await f.service.operational(user(), '2026');
+    expect(failed.sources.teaching.status).toBe('error');
+    expect(failed.sources.grades.status).toBe('error');
+    expect(failed.sources.approvals.status).toBe('error');
+    expect(failed.sources.grouping.status).toBe('ready');
+    const retried = await f.service.operational(user(), '2026', 'approvals');
+    expect(retried.sources.approvals.status).toBe('ready');
+    expect(f.scheduling.listCourseOfferings).toHaveBeenCalledTimes(2);
+  });
+
   it('shows scoped pending learner requests and links to the decision screens', async () => {
     const f = fixture();
     f.requests.query.mockResolvedValueOnce([{ id: 'leave', recordId: 'learner', fullName: 'Nguyễn Văn An', code: 'HV01', reason: 'Việc gia đình' }]);

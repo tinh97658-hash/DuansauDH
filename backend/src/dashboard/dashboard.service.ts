@@ -87,8 +87,8 @@ export class DashboardService {
       href: href("/masters/assign-class-groups", { year }), items: items.slice(0, 5) };
   }
 
-  private async teaching(year: string, permissions: ReturnType<typeof operationalPermissions>) {
-    const offerings = (await this.scheduling.listCourseOfferings({ program: "masters", academicYear: year })).map(plain);
+  private async teaching(year: string, permissions: ReturnType<typeof operationalPermissions>, offeringsPromise: Promise<any[]>) {
+    const offerings = await offeringsPromise;
     const item = (offering: any) => {
       const group = scopeGroup(offering, year);
       return { id: offering.id, title: offering.name || group?.code || offering.subject?.name || "Lớp học phần",
@@ -120,8 +120,8 @@ export class DashboardService {
     };
   }
 
-  private async grades(year: string) {
-    const offerings = (await this.scheduling.listCourseOfferings({ program: 'masters', academicYear: year })).map(plain);
+  private async grades(year: string, offeringsPromise: Promise<any[]>) {
+    const offerings = await offeringsPromise;
     const tracking = await this.gradebooks.tracking(offerings, true);
     const warningGroups = [
       { key: 'components', title: 'CHỜ NHẬP ĐIỂM THÀNH PHẦN', items: [] as any[] },
@@ -150,8 +150,8 @@ export class DashboardService {
       href: items[0]?.href || href("/masters/exam-lists", { year }) };
   }
 
-  private async approvals(year: string) {
-    const offerings = (await this.scheduling.listCourseOfferings({ program: 'masters', academicYear: year })).map(plain);
+  private async approvals(year: string, offeringsPromise: Promise<any[]>) {
+    const offerings = await offeringsPromise;
     const tracking = await this.gradebooks.tracking(offerings);
     const eligibility: any[] = [], results: any[] = [], reopens: any[] = [];
     for (const offering of offerings) {
@@ -184,14 +184,17 @@ export class DashboardService {
     const permissions = operationalPermissions(user, access.permissions, access.groupScope?.readOnly, program);
     let majorsPromise: Promise<any[]> | undefined;
     const majors = () => majorsPromise ||= this.system.listMajors("masters").then((rows) => rows.map(plain));
+    // Share only within this request, preserving each user's scope and fresh data on refresh.
+    let offeringsPromise: Promise<any[]> | undefined;
+    const offerings = () => offeringsPromise ||= this.scheduling.listCourseOfferings({ program: "masters", academicYear: year }).then(rows => rows.map(plain));
     // Each program supplies the same section contract. Add doctoral providers here as
     // those workflows ship; never fall back to masters data or fabricated zero counts.
     const providers: Record<DashboardProgram, Partial<Record<DashboardSection, () => Promise<any>>>> = {
       masters: {
         grouping: () => this.grouping(year, majors()),
-        teaching: () => this.teaching(year, permissions),
-        grades: () => this.grades(year),
-        approvals: () => this.approvals(year),
+        teaching: () => this.teaching(year, permissions, offerings()),
+        grades: () => this.grades(year, offerings()),
+        approvals: () => this.approvals(year, offerings()),
         studyLeaveApproval: () => this.learnerRequests(year, "studyLeaveApproval"),
         majorTransferApproval: () => this.learnerRequests(year, "majorTransferApproval"),
       },

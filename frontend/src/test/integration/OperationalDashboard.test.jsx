@@ -29,6 +29,28 @@ const open = async () => {
 };
 beforeEach(() => { vi.clearAllMocks(); axios.get.mockResolvedValue({ data: fixture() }); });
 
+it('keeps an in-flight dashboard request when focus and polling refreshes arrive', async () => {
+  vi.useFakeTimers();
+  let resolve;
+  axios.get.mockImplementation(() => new Promise(done => { resolve = done; }));
+  try {
+    await open();
+    const signal = axios.get.mock.calls[0][1].signal;
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+      vi.advanceTimersByTime(30000);
+    });
+    expect(signal.aborted).toBe(false);
+    expect(axios.get).toHaveBeenCalledTimes(1);
+    await act(async () => { resolve({ data: fixture() }); });
+    expect(screen.getByText('Công nghệ thông tin')).toBeInTheDocument();
+    await act(async () => { vi.advanceTimersByTime(30000); });
+    expect(axios.get).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 it("distinguishes pending sessions from warning classes and gives each warning group a badge", async () => {
   const data = fixture();
   data.sources.teaching.data.progress = { count: 7, itemCount: 3, href: "/masters/schedule?year=2026", items: [5, 1, 1].map((count, i) => ({
@@ -369,7 +391,8 @@ it.each([5, 12])("shows every scoped teaching warning and counts the displayed %
   const warnings = screen.getByRole("complementary", { name: "CẢNH BÁO" });
   expect(within(warnings).getAllByRole("listitem")).toHaveLength(total);
   expect(within(warnings).getAllByRole("listitem").map((li) => li.querySelector("strong").textContent)).toEqual(Array.from({length:total},(_,i)=>`Lớp cảnh báo ${i+1}`));
-  expect(within(warnings).getAllByText(`${total} lớp`)).toHaveLength(2);
+  expect(within(warnings).getByText(`${total} lớp`)).toBeInTheDocument();
+  expect(within(warnings).getByRole('region', { name: 'BUỔI HỌC CHƯA XÁC NHẬN' })).toHaveTextContent(`${total} buổi`);
   expect(within(warnings).getAllByTitle(detail.trim())).toHaveLength(total);
   const all = within(warnings).getByRole("link", { name: 'Xem tất cả' });
   expect(all).toHaveAttribute("href", data.sources.teaching.data.progress.href);
@@ -413,6 +436,6 @@ it('counts a class only once across warning groups and keeps each group CTA scop
  const data=fixture();const shared={id:'same-class',title:'Lớp có nhiều cảnh báo',detail:'Thi xong 1 ngày trước',href:'/masters/exam-lists?year=2026&offeringId=same-class'};
  data.sources.teaching.data.progress={count:1,items:[{...shared,detail:'1 buổi đã qua giờ, chưa xác nhận'}],href:'/masters/schedule?year=2026&queue=pending-confirmation'};
  data.sources.grades.data.warningGroups=[{key:'examGrades',title:'CHỜ NHẬP ĐIỂM THI',items:[shared]}];axios.get.mockResolvedValue({data});await open();
-  const panel=screen.getByRole('complementary',{name:'CẢNH BÁO'});expect(within(panel).getAllByText('1 lớp')).toHaveLength(3);expect(within(panel).getAllByRole('listitem')).toHaveLength(2);
+  const panel=screen.getByRole('complementary',{name:'CẢNH BÁO'});expect(within(panel).getAllByText('1 lớp')).toHaveLength(2);expect(within(panel).getByRole('region',{name:'BUỔI HỌC CHƯA XÁC NHẬN'})).toHaveTextContent('1 buổi');expect(within(panel).getAllByRole('listitem')).toHaveLength(2);
  const exam=within(panel).getByRole('region',{name:'CHỜ NHẬP ĐIỂM THI'});fireEvent.click(within(exam).getByRole('link',{name:'Xem tất cả'}));expect(screen.getByTestId('location')).toHaveTextContent('/masters/exam-lists?year=2026');
 });

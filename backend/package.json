@@ -56,7 +56,7 @@
     "express-rate-limit": "^8.6.2",
     "express-session": "^1.19.0",
     "helmet": "^8.0.0",
-    "joi": "^17.13.6",
+    "joi": "^17.13.9",
     "multer": "^2.5.0",
     "nodemailer": "^10.2.1",
     "passport": "^0.7.0",
@@ -71,7 +71,7 @@
     "umzug": "^3.8.2"
   },
   "devDependencies": {
-    "@nestjs/cli": "^11.0.24",
+    "@nestjs/cli": "^12.0.11",
     "@nestjs/testing": "^11.2.2",
     "@types/compression": "^1.8.1",
     "@types/cookie-parser": "^1.4.10",
@@ -90,6 +90,9 @@
   },
   "overrides": {
     "uuid": "^11.1.1",
-    "multer": "$multer"
+    "multer": "$multer",
+    "minimatch": "^11.0.1",
+    "glob@>=9": "^14.0.3",
+    "test-exclude": "^8.0.0"
   }
 }

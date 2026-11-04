@@ -122,19 +122,22 @@ export default function OperationalDashboard() {
   const gradebookRevision = useGradebookRevision();
   const [state, setState] = useState({ year, program, loading: true, permissions: null, sources: {}, error: false });
   const generation = useRef(0);
+  const inFlight = useRef(false);
   useEffect(() => {
     const request = ++generation.current;
     const controller = new AbortController();
+    inFlight.current = true;
     setState(previous => previous.year === year && previous.program === program && previous.permissions
       ? { ...previous, error: false } : { year, program, loading: true, permissions: null, sources: {}, error: false });
     axios.get(`${API_BASE_URL}/dashboard/operational`, { params: { year, program }, withCredentials: true, signal: controller.signal })
       .then(({ data }) => { if (request === generation.current) setState({ ...data, year, program, loading: false, error: false }); })
-      .catch(() => { if (request === generation.current) setState({ year, program, loading: false, permissions: null, sources: {}, error: true }); });
-    return () => { controller.abort(); generation.current += 1; };
+      .catch(() => { if (request === generation.current) setState({ year, program, loading: false, permissions: null, sources: {}, error: true }); })
+      .finally(() => { if (request === generation.current) inFlight.current = false; });
+    return () => { controller.abort(); generation.current += 1; inFlight.current = false; };
   }, [year, program, revision, gradebookRevision]);
 
   useEffect(() => {
-    const refresh = () => { if (document.visibilityState !== "hidden") setRevision(value => value + 1); };
+    const refresh = () => { if (document.visibilityState !== "hidden" && !inFlight.current) setRevision(value => value + 1); };
     const timer = window.setInterval(refresh, 30000);
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);

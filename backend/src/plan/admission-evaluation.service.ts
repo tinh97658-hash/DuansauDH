@@ -83,20 +83,27 @@ export class AdmissionEvaluationService {
     const execute = async (transaction: Transaction) => {
       const round = await this.rounds.findByPk(dto.roundId, { transaction, lock: transaction.LOCK.UPDATE });
       if (!round) throw new NotFoundException("Không tìm thấy đợt xét tuyển.");
-      const record = await this.records.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
-      if (!record) throw new NotFoundException("Không tìm thấy hồ sơ.");
-      if (record.trainingLevel !== "Thạc sĩ" || record.academicYear !== round.academicYear) throw new BadRequestException("Đợt xét tuyển phải cùng năm tuyển sinh với hồ sơ thạc sĩ.");
-      let evaluation = await this.evaluations.findOne({ where: { admissionRecordId: id }, transaction, lock: transaction.LOCK.UPDATE });
-      this.requireVersion(evaluation, dto.version);
-      if (evaluation && evaluation.decision !== "pending") throw new ConflictException("Hồ sơ đã được duyệt. Mở lại kết quả trước khi sửa.");
-      if (!evaluation && (record.status === "admitted" || record.status === "approved" || ["Đã trúng tuyển", "Đang học"].includes(record.studyStatus || ""))) throw new ConflictException("Hồ sơ đã trúng tuyển theo dữ liệu cũ. Cần đối soát quyết định trước khi đưa vào luồng xét tuyển mới.");
-      const payload = { roundId: round.id, inputs: dto.inputs, recordSnapshot: admissionRecordSnapshot(record), version: dto.version + 1 };
-      if (evaluation) await evaluation.update(payload as any, { transaction });
-      else evaluation = await this.evaluations.create({ ...payload, admissionRecordId: id, decision: "pending" } as any, { transaction });
-      await this.appendHistory(record, evaluation, round, "saved", actor, {}, transaction);
-      return this.view(record, evaluation, round);
+      return this.saveLocked(id, dto, actor, transaction, round);
     };
     return existingTransaction ? execute(existingTransaction) : this.sequelize.transaction(execute);
+  }
+  // The caller holds the round lock. Score imports preserve the other inputs
+  // from the locked evaluation instead of issuing a second, unlocked read.
+  private async saveLocked(id: string, dto: SaveAdmissionEvaluationDto, actor: any, transaction: Transaction, round: AdmissionRound, scoreOnly = false) {
+    const record = await this.records.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+    if (!record) throw new NotFoundException("Không tìm thấy hồ sơ.");
+    if (record.trainingLevel !== "Thạc sĩ" || record.academicYear !== round.academicYear) throw new BadRequestException("Đợt xét tuyển phải cùng năm tuyển sinh với hồ sơ thạc sĩ.");
+    let evaluation = await this.evaluations.findOne({ where: { admissionRecordId: id }, transaction, lock: transaction.LOCK.UPDATE });
+    if (scoreOnly && evaluation && evaluation.roundId !== round.id) throw new ConflictException("Hồ sơ đã thuộc đợt khác. Tải lại bảng điểm.");
+    this.requireVersion(evaluation, dto.version);
+    if (evaluation && evaluation.decision !== "pending") throw new ConflictException("Hồ sơ đã được duyệt. Mở lại kết quả trước khi sửa.");
+    if (!evaluation && (record.status === "admitted" || record.status === "approved" || ["Đã trúng tuyển", "Đang học"].includes(record.studyStatus || ""))) throw new ConflictException("Hồ sơ đã trúng tuyển theo dữ liệu cũ. Cần đối soát quyết định trước khi đưa vào luồng xét tuyển mới.");
+    const inputs = scoreOnly ? { ...evaluation?.inputs, manualTotal: dto.inputs.manualTotal } : dto.inputs;
+    const payload = { roundId: round.id, inputs, recordSnapshot: admissionRecordSnapshot(record), version: dto.version + 1 };
+    if (evaluation) await evaluation.update(payload as any, { transaction });
+    else evaluation = await this.evaluations.create({ ...payload, admissionRecordId: id, decision: "pending" } as any, { transaction });
+    await this.appendHistory(record, evaluation, round, "saved", actor, {}, transaction);
+    return this.view(record, evaluation, round);
   }
   async ranking(roundId: string, transaction?: Transaction) {
     const query = transaction ? { transaction, lock: transaction.LOCK.UPDATE } : {};
@@ -133,9 +140,7 @@ export class AdmissionEvaluationService {
       if (!ids.length || new Set(ids).size !== ids.length) throw new BadRequestException("Danh sách điểm trống hoặc trùng hồ sơ.");
       for (const row of [...dto.rows].sort((a, b) => a.admissionRecordId.localeCompare(b.admissionRecordId))) {
         if (!Number.isFinite(row.score) || row.score < 0 || row.score > 20) throw new BadRequestException("Điểm phải từ 0 đến 20.");
-        const current = await this.evaluations.findOne({ where: { admissionRecordId: row.admissionRecordId }, transaction });
-        if (current && current.roundId !== roundId) throw new ConflictException("Hồ sơ đã thuộc đợt khác. Tải lại bảng điểm.");
-        await this.save(row.admissionRecordId, { roundId, version: row.version, inputs: { ...current?.inputs, manualTotal: row.score } }, actor, transaction);
+        await this.saveLocked(row.admissionRecordId, { roundId, version: row.version, inputs: { manualTotal: row.score } }, actor, transaction, round, true);
       }
       return { savedCount: dto.rows.length };
     });

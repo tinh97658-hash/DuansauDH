@@ -181,6 +181,38 @@ describe("Nhập điểm và duyệt danh sách", () => {
     expect(evaluation.update).toHaveBeenCalledWith(expect.objectContaining({ version: 2 }), { transaction: tx });
     expect(history.create).toHaveBeenCalled(); expect(record.update).not.toHaveBeenCalled();
   });
+  it('does not reload the locked round or read the evaluation twice when importing scores', async () => {
+    const { service, rounds, evaluations, evaluation, history, tx } = setup();
+    await service.saveScores('round', { rows: [{ admissionRecordId: 'record', version: 1, score: 0 }] }, { id: 'admin' });
+    expect(evaluation.inputs.manualTotal).toBe(0);
+    expect(evaluation.inputs.englishScore).toBe(8);
+    expect(evaluation.inputs.degreeVerified).toBe(true);
+    expect(history.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'saved' }), { transaction: tx });
+    expect(rounds.findByPk).toHaveBeenCalledTimes(1);
+    expect(evaluations.findOne).toHaveBeenCalledTimes(1);
+    expect(evaluations.findOne).toHaveBeenCalledWith(expect.objectContaining({ transaction: tx, lock: tx.LOCK.UPDATE }));
+  });
+  it('imports multiple scores in lock order while preserving each evaluation inputs and history', async () => {
+    const f = setup();
+    const secondRecord = { ...f.record, id: 'record-2' };
+    const secondEvaluation: any = { ...f.evaluation, id: 'eval-2', admissionRecordId: 'record-2', inputs: { englishScore: 6 } };
+    secondEvaluation.toJSON = () => ({ ...secondEvaluation, update: undefined, toJSON: undefined });
+    secondEvaluation.update = jest.fn(async values => Object.assign(secondEvaluation, values));
+    f.records.findByPk.mockImplementation(async id => id === 'record' ? f.record : secondRecord);
+    f.evaluations.findOne.mockImplementation(async ({ where }) => where.admissionRecordId === 'record' ? f.evaluation : secondEvaluation);
+    const result = await f.service.saveScores('round', { rows: [
+      { admissionRecordId: 'record-2', version: 1, score: 19 },
+      { admissionRecordId: 'record', version: 1, score: 0 },
+    ] }, {});
+    expect(result.savedCount).toBe(2);
+    expect(f.evaluation.inputs).toMatchObject({ englishScore: 8, manualTotal: 0 });
+    expect(secondEvaluation.inputs).toEqual({ englishScore: 6, manualTotal: 19 });
+    expect(f.records.findByPk.mock.calls.map(([id]) => id)).toEqual(['record', 'record-2']);
+    expect(f.rounds.findByPk).toHaveBeenCalledTimes(1);
+    expect(f.evaluations.findOne).toHaveBeenCalledTimes(2);
+    expect(f.history.create).toHaveBeenCalledTimes(2);
+    expect(f.db.transaction).toHaveBeenCalledTimes(1);
+  });
   it.each(["version", "decided", "otherRound", "duplicate", "outOfRange"])("chặn nhập hàng loạt khi %s", async (problem) => {
     const { service, evaluation, record } = setup();
     const row = { admissionRecordId: "record", version: 1, score: 18 };

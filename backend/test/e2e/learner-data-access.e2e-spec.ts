@@ -19,6 +19,8 @@ import { GradingPolicyService } from "../../src/masters/grading-policy.service.j
 import { AdmissionEvaluationService } from "../../src/plan/admission-evaluation.service.js";
 import { ReportsController } from "../../src/reports/reports.controller.js";
 import { ReportsService } from "../../src/reports/reports.service.js";
+import { LecturerPaymentService } from "../../src/reports/lecturer-payment.service.js";
+import { SchedulingService } from "../../src/scheduling/scheduling.service.js";
 import { ClassScoreSummaryService } from "../../src/reports/class-score-summary.service.js";
 import { RbacService } from "../../src/auth/rbac.service.js";
 
@@ -77,6 +79,8 @@ describe("Learner data access over HTTP", () => {
         { provide: MastersService, useValue: { listClassGroups: read, getClassGroup: read, listEligibleStudents: read } },
         { provide: ExamGradebookService, useValue: { history: read, transition: write } },
         { provide: ReportsService, useValue: {} },
+        { provide: LecturerPaymentService, useValue: {} },
+        { provide: SchedulingService, useValue: {} },
         { provide: ClassScoreSummaryService, useValue: { learnerScorecard: read, issuesForRecord: read, issued: read, issue: write } },
         { provide: GradingPolicyService, useValue: {} },
         { provide: ExamScheduleService, useValue: {list:read} },
