@@ -30,7 +30,7 @@ let created = false;
     });
     await migrator.up();
     console.log('All migrations, including 090, passed on a fresh disposable database.');
-    const result = spawnSync(process.execPath, [require.resolve('jest/bin/jest'), '--config', 'test/jest.config.cjs', '--runInBand', 'test/integration/lecturer-payment-postgres.spec.ts'], {
+    const result = spawnSync(process.execPath, [require.resolve('jest/bin/jest'), '--config', 'test/jest.config.cjs', '--runInBand', 'test/integration/lecturer-payment-postgres.spec.ts', 'test/integration/lecturer-payment-batch-postgres.spec.ts'], {
       cwd: root, stdio: 'inherit', env: { ...process.env, DATABASE_URL: uri.toString(), RUN_LECTURER_PAYMENT_DB_TESTS: 'true', NODE_ENV: 'test' },
     });
     process.exitCode = result.status ?? 1;

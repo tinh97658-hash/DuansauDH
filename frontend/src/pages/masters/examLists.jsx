@@ -517,10 +517,10 @@ export default function ExamLists() {
           {!blank&&canApproveGrades&&['submitted','approved'].includes(workflow.final.status)&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('final','reopen')}>Mở lại kết quả</Button>}
         </>}
         {!blank && <Button startIcon={<HistoryRounded />} disabled={!offeringId || saving} onClick={loadHistory}>Lịch sử điểm</Button>}
-          <DocumentExportMenu label={blank ? "Xuất báo cáo" : "Xuất bảng điểm"} disabled={!groupId || !offeringId || !total || busy || saving || exporting || (blank && !examPrintReady)}
-            onWord={() => exportFile("word")} onExcel={() => exportFile("excel")} onPdf={() => exportFile("pdf")} />
-          {!blank && <Tooltip title={dirtyCount ? "Lưu các điểm đang chỉnh sửa trước khi xuất phiếu ký" : "Xuất theo mẫu BM.02-QT.SDH.03 cho toàn bộ lớp học phần"}><span>
-            <DocumentExportMenu label="Xuất báo cáo" disabled={!groupId || !offeringId || !totalRows || busy || saving || exporting || !!dirtyCount}
+          {blank && <DocumentExportMenu label="Danh sách thi" title="Xuất lịch thi kết thúc học phần" disabled={!groupId || !offeringId || !total || busy || saving || exporting || !examPrintReady}
+            onWord={() => exportFile("word")} onExcel={() => exportFile("excel")} onPdf={() => exportFile("pdf")} />}
+          {!blank && <Tooltip title={dirtyCount ? "Lưu các điểm đang chỉnh sửa trước khi xuất phiếu ký" : "Xuất phiếu theo dõi tình hình học tập — BM.02-QT.SDH.03"}><span>
+            <DocumentExportMenu label="Xuất báo cáo" title="Xuất phiếu theo dõi tình hình học tập — BM.02-QT.SDH.03" disabled={!groupId || !offeringId || !totalRows || busy || saving || exporting || !!dirtyCount}
               onWord={() => exportSigningSheet("word")} onExcel={() => exportSigningSheet("excel")} onPdf={() => exportSigningSheet("pdf")} />
           </span></Tooltip>}
           {!blank && <Button startIcon={<SaveRounded />} disabled={!workflowEditable || !canSubmitGrades || !teachingCompleted || !dirtyCount || saving || exporting || busy} onClick={save}>{saving ? "Đang lưu..." : "Cập nhật cả bảng"}</Button>}

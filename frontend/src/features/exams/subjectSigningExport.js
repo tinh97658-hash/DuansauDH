@@ -1,5 +1,5 @@
 import { BRAND } from "../../config/branding";
-import { pointsToExcelWidth, excelRowHeight } from "../../utils/documentLayout";
+import { createExcelForm, excelRowHeight } from "../../utils/documentLayout";
 import { openDocumentPreview, sanitizeDocumentFilenamePart } from "../../utils/documentFiles";
 import { formatScore, numericScore } from "./gradebook";
 
@@ -60,79 +60,76 @@ export function readSubjectSigningPreview(id) {
 export async function createSubjectSigningExcel(document) {
   const module = await import("exceljs");
   const book = new (module.default || module).Workbook();
-  const rows = document.rows;
-  const sheet = book.addWorksheet("Theo dõi môn học");
-  const physicalWidths = SUBJECT_SIGNING_FORM.widths.map(width => width / 20);
-  sheet.columns = physicalWidths.map(width => ({ width: pointsToExcelWidth(width) }));
-  const merge = (row, from, to, value, bold = false, center = false) => {
-    if (to > from) sheet.mergeCells(row, from, row, to);
-    const cell = sheet.getCell(row, from); cell.value = value;
-    cell.font = { name: "Times New Roman", size: 13, bold };
-    cell.alignment = { horizontal: center ? "center" : "left", vertical: "middle", wrapText: true };
-  };
-  merge(1, 1, 8, document.university, false, true); merge(2, 1, 8, document.institute, true, true);
-  sheet.getCell("A1").font.size = 14; sheet.getCell("A2").font.size = 14;
-  merge(3, 1, 17, document.title, true, true); sheet.getRow(3).height = 30; sheet.getCell("A3").font.size = 14;
+  const widths = SUBJECT_SIGNING_FORM.widths.map(width => width / 20);
+  const width = widths.reduce((sum, value) => sum + value, 0);
+  const inset = SUBJECT_SIGNING_LAYOUT.inset / 20, metadataWidth = width - inset - 16;
   const metadataFields = signingMetadataFields(document);
-  metadataFields.forEach((fields, i) => {
-    const rowNumber = 4 + i;
-    const percentages = SUBJECT_SIGNING_LAYOUT.metadataWidths[i];
-    let from = 1, percent = 0;
-    fields.forEach(([label, value], index) => {
-      percent += percentages[index];
-      const target = physicalWidths.reduce((sum, width) => sum + width, 0) * percent / 100;
-      let to = from, used = physicalWidths.slice(0, from - 1).reduce((sum, width) => sum + width, 0);
-      while (to < 17 && used + physicalWidths[to - 1] < target) { used += physicalWidths[to - 1]; to++; }
-      if (index === fields.length - 1) to = 17;
-      merge(rowNumber, from, to, "");
-      const cell = sheet.getCell(rowNumber, from);
-      cell.value = { richText: [{ text: `${label}: `, font: { bold: true } }, { text: value, font: { bold: label === "Địa điểm" } }] };
-      sheet.getRow(rowNumber).height = Math.max(sheet.getRow(rowNumber).height || 15,
-        excelRowHeight([`${label}: ${value}`], [physicalWidths.slice(from - 1, to).reduce((sum, width) => sum + width, 0)], 13, 0));
-      from = to + 1;
-    });
+  const metadataEdges = SUBJECT_SIGNING_LAYOUT.metadataWidths.map(percentages => {
+    let total = 0;
+    return [inset, ...percentages.map(percent => inset + metadataWidth * (total += percent) / 100)];
   });
-  const headerRow = 4 + metadataFields.length, subheaderRow = headerRow + 1, dataRow = headerRow + 2;
-  sheet.mergeCells(headerRow, 1, subheaderRow, 1); sheet.getCell(headerRow, 1).value = "STT";
-  sheet.mergeCells(headerRow, 2, subheaderRow, 2); sheet.getCell(headerRow, 2).value = "Họ và tên học viên";
-  merge(headerRow, 3, 14, "Theo dõi số tiết học của học viên", true, true);
-  merge(headerRow, 15, 16, "Số tiết vắng", true, true);
-  sheet.mergeCells(headerRow, 17, subheaderRow, 17); sheet.getCell(headerRow, 17).value = "Kết quả xử lý";
-  ["Điểm KT", "Điểm ThL/TH", "Điểm TL/BTL", "Có lý do", "Không lý do"].forEach((value, i) => { sheet.getCell(subheaderRow, 12 + i).value = value; });
-  sheet.getRow(headerRow).height = 14; sheet.getRow(subheaderRow).height = 28;
-  rows.forEach((values, i) => { values.forEach((value, col) => { sheet.getCell(dataRow + i, col + 1).value = value; });
-    sheet.getRow(dataRow + i).height = excelRowHeight(values, physicalWidths, 12, 0, 14.25); });
-  const summaryRow = dataRow + rows.length;
-  const notesRow = summaryRow + 2;
-  const dateRow = notesRow + SUBJECT_SIGNING_FORM.notes.length;
-  const signatureRow = dateRow + 1;
-  const finalRow = signatureRow + 2;
-  ["Có mặt/Tổng số", "Cán bộ phụ trách"].forEach((value, i) => { merge(summaryRow + i, 1, 2, value); sheet.getRow(summaryRow + i).height = 26; });
+  const form = createExcelForm(book, "Theo dõi môn học", {
+    widths, stops: [...metadataEdges.flat(), inset, inset + 266, 35, width - 16, width / 3, width * 2 / 3],
+    fontSize: 13, landscape: true,
+    margins: { left: 43 / 72, right: 33.55 / 72, top: 30 / 72, bottom: 54 / 72, header: .1, footer: .4 },
+  });
+  const { sheet, edges, put, columnAt } = form;
+  put(1, inset, inset + 266, document.university, { size: 14, horizontal: "center" });
+  put(2, inset, inset + 266, document.institute, { size: 14, bold: true, horizontal: "center" });
+  put(3, 0, width, document.title, { size: 14, bold: true, horizontal: "center", height: 30 });
+  metadataFields.forEach((fields, row) => fields.forEach(([label, value], col) => {
+    const font = { name: "Times New Roman", size: 13 };
+    put(4 + row, metadataEdges[row][col], metadataEdges[row][col + 1], { richText: [
+      { text: label + ": ", font: { ...font, bold: true } },
+      { text: value, font: { ...font, bold: label === "Địa điểm" } },
+    ] });
+  }));
+  const headerRow = 8, subheaderRow = 9, dataRow = 10;
   const border = Object.fromEntries(["top", "bottom", "left", "right"].map(side => [side, { style: "thin", color: { argb: "FF000000" } }]));
-  for (let row = headerRow; row < notesRow; row++) for (let col = 1; col <= 17; col++) {
-    const cell = sheet.getCell(row, col); cell.border = border;
-    cell.font = { name: "Times New Roman", size: 12, bold: row < dataRow };
-    cell.alignment = { wrapText: true, vertical: "middle", horizontal: row >= dataRow && col === 2 ? "left" : "center" };
-  }
-  SUBJECT_SIGNING_FORM.notes.forEach((line, i) => {
-    merge(notesRow + i, 1, 17, line); sheet.getRow(notesRow + i).height = excelRowHeight([line], [physicalWidths.reduce((sum, width) => sum + width, 0)], 13, 0, 15);
-    sheet.getCell(notesRow + i, 1).font = { name: "Times New Roman", size: 13, italic: true };
+  const tableCell = (row, from, to, value, bold = false, horizontal = "center") => {
+    const cell = put(row, edges[from], edges[to], value, { size: 12, bold, horizontal, border, height: 14.25 });
+    cell.alignment.vertical = "middle";
+    return cell;
+  };
+  [[0, "STT"], [1, "Họ và tên học viên"], [16, "Kết quả xử lý"]].forEach(([col, label]) => {
+    const first = columnAt(edges[col]), last = columnAt(edges[col + 1]) - 1;
+    sheet.mergeCells(headerRow, first, subheaderRow, last);
+    const cell = sheet.getCell(headerRow, first);
+    cell.value = label; cell.font = { name: "Times New Roman", size: 12, bold: true };
+    cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true }; cell.border = border;
   });
-  sheet.getCell(notesRow, 1).value = { richText: [
-    { text: "Ghi chú: ", font: { bold: true, italic: false } },
-    { text: "Phần theo dõi số tiết của học viên", font: { bold: true, italic: true } },
-    { text: SUBJECT_SIGNING_FORM.notes[0].slice("Ghi chú: Phần theo dõi số tiết của học viên".length), font: { italic: true } },
+  tableCell(headerRow, 2, 14, "Theo dõi số tiết học của học viên", true);
+  tableCell(headerRow, 14, 16, "Số tiết vắng", true);
+  Array.from({ length: 9 }, (_, i) => tableCell(subheaderRow, i + 2, i + 3, "", true));
+  ["Điểm KT", "Điểm ThL/TH", "Điểm TL/BTL", "Có lý do", "Không lý do"].forEach((value, i) => tableCell(subheaderRow, 11 + i, 12 + i, value, true));
+  sheet.getRow(headerRow).height = Math.max(14, sheet.getRow(headerRow).height || 0);
+  sheet.getRow(subheaderRow).height = Math.max(28, sheet.getRow(subheaderRow).height || 0);
+  document.rows.forEach((values, row) => {
+    values.forEach((value, col) => tableCell(dataRow + row, col, col + 1, value, false, col === 1 ? "left" : "center"));
+    sheet.getRow(dataRow + row).height = excelRowHeight(values, widths, 12, 0, 14.25);
+  });
+  const summaryRow = dataRow + document.rows.length;
+  ["Có mặt/Tổng số", "Cán bộ phụ trách"].forEach((value, i) => {
+    tableCell(summaryRow + i, 0, 2, value, false, "left");
+    for (let col = 2; col < 17; col++) tableCell(summaryRow + i, col, col + 1, "");
+    sheet.getRow(summaryRow + i).height = Math.max(26, sheet.getRow(summaryRow + i).height || 0);
+  });
+  const notesRow = summaryRow + 2, dateRow = notesRow + SUBJECT_SIGNING_FORM.notes.length, signatureRow = dateRow + 1;
+  SUBJECT_SIGNING_FORM.notes.forEach((line, i) => put(notesRow + i, 35, width - 16, line, { italic: true }));
+  sheet.getCell(notesRow, columnAt(35)).value = { richText: [
+    { text: "Ghi chú: ", font: { name: "Times New Roman", size: 13, bold: true, italic: false } },
+    { text: "Phần theo dõi số tiết của học viên", font: { name: "Times New Roman", size: 13, bold: true, italic: true } },
+    { text: SUBJECT_SIGNING_FORM.notes[0].slice("Ghi chú: Phần theo dõi số tiết của học viên".length), font: { name: "Times New Roman", size: 13, italic: true } },
   ] };
-  merge(dateRow, 12, 17, subjectSigningDate, false, true); sheet.getCell(dateRow, 12).font = { name: "Times New Roman", size: 13, italic: true };
+  put(dateRow, width * 2 / 3, width, subjectSigningDate, { italic: true, horizontal: "center" });
   SUBJECT_SIGNING_FORM.signatures.forEach((role, i) => {
-    const from = [1, 7, 12][i], to = [6, 11, 17][i];
-    merge(signatureRow, from, to, role, false, true); merge(signatureRow + 1, from, to, "(Ký và ghi rõ họ tên)", false, true);
-    sheet.getCell(signatureRow + 1, from).font.italic = true;
+    put(signatureRow, width * i / 3, width * (i + 1) / 3, role, { horizontal: "center" });
+    put(signatureRow + 1, width * i / 3, width * (i + 1) / 3, "(Ký và ghi rõ họ tên)", { italic: true, horizontal: "center" });
   });
+  const finalRow = signatureRow + 2;
   sheet.getRow(finalRow).height = 45;
-  sheet.pageSetup = { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0,
-    printTitlesRow: `${headerRow}:${subheaderRow}`, printArea: `A1:Q${finalRow}`, margins: { left: 43 / 72, right: 33.55 / 72, top: 30 / 72, bottom: 54 / 72, header: .1, footer: .4 } };
-  sheet.headerFooter.oddFooter = `&L&"Times New Roman,Bold"&9&K808080NBH: ${SUBJECT_SIGNING_FORM.publishedOn}-REV:${SUBJECT_SIGNING_FORM.revision}&R&"Times New Roman,Bold"&9&K808080${SUBJECT_SIGNING_FORM.code}`;
+  form.finish(finalRow, headerRow, subheaderRow);
+  sheet.headerFooter.oddFooter = '&L&"Times New Roman,Bold"&9&K808080NBH: ' + SUBJECT_SIGNING_FORM.publishedOn + '-REV:' + SUBJECT_SIGNING_FORM.revision + '&R&"Times New Roman,Bold"&9&K808080' + SUBJECT_SIGNING_FORM.code;
   return new Blob([await book.xlsx.writeBuffer()], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 }
 

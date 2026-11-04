@@ -73,7 +73,7 @@ it("exports the selected classes through the progress form with the current subj
   mount(); await chooseScope();
   fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: "Hệ phân tán" } });
   fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Word (.docx)" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Word (.docx)" }));
   const dialog = screen.getByRole("dialog");
   fireEvent.click(within(dialog).getByRole("checkbox", { name: "CNT2027.02 Khóa 2027" }));
   fireEvent.click(within(dialog).getByRole("button", { name: "Xuất 1 báo cáo" }));
@@ -113,7 +113,7 @@ it("prefills the class selected in the page filter and allows cancelling without
   mount(); await chooseScope();
   fireEvent.change(screen.getByLabelText("Lớp học viên"), { target: { value: "group-2027-2" } });
   fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Excel (.xlsx)" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Excel (.xlsx)" }));
   const dialog = screen.getByRole("dialog");
   expect(within(dialog).getByRole("checkbox", { name: "CNT2027.02 Khóa 2027" })).toBeChecked();
   fireEvent.click(within(dialog).getByRole("button", { name: "Đóng" }));
@@ -139,7 +139,7 @@ it.each([["word", "Word (.docx)"], ["excel", "Excel (.xlsx)"], ["pdf", "PDF (.pd
 it("keeps selected classes while searching and lets users change the export format in the dialog", async () => {
   mount(); await chooseScope();
   fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Word (.docx)" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Word (.docx)" }));
   const dialog = screen.getByRole("dialog");
   expect(within(dialog).getByRole("radio", { name: "Word" })).toBeChecked();
   fireEvent.click(within(dialog).getByRole("checkbox", { name: "CNT2027.01 Khóa 2027" }));
@@ -159,7 +159,7 @@ it("previews one class without exporting the selection or closing the dialog", a
   try {
     mount(); await chooseScope();
     fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Word (.docx)" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Word (.docx)" }));
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "Xem trước CNT2027.02" }));
     await waitFor(() => expect(downloadReport).toHaveBeenCalledTimes(1));

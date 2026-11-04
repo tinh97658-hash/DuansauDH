@@ -20,9 +20,13 @@ describe('Lecturer payment authorization and validation', () => {
     await expect(guard.canActivate(context('lecturerPayments'))).resolves.toBe(true);
     await expect(guard.canActivate(context('paymentOffering'))).resolves.toBe(true);
     await expect(guard.canActivate(context('updatePayment', 'PUT'))).rejects.toThrow(ForbiddenException);
+    await expect(guard.canActivate(context('previewPaymentBatch', 'POST'))).rejects.toThrow(ForbiddenException);
+    await expect(guard.canActivate(context('applyPaymentBatch', 'PUT'))).rejects.toThrow(ForbiddenException);
     await expect(guard.canActivate(context('exportPayments'))).rejects.toThrow(ForbiddenException);
     rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['reports.view', 'reports.payments.manage']) });
     await expect(guard.canActivate(context('updatePayment', 'PUT'))).resolves.toBe(true);
+    await expect(guard.canActivate(context('previewPaymentBatch', 'POST'))).resolves.toBe(true);
+    await expect(guard.canActivate(context('applyPaymentBatch', 'PUT'))).resolves.toBe(true);
     expect(rbac.effectiveAccess).toHaveBeenLastCalledWith(user, true);
   });
   it.each(['false', 1, null, undefined])('rejects non-boolean paid value %s', async paid => {

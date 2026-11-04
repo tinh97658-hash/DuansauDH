@@ -13,6 +13,7 @@ import { api, groupsOf, intersectDays, labelOf, message, Modal, normalize, Notic
 
 import { addDays, formatDateKey, getBusinessTodayKey, getBusinessWallTime, isSessionPast, isSessionStartedInBusinessTimezone, periodTimes, mondayOf, vietnameseDate, vietnameseDayMonth, vietnameseWeekdayShort, weekDaysFrom } from "../../utils/schedulingCalendar";
 import SessionEditor from "./SessionEditor";
+import PendingConfirmationButton from "./PendingConfirmationButton";
 import { shouldSuggestClosing } from "./sessionWarning";
 import OfferingDetails from "./OfferingDetails";
 import { disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
@@ -436,7 +437,7 @@ export default function Schedule({ user }) {
     </article>;
   })}{!listed.length && <Notice>Không có lớp học phần trong phạm vi đã chọn.</Notice>}</section>}</div></div></div></aside>
   <section className="sl-right"><div className="sl-schedule-head"><h1>XẾP LỊCH</h1><div className="sl-week"><button aria-label="Tuần trước" onClick={() => changeWeek(formatDateKey(addDays(week, -7)))}>‹</button><strong>{vietnameseDate(week)} — {vietnameseDate(end)}</strong><button aria-label="Tuần sau" onClick={() => changeWeek(formatDateKey(addDays(week, 7)))}>›</button></div>
-    <div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" label="Xuất báo cáo" disabled={sessions.loading || !!sessions.error || majors.loading || !!majors.error || offerings.loading || !!offerings.error} showFileIcons onWord={downloadWord} onExcel={downloadExcel} onPdf={openPdfPreview} onError={(failure) => notify.error(message(failure))} /><button className="sl-btn sl-today" disabled={week === currentWeek && !focusedDate} onClick={() => changeWeek(currentWeek)}>Tuần này</button>{canEdit && <button className="sl-pending" onClick={() => setPendingOpen(true)}>{pending.loading ? "…" : pending.data?.length ?? "—"} chờ xác nhận</button>}</div>
+    <div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" label="Xuất báo cáo" disabled={sessions.loading || !!sessions.error || majors.loading || !!majors.error || offerings.loading || !!offerings.error} showFileIcons onWord={downloadWord} onExcel={downloadExcel} onPdf={openPdfPreview} onError={(failure) => notify.error(message(failure))} /><button className="sl-btn sl-today" disabled={week === currentWeek && !focusedDate} onClick={() => changeWeek(currentWeek)}>Tuần này</button>{canEdit && <PendingConfirmationButton count={pending.data?.length} loading={pending.loading} error={pending.error} open={pendingOpen} controls="schedule-pending-dialog" onClick={() => setPendingOpen(true)} />}</div>
   </div>{selecting && <div className="sl-selected-strip"><span className="sl-selected-tag">ĐANG XẾP</span><strong className="sl-selected-offering" title={offeringTitle(selected)}>{offeringTitle(selected)}</strong><span className="sl-selected-meta">{selected.subject?.code ? `${selected.subject.code} · ` : ""}{groupsOf(selected).length} lớp/nhóm · {selected.participantCount ?? 0} HV</span><button type="button" className="sl-btn sl-selected-clear" onClick={() => setSelected("")}>Bỏ chọn</button></div>}
     {sessions.error && <Notice error={sessions.error} />}{error && <Notice error={error} />}
     <div className={`sl-calendar-wrap ${selecting ? "sl-selecting" : ""}`} aria-busy={sessions.loading}>{focusedDay ? <section className="sl-day-focus" aria-label={`Lịch ngày ${vietnameseDate(focusedDate)}`}>
@@ -493,7 +494,7 @@ export default function Schedule({ user }) {
   </section>
   {editor && <SessionEditor key={editor.session?.id || `${editor.date}-${editor.period}`} {...editor} user={user} onClose={() => setEditor(null)} onSaved={saved} onViewOffering={(offering) => { setEditor(null); setDetails(offering); }} />}
   {details && <OfferingDetails offering={details} user={user} onClose={() => setDetails(null)} onSaved={saved} onOpenSession={openSession} onSelect={select} />}
-  {pendingOpen && <Modal wide className="sl-pending-drawer" bodyClassName="sl-pending-body" title={`BUỔI CHỜ XÁC NHẬN · ${pendingRows.length}`} busy={saving} onClose={() => setPendingOpen(false)}>
+  {pendingOpen && <Modal id="schedule-pending-dialog" wide className="sl-pending-drawer" bodyClassName="sl-pending-body" title={`BUỔI CHỜ XÁC NHẬN · ${pendingRows.length}`} busy={saving} onClose={() => setPendingOpen(false)}>
     {pending.loading ? <Notice>Đang tải...</Notice> : pending.error ? <Notice error={pending.error} /> : <>
       {error && <Notice error={error} />}
       {pendingRows.length ? [...pendingRows].sort((left, right) => `${left.sessionDate} ${left.period}`.localeCompare(`${right.sessionDate} ${right.period}`)).map((session) => {

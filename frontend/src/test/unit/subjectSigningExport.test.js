@@ -2,7 +2,8 @@ import JSZip from "jszip";
 import ExcelJS from "exceljs";
 import fs from "node:fs";
 import path from "node:path";
-import { buildSubjectSigningDocument, createSubjectSigningWord, createSubjectSigningExcel } from "../../features/exams/subjectSigningExport";
+import { buildSubjectSigningDocument, createSubjectSigningWord, createSubjectSigningExcel, SUBJECT_SIGNING_FORM } from "../../features/exams/subjectSigningExport";
+import { excelWidthToPoints } from "../../utils/documentLayout";
 
 const sample = () => buildSubjectSigningDocument([
   { code: "CKTM 2026.1.1", academicYear: "2026", major: { name: "Cơ khí thông minh và Robot" } },
@@ -58,18 +59,52 @@ it("round-trips all 31 learners in Excel with the source form's merged cells and
   const book = new ExcelJS.Workbook(); await book.xlsx.load(await bytes(await createSubjectSigningExcel(sample())));
   expect(book.worksheets).toHaveLength(1);
   const first = book.worksheets[0];
-  expect(first.getCell("L10").value).toBe(0); expect(first.getCell("M10").value).toBe("");
-  expect(first.getCell("N10").value).toBe(9); expect(first.getCell("Q10").value).toBe("Không đạt");
-  expect(first.model.merges).toContain("C8:N8");
-  expect(first.getCell("G46").value).toBe("CÁN BỘ PHỤ TRÁCH");
-  expect(first.getCell("B40").value).toBe("Nguyễn Văn An 31");
+  const at = (row, logicalColumn) => {
+    const x = SUBJECT_SIGNING_FORM.widths.slice(0, logicalColumn).reduce((a, b) => a + b, 0) / 20;
+    let left = 0;
+    for (let col = 1; col <= first.columnCount; col++) {
+      if (Math.abs(left - x) < .03) return first.getCell(row, col).master;
+      left += excelWidthToPoints(first.getColumn(col).width);
+    }
+    throw Error('Logical column missing');
+  };
+  expect(at(10, 11).value).toBe(0); expect(at(10, 12).value).toBe("");
+  expect(at(10, 13).value).toBe(9); expect(at(10, 16).value).toBe("Không đạt");
+  expect(at(8, 2).value).toBe("Theo dõi số tiết học của học viên");
+  expect(first.getRow(46).values).toContain("CÁN BỘ PHỤ TRÁCH");
+  expect(at(40, 1).value).toBe("Nguyễn Văn An 31");
   expect(first.getCell("A41").value).toBe("Có mặt/Tổng số");
-  expect(first.getCell("A4").value.richText).toContainEqual({ text: "Tên học phần: ", font: { bold: true } });
-  expect(first.getCell("A5").value.richText).toContainEqual({ text: "Chuyên ngành: ", font: { bold: true } });
-  expect(first.getCell("A44").font.italic).toBe(true);
-  expect(first.getCell("L45").font.italic).toBe(true);
-  expect(first.getCell("G46").font.bold).not.toBe(true);
-  expect(first.getCell("G47").font.italic).toBe(true);
+  const firstValue = row => [...new Set(first.getRow(row).values.filter(Boolean))][0];
+  expect(firstValue(4).richText).toContainEqual(expect.objectContaining({ text: "Tên học phần: ", font: expect.objectContaining({ bold: true, name: 'Times New Roman', size: 13 }) }));
+  expect(firstValue(5).richText).toContainEqual(expect.objectContaining({ text: "Chuyên ngành: ", font: expect.objectContaining({ bold: true }) }));
   expect(Array.from({ length: 31 }, (_, i) => first.getCell(10 + i, 1).value)).toEqual(Array.from({ length: 31 }, (_, i) => i + 1));
-  expect(first.pageSetup).toMatchObject({ orientation: "landscape", fitToWidth: 1, fitToHeight: 0, printTitlesRow: "8:9", printArea: "A1:Q48" });
+  expect(first.pageSetup).toMatchObject({ orientation: "landscape", fitToWidth: 1, fitToHeight: 0, printTitlesRow: "8:9", printArea: `A1:${first.getColumn(first.columnCount).letter}48` });
+});
+
+it('gives metadata independent widths and equal signature thirds with long fixture content', async () => {
+  const doc = { ...sample(), subject: 'Học phần có tên dài phục vụ kiểm tra bố cục '.repeat(3),
+    group: 'Lớp học phần liên khóa chuyên ngành kỹ thuật '.repeat(3), year: '2026–2027',
+    lecturer: 'Nguyễn Thị Giảng Viên Tên Dài', lecturerUnit: 'Đơn vị công tác có tên dài '.repeat(3) };
+  const blob = await createSubjectSigningExcel(doc), buffer = await bytes(blob);
+  fs.mkdirSync(path.resolve('../.tmp'), { recursive: true });
+  fs.writeFileSync(path.resolve('../.tmp/subject-signing-ux-sample.xlsx'), new Uint8Array(buffer));
+  const book = new ExcelJS.Workbook(); await book.xlsx.load(buffer); const sheet = book.worksheets[0];
+  const width = cell => {
+    const range = sheet.model.merges.map(value => value.split(':').map(address => sheet.getCell(address)))
+      .find(([start]) => start.address === cell.master.address);
+    return range ? Array.from({ length: range[1].col - range[0].col + 1 }, (_, i) => excelWidthToPoints(sheet.getColumn(range[0].col + i).width)).reduce((a, b) => a + b, 0) : excelWidthToPoints(sheet.getColumn(cell.col).width);
+  };
+  const metadata = [...new Set(sheet.getRow(6).values.filter(Boolean))];
+  expect(metadata.map(v => v.richText[0].text)).toEqual(['Khóa: ', 'Năm: ', 'Địa điểm: ']);
+  const cells = [];
+  sheet.getRow(6).eachCell(cell => { if (cell.address === cell.master.address && cell.value) cells.push(cell); });
+  expect(width(cells[0])).toBeCloseTo(101, 0); expect(width(cells[1])).toBeCloseTo(101, 0);
+  expect(width(cells[2])).toBeCloseTo(519.44, 0);
+  expect(sheet.getRow(6).height).toBeLessThan(60);
+  const signatures = [];
+  sheet.getRow(46).eachCell(cell => { if (cell.address === cell.master.address && cell.value) signatures.push(width(cell)); });
+  expect(signatures).toHaveLength(3);
+  signatures.forEach(value => expect(value).toBeCloseTo(255.15, 1));
+  expect(sheet.getRow(4).height).toBeGreaterThan(17);
+  expect(sheet.getRow(7).height).toBeGreaterThan(17);
 });

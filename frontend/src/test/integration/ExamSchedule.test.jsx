@@ -34,9 +34,9 @@ it('exports the filtered exam week through the shared PDF preview',async()=>{
   renderPage(['gradebook.view']);await waitFor(()=>expect(screen.getByRole('button',{name:'Xuất báo cáo'})).toBeEnabled());
   fireEvent.change(screen.getByRole('textbox',{name:'Tìm kiếm'}),{target:{value:'Quản trị'}});
   fireEvent.click(screen.getByRole('button',{name:'Xuất báo cáo'}));
-  expect(screen.getByRole('menuitem',{name:'Xuất Word (.docx)'})).toBeInTheDocument();
-  expect(screen.getByRole('menuitem',{name:'Xuất Excel (.xlsx)'})).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('menuitem',{name:'Xuất PDF (.pdf)'}));
+  expect(screen.getByRole('menuitem',{name:'Word (.docx)'})).toBeInTheDocument();
+  expect(screen.getByRole('menuitem',{name:'Excel (.xlsx)'})).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('menuitem',{name:'PDF (.pdf)'}));
   const snapshot=JSON.parse(tab.sessionStorage.setItem.mock.calls[0][1]);
   expect(snapshot).toMatchObject({kind:'exam',week:date,end:'2026-10-25',sessionCount:1});
   expect(snapshot.rows[0]).toContain('Quản trị');
@@ -100,11 +100,11 @@ it('requires a cancellation reason inside the same detail dialog',async()=>{
  fireEvent.change(within(dialog).getByLabelText('Lý do hủy'),{target:{value:'Đổi kế hoạch'}});fireEvent.click(button);await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/session/cancel'),{version:3,note:'Đổi kế hoạch'},{withCredentials:true}));
 });
 it('confirms Held directly without any reason field',async()=>{
- data.sessions=[session({pendingConfirmation:true,canEdit:false})];renderPage();fireEvent.click(await screen.findByRole('button',{name:'1 chờ xác nhận'}));const dialog=screen.getByRole('dialog');expect(within(dialog).queryByRole('textbox')).toBeNull();fireEvent.click(within(dialog).getByRole('button',{name:'✓ Đã diễn ra'}));await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/session/confirm'),{version:3,note:'',status:'held'},{withCredentials:true}));
+ data.sessions=[session({pendingConfirmation:true,canEdit:false})];renderPage();fireEvent.click(await screen.findByRole('button',{name:'Chờ xác nhận (1)'}));const dialog=screen.getByRole('dialog');expect(within(dialog).queryByRole('textbox')).toBeNull();fireEvent.click(within(dialog).getByRole('button',{name:'✓ Đã diễn ra'}));await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/session/confirm'),{version:3,note:'',status:'held'},{withCredentials:true}));
 });
 it.each([0,1,3])('uses the vt5 pending card layout with %i sessions',async(count)=>{
  data.sessions=Array.from({length:count},(_,i)=>session({id:'pending'+i,pendingConfirmation:true,canEdit:false,name:'Lớp học phần có tên dài '+i,subjectName:'Quản trị nguồn nhân lực và phát triển tổ chức'}));
- renderPage();fireEvent.click(await screen.findByRole('button',{name:count+' chờ xác nhận'}));
+ renderPage();fireEvent.click(await screen.findByRole('button',{name:'Chờ xác nhận ('+count+')'}));
  const dialog=screen.getByRole('dialog',{name:'CA THI CHỜ XÁC NHẬN · '+count});
  expect(dialog).toHaveClass('sl-pending-drawer','ep-pending-dialog','v20-wide');
  expect(within(dialog).queryByRole('table')).toBeNull();
@@ -114,11 +114,11 @@ it.each([0,1,3])('uses the vt5 pending card layout with %i sessions',async(count
  for(const button of within(dialog).getAllByRole('button',{name:'Đóng'}))expect(button).toBeEnabled();
 });
 it('asks for Not Held reason only after choosing that action',async()=>{
- data.sessions=[session({pendingConfirmation:true,canEdit:false})];renderPage();fireEvent.click(await screen.findByRole('button',{name:'1 chờ xác nhận'}));fireEvent.click(screen.getByRole('button',{name:'Không diễn ra'}));const dialog=screen.getByRole('dialog',{name:'KHÔNG DIỄN RA'}),button=within(dialog).getByRole('button',{name:'Xác nhận không diễn ra'});expect(button).toBeDisabled();fireEvent.change(within(dialog).getByLabelText('Lý do không diễn ra'),{target:{value:'Mưa bão'}});fireEvent.click(button);await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/session/confirm'),{version:3,note:'Mưa bão',status:'not_held'},{withCredentials:true}));
+ data.sessions=[session({pendingConfirmation:true,canEdit:false})];renderPage();fireEvent.click(await screen.findByRole('button',{name:'Chờ xác nhận (1)'}));fireEvent.click(screen.getByRole('button',{name:'Không diễn ra'}));const dialog=screen.getByRole('dialog',{name:'KHÔNG DIỄN RA'}),button=within(dialog).getByRole('button',{name:'Xác nhận không diễn ra'});expect(button).toBeDisabled();fireEvent.change(within(dialog).getByLabelText('Lý do không diễn ra'),{target:{value:'Mưa bão'}});fireEvent.click(button);await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/session/confirm'),{version:3,note:'Mưa bão',status:'not_held'},{withCredentials:true}));
 });
 it('sorts pending cards by time, preserves detail access and disables confirmation for read-only users',async()=>{
  data.sessions=[session({id:'later',name:'Lớp muộn',startTime:'11:00',pendingConfirmation:true}),session({id:'early',name:'Lớp sớm',pendingConfirmation:true})];
- renderPage(['gradebook.view']);fireEvent.click(await screen.findByRole('button',{name:'2 chờ xác nhận'}));
+ renderPage(['gradebook.view']);fireEvent.click(await screen.findByRole('button',{name:'Chờ xác nhận (2)'}));
  const dialog=screen.getByRole('dialog'),cards=within(dialog).getAllByRole('article');expect(cards[0]).toHaveTextContent('Lớp sớm');expect(cards[1]).toHaveTextContent('Lớp muộn');
  for(const card of cards){expect(within(card).getByRole('button',{name:'Không diễn ra'})).toBeDisabled();expect(within(card).getByRole('button',{name:'✓ Đã diễn ra'})).toBeDisabled();}
  fireEvent.click(within(cards[0]).getByRole('button',{name:'Lớp sớm'}));expect(within(screen.getByRole('dialog',{name:'CHI TIẾT BUỔI THI'})).getByRole('button',{name:/Danh sách thí sinh.*Lớp sớm/})).toBeInTheDocument();expect(axios.post).not.toHaveBeenCalled();

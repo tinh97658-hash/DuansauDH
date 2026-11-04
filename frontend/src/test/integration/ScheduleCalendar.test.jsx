@@ -454,7 +454,7 @@ it("shows all pending confirmations independently of the displayed week and sort
   axios.get.mockImplementation(async (url) => ({ data: url.includes("/course-offerings?") ? [offering] : url.includes("/pending-teaching-sessions") ? pendingSessions : [] }));
 
   render(<MemoryRouter useTransitions={false}><ScheduleView user={{ canManageScheduling: true }} /></MemoryRouter>);
-  fireEvent.click(await screen.findByRole("button", { name: "2 chờ xác nhận" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Chờ xác nhận (2)" }));
 
   const dialog = screen.getByRole("dialog", { name: /BUỔI CHỜ XÁC NHẬN/ });
   const cards = within(dialog).getAllByRole("article");

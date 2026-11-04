@@ -58,6 +58,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     envDir,
+    // Worktrees may share node_modules via a junction. Keep optimizer caches
+    // separate from other servers and from Vitest to avoid mixed React chunks.
+    cacheDir: path.resolve(__dirname, "../.tmp/vite-cache", mode),
+    resolve: { dedupe: ["react", "react-dom", "@emotion/react", "@emotion/styled"] },
     envPrefix: ["VITE_", "REACT_APP_"],
     plugins: [
       vitestJestCompat,

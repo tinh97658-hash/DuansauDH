@@ -18,7 +18,7 @@ describeDb('Lecturer payments PostgreSQL', () => {
     app = await NestFactory.createApplicationContext(AppModule, { logger: false, abortOnError: false });
     db = new Sequelize(process.env.DATABASE_URL, { dialect: 'postgres', logging: false });
     tx = await db.transaction();
-    const query = (sql: string, options: any = {}) => db.query(sql, { ...options, transaction: tx })
+    const query = (sql: string, options: any = {}) => db.query(sql, { ...options, transaction: options.transaction || tx })
       .catch(error => { throw new Error(error.original?.message || error.message); });
     // Temporary fixtures shadow application tables; everything rolls back after this suite.
     await query(`CREATE TEMP TABLE course_offerings(id uuid PRIMARY KEY,subject_id uuid,name text,status text,completed_at timestamptz);
@@ -48,7 +48,7 @@ describeDb('Lecturer payments PostgreSQL', () => {
     { replacements: { subject: id(1), unit: id(2), l1: id(3), l2: id(4), o1: id(5), o2: id(6), o3: id(7),
       emptyUnit: id(90), uncompletedUnit: id(91), uncompletedLecturer: id(92),
       ...Object.fromEntries(Array.from({ length: 10 }, (_, n) => [`s${n + 1}`, id(n + 10)])) } });
-    service = new LecturerPaymentService({ query } as any);
+    service = new LecturerPaymentService({ query, transaction: (work: any) => db.transaction({ transaction: tx }, work) } as any);
   });
   afterAll(async () => { await tx?.rollback(); await db?.close(); await app?.close(); });
 

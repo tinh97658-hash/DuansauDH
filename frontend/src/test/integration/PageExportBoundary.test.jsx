@@ -18,7 +18,7 @@ it("adds all three formats to a data page and exports its visible snapshot", asy
   render(<PageExportBoundary title="Học viên">{table}</PageExportBoundary>);
   fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
   expect(screen.getAllByRole("menuitem")).toHaveLength(3);
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Word (.docx)" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Word (.docx)" }));
   await waitFor(() => expect(downloadReport).toHaveBeenCalledWith(expect.objectContaining({ title: "Học viên",
     sections: [expect.objectContaining({ rows: [["HV001", "Nguyễn An"]] })] }), "word"));
 });
@@ -31,7 +31,7 @@ it("places export beside the page's add action and removes the separate top tool
   expect(document.querySelector(".page-export-toolbar")).toBeNull();
   fireEvent.click(menu);
   expect(screen.getAllByRole("menuitem")).toHaveLength(3);
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Excel (.xlsx)" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Excel (.xlsx)" }));
   await waitFor(() => expect(downloadReport).toHaveBeenCalledWith(expect.objectContaining({ title: "Danh mục" }), "excel"));
 });
 
@@ -40,11 +40,11 @@ it("keeps an existing specialized export and fills in its missing format without
   render(<PageExportBoundary title="Lịch">{table}<DocumentExportMenu onPdf={pdf} /></PageExportBoundary>);
   expect(screen.getAllByRole("button", { name: "Xuất báo cáo" })).toHaveLength(1);
   fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất PDF (.pdf)" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "PDF (.pdf)" }));
   expect(pdf).toHaveBeenCalledOnce();
   expect(downloadReport).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Excel (.xlsx)" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Excel (.xlsx)" }));
   await waitFor(() => expect(downloadReport).toHaveBeenCalledWith(expect.any(Object), "excel"));
 });
 
@@ -54,9 +54,9 @@ it.each([false, true])("limits record exports to Excel with inline placement %s"
   </PageExportBoundary>);
   fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
   expect(screen.getAllByRole("menuitem")).toHaveLength(1);
-  expect(screen.queryByRole("menuitem", { name: "Xuất Word (.docx)" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("menuitem", { name: "Xuất PDF (.pdf)" })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Excel (.xlsx)" }));
+  expect(screen.queryByRole("menuitem", { name: "Word (.docx)" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("menuitem", { name: "PDF (.pdf)" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("menuitem", { name: "Excel (.xlsx)" }));
   await waitFor(() => expect(downloadReport).toHaveBeenCalledWith(expect.objectContaining({ title: "Hồ sơ tuyển sinh" }), "excel"));
   expect(window.open).not.toHaveBeenCalled();
 });
@@ -70,7 +70,7 @@ it("exports the full registered dataset using the latest filter even on pages wi
   render(<PageExportBoundary title="Danh sách"><Dataset /></PageExportBoundary>);
   fireEvent.click(screen.getByRole("button", { name: "Đổi bộ lọc" }));
   fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Excel (.xlsx)" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Excel (.xlsx)" }));
   await waitFor(() => expect(downloadReport).toHaveBeenCalledWith(expect.objectContaining({ sections: [expect.objectContaining({ rows: [["Mới"], ["Trang 2"]] })] }), "excel"));
 });
 
@@ -79,7 +79,7 @@ it("disables export until data is available and reports failures", async () => {
   expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeDisabled();
   rerender(<PageExportBoundary title="Danh sách" config={{ getReport: async () => { throw new Error("Không tải được trang 2"); } }}>{table}</PageExportBoundary>);
   fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất PDF (.pdf)" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "PDF (.pdf)" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Không tải được trang 2");
   expect(downloadReport).not.toHaveBeenCalled();
   expect(window.open.mock.results[0].value.close).toHaveBeenCalledOnce();
@@ -90,7 +90,7 @@ it("reserves the PDF tab before asynchronous data loading completes", async () =
   const getReport = vi.fn(() => new Promise(resolve => { finish = resolve; }));
   render(<PageExportBoundary title="Danh sách" config={{ getReport }}>{table}</PageExportBoundary>);
   fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất PDF (.pdf)" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "PDF (.pdf)" }));
   expect(window.open).toHaveBeenCalledWith("about:blank", "_blank");
   expect(getReport).toHaveBeenCalledOnce();
   expect(downloadReport).not.toHaveBeenCalled();
@@ -104,7 +104,7 @@ it("reports a blocked preview tab before loading export data", async () => {
   const getReport = vi.fn();
   render(<PageExportBoundary title="Danh sách" config={{ getReport }}>{table}</PageExportBoundary>);
   fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất PDF (.pdf)" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "PDF (.pdf)" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("chặn tab xem trước");
   expect(getReport).not.toHaveBeenCalled();
   expect(downloadReport).not.toHaveBeenCalled();

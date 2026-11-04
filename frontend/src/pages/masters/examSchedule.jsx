@@ -5,6 +5,7 @@ import { notify } from '../../utils/notify';
 import {Tooltip} from '@mui/material';
 import YearSelect from '../../features/scheduling/YearSelect';
 import FeatureLayout from '../../components/FeatureLayout';
+import PendingConfirmationButton from '../../features/scheduling/PendingConfirmationButton';
 import DocumentExportMenu from '../../components/DocumentExportMenu';
 import {buildExamScheduleDocument} from '../../features/exams/examScheduleExport';
 import {createScheduleExcel,createScheduleWord,downloadScheduleFile,exportSchedule} from '../../features/scheduling/scheduleExport';
@@ -29,6 +30,7 @@ export default function ExamSchedule(){
  const {can}=usePermissions(),canWrite=can('scheduling.write'),canView=can('gradebook.view')||can('scheduling.view');const [params]=useSearchParams();
  const [week,setWeek]=useState(()=>formatDateKey(mondayOf(getBusinessTodayKey()))),[revision,setRevision]=useState(0);
  const [data,setData]=useState({queue:[],approvedOfferings:[],sessions:[],rooms:[]}),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState('');
+ const [loadError,setLoadError]=useState('');
  const [filters,setFilters]=useState({discipline:'',major:'',year:'',search:''});
  const [sidebarCollapsed,setSidebarCollapsed]=useState(false);
  const [offeringId,setOfferingId]=useState(params.get('offeringId')||''),[detail,setDetail]=useState(null),[editor,setEditor]=useState(null),[aggregate,setAggregate]=useState(null),[reason,setReason]=useState(null),[pendingOpen,setPendingOpen]=useState(false);
@@ -37,8 +39,8 @@ export default function ExamSchedule(){
   const timer=setInterval(refresh,60000);window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);
   return()=>{clearInterval(timer);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};
  },[canView]);
- useEffect(()=>{if(!canView){setLoading(false);return;}let active=true;setLoading(true);setError('');
-  axios.get(`${API_BASE_URL}/masters/exam-schedule`,{params:{from:week,to:last},withCredentials:true}).then(({data:next})=>{if(active)setData(next);}).catch(e=>{if(active)setError(errorText(e));}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};
+ useEffect(()=>{if(!canView){setLoading(false);return;}let active=true;setLoading(true);setError('');setLoadError('');
+  axios.get(`${API_BASE_URL}/masters/exam-schedule`,{params:{from:week,to:last},withCredentials:true}).then(({data:next})=>{if(active)setData(next);}).catch(e=>{if(active){const message=errorText(e);setError(message);setLoadError(message);}}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};
  },[week,last,revision,canView]);
  // Historical sessions retain academic context even when their old snapshot is no longer current.
  const offerings=[...new Map([...data.sessions.map(s=>({...s,id:s.courseOfferingId})),...(data.approvedOfferings||[])].map(o=>[o.id,o])).values()];
@@ -92,7 +94,7 @@ export default function ExamSchedule(){
     </div>
    </div></aside>
    <section className="sl-right ep-calendar" aria-label="Lịch thi tuần">
-    <div className="sl-schedule-head"><div className="ep-heading-actions"><h1>XẾP LỊCH THI</h1>{canWrite&&<button className="sl-btn sl-btn-primary" disabled={loading||saving} onClick={()=>compose(null,{offering:selected})}>+ Tạo buổi thi ghép</button>}</div><div className="sl-week"><button aria-label="Tuần trước" onClick={()=>setWeek(formatDateKey(addDays(week,-7)))}>‹</button><strong>{formatExamDate(week)} – {formatExamDate(last)}</strong><button aria-label="Tuần sau" onClick={()=>setWeek(formatDateKey(addDays(week,7)))}>›</button></div><div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" disabled={loading||saving||!!error} onWord={()=>downloadExport('docx')} onExcel={()=>downloadExport('xlsx')} onPdf={()=>exportSchedule(printSchedule())} onError={e=>setError(e.message||'Không thể xuất lịch thi.')}/><button className="sl-btn sl-today" onClick={()=>setWeek(formatDateKey(mondayOf(getBusinessTodayKey())))}>Tuần này</button><button className="sl-pending" onClick={()=>{setError('');setPendingOpen(true);}}>{pending.length} chờ xác nhận</button></div></div>
+    <div className="sl-schedule-head"><div className="ep-heading-actions"><h1>XẾP LỊCH THI</h1>{canWrite&&<button className="sl-btn sl-btn-primary" disabled={loading||saving} onClick={()=>compose(null,{offering:selected})}>+ Tạo buổi thi ghép</button>}</div><div className="sl-week"><button aria-label="Tuần trước" onClick={()=>setWeek(formatDateKey(addDays(week,-7)))}>‹</button><strong>{formatExamDate(week)} – {formatExamDate(last)}</strong><button aria-label="Tuần sau" onClick={()=>setWeek(formatDateKey(addDays(week,7)))}>›</button></div><div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" disabled={loading||saving||!!error} onWord={()=>downloadExport('docx')} onExcel={()=>downloadExport('xlsx')} onPdf={()=>exportSchedule(printSchedule())} onError={e=>setError(e.message||'Không thể xuất lịch thi.')}/><button className="sl-btn sl-today" onClick={()=>setWeek(formatDateKey(mondayOf(getBusinessTodayKey())))}>Tuần này</button><PendingConfirmationButton count={pending.length} loading={loading} error={loadError} open={pendingOpen} controls="exam-pending-dialog" onClick={()=>setPendingOpen(true)} /></div></div>
     {selected&&<div className="sl-selected-strip"><span className="sl-selected-tag">ĐANG XẾP</span><strong className="sl-selected-offering" title={selected.name}>{examOfferingLabel(selected)}</strong><span className="sl-selected-meta">{selected.candidateCount} TS</span><button className="sl-btn sl-selected-clear" onClick={()=>setOfferingId('')}>Bỏ chọn</button></div>}
     {error&&!editor&&!reason&&<div role="alert" className="v20-error">{error}</div>}{!canWrite&&<div className="v20-hint">Chế độ chỉ xem — cần quyền xếp lịch để thay đổi ca thi.</div>}
     <div className="sl-calendar-wrap ep-calendar-scroll"><div className="sl-calendar ep-period-calendar" role="table" aria-label="Lịch thi theo tuần"><div className="sl-corner">BUỔI</div>
@@ -119,7 +121,7 @@ export default function ExamSchedule(){
    onSaveSession={(session,form,retry)=>mutate('save',session,'',form,retry,true)}
    onAction={(action,session,note)=>mutate(action,session,note,undefined,undefined,true)}/>}
   {aggregate&&<Modal wide className="ep-list-dialog" title={`CÁC CA THI · ${formatExamDate(aggregate.date)} · ${aggregate.periodLabel}`} onClose={close(setAggregate)} actions={<button className="sl-btn" onClick={close(setAggregate)}>Đóng</button>}><ExamListTable sessions={aggregate.sessions} onSelect={openDetail}/></Modal>}
-  {pendingOpen&&<Modal wide className="sl-pending-drawer ep-pending-dialog" bodyClassName="sl-pending-body" title={`CA THI CHỜ XÁC NHẬN · ${pending.length}`} busy={saving} onClose={()=>{if(!saving)setPendingOpen(false);}}>
+  {pendingOpen&&<Modal id="exam-pending-dialog" wide className="sl-pending-drawer ep-pending-dialog" bodyClassName="sl-pending-body" title={`CA THI CHỜ XÁC NHẬN · ${pending.length}`} busy={saving} onClose={()=>{if(!saving)setPendingOpen(false);}}>
    {error&&!reason&&<div role="alert" className="v20-error">{error}</div>}{pending.length?<ExamPendingCards sessions={pending} onSelect={openDetail} canWrite={canWrite} saving={saving} onHeld={s=>mutate('held',s)} onNotHeld={s=>{setError('');setReason({action:'not_held',session:s});}}/>:<p>Không có ca thi chờ xác nhận.</p>}
   </Modal>}
   {reason&&<ExamReasonDialog key={`${reason.action}:${reason.session.id}`} {...reason} saving={saving} error={error} onClose={close(setReason)} onConfirm={note=>mutate(reason.action,reason.session,note)}/>}

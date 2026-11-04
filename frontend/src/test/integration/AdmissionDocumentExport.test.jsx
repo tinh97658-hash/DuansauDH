@@ -160,9 +160,9 @@ it("both detail dropdowns only export Excel and preserve the current unsaved for
   for (const [index, trigger] of triggers.entries()) {
     fireEvent.click(trigger);
     expect(screen.getAllByRole("menuitem")).toHaveLength(1);
-    expect(screen.queryByRole("menuitem", { name: "Xuất Word (.docx)" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Xuất PDF (.pdf)" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Excel (.xlsx)" }));
+    expect(screen.queryByRole("menuitem", { name: "Word (.docx)" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "PDF (.pdf)" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Excel (.xlsx)" }));
     await waitFor(() => expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledTimes(index + 1), { timeout: 10000 });
     const workbook = await JSZip.loadAsync(await bufferOf(URL.createObjectURL.mock.calls[index][0]));
     expect(workbook.file("xl/workbook.xml")).not.toBeNull();
@@ -195,7 +195,7 @@ it.each(["applications", "admitted-masters"])("exports %s only as Excel with eve
   await waitFor(() => expect(trigger).toBeEnabled());
   fireEvent.click(trigger);
   expect(screen.getAllByRole("menuitem")).toHaveLength(1);
-  fireEvent.click(screen.getByRole("menuitem", { name: "Xuất Excel (.xlsx)" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Excel (.xlsx)" }));
   await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(1), { timeout: 10000 });
   const book = new ExcelJS.Workbook();
   await book.xlsx.load(await bufferOf(URL.createObjectURL.mock.calls[0][0]));

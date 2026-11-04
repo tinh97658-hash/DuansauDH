@@ -2,11 +2,11 @@ import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { Alert, Button, Checkbox, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
   FormControlLabel, InputAdornment, Radio, RadioGroup, TextField, Tooltip } from "@mui/material";
-import DownloadRounded from "@mui/icons-material/DownloadRounded";
+import { ExportDownloadIcon as DownloadRounded } from "../../components/ReportExportIcons";
 import SearchRounded from "@mui/icons-material/SearchRounded";
 import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
-import { ReactComponent as PdfFileIcon } from "../../assets/icons/filetype-pdf.svg";
-import { ReactComponent as WordFileIcon } from "../../assets/icons/filetype-docx.svg";
+import { PdfFileIcon } from "../../components/ReportExportIcons";
+import { WordFileIcon } from "../../components/ReportExportIcons";
 import { API_BASE_URL } from "../../config/http";
 import { learnerTranscriptFilename, normalizeLearnerTranscript } from "./learnerTranscript";
 import { openLearnerTranscriptPdfPreview } from "./learnerTranscriptPdfPreview";

@@ -18,6 +18,8 @@ it('keeps group headers unselectable and selects offering IDs with the keyboard'
   expect(within(list).getAllByRole('option')).toHaveLength(3);
   expect(within(list).getAllByRole('presentation')).toHaveLength(2);
   expect(within(list).getByText('2 lớp')).toBeInTheDocument();
+  expect(within(list).queryByText('Đang giảng dạy')).not.toBeInTheDocument();
+  expect(within(list).getByText('Thiếu điểm TP')).toBeInTheDocument();
   await userEvent.keyboard('{ArrowDown}{Enter}');
   expect(change).toHaveBeenCalledWith(expect.objectContaining({ target: expect.objectContaining({ value: 'o1' }) }), expect.anything());
 });
@@ -29,7 +31,7 @@ it('opens at the first option instead of a deep selection and closes with Escape
   </FilterSelectField>);
   fireEvent.mouseDown(screen.getByLabelText('Class'));
   const list = screen.getByRole('listbox');
-  expect(within(list).getByRole('option', { name: /Class 0 / })).toHaveFocus();
+  expect(within(list).getByRole('option', { name: 'Class 0' })).toHaveFocus();
   expect(list.closest('.exam-stage-menu')).toHaveStyle({ overflowY: 'auto', overscrollBehaviorY: 'contain' });
   await userEvent.keyboard('{Escape}');
   await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument());

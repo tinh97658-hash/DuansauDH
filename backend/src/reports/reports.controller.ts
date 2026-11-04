@@ -1,5 +1,5 @@
 import { LecturerPaymentService } from "./lecturer-payment.service.js";
-import { LecturerPaymentQueryDto, UpdateLecturerPaymentDto } from "./dto/lecturer-payment.dto.js";
+import { ApplyLecturerPaymentBatchDto, LecturerPaymentQueryDto, PreviewLecturerPaymentBatchDto, UpdateLecturerPaymentDto } from "./dto/lecturer-payment.dto.js";
 import { SchedulingService } from "../scheduling/scheduling.service.js";
 import { Body, Controller, Get, Post, Put, Param, ParseUUIDPipe, Query, UseGuards } from "@nestjs/common";
 import { ReportsService } from "./reports.service.js";
@@ -29,6 +29,16 @@ export class ReportsController {
 
   @Get("lecturer-payments")
   lecturerPayments(@Query() query: LecturerPaymentQueryDto) { return this.payments.list(query); }
+
+  @Post("lecturer-payments/batch-preview") @RequirePermissions("reports.view", "reports.payments.manage")
+  previewPaymentBatch(@Body() dto: PreviewLecturerPaymentBatchDto, @CurrentUser() actor: any) {
+    return this.payments.previewBatch(dto.filters, dto.paid, actor.id);
+  }
+
+  @Put("lecturer-payments/batch") @RequirePermissions("reports.view", "reports.payments.manage")
+  applyPaymentBatch(@Body() dto: ApplyLecturerPaymentBatchDto, @CurrentUser() actor: any) {
+    return this.payments.applyBatch(dto.token, actor.id);
+  }
 
   @Put("lecturer-payments/:offeringId/:lecturerId") @RequirePermissions("reports.view", "reports.payments.manage")
   updatePayment(@Param("offeringId", ParseUUIDPipe) offeringId: string,

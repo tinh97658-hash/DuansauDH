@@ -56,7 +56,7 @@ export function offeringOptions(choices, labelOf, onReselect) {
       <MenuItem key={entry.offering.id} value={entry.offering.id} className="exam-stage-option"
         onClick={() => onReselect?.(entry)}>
         <span className="exam-stage-name" title={label}>{label}</span>
-        <span className={`exam-stage-badge exam-stage-${stage.tone}`}>{stage.label}</span>
+        {stage.group !== 0 && <span className={`exam-stage-badge exam-stage-${stage.tone}`}>{stage.label}</span>}
       </MenuItem>,
     ];
   });

@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { Alert, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel,
   InputAdornment, Radio, RadioGroup, TextField } from "@mui/material";
-import DownloadRounded from "@mui/icons-material/DownloadRounded";
+import { ExportDownloadIcon as DownloadRounded } from "../../components/ReportExportIcons";
 import SearchRounded from "@mui/icons-material/SearchRounded";
 import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
-import { ReactComponent as PdfFileIcon } from "../../assets/icons/filetype-pdf.svg";
-import { ReactComponent as WordFileIcon } from "../../assets/icons/filetype-docx.svg";
-import { ReactComponent as ExcelFileIcon } from "../../assets/icons/filetype-xlsx.svg";
+import { PdfFileIcon } from "../../components/ReportExportIcons";
+import { WordFileIcon } from "../../components/ReportExportIcons";
+import { ExcelFileIcon } from "../../components/ReportExportIcons";
 import "../learners/learnerTranscript.css";
 
 const formats = [

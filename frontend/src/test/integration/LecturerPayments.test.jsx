@@ -3,7 +3,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import axios from 'axios';
 import LecturerPayments from '../../pages/reports/lecturerPayments';
 import { AuthSessionContext } from '../../context/AuthSession';
-import { downloadReport } from '../../utils/reportExport';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -11,7 +10,6 @@ import { execFileSync } from 'node:child_process';
 
 vi.mock('axios');
 vi.mock('../../components/FeatureLayout', () => ({ default: ({ children }) => <div>{children}</div> }));
-vi.mock('../../utils/reportExport', () => ({ downloadReport: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../../features/scheduling/OfferingDetails', () => ({ default: ({ offering, readOnly, readBasePath }) =>
   <div role="dialog" data-read-only={String(readOnly)} data-base={readBasePath}>{offering.id}</div> }));
 
@@ -30,19 +28,19 @@ beforeEach(() => {
 
 it('saves the exact pair, reloads persisted state, and can uncheck after remount', async () => {
   const view = mount();
-  const checkbox = await screen.findByRole('checkbox');
+  const checkbox = await screen.findByRole('checkbox', { name: /^Đã thanh toán:/ });
   expect(checkbox).not.toBeChecked();
   fireEvent.click(checkbox);
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.stringContaining('/offering-1/lecturer-1'), { paid: true }, { withCredentials: true }));
-  await waitFor(() => expect(screen.getByRole('checkbox')).toBeChecked());
+  await waitFor(() => expect(screen.getByRole('checkbox', { name: /^Đã thanh toán:/ })).toBeChecked());
   view.unmount(); mount();
-  expect(await screen.findByRole('checkbox')).toBeChecked();
-  fireEvent.click(screen.getByRole('checkbox'));
-  await waitFor(() => expect(screen.getByRole('checkbox')).not.toBeChecked());
+  expect(await screen.findByRole('checkbox', { name: /^Đã thanh toán:/ })).toBeChecked();
+  fireEvent.click(screen.getByRole('checkbox', { name: /^Đã thanh toán:/ }));
+  await waitFor(() => expect(screen.getByRole('checkbox', { name: /^Đã thanh toán:/ })).not.toBeChecked());
 });
 
 it('passes completion dates, unit, lecturer, payment status and search together', async () => {
-  mount(); await screen.findByRole('checkbox');
+  mount(); await screen.findByRole('checkbox', { name: /^Đã thanh toán:/ });
   fireEvent.change(screen.getByLabelText('Từ ngày'), { target: { value: '2026-11-01' } });
   fireEvent.change(screen.getByLabelText('Đến ngày'), { target: { value: '2026-11-03' } });
   fireEvent.change(screen.getByLabelText('Đơn vị'), { target: { value: 'unit-1' } });
@@ -54,29 +52,28 @@ it('passes completion dates, unit, lecturer, payment status and search together'
   }));
 });
 
-it('opens the shared detail and exports one numeric session count and saved completion date', async () => {
-  mount(); await screen.findByRole('checkbox');
+it('opens the shared detail and shows session count and completion date without an export button', async () => {
+  mount(); await screen.findByRole('checkbox', { name: /^Đã thanh toán:/ });
   expect(screen.getByText('3')).toBeInTheDocument();
   expect(screen.getByText('3/11/2026')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Lớp CNTT' }));
   expect(screen.getByRole('dialog')).toHaveAttribute('data-base', '/reports/lecturer-payments/offerings');
   expect(screen.getByRole('dialog')).toHaveAttribute('data-read-only', 'true');
-  fireEvent.click(screen.getByRole('button', { name: 'Xuất Excel' }));
-  await waitFor(() => expect(downloadReport).toHaveBeenCalledWith(expect.objectContaining({ sections: [expect.objectContaining({ rows: [[1, 'Nguyễn An', 'Lớp CNTT', 3, '3/11/2026', 'Chưa thanh toán']] })] }), 'excel'));
+  expect(screen.queryByRole('button', { name: 'Xuất Excel' })).not.toBeInTheDocument();
 });
 
 it.each([[['reports.view'], false], [['reports.view', 'reports.payments.manage'], true]])('disables payment writes for viewers and read-only roles', async (permissions, readOnly) => {
   mount(permissions, readOnly);
-  expect(await screen.findByRole('checkbox')).toBeDisabled();
+  expect(await screen.findByRole('checkbox', { name: /^Đã thanh toán:/ })).toBeDisabled();
   expect(screen.queryByRole('button', { name: 'Xuất Excel' })).not.toBeInTheDocument();
   expect(axios.put).not.toHaveBeenCalled();
 });
 
 it('keeps the saved state when a write fails', async () => {
   axios.put.mockRejectedValue(new Error('failure'));
-  mount(); fireEvent.click(await screen.findByRole('checkbox'));
+  mount(); fireEvent.click(await screen.findByRole('checkbox', { name: /^Đã thanh toán:/ }));
   await screen.findByRole('alert');
-  expect(screen.getByRole('checkbox')).not.toBeChecked();
+  expect(screen.getByRole('checkbox', { name: /^Đã thanh toán:/ })).not.toBeChecked();
 });
 
 it('defaults to all time and automatically shows an empty result for a catalog unit with no lecturers', async () => {
@@ -84,7 +81,7 @@ it('defaults to all time and automatically shows an empty result for a catalog u
     ? { data: { lecturers: [{ id: 'lecturer-1', name: row.lecturerName, unitId: 'unit-1' }],
       units: [{ id: 'unit-1', name: 'Khoa CNTT' }, { id: 'unit-empty', name: 'Đơn vị chưa có giảng viên' }] } }
     : { data: { rows: config.params.unitId === 'unit-empty' ? [] : [{ ...row, paid }] } });
-  mount(); await screen.findByRole('checkbox');
+  mount(); await screen.findByRole('checkbox', { name: /^Đã thanh toán:/ });
   expect(screen.getByLabelText('Từ ngày')).toBeVisible();
   expect(screen.getByLabelText('Từ ngày')).toHaveValue('');
   expect(screen.getByLabelText('Đến ngày')).toBeVisible();
@@ -100,7 +97,7 @@ it('defaults to all time and automatically shows an empty result for a catalog u
   expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/lecturer-payments$/), {
     params: { unitId: 'unit-empty', paymentStatus: 'all' }, withCredentials: true,
   });
-  expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  expect(screen.queryByRole('checkbox', { name: /^Đã thanh toán:/ })).not.toBeInTheDocument();
 });
 
 const browser = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(file => file && fs.existsSync(file));

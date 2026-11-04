@@ -1,4 +1,5 @@
-import { IsBoolean, IsDateString, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsBoolean, IsDateString, IsDefined, IsIn, IsOptional, IsString, IsUUID, MaxLength, ValidateNested } from 'class-validator';
 
 export class LecturerPaymentQueryDto {
   @IsOptional() @IsDateString({ strict: true }) from?: string;
@@ -11,4 +12,12 @@ export class LecturerPaymentQueryDto {
 
 export class UpdateLecturerPaymentDto {
   @IsBoolean() paid!: boolean;
+}
+
+export class PreviewLecturerPaymentBatchDto extends UpdateLecturerPaymentDto {
+  @IsDefined() @ValidateNested() @Type(() => LecturerPaymentQueryDto) filters!: LecturerPaymentQueryDto;
+}
+
+export class ApplyLecturerPaymentBatchDto {
+  @IsString() @MaxLength(5000000) token!: string;
 }

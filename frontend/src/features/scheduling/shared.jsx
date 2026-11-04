@@ -115,10 +115,10 @@ export function useLoad(loader, dependencies) {
 export function Notice({ error, children }) {
   return <div className={error ? "v20-error" : "sl-empty"} role={error ? "alert" : "status"}>{error || children}</div>;
 }
-export function Modal({ title, children, onClose, busy = false, wide = false, drawer = false, actions, className = "", hideHeader = false, bodyClassName = "", transparentBackdrop = false }) {
+export function Modal({ title, children, onClose, busy = false, wide = false, drawer = false, actions, className = "", hideHeader = false, bodyClassName = "", transparentBackdrop = false, id }) {
   const titleId = useId();
   return <Dialog className="app-popup" open hideBackdrop={transparentBackdrop} onClose={busy ? undefined : onClose} maxWidth={false} aria-labelledby={titleId}
-    PaperProps={{ className: `scheduling-v20 v20-dialog ${wide ? "v20-wide" : ""} ${drawer ? "v20-drawer" : ""} ${className}` }}>
+    PaperProps={{ id, className: `scheduling-v20 v20-dialog ${wide ? "v20-wide" : ""} ${drawer ? "v20-drawer" : ""} ${className}` }}>
     {hideHeader ? <h2 id={titleId} className="sl-sr-only">{title}</h2> : <header className="v20-dialog-head"><h2 id={titleId}>{title}</h2><button className="sl-btn" aria-label="Đóng" disabled={busy} onClick={onClose}>×</button></header>}
     <div className={`v20-dialog-body ${bodyClassName}`}>{children}</div>
     {actions && <footer className="v20-dialog-foot">{actions}</footer>}
