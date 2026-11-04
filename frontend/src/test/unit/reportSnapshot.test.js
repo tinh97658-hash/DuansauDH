@@ -12,7 +12,7 @@ it("exports table values while excluding selections, actions, hidden tables and 
   const report = snapshotReport(root, "Học viên");
   expect(report.sections).toHaveLength(1);
   expect(report.sections[0].headers).toEqual(["Mã HV", "Ngày sinh", "Điểm"]);
-  expect(report.sections[0].rows).toEqual([["001", "03/02/95", "0"]]);
+  expect(report.sections[0].rows).toEqual([["001", "03/02/1995", "0"]]);
   expect(report.metadata).toContainEqual(["Tìm kiếm", "Nguyễn"]);
   expect(report.metadata).toContainEqual(["Trang", "Hiển thị 1–15 trên 30 bản ghi"]);
   expect(JSON.stringify(report)).not.toMatch(/secret|Mật khẩu|hidden|Xóa/);

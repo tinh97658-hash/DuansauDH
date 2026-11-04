@@ -326,7 +326,7 @@ describe("Training Plan Subject identity persistence", () => {
 
   it("selects all eligible majors allowed to study a subject together", async () => {
     const local = { ...root, id: "local", majorId: major.id, allowCrossMajor: false, sharedMajorIds: [], name: "Triết học" };
-    configureReads([local]);
+    configureReads([local], [major, otherMajor], [{ ...root, name: local.name }, local]);
     axios.put.mockResolvedValue({ data: { ...local, allowCrossMajor: true, sharedMajorIds: [otherMajor.id] } });
     await act(async () => { render(<TrainingPlan />); });
 
@@ -365,7 +365,7 @@ describe("Training Plan Subject identity persistence", () => {
   });
 
   it("keeps the checkbox state when saving the change fails", async () => {
-    const local = { ...root, majorId: major.id };
+    const local = { ...root, id: "local-subject", majorId: major.id };
     configureReads([local]);
     axios.put.mockRejectedValue({ response: { data: { message: "Học phần đang được sử dụng" } } });
     await act(async () => { render(<TrainingPlan />); });
@@ -374,74 +374,43 @@ describe("Training Plan Subject identity persistence", () => {
     expect(toast.error).toHaveBeenCalledWith("Học phần đang được sử dụng");
   });
 
-  it("saves the automatic sharing flag together with a new draft", async () => {
+  it("does not allow selecting a major before its matching subject exists", async () => {
     configureReads([], [major, otherMajor], []);
-    axios.post.mockResolvedValue({ data: { subjects: [
-      { ...root, id: "new-local", majorId: major.id, sharedMajorIds: [otherMajor.id] },
-      { ...root, id: "new-other", majorId: otherMajor.id, codeNumber: 301, codeText: "OTHER", sharedMajorIds: [major.id] },
-    ] } });
     await act(async () => { render(<TrainingPlan />); });
-    await clickAndWait(await screen.findByRole("button", { name: "Thêm dòng mới" }));
-    fireEvent.change(screen.getByPlaceholderText("Mã số (101)"), { target: { value: "201" } });
-    fireEvent.change(screen.getByPlaceholderText("Mã chữ (CS01)"), { target: { value: "LOCAL" } });
-    fireEvent.change(screen.getByPlaceholderText("Nhập tên học phần..."), { target: { value: root.name } });
-    fireEvent.mouseDown(screen.getByLabelText(`Phạm vi học chung: ${root.name}`));
-    await clickAndWait(screen.getByRole("option", { name: /^(?:QTKD — )?Quản trị kinh doanh$/ }));
-    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("option", { name: /^(?:QTKD — )?Quản trị kinh doanh$/ })).not.toBeInTheDocument());
+    await clickAndWait(screen.getByRole('button', { name: 'Thêm dòng mới' }));
+    fireEvent.change(screen.getByPlaceholderText('Nhập tên học phần...'), { target: { value: root.name } });
+    fireEvent.mouseDown(screen.getByLabelText(/Phạm vi học chung:/));
+    const option = screen.getByRole('option', { name: /Quản trị kinh doanh/ });
+    expect(option).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(option);
+    expect(axios.post).not.toHaveBeenCalled();
     expect(axios.put).not.toHaveBeenCalled();
-    await clickAndWait(await screen.findByRole("button", { name: "Lưu & Thêm tiếp (Enter)" }));
-    const numberInputs = await screen.findAllByLabelText("Mã số");
-    const textInputs = screen.getAllByLabelText("Mã chữ");
-    fireEvent.change(numberInputs[1], { target: { value: "301" } });
-    fireEvent.change(textInputs[1], { target: { value: "OTHER" } });
-    await clickAndWait(screen.getByRole("button", { name: "Tạo cho tất cả chuyên ngành" }));
-    await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
-      expect.stringContaining("/plan/subjects/shared"),
-      expect.objectContaining({
-        source: expect.objectContaining({ codeText: "LOCAL", sharedMajorIds: [otherMajor.id] }),
-        counterparts: [{ majorId: otherMajor.id, codeNumber: 301, codeText: "OTHER" }],
-      }),
-      { withCredentials: true },
-    ));
   });
 
-  it("keeps all sharing options but requests codes only for selected majors without a matching course", async () => {
+  it("selects only existing exact matches and does not request creation in missing majors", async () => {
     configureReads([], [major, otherMajor, thirdMajor]);
     axios.post.mockResolvedValue({ data: {
-      subject: { ...root, id: 'new-mixed', majorId: major.id },
-      linkedSubjects: [root],
-      createdCounterparts: [{ ...root, id: 'new-third', majorId: thirdMajor.id }],
+      subject: { ...root, id: 'new-mixed', majorId: major.id }, linkedSubjects: [root], createdCounterparts: [],
     } });
     await act(async () => { render(<TrainingPlan />); });
     await clickAndWait(screen.getByRole('button', { name: 'Thêm dòng mới' }));
     fireEvent.change(screen.getByPlaceholderText('Mã số (101)'), { target: { value: '503' } });
     fireEvent.change(screen.getByPlaceholderText('Mã chữ (CS01)'), { target: { value: 'LOCAL' } });
-    fireEvent.change(screen.getByPlaceholderText('Nhập tên học phần...'), { target: { value: `  ${root.name.toLocaleUpperCase('vi')}  ` } });
+    fireEvent.change(screen.getByPlaceholderText('Nhập tên học phần...'), { target: { value: root.name } });
     fireEvent.mouseDown(screen.getByLabelText(/Phạm vi học chung:/));
     const options = await screen.findByRole('listbox');
-    expect(within(options).getByRole('option', { name: /Quản trị kinh doanh/ })).toBeInTheDocument();
-    expect(within(options).getByRole('option', { name: /Khai thác hàng hải/ })).toBeInTheDocument();
+    expect(within(options).getByRole('option', { name: /Quản trị kinh doanh/ })).not.toHaveAttribute('aria-disabled', 'true');
+    expect(within(options).getByRole('option', { name: /Khai thác hàng hải/ })).toHaveAttribute('aria-disabled', 'true');
     await clickAndWait(within(options).getByRole('option', { name: 'Chọn tất cả' }));
     fireEvent.keyDown(options, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument());
     await clickAndWait(screen.getByRole('button', { name: 'Lưu & Thêm tiếp (Enter)' }));
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText(/Khai thác hàng hải/)).toBeInTheDocument();
-    expect(within(dialog).queryByText(/Quản trị kinh doanh/)).not.toBeInTheDocument();
-    expect(within(dialog).getAllByLabelText('Mã số')).toHaveLength(2);
-    fireEvent.change(within(dialog).getAllByLabelText('Mã số')[1], { target: { value: '601' } });
-    fireEvent.change(within(dialog).getAllByLabelText('Mã chữ')[1], { target: { value: 'NEW-601' } });
-    await clickAndWait(within(dialog).getByRole('button', { name: 'Tạo cho tất cả chuyên ngành' }));
     await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
       expect.stringContaining('/plan/subjects/link-existing'),
-      expect.objectContaining({
-        source: expect.objectContaining({ sharedMajorIds: [otherMajor.id, thirdMajor.id] }),
-        existingSubjectIds: [root.id],
-        counterparts: [{ majorId: thirdMajor.id, codeNumber: 601, codeText: 'NEW-601' }],
-      }),
+      expect.objectContaining({ source: expect.objectContaining({ sharedMajorIds: [otherMajor.id] }), existingSubjectIds: [root.id], counterparts: [] }),
       { withCredentials: true },
     ));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it("links existing courses directly when every selected major already has the course", async () => {
@@ -468,22 +437,17 @@ describe("Training Plan Subject identity persistence", () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it("does not duplicate a same-name course with different credits during bulk creation", async () => {
+  it("disables a same-name course with different credits before selection", async () => {
     configureReads([], [major, otherMajor], [{ ...root, credits: 2 }]);
     await act(async () => { render(<TrainingPlan />); });
     await clickAndWait(screen.getByRole('button', { name: 'Thêm dòng mới' }));
-    fireEvent.change(screen.getByPlaceholderText('Mã số (101)'), { target: { value: '505' } });
-    fireEvent.change(screen.getByPlaceholderText('Mã chữ (CS01)'), { target: { value: 'LOCAL' } });
     fireEvent.change(screen.getByPlaceholderText('Nhập tên học phần...'), { target: { value: root.name } });
-    fireEvent.mouseDown(screen.getByLabelText(`Phạm vi học chung: ${root.name}`));
-    const options = await screen.findByRole('listbox');
-    await clickAndWait(within(options).getByRole('option', { name: /Quản trị kinh doanh/ }));
-    fireEvent.keyDown(options, { key: 'Escape' });
-    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument());
-    await clickAndWait(screen.getByRole('button', { name: 'Lưu & Thêm tiếp (Enter)' }));
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('khác số tín chỉ (2 TC)'));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByLabelText(/Phạm vi học chung:/));
+    const option = screen.getByRole('option', { name: /Quản trị kinh doanh/ });
+    expect(option).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(option);
     expect(axios.post).not.toHaveBeenCalled();
+    expect(axios.put).not.toHaveBeenCalled();
   });
 
   it("does not suggest while typing and asks only after saving an exact name and credit match", async () => {
@@ -618,39 +582,25 @@ describe("Training Plan Subject identity persistence", () => {
     expect(nameInput).toHaveValue(root.name.slice(0, 3));
   });
 
-  it.each([true, false])("shows every eligible major and requests codes for majors without the subject (link existing: %s)", async (linkExisting) => {
+  it.each([true, false])("offers only matching majors in the save-time prompt (accept: %s)", async accept => {
     configureReads([], [major, otherMajor, thirdMajor]);
-    const created = { ...root, id: "created-all-majors", majorId: major.id, sharedMajorIds: [otherMajor.id, thirdMajor.id] };
-    axios.post.mockResolvedValue({ data: linkExisting ? {
-      subject: created,
-      linkedSubjects: [{ ...root, sharedMajorIds: [major.id, thirdMajor.id] }],
-      createdCounterparts: [{ ...root, id: "third-copy", majorId: thirdMajor.id, codeNumber: 501, codeText: "KTHH-501" }],
-    } : { subjects: [created, { ...root, id: 'third-copy', majorId: thirdMajor.id }] } });
+    const created = { ...root, id: 'created-match', majorId: major.id };
+    axios.post.mockResolvedValue({ data: accept ? { subject: created, linkedSubjects: [root], createdCounterparts: [] } : created });
     await act(async () => { render(<TrainingPlan />); });
-    await clickAndWait(await screen.findByRole("button", { name: "Thêm dòng mới" }));
-    fireEvent.change(screen.getByPlaceholderText("Mã số (101)"), { target: { value: "403" } });
-    fireEvent.change(screen.getByPlaceholderText("Mã chữ (CS01)"), { target: { value: "LOCAL-403" } });
-    fireEvent.change(screen.getByPlaceholderText("Nhập tên học phần..."), { target: { value: root.name } });
-    await clickAndWait(screen.getByRole("button", { name: "Lưu & Thêm tiếp (Enter)" }));
-    await clickAndWait(await screen.findByRole("button", { name: "Có" }));
-
-    expect(screen.getByLabelText(/^(?:QTKD — )?Quản trị kinh doanh/)).toBeChecked();
-    expect(screen.getByLabelText(/^(?:KTHH — )?Khai thác hàng hải/)).not.toBeChecked();
-    if (!linkExisting) await clickAndWait(screen.getByLabelText(/^(?:QTKD — )?Quản trị kinh doanh/));
-    await clickAndWait(screen.getByLabelText(/^(?:KTHH — )?Khai thác hàng hải/));
-    await clickAndWait(screen.getByRole("button", { name: "Xác nhận học chung" }));
-
-    const numberInputs = await screen.findAllByLabelText("Mã số");
-    const textInputs = screen.getAllByLabelText("Mã chữ");
-    fireEvent.change(numberInputs[1], { target: { value: "501" } });
-    fireEvent.change(textInputs[1], { target: { value: "KTHH-501" } });
-    await clickAndWait(screen.getByRole("button", { name: "Tạo cho tất cả chuyên ngành" }));
+    await clickAndWait(screen.getByRole('button', { name: 'Thêm dòng mới' }));
+    fireEvent.change(screen.getByPlaceholderText('Mã số (101)'), { target: { value: '403' } });
+    fireEvent.change(screen.getByPlaceholderText('Mã chữ (CS01)'), { target: { value: 'LOCAL-403' } });
+    fireEvent.change(screen.getByPlaceholderText('Nhập tên học phần...'), { target: { value: root.name } });
+    await clickAndWait(screen.getByRole('button', { name: 'Lưu & Thêm tiếp (Enter)' }));
+    await clickAndWait(await screen.findByRole('button', { name: accept ? 'Có' : 'Không' }));
+    if (accept) {
+      expect(screen.getByLabelText(/Quản trị kinh doanh/)).toBeChecked();
+      expect(screen.queryByLabelText(/Khai thác hàng hải/)).not.toBeInTheDocument();
+      await clickAndWait(screen.getByRole('button', { name: 'Xác nhận học chung' }));
+    }
     await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
-      expect.stringContaining(linkExisting ? "/plan/subjects/link-existing" : "/plan/subjects/shared"),
-      expect.objectContaining({
-        ...(linkExisting ? { existingSubjectIds: [root.id] } : {}),
-        counterparts: [{ majorId: thirdMajor.id, codeNumber: 501, codeText: "KTHH-501" }],
-      }),
+      expect.stringMatching(accept ? /\/plan\/subjects\/link-existing$/ : /\/plan\/subjects$/),
+      accept ? expect.objectContaining({ existingSubjectIds: [root.id], counterparts: [] }) : expect.objectContaining({ sharedMajorIds: [] }),
       { withCredentials: true },
     ));
   });

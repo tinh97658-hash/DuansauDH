@@ -26,6 +26,7 @@
     "db:seed:common": "npm run build && node dist/database/seed-common.js",
     "db:seed:demo": "npm run build && node dist/database/seed-demo.js",
     "db:seed:scheduling-test": "npm run build && node dist/database/seeds/seed-scheduling-test.js",
+    "db:seed:exam-demo": "npm run build && node dist/database/seeds/seed-exam-demo.js",
     "db:seed:masters": "npm run build && node dist/database/seeds/seed-masters-cntt-qtkd.js",
     "db:seed:admissions": "npm run build && node dist/database/seeds/seed-admission-records.js",
     "db:seed:lecturers": "npm run build && node dist/database/seeds/seed-lecturers-by-major.js",

@@ -89,7 +89,7 @@ it("shows the whole curriculum, preserving zero, exemption and blank ungraded ce
   mount();
   const row = (await screen.findByText("HV001")).closest("tr");
   expect(screen.getAllByRole("columnheader").map(header => header.textContent)).toEqual(["STT", "Mã HV", "Họ đệm", "Tên", "Ngày sinh", "Giới tính", "Triết học", "Tiếng Anh", "Luận văn"]);
-  expect(within(row).getAllByRole("cell").map(cell => cell.textContent)).toEqual(["1", "HV001", "Nguyễn Văn", "An", "16/04/97", "Nam", "0", "MT", ""]);
+  expect(within(row).getAllByRole("cell").map(cell => cell.textContent)).toEqual(["1", "HV001", "Nguyễn Văn", "An", "16/04/1997", "Nam", "0", "MT", ""]);
   expect(within(row).getByText("0")).toHaveClass("css-failed");
   expect(screen.queryByText("CTĐT Thạc sĩ")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Thoát" })).not.toBeInTheDocument();

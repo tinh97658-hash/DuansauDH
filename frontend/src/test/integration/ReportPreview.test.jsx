@@ -18,7 +18,7 @@ it("opens a frozen PDF preview with the complete masthead and prints only after 
   report.sections[0].rows[0][1] = "Tên đã thay đổi";
   render(<MemoryRouter initialEntries={[url]}><ReportPreview /></MemoryRouter>);
   for (const label of ["BỘ XÂY DỰNG", "TRƯỜNG ĐẠI HỌC HÀNG HẢI VIỆT NAM", "VIỆN ĐÀO TẠO SAU ĐẠI HỌC", "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", "Độc lập - Tự do - Hạnh phúc", "Nguyễn An"]) expect(screen.getByText(label)).toBeInTheDocument();
-  expect(screen.getByText(/Hải Phòng, ngày \d{2}\/\d{2}\/\d{2}/)).toBeInTheDocument();
+  expect(screen.getByText(/Hải Phòng, ngày \d{2}\/\d{2}\/\d{4}\b/)).toBeInTheDocument();
   expect(window.print).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "In / Lưu PDF" }));
   expect(window.print).toHaveBeenCalledTimes(1);

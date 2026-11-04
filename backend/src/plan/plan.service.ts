@@ -6,7 +6,7 @@ import { STUDY_MANAGEMENT_STATUSES } from "./admission-values.js";
 import { AdmissionEvaluationService } from "./admission-evaluation.service.js";
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
-import { col, fn, Op, literal, UniqueConstraintError, where as sqlWhere } from "sequelize";
+import { col, fn, Op, literal, QueryTypes, UniqueConstraintError, where as sqlWhere } from "sequelize";
 import { learnerStudyStatusSql } from "./learner-study-status.js";
 import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
@@ -161,7 +161,8 @@ export class PlanService {
     return this.subjectIdentityTransaction(async (transaction) => {
       await this.requireMajorForProgram(dto.majorId, program, transaction);
       await this.assertSubjectCodePairAvailable(dto, transaction);
-      const sharedMajorIds = await this.validateSharedMajorIds(dto.sharedMajorIds || [], dto.majorId, program, transaction);
+      const sharedMajorIds = await this.validateSharedMajorIds(dto.sharedMajorIds || [], dto.majorId, program, transaction,
+        { name: dto.name, credits: dto.credits ?? 3 });
       dto.allowCrossMajor = sharedMajorIds.length > 0;
       await this.validateSubjectIdentityTarget(
         undefined,
@@ -197,6 +198,7 @@ export class PlanService {
       }, transaction, id);
       const sharedMajorIds = await this.validateSharedMajorIds(
         dto.sharedMajorIds ?? subject.sharedMajorIds ?? [], majorId, program, transaction,
+        { name: dto.name ?? subject.name, credits: dto.credits ?? subject.credits ?? 3 },
       );
       if (dto.sharedMajorIds !== undefined || sharedMajorIds.length > 0) dto.allowCrossMajor = sharedMajorIds.length > 0;
       const payload = this.pick(dto, [
@@ -205,13 +207,31 @@ export class PlanService {
         "canonicalSubjectId", "allowCrossMajor", "sharedMajorIds",
       ]);
       payload.sharedMajorIds = sharedMajorIds;
+      // An explicit sharing scope controls future grouping, not the subject's
+      // academic identity. Keep structural and legacy identity edits protected.
       const protectedFields = ["codeNumber", "codeText", "name", "majorId", "program", "credits",
-        "subjectType", "isRequired", "canonicalSubjectId", "allowCrossMajor", "sharedMajorIds"];
-      if (protectedFields.some(key => payload[key] !== undefined && !isDeepStrictEqual(
-        key === "sharedMajorIds" ? [...(payload[key] as string[] || [])].sort() : payload[key],
-        key === "sharedMajorIds" ? [...(subject[key] || [])].sort() : subject[key],
-      ))) await assertSubjectStructureEditable(this.sequelize, id, transaction);
+        "subjectType", "isRequired", "canonicalSubjectId"];
+      const legacySharingChanged = dto.sharedMajorIds === undefined && payload.allowCrossMajor !== undefined
+        && payload.allowCrossMajor !== subject.allowCrossMajor;
+      if (legacySharingChanged || protectedFields.some(key => payload[key] !== undefined
+        && !isDeepStrictEqual(payload[key], subject[key]))) {
+        await assertSubjectStructureEditable(this.sequelize, id, transaction);
+      }
       await this.validateSubjectIdentityUpdate(subject, dto, program, transaction);
+      if (dto.sharedMajorIds !== undefined && (!isDeepStrictEqual(
+        [...sharedMajorIds].sort(), [...(subject.sharedMajorIds || [])].sort(),
+      ) || payload.allowCrossMajor !== subject.allowCrossMajor)) {
+        const [usage] = await this.sequelize.query<{ used: boolean }>(`SELECT EXISTS (
+          SELECT 1 FROM course_offerings offering
+          JOIN course_offering_class_groups link ON link.course_offering_id=offering.id
+          JOIN class_groups linked_group ON linked_group.id=link.class_group_id
+          WHERE offering.subject_id=:subjectId AND linked_group.major_id NOT IN (:allowedMajorIds)
+        ) AS used`, {
+          replacements: { subjectId: id, allowedMajorIds: [majorId, ...sharedMajorIds] },
+          transaction, type: QueryTypes.SELECT,
+        });
+        if (usage?.used) throw new ConflictException("Không thể bỏ ngành đang có lớp học phần dùng chung môn này. Giữ ngành đó trong phạm vi để bảo toàn lớp và kết quả đã có.");
+      }
       if (dto.codeText !== undefined) {
         payload.code = dto.codeText;
       } else if (dto.codeNumber !== undefined && !subject.codeText) {
@@ -346,11 +366,11 @@ export class PlanService {
         throw new BadRequestException("Có chuyên ngành học chung không tồn tại, đã ngừng sử dụng hoặc khác bậc đào tạo.");
       }
 
-      const normalizedSourceName = source.name.trim().replace(/\s+/g, " ").toLocaleLowerCase("vi");
+      const normalizedSourceName = source.name.normalize("NFC").trim();
       if (existingSubjects.some((subject) => (
         subject.program !== program
-        || subject.name.trim().replace(/\s+/g, " ").toLocaleLowerCase("vi") !== normalizedSourceName
-        || Number(subject.credits) !== Number(source.credits || 0)
+        || subject.active === false || subject.name.normalize("NFC").trim() !== normalizedSourceName
+        || Number(subject.credits) !== Number(source.credits ?? 3)
       ))) {
         throw new BadRequestException("Học phần học chung phải cùng tên, cùng số tín chỉ và cùng bậc đào tạo.");
       }
@@ -428,7 +448,9 @@ export class PlanService {
     if (codes) throw new ConflictException(`Học phần có ${codes} đã tồn tại trong chuyên ngành này. Vui lòng sử dụng mã khác.`);
   }
 
-  private async validateSharedMajorIds(ids: string[], ownMajorId: string, program: string, transaction: Transaction) {
+  // Sharing requires an existing active counterpart; subject codes may differ by major.
+  private async validateSharedMajorIds(ids: string[], ownMajorId: string, program: string, transaction: Transaction,
+    identity: { name: string; credits: number }) {
     const uniqueIds = [...new Set(ids || [])];
     if (uniqueIds.includes(ownMajorId)) throw new BadRequestException("Phạm vi học chung không được chứa chính chuyên ngành của học phần.");
     if (uniqueIds.length === 0) return uniqueIds;
@@ -438,6 +460,17 @@ export class PlanService {
     });
     if (majors.length !== uniqueIds.length) {
       throw new BadRequestException("Phạm vi học chung có chuyên ngành không tồn tại, đã ngừng sử dụng hoặc khác bậc đào tạo.");
+    }
+    const counterparts = await this.subjects.findAll({
+      where: { majorId: { [Op.in]: uniqueIds }, program, active: true, credits: identity.credits },
+      attributes: ["majorId", "name", "credits", "program", "active"], transaction,
+    });
+    const name = String(identity.name || "").normalize("NFC").trim();
+    const matched = new Set(counterparts.filter(subject => subject.active !== false && subject.program === program
+      && Number(subject.credits) === Number(identity.credits)
+      && String(subject.name || "").normalize("NFC").trim() === name).map(subject => subject.majorId));
+    if (uniqueIds.some(id => !matched.has(id))) {
+      throw new BadRequestException("Chỉ được chọn ngành có học phần đang hoạt động, cùng tên, cùng số tín chỉ và cùng bậc đào tạo.");
     }
     return uniqueIds;
   }

@@ -417,7 +417,7 @@ export class ExamGradebookService {
     if(this.workflow){await this.scope(dto);await this.workflow.transition(dto,actor,phase,tx=>this.allWorkflowRows(dto,tx));return this.get({...dto,rosterScope:'offering'});}
     if (['request_reopen','reject_reopen'].includes(dto.action)) throw new BadRequestException('Bảng điểm cũ không hỗ trợ xin mở lại tư cách.');
     await assertGradebookWorkflowAccess(actor, dto.action, this.rbac);
-    if (!dto.note?.trim()) throw new BadRequestException("Nhập lý do hoặc căn cứ xử lý bảng điểm.");
+    if (dto.action === 'reopen' && !dto.note?.trim()) throw new BadRequestException("Nhập lý do hoặc căn cứ mở lại bảng điểm.");
     await this.sequelize.transaction(async transaction => {
       await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
       const { offering } = await this.scope(dto, transaction);
@@ -465,7 +465,7 @@ export class ExamGradebookService {
       }
       const next = dto.action === "submit" ? "submitted" : dto.action === "approve" ? "approved" : "draft";
       await offering.update({ gradebookStatus: next, gradebookVersion: (offering.gradebookVersion || 0) + 1, gradebookSnapshot: snapshot }, { transaction });
-      await this.audit(offering.id, dto.action, actor, dto.note.trim(), before, { status: next, snapshot }, transaction);
+      await this.audit(offering.id, dto.action, actor, dto.note?.trim() || '', before, { status: next, snapshot }, transaction);
     });
     return this.get({ ...dto, rosterScope: "offering" });
   }

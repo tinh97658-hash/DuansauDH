@@ -1,4 +1,4 @@
-export const DATE_PLACEHOLDER = "dd/mm/yy";
+export const DATE_PLACEHOLDER = "dd/mm/yyyy";
 export const DATE_TIME_ZONE = "Asia/Ho_Chi_Minh";
 
 const validKey = (year, month, day) => {
@@ -27,11 +27,11 @@ export function formatDate(value, fallback = "—") {
   if (value == null || value === "") return fallback;
   const text = value instanceof Date && Number.isFinite(value.getTime()) ? value.toISOString() : String(value);
   const key = parseDisplayDate(text);
-  return key ? `${key.slice(8, 10)}/${key.slice(5, 7)}/${key.slice(2, 4)}` : text;
+  return key ? `${key.slice(8, 10)}/${key.slice(5, 7)}/${key.slice(0, 4)}` : text;
 }
 
 const dateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
-  timeZone: DATE_TIME_ZONE, day: "2-digit", month: "2-digit", year: "2-digit",
+  timeZone: DATE_TIME_ZONE, day: "2-digit", month: "2-digit", year: "numeric",
   hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
 });
 

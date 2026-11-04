@@ -36,6 +36,7 @@ import { useSubjectCatalogRevision } from "../../utils/subjectCatalog";
 import { notifyGradebookSaved } from "../../utils/gradebookRevision";
 import { useUnsavedGrades, UNSAVED_GRADE_MESSAGE } from "../../components/UnsavedChangesGuard";
 import { hasGradeChanges } from "../../utils/gradebookNavigation";
+import { navigateScoreGrid } from "../../utils/scoreGridNavigation";
 
 import { stageOf, sortOfferingChoices } from "../../features/exams/offeringStages";
 import { offeringOptions, useOfferingMenu } from "../../features/exams/OfferingOptions";
@@ -100,7 +101,8 @@ export default function ExamLists() {
   const componentEditable=newWorkflow&&workflow.eligibility.status==='draft';
   const resultEditable=newWorkflow&&workflow.eligibility.status==='approved'&&workflow.final.status==='draft';
   const workflowEditable=componentEditable||resultEditable;
-  const beginWorkflow=(phase,action)=>{setWorkflowPhase(phase);setWorkflowAction(action);};
+  const workflowNeedsNote = ['reopen', 'request_reopen', 'reject_reopen'].includes(workflowAction);
+  const beginWorkflow=(phase,action)=>{setWorkflowNote('');setWorkflowPhase(phase);setWorkflowAction(action);};
   const [auditRows, setAuditRows] = useState(null);
   const [groups, setGroups] = useState([]), [subjects, setSubjects] = useState([]);
   const [loadedOffering, setLoadedOffering] = useState(null);
@@ -532,11 +534,14 @@ export default function ExamLists() {
       </div>
       </div>
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
+      {!blank && (componentEditable || resultEditable) && <Typography className="exam-no-print" variant="caption" sx={{ display: "block", mb: 0.75, color: "text.secondary" }}>
+        Dùng ↑ ↓ ← → để chuyển giữa các ô điểm có thể nhập trên trang hiện tại.
+      </Typography>}
       <Paper variant="outlined" sx={{ ...panelSx, overflow: "hidden" }}>
         {busy ? <Box sx={{ py: 4, textAlign: "center" }}><CircularProgress size={30} aria-label="Đang tải bảng điểm" /></Box> : !groupId || !offeringId ? <Box className="exam-empty-scope" role="status">
           <Typography component="h1">Chưa chọn lớp học phần</Typography>
           <Typography>Chọn lớp học phần và môn ở phía trên để xem bảng điểm.</Typography>
-        </Box> : <TableContainer sx={{ overflowX: "auto" }} className="exam-table-container exam-no-print" onPointerDownCapture={() => { if (canSubmitGrades && !teachingCompleted) showCompletionWarning(); }}>
+        </Box> : <TableContainer sx={{ overflowX: "auto" }} className="exam-table-container exam-no-print" onKeyDown={navigateScoreGrid} onPointerDownCapture={() => { if (canSubmitGrades && !teachingCompleted) showCompletionWarning(); }}>
           <ResizableTable columns={columns} storageKey="masters-exam-gradebook-columns" freezeThrough="firstName">
             <TableBody>{!visible.length ? <TableRow><TableCell colSpan={columns.length} align="center" sx={{ py: 6, color: "#607486" }}>{!groupId ? "Chưa có lớp học viên." : !offeringId ? "Lớp chưa có học phần được tổ chức. Hãy tạo lớp học phần để nhập điểm." : "Không có học viên phù hợp với danh sách đang chọn."}</TableCell></TableRow> : pageRows.map((row, index) => {
               const name = personNameParts(row);
@@ -555,7 +560,7 @@ export default function ExamLists() {
                   const disabled = rowLocked || (['testScore','assignmentScore'].includes(key)?!componentEditable:key==='examScore'?!resultEditable||!row.examScoreEditable:true);
                   const cellClass = key === 'examScore' ? (disabled ? 'exam-derived-cell exam-score-locked' : 'exam-editable-cell') : calculatedColumns.has(key) ? 'exam-derived-cell' : undefined;
                   return <TableCell key={key} align="center" className={cellClass}>
-                  <TextField fullWidth size="small" autoComplete="off" name={`grade-${offeringId}-${row.participantId}-${key}`} value={blank ? "" : row[key]} disabled={disabled} InputProps={{ readOnly: ["courseScore", "grade4"].includes(key) }} error={!blank && numericScore(row[key]) !== null && (!Number.isFinite(numericScore(row[key])) || numericScore(row[key]) < 0 || numericScore(row[key]) > max)} onChange={["courseScore", "grade4"].includes(key) ? undefined : (event) => { const value = event.target.value; const score = numericScore(value); if (value === "" || (/^\d*(?:[.,]\d*)?$/.test(value) && Number.isFinite(score) && score >= 0 && score <= max)) edit(row.participantId, { [key]: value }); }} onBlur={calculatedColumns.has(key) ? undefined : () => formatInput(row.participantId, key)} inputProps={{ "aria-label": `${label} ${row.code}`, inputMode: "decimal", autoCorrect: "off", autoCapitalize: "off", spellCheck: false }} sx={inputSx} />
+                  <TextField fullWidth size="small" autoComplete="off" name={`grade-${offeringId}-${row.participantId}-${key}`} value={blank ? "" : row[key]} disabled={disabled} InputProps={{ readOnly: ["courseScore", "grade4"].includes(key) }} error={!blank && numericScore(row[key]) !== null && (!Number.isFinite(numericScore(row[key])) || numericScore(row[key]) < 0 || numericScore(row[key]) > max)} onChange={["courseScore", "grade4"].includes(key) ? undefined : (event) => { const value = event.target.value; const score = numericScore(value); if (value === "" || (/^\d*(?:[.,]\d*)?$/.test(value) && Number.isFinite(score) && score >= 0 && score <= max)) edit(row.participantId, { [key]: value }); }} onBlur={calculatedColumns.has(key) ? undefined : () => formatInput(row.participantId, key)} inputProps={{ "data-score-column": key, "aria-label": `${label} ${row.code}`, inputMode: "decimal", autoCorrect: "off", autoCapitalize: "off", spellCheck: false }} sx={inputSx} />
                 </TableCell>;
                 })}
                 <TableCell className="exam-derived-cell"><TextField fullWidth size="small" value={blank ? "" : row.letterGrade} disabled={rowLocked || (row.eligible === false && !row.examExempt)} InputProps={{ readOnly: true }} inputProps={{ "aria-label": `Thang điểm chữ ${row.code}`, maxLength: 10 }} sx={inputSx} /></TableCell>
@@ -593,8 +598,10 @@ export default function ExamLists() {
         saving={saving}
         onConfirm={runWorkflow}
         confirmText="Xác nhận"
-        confirmDisabled={!workflowNote.trim()}
+        confirmDisabled={workflowNeedsNote && !workflowNote.trim()}
       >
+        {!workflowNeedsNote && <Typography>Xác nhận {workflowAction === 'submit' ? 'gửi duyệt' : 'duyệt'} {workflowPhase === 'eligibility' ? 'tư cách thi' : 'kết quả cuối'} của lớp học phần này?</Typography>}
+        {workflowNeedsNote && <>
         <Typography component="label" htmlFor="exam-workflow-note" sx={{ display: "block", mb: "6px", color: "#435b72", fontSize: "13px", fontWeight: 700, lineHeight: 1.5, textTransform: "uppercase" }}>
           Lý do hoặc căn cứ
         </Typography>
@@ -605,6 +612,7 @@ export default function ExamLists() {
           value={workflowNote} disabled={saving} onChange={event => setWorkflowNote(event.target.value)}
           sx={{ "& .MuiInputBase-input:focus-visible": { outline: "none" } }}
         />
+        </>}
       </AppDialog>
       {auditRows !== null && <GradebookHistoryDialog events={auditRows} onClose={() => setAuditRows(null)} />}
       <ConfirmDialog

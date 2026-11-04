@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import axios from "axios";
 import AdmissionScores from "../../pages/masters/admissionScores";
@@ -24,6 +24,72 @@ function configure(rounds = [round]) {
 }
 const mount = (session = null) => render(<ThemeProvider theme={theme}><CssBaseline /><AuthSessionContext.Provider value={{ ...session, access: { permissions: ["admission.manage"] } }}><MemoryRouter useTransitions={false}><AdmissionScores /></MemoryRouter></AuthSessionContext.Provider></ThemeProvider>);
 beforeEach(() => { jest.clearAllMocks(); configure(); });
+it("searches rounds without accents and combines the search with the year filter", async () => {
+  const oldRound = { ...round, id: "round-old", name: "Đợt tuyển sinh mùa thu", academicYear: "2025" };
+  const otherRound = { ...round, id: "round-other", name: "Đợt bổ sung", academicYear: "2026" };
+  configure([round, oldRound, otherRound]); mount();
+  await screen.findByText("HS001");
+  fireEvent.click(screen.getByRole("button", { name: "Quản lý đợt" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(within(dialog).getByText("Hiển thị 3 / 3 đợt xét tuyển")).toBeInTheDocument();
+  fireEvent.change(within(dialog).getByLabelText("Tìm đợt xét tuyển"), { target: { value: "dot tuyen sinh" } });
+  expect(within(dialog).getByText(oldRound.name)).toBeInTheDocument();
+  expect(within(dialog).queryByText(otherRound.name)).not.toBeInTheDocument();
+  fireEvent.mouseDown(within(dialog).getByLabelText("Lọc năm tuyển sinh"));
+  fireEvent.click(await screen.findByRole("option", { name: "2026" }));
+  expect(within(dialog).getByText(/Không tìm thấy đợt phù hợp/)).toBeInTheDocument();
+  fireEvent.change(within(dialog).getByLabelText("Tìm đợt xét tuyển"), { target: { value: "" } });
+  expect(within(dialog).getByText(otherRound.name)).toBeInTheDocument();
+  expect(within(dialog).queryByText(oldRound.name)).not.toBeInTheDocument();
+  expect(axios.post).not.toHaveBeenCalled(); expect(axios.put).not.toHaveBeenCalled();
+});
+it("selects a round from the management list and loads its ranking", async () => {
+  const otherRound = { ...round, id: "round-other", name: "Đợt bổ sung" };
+  configure([round, otherRound]); mount(); await screen.findByText("HS001");
+  fireEvent.click(screen.getByRole("button", { name: "Quản lý đợt" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(within(dialog).getByRole("button", { name: `Chọn đợt ${round.name}` })).toBeDisabled();
+  fireEvent.click(within(dialog).getByRole("button", { name: `Chọn đợt ${otherRound.name}` }));
+  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/admission-rounds/round-other/ranking"), { withCredentials: true }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+});
+it("refreshes the management list so newly added rounds become available", async () => {
+  mount(); await screen.findByText("HS001");
+  fireEvent.click(screen.getByRole("button", { name: "Quản lý đợt" }));
+  const dialog = await screen.findByRole("dialog");
+  const newRound = { ...round, id: "round-new", name: "Đợt mới cập nhật", academicYear: "2027" };
+  configure([newRound, round]);
+  fireEvent.click(within(dialog).getByRole("button", { name: "Tải lại danh sách" }));
+  expect(await within(dialog).findByText(newRound.name)).toBeInTheDocument();
+  expect(within(dialog).getByText("Hiển thị 2 / 2 đợt xét tuyển")).toBeInTheDocument();
+});
+it("keeps unsaved thresholds when cancelling a round change from the management list", async () => {
+  const otherRound = { ...round, id: "round-other", name: "Đợt bổ sung" };
+  configure([round, otherRound]); mount(); await screen.findByText("HS001");
+  fireEvent.change(screen.getByLabelText("Điểm ngưỡng Công nghệ thông tin"), { target: { value: "14" } });
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  try {
+    fireEvent.click(screen.getByRole("button", { name: "Quản lý đợt" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: `Chọn đợt ${otherRound.name}` }));
+    expect(confirm).toHaveBeenCalled();
+    expect(axios.get.mock.calls.some(([url]) => url.endsWith("/round-other/ranking"))).toBe(false);
+    fireEvent.click(within(dialog).getAllByRole("button", { name: "Đóng", exact: true }).at(-1));
+    expect(screen.getByLabelText("Điểm ngưỡng Công nghệ thông tin")).toHaveValue(14);
+  } finally { confirm.mockRestore(); }
+});
+it("paginates the round list and returns to matching results when searching", async () => {
+  const manyRounds = Array.from({ length: 12 }, (_, index) => ({ ...round, id: `round-${index}`, name: `Đợt số ${index + 1}` }));
+  configure(manyRounds); mount(); await screen.findByText("HS001");
+  fireEvent.click(screen.getByRole("button", { name: "Quản lý đợt" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(within(dialog).queryByText("Đợt số 12")).not.toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Trang sau" }));
+  expect(within(dialog).getByText("Đợt số 12")).toBeInTheDocument();
+  fireEvent.change(within(dialog).getByLabelText("Tìm đợt xét tuyển"), { target: { value: "Đợt số 1" } });
+  expect(within(dialog).getByText("Đợt số 1")).toBeInTheDocument();
+  expect(within(dialog).getByText("Hiển thị 4 / 12 đợt xét tuyển")).toBeInTheDocument();
+});
 it("switches between pending applications and eligible applications without changing decisions", async () => {
   const originalGet = axios.get.getMockImplementation();
   const rows = [record, ranking.rows[1],

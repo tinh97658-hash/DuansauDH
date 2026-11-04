@@ -18,6 +18,7 @@ const subject = (overrides: Record<string, unknown> = {}) => ({
 
 const buildService = () => {
   const subjects = {
+    findAll: jest.fn().mockResolvedValue([]),
     findByPk: jest.fn(),
     findOne: jest.fn().mockResolvedValue(null),
     count: jest.fn().mockResolvedValue(0),
@@ -169,6 +170,7 @@ describe("PlanService Subject logical identity", () => {
     const { service, subjects, majors } = buildService();
     const targetMajorId = "11111111-1111-4111-8111-111111111111";
     majors.findAll.mockResolvedValue([{ id: targetMajorId }]);
+    subjects.findAll.mockResolvedValue([subject({ majorId: targetMajorId, name: "Học phần mới", credits: 3 })]);
     subjects.create.mockResolvedValue(subject({ id: "scoped-subject", sharedMajorIds: [targetMajorId], allowCrossMajor: true }));
 
     await service.createSubject(createDto({ sharedMajorIds: [targetMajorId] }));
@@ -177,6 +179,38 @@ describe("PlanService Subject logical identity", () => {
       sharedMajorIds: [targetMajorId],
       allowCrossMajor: true,
     }), { transaction });
+  });
+
+  it.each([
+    { name: "Môn khác", credits: 3 }, { name: "Học phần mới", credits: 2 },
+    { name: "Học phần mới", credits: 3, active: false },
+    { name: "Học phần mới", credits: 3, program: "doctoral" },
+    { name: "hoc phan moi", credits: 3 },
+  ])("rejects sharing with an incompatible counterpart: %j", async counterpart => {
+    const { service, subjects, majors } = buildService();
+    majors.findAll.mockResolvedValue([{ id: "target" }]);
+    subjects.findAll.mockResolvedValue([subject({ majorId: "target", ...counterpart })]);
+    await expect(service.createSubject(createDto({ sharedMajorIds: ["target"] })))
+      .rejects.toThrow("Chỉ được chọn ngành có học phần");
+    expect(subjects.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects sharing with a major that has no matching subject", async () => {
+    const { service, subjects, majors } = buildService();
+    majors.findAll.mockResolvedValue([{ id: "target" }]);
+    await expect(service.createSubject(createDto({ sharedMajorIds: ["target"] })))
+      .rejects.toThrow("Chỉ được chọn ngành có học phần");
+    expect(subjects.create).not.toHaveBeenCalled();
+  });
+
+  it("rechecks the edited name against the selected sharing majors", async () => {
+    const { service, subjects, majors } = buildService();
+    const current = subject({ name: "Học phần mới", credits: 3, sharedMajorIds: ["target"] });
+    subjects.findByPk.mockResolvedValue(current);
+    majors.findAll.mockResolvedValue([{ id: "target" }]);
+    subjects.findAll.mockResolvedValue([subject({ majorId: "target", name: current.name, credits: 3 })]);
+    await expect(service.updateSubject(current.id, { name: "Tên khác" })).rejects.toThrow("Chỉ được chọn ngành có học phần");
+    expect(current.update).not.toHaveBeenCalled();
   });
 
   it("creates one linked subject record per major in a single transaction", async () => {
@@ -298,6 +332,37 @@ describe("PlanService Subject logical identity", () => {
     await expect(service.updateSubject(root.id, { majorId: "major-2" }))
       .rejects.toThrow("Không thể đổi chuyên ngành của môn gốc");
     expect(root.update).not.toHaveBeenCalled();
+  });
+
+  it("allows explicit valid sharing scope changes on a used subject without changing its academic structure", async () => {
+    const { service, subjects, majors, sequelize } = buildService();
+    const current = subject({ name: "Thị giác máy tính nâng cao", credits: 2, sharedMajorIds: [] });
+    subjects.findByPk.mockResolvedValue(current);
+    majors.findAll.mockResolvedValue([{ id: "target" }]);
+    subjects.findAll.mockResolvedValue([subject({ id: "counterpart", majorId: "target", name: current.name, credits: 2 })]);
+    sequelize.query.mockImplementation(async (sql: string) => [{ used: !sql.includes("course_offering_class_groups") }]);
+    await service.updateSubject(current.id, { sharedMajorIds: ["target"], allowCrossMajor: true, canonicalSubjectId: null });
+    expect(current.update).toHaveBeenCalledWith(expect.objectContaining({ sharedMajorIds: ["target"], allowCrossMajor: true }), { transaction });
+    expect(sequelize.query.mock.calls.some(([sql]) => String(sql).includes("WITH affected AS"))).toBe(false);
+  });
+
+  it("does not remove a major from an existing shared offering", async () => {
+    const { service, subjects, sequelize } = buildService();
+    const current = subject({ name: "Triết học", credits: 3, sharedMajorIds: ["linked-major"], allowCrossMajor: true });
+    subjects.findByPk.mockResolvedValue(current);
+    sequelize.query.mockResolvedValue([{ used: true }]);
+    await expect(service.updateSubject(current.id, { sharedMajorIds: [], allowCrossMajor: false }))
+      .rejects.toThrow("Không thể bỏ ngành đang có lớp học phần dùng chung");
+    expect(current.update).not.toHaveBeenCalled();
+  });
+
+  it("allows removing an unused sharing scope even when the subject is otherwise in use", async () => {
+    const { service, subjects, sequelize } = buildService();
+    const current = subject({ name: "Triết học", credits: 3, sharedMajorIds: ["unused-major"], allowCrossMajor: true });
+    subjects.findByPk.mockResolvedValue(current);
+    sequelize.query.mockImplementation(async (sql: string) => [{ used: !sql.includes("course_offering_class_groups") }]);
+    await service.updateSubject(current.id, { sharedMajorIds: [], allowCrossMajor: false });
+    expect(current.update).toHaveBeenCalledWith(expect.objectContaining({ sharedMajorIds: [], allowCrossMajor: false }), { transaction });
   });
 
   it("blocks changing legacy sharing when the subject has an offering", async () => {

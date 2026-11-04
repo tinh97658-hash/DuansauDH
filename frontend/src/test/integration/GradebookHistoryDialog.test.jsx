@@ -15,7 +15,7 @@ it.each([
 ])("displays recorded grades from %s without turning missing marks into zero", (action, after) => {
   render(<GradebookHistoryDialog events={[{ ...event, action, after }]} onClose={() => {}} />);
   const history = screen.getByRole("table", { name: "Lịch sử bảng điểm" });
-  expect(within(history).getByText("29/10/26 11:09:33")).toBeInTheDocument();
+  expect(within(history).getByText("29/10/2026 11:09:33")).toBeInTheDocument();
   expect(within(history).getByText("Administrator")).toBeInTheDocument();
   expect(within(history).getByText(event.note)).toBeInTheDocument();
   const toggle = screen.getByRole("button", { name: "Xem kết quả (1)" });

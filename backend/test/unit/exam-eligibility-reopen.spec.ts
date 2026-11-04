@@ -19,6 +19,28 @@ function fixture(permissions = ['gradebook.submit']) {
   return { service, state, db, sql, event, load, dto, actor };
 }
 
+it.each(['reopen', 'request_reopen', 'reject_reopen'])('requires a reason for %s', async action => {
+  const f = fixture(['gradebook.approve', 'gradebook.submit']);
+  await expect(f.service.transition({...f.dto, action, note: '  '}, f.actor, 'eligibility', f.load)).rejects.toThrow(BadRequestException);
+  expect(f.db.transaction).not.toHaveBeenCalled();
+});
+
+it.each(['eligibility', 'final'] as const)('allows submitting and approving %s without a reason', async phase => {
+  const f = fixture(['gradebook.approve', 'gradebook.submit']);
+  const row = {participantId:'learner', classGroupId:'group', eligible:true, examExempt:false, testScore:8, assignmentScore:8, examScore:8, courseScore:8, result:'passed'};
+  f.load.mockResolvedValue([row]);
+  jest.spyOn(f.service, 'approvedRows').mockResolvedValue([row]);
+  jest.spyOn(f.service as any, 'writeRows').mockResolvedValue(undefined);
+  for (const action of ['submit', 'approve']) {
+    f.state.eligibility_status = phase === 'eligibility' ? (action === 'submit' ? 'draft' : 'submitted') : 'approved';
+    f.state.result_status = action === 'submit' ? 'draft' : 'submitted';
+    f.state.eligibility_submission = {rows:[row]};
+    f.state.result_snapshot = {rows:[row]};
+    await f.service.transition({...f.dto, action, version:phase === 'final' ? 0 : 2, note:undefined}, f.actor, phase, f.load);
+    expect(f.event).toHaveBeenLastCalledWith('offering', `${phase}.${action}`, f.actor, '', expect.any(Object), expect.any(Object), expect.any(Object));
+  }
+});
+
 it('records a supervisor request without reopening the approved roster or changing scores', async () => {
   const f = fixture();
   await f.service.transition(f.dto, f.actor, 'eligibility', f.load);

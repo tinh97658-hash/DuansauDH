@@ -28,6 +28,7 @@ import InlineReportExport from "../../components/InlineReportExport";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
 import SubjectSharingCheckbox from "../../components/SubjectSharingCheckbox";
+import { sharedSubjectName } from "../../utils/subjectSharing";
 import AppDialog from "../../components/AppDialog";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { getMockConfirmResult } from "../../utils/confirmHelper";
@@ -377,17 +378,19 @@ const TrainingPlan = () => {
   );
 
   const shareableExistingSubjects = useMemo(() => {
-    const normalizedName = normalizeSubjectName(subjectDraft.name);
+    const normalizedName = sharedSubjectName(subjectDraft.name);
     const seenMajorIds = new Set();
     return programSubjects.filter((subject) => {
       const matches = sharingCandidateMajorIds.has(subject.majorId)
-        && normalizeSubjectName(subject.name) === normalizedName
+        && subject.active !== false && subject.program === level
+        && sharedSubjectName(subject.name) === normalizedName
         && Number(subject.credits) === Number(subjectDraft.credits || 0)
         && !seenMajorIds.has(subject.majorId);
       if (matches) seenMajorIds.add(subject.majorId);
       return matches;
     });
-  }, [programSubjects, sharingCandidateMajorIds, subjectDraft.credits, subjectDraft.name]);
+  }, [programSubjects, sharingCandidateMajorIds, subjectDraft.credits, subjectDraft.name, level]);
+  const eligibleSharingMajors = sharingCandidateMajors.filter(major => shareableExistingSubjects.some(subject => subject.majorId === major.id));
 
   const matchingMajorLabels = useMemo(() => shareableExistingSubjects.map((subject) => {
     const subjectMajor = majors.find((major) => major.id === subject.majorId);
@@ -755,7 +758,8 @@ const TrainingPlan = () => {
   };
 
   const prepareSharedSubjects = (targetMajorIds, keepOpenForNext) => {
-    const selectedMajorIds = targetMajorIds.filter((id) => sharingCandidateMajorIds.has(id));
+    const selectedMajorIds = targetMajorIds.filter((id) => eligibleSharingMajors.some(major => major.id === id));
+    if (!selectedMajorIds.length) return toast.error("Không có ngành nào có học phần cùng tên và số tín chỉ để học chung.");
     const existingByMajorId = new Map(shareableExistingSubjects.map((subject) => [subject.majorId, subject]));
     const incompatibleSubject = programSubjects.find((subject) => (
       selectedMajorIds.includes(subject.majorId)
@@ -1338,6 +1342,7 @@ const TrainingPlan = () => {
                             <SubjectSharingCheckbox
                               subject={{ ...editingSubjectForm, majorId, program: level }}
                               majors={majors}
+                              subjects={programSubjects}
                               disabled={!isAdmin}
                               onChange={(identity) => setEditingSubjectForm((current) => ({ ...current, ...identity }))}
                             />
@@ -1447,6 +1452,7 @@ const TrainingPlan = () => {
                           <SubjectSharingCheckbox
                             subject={row}
                             majors={majors}
+                            subjects={programSubjects}
                             disabled={!isAdmin}
                             onChange={(identity) => handleSubjectSharingChange(row, identity)}
                           />
@@ -1603,6 +1609,7 @@ const TrainingPlan = () => {
                       <SubjectSharingCheckbox
                         subject={{ ...subjectDraft, majorId, program: level }}
                         majors={majors}
+                        subjects={programSubjects}
                         disabled={!isAdmin}
                         onChange={(identity) => setSubjectDraft((current) => ({ ...current, ...identity }))}
                       />
@@ -2185,19 +2192,19 @@ const TrainingPlan = () => {
                 sx={{ m: 0, px: 1.5, py: 0.5, width: "100%", bgcolor: "#F4F7FA" }}
                 control={(
                   <Checkbox
-                    checked={sharingCandidateMajors.length > 0
-                      && sharingPromptMajorIds.length === sharingCandidateMajors.length}
+                    checked={eligibleSharingMajors.length > 0
+                      && sharingPromptMajorIds.length === eligibleSharingMajors.length}
                     indeterminate={sharingPromptMajorIds.length > 0
-                      && sharingPromptMajorIds.length < sharingCandidateMajors.length}
+                      && sharingPromptMajorIds.length < eligibleSharingMajors.length}
                     onChange={(event) => setSharingPromptMajorIds(
-                      event.target.checked ? sharingCandidateMajors.map((major) => major.id) : [],
+                      event.target.checked ? eligibleSharingMajors.map((major) => major.id) : [],
                     )}
                   />
                 )}
                 label={<Typography sx={{ fontWeight: 700, fontSize: 13.5, color: "#172B3A" }}>Chọn tất cả</Typography>}
               />
               <Divider />
-              {sharingCandidateMajors.map((targetMajor, index) => {
+              {eligibleSharingMajors.map((targetMajor, index) => {
                 const existingSubject = shareableExistingSubjects.find((subject) => subject.majorId === targetMajor.id);
                 return (
                   <React.Fragment key={targetMajor.id}>

@@ -45,7 +45,7 @@ it('prints only the selected admission columns in one table while preserving the
   expect(source.sections[0].headers).toHaveLength(13);
 });
 
-it("creates a genuine XLSX with Vietnamese headings, short dates, numeric zero and leading-zero identifiers", async () => {
+it("creates a genuine XLSX with Vietnamese headings, full-year dates, numeric zero and leading-zero identifiers", async () => {
   const book = new ExcelJS.Workbook();
   await book.xlsx.load(await bytesOf(await createReportExcel(report())));
   const sheet = book.worksheets[0];
@@ -54,9 +54,9 @@ it("creates a genuine XLSX with Vietnamese headings, short dates, numeric zero a
   expect(sheet.getCell("A3").value).toBe("VIỆN ĐÀO TẠO SAU ĐẠI HỌC");
   expect(logicalCells(sheet.getRow(1))[1].value).toBe("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM");
   expect(logicalCells(sheet.getRow(2))[1].value).toBe("Độc lập - Tự do - Hạnh phúc");
-  expect(logicalCells(sheet.getRow(3))[1].value).toBe("Hải Phòng, ngày 31/10/26");
+  expect(logicalCells(sheet.getRow(3))[1].value).toBe("Hải Phòng, ngày 31/10/2026");
   const row = sheet.getRow(sheet.rowCount);
-  expect(logicalCells(row).map(cell => cell.value)).toEqual([1, "Nguyễn Thị Ánh", "03/02/95", "0901234567", 0]);
+  expect(logicalCells(row).map(cell => cell.value)).toEqual([1, "Nguyễn Thị Ánh", "03/02/1995", "0901234567", 0]);
   expect(sheet.getRow(sheet.rowCount - 1).values).not.toContain("Thao tác");
   expect(sheet.views[0].state).toBe("frozen");
   expect(excelWidthToPoints(sheet.getColumn(1).width)).toBeCloseTo(32);
@@ -68,7 +68,7 @@ it("creates a genuine XLSX with Vietnamese headings, short dates, numeric zero a
 it("creates a genuine Word document with institution headings and the same dataset", async () => {
   const zip = await JSZip.loadAsync(await bytesOf(await createReportWord(report())));
   const xml = await zip.file("word/document.xml").async("string");
-  for (const text of ["NGUYỄN", "03/02/95", "0901234567", "HÀNG HẢI", "BỘ XÂY DỰNG", "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", "Độc lập - Tự do - Hạnh phúc", "Hải Phòng, ngày 31/10/26"]) expect(xml.toUpperCase()).toContain(text.toUpperCase());
+  for (const text of ["NGUYỄN", "03/02/1995", "0901234567", "HÀNG HẢI", "BỘ XÂY DỰNG", "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", "Độc lập - Tự do - Hạnh phúc", "Hải Phòng, ngày 31/10/2026"]) expect(xml.toUpperCase()).toContain(text.toUpperCase());
   expect(xml).not.toContain("Xóa");
   expect(xml).toContain("w:tblHeader");
   expect(xml).not.toContain('w:fill="DCE7F1"');
@@ -136,7 +136,7 @@ it("creates a real PDF with Vietnamese text and multiple pages", async () => {
   const parsed = await readTranscriptPdf(pdf);
   expect(parsed.length).toBeGreaterThan(1);
   expect(JSON.stringify(parsed)).toContain("Nguyễn Thị Ánh");
-  for (const text of ["BỘ XÂY DỰNG", "CỘNG HÒA XÃ HỘI", "Độc lập - Tự do - Hạnh phúc", "31/10/26"]) expect(JSON.stringify(parsed)).toContain(text);
+  for (const text of ["BỘ XÂY DỰNG", "CỘNG HÒA XÃ HỘI", "Độc lập - Tự do - Hạnh phúc", "31/10/2026"]) expect(JSON.stringify(parsed)).toContain(text);
 }, 30000);
 
 it("creates a standalone progress PDF with class metadata and signing roles", async () => {

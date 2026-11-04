@@ -87,6 +87,102 @@ beforeEach(async () => {
   jest.clearAllMocks(); localStorage.clear(); setup();
 });
 
+it.each([
+  ['components', 'draft', 'Gửi duyệt tư cách', 'eligibility', 'submit'],
+  ['components', 'submitted', 'Duyệt tư cách', 'eligibility', 'approve'],
+  ['final', 'draft', 'Gửi duyệt kết quả', 'final', 'submit'],
+  ['final', 'submitted', 'Duyệt kết quả', 'final', 'approve'],
+])('confirms %s / %s without asking for a reason', async (phase, status, label, endpoint, action) => {
+  setup('admin', [{...savedRow, testScore:8, assignmentScore:8, examScore:phase==='final'?8:null}], phase);
+  const original=axios.get.getMockImplementation();
+  axios.get.mockImplementation(async (url, config) => {
+    const result=await original(url,config);
+    if (!url.endsWith('/exam-lists')) return result;
+    const workflow=workflowFor(phase);
+    workflow[endpoint].status=status;
+    return {data:{...result.data,workflow}};
+  });
+  axios.post.mockResolvedValue({data:{}});
+  render(<ExamLists/>);
+  await screen.findByLabelText('Điểm kiểm tra HV001');
+  await waitFor(()=>expect(screen.getByRole('button',{name:label})).toBeEnabled());
+  fireEvent.click(screen.getByRole('button',{name:label}));
+  const dialog=await screen.findByRole('dialog');
+  expect(within(dialog).queryByLabelText('Lý do hoặc căn cứ')).not.toBeInTheDocument();
+  expect(within(dialog).getByRole('button',{name:'Xác nhận'})).toBeEnabled();
+  fireEvent.click(within(dialog).getByRole('button',{name:'Xác nhận'}));
+  await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining(`/exam-lists/${endpoint}/workflow`),expect.objectContaining({action,note:''})));
+});
+
+it("keyboard arrows navigate editable score cells in all four directions without saving", async () => {
+  setup('admin', [
+    { ...savedRow, testScore: 8, assignmentScore: 7 },
+    { ...savedRow, participantId: 'student:two', code: 'HV002', testScore: 6, assignmentScore: 9 },
+  ], 'components');
+  render(<ExamLists />);
+  const first = await screen.findByLabelText('Điểm kiểm tra HV001');
+  const right = screen.getByLabelText('Điểm BTL/TL/KT HV001');
+  const below = screen.getByLabelText('Điểm BTL/TL/KT HV002');
+  const left = screen.getByLabelText('Điểm kiểm tra HV002');
+  first.focus();
+  fireEvent.keyDown(first, { key: 'ArrowRight' }); expect(right).toHaveFocus();
+  expect(right.selectionStart).toBe(0); expect(right.selectionEnd).toBe(right.value.length);
+  fireEvent.keyDown(right, { key: 'ArrowDown' }); expect(below).toHaveFocus();
+  fireEvent.keyDown(below, { key: 'ArrowLeft' }); expect(left).toHaveFocus();
+  fireEvent.keyDown(left, { key: 'ArrowUp' }); expect(first).toHaveFocus();
+  expect(axios.put).not.toHaveBeenCalled();
+});
+
+it("keyboard arrows skip locked learners and keep focus at the editable grid edges", async () => {
+  setup('admin', [
+    { ...savedRow, testScore: 8, assignmentScore: 7 },
+    { ...savedRow, participantId: 'student:locked', code: 'HV002', profileForeignLanguageExempt: true },
+    { ...savedRow, participantId: 'student:three', code: 'HV003', testScore: 6, assignmentScore: 9 },
+  ], 'components');
+  render(<ExamLists />);
+  const first = await screen.findByLabelText('Điểm kiểm tra HV001');
+  const third = screen.getByLabelText('Điểm kiểm tra HV003');
+  expect(screen.getByLabelText('Điểm kiểm tra HV002')).toBeDisabled();
+  first.focus();
+  fireEvent.keyDown(first, { key: 'ArrowDown' }); expect(third).toHaveFocus();
+  expect(fireEvent.keyDown(third, { key: 'ArrowDown' })).toBe(false); expect(third).toHaveFocus();
+  fireEvent.keyDown(third, { key: 'ArrowRight' });
+  const lastColumn = screen.getByLabelText('Điểm BTL/TL/KT HV003');
+  expect(lastColumn).toHaveFocus();
+  fireEvent.keyDown(lastColumn, { key: 'ArrowRight' }); expect(lastColumn).toHaveFocus();
+  expect(axios.put).not.toHaveBeenCalled();
+});
+
+it("keyboard arrows navigate exam marks while skipping approved component and calculated marks", async () => {
+  setup('admin', [
+    { ...savedRow, testScore: 8, assignmentScore: 8 },
+    { ...savedRow, participantId: 'student:two', code: 'HV002', testScore: 7, assignmentScore: 7 },
+  ], 'final');
+  render(<ExamLists />);
+  const first = await screen.findByLabelText('Điểm thi hết môn HV001');
+  expect(first).toBeEnabled();
+  expect(screen.getByLabelText('Điểm kiểm tra HV001')).toBeDisabled();
+  first.focus();
+  fireEvent.keyDown(first, { key: 'ArrowLeft' }); expect(first).toHaveFocus();
+  fireEvent.keyDown(first, { key: 'ArrowRight' }); expect(first).toHaveFocus();
+  fireEvent.keyDown(first, { key: 'ArrowDown' }); expect(screen.getByLabelText('Điểm thi hết môn HV002')).toHaveFocus();
+  expect(axios.put).not.toHaveBeenCalled();
+});
+
+it("keyboard arrows preserve typed scores and keep modified arrows available for text selection", async () => {
+  setup('admin', [{ ...savedRow, testScore: 8, assignmentScore: 7 }], 'components');
+  render(<ExamLists />);
+  const first = await screen.findByLabelText('Điểm kiểm tra HV001');
+  first.focus();
+  fireEvent.change(first, { target: { value: '8.5' } });
+  expect(fireEvent.keyDown(first, { key: 'ArrowRight', shiftKey: true })).toBe(true);
+  expect(first).toHaveFocus();
+  fireEvent.keyDown(first, { key: 'ArrowRight' });
+  expect(first).toHaveValue('8.5');
+  expect(screen.getByLabelText('Điểm BTL/TL/KT HV001')).toHaveFocus();
+  expect(axios.put).not.toHaveBeenCalled();
+});
+
 it("shows a compact no-scope state without score columns in either view", async () => {
   axios.get.mockResolvedValue({ data: { groups: [], courseOfferings: [] } });
   render(<ExamLists />);
@@ -133,7 +229,7 @@ it("closes a rejected eligibility submission and shows an error toast with the u
   const originalScore = score.value;
   fireEvent.click(screen.getByRole("button", { name: "Gửi duyệt tư cách" }));
   const dialog = await screen.findByRole("dialog");
-  fireEvent.change(within(dialog).getByLabelText("Lý do hoặc căn cứ"), { target: { value: "Đối chiếu tư cách thi" } });
+  expect(within(dialog).queryByLabelText("Lý do hoặc căn cứ")).not.toBeInTheDocument();
   fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận" }));
   expect(dialog).toBeInTheDocument();
   await act(async () => { rejectSubmission({ response: { status: 400, data: { message } } }); });
@@ -145,7 +241,7 @@ it("closes a rejected eligibility submission and shows an error toast with the u
   expect(screen.getByLabelText("Điểm kiểm tra HV001")).toHaveValue(originalScore);
   expect(screen.getByRole("button", { name: "Gửi duyệt tư cách" })).toBeEnabled();
   expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/exam-lists/eligibility/workflow"),
-    expect.objectContaining({ action: "submit", note: "Đối chiếu tư cách thi" }));
+    expect.objectContaining({ action: "submit", note: "" }));
 });
 
 it("preserves eligibility submit, approve, approved DS and reopen in the gradebook", async () => {
@@ -173,7 +269,14 @@ it("preserves eligibility submit, approve, approved DS and reopen in the gradebo
   const transition = async (label, expected) => {
     fireEvent.click(screen.getByRole('button', { name: label }));
     const dialog = await screen.findByRole('dialog');
-    fireEvent.change(within(dialog).getByLabelText('Lý do hoặc căn cứ'), { target: { value: 'Đã đối chiếu hồ sơ' } });
+    const note = within(dialog).queryByLabelText('Lý do hoặc căn cứ');
+    if (label.includes('Mở lại')) {
+      expect(within(dialog).getByRole('button', { name: 'Xác nhận' })).toBeDisabled();
+      fireEvent.change(note, { target: { value: 'Đã đối chiếu hồ sơ' } });
+    } else {
+      expect(note).not.toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: 'Xác nhận' })).toBeEnabled();
+    }
     fireEvent.click(within(dialog).getByRole('button', { name: 'Xác nhận' }));
     await screen.findByText(expected, {}, { timeout: 10000 });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -310,7 +413,7 @@ it("allows an examiner to submit but not approve a complete gradebook", async ()
   await screen.findByLabelText("Điểm kiểm tra HV001");
   fireEvent.click(screen.getByRole("button", { name: "Gửi duyệt tư cách" }));
   const dialog = await screen.findByRole("dialog");
-  fireEvent.change(within(dialog).getByLabelText("Lý do hoặc căn cứ"), { target: { value: "Đã đối chiếu điểm" } });
+  expect(within(dialog).queryByLabelText("Lý do hoặc căn cứ")).not.toBeInTheDocument();
   fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận" }));
   await screen.findByText("Tư cách chờ duyệt");
   expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeDisabled();
@@ -1138,7 +1241,7 @@ it.each(['waiting','final'])('unlocks only exam marks in the held final stage (%
 it('submits final results through a separate endpoint and version',async()=>{
  setup('examiner',[{...savedRow,testScore:8,assignmentScore:8,examScore:8}],'final');render(<ExamLists/>);
  fireEvent.click(await screen.findByRole('button',{name:'Gửi duyệt kết quả'}));
- const dialog=await screen.findByRole('dialog');fireEvent.change(within(dialog).getByLabelText('Lý do hoặc căn cứ'),{target:{value:'Đã đối chiếu kết quả thi'}});
+ const dialog=await screen.findByRole('dialog');expect(within(dialog).queryByLabelText('Lý do hoặc căn cứ')).not.toBeInTheDocument();
  fireEvent.click(within(dialog).getByRole('button',{name:'Xác nhận'}));await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/exam-lists/final/workflow'),expect.objectContaining({version:0,action:'submit'})));
  expect(screen.getByLabelText('Điểm kiểm tra HV001')).toBeDisabled();
 });

@@ -7,6 +7,7 @@ import EditRounded from "@mui/icons-material/EditRounded";
 import InfoOutlined from "@mui/icons-material/InfoOutlined";
 import RefreshRounded from "@mui/icons-material/RefreshRounded";
 import BulkAdmissionWorkflow from "../../features/admission/BulkAdmissionWorkflow";
+import AdmissionRoundManager from "../../features/admission/AdmissionRoundManager";
 import FeatureLayout from "../../components/FeatureLayout";
 import InlineReportExport from "../../components/InlineReportExport";
 import FilterSearchField from "../../components/FilterSearchField";
@@ -57,14 +58,18 @@ export default function AdmissionScores() {
   const [thresholdDrafts, setThresholdDrafts] = useState({});
   const [discardAction, setDiscardAction] = useState(null);
   const [showEligible, setShowEligible] = useState(false);
+  const [roundManagerOpen, setRoundManagerOpen] = useState(false), [roundsLoading, setRoundsLoading] = useState(false);
   const thresholdsDirty = Object.keys(thresholdDrafts).length > 0;
   const loadRounds = useCallback(async () => {
-    const [config, catalog] = await Promise.all([
-      axios.get(`${API_BASE_URL}/plan/admission-rounds`, options), axios.get(`${API_BASE_URL}/system/majors`, options),
-    ]);
-    setRounds(config.data.rows || []);
-    setMajors(normalizeMajorsResponse(catalog.data).filter((major) => major.program === "masters" && major.active !== false));
-    return config.data.rows || [];
+    setRoundsLoading(true);
+    try {
+      const [config, catalog] = await Promise.all([
+        axios.get(`${API_BASE_URL}/plan/admission-rounds`, options), axios.get(`${API_BASE_URL}/system/majors`, options),
+      ]);
+      setRounds(config.data.rows || []);
+      setMajors(normalizeMajorsResponse(catalog.data).filter((major) => major.program === "masters" && major.active !== false));
+      return config.data.rows || [];
+    } finally { setRoundsLoading(false); }
   }, []);
   useEffect(() => {
     loadRounds().then((rows) => { if (rows.length) setRoundId(rows[0].id); else setLoading(false); })
@@ -100,12 +105,24 @@ export default function AdmissionScores() {
       rules: round.rules, regulationNo: round.regulationNo || "", decisionNo: round.decisionNo || undefined, decisionDate: round.decisionDate || undefined }
       : { name: "", academicYear: "2026", majorThresholds: [] });
   };
+  const selectRound = (id) => runWithDiscardCheck(() => {
+    setData(null); setThresholdDrafts({}); setMajorFilter("all"); setRoundId(id); setRoundManagerOpen(false);
+  });
+  const refreshRounds = async () => {
+    setError("");
+    try {
+      const updated = await loadRounds();
+      setThresholdDrafts({});
+      if (updated.some(round => round.id === roundId)) await loadRanking();
+      else { setData(null); setRoundId(updated[0]?.id || ""); setLoading(false); }
+    } catch (err) { setError(err.response?.data?.message || "Không tải được đợt xét tuyển."); }
+  };
   const saveRound = async () => {
     setSaving(true); setError("");
     try {
       const { id, ...payload } = form;
       const response = id ? await axios.put(`${API_BASE_URL}/plan/admission-rounds/${id}`, payload, options) : await axios.post(`${API_BASE_URL}/plan/admission-rounds`, payload, options);
-      await loadRounds(); setForm(null); setThresholdDrafts({});
+      await loadRounds(); setForm(null); setRoundManagerOpen(false); setThresholdDrafts({});
       if (response.data.id === roundId) await loadRanking(); else { setData(null); setRoundId(response.data.id); }
     } catch (err) { setError(err.response?.data?.message || "Không thể lưu đợt xét tuyển."); }
     finally { setSaving(false); }
@@ -140,11 +157,12 @@ export default function AdmissionScores() {
       <Paper variant="outlined" sx={{ p: "12px", borderRadius: "6px", borderColor: "#C6D5E1", bgcolor: "#FFF", boxShadow: "none" }}>
         <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="flex-end">
           <FilterSelectField label="Đợt xét tuyển toàn viện" value={roundId} disabled={saving || workflowBusy || loading}
-            onChange={(event) => { const val = event.target.value; runWithDiscardCheck(() => { setData(null); setThresholdDrafts({}); setMajorFilter("all"); setRoundId(val); }); }} sx={{ width: { xs: "100%", sm: 360 }, maxWidth: "100%" }}>
+            onChange={(event) => selectRound(event.target.value)} sx={{ width: { xs: "100%", sm: 360 }, maxWidth: "100%" }}>
             <MenuItem value="">Chọn đợt xét tuyển</MenuItem>{rounds.map((round) => <MenuItem key={round.id} value={round.id}>{round.name} · {round.academicYear}</MenuItem>)}
           </FilterSelectField>
           <Stack direction="row" gap={1} flexWrap="wrap" sx={{ "& .MuiButton-root": { height: 38, whiteSpace: "nowrap", borderRadius: "4px" } }}>
-            <Button size="small" variant="outlined" startIcon={<RefreshRounded />} onClick={() => runWithDiscardCheck(() => { setThresholdDrafts({}); loadRanking(); })} disabled={!roundId || loading || workflowBusy || saving}>Tải lại</Button>
+            <Button size="small" variant="outlined" disabled={workflowBusy || saving} onClick={() => setRoundManagerOpen(true)}>Quản lý đợt</Button>
+            <Button size="small" variant="outlined" startIcon={<RefreshRounded />} onClick={() => runWithDiscardCheck(refreshRounds)} disabled={roundsLoading || loading || workflowBusy || saving}>Tải lại</Button>
             {admin && <>
               <Button size="small" variant="outlined" startIcon={<EditRounded />} disabled={!data || loading || workflowBusy || saving} onClick={() => runWithDiscardCheck(() => openForm(data.round))}>Sửa đợt</Button>
               <Button size="small" variant="contained" startIcon={<AddRounded />} disabled={workflowBusy || saving} onClick={() => runWithDiscardCheck(() => openForm(null))} sx={{ bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F" } }}>Tạo đợt xét tuyển</Button>
@@ -195,6 +213,10 @@ export default function AdmissionScores() {
                 "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: "#16803c", opacity: 0.5 } }} />} />} />
       </>}
     </Stack>
+    <AdmissionRoundManager open={roundManagerOpen && !form} onClose={() => setRoundManagerOpen(false)}
+      rounds={rounds} selectedRoundId={roundId} admin={admin} loading={roundsLoading || loading || saving || workflowBusy}
+      error={error} onRefresh={() => runWithDiscardCheck(refreshRounds)} onSelect={selectRound}
+      onEdit={round => runWithDiscardCheck(() => openForm(round))} onCreate={() => runWithDiscardCheck(() => openForm(null))} />
     <AppDialog
       open={Boolean(form)}
       onClose={() => !saving && setForm(null)}

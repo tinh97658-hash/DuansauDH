@@ -42,5 +42,5 @@ export class GradebookWorkflowDto extends ExamGradebookQueryDto {
   @IsIn(["submit", "approve", "reopen", "request_reopen", "reject_reopen"]) action!: "submit" | "approve" | "reopen" | "request_reopen" | "reject_reopen";
   @IsInt() @Min(0) revision!: number;
   @IsInt() @Min(0) version!: number;
-  @IsString() @MaxLength(2000) note!: string;
+  @IsOptional() @IsString() @MaxLength(2000) note?: string;
 }

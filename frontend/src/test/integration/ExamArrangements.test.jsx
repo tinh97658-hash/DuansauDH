@@ -121,7 +121,7 @@ it('places the compose button beside the heading and hides expired calendar acti
  const composeButton=await screen.findByRole('button',{name:'+ Tạo buổi thi ghép'});
  expect(composeButton.closest('.sl-schedule-head')).toContainElement(screen.getByRole('heading',{name:'XẾP LỊCH THI'}));
  fireEvent.click(await screen.findByRole('button',{name:/CNTT 2026.1.1 15 TS Triết học/}));
- const morning=screen.getByRole('button',{name:'Chọn 19/10/26 Sáng'}),afternoon=screen.getByRole('button',{name:'Chọn 19/10/26 Chiều'});
+ const morning=screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'}),afternoon=screen.getByRole('button',{name:'Chọn 19/10/2026 Chiều'});
  expect(morning).toBeEnabled();
  examClock.value='2026-10-19 08:01:00';fireEvent.focus(window);
  expect(morning).toBeDisabled();expect(afternoon).toBeEnabled();
@@ -129,7 +129,7 @@ it('places the compose button beside the heading and hides expired calendar acti
  examClock.value='2026-10-19 14:01:00';fireEvent.focus(window);
  expect(afternoon).toBeDisabled();
  expect(within(afternoon.closest('.sl-slot')).queryByRole('button',{name:'+ Xếp lịch'})).toBeNull();
- expect(screen.getByRole('button',{name:'Chọn 20/10/26 Sáng'})).toBeEnabled();
+ expect(screen.getByRole('button',{name:'Chọn 20/10/2026 Sáng'})).toBeEnabled();
 });
 it.each([
  ['2026-10-19 08:01:00','2026-10-19','AFTERNOON','14:00'],
@@ -198,15 +198,15 @@ it('edits only an unlocked group in the same dialog and keeps the form on a reje
 
 it('keeps the overview open and follows the new week after moving an arrangement',async()=>{
  data.sessions=[session(a,'moving')];renderPage();
- fireEvent.click(await screen.findByRole('button',{name:/19\/10\/26 08:00 Đã xếp lịch/}));
+ fireEvent.click(await screen.findByRole('button',{name:/19\/10\/2026 08:00 Đã xếp lịch/}));
  const dialog=screen.getByRole('dialog',{name:'CHI TIẾT BUỔI THI'});
  fireEvent.click(screen.getByRole('button',{name:'Chỉnh sửa buổi thi'}));
- fireEvent.change(screen.getByLabelText('Ngày thi'),{target:{value:'26/10/26'}});
+ fireEvent.change(screen.getByLabelText('Ngày thi'),{target:{value:'26/10/2026'}});
  axios.put.mockImplementation(async()=>{data.sessions=[session(a,'moving',{examDate:'2026-10-26',version:1,arrangementVersion:1})];return {data:{}};});
  await waitFor(()=>expect(screen.getByRole('button',{name:'Lưu thay đổi'})).toBeEnabled());
  fireEvent.click(screen.getByRole('button',{name:'Lưu thay đổi'}));
  await waitFor(()=>expect(within(dialog).getByRole('table',{name:'Các học phần trong buổi thi'})).toBeInTheDocument());
- await waitFor(()=>expect(dialog).toHaveTextContent('26/10/26'));
+ await waitFor(()=>expect(dialog).toHaveTextContent('26/10/2026'));
  expect(axios.get).toHaveBeenCalledWith(expect.stringContaining('/masters/exam-schedule'),expect.objectContaining({params:{from:'2026-10-26',to:'2026-11-01'}}));
  expect(screen.getAllByRole('dialog')).toHaveLength(1);
 });
@@ -300,7 +300,7 @@ it('only suggests the two postgraduate units and lecturers from the selected uni
 });
 it('restores external names when editing a single-group arrangement',async()=>{
  data.sessions=[session(a,'external',{lecturerId:null,lecturerName:'Lê Văn Bình',externalInvigilatorName:'Lê Văn Bình',externalUnitName:'Trung tâm Khảo thí'})];
- renderPage();fireEvent.click(await screen.findByRole('button',{name:/19\/10\/26 08:00 Đã xếp lịch/}));
+ renderPage();fireEvent.click(await screen.findByRole('button',{name:/19\/10\/2026 08:00 Đã xếp lịch/}));
  const detail=screen.getByRole('dialog',{name:'CHI TIẾT BUỔI THI'});expect(detail).toHaveTextContent('Lê Văn Bình');
  fireEvent.click(screen.getByRole('button',{name:'Chỉnh sửa buổi thi'}));expect(screen.getAllByRole('dialog')).toHaveLength(1);expect(detail).toBeInTheDocument();
  expect(screen.getByRole('combobox',{name:'Đơn vị'})).toHaveValue('Trung tâm Khảo thí');

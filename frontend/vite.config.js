@@ -84,7 +84,9 @@ export default defineConfig(({ mode }) => {
       exclude: [],
     },
     optimizeDeps: {
-      include: iconDependencies,
+      // Initialize MUI's styling engine in the same pre-bundle as its components.
+      // Icon/deep imports can otherwise evaluate Popper before styled is ready.
+      include: ["@emotion/react", "@emotion/styled", "@mui/material", "@mui/material/styles", ...iconDependencies],
       esbuildOptions: {
         loader: {
           ".js": "jsx",

@@ -4,6 +4,8 @@ Hệ thống nội bộ của **Viện Đào tạo Sau đại học – Trườn
 
 ## Công nghệ
 
+Dữ liệu demo nhập điểm, lịch sử giảng dạy và tạo lịch thi: xem [hướng dẫn demo thi](docs/exam-demo.md), chạy riêng bằng `npm --prefix backend run db:seed:exam-demo`.
+
 - Frontend: React 18, React Router 6, Material UI, Ant Design, Bootstrap và Axios.
 - Backend: Node.js 22, NestJS 11, Passport, class-validator, bcrypt, Multer và Nodemailer.
 - Database: PostgreSQL 16.

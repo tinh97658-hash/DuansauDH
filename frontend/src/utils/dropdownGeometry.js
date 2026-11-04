@@ -5,23 +5,30 @@ export function dropdownAnchor(anchorEl) {
     ? anchor.closest('.MuiInputBase-root') || anchor : anchor;
 }
 
-export function dropdownMenuGeometry(anchorEl, { allowFlip = false, menuHeight = 360 } = {}) {
+export function dropdownMenuGeometry(anchorEl, { allowFlip = true, menuHeight = 360, minWidth = 0 } = {}) {
   const anchor = dropdownAnchor(anchorEl);
   const bounds = anchor?.getBoundingClientRect();
   if (!bounds?.width) return null;
-  const viewportHeight = anchor.ownerDocument?.defaultView?.innerHeight || window.innerHeight;
-  const viewportWidth = anchor.ownerDocument?.defaultView?.innerWidth || window.innerWidth;
-  const below = Math.max(0, viewportHeight - bounds.bottom - 12);
-  const above = Math.max(0, bounds.top - 12);
+  const view = anchor.ownerDocument?.defaultView || window;
+  const viewportHeight = view.visualViewport?.height || view.innerHeight;
+  const viewportWidth = view.visualViewport?.width || view.innerWidth;
+  const viewportTop = view.visualViewport?.offsetTop || 0;
+  const viewportLeft = view.visualViewport?.offsetLeft || 0;
+  const width = Math.min(Math.max(bounds.width, minWidth), Math.max(0, viewportWidth - 16));
+  const below = Math.max(0, viewportTop + viewportHeight - bounds.bottom - 12);
+  const above = Math.max(0, bounds.top - viewportTop - 12);
   const upwards = allowFlip && below < Math.min(menuHeight, 360) && above > below;
   const maxHeight = Math.min(360, upwards ? above : below);
-  const top = upwards ? Math.max(8, bounds.top - 4 - Math.min(menuHeight, maxHeight)) : bounds.bottom + 4;
-  return { width: bounds.width, left: allowFlip ? Math.max(0, Math.min(bounds.left, viewportWidth - bounds.width)) : bounds.left,
+  const desiredTop = upwards ? bounds.top - 4 - Math.min(menuHeight, maxHeight) : bounds.bottom + 4;
+  const top = Math.max(viewportTop + 8, Math.min(desiredTop, viewportTop + viewportHeight - Math.min(menuHeight, maxHeight) - 8));
+  return { width, left: allowFlip || minWidth > 0 ? Math.max(viewportLeft + 8, Math.min(bounds.left, viewportLeft + viewportWidth - width - 8)) : bounds.left,
     top, maxHeight };
 }
 
 export function dropdownMenuStyles(anchorEl) {
-  const geometry = dropdownMenuGeometry(anchorEl);
+  const anchor = dropdownAnchor(anchorEl);
+  const requestedWidth = Number(anchor?.getAttribute?.('data-dropdown-min-width'));
+  const geometry = dropdownMenuGeometry(anchorEl, { minWidth: Number.isFinite(requestedWidth) ? Math.max(0, requestedWidth) : 0 });
   if (!geometry) return {};
   return {
     width: `${geometry.width}px !important`,

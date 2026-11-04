@@ -1,9 +1,12 @@
 import { formatDate, formatDateTime, parseDisplayDate } from "../../utils/dateFormat";
 
-it("formats ISO and legacy dates as dd/mm/yy, including date-time API values", () => {
-  expect(formatDate("2026-10-17")).toBe("17/10/26");
-  expect(formatDate("1995-06-18T00:00:00.000Z")).toBe("18/06/95");
-  expect(formatDate("2/3/2001")).toBe("02/03/01");
+it("formats ISO and legacy dates as dd/mm/yyyy, including date-time API values", () => {
+  expect(formatDate("2026-10-17")).toBe("17/10/2026");
+  expect(formatDate("1995-06-18T00:00:00.000Z")).toBe("18/06/1995");
+  expect(formatDate("2/3/2001")).toBe("02/03/2001");
+  expect(formatDate("01/01/00")).toBe("01/01/2000");
+  expect(formatDate("03/03/93")).toBe("03/03/1993");
+  expect(formatDate("2095-06-18")).toBe("18/06/2095");
   expect(formatDate(null)).toBe("—");
 });
 
@@ -18,7 +21,7 @@ it("parses day first, checks leap days, and preserves the century of existing da
   }
 });
 
-it("shows audit timestamps in Vietnam time with a short date", () => {
-  expect(formatDateTime("2026-10-16T18:04:05Z")).toBe("17/10/26 01:04:05");
+it("shows audit timestamps in Vietnam time with a full year", () => {
+  expect(formatDateTime("2026-10-16T18:04:05Z")).toBe("17/10/2026 01:04:05");
   expect(formatDateTime("bad")).toBe("—");
 });

@@ -43,7 +43,7 @@ it("exports Word using the reference font, A4 geometry, black table and sign-off
   expect(xml).toContain('w:h="16840"');
   expect(xml).toContain('w:ascii="Times New Roman"');
   expect(xml).toContain('w:color="000000"');
-  for (const label of ["THEO DÕI TIẾN ĐỘ HỌC TẬP", ...groups.map(group => group.code), "Hoàn thành 0/18", "CHUYÊN VIÊN", "VIỆN TRƯỞNG VIỆN ĐTSĐH", "Hải Phòng, ngày 03/11/26"]) expect(xml).toContain(label);
+  for (const label of ["THEO DÕI TIẾN ĐỘ HỌC TẬP", ...groups.map(group => group.code), "Hoàn thành 0/18", "CHUYÊN VIÊN", "VIỆN TRƯỞNG VIỆN ĐTSĐH", "Hải Phòng, ngày 03/11/2026"]) expect(xml).toContain(label);
   expect(xml).not.toContain("Điểm trung bình");
   expect(xml).not.toContain("BỘ XÂY DỰNG");
   expect(xml).toContain(`w:w="${PROGRESS_FORM_WIDTHS[1]}"`);

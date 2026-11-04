@@ -121,7 +121,8 @@ export class ExamWorkflowService {
   async transition(dto:any,actor:any,phase:'eligibility'|'final',load:ExamRosterLoader) {
     await assertGradebookWorkflowAccess(actor,dto.action,this.rbac);
     if (['request_reopen','reject_reopen'].includes(dto.action) && phase !== 'eligibility') throw new BadRequestException('Yêu cầu mở lại chỉ áp dụng cho tư cách thi.');
-    if(!dto.note?.trim())throw new BadRequestException('Nhập lý do hoặc căn cứ xử lý.');
+    const note = dto.note?.trim() || '';
+    if(['reopen','request_reopen','reject_reopen'].includes(dto.action) && !note)throw new BadRequestException('Nhập lý do hoặc căn cứ mở lại.');
     await this.db.transaction(async transaction=>{
       await this.query('SELECT pg_advisory_xact_lock(21026)',{},transaction);
       const {state}=await this.lock(dto.courseOfferingId,transaction);const id=dto.courseOfferingId;
@@ -142,7 +143,7 @@ export class ExamWorkflowService {
         await this.db.query(`UPDATE course_exam_workflows SET eligibility_submission=CAST(:submission AS jsonb),
           eligibility_version=eligibility_version+1,updated_at=now() WHERE course_offering_id=:id`,
           {transaction,replacements:{id,submission:JSON.stringify(submission)}});
-        await this.event(id,`eligibility.${dto.action}`,actor,dto.note,state,await this.state(id,transaction),transaction);
+        await this.event(id,`eligibility.${dto.action}`,actor,note,state,await this.state(id,transaction),transaction);
         return;
       }
       const expected=dto.action==='submit'?'draft':dto.action==='approve'?'submitted':null;
@@ -188,7 +189,7 @@ export class ExamWorkflowService {
         if(dto.action==='reopen')await this.writeRows(id,rows.map(row=>({...row,finalized:false})),transaction);
         await this.db.query(`UPDATE course_offerings SET gradebook_status=:next,gradebook_version=gradebook_version+1,gradebook_snapshot=CAST(:snapshot AS jsonb) WHERE id=:id`,{transaction,replacements:{id,next,snapshot:JSON.stringify(snapshot)}});
       }
-      await this.event(id,`${phase}.${dto.action}`,actor,dto.note,state,await this.state(id,transaction),transaction);
+      await this.event(id,`${phase}.${dto.action}`,actor,note,state,await this.state(id,transaction),transaction);
     });
   }
 }

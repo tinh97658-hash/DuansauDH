@@ -90,7 +90,7 @@ it('shows an overdue extension separately from the unchanged current deadline an
   axios.get.mockResolvedValue({ data: { leaves: [{ ...leave, extensions: [{ status: 'pending', endDate: '2027-06-30', reason: 'Xin gia hạn' }] }], affectedOfferings: [] } });
   render(<StudyLeavePanel record={{ ...record, studyStatus: 'Bảo lưu quá hạn' }} isAdmin />);
   expect(await screen.findByText('Bảo lưu quá hạn')).toBeInTheDocument();
-  expect(screen.getByText(/Hạn hiện tại vẫn là 30\/06\/26/)).toBeInTheDocument();
+  expect(screen.getByText(/Hạn hiện tại vẫn là 30\/06\/2026/)).toBeInTheDocument();
   expect(screen.getByText(/Kiểm tra: 0 · Bài tập: 7/)).toBeInTheDocument();
   expect(screen.getByText('Không đạt do bảo lưu; học lại từ đầu khi trở lại')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Duyệt gia hạn' })).toBeEnabled();

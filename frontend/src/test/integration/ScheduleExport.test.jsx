@@ -22,7 +22,7 @@ const snapshot = {
 const specificHeaders = ["STT", "Lớp", "Học phần", "Giảng viên", "Thời gian", "Phòng học", "Ghi chú"];
 const specificValues = snapshot.rows[0].filter((_, index) => index !== 1);
 const documentTitle = "KẾ HOẠCH GIẢNG DẠY VÀ HỌC TẬP";
-const documentRange = "Từ ngày: 05/10/26 đến ngày 11/10/26 (Tuần 41 năm 2026)";
+const documentRange = "Từ ngày: 05/10/2026 đến ngày 11/10/2026 (Tuần 41 năm 2026)";
 const bufferOf = (blob) => new Promise((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve(reader.result);
@@ -138,9 +138,9 @@ it("reports missing or corrupt preview data instead of loading another week", ()
 });
 
 it.each([
-  [9, [1, snapshot.major, "CNTT-2026", "Cơ sở dữ liệu", "Nguyễn An", "05/10/26", "Sáng", "A101", "Ghi chú tiếng Việt"]],
-  [10, [1, "05/10/26", "Sáng", snapshot.discipline, snapshot.major, "Cơ sở dữ liệu", "CNTT-2026", "Nguyễn An", "A101", "Ghi chú tiếng Việt"]],
-  [15, [1, "05/10/26", "Sáng", "08:00 - 11:00", "00123", "Cơ sở dữ liệu", "SEED_TEST_2026: MERGED",
+  [9, [1, snapshot.major, "CNTT-2026", "Cơ sở dữ liệu", "Nguyễn An", "05/10/2026", "Sáng", "A101", "Ghi chú tiếng Việt"]],
+  [10, [1, "05/10/2026", "Sáng", snapshot.discipline, snapshot.major, "Cơ sở dữ liệu", "CNTT-2026", "Nguyễn An", "A101", "Ghi chú tiếng Việt"]],
+  [15, [1, "05/10/2026", "Sáng", "08:00 - 11:00", "00123", "Cơ sở dữ liệu", "SEED_TEST_2026: MERGED",
     "CNTT-2026", snapshot.discipline, snapshot.major, "Nguyễn An", "A101", 30, "Đã xếp", "Ghi chú tiếng Việt"]],
 ])("reloads an older %s-column preview snapshot using the current document columns", (_, row) => {
   const legacy = { ...snapshot, version: 1, rows: [row] };
