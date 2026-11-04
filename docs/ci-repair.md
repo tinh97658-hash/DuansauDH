@@ -26,6 +26,15 @@ Sau audit, chạy tiếp các bước CI phát hiện hai vấn đề sẵn có 
 - Ba test dashboard kỳ vọng đơn vị lớp ở nhóm cảnh báo buổi học. Cập nhật test
   để kiểm tra đúng tổng lớp, số buổi và liên kết theo từng nhóm.
 
+Lượt frontend đầy đủ đầu tiên tiếp tục phát hiện 31 lỗi trong 9 file test cũ.
+Các nhóm sửa gồm: tên menu xuất báo cáo và giai đoạn bảng điểm, fixture trạng
+thái bảng điểm, mount toast host khi kiểm tra thông báo lỗi, quyền trong fixture
+chuyển ngành, chờ dialog đóng trước khi thao tác ribbon, thao tác bộ chọn năm MUI
+và kiểm tra công tắc chỉ đọc đang disabled. Không skip test hoặc tăng timeout
+để bỏ qua lỗi; giữ các kiểm tra API, dữ liệu đang nhập và trạng thái khóa điểm.
+Test bảng điểm cũng đợi hết lượt event loop để Toastify unregister container
+của test trước trước khi mount host mới, tránh giữ lại ID toast cũ.
+
 ## Kiểm chứng và phạm vi
 
 - Giữ nguyên workflow và ngưỡng audit. Root/frontend/production backend không

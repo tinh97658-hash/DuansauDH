@@ -78,7 +78,8 @@ it("combines DESC with discipline, major and academic-year filters", async () =>
   fireEvent.click(screen.getByRole("button", { name: "Mở Chuyên ngành" }));
   fireEvent.click(within(screen.getByRole("listbox", { name: "Chuyên ngành" })).getByRole("option", { name: "Quản trị kinh doanh" }));
   expect(cards()).toEqual(["offering-C", "offering-D"]);
-  fireEvent.change(screen.getByLabelText("Khóa / Năm"), { target: { value: "2025" } });
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Khóa / Năm" }));
+  fireEvent.click(await screen.findByRole("option", { name: "2025" }));
   expect(cards()).toEqual(["offering-D"]);
   expect(badge()).toHaveTextContent("1");
   expect(sortButton("Số buổi giảm dần")).toBeInTheDocument();

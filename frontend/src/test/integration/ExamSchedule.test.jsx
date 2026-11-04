@@ -1,3 +1,5 @@
+import { renderToastHost } from "../renderToastHost";
+beforeEach(renderToastHost);
 import React from 'react';
 import {fireEvent,screen,waitFor,within} from '@testing-library/react';
 import {MemoryRouter} from 'react-router-dom';
@@ -78,7 +80,7 @@ it('recalculates occupied rooms when another calendar date is selected',async()=
  expect(await screen.findByRole('button',{name:/301 2 chỗ ĐÃ CÓ LỊCH/})).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'Đóng',exact:true}));fireEvent.click(screen.getByRole('button',{name:'Chọn 20/10/2026 Sáng'}));await waitFor(()=>expect(axios.get).toHaveBeenLastCalledWith(expect.any(String),expect.objectContaining({params:{from:'2026-10-20',to:'2026-10-20'}})));await waitFor(()=>expect(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/})).toBeEnabled());
 });
 it('blocks candidate conflict and keeps authoritative server error/form on failure',async()=>{
- axios.post.mockRejectedValue({response:{status:409,data:{message:'Thí sinh trùng ca thi trên máy chủ'}}});renderPage();await open();selectRoom();fireEvent.click(screen.getByRole('button',{name:'Xếp lịch'}));expect(await screen.findByRole('alert')).toHaveTextContent('máy chủ');expect(screen.getByRole('dialog',{name:'XẾP LỊCH THI'})).toBeInTheDocument();expect(lecturerButton()).toHaveTextContent('Nguyễn An');
+ axios.post.mockRejectedValue({response:{status:409,data:{message:'Thí sinh trùng ca thi trên máy chủ'}}});renderPage();await open();selectRoom();fireEvent.click(screen.getByRole('button',{name:'Xếp lịch'}));expect((await screen.findByText('Thí sinh trùng ca thi trên máy chủ')).closest('.Toastify__toast')).toHaveClass('Toastify__toast--error');expect(screen.getByRole('dialog',{name:'XẾP LỊCH THI'})).toBeInTheDocument();expect(lecturerButton()).toHaveTextContent('Nguyễn An');
 });
 it('keeps read-only calendar controls disabled',async()=>{renderPage(['gradebook.view']);await screen.findByRole('button',{name:/Lớp QT/});fireEvent.click(queueButton());expect(screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'})).toBeDisabled();expect(screen.queryByRole('dialog')).toBeNull();});
 it('shows two direct full-width cards, then +N with hover preview and full-list drilldown',async()=>{

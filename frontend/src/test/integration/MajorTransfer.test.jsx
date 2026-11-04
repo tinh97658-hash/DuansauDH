@@ -1,6 +1,7 @@
 import React from "react";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import axios from "axios";
+import { renderWithPermissions } from "../renderWithPermissions";
 import { toast } from "react-toastify";
 import AdminAdmissionRecordDetail from "../../pages/plan/admissionRecordDetail";
 
@@ -42,6 +43,7 @@ function reads(transfers = []) {
   });
 }
 beforeEach(() => { jest.resetAllMocks(); reads(); });
+const renderPage = () => renderWithPermissions(<AdminAdmissionRecordDetail />, ["admission.manage", "majortransfer.request", "majortransfer.approve"]);
 
 async function requestDialog() {
   fireEvent.click(await screen.findByRole("button", { name: "Chuyển chuyên ngành" }));
@@ -52,7 +54,7 @@ async function requestDialog() {
   return dialog;
 }
 async function approvalDialog() {
-  reads([transfer]); render(<AdminAdmissionRecordDetail />);
+  reads([transfer]); renderPage();
   fireEvent.click(await screen.findByRole("button", { name: "Duyệt" }));
   const dialog = await screen.findByRole("dialog");
   await waitFor(() => expect(within(dialog).getByRole("button", { name: "Duyệt chuyển ngành" })).toBeEnabled());
@@ -60,7 +62,7 @@ async function approvalDialog() {
 }
 
 it("POSTs a pending request and reports waiting for processing, without claiming the record was changed", async () => {
-  axios.post.mockResolvedValue({ data: transfer }); render(<AdminAdmissionRecordDetail />);
+  axios.post.mockResolvedValue({ data: transfer }); renderPage();
   const dialog = await requestDialog();
   fireEvent.click(within(dialog).getByRole("button", { name: "Gửi chờ hội đồng" }));
   await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Đã gửi yêu cầu chuyển chuyên ngành, chờ xử lý."));
@@ -71,10 +73,12 @@ it("POSTs a pending request and reports waiting for processing, without claiming
 
 it("surfaces a request API error and emits no success", async () => {
   axios.post.mockRejectedValue({ response: { data: { message: "Đang có yêu cầu chờ xử lý." } } });
-  render(<AdminAdmissionRecordDetail />); const dialog = await requestDialog();
+  renderPage(); const dialog = await requestDialog();
   fireEvent.click(within(dialog).getByRole("button", { name: "Gửi chờ hội đồng" }));
   await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Đang có yêu cầu chờ xử lý."));
   expect(toast.success).not.toHaveBeenCalled(); expect(screen.getByRole("dialog")).toBeInTheDocument();
+  expect(within(dialog).getByLabelText("Lý do chuyển")).toHaveValue("Đổi định hướng");
+  expect(within(dialog).getByRole("button", { name: "Gửi chờ hội đồng" })).toBeEnabled();
 });
 
 it("only shows approval success after the decision API resolves", async () => {
@@ -85,6 +89,7 @@ it("only shows approval success after the decision API resolves", async () => {
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.stringContaining("/major-transfers/transfer-1/decision"),
     { decision: "approved", toCurriculumId: "curriculum-B", note: "" }, { withCredentials: true }));
   expect(toast.success).not.toHaveBeenCalled();
+  expect(within(dialog).getByRole("button", { name: "Duyệt chuyển ngành" })).toBeDisabled();
   await act(async () => { finish({ data: { ...transfer, status: "approved" } }); });
   await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Đã duyệt chuyển chuyên ngành và đối chiếu học phần được công nhận."));
 });
@@ -95,4 +100,6 @@ it("keeps the approval dialog open and displays the backend error on failure", a
   fireEvent.click(within(dialog).getByRole("button", { name: "Duyệt chuyển ngành" }));
   await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Chương trình đào tạo mới không phù hợp."));
   expect(toast.success).not.toHaveBeenCalled(); expect(screen.getByRole("dialog")).toBeInTheDocument();
+  expect(within(dialog).getByLabelText("Chương trình đào tạo mới")).toHaveTextContent("CT-B");
+  expect(within(dialog).getByRole("button", { name: "Duyệt chuyển ngành" })).toBeEnabled();
 });

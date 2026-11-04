@@ -26,13 +26,13 @@ describe("Ribbon current-session POST logout", () => {
   ])("confirms unsaved grades before navigating with %s", async (label, destination) => {
     renderPage(false, true); fireEvent.click(screen.getByRole("button", { name: label }));
     fireEvent.click(await screen.findByText("Ở lại")); expect(screen.getByTestId("route")).toHaveTextContent("/system/change-password");
-    fireEvent.click(screen.getByRole("button", { name: label })); fireEvent.click(await screen.findByText("Bỏ thay đổi và tiếp tục"));
+    fireEvent.click(await screen.findByRole("button", { name: label })); fireEvent.click(await screen.findByText("Bỏ thay đổi và tiếp tục"));
     await waitFor(() => expect(screen.getByTestId("route").textContent).toBe(destination));
   });
   it("cancels logout before POST when confirmation is declined", async () => {
     axios.post.mockResolvedValue({ status: 204 }); renderPage(false, true);
     fireEvent.click(screen.getByRole("button", { name: "Thoát chương trình" })); fireEvent.click(await screen.findByText("Ở lại")); expect(axios.post).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Thoát chương trình" })); fireEvent.click(await screen.findByText("Bỏ thay đổi và tiếp tục"));
+    fireEvent.click(await screen.findByRole("button", { name: "Thoát chương trình" })); fireEvent.click(await screen.findByText("Bỏ thay đổi và tiếp tục"));
     expect(await screen.findByRole("heading", { name: "Login page" })).toBeInTheDocument();
   });
   it.each([false, true])("permissionless Staff, forced password=%s, POSTs with credentials before navigation", async forced => {

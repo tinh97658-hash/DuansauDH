@@ -91,7 +91,7 @@ it.each([["word", "Word (.docx)"], ["excel", "Excel (.xlsx)"], ["pdf", "PDF (.pd
   try {
     mount(); await chooseScope();
     fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: `Xuất ${label}` }));
+    fireEvent.click(screen.getByRole("menuitem", { name: label }));
     const dialog = screen.getByRole("dialog");
     const confirm = within(dialog).getByRole("button", { name: "Xuất báo cáo" });
     expect(confirm).toBeDisabled();
@@ -123,7 +123,7 @@ it("prefills the class selected in the page filter and allows cancelling without
 it.each([["word", "Word (.docx)"], ["excel", "Excel (.xlsx)"], ["pdf", "PDF (.pdf)"]])("exports multiple selected classes as separate %s files in a ZIP", async (format, label) => {
   mount(); await chooseScope();
   fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: `Xuất ${label}` }));
+  fireEvent.click(screen.getByRole("menuitem", { name: label }));
   const dialog = screen.getByRole("dialog");
   fireEvent.click(within(dialog).getByRole("checkbox", { name: "Chọn tất cả lớp" }));
   fireEvent.click(within(dialog).getByRole("button", { name: "Xuất 2 báo cáo" }));

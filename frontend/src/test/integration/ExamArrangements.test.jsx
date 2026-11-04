@@ -1,3 +1,5 @@
+import { renderToastHost } from "../renderToastHost";
+beforeEach(renderToastHost);
 import {formatDate} from "../../utils/dateFormat";
 import React from 'react';
 import {act,fireEvent,screen,waitFor,within} from '@testing-library/react';
@@ -112,8 +114,10 @@ it('blocks insufficient capacity and rounds overlapping the previous longest exa
 });
 it('retains the composed form and server conflict details on a stale save',async()=>{
  await open();add(1,a);axios.post.mockRejectedValue({response:{data:{message:'Thí sinh Nguyễn An trùng giờ với môn khác'}}});fireEvent.click(screen.getByRole('button',{name:'Lưu buổi thi'}));
- expect(await screen.findByRole('alert')).toHaveTextContent('Nguyễn An');expect(screen.getByRole('alert')).toHaveClass('ep-candidate-warning');expect(screen.getByRole('dialog',{name:'TẠO BUỔI THI'})).toHaveTextContent('Triết học');
- expect(screen.getByRole('alert').closest('.v20-dialog-foot')).toContainElement(screen.getByRole('button',{name:'Lưu buổi thi'}));
+ expect((await screen.findByText('Thí sinh Nguyễn An trùng giờ với môn khác')).closest('.Toastify__toast')).toHaveClass('Toastify__toast--error');
+ expect(screen.getByRole('dialog',{name:'TẠO BUỔI THI'})).toHaveTextContent('Triết học');
+ expect(screen.getByRole('button',{name:'Lưu buổi thi'})).toBeEnabled();
+ expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/masters/exam-arrangements'),expect.objectContaining({groups:[expect.objectContaining({courseOfferingId:'a',snapshotId:'snapshot-a'})]}),{withCredentials:true});
 });
 const session=(o,id,extra={})=>({...o,id,courseOfferingId:o.id,arrangementId:'arrangement',arrangementVersion:0,roundNo:1,version:0,examDate:'2026-10-19',startTime:'08:00',endTime:'09:00',roomId:'room',roomCode:'301',lecturerId:'lecturer',lecturerName:'Nguyễn An',status:'scheduled',canEdit:true,...extra});
 it('places the compose button beside the heading and hides expired calendar actions on clock updates',async()=>{
@@ -185,7 +189,7 @@ it('edits only an unlocked group in the same dialog and keeps the form on a reje
  axios.put.mockRejectedValueOnce({response:{data:{message:'Lịch thi đã thay đổi trên máy chủ'}}});
  await waitFor(()=>expect(screen.getByRole('button',{name:'Lưu thay đổi'})).toBeEnabled());
  fireEvent.click(screen.getByRole('button',{name:'Lưu thay đổi'}));
- expect(await within(dialog).findByRole('alert')).toHaveTextContent('Lịch thi đã thay đổi');
+ expect((await screen.findByText('Lịch thi đã thay đổi trên máy chủ')).closest('.Toastify__toast')).toHaveClass('Toastify__toast--error');
  expect(screen.getByLabelText(`Kết thúc ${future.name}`)).toHaveValue('10:30');
  expect(axios.put).toHaveBeenCalledWith(expect.stringContaining('/exam-arrangements/arrangement'),expect.objectContaining({version:7,groups:[
   expect.objectContaining({id:'held',version:3,startTime:'08:00',endTime:'09:00'}),

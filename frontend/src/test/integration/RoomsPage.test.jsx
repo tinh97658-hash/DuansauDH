@@ -73,7 +73,11 @@ describe("Room admin catalog", () => {
     expect(axios.get.mock.calls.some(([url]) => url.includes("includeInactive"))).toBe(false);
     expect(screen.queryByRole("button", { name: "Thêm phòng" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sửa" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    const status = screen.getByRole("checkbox", { name: "Vô hiệu hóa phòng 301" });
+    expect(status).toBeChecked();
+    expect(status).toBeDisabled();
+    fireEvent.click(status);
+    expect(axios.put).not.toHaveBeenCalled();
     fireEvent.doubleClick(screen.getByText("Phòng 301"));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });

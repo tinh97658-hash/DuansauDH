@@ -1,4 +1,5 @@
 import { renderWithPermissions } from "../renderWithPermissions";
+import { renderToastHost } from "../renderToastHost";
 import React from "react";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import axios from "axios";
@@ -10,6 +11,7 @@ const render = (ui, options) => renderWithPermissions(ui, ["catalog.manage"], op
 jest.mock("axios");
 jest.mock("@mui/icons-material", () => new Proxy({}, { get: () => () => null }));
 jest.mock("../../components/FeatureLayout", () => ({ children }) => <div>{children}</div>);
+beforeEach(renderToastHost);
 
 it("fills the screen with a small catalog and remembers independently resized columns", async () => {
   localStorage.clear();

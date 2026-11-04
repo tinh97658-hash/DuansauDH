@@ -1,5 +1,10 @@
 import { renderToastHost } from "../renderToastHost";
-beforeEach(renderToastHost);
+// Let Toastify unregister the previous page container before mounting a new host.
+// Mounting first cancels its queued unmount event and can retain a stale toast ID.
+beforeEach(async () => {
+  await new Promise(resolve => setTimeout(resolve, 0));
+  renderToastHost();
+});
 import { MemoryRouter, createMemoryRouter, RouterProvider, Link } from "react-router-dom";
 import { AuthSessionContext } from "../../context/AuthSession";
 import { act, configure, fireEvent, render as renderUi, screen, waitFor, within } from "@testing-library/react";
@@ -206,7 +211,7 @@ it("keeps headers for a valid empty roster and discloses the unchanged rules", a
   fireEvent.click(screen.getByText("Quy tắc tính điểm và tư cách thi"));
   expect(disclosure).toHaveTextContent("Nháy đúp mép tiêu đề để tự căn độ rộng cột.");
   expect(screen.queryByRole("heading", { name: "CẢ BẢNG ĐIỂM" })).not.toBeInTheDocument();
-  expect(document.querySelector(".exam-view-toolbar")).toContainElement(screen.getByRole("button", { name: "Cài đặt điểm số" }));
+  expect(document.querySelector(".exam-tool-actions")).toContainElement(screen.getByRole("button", { name: "Cài đặt điểm số" }));
 });
 
 it.each([
@@ -237,7 +242,6 @@ it("closes a rejected eligibility submission and shows an error toast with the u
   const alert = await screen.findByText(message);
   expect(alert).toHaveTextContent(message);
   expect(alert.closest(".Toastify__toast")).toHaveClass("Toastify__toast--error");
-  expect(screen.getByText("Tư cách nháp")).toBeInTheDocument();
   expect(screen.getByLabelText("Điểm kiểm tra HV001")).toHaveValue(originalScore);
   expect(screen.getByRole("button", { name: "Gửi duyệt tư cách" })).toBeEnabled();
   expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/exam-lists/eligibility/workflow"),
@@ -278,18 +282,18 @@ it("preserves eligibility submit, approve, approved DS and reopen in the gradebo
       expect(within(dialog).getByRole('button', { name: 'Xác nhận' })).toBeEnabled();
     }
     fireEvent.click(within(dialog).getByRole('button', { name: 'Xác nhận' }));
-    await screen.findByText(expected, {}, { timeout: 10000 });
+    await screen.findByRole(expected === 'Xếp lịch thi' ? 'link' : 'button', { name: expected }, { timeout: 10000 });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   };
-  await transition('Gửi duyệt tư cách', 'Tư cách chờ duyệt');
+  await transition('Gửi duyệt tư cách', 'Duyệt tư cách');
   expect((await screen.findByText(/Tư cách thi đang chờ duyệt/)).closest('.Toastify__toast').id).toBe(reminderId);
-  await transition('Duyệt tư cách', 'DS thi đã duyệt');
+  await transition('Duyệt tư cách', 'Xếp lịch thi');
   expect((await screen.findByText('Đã duyệt tư cách thi. Vui lòng xếp lịch thi cho danh sách đã duyệt.')).closest('.Toastify__toast').id).toBe(reminderId);
   expect(screen.queryByText(/Tư cách thi đang chờ duyệt/)).not.toBeInTheDocument();
   expect(warn).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole('button', { name: "Danh sách thi" }));
   expect(await screen.findByRole('cell', { name: 'HV001' })).toBeInTheDocument();
-  await transition('Mở lại tư cách', 'Tư cách nháp');
+  await transition('Mở lại tư cách', 'Gửi duyệt tư cách');
   expect(await screen.findByText(/Vui lòng gửi duyệt tư cách thi/)).toBeInTheDocument();
   expect(screen.queryByText(/Đã duyệt tư cách thi\. Vui lòng xếp lịch thi/)).not.toBeInTheDocument();
   expect(axios.post.mock.calls.map(([, body]) => body.action)).toEqual(['submit', 'approve', 'reopen']);
@@ -350,7 +354,7 @@ it('sends a supervisor eligibility reopen request with a reason and keeps scores
   fireEvent.change(within(dialog).getByLabelText('Lý do hoặc căn cứ'),{target:{value:'Sửa điểm theo biên bản'}});
   fireEvent.click(within(dialog).getByRole('button',{name:'Xác nhận'}));
   await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/exam-lists/eligibility/workflow'),expect.objectContaining({action:'request_reopen',note:'Sửa điểm theo biên bản',version:2,revision:0})));
-  expect(await screen.findByText(/Đang chờ duyệt mở lại tư cách/)).toHaveTextContent('Sửa điểm theo biên bản');
+  expect(await screen.findByText('Chờ duyệt mở lại tư cách')).toHaveAttribute('title', 'Sửa điểm theo biên bản');
   expect(screen.queryByRole('button',{name:'Xin mở lại tư cách'})).not.toBeInTheDocument();
   expect(screen.getByLabelText('Điểm kiểm tra HV001')).toBeDisabled();
 });
@@ -373,17 +377,18 @@ it("locks approved grades and requires an explicit reopening reason", async () =
   axios.get.mockImplementation(async (url, config) => {
     const result = await original(url, config);
     return url.endsWith("/exam-lists") ? { data: { ...result.data, workflow, offering: { ...result.data.offering,
+      gradebookStage: workflow.final.status === 'approved' ? 'completed' : 'result_ready',
       gradebookCompletionStatus: workflow.final.status === 'approved' ? 'completed' : 'needs_lock' } } } : result;
   });
   axios.post.mockImplementation(async () => { workflow = workflowFor('final');workflow.final.version=3; return { data: {} }; });
   render(<ExamLists />);
   expect(await screen.findByLabelText("Điểm kiểm tra HV001")).toBeDisabled();
-  expect(screen.getByText("Kết quả đã duyệt")).toBeInTheDocument();
+  expect(screen.getByRole('status', { name: 'Giai đoạn bảng điểm' })).toHaveTextContent('Đã hoàn tất bảng điểm');
   expect(screen.queryByRole('button',{name:'Mở lại tư cách'})).not.toBeInTheDocument();
   expect(screen.getByRole('button',{name:'Mở lại kết quả'})).toBeEnabled();
   expect(screen.getByRole('button',{name:'Lịch sử điểm'})).toBeEnabled();
   fireEvent.mouseDown(screen.getByLabelText('Tên lớp học phần'));
-  expect(screen.getByText('ĐÃ HOÀN TẤT')).toBeInTheDocument();
+  expect(screen.getByText('Đã hoàn tất')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('option'));
   fireEvent.click(screen.getByRole("button", { name: "Mở lại kết quả" }));
   const dialog = await screen.findByRole("dialog");
@@ -392,12 +397,13 @@ it("locks approved grades and requires an explicit reopening reason", async () =
   fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận" }));
   await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/exam-lists/final/workflow"), expect.objectContaining({ action: "reopen", version: 2, note: "Điều chỉnh theo biên bản" })));
   await waitFor(() => expect(screen.getByLabelText("Điểm thi hết môn HV001")).toBeEnabled());
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   expect(screen.queryByRole('button',{name:'Mở lại tư cách'})).not.toBeInTheDocument();
   expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeDisabled();
-  expect(screen.getByText('Đã lưu đủ điểm thi hết môn. Cần gửi duyệt và duyệt kết quả để khóa điểm.')).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('Đủ điểm thi · Cần gửi duyệt kết quả');
   fireEvent.mouseDown(screen.getByLabelText('Tên lớp học phần'));
-  expect(screen.getByText('CẦN KHÓA ĐIỂM')).toBeInTheDocument();
-  expect(screen.queryByText('ĐÃ HOÀN TẤT')).not.toBeInTheDocument();
+  expect(screen.getByText('Chờ gửi duyệt kết quả')).toBeInTheDocument();
+  expect(screen.queryByText('Đã hoàn tất')).not.toBeInTheDocument();
 });
 
 it("allows an examiner to submit but not approve a complete gradebook", async () => {
@@ -415,8 +421,8 @@ it("allows an examiner to submit but not approve a complete gradebook", async ()
   const dialog = await screen.findByRole("dialog");
   expect(within(dialog).queryByLabelText("Lý do hoặc căn cứ")).not.toBeInTheDocument();
   fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận" }));
-  await screen.findByText("Tư cách chờ duyệt");
-  expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeDisabled();
+  await waitFor(() => expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeDisabled());
+  expect(screen.queryByRole('button', { name: 'Gửi duyệt tư cách' })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Duyệt tư cách" })).not.toBeInTheDocument();
 });
 
@@ -448,7 +454,7 @@ it("locks unfinished classes, shows the yellow warning at the right, and unlocks
   const input = await screen.findByLabelText("Điểm kiểm tra HV001");
   expect(input).toBeDisabled();
   fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
-  expect(screen.getByText("ĐANG HỌC")).toBeInTheDocument();
+  expect(screen.getByText("ĐANG GIẢNG DẠY")).toBeInTheDocument();
   fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
   expect(screen.getByLabelText("Điểm BTL/TL/KT HV001")).toBeDisabled();
   expect(screen.getByLabelText("Điểm thi hết môn HV001")).toBeDisabled();
@@ -464,8 +470,8 @@ it("locks unfinished classes, shows the yellow warning at the right, and unlocks
   fireEvent(window, new Event("focus"));
   await waitFor(() => expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeEnabled());
   fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
-  expect(screen.getByText("CẦN HOÀN THIỆN")).toBeInTheDocument();
-  expect(screen.queryByText("ĐANG HỌC")).not.toBeInTheDocument();
+  expect(screen.getByText("CẦN RÀ SOÁT")).toBeInTheDocument();
+  expect(screen.queryByText("ĐANG GIẢNG DẠY")).not.toBeInTheDocument();
   fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
   fireEvent.change(screen.getByLabelText("Điểm kiểm tra HV001"), { target: { value: "8" } });
   fireEvent.click(screen.getByRole("button", { name: "Cập nhật cả bảng" }));
@@ -604,7 +610,7 @@ it("selects subject names and local curriculum codes while keeping the entire sh
   await screen.findByLabelText("Điểm kiểm tra HV001");
   expect(screen.getByLabelText("Tên lớp học phần")).toHaveTextContent("Tiếng anh");
   expect(screen.getByLabelText("Môn")).toHaveTextContent("HPTA - Tiếng anh");
-  expect(screen.getByText("18 / 18 học viên")).toBeInTheDocument();
+  expect(screen.getByText("18/18 học viên")).toBeInTheDocument();
   fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
   const names = screen.getByRole("listbox");
   expect(within(names).getAllByRole("option")).toHaveLength(2);
@@ -662,7 +668,9 @@ it("opens and saves the old CNTT–QLTC gradebook separately from a newer cross-
   const list = screen.getByRole("listbox");
   expect(within(list).getAllByRole("option")).toHaveLength(2);
   expect(within(list).getByRole("option", { name: newName })).toBeInTheDocument();
-  fireEvent.click(within(list).getByRole("option", { name: oldName }));
+  const oldOffering = within(list).getAllByRole('option').find(option => within(option).queryByText(oldName));
+  expect(within(oldOffering).getByText('Cần rà soát')).toBeInTheDocument();
+  fireEvent.click(oldOffering);
   const input = await screen.findByLabelText("Điểm kiểm tra OLD001");
   expect(input).toBeEnabled();
   expect(input).toHaveValue("8.0");
@@ -826,20 +834,20 @@ it('separates studying and teaching-completed offerings while preserving grade l
  axios.get.mockImplementation(async(url,config)=>{
   const result=await original(url,config);
   if(url.endsWith('/options'))return {data:{...result.data,courseOfferings:[
-   {...result.data.courseOfferings[0],id:'done',name:'Lớp đã khóa điểm',examGradesComplete:true,gradebookCompletionStatus:'completed'},
-   {...result.data.courseOfferings[0],id:'lock',name:'Lớp đã nhập đủ điểm',examGradesComplete:true,gradebookCompletionStatus:'needs_lock'},
-   {...result.data.courseOfferings[0],id:'todo',name:'Lớp cần nhập điểm',examGradesComplete:false,gradebookCompletionStatus:'incomplete'},
-   {...result.data.courseOfferings[0],id:'studying',name:'Lớp đang học',status:'active',examGradesComplete:false,gradebookCompletionStatus:'incomplete'},
+    {...result.data.courseOfferings[0],id:'done',name:'Lớp đã khóa điểm',gradebookStage:'completed',examGradesComplete:true,gradebookCompletionStatus:'completed'},
+    {...result.data.courseOfferings[0],id:'lock',name:'Lớp đã nhập đủ điểm',gradebookStage:'result_ready',examGradesComplete:true,gradebookCompletionStatus:'needs_lock'},
+    {...result.data.courseOfferings[0],id:'todo',name:'Lớp cần nhập điểm',gradebookStage:'components_missing',examGradesComplete:false,gradebookCompletionStatus:'incomplete'},
+    {...result.data.courseOfferings[0],id:'studying',name:'Lớp đang học',gradebookStage:'teaching',status:'active',examGradesComplete:false,gradebookCompletionStatus:'incomplete'},
   ]}};
   return result;
  });
  render(<ExamLists/>);const select=await screen.findByLabelText('Tên lớp học phần');await waitFor(()=>expect(select).not.toHaveAttribute('aria-disabled','true'));
  fireEvent.mouseDown(select);const options=screen.getAllByRole('option');
  expect(options.map(o=>o.textContent)).toEqual([expect.stringContaining('Lớp đang học'),expect.stringContaining('Lớp cần nhập điểm'),expect.stringContaining('Lớp đã nhập đủ điểm'),expect.stringContaining('Lớp đã khóa điểm')]);
- expect(options[2]).not.toHaveClass('exam-offering-completed');
- expect(options[3]).toHaveClass('exam-offering-completed');expect(options[3]).not.toHaveAttribute('aria-disabled','true');
- expect(screen.getByText('ĐANG HỌC')).toBeInTheDocument();
- expect(screen.getByText('CẦN HOÀN THIỆN')).toBeInTheDocument();expect(screen.getByText('CẦN KHÓA ĐIỂM')).toBeInTheDocument();expect(screen.getByText('ĐÃ HOÀN TẤT')).toBeInTheDocument();
+ expect(within(options[2]).getByText('Chờ gửi duyệt kết quả')).toHaveClass('exam-stage-neutral');
+ expect(within(options[3]).getByText('Đã hoàn tất')).toHaveClass('exam-stage-green');expect(options[3]).not.toHaveAttribute('aria-disabled','true');
+ expect(screen.getByText('ĐANG GIẢNG DẠY')).toBeInTheDocument();
+ expect(screen.getByText('ĐIỂM THÀNH PHẦN & TƯ CÁCH THI')).toBeInTheDocument();expect(screen.getByText('DUYỆT & HOÀN TẤT')).toBeInTheDocument();
  fireEvent.keyDown(screen.getByRole('listbox'),{key:'Home'});expect(options[0]).toHaveFocus();
  fireEvent.keyDown(screen.getByRole('listbox'),{key:'End'});expect(options[3]).toHaveFocus();
  fireEvent.click(options[3]);await waitFor(()=>expect(select).toHaveTextContent('Lớp đã khóa điểm'));expect(select).not.toHaveClass('exam-offering-completed');
@@ -1000,7 +1008,7 @@ it("shows blank exam sheets without clearing drafts and keeps supervisors read-o
   }
   expect(within(screen.getByTestId("exam-print-table")).getAllByRole("columnheader", { hidden: true })).toHaveLength(9);
   expect(screen.queryByRole("columnheader", { name: /^Kết quả điểm/ })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Cả bảng điểm" }));
+  fireEvent.click(screen.getByRole("button", { name: "Bảng điểm" }));
   expect(await screen.findByLabelText("Điểm học phần HV001")).toBeInTheDocument();
   expect(axios.put).not.toHaveBeenCalled();
 });
