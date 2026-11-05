@@ -7,6 +7,7 @@ import { Passport } from "passport";
 import request from "supertest";
 import { AccountsController } from "../../src/accounts/accounts.controller.js";
 import { AccountsService } from "../../src/accounts/accounts.service.js";
+import { AuditService } from "../../src/audit/audit.service.js";
 import { AuthController } from "../../src/auth/auth.controller.js";
 import { AuthService } from "../../src/auth/auth.service.js";
 import { LocalAuthGuard } from "../../src/auth/auth.guards.js";
@@ -66,6 +67,7 @@ describe("Security fixes with real Passport sessions", () => {
       { provide: ConfigService, useValue: config }, { provide: AuthService, useValue: auth },
       { provide: StudentsService, useValue: students }, { provide: StaffService, useValue: {} },
       { provide: AccountsService, useValue: accounts },
+      { provide: AuditService, useValue: { record: jest.fn().mockResolvedValue(undefined) } },
       { provide: RbacService, useValue: { effectiveAccess: async () => ({ permissions: new Set() }) } },
     ] }).overrideGuard(LocalAuthGuard).useValue({ canActivate: authAttempt }).compile();
     app = module.createNestApplication();

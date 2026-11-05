@@ -93,25 +93,25 @@ describe("Batch A API contracts with real guards and ValidationPipe", () => {
 
   describe('Exam schedule API permissions and validation',()=>{
     const valid={courseOfferingId:randomUUID(),snapshotId:randomUUID(),eligibilityVersion:2,examDate:'2099-05-04',startTime:'08:00',endTime:'10:00',roomId:randomUUID(),lecturerId:randomUUID()};
-    it.each(['gradebook.view','scheduling.write','gradebook.submit','gradebook.approve'])('read with %s is independent of mutation ownership',async permission=>{
-      permissions=new Set([permission]);await request(app.getHttpServer()).get('/masters/exam-schedule?from=2099-05-01&to=2099-05-07').expect(permission==='gradebook.view'?200:403);
+    it.each(['exams.view','gradebook.view','scheduling.write','gradebook.submit','gradebook.approve'])('read with %s is independent of mutation ownership',async permission=>{
+      permissions=new Set([permission]);await request(app.getHttpServer()).get('/masters/exam-schedule?from=2099-05-01&to=2099-05-07').expect(permission==='exams.view'?200:403);
     });
-    it.each(['scheduling.write','gradebook.view','gradebook.submit','gradebook.approve'])('mutations require scheduling.write, given %s',async permission=>{
-      permissions=new Set([permission]);const allowed=permission==='scheduling.write';
+    it.each(['exams.write','scheduling.write','gradebook.view','gradebook.submit','gradebook.approve'])('mutations require exams.write, given %s',async permission=>{
+      permissions=new Set([permission]);const allowed=permission==='exams.write';
       await request(app.getHttpServer()).post('/masters/exam-sessions').send(valid).expect(allowed?201:403);
       await request(app.getHttpServer()).put(`/masters/exam-sessions/${id}`).send({...valid,version:0}).expect(allowed?200:403);
       await request(app.getHttpServer()).post(`/masters/exam-sessions/${id}/cancel`).send({version:0,note:'QA'}).expect(allowed?201:403);
       await request(app.getHttpServer()).post(`/masters/exam-sessions/${id}/confirm`).send({version:0,note:'QA',status:'held'}).expect(allowed?201:403);
     });
     it.each([{examDate:'2026-02-30'},{examDate:'0000-01-01'},{startTime:'24:00'},{endTime:'10:70'},{snapshotId:'wrong'},{eligibilityVersion:-1},{lecturerId:undefined},{lecturerId:'wrong'}])('rejects invalid scheduling fields %p before service',async patch=>{
-      permissions=new Set(['scheduling.write']);await request(app.getHttpServer()).post('/masters/exam-sessions').send({...valid,...patch}).expect(400);expect(examSchedule.schedule).not.toHaveBeenCalled();
+      permissions=new Set(['exams.write']);await request(app.getHttpServer()).post('/masters/exam-sessions').send({...valid,...patch}).expect(400);expect(examSchedule.schedule).not.toHaveBeenCalled();
     });
     it('rejects invalid confirmation decisions and IDs',async()=>{
-      permissions=new Set(['scheduling.write']);await request(app.getHttpServer()).post(`/masters/exam-sessions/${id}/confirm`).send({version:0,note:'QA',status:'completed'}).expect(400);
+      permissions=new Set(['exams.write']);await request(app.getHttpServer()).post(`/masters/exam-sessions/${id}/confirm`).send({version:0,note:'QA',status:'completed'}).expect(400);
       await request(app.getHttpServer()).post('/masters/exam-sessions/not-a-uuid/cancel').send({version:0,note:'QA'}).expect(400);
     });
     it('rejects client-supplied candidate identities on create and edit before service',async()=>{
-      permissions=new Set(['scheduling.write']);
+      permissions=new Set(['exams.write']);
       await request(app.getHttpServer()).post('/masters/exam-sessions').send({...valid,candidateIds:['student:'+randomUUID()]}).expect(400);
       await request(app.getHttpServer()).put(`/masters/exam-sessions/${id}`).send({...valid,version:0,candidateIds:[]}).expect(400);
       expect(examSchedule.schedule).not.toHaveBeenCalled();expect(examSchedule.reschedule).not.toHaveBeenCalled();
