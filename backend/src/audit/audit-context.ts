@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import { QueryTypes } from "sequelize";
 import { Staff } from "../database/models/staff.model.js";
+import { workingProfileStorage } from '../auth/profile-context.js';
 import { isAuditWrite } from "./audit-write-query.js";
 
 /**
@@ -12,6 +13,7 @@ import { isAuditWrite } from "./audit-write-query.js";
  * Được set vào biến phiên PostgreSQL (LOCAL, theo transaction) để trigger `audit_capture` đọc được.
  */
 export interface AuditContext {
+  actorProfileId?: string | null;
   actorStaffId: string | null;
   actorEmail: string | null;
   requestId: string;
@@ -81,6 +83,7 @@ export class AuditContextService implements OnModuleInit {
     await query(
       `SELECT
          set_config('app.actor_staff_id', :actorStaffId, true),
+         set_config('app.actor_profile_id', :actorProfileId, true),
          set_config('app.actor_email', :actorEmail, true),
          set_config('app.request_id', :requestId, true),
          set_config('app.ip', :ip, true),
@@ -88,6 +91,7 @@ export class AuditContextService implements OnModuleInit {
       {
         replacements: {
           actorStaffId: context?.actorStaffId ?? "",
+          actorProfileId: context?.actorProfileId ?? workingProfileStorage.getStore()?.roleId ?? '',
           actorEmail: context?.actorEmail ?? "",
           requestId: context?.requestId ?? "",
           ip: context?.ip ?? "",
@@ -112,6 +116,7 @@ export class AuditContextMiddleware implements NestMiddleware {
     this.context.run(
       {
         actorStaffId: isStaff ? user.id : null,
+        actorProfileId:isStaff?workingProfileStorage.getStore()?.roleId||null:null,
         actorEmail: isStaff ? user.email : null,
         requestId: headerRequestId ? String(headerRequestId) : randomUUID(),
         ip: request.ip ?? null,

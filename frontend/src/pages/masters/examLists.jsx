@@ -96,9 +96,9 @@ export default function ExamLists() {
   const [workflow, setWorkflow] = useState({ status: "draft", version: 0 });
   const [workflowAction, setWorkflowAction] = useState("");
   const [workflowNote, setWorkflowNote] = useState("");
-  const [workflowPhase,setWorkflowPhase]=useState('eligibility');
+  const [workflowPhase,setWorkflowPhase]=useState('final');
   const newWorkflow=workflow.mode==='new',legacyWorkflow=workflow.mode==='legacy_preserved';
-  const componentEditable=newWorkflow&&workflow.eligibility.status==='draft';
+  const componentEditable=newWorkflow&&!['submitted','approved'].includes(workflow.final.status);
   const resultEditable=newWorkflow&&workflow.eligibility.status==='approved'&&workflow.final.status==='draft';
   const workflowEditable=componentEditable||resultEditable;
   const workflowNeedsNote = ['reopen', 'request_reopen', 'reject_reopen'].includes(workflowAction);
@@ -185,9 +185,9 @@ export default function ExamLists() {
         const refreshedDirty = { ...dirtyRef.current };
         setRows(data.rows.map(row => {
           savedRows.current.set(row.participantId, draftOf(row));
-          const draft = row.profileForeignLanguageExempt || row.studyLeaveFailure || (data.workflow && data.workflow.status !== "draft") ? undefined : dirtyRef.current[row.participantId];
-          if (row.profileForeignLanguageExempt || row.studyLeaveFailure) delete refreshedDirty[row.participantId];
-          const merged = { ...row, ...draft, studyStatus: row.studyStatus, studyLeaveFailure: row.studyLeaveFailure, eligibilityPolicy: row.eligibilityPolicy, profileForeignLanguageExempt: row.profileForeignLanguageExempt };
+          const draft = row.canEditGrade === false || row.profileForeignLanguageExempt || row.studyLeaveFailure || (data.workflow && data.workflow.status !== "draft") ? undefined : dirtyRef.current[row.participantId];
+          if (row.canEditGrade === false || row.profileForeignLanguageExempt || row.studyLeaveFailure) delete refreshedDirty[row.participantId];
+          const merged = { ...row, ...draft, canEditGrade: row.canEditGrade, studyStatus: row.studyStatus, studyLeaveFailure: row.studyLeaveFailure, eligibilityPolicy: row.eligibilityPolicy, profileForeignLanguageExempt: row.profileForeignLanguageExempt };
           const next = { ...(draft ? updateGradeDraft(merged) : draftOf(row)), savedEligibility: row.eligible };
           if (draft) refreshedDirty[row.participantId] = next;
           return next;
@@ -279,7 +279,7 @@ export default function ExamLists() {
   const edit = (id, patch) => {
     if (!workflowEditable) return;
     if (!canSubmitGrades || !teachingCompleted) { if (canSubmitGrades) showCompletionWarning(); return; }
-    if (rows.find(row => row.participantId === id)?.profileForeignLanguageExempt || rows.find(row => row.participantId === id)?.studyLeaveFailure) return;
+    if (rows.find(row => row.participantId === id)?.canEditGrade === false || rows.find(row => row.participantId === id)?.profileForeignLanguageExempt || rows.find(row => row.participantId === id)?.studyLeaveFailure) return;
     if(('testScore' in patch||'assignmentScore' in patch||'examExempt' in patch)&&!componentEditable)return;
     if('examScore' in patch&&(!resultEditable||!rows.find(row=>row.participantId===id)?.examScoreEditable))return;
     const apply = row => ["testScore", "assignmentScore", "examScore", "examExempt"].some(key => key in patch) ? updateGradeDraft(row, patch) : { ...row, ...patch };
@@ -330,6 +330,8 @@ export default function ExamLists() {
         page, pageSize: PAGE_SIZE, mode, search,
       });
       setRows(data.rows.map(row => { const saved = draftOf(row); savedRows.current.set(row.participantId, saved); return { ...saved, savedEligibility: row.eligible }; })); setRevision(data.revision); setDirty({}); dirtyRef.current = {};
+      if (data.workflow) setWorkflow(data.workflow);
+      if (data.offering) setLoadedOffering(data.offering);
       refreshOfferingCompletion(data.offering);
       setTotal(data.total); setTotalRows(data.totalRows); setPage(data.page);
       setUnassessedRows(data.unassessedRows ?? null);
@@ -398,7 +400,7 @@ export default function ExamLists() {
     courseScore: 100, grade4: 76, letter: 92, attempts: 152, result: 136, notes: 360 };
   const columns = gradebookColumns(blank).map(column => {
     const label = column.key === 'eligible'
-      ? (newWorkflow && workflow.eligibility.status === 'approved' ? (blank ? 'Đã duyệt' : 'Tư cách đã duyệt') : 'Tư cách dự kiến')
+      ? 'Tư cách thi'
       : column.label;
     return { ...column, width: columnWidths[column.key],
       minWidth: column.key === 'index' ? 40 : column.key === 'notes' ? 240 : Math.min(columnWidths[column.key], column.minWidth || 72),
@@ -408,14 +410,12 @@ export default function ExamLists() {
     };
   });
   const busy = optionsLoading || loading;
-  const eligibilityLabel = { draft: 'Tư cách nháp', submitted: 'Chờ duyệt tư cách', approved: 'Đã duyệt' }[workflow.eligibility?.status] || 'Đang tải quy trình';
+  const eligibilityLabel = { draft: 'Chưa đủ điểm thành phần', submitted: 'Cần lưu lại điểm', approved: 'Tư cách thi tự động' }[workflow.eligibility?.status] || 'Đang tải quy trình';
   const needsLockNotice = newWorkflow && selectedEntry?.offering.gradebookCompletionStatus === 'needs_lock' && workflow.final.status !== 'approved';
   let workflowReminder = '';
   if (!error && !dirtyCount && teachingCompleted && totalRows > 0 && newWorkflow && loadedOffering?.id === offeringId) {
-    if (componentEditable && unassessedRows === 0) workflowReminder = 'Đã nhập đủ điểm thành phần. Vui lòng gửi duyệt tư cách thi để chốt danh sách dự thi.';
-    else if (workflow.eligibility.status === 'submitted') workflowReminder = 'Tư cách thi đang chờ duyệt. Vui lòng duyệt tư cách để chốt danh sách dự thi.';
-    else if (workflow.eligibility.status === 'approved' && workflow.final.status !== 'approved' && loadedOffering.examScheduling?.remainingCount > 0)
-      workflowReminder = 'Đã duyệt tư cách thi. Vui lòng xếp lịch thi cho danh sách đã duyệt.';
+    if (workflow.eligibility.status === 'approved' && workflow.final.status !== 'approved' && loadedOffering.examScheduling?.remainingCount > 0)
+      workflowReminder = 'Đã tính tư cách thi. Vui lòng xếp lịch thi cho học viên đủ tư cách.';
   }
   useEffect(() => {
     if (workflowReminderToast.current && workflowReminderToast.current.offeringId !== offeringId) {
@@ -498,7 +498,7 @@ export default function ExamLists() {
         <div className="exam-toolbar-status">
           {busy ? <Typography role="status">Đang tải...</Typography> : !selectedEntry ? <Typography role="status">Chưa chọn lớp học phần</Typography> : <>
             {legacyWorkflow ? <Typography role="status" title="Bảng điểm cũ được bảo toàn, chỉ xem trong quy trình mới. Cần rà soát trước khi chuyển đổi; không tự suy diễn danh sách thi hoặc ca thi đã diễn ra.">Dữ liệu cũ · Chỉ xem</Typography>
-              : blank ? <Typography role="status" title={newWorkflow && workflow.eligibility.status !== 'approved' ? 'Danh sách thi chỉ hiển thị sau khi duyệt tư cách thi. Tư cách dự kiến chưa phải danh sách được phép xếp thi.' : undefined}>{eligibilityLabel} · {total}/{totalRows} học viên</Typography>
+              : blank ? <Typography role="status" title={newWorkflow && workflow.eligibility.status !== 'approved' ? 'Danh sách thi tự động cập nhật sau khi lưu đủ điểm thành phần.' : undefined}>{eligibilityLabel} · {total}/{totalRows} học viên</Typography>
                 : needsLockNotice ? <Typography role="status" className="exam-status-warning" title="Đã lưu đủ điểm thi hết môn. Cần gửi duyệt và duyệt kết quả để khóa điểm.">{workflow.final.status === 'submitted' ? 'Chờ duyệt / khóa điểm' : 'Đủ điểm thi · Cần gửi duyệt kết quả'}</Typography>
                   : <GradebookStageNotice offering={selectedEntry?.offering} />}
             {(!blank || legacyWorkflow) && <Typography className="exam-student-count">{total}/{totalRows} học viên</Typography>}
@@ -507,15 +507,10 @@ export default function ExamLists() {
           {dirtyCount > 0 && <Chip size="small" color="warning" variant="outlined" label={`${dirtyCount} học viên chưa lưu`} title={blank ? 'Chuyển sang Bảng điểm và cập nhật cả bảng để lưu thay đổi trước khi in danh sách thi.' : undefined} />}
         </div>
         <div className="exam-tool-actions">
-        {newWorkflow&&canSubmitGrades&&componentEditable&&<Button disabled={busy||saving||dirtyCount>0||!teachingCompleted||!offeringId} onClick={()=>beginWorkflow('eligibility','submit')}>Gửi duyệt tư cách</Button>}
-        {newWorkflow&&canApproveGrades&&workflow.eligibility.status==='submitted'&&<Button disabled={busy||saving||dirtyCount>0} onClick={()=>beginWorkflow('eligibility','approve')}>Duyệt tư cách</Button>}
-        {newWorkflow&&canSubmitGrades&&!canApproveGrades&&workflow.eligibility.status==='approved'&&workflow.eligibility.canReopen&&!workflow.eligibility.reopenRequest&&workflow.final.status!=='approved'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','request_reopen')}>Xin mở lại tư cách</Button>}
-        {newWorkflow&&canApproveGrades&&workflow.eligibility.canReopen&&workflow.final.status!=='approved'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','reopen')}>{workflow.eligibility.reopenRequest?'Duyệt mở lại tư cách':'Mở lại tư cách'}</Button>}
-        {newWorkflow&&canApproveGrades&&workflow.eligibility.reopenRequest&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','reject_reopen')}>Từ chối mở lại tư cách</Button>}
         {newWorkflow&&workflow.eligibility.status==='approved'&&<>
-          {can('gradebook.view')&&workflow.final.status!=='approved'&&loadedOffering?.id===offeringId&&loadedOffering.examScheduling?.candidateCount>0&&(loadedOffering.examScheduling.remainingCount>0||workflow.final.status==='not_available')&&<Button startIcon={<CalendarMonthOutlined />} component={Link} to={`/masters/exam-schedule?offeringId=${offeringId}`}>{loadedOffering.examScheduling.remainingCount>0?'Xếp lịch thi':'Xem lịch thi'}</Button>}
+          {can('exams.view')&&workflow.final.status!=='approved'&&loadedOffering?.id===offeringId&&loadedOffering.examScheduling?.candidateCount>0&&(loadedOffering.examScheduling.remainingCount>0||workflow.final.status==='not_available')&&<Button startIcon={<CalendarMonthOutlined />} component={Link} to={`/masters/exam-schedule?offeringId=${offeringId}`}>{loadedOffering.examScheduling.remainingCount>0?'Xếp lịch thi':'Xem lịch thi'}</Button>}
           {!blank&&canSubmitGrades&&workflow.final.status==='draft'&&<Button disabled={busy||saving||dirtyCount>0} onClick={()=>beginWorkflow('final','submit')}>Gửi duyệt kết quả</Button>}
-          {!blank&&canApproveGrades&&workflow.final.status==='submitted'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('final','approve')}>Duyệt kết quả</Button>}
+          {!blank&&canApproveGrades&&workflow.final.status==='submitted'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('final','approve')}>Duyệt và khóa điểm</Button>}
           {!blank&&canApproveGrades&&['submitted','approved'].includes(workflow.final.status)&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('final','reopen')}>Mở lại kết quả</Button>}
         </>}
         {!blank && <Button startIcon={<HistoryRounded />} disabled={!offeringId || saving} onClick={loadHistory}>Lịch sử điểm</Button>}
@@ -525,7 +520,7 @@ export default function ExamLists() {
             <DocumentExportMenu label="Xuất báo cáo" title="Xuất phiếu theo dõi tình hình học tập — BM.02-QT.SDH.03" disabled={!groupId || !offeringId || !totalRows || busy || saving || exporting || !!dirtyCount}
               onWord={() => exportSigningSheet("word")} onExcel={() => exportSigningSheet("excel")} onPdf={() => exportSigningSheet("pdf")} />
           </span></Tooltip>}
-          {!blank && <Button startIcon={<SaveRounded />} disabled={!workflowEditable || !canSubmitGrades || !teachingCompleted || !dirtyCount || saving || exporting || busy} onClick={save}>{saving ? "Đang lưu..." : "Cập nhật cả bảng"}</Button>}
+          {!blank && <Button startIcon={<SaveRounded />} disabled={!workflowEditable || !canSubmitGrades || !teachingCompleted || (!dirtyCount && !(newWorkflow && workflow.eligibility.status !== 'approved' && totalRows > 0 && unassessedRows === 0)) || saving || exporting || busy} onClick={save}>{saving ? "Đang lưu..." : "Cập nhật cả bảng"}</Button>}
           <Tooltip title="Cài đặt điểm số">
             <span><IconButton aria-label="Cài đặt điểm số" disabled={optionsLoading} onClick={() => setSettingsOpen(true)} size="small"
               sx={{ color: "#173E75", width: 34, height: 34, "&:hover": { bgcolor: "#EDF4FA" } }}><SettingsRounded fontSize="small" /></IconButton></span>
@@ -535,7 +530,7 @@ export default function ExamLists() {
       </div>
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
       {!blank && (componentEditable || resultEditable) && <Typography className="exam-no-print" variant="caption" sx={{ display: "block", mb: 0.75, color: "text.secondary" }}>
-        Dùng ↑ ↓ ← → để chuyển giữa các ô điểm có thể nhập trên trang hiện tại.
+        Người phụ trách một lớp thành viên có thể nhập điểm cho toàn bộ lớp ghép. Dùng ↑ ↓ ← → để chuyển giữa các ô điểm có thể nhập trên trang hiện tại.
       </Typography>}
       <Paper variant="outlined" sx={{ ...panelSx, overflow: "hidden" }}>
         {busy ? <Box sx={{ py: 4, textAlign: "center" }}><CircularProgress size={30} aria-label="Đang tải bảng điểm" /></Box> : !groupId || !offeringId ? <Box className="exam-empty-scope" role="status">
@@ -545,9 +540,10 @@ export default function ExamLists() {
           <ResizableTable columns={columns} storageKey="masters-exam-gradebook-columns" freezeThrough="firstName">
             <TableBody>{!visible.length ? <TableRow><TableCell colSpan={columns.length} align="center" sx={{ py: 6, color: "#607486" }}>{!groupId ? "Chưa có lớp học viên." : !offeringId ? "Lớp chưa có học phần được tổ chức. Hãy tạo lớp học phần để nhập điểm." : "Không có học viên phù hợp với danh sách đang chọn."}</TableCell></TableRow> : pageRows.map((row, index) => {
               const name = personNameParts(row);
-              const rowLocked = locked || !!row.profileForeignLanguageExempt || !!row.studyLeaveFailure;
+              const rowLocked = locked || row.canEditGrade === false || !!row.profileForeignLanguageExempt || !!row.studyLeaveFailure;
               return <TableRow key={row.participantId} hover sx={{ "& td": { fontSize: 12.5, py: 0.75, borderColor: "#E2EBF2" }, ...(dirty[row.participantId] ? { bgcolor: "#FFFDF5" } : {}) }}>
                 <TableCell align="center">{pageStart + index + 1}</TableCell><TableCell sx={{ fontWeight: 500 }}>{row.code || "—"}
+                  {row.canEditGrade === false && <Typography component="span" variant="caption" display="block" sx={{color:'text.secondary'}}>Chỉ xem</Typography>}
                   {["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn"].includes(row.studyStatus) && <Typography component="span" variant="caption" display="block" sx={{ color: "#B86216", fontWeight: 500, fontSize: 11, whiteSpace: "nowrap" }}>{row.studyStatus}</Typography>}
                 </TableCell>
                 <TableCell title={name.familyAndMiddle}>{name.familyAndMiddle}</TableCell><TableCell title={name.givenName}>{name.givenName}</TableCell>
@@ -587,7 +583,7 @@ export default function ExamLists() {
         </Box>}
       </Paper>
       <details className="exam-rules-disclosure exam-no-print"><summary>Quy tắc tính điểm và tư cách thi</summary>
-      <Typography sx={{ color: "#607486", fontSize: 11.5 }}>Tư cách dự kiến dùng điểm thành phần và cấu hình hiện hành. Điều kiện đạt so sánh điểm gốc của các thành phần và điểm học phần trước khi làm tròn với ngưỡng trong Cài đặt điểm số. Điểm hiển thị và quy đổi vẫn làm tròn như cũ. Sau khi duyệt, DS thi và điểm thành phần được lưu cố định. Chưa đến giai đoạn nhập điểm thi khi chưa có ca thi được xác nhận Đã diễn ra. Không đủ tư cách thi được giữ nguyên quyết định, không tự chuyển thành 0/F. Kết quả cuối được gửi duyệt và mở lại riêng. Các ô nền xanh xám được tính tự động. Nháy đúp mép tiêu đề để tự căn độ rộng cột.</Typography>
+      <Typography sx={{ color: "#607486", fontSize: 11.5 }}>Tư cách thi tự động cập nhật khi lưu đủ điểm thành phần, không cần duyệt trước khi thi. Có thể sửa điểm thành phần cho đến khi gửi duyệt kết quả cuối. Điều kiện đạt so sánh điểm gốc và điểm học phần trước khi làm tròn với ngưỡng trong Cài đặt điểm số. Điểm thi chỉ nhập sau khi ca thi được xác nhận Đã diễn ra. Lịch thi đã xếp giữ nguyên danh sách tại thời điểm xếp; hãy kiểm tra lại lịch khi tư cách thi thay đổi. Kết quả cuối được gửi duyệt, duyệt và khóa điểm; mở lại kết quả cần lý do. Các ô nền xanh xám được tính tự động. Nháy đúp mép tiêu đề để tự căn độ rộng cột.</Typography>
       </details>
       {dirtyCount > 0 && !blank && <Alert severity="warning" sx={{ mt: 1 }} className="exam-no-print">Bạn có điểm chưa lưu.</Alert>}
       {settingsOpen && <GradeSettingsDialog canEdit={canEditPolicy} initialMajorId={majorId} initialYear={year} groups={groups} onClose={() => setSettingsOpen(false)} />}

@@ -49,6 +49,7 @@ import HistoryEduOutlined from "@mui/icons-material/HistoryEduOutlined";
 import { API_BASE_URL } from "../config/http";
 import { BRAND } from "../config/branding";
 import { useAuthSession } from "../context/AuthSession";
+import { routeViewCode } from '../features/accounts/routePermissions';
 import { preloadPage } from "../utils/lazyPage";
 import "../styles/ribbon-header.css";
 
@@ -125,7 +126,7 @@ export const ribbons = {
     ]),
     group("QUẢN LÝ ĐIỂM", [
       action("Danh sách thi, điểm thi", "/masters/exam-lists", ListAltOutlined, "#a04f86", { permissions: ["gradebook.view"] }),
-      action('Xếp lịch thi', '/masters/exam-schedule', CalendarMonthOutlined, '#b75c75', { anyPermissions: ['gradebook.view','scheduling.view'] }),
+      action('Xếp lịch thi', '/masters/exam-schedule', CalendarMonthOutlined, '#b75c75', { permissions: ['exams.view'] }),
       action("Tổng hợp điểm của lớp", "/reports/class-score-summary", SummarizeOutlined, "#168b7c", { permissions: ["reports.view"] }),
     ]),
     group("THỦ TỤC ĐẦU RA", [
@@ -182,7 +183,7 @@ const RibbonHeader = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const session = useAuthSession();
-  const sessionRole = session ? session.user?.role || "student" : null;
+  const sessionRole = session ? session.activeProfile?.code || session.user?.role || "student" : null;
   const [activeTab, setActiveTab] = useState(() => tabForPath(location.pathname));
   const [commandsCollapsed, setCommandsCollapsed] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -210,7 +211,8 @@ const RibbonHeader = () => {
   const hasPermission = (permission) => access
     ? (access.permissions || []).includes(permission)
     : false;
-  const canSee = (item) => (!item.roles || item.roles.includes(role)) && (!item.permissions || item.permissions.every(hasPermission)) && (!item.anyPermissions || item.anyPermissions.some(hasPermission));
+  const canSee = (item) => (!item.roles || item.roles.includes(role)) && (!item.permissions || item.permissions.every(hasPermission)) && (!item.anyPermissions || item.anyPermissions.some(hasPermission))
+    && (!access?.routeCatalog||!item.permissions||hasPermission(routeViewCode(item.route)));
   const visibleTabs = tabs.filter(([id]) => ribbons[id].some(section => section.actions.some(canSee)));
   const selectedTab = visibleTabs.some(([id]) => id === activeTab) ? activeTab : visibleTabs[0]?.[0];
   const runAction = async (item) => {
@@ -241,12 +243,14 @@ const RibbonHeader = () => {
             <span>{BRAND.institute}</span>
           </div>
         </div>
-        <div className="ribbon-user" title={`Vai trò: ${roleNames[role] || role}`}>
+        <div className="ribbon-user" title={`Hồ sơ: ${session?.activeProfile?.name||roleNames[role]||role}`}>
           <div className="ribbon-user-avatar">{role === "admin" ? "AD" : "NV"}</div>
           <div className="ribbon-user-info">
-            <span className="ribbon-user-name">{roleNames[role] || role}</span>
-            <span className="ribbon-user-role">{BRAND.institute}</span>
+            <span className="ribbon-user-name">{session?.user?.name||roleNames[role]||role}</span>
+            <span className="ribbon-user-role">{session?.activeProfile?.name||roleNames[role]||role}</span>
+            {session?.activeProfile&&<span className="ribbon-user-role">{session.activeProfile.scopeLabel}</span>}
           </div>
+          {session?.chooseProfile&&(session.profiles||[]).length>1&&<button type="button" className="sl-btn" onClick={async()=>{if(await confirmLeave())session.chooseProfile();}}>Đổi phiên làm việc</button>}
         </div>
       </div>
       {logoutError && <div role="alert">{logoutError}</div>}

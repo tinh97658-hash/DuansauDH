@@ -52,7 +52,7 @@ describe("AuditContextService write boundary", () => {
     const [sql, setup] = originalQuery.mock.calls[0];
     expect(sql).toContain("set_config('app.actor_staff_id', :actorStaffId, true)");
     expect(setup.transaction).toBe(tx);
-    expect(setup.replacements).toEqual(context);
+    expect(setup.replacements).toEqual({...context,actorProfileId:""});
     expect(originalQuery.mock.calls[1]).toEqual(["UPDATE staff SET name=$1", { ...options, transaction: tx }]);
     expect(options).not.toHaveProperty("transaction");
   });
@@ -74,7 +74,7 @@ describe("AuditContextService write boundary", () => {
   it("clears missing actor/correlation fields for explicit system writes", async () => {
     const { db, originalQuery } = build();
     await db.query("UPDATE staff SET name='system'", { transaction: { id: "system" } });
-    expect(originalQuery.mock.calls[0][1].replacements).toEqual({ actorStaffId: "", actorEmail: "", requestId: "", ip: "", userAgent: "" });
+    expect(originalQuery.mock.calls[0][1].replacements).toEqual({ actorProfileId:"", actorStaffId: "", actorEmail: "", requestId: "", ip: "", userAgent: "" });
   });
   it("rethrows setup failures before executing DML and does not install twice", async () => {
     const { service, db, originalQuery } = build();
@@ -109,7 +109,7 @@ describe("AuditContextMiddleware", () => {
     const req: any = { user, ip: "127.0.0.1", get: (name: string) => name === "x-request-id" ? "QA-AUDIT-123" : "test-agent" };
     await new Promise<void>((resolve, reject) => middleware.use(req, {} as any, () => {
       Promise.resolve().then(() => {
-        expect(service.current()).toEqual({ actorStaffId: type === "staff" ? "a" : null, actorEmail: type === "staff" ? "a@example.invalid" : null, requestId: "QA-AUDIT-123", ip: "127.0.0.1", userAgent: "test-agent" });
+        expect(service.current()).toEqual({ actorProfileId:null, actorStaffId: type === "staff" ? "a" : null, actorEmail: type === "staff" ? "a@example.invalid" : null, requestId: "QA-AUDIT-123", ip: "127.0.0.1", userAgent: "test-agent" });
       }).then(resolve, reject);
     }));
     expect(service.current()).toBeUndefined();

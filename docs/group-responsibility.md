@@ -2,6 +2,8 @@
 
 # Chuyên viên phụ trách và khóa quyền theo nhóm
 
+> Từ migration **096**, nhập hồ sơ và xét tuyển có phạm vi riêng cho hồ sơ **chưa phân lớp**: xem theo `admission.view`, ghi theo `admission.manage` của hồ sơ làm việc đang chọn. Không cần được phân công lớp để xử lý hồ sơ đầu vào. Hồ sơ đã thuộc lớp vẫn theo giới hạn lớp; danh sách học viên, điểm học phần, học phí và báo cáo không được mở rộng bởi ngoại lệ này. Khóa **Chỉ xem** vẫn chặn ghi. Xem [quy tắc xét tuyển](admission-evaluation.md).
+
 Mỗi nhóm học viên có tối đa một chuyên viên phụ trách; một chuyên viên có thể phụ trách nhiều nhóm. Tài khoản phải đang hoạt động. Các nhóm có sẵn được giữ nguyên và hiển thị **Chưa phân công** cho đến khi người có quyền phân công lựa chọn người phụ trách.
 
 ## Thao tác

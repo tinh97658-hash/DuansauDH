@@ -4,7 +4,7 @@ import { ConfirmExamDto, ExamScheduleQueryDto, ExamSessionActionDto, RescheduleE
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
 import { GroupResponsibilityService } from "../auth/group-responsibility.service.js";
 import { CurrentUser } from "../common/auth-user.js";
-import { RequirePermissions, RequireAnyPermissions } from "../common/permissions.decorator.js";
+import { RequirePermissions } from "../common/permissions.decorator.js";
 import { PermissionsGuard } from "../common/permissions.guard.js";
 import { GradebookWorkflowGuard } from "./gradebook-workflow.guard.js";
 import { GradingPolicyService } from "./grading-policy.service.js";
@@ -31,7 +31,7 @@ export class MastersController {
   ) {}
 
   @Get("exam-lists/history") @RequirePermissions("gradebook.view")
-  gradebookHistory(@Query() query: ExamGradebookQueryDto) { return this.gradebooks.history(query); }
+  gradebookHistory(@Query() query: ExamGradebookQueryDto, @CurrentUser() actor: any) { return this.gradebooks.historyForActor(query,actor); }
 
   @Post("exam-lists/workflow")
   // Override masters.view: the action-aware guard requires submit OR approve
@@ -44,19 +44,19 @@ export class MastersController {
   eligibilityWorkflow(@Body() dto:GradebookWorkflowDto,@CurrentUser() actor:any){return this.gradebooks.transition(dto,actor,'eligibility');}
   @Post('exam-lists/final/workflow') @RequirePermissions() @UseGuards(GradebookWorkflowGuard)
   finalWorkflow(@Body() dto:GradebookWorkflowDto,@CurrentUser() actor:any){return this.gradebooks.transition(dto,actor,'final');}
-  @Get('exam-schedule') @RequirePermissions() @RequireAnyPermissions('scheduling.view','gradebook.view')
-  listExamSchedule(@Query() query:ExamScheduleQueryDto){return this.examSchedule.list(query);}
-  @Post('exam-arrangements') @RequirePermissions('scheduling.write')
+  @Get('exam-schedule') @RequirePermissions('exams.view')
+  listExamSchedule(@Query() query:ExamScheduleQueryDto,@CurrentUser() actor:any){return this.examSchedule.list(query,actor);}
+  @Post('exam-arrangements') @RequirePermissions('exams.write')
   createExamArrangement(@Body() dto:SaveExamArrangementDto,@CurrentUser() actor:any){return this.examSchedule.saveArrangement(null,dto,actor);}
-  @Put('exam-arrangements/:id') @RequirePermissions('scheduling.write')
+  @Put('exam-arrangements/:id') @RequirePermissions('exams.write')
   updateExamArrangement(@Param('id',ParseUUIDPipe) id:string,@Body() dto:SaveExamArrangementDto,@CurrentUser() actor:any){return this.examSchedule.saveArrangement(id,dto,actor);}
-  @Post('exam-sessions') @RequirePermissions('scheduling.write')
+  @Post('exam-sessions') @RequirePermissions('exams.write')
   scheduleExam(@Body() dto:ScheduleExamDto,@CurrentUser() actor:any){return this.examSchedule.schedule(dto,actor);}
-  @Put('exam-sessions/:id') @RequirePermissions('scheduling.write')
+  @Put('exam-sessions/:id') @RequirePermissions('exams.write')
   rescheduleExam(@Param('id',ParseUUIDPipe) id:string,@Body() dto:RescheduleExamDto,@CurrentUser() actor:any){return this.examSchedule.reschedule(id,dto,actor);}
-  @Post('exam-sessions/:id/cancel') @RequirePermissions('scheduling.write')
+  @Post('exam-sessions/:id/cancel') @RequirePermissions('exams.write')
   cancelExam(@Param('id',ParseUUIDPipe) id:string,@Body() dto:ExamSessionActionDto,@CurrentUser() actor:any){return this.examSchedule.cancel(id,dto,actor);}
-  @Post('exam-sessions/:id/confirm') @RequirePermissions('scheduling.write')
+  @Post('exam-sessions/:id/confirm') @RequirePermissions('exams.write')
   confirmExam(@Param('id',ParseUUIDPipe) id:string,@Body() dto:ConfirmExamDto,@CurrentUser() actor:any){return this.examSchedule.confirm(id,dto,actor);}
 
   @Get("bridge-course") bridgeCourse() { return this.masters.bridgeCourse(); }
@@ -67,14 +67,15 @@ export class MastersController {
   @Put("grading-policies") @RequirePermissions("gradebook.policy")
   saveGradingPolicies(@Body() dto: SaveGradingPoliciesDto, @CurrentUser() user: any) { return this.gradingPolicies.save(dto, user?.id ? String(user.id) : undefined); }
   @Get("admission-scores")
+  @RequirePermissions('admission.view')
   admissionScores(@Query("roundId") roundId?: string) { return roundId ? this.admissionEvaluation.ranking(roundId) : this.admissionEvaluation.listRounds(); }
   @Get("exam-eligibility") examEligibility() { return this.masters.examEligibility(); }
   @Get("exam-lists/options") @RequirePermissions("gradebook.view")
-  examListOptions() { return this.gradebooks.options(); }
+  examListOptions(@CurrentUser() actor: any) { return this.gradebooks.optionsForActor(actor); }
   @Get("exam-lists/subjects") @RequirePermissions("gradebook.view")
-  examListSubjects(@Query() query: ExamSubjectsQueryDto) { return this.gradebooks.subjects(query.classGroupId); }
+  examListSubjects(@Query() query: ExamSubjectsQueryDto, @CurrentUser() actor: any) { return this.gradebooks.subjectsForActor(query.classGroupId,actor); }
   @Get("exam-lists") @RequirePermissions("gradebook.view")
-  examLists(@Query() query: ExamGradebookQueryDto) { return this.gradebooks.get(query); }
+  examLists(@Query() query: ExamGradebookQueryDto, @CurrentUser() actor: any) { return this.gradebooks.getForActor(query,actor); }
   @Put("exam-lists") @RequirePermissions("gradebook.submit")
   saveExamLists(@Body() dto: SaveExamGradebookDto, @CurrentUser() actor: any) { return this.gradebooks.save(dto, actor); }
   @Get("english-exam") englishExam() { return this.masters.englishExam(); }

@@ -4,6 +4,8 @@ import { Sequelize } from 'sequelize-typescript';
 import { ClassGroup } from '../database/models/training/class-group.model.js';
 import { Staff } from '../database/models/staff.model.js';
 import { RbacService } from './rbac.service.js';
+import { workingProfileStorage } from './profile-context.js';
+import { routePermissionAllowed } from './route-authorization.js';
 
 @Injectable()
 export class GroupResponsibilityService {
@@ -16,7 +18,7 @@ export class GroupResponsibilityService {
   async forCreation(actor: Staff, requestedId?: string) {
     if (requestedId && requestedId !== actor.id) {
       const access = await this.rbac.effectiveAccess(actor);
-      if (!access.permissions.has('groups.assign')) throw new ForbiddenException('Bạn không có quyền phân công chuyên viên.');
+      if (!this.canAssign(access.permissions)) throw new ForbiddenException('Bạn không có quyền phân công chuyên viên.');
     }
     const staffId = requestedId || actor.id;
     const staff = await Staff.findByPk(staffId);
@@ -26,7 +28,7 @@ export class GroupResponsibilityService {
 
   async forUpdate(actor: Staff, staffId: string) {
     const access = await this.rbac.effectiveAccess(actor);
-    if (!access.permissions.has('groups.assign')) throw new ForbiddenException('Bạn không có quyền phân công chuyên viên.');
+    if (!this.canAssign(access.permissions)) throw new ForbiddenException('Bạn không có quyền phân công chuyên viên.');
     return this.forCreation(actor, staffId);
   }
 
@@ -41,5 +43,10 @@ export class GroupResponsibilityService {
       return { message: 'Đã phân công chuyên viên phụ trách.', data: { id: group.id, responsibleStaffId: staffId,
         responsibleStaff: { id: staff.id, name: staff.name, email: staff.email } } };
     });
+  }
+
+  private canAssign(permissions:Set<string>){
+    const profile=workingProfileStorage.getStore();
+    return permissions.has('groups.assign')&&(!profile||routePermissionAllowed(permissions,profile.requestPath||'','POST',['groups.assign']));
   }
 }

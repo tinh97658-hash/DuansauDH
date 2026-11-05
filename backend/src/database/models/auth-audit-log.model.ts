@@ -3,6 +3,8 @@ import { Staff } from "./staff.model.js";
 
 @Table({ tableName: "auth_audit_logs", underscored: true, timestamps: true })
 export class AuthAuditLog extends Model {
+  @Column(DataType.UUID) declare actorProfileId:string|null;
+  @Column(DataType.JSONB) declare actorProfile:Record<string,unknown>|null;
   @Default(DataType.UUIDV4)
   @Column({ type: DataType.UUID, primaryKey: true })
   declare id: string;

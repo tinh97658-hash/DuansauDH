@@ -6,6 +6,8 @@ import { Permission } from "../database/models/permission.model.js";
 import { Role } from "../database/models/role.model.js";
 import { StaffRole } from "../database/models/staff-role.model.js";
 import { permissionAssignableToRole } from "./permissions.js";
+import { workingProfileStorage } from './profile-context.js';
+import { effectiveProfilePermissions } from './permission-tree.js';
 
 export interface EffectiveAccess {
   permissions: Set<string>;
@@ -18,8 +20,8 @@ export interface EffectiveAccess {
 const CACHE_TTL_MS = 30_000;
 
 /**
- * Phân giải quyền hiệu lực của một cán bộ: hợp quyền của mọi vai trò được gán.
- * Fallback sang cột `staff.role` cho dữ liệu cũ chưa có bản ghi `staff_roles`.
+ * Request người dùng chỉ phân giải vai trò của hồ sơ đang chọn. Tác vụ nội bộ
+ * không có request context giữ chế độ tương thích; không dùng chế độ này qua HTTP.
  */
 @Injectable()
 export class RbacService {
@@ -38,21 +40,24 @@ export class RbacService {
   }
 
   async effectiveAccess(staff: { id: string; role?: string; sessionVersion?: number }, fresh = false): Promise<EffectiveAccess> {
-    const key = `${staff.id}:${staff.sessionVersion ?? 0}`;
+    const profile=workingProfileStorage.getStore();
+    const scoped=profile?.staffId===staff.id;
+    if(scoped&&(!profile.roleId||profile.selectionRequired))return {permissions:new Set(),roleCodes:[],groupScope:{restrictView:true,restrictEdit:true,readOnly:true}};
+    const key = `${staff.id}:${staff.sessionVersion ?? 0}:${scoped?profile.roleId:'internal'}`;
     const cached = this.cache.get(key);
-    if (!fresh && cached && cached.expiresAt > Date.now()) return cached.access;
+    if (!scoped && !fresh && cached && cached.expiresAt > Date.now()) return cached.access;
     const access = await this.compute(staff);
     this.cache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, access });
     return access;
   }
 
-  private async compute(staff: { id: string; role?: string }): Promise<EffectiveAccess> {
+  async availableRoles(staff: {id:string;role?:string}) {
     const assignments = await this.staffRoles.findAll({
       where: { staffId: staff.id },
       include: [{ model: Role, as: "role", include: [{ model: Permission, as: "permissions" }, { model: RolePermissionScope, as: "permissionScopes" }] }],
     });
     let roleModels = assignments.map((assignment) => assignment.role).filter(Boolean) as Role[];
-    if (!roleModels.length && staff.role) {
+    if (!assignments.length && staff.role) {
       const fallback = await this.roles.findOne({
         where: { code: staff.role },
         include: [{ model: Permission, as: "permissions" }, { model: RolePermissionScope, as: "permissionScopes" }],
@@ -60,13 +65,26 @@ export class RbacService {
       if (fallback) roleModels = [fallback];
     }
 
-    roleModels = roleModels.filter((role) => role.active === true);
-    const permissions = new Set<string>();
+    return roleModels.filter(role=>role.active===true);
+  }
+
+  async profiles(staff:{id:string;role?:string}){
+    return (await this.availableRoles(staff)).map(role=>({id:role.id,name:role.name,code:role.code,
+      scopeLabel:role.restrictGroupView?'Lớp được phân công phụ trách':'Theo phạm vi quyền được cấp',readOnly:role.groupReadOnly===true}));
+  }
+
+  private async compute(staff: { id: string; role?: string }) {
+    let roleModels=await this.availableRoles(staff);
+    const profile=workingProfileStorage.getStore();
+    const scoped=profile?.staffId===staff.id;
+    if(scoped)roleModels=roleModels.filter(role=>role.id===profile.roleId);
+    let permissions = new Set<string>();
     for (const role of roleModels) {
       for (const permission of role.permissions ?? []) if (permissionAssignableToRole(permission.code, role.code)) permissions.add(permission.code);
     }
+    if(scoped)permissions=effectiveProfilePermissions(permissions);
     const academicGrants = roleModels.flatMap(role => (role.permissions ?? [])
-      .filter(permission => INSTITUTION_PERMISSIONS.has(permission.code) && permissionAssignableToRole(permission.code, role.code))
+      .filter(permission => permissions.has(permission.code) && INSTITUTION_PERMISSIONS.has(permission.code) && permissionAssignableToRole(permission.code, role.code))
       .map(permission => ({ roleId: role.id, permission: permission.code, scope: 'institution' as const })));
     const schedulingGrants: ScopedGrant[] = academicGrants
       .filter(grant => Object.hasOwn(SCHEDULING_SCOPES, grant.permission))

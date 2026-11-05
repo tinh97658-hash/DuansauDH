@@ -34,6 +34,8 @@ const serialize = (log: AuthAuditLog) => {
   return {
     id: value.id,
     action: value.action,
+    actorProfileId:value.actorProfileId,
+    actorProfile:value.actorProfile,
     metadata: value.metadata,
     ip: value.ip,
     userAgent: value.userAgent,

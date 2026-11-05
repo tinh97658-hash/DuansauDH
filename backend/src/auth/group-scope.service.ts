@@ -4,6 +4,7 @@ import { groupScopeStorage, type GroupScopeContext } from "./group-scope-context
 import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
 import type { EffectiveAccess } from './rbac.service.js';
+import { workingProfileStorage } from './profile-context.js';
 
 @Injectable()
 export class GroupScopeService implements OnModuleInit {
@@ -65,7 +66,7 @@ export class GroupScopeService implements OnModuleInit {
         ? kind === 'group' ? 'app_schedule_group_allowed(:id,true)'
           : kind === 'record' ? 'app_schedule_record_allowed(:id,true)' : "app_schedule_allowed(:id,'scheduling.organize')"
         : kind === 'group' ? 'app_group_allowed(:id,true)'
-        : kind === 'record' ? 'app_record_allowed(:id,true)'
+        : kind === 'record' ? (this.current()?.admissionAction ? '(app_record_allowed(:id,true) OR app_admission_unassigned_allowed(:id,true))' : 'app_record_allowed(:id,true)')
         : kind === 'offering' ? 'app_offering_allowed(:id,true)'
         : kind === 'arrangement' ? `NOT EXISTS(SELECT 1 FROM app_arrangement_offerings(:id) o WHERE NOT app_offering_allowed(o.offering_id,true))`
         : `EXISTS(SELECT 1 FROM ${kind} WHERE id=:id AND ${['teaching_sessions', 'course_exam_sessions'].includes(kind)
@@ -83,14 +84,14 @@ export class GroupScopeService implements OnModuleInit {
     (this.sequelize as any).query = async (sql: any, options: any = {}) => {
       const scope = this.storage.getStore();
       const statement = typeof sql === 'string' ? sql : sql?.query;
-      if (!scope?.staffId || (!scope.restrictView && !scope.restrictEdit && !scope.readOnly && !scope.schedulingAction && !scope.academicDomain) || /^(?:START TRANSACTION|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE SAVEPOINT|SET TRANSACTION|SET CONSTRAINTS)\b/i.test(statement?.trim() || '')) {
+      if (!scope?.staffId || (!scope.restrictView && !scope.restrictEdit && !scope.readOnly && !scope.schedulingAction && !scope.academicDomain && !scope.admissionAction && workingProfileStorage.getStore()?.staffId!==scope.staffId) || /^(?:START TRANSACTION|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE SAVEPOINT|SET TRANSACTION|SET CONSTRAINTS)\b/i.test(statement?.trim() || '')) {
         return query(sql, options);
       }
       const execute = async (tx: any) => {
         let initialized = this.initialized.get(tx);
         if (!initialized) {
           initialized = (async () => {
-            if (scope.schedulingAction === 'write' || scope.schedulingAction === 'organize' || (scope.academicDomain && scope.academicPermission !== 'gradebook.view' && scope.academicPermission !== 'scheduling.view')) {
+            if (scope.admissionAction === 'manage' || scope.schedulingAction === 'write' || scope.schedulingAction === 'organize' || (scope.academicDomain && scope.academicPermission !== 'gradebook.view' && scope.academicPermission !== 'exams.view')) {
               // Administrative changes take the exclusive counterpart of this lock.
               await query('SELECT pg_advisory_xact_lock_shared(74621901)', { transaction: tx });
               // Member assignment/removal and offering creation use 21026. Take it
@@ -107,11 +108,17 @@ export class GroupScopeService implements OnModuleInit {
               set_config('app.scheduling_action', :schedulingAction, true),
               set_config('app.scheduling_grants', :schedulingGrants, true),
               set_config('app.academic_domain', :academicDomain, true),
-              set_config('app.academic_permission', :academicPermission, true)`, {
+              set_config('app.academic_permission', :academicPermission, true),
+              set_config('app.admission_action', :admissionAction, true),
+              set_config('app.profile_enforced', :profileEnforced, true),
+              set_config('app.active_profile_id', :profileId, true)`, {
               transaction: tx,
               replacements: { staffId: scope.staffId, restrictView: String(scope.restrictView),
                 restrictEdit: String(scope.restrictEdit), readOnly: String(scope.readOnly), schedulingView: String(scope.schedulingView === true), schedulingAction: scope.schedulingAction ?? '', schedulingGrants: JSON.stringify(scope.schedulingGrants ?? []),
-                academicDomain: scope.academicDomain ?? '', academicPermission: scope.academicPermission ?? '' },
+                academicDomain: scope.academicDomain ?? '', academicPermission: scope.academicPermission ?? '',
+                admissionAction: scope.admissionAction ?? '',
+                profileEnforced:String(workingProfileStorage.getStore()?.staffId===scope.staffId),
+                profileId:workingProfileStorage.getStore()?.roleId||'' },
             });
           })();
           this.initialized.set(tx, initialized);

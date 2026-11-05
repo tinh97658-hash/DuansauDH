@@ -6,8 +6,8 @@ import { offeringStages as stages, stageOf } from './offeringStages';
 const descriptions = new Map([
   [stages.teaching, 'Đang giảng dạy · Chưa mở nhập điểm'],
   [stages.components_missing, 'Đang nhập điểm thành phần'],
-  [stages.eligibility_ready, 'Chờ gửi duyệt tư cách thi'],
-  [stages.eligibility_pending, 'Chờ duyệt tư cách thi'],
+  [stages.eligibility_ready, 'Sẵn sàng xếp thi'],
+  [stages.eligibility_pending, 'Lưu điểm để cập nhật tư cách thi'],
   [stages.awaiting_exam, 'Chờ tổ chức thi'],
   [stages.exam_missing, 'Chờ nhập điểm thi'],
   [stages.result_ready, 'Chờ gửi duyệt kết quả'],

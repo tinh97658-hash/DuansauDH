@@ -19,12 +19,15 @@ import "./classScoreSummary.css";
 import { useSubjectCatalogRevision } from "../../utils/subjectCatalog";
 import { useGradebookRevision } from "../../utils/gradebookRevision";
 import { downloadDocumentFile, sanitizeDocumentFilenamePart } from "../../utils/documentFiles";
+import {useAuthSession} from '../../context/AuthSession';
 
 const PAGE_SIZE = 15;
 const endpoint = `${API_BASE_URL}/reports/class-score-summary`;
 const errorMessage = (error, fallback) => error.response?.data?.message || error.message || fallback;
 
 export default function ClassScoreSummary() {
+  const session=useAuthSession();
+  const scoped=session?.access?.groupScope?.restrictView===true;
   const catalogRevision = useSubjectCatalogRevision();
   const gradebookRevision = useGradebookRevision();
   const [groups, setGroups] = useState([]);
@@ -156,7 +159,7 @@ export default function ClassScoreSummary() {
           {!majors.length && <MenuItem value="">Chưa có chuyên ngành</MenuItem>}
           {majors.map(major => <MenuItem key={major.id} value={major.id}>{major.name}</MenuItem>)}
         </FilterSelectField>
-        <FilterSelectField label="Chọn lớp" value={classGroupId} disabled={loadingOptions || exporting || !classes.length} onChange={event => selectGroup(groups.find(group => group.id === event.target.value))}>
+        <FilterSelectField label="Chọn lớp" value={classGroupId} disabled={loadingOptions || exporting || !classes.length || (scoped&&classes.length===1)} onChange={event => selectGroup(groups.find(group => group.id === event.target.value))}>
           {!classes.length && <MenuItem value="">Chọn lớp học viên</MenuItem>}
           {classes.map(group => <MenuItem key={group.id} value={group.id}>{group.code || group.name}{group.major?.name ? ` — ${group.major.name}` : ""}</MenuItem>)}
         </FilterSelectField>

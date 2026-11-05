@@ -22,7 +22,7 @@ function configure(rounds = [round]) {
     return Promise.reject(new Error(url));
   });
 }
-const mount = (session = null) => render(<ThemeProvider theme={theme}><CssBaseline /><AuthSessionContext.Provider value={{ ...session, access: { permissions: ["admission.manage"] } }}><MemoryRouter useTransitions={false}><AdmissionScores /></MemoryRouter></AuthSessionContext.Provider></ThemeProvider>);
+const mount = (session = null) => render(<ThemeProvider theme={theme}><CssBaseline /><AuthSessionContext.Provider value={{ access: { permissions: ["admission.manage"] }, ...session }}><MemoryRouter useTransitions={false}><AdmissionScores /></MemoryRouter></AuthSessionContext.Provider></ThemeProvider>);
 beforeEach(() => { jest.clearAllMocks(); configure(); });
 it("searches rounds without accents and combines the search with the year filter", async () => {
   const oldRound = { ...round, id: "round-old", name: "Đợt tuyển sinh mùa thu", academicYear: "2025" };
@@ -90,7 +90,7 @@ it("paginates the round list and returns to matching results when searching", as
   expect(within(dialog).getByText("Đợt số 1")).toBeInTheDocument();
   expect(within(dialog).getByText("Hiển thị 4 / 12 đợt xét tuyển")).toBeInTheDocument();
 });
-it("switches between pending applications and eligible applications without changing decisions", async () => {
+it("shows pending applications by default and includes old records only when requested", async () => {
   const originalGet = axios.get.getMockImplementation();
   const rows = [record, ranking.rows[1],
     { ...record, admissionRecordId: "admitted", code: "HS003", fullName: "Đã duyệt", decision: "admitted" },
@@ -101,7 +101,7 @@ it("switches between pending applications and eligible applications without chan
     ? Promise.resolve({ data: { ...ranking, rows, admittedCount: 1 } }) : originalGet(url));
   mount();
   await screen.findByText("HS001");
-  const toggle = screen.getByRole("switch", { name: "Hiển thị hồ sơ đủ điều kiện" });
+  const toggle = screen.getByRole("switch", { name: "Hiển thị cả hồ sơ cũ (đã duyệt)" });
   expect(toggle).not.toBeChecked();
   expect(screen.getByText("HS002")).toBeInTheDocument();
   expect(screen.getByText("HS004")).toBeInTheDocument();
@@ -113,11 +113,54 @@ it("switches between pending applications and eligible applications without chan
   expect(toggle).toBeChecked();
   expect(screen.getByText("HS001")).toBeInTheDocument();
   expect(screen.getByText("HS003")).toBeInTheDocument();
-  for (const code of ["HS002", "HS004", "HS005", "HS006"]) expect(screen.queryByText(code)).not.toBeInTheDocument();
-  fireEvent.click(toggle);
+  for (const code of ["HS002", "HS004", "HS005", "HS006"]) expect(screen.getByText(code)).toBeInTheDocument();
+  fireEvent.mouseDown(screen.getByLabelText("Lọc hồ sơ"));
+  fireEvent.click(await screen.findByRole("option", { name: "Đạt ngưỡng", exact: true }));
+  expect(screen.queryByText("HS006")).not.toBeInTheDocument();
+  fireEvent.mouseDown(screen.getByLabelText("Lọc hồ sơ"));
+  fireEvent.click(await screen.findByRole("option", { name: "Tất cả", exact: true }));
+  expect(toggle).toBeChecked();
   expect(screen.getByText("HS002")).toBeInTheDocument();
   expect(screen.getByLabelText("Điểm HS002")).toHaveValue(14);
+  expect(screen.getByText("HS003")).toBeInTheDocument();
+  expect(screen.getByText("HS005")).toBeInTheDocument();
+  fireEvent.click(toggle);
+  expect(toggle).not.toBeChecked();
+  expect(screen.getByText("HS002")).toBeInTheDocument();
+  expect(screen.getByText("HS006")).toBeInTheDocument();
   expect(screen.queryByText("HS003")).not.toBeInTheDocument();
+  expect(screen.queryByText("HS005")).not.toBeInTheDocument();
+  fireEvent.mouseDown(screen.getByLabelText("Lọc hồ sơ"));
+  fireEvent.click(await screen.findByRole("option", { name: "Không trúng tuyển", exact: true }));
+  expect(toggle).toBeChecked();
+  expect(screen.getByText("HS005")).toBeInTheDocument();
+  expect(screen.queryByText("HS001")).not.toBeInTheDocument();
+  expect(axios.post).not.toHaveBeenCalled();
+  expect(axios.put).not.toHaveBeenCalled();
+});
+
+it("lets a view-only specialist see unscored applications and switch to old records without edit controls", async () => {
+  const originalGet = axios.get.getMockImplementation();
+  const unscored = { ...record, total: null, meetsCutoff: null };
+  const old = { ...record, admissionRecordId: "old", code: "HS-OLD", decision: "admitted", studyStatus: "Đang học" };
+  axios.get.mockImplementation(url => url.endsWith("/ranking")
+    ? Promise.resolve({ data: { ...ranking, rows: [unscored, old], admittedCount: 1 } }) : originalGet(url));
+  mount({ access: { permissions: ["admission.view"] } });
+  expect(await screen.findByText("HS001")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Điểm HS001")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Lưu điểm" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Xét tuyển", exact: true })).not.toBeInTheDocument();
+  expect(screen.queryByText("HS-OLD")).not.toBeInTheDocument();
+  const toggle = screen.getByRole("switch", { name: "Hiển thị cả hồ sơ cũ (đã duyệt)" });
+  expect(toggle).toBeEnabled();
+  fireEvent.click(toggle);
+  expect(screen.getByText("HS-OLD")).toBeInTheDocument();
+  expect(screen.getByText("HS001")).toBeInTheDocument();
+  fireEvent.mouseDown(screen.getByLabelText("Lọc hồ sơ"));
+  fireEvent.click(await screen.findByRole("option", { name: "Đạt ngưỡng", exact: true }));
+  fireEvent.click(toggle);
+  expect(screen.getByText("HS001")).toBeInTheDocument();
+  expect(screen.queryByText("HS-OLD")).not.toBeInTheDocument();
   expect(axios.post).not.toHaveBeenCalled();
   expect(axios.put).not.toHaveBeenCalled();
 });

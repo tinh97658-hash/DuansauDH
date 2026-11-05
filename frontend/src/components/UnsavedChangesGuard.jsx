@@ -5,13 +5,14 @@ import ConfirmDialog from "./ConfirmDialog";
 const GuardContext = createContext(null);
 export const UNSAVED_GRADE_MESSAGE = "Bạn đã chỉnh sửa điểm nhưng chưa lưu. Nếu rời khỏi trang, những thay đổi này sẽ bị mất.";
 
-export function useUnsavedGrades(dirty) {
+export function useUnsavedChanges(dirty,message=UNSAVED_GRADE_MESSAGE) {
   const guard = useContext(GuardContext);
   useEffect(() => {
-    guard?.setDirty(dirty);
+    guard?.setDirty(dirty,message);
     return () => guard?.setDirty(false);
-  }, [guard?.setDirty, dirty]);
+  }, [guard?.setDirty, dirty,message]);
 }
+export const useUnsavedGrades=dirty=>useUnsavedChanges(dirty);
 
 export function useConfirmGradeLeave() {
   return useContext(GuardContext)?.confirmLeave || (() => Promise.resolve(true));
@@ -24,7 +25,8 @@ export function useDiscardUnsavedGrades() {
 export default function UnsavedChangesGuard() {
   const [dirty, updateDirty] = useState(false);
   const dirtyRef = useRef(false);
-  const setDirty = useCallback(value => { dirtyRef.current = value; updateDirty(value); }, []);
+  const [message,setMessage]=useState(UNSAVED_GRADE_MESSAGE);
+  const setDirty = useCallback((value,nextMessage=UNSAVED_GRADE_MESSAGE) => { dirtyRef.current = value; updateDirty(value);setMessage(nextMessage); }, []);
   const [manual, setManual] = useState(false);
   const resolver = useRef(null);
   const blocker = useBlocker(({ currentLocation, nextLocation }) => dirtyRef.current && (
@@ -49,7 +51,7 @@ export default function UnsavedChangesGuard() {
   return <GuardContext.Provider value={{ setDirty, confirmLeave }}>
     <Outlet />
     <ConfirmDialog open={manual || blocker.state === "blocked"} onClose={() => answer(false)}
-      title="CÓ ĐIỂM CHƯA LƯU" content={UNSAVED_GRADE_MESSAGE} cancelText="Ở lại"
+      title={message===UNSAVED_GRADE_MESSAGE?'CÓ ĐIỂM CHƯA LƯU':'CÓ THAY ĐỔI CHƯA LƯU'} content={message} cancelText="Ở lại"
       confirmText="Bỏ thay đổi và tiếp tục" severity="warning" onConfirm={() => answer(true)} />
   </GuardContext.Provider>;
 }

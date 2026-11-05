@@ -54,7 +54,7 @@ it('shares authoritative component stages between tracking and options without w
   expect((await service.tracking([offering], true)).get('o1').gradebookStage).toBe('components_missing');
   expect((await service.options()).courseOfferings[0].gradebookStage).toBe('components_missing');
   get.mockResolvedValue({ totalRows: 5, unassessedRows: 0 } as never);
-  expect((await service.options()).courseOfferings[0].gradebookStage).toBe('eligibility_ready');
+  expect((await service.options()).courseOfferings[0].gradebookStage).toBe('awaiting_exam');
   get.mockResolvedValue({ totalRows: 0, unassessedRows: 0 } as never);
   expect((await service.options()).courseOfferings[0].gradebookStage).toBe('review');
   expect(get).toHaveBeenCalledWith(expect.objectContaining({ rosterScope: 'offering' }));

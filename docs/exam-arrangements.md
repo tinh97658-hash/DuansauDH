@@ -15,7 +15,7 @@ luồng này từ hộp xếp lịch một môn bằng **Ghép học phần / th
 - Thí sinh không được thi hai môn giao giờ, kể cả cùng một người mang
   mã hồ sơ tuyển sinh và mã sinh viên khác nhau.
 - Thêm hoặc chuyển môn vào đợt bị trùng giờ thí sinh sẽ bị chặn ngay và hiện cảnh báo vàng với số thí sinh trùng lịch (mỗi người tính một lần) và hướng dẫn chọn đợt hoặc giờ khác. Nếu đổi giờ gây trùng lịch, không được lưu cho đến khi xử lý hết xung đột.
-- Danh sách lấy nguyên từ bản duyệt tư cách thi; không chia nhỏ danh sách.
+- Tư cách thi được tính tự động khi lưu đủ điểm thành phần, không cần duyệt trước thi. Mỗi lần xếp thi lấy học viên đủ tư cách chưa có lịch thi còn hiệu lực. Lịch đã xếp giữ nguyên danh sách tại thời điểm xếp; sửa điểm thành phần không sửa lịch sử danh sách thi.
 
 Mở ô lịch để xem buổi, chọn **Chi tiết** của nhóm để hủy riêng hoặc mở
 bảng điểm. Hủy cần lý do và chỉ thực hiện trước khi nhóm bắt đầu. Nhóm

@@ -47,7 +47,7 @@ describeDb('Grouped exam reservations on PostgreSQL',()=>{
   const actorId=randomUUID();room=randomUUID();lecturer=randomUUID();
   actor=Object.create(Staff.prototype);Object.defineProperties(actor,{id:{value:actorId},name:{value:'Scheduler'},role:{value:'admin'}});
   await sql('INSERT INTO staff VALUES(:id); INSERT INTO rooms VALUES(:room,30,true); INSERT INTO lecturers VALUES(:lecturer,true)',{id:actorId,room,lecturer});
-  const rbac:any={effectiveAccess:async()=>({permissions:new Set(['scheduling.write'])})};
+  const rbac:any={effectiveAccess:async()=>({permissions:new Set(['exams.write'])})};
   // Verify backfill against a real pre-migration session and roster.
   const legacy=await offering(['legacy']);const session=randomUUID();
   await sql(`INSERT INTO course_exam_sessions(id,course_offering_id,eligibility_snapshot_id,exam_date,start_time,end_time,room_id,lecturer_id,created_by,updated_by)

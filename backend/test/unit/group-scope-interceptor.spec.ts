@@ -57,3 +57,41 @@ it.each([['request_reopen','gradebook.submit'],['reject_reopen','gradebook.appro
   await lastValueFrom(stream);
   expect(scope.current()).toMatchObject({academicDomain:'gradebook',academicPermission:permission});
 });
+
+it.each([['GET','exams.view'],['POST','exams.write']])('uses the independent exam permission for %s',async(method,permission)=>{
+  const {interceptor,context,scope}=setup(method);
+  const request=context.switchToHttp().getRequest();
+  context.switchToHttp=()=>({getRequest:()=>({...request,originalUrl:'/masters/exam-schedule'})});
+  const stream=await interceptor.intercept(context,{handle:()=>of({ok:true})});
+  await lastValueFrom(stream);
+  expect(scope.current()).toMatchObject({academicDomain:'exam',academicPermission:permission});
+});
+
+it.each([
+  ['GET', '/plan/admission-rounds/round/ranking', 'view'],
+  ['PUT', '/plan/admission-rounds/round/scores', 'manage'],
+  ['POST', '/plan/admission-rounds/round/confirm', 'manage'],
+  ['GET', '/plan/admission-records/record', 'view'],
+  ['POST', '/plan/admission-records', 'manage'],
+  ['PUT', '/plan/admission-records/record/evaluation', 'manage'],
+  ['GET', '/plan/admission-records/record/learning-results', undefined],
+  ['GET', '/plan/admission-records/record/study-leaves', undefined],
+  ['POST', '/plan/admission-records/record/major-transfers', undefined],
+  ['PUT', '/plan/admission-records/record/tuition', undefined],
+  ['GET', '/reports/class-score-summary', undefined],
+])('selects the pre-class admission scope for %s %s', async (method, path, action) => {
+  const { interceptor, context, scope } = setup(method);
+  const request = context.switchToHttp().getRequest();
+  context.switchToHttp = () => ({ getRequest: () => ({ ...request, originalUrl: path }) });
+  await lastValueFrom(await interceptor.intercept(context, { handle: () => of({}) }));
+  expect(scope.current().admissionAction).toBe(action);
+});
+
+it.each(['learners', 'study-management'])('keeps %s lists under learner scope', async admissionStage => {
+  const { interceptor, context, scope } = setup();
+  const request = context.switchToHttp().getRequest();
+  context.switchToHttp = () => ({ getRequest: () => ({ ...request,
+    originalUrl: '/plan/admission-records?admissionStage=' + admissionStage, query: { admissionStage } }) });
+  await lastValueFrom(await interceptor.intercept(context, { handle: () => of({}) }));
+  expect(scope.current().admissionAction).toBeUndefined();
+});

@@ -28,6 +28,7 @@ import { RbacService } from "../auth/rbac.service.js";
 import { assertGradebookWorkflowAccess } from "./gradebook-workflow-access.js";
 import { ExamWorkflowService } from './exam-workflow.service.js';
 import { gradebookStage, gradebookCompletionStatus, legacyExamGradesComplete, resolveApprovedExamRows, unresolvedExamRows } from './exam-tracking.js';
+import { GradebookAccessService } from './gradebook-access.service.js';
 
 export const emptyExamGrade = (participantId: string): CourseExamGrade => ({
   participantId, eligible: null, examExempt: false, testScore: null, assignmentScore: null,
@@ -46,7 +47,37 @@ export class ExamGradebookService {
     @Optional() private readonly policies?: GradingPolicyService,
     @Optional() private readonly rbac?: RbacService,
     @Optional() private readonly workflow?: ExamWorkflowService,
+    @Optional() private readonly access?: GradebookAccessService,
   ) {}
+
+  async optionsForActor(actor: unknown) {
+    if (!this.access) return this.options();
+    const access=await this.access.forActor(actor);
+    const allowed=await this.access.offeringIds(access);
+    const result=await this.options();
+    const courseOfferings=result.courseOfferings.filter(offering=>allowed===null||allowed.has(offering.id));
+    const visibleGroups=new Set(courseOfferings.flatMap(offering=>offering.groupLinks.map((link:any)=>link.classGroupId)));
+    return {...result,courseOfferings,groups:result.groups.filter(group=>access.groupIds===null||access.groupIds.has(group.id)||visibleGroups.has(group.id))};
+  }
+
+  async subjectsForActor(classGroupId: string, actor: unknown) {
+    if (!this.access) return this.subjects(classGroupId);
+    const access=await this.access.forActor(actor);
+    const allowed=await this.access.offeringIds(access);
+    return (await this.subjects(classGroupId)).filter(offering=>allowed===null||allowed.has(offering.id));
+  }
+
+  async getForActor(query: ExamGradebookQueryDto, actor: unknown) {
+    if (!this.access) return this.get(query);
+    const access=await this.access.assertOffering(actor,query.courseOfferingId);
+    const result=await this.get(query);
+    return {...result,rows:result.rows.map(row=>({...row,canEditGrade:this.access!.canEdit(access)}))};
+  }
+
+  async historyForActor(query: ExamGradebookQueryDto, actor: unknown) {
+    if(this.access)await this.access.assertOffering(actor,query.courseOfferingId);
+    return this.history(query);
+  }
 
   async options() {
     const groups = await this.groups.findAll({
@@ -86,9 +117,9 @@ export class ExamGradebookService {
         COALESCE((SELECT jsonb_agg(jsonb_build_object('grades',b.grades) ORDER BY b.updated_at DESC,b.class_group_id)
           FROM course_exam_gradebooks b WHERE b.course_offering_id=o.id),'[]'::jsonb) AS books,
         ARRAY(SELECT c.participant_id FROM course_exam_session_candidates c JOIN course_exam_sessions es ON es.id=c.session_id
-          WHERE es.course_offering_id=o.id AND es.eligibility_snapshot_id=p.id AND es.status='held') AS "heldIds",
+          WHERE es.course_offering_id=o.id AND es.status='held') AS "heldIds",
         (SELECT MAX((es.exam_date+es.end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh') FROM course_exam_sessions es
-          WHERE es.course_offering_id=o.id AND es.eligibility_snapshot_id=p.id AND es.status='held') AS "examCompletedAt"
+          WHERE es.course_offering_id=o.id AND es.status='held') AS "examCompletedAt"
       FROM course_offerings o JOIN subjects s ON s.id=o.subject_id
       LEFT JOIN course_exam_workflows w ON w.course_offering_id=o.id
       LEFT JOIN course_exam_eligibility_snapshots p ON p.id=w.eligibility_snapshot_id AND p.course_offering_id=o.id
@@ -174,7 +205,7 @@ export class ExamGradebookService {
       const all=await this.workflow!.approvedRows(offering.id,state,transaction);
       const assigned = await this.workflow!.query(`SELECT DISTINCT c.participant_id, es.status FROM course_exam_sessions es
         JOIN course_exam_session_candidates c ON c.session_id=es.id
-        WHERE es.course_offering_id=:id AND es.eligibility_snapshot_id=:snapshot AND es.status IN ('scheduled','held')`,
+        WHERE es.course_offering_id=:id AND es.status IN ('scheduled','held')`,
         {id:offering.id,snapshot:state.eligibility_snapshot_id},transaction);
       const assignedIds = new Set(assigned.map(row=>row.participant_id));
       const candidates = all.filter((row:any)=>row.eligible===true&&!row.examExempt);
@@ -187,7 +218,7 @@ export class ExamGradebookService {
       const pageSize=Math.min(15,Math.max(1,query.pageSize||15)),page=Math.min(query.page||1,Math.max(1,Math.ceil(rows.length/pageSize)));
       return {group:{id:group.id,name:group.name,code:group.code,academicYear:group.academicYear},
         offering:{...(typeof offering.get==='function'?offering.get({plain:true}):offering),examScheduling,examGradesComplete,gradebookStage:stage,gradebookCompletionStatus:gradebookCompletionStatus(state,examGradesComplete)},workflow:this.workflow!.publicState(state),
-        revision:await this.workflow!.revision(offering.id,transaction),total:rows.length,totalRows:scoped.length,unassessedRows:0,page,pageSize,
+        revision:await this.workflow!.revision(offering.id,transaction),total:rows.length,totalRows:scoped.length,unassessedRows:scoped.filter((row:any)=>row.eligible==null&&!row.examExempt&&!row.profileForeignLanguageExempt&&!row.studyLeaveFailure).length,page,pageSize,
         eligibilityPolicy:all[0]?.eligibilityPolicy||LEGACY_GRADING_POLICY,rows:rows.slice((page-1)*pageSize,page*pageSize)};
     }
     const shared = query.rosterScope === "offering";
@@ -306,7 +337,8 @@ export class ExamGradebookService {
   }
 
   async save(dto: SaveExamGradebookDto, actor?: any) {
-    if(this.workflow){await this.scope(dto);await this.workflow.save(dto,actor,tx=>this.allWorkflowRows(dto,tx));return this.get(dto);}
+    if(this.access)await this.access.assertOffering(actor,dto.courseOfferingId);
+    if(this.workflow){await this.scope(dto);await this.workflow.save(dto,actor,tx=>this.allWorkflowRows(dto,tx));return this.getForActor(dto,actor);}
     if (dto.rosterScope === "offering") return this.saveOffering(dto, actor);
     await this.sequelize.transaction(async (transaction) => {
       await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
@@ -414,7 +446,8 @@ export class ExamGradebookService {
   }
 
   async transition(dto: GradebookWorkflowDto, actor: any,phase:'eligibility'|'final'='eligibility') {
-    if(this.workflow){await this.scope(dto);await this.workflow.transition(dto,actor,phase,tx=>this.allWorkflowRows(dto,tx));return this.get({...dto,rosterScope:'offering'});}
+    if(this.access)await this.access.assertOffering(actor,dto.courseOfferingId);
+    if(this.workflow){await this.scope(dto);await this.workflow.transition(dto,actor,phase,tx=>this.allWorkflowRows(dto,tx));return this.getForActor({...dto,rosterScope:'offering'},actor);}
     if (['request_reopen','reject_reopen'].includes(dto.action)) throw new BadRequestException('Bảng điểm cũ không hỗ trợ xin mở lại tư cách.');
     await assertGradebookWorkflowAccess(actor, dto.action, this.rbac);
     if (dto.action === 'reopen' && !dto.note?.trim()) throw new BadRequestException("Nhập lý do hoặc căn cứ mở lại bảng điểm.");

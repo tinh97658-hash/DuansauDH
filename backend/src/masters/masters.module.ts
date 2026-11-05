@@ -17,6 +17,7 @@ import { CourseOfferingClassGroup } from "../database/models/training/course-off
 import { Subject } from "../database/models/plan/subject.model.js";
 import { ExamWorkflowService } from './exam-workflow.service.js';
 import { ExamScheduleService } from './exam-schedule.service.js';
+import { GradebookAccessService } from './gradebook-access.service.js';
 
 @Module({
   imports: [
@@ -32,7 +33,7 @@ import { ExamScheduleService } from './exam-schedule.service.js';
     PlanModule,
   ],
   controllers: [MastersController],
-  providers: [MastersService, ExamGradebookService, GradingPolicyService, ExamWorkflowService, ExamScheduleService],
+  providers: [MastersService, ExamGradebookService, GradingPolicyService, ExamWorkflowService, ExamScheduleService, GradebookAccessService],
   exports: [MastersService, ExamGradebookService],
 })
 export class MastersModule {}

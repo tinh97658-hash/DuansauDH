@@ -5,8 +5,8 @@ export const stageGroups = [
 export const offeringStages = {
   teaching: { group: 0, order: 0, label: 'Đang giảng dạy', tone: 'teal' },
   components_missing: { group: 1, order: 1, label: 'Thiếu điểm TP', tone: 'warm' },
-  eligibility_ready: { group: 1, order: 2, label: 'Chờ gửi duyệt tư cách', tone: 'neutral' },
-  eligibility_pending: { group: 1, order: 3, label: 'Chờ duyệt tư cách', tone: 'blue' },
+  eligibility_ready: { group: 1, order: 2, label: 'Sẵn sàng xếp thi', tone: 'neutral' },
+  eligibility_pending: { group: 1, order: 3, label: 'Cần lưu lại điểm', tone: 'blue' },
   awaiting_exam: { group: 2, order: 4, label: 'Chờ xếp lịch / tổ chức thi', tone: 'warm' },
   exam_missing: { group: 2, order: 5, label: 'Thiếu điểm thi', tone: 'warm' },
   result_ready: { group: 3, order: 6, label: 'Chờ gửi duyệt kết quả', tone: 'neutral' },

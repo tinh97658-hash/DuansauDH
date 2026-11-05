@@ -1,5 +1,6 @@
 import { ConflictException } from "@nestjs/common";
 import { AdministrationSafetyService, ADMINISTRATION_PERMISSIONS } from "../../src/auth/administration-safety.service.js";
+import {workingProfileStorage} from '../../src/auth/profile-context.js';
 
 describe("AdministrationSafetyService", () => {
   const build = () => {
@@ -25,5 +26,12 @@ describe("AdministrationSafetyService", () => {
     const { service, sequelize } = build();
     sequelize.query.mockResolvedValue([]);
     await expect(service.assertRetained({} as any)).rejects.toThrow(ConflictException);
+  });
+  it('prevents losing management access from the active profile even if another administrator exists',async()=>{
+    const {service,sequelize}=build();sequelize.query.mockResolvedValue([]);
+    await workingProfileStorage.run({staffId:'actor',roleId:'profile',selectionRequired:false},async()=>{
+      await expect(service.assertActorRetained('actor',{} as any)).rejects.toThrow(ConflictException);
+    });
+    expect(sequelize.query.mock.calls[0][1].replacements.roleId).toBe('profile');
   });
 });
