@@ -11,6 +11,19 @@ export const PROFILE_PERMISSION_GUARD_SQL=`CREATE OR REPLACE FUNCTION app_role_p
         AND NOT EXISTS(SELECT 1 FROM public.role_permissions granted WHERE granted.role_id=$1
           AND granted.permission_id=requirements.required_permission_id)))) $$;`;
 
+// Empty installations are seeded after migration. Existing staff must retain
+// a usable administrator profile before changing the authorization model.
+export const WORKING_PROFILE_ADMIN_GUARD_SQL=`DO $$ BEGIN
+  IF EXISTS(SELECT 1 FROM public.staff) AND NOT EXISTS(
+    SELECT s.id FROM public.staff s JOIN public.roles r ON r.active AND NOT r.group_read_only AND (
+      EXISTS(SELECT 1 FROM public.staff_roles sr WHERE sr.staff_id=s.id AND sr.role_id=r.id)
+      OR (NOT EXISTS(SELECT 1 FROM public.staff_roles sr WHERE sr.staff_id=s.id) AND r.code=s.role))
+    JOIN public.role_permissions rp ON rp.role_id=r.id JOIN public.permissions p ON p.id=rp.permission_id
+    WHERE s.status='active' AND p.code IN ('module.administration','account.view','account.manage','role.view','role.manage')
+    GROUP BY s.id,r.id HAVING count(DISTINCT p.code)=5)
+  THEN RAISE EXCEPTION 'Cần có ít nhất một hồ sơ quản trị đầy đủ trước khi chuyển sang chọn hồ sơ làm việc'; END IF;
+END $$;`;
+
 export async function up({context:qi}:{context:QueryInterface}){
   await qi.sequelize.transaction(async transaction=>{
     for(const permission of PERMISSIONS.filter(value=>value.code.startsWith('module.'))){
@@ -75,16 +88,7 @@ export async function up({context:qi}:{context:QueryInterface}){
       END $$;
       CREATE TRIGGER audit_working_profile BEFORE INSERT ON db_change_logs FOR EACH ROW EXECUTE FUNCTION app_audit_profile();
       CREATE TRIGGER audit_working_profile BEFORE INSERT ON auth_audit_logs FOR EACH ROW EXECUTE FUNCTION app_audit_profile();
-      DO $$ BEGIN
-        IF NOT EXISTS(
-          SELECT s.id FROM public.staff s JOIN public.roles r ON r.active AND NOT r.group_read_only AND (
-            EXISTS(SELECT 1 FROM public.staff_roles sr WHERE sr.staff_id=s.id AND sr.role_id=r.id)
-            OR (NOT EXISTS(SELECT 1 FROM public.staff_roles sr WHERE sr.staff_id=s.id) AND r.code=s.role))
-          JOIN public.role_permissions rp ON rp.role_id=r.id JOIN public.permissions p ON p.id=rp.permission_id
-          WHERE s.status='active' AND p.code IN ('module.administration','account.view','account.manage','role.view','role.manage')
-          GROUP BY s.id,r.id HAVING count(DISTINCT p.code)=5)
-        THEN RAISE EXCEPTION 'Cần có ít nhất một hồ sơ quản trị đầy đủ trước khi chuyển sang chọn hồ sơ làm việc'; END IF;
-      END $$;
+      ${WORKING_PROFILE_ADMIN_GUARD_SQL}
     `,{transaction});
   });
 }

@@ -26,6 +26,10 @@ const originalCwd = process.cwd();
   const migrated = spawnSync(process.execPath, ['dist/database/migrate.js', 'up'], { cwd: base, env, encoding: 'utf8' });
   // Test DB contains no personal data; suppress credentials and SQL in console.
   fs.writeFileSync(path.join(__dirname, 'postgres-migrations-test.log'), (migrated.stdout || '') + (migrated.stderr || ''));
+  if (migrated.status !== 0) {
+    const detail = (migrated.stderr || '').split(/\r?\n/).find(line => line.startsWith('MigrationError:'));
+    if (detail) console.error(detail);
+  }
   assert.equal(migrated.status, 0, 'Disposable database migrations failed; inspect postgres-migrations-test.log');
   Object.assign(process.env, env);
   require(path.join(base, 'node_modules/reflect-metadata'));
@@ -39,6 +43,19 @@ const originalCwd = process.cwd();
   const { UploadStorageService } = require(path.join(base, 'dist/students/upload-storage.service'));
   const bcrypt = require(path.join(base, 'node_modules/bcrypt'));
   app = await NestFactory.createApplicationContext(AppModule, { logger: false });
+  const { WORKING_PROFILE_ADMIN_GUARD_SQL } = require(path.join(base, 'dist/database/migrations/094-working-profiles-permission-tree'));
+  const checkAdmin = () => Staff.sequelize.query(WORKING_PROFILE_ADMIN_GUARD_SQL);
+  await checkAdmin(); // A fresh installation has no staff before seeding.
+  const migrationActor = await Staff.create({ name: 'Migration guard test', email: 'migration-guard@example.invalid', role: 'supervisor', status: 'active' });
+  try {
+    await assert.rejects(checkAdmin, /ít nhất một hồ sơ quản trị đầy đủ/);
+    await migrationActor.update({ role: 'admin' });
+    await checkAdmin();
+    await migrationActor.update({ status: 'disabled' });
+    await assert.rejects(checkAdmin, /ít nhất một hồ sơ quản trị đầy đủ/);
+  } finally {
+    await migrationActor.destroy();
+  }
   const auth = app.get(AuthService);
   const hash = await bcrypt.hash('Synthetic-old-password', 4);
   const token = crypto.randomBytes(32).toString('hex');
@@ -67,7 +84,7 @@ const originalCwd = process.cwd();
     const previous = oldFile; oldFile = filename; return { oldFile: previous, value: undefined };
   });
   assert.deepEqual(await fsp.readdir(path.join(folder, 'public/submissions/submitted')), [oldFile]);
-  console.log('PASS: fresh database migrations, atomic single-use reset, real session versions, withdrawn approval, Staff rotation, upload transaction/cleanup.');
+  console.log('PASS: fresh database migrations, existing-staff administrator guard, atomic single-use reset, real session versions, withdrawn approval, Staff rotation, upload transaction/cleanup.');
 })().catch(error => { console.error(error.message); process.exitCode = 1; }).finally(async () => {
   process.chdir(originalCwd);
   if (app) await app.close();
