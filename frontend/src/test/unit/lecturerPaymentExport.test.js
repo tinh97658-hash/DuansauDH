@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import { createReportExcel, normalizeReport } from '../../utils/reportExport';
 
 it('preserves NT lecturer payment values in the VT Excel form engine', async () => {
-  const report = normalizeReport({ title: 'Thống kê thanh toán giảng viên', sections: [{
+  const report = normalizeReport({ title: 'Báo cáo tài chính', sections: [{
     headers: ['STT', 'Giảng viên', 'Lớp học phần', 'Số buổi', 'Ngày hoàn thành', 'Đã thanh toán'],
     rows: [[1, 'Nguyễn An', 'Lớp CNTT — Quản trị dữ liệu', 3, '03/11/2026', 'Đã thanh toán'],
       [2, 'Trần Bình', 'Lớp QTKD', 0, '02/11/2026', 'Chưa thanh toán']],

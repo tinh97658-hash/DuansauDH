@@ -9,16 +9,23 @@ describeDb('Payment batch atomicity, conflicts and RLS on disposable PostgreSQL'
   const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
   const actor = id(99);
   const config = { get: () => 'batch-test-only-secret-never-production' };
+  const save = async (paid: boolean) => {
+    const current = (await service.list()).rows.find(row => row.lecturerId === id(1));
+    return service.update(id(30), id(1), { paid, paymentVersion: current?.paymentVersion ?? null,
+      paymentDate: paid ? '2026-11-01' : null }, actor);
+  };
   beforeAll(async () => {
     if (!/\/pgsms_lecturer_payment_test_\d+$/.test(process.env.DATABASE_URL || '')) throw Error('Disposable test database required.');
     db = new Sequelize(process.env.DATABASE_URL!, { logging: false, dialectOptions: { options: `-c search_path=${schema},public` }, pool: { max: 4 } });
     await db.query(`CREATE SCHEMA ${schema};
       CREATE TABLE ${schema}.subjects(id uuid PRIMARY KEY,name text);
       CREATE TABLE ${schema}.units(id uuid PRIMARY KEY,name text);
+      CREATE TABLE ${schema}.class_groups(id uuid PRIMARY KEY,code text,name text);
+      CREATE TABLE ${schema}.course_offering_class_groups(course_offering_id uuid,class_group_id uuid);
       CREATE TABLE ${schema}.lecturers(id uuid PRIMARY KEY,name text,unit_id uuid);
       CREATE TABLE ${schema}.course_offerings(id uuid PRIMARY KEY,subject_id uuid,name text,status text,completed_at timestamptz);
       CREATE TABLE ${schema}.teaching_sessions(id uuid PRIMARY KEY,course_offering_id uuid,lecturer_id uuid,status text,confirmed_at timestamptz,created_at timestamptz,session_date date,end_time time);
-      CREATE TABLE ${schema}.lecturer_payments(course_offering_id uuid,lecturer_id uuid,paid boolean NOT NULL,updated_by_staff_id uuid,created_at timestamptz,updated_at timestamptz NOT NULL,PRIMARY KEY(course_offering_id,lecturer_id));
+      CREATE TABLE ${schema}.lecturer_payments(course_offering_id uuid,lecturer_id uuid,paid boolean NOT NULL,payment_date date,note text DEFAULT '',updated_by_staff_id uuid,created_at timestamptz,updated_at timestamptz NOT NULL,PRIMARY KEY(course_offering_id,lecturer_id));
       GRANT USAGE ON SCHEMA ${schema} TO pgsms_group_scoped;
       GRANT SELECT ON ALL TABLES IN SCHEMA ${schema} TO pgsms_group_scoped;
       GRANT INSERT,UPDATE ON ${schema}.lecturer_payments TO pgsms_group_scoped;
@@ -44,9 +51,9 @@ describeDb('Payment batch atomicity, conflicts and RLS on disposable PostgreSQL'
   afterAll(async () => { await db?.close(); }); // The runner drops this entire disposable database.
 
   it('freezes all filtered targets and leaves paid/out-of-filter pairs untouched', async () => {
-    await service.update(id(30), id(1), true, actor);
+    await save(true);
     const before = (await service.list()).rows.find(row => row.lecturerId === id(1))!;
-    const preview = await service.previewBatch({ unitId: id(20), paymentStatus: 'all', search: 'Completed', from: '2026-11-03', to: '2026-11-03' }, true, actor);
+    const preview = await service.previewBatch({ unitId: id(20), paymentStatus: 'all', search: 'Completed', from: '2026-11-03', to: '2026-11-03' }, true, actor, '2026-11-01');
     expect(preview).toMatchObject({ count: 1, total: 2, unchanged: 1 });
     const result = await service.applyBatch(preview.token, actor);
     expect(result.updated).toBe(1);
@@ -60,31 +67,43 @@ describeDb('Payment batch atomicity, conflicts and RLS on disposable PostgreSQL'
   });
 
   it('does not silently add newly eligible pairs after confirmation preview', async () => {
-    const preview = await service.previewBatch({ unitId: id(20) }, true, actor);
+    const preview = await service.previewBatch({ unitId: id(20) }, true, actor, '2026-11-01');
     await db.query(`UPDATE lecturers SET unit_id='${id(20)}' WHERE id='${id(3)}'`);
     expect((await service.applyBatch(preview.token, actor)).updated).toBe(2);
     expect((await service.list()).rows.find(row => row.lecturerId === id(3))!.paid).toBe(false);
   });
 
   it('rejects stale state, including ABA changes, and leaves other targets unchanged', async () => {
-    await service.update(id(30), id(1), false, actor);
-    const preview = await service.previewBatch({ unitId: id(20) }, true, actor);
-    await service.update(id(30), id(1), true, actor);
-    await service.update(id(30), id(1), false, actor);
+    await save(false);
+    const preview = await service.previewBatch({ unitId: id(20) }, true, actor, '2026-11-01');
+    await save(true);
+    await save(false);
     await expect(service.applyBatch(preview.token, actor)).rejects.toMatchObject({ status: 409 });
     expect((await service.list()).rows.every(row => !row.paid)).toBe(true);
   });
 
   it('serializes concurrent application of one preview: one commits and one reports conflict', async () => {
-    const preview = await service.previewBatch({ unitId: id(20) }, true, actor);
+    const preview = await service.previewBatch({ unitId: id(20) }, true, actor, '2026-11-01');
     const outcomes = await Promise.allSettled([service.applyBatch(preview.token, actor), service.applyBatch(preview.token, actor)]);
     expect(outcomes.filter(result => result.status === 'fulfilled')).toHaveLength(1);
     expect(outcomes.filter(result => result.status === 'rejected')).toHaveLength(1);
     expect((await service.list({ paymentStatus: 'paid' })).rows).toHaveLength(2);
   });
 
+  it('serializes single-row date/note edits and rejects the stale writer', async () => {
+    const original = await save(true);
+    const input = { paid: true, paymentDate: '2026-10-28', paymentVersion: original.paymentVersion };
+    const outcomes = await Promise.allSettled([
+      service.update(id(30), id(1), { ...input, note: 'First' }, actor),
+      service.update(id(30), id(1), { ...input, note: 'Second' }, actor),
+    ]);
+    expect(outcomes.filter(r => r.status === 'fulfilled')).toHaveLength(1);
+    expect(outcomes.filter(r => r.status === 'rejected')).toHaveLength(1);
+    expect((await service.list()).rows.find(r => r.lecturerId === id(1))).toMatchObject({ paid: true, paymentDate: '2026-10-28' });
+  });
+
   it('rejects changed eligibility, other actors, expired and tampered snapshots', async () => {
-    const preview = await service.previewBatch({ unitId: id(20) }, true, actor);
+    const preview = await service.previewBatch({ unitId: id(20) }, true, actor, '2026-11-01');
     await expect(service.applyBatch(preview.token, id(98))).rejects.toMatchObject({ status: 409 });
     await expect(service.applyBatch(preview.token + 'x', actor)).rejects.toMatchObject({ status: 400 });
     const clock = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 11 * 60 * 1000);
@@ -105,9 +124,10 @@ describeDb('Payment batch atomicity, conflicts and RLS on disposable PostgreSQL'
         return work(transaction);
       }),
     } as any, config as any);
-    const preview = await scoped.previewBatch({ unitId: id(20) }, true, actor);
+    const preview = await scoped.previewBatch({ unitId: id(20) }, true, actor, '2026-11-01');
     expect(preview.count).toBe(2);
     await expect(scoped.applyBatch(preview.token, actor)).rejects.toThrow();
+    await expect(scoped.update(id(30), id(2), { paid: true, paymentDate: '2026-11-01', note: 'Denied', paymentVersion: null }, actor)).rejects.toThrow();
     expect((await db.query('SELECT * FROM lecturer_payments', { type: QueryTypes.SELECT }))).toHaveLength(0);
   });
 });

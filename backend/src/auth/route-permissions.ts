@@ -52,7 +52,7 @@ export const PERMISSION_ROUTES:PermissionRoute[] = [
   {"path":"/doctoral/closed-review","name":"Phản biện kín 2 người","section":"ĐÀO TẠO TIẾN SĨ","group":"TIỂU LUẬN, HỘI THẢO VÀ BẢO VỆ","read":["doctoral.view"],"actions":[]},
   {"path":"/doctoral/university-defense","name":"Bảo vệ cấp trường","section":"ĐÀO TẠO TIẾN SĨ","group":"TIỂU LUẬN, HỘI THẢO VÀ BẢO VỆ","read":["doctoral.view"],"actions":[]},
   {"path":"/doctoral/graduation-docs","name":"Hồ sơ tốt nghiệp","section":"ĐÀO TẠO TIẾN SĨ","group":"TIỂU LUẬN, HỘI THẢO VÀ BẢO VỆ","read":["doctoral.view"],"actions":[]},
-  {"path":"/reports/lecturer-payments","name":"Thanh toán giảng viên","section":"BÁO CÁO","group":"BÁO CÁO CHUNG","read":["reports.view"],"actions":["reports.payments.manage","reports.export"]},
+  {"path":"/reports/lecturer-payments","name":"Báo cáo tài chính","section":"BÁO CÁO","group":"BÁO CÁO CHUNG","read":["reports.view"],"actions":["reports.payments.manage","reports.export"]},
   {"path":"/reports/class-lists","name":"Danh sách lớp","section":"BÁO CÁO","group":"BÁO CÁO CHUNG","read":["reports.view"],"actions":["reports.export"]},
   {"path":"/reports/course-scores","name":"Bảng điểm môn học","section":"BÁO CÁO","group":"BÁO CÁO CHUNG","read":["reports.view"],"actions":["reports.export"]},
   {"path":"/reports/ministerial-report","name":"Báo cáo gửi Bộ","section":"BÁO CÁO","group":"BÁO CÁO CHUNG","read":["reports.view"],"actions":["reports.export"]},

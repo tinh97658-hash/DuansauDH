@@ -5,7 +5,7 @@
 .lp-date-filter input:focus { border-color:#0b7fa3; outline:none; box-shadow:none; }
 .lp-link:focus-visible { outline:2px solid #0b7fa3; outline-offset:2px; }
 /* Filtered row removal is anchored explicitly; avoid a second native scroll adjustment. */
-.lp-page .lp-table { width:100%; min-width:1000px; table-layout:fixed; overflow-anchor:none; }
+.lp-page .lp-table { width:100%; min-width:1280px; table-layout:fixed; overflow-anchor:none; }
 .lp-table th,.lp-table td { text-align:center; padding:9px 12px; white-space:normal; }
 .lp-table th:nth-child(1),.lp-table td:nth-child(1) { padding-left:6px; padding-right:6px; }
 .lp-table th:nth-child(2),.lp-table th:nth-child(3),.lp-table td:nth-child(2),.lp-table td:nth-child(3) { text-align:left; }
@@ -17,3 +17,19 @@
 .lp-page .tp-table-wrap { flex:none; width:100%; min-width:0; min-height:0; }
 .lp-page .tp-table-scroll { height:auto; }
 .lp-table tr[aria-busy=true] input { cursor:wait; }
+.lp-table th:nth-child(4),.lp-table td:nth-child(4),.lp-table th:nth-child(9),.lp-table td:nth-child(9) { text-align:left; }
+.lp-payment-date { width:100%; min-width:0; }
+.lp-payment-date .MuiInputBase-root { background:#fff; font-size:13px; border-radius:4px; }
+.lp-payment-date .MuiInputBase-input { padding:9px 6px; min-width:0; }
+.lp-payment-date .MuiInputAdornment-root { margin-left:0; }
+.lp-payment-date .Mui-disabled { background:#f1f4f7; }
+.lp-payment-date .Mui-disabled .MuiOutlinedInput-notchedOutline { border-color:#d2d9e0; }
+.lp-payment-date .Mui-disabled svg { color:#98a3ad; }
+.lp-payment-date .Mui-focused .MuiOutlinedInput-notchedOutline { border-color:#0b7fa3; }
+.lp-missing-date { display:block; color:#925c07; font-size:12px; margin-top:4px; }
+.lp-note { width:100%; min-width:0; padding:9px 7px; border:1px solid #b9cbd8; border-radius:4px; font:inherit; background:#fff; color:inherit; text-overflow:ellipsis; }
+.lp-note:disabled { background:#f1f4f7; }
+.lp-note:focus { outline:2px solid #0b7fa3; outline-offset:1px; }
+.lp-saving { display:block; color:#667b89; margin-top:4px; font-size:12px; }
+.lp-row-error { color:#b42318; font-size:12px; margin-top:5px; }
+.lp-group-names { line-height:1.5; overflow-wrap:anywhere; }

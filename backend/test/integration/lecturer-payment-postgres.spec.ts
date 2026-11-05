@@ -25,9 +25,11 @@ describeDb('Lecturer payments PostgreSQL', () => {
       CREATE TEMP TABLE subjects(id uuid PRIMARY KEY,name text);
       CREATE TEMP TABLE lecturers(id uuid PRIMARY KEY,name text,unit_id uuid);
       CREATE TEMP TABLE units(id uuid PRIMARY KEY,name text);
+      CREATE TEMP TABLE class_groups(id uuid PRIMARY KEY,code text,name text);
+      CREATE TEMP TABLE course_offering_class_groups(course_offering_id uuid,class_group_id uuid);
       CREATE TEMP TABLE teaching_sessions(id uuid PRIMARY KEY,course_offering_id uuid,lecturer_id uuid,status text,
         confirmed_at timestamptz,created_at timestamptz,session_date date,end_time time);
-      CREATE TEMP TABLE lecturer_payments(course_offering_id uuid,lecturer_id uuid,paid boolean DEFAULT false,
+      CREATE TEMP TABLE lecturer_payments(course_offering_id uuid,lecturer_id uuid,paid boolean DEFAULT false,payment_date date,note text DEFAULT '',
         updated_by_staff_id uuid,created_at timestamptz,updated_at timestamptz,PRIMARY KEY(course_offering_id,lecturer_id));`);
     await query(`INSERT INTO subjects VALUES (:subject,'Subject');
       INSERT INTO units VALUES (:unit,'Unit'),(:emptyUnit,'Empty unit'),(:uncompletedUnit,'Unit');
@@ -90,15 +92,68 @@ describeDb('Lecturer payments PostgreSQL', () => {
     expect((await service.list({ unitId: id(2), lecturerId: id(3), from: '2026-11-03', to: '2026-11-03', search: 'completed', paymentStatus: 'unpaid' })).rows).toHaveLength(1);
   });
   it('persists changes only for the selected pair; paid and unpaid filters follow saved state', async () => {
-    await service.update(id(5), id(3), true, id(99));
+    await service.update(id(5), id(3), { paid: true, paymentVersion: null, paymentDate: '2026-11-01' }, id(99));
     expect((await service.list({ paymentStatus: 'paid' })).rows).toEqual([expect.objectContaining({ courseOfferingId: id(5), lecturerId: id(3), paid: true })]);
     expect((await service.list({ paymentStatus: 'unpaid' })).rows).toHaveLength(2);
-    await service.update(id(5), id(3), false, id(99));
+    const saved = (await service.list({ paymentStatus: 'paid' })).rows[0];
+    await service.update(id(5), id(3), { paid: false, paymentVersion: saved.paymentVersion }, id(99));
     expect((await service.list({ paymentStatus: 'paid' })).rows).toHaveLength(0);
     expect((await service.list()).rows.every(r => !r.paid)).toBe(true);
   });
   it('rejects an active offering or a lecturer without held sessions in the selected class', async () => {
-    await expect(service.update(id(7), id(3), true, id(99))).rejects.toThrow();
-    await expect(service.update(id(6), id(4), true, id(99))).rejects.toThrow();
+    await expect(service.update(id(7), id(3), { paid: true, paymentVersion: null, paymentDate: '2026-11-01' }, id(99))).rejects.toThrow();
+    await expect(service.update(id(6), id(4), { paid: true, paymentVersion: null, paymentDate: '2026-11-01' }, id(99))).rejects.toThrow();
+  });
+
+  it('returns actual custom offering names and linked groups without multiplying sessions; searches both group fields', async () => {
+    await db.query(`UPDATE course_offerings SET name='Lớp tự đặt - không tách - tên' WHERE id=:offering;
+      INSERT INTO class_groups VALUES (:g1,'CNTT-26','Công nghệ thông tin'),(:g2,'QTKD-26','Quản trị kinh doanh');
+      INSERT INTO course_offering_class_groups VALUES (:offering,:g1),(:offering,:g2)`, {
+      transaction: tx, replacements: { offering: id(5), g1: id(81), g2: id(82) },
+    });
+    for (const search of ['CNTT-26', 'Quản trị kinh doanh']) {
+      const { rows } = await service.list({ search });
+      expect(rows).toHaveLength(2);
+      expect(rows[0].offeringName).toBe('Lớp tự đặt - không tách - tên');
+      expect(rows[0].participatingGroups).toHaveLength(2);
+      expect(rows.find(row => row.lecturerId === id(3)).sessionCount).toBe(2);
+    }
+  });
+
+  it('saves notes independently, backdated payments and changed dates, then clears only the effective date', async () => {
+    const row = () => service.list().then(({ rows }) => rows.find(r => r.courseOfferingId === id(5) && r.lecturerId === id(3)));
+    let current = await row();
+    const noteOnly = await service.update(id(5), id(3), { paid: false, note: 'Chờ chứng từ', paymentVersion: current.paymentVersion }, id(99));
+    expect(noteOnly).toMatchObject({ paid: false, paymentDate: null, note: 'Chờ chứng từ', updatedByStaffId: id(99) });
+    const paid = await service.update(id(5), id(3), { paid: true, paymentDate: '2026-10-29', paymentVersion: noteOnly.paymentVersion }, id(99));
+    expect(paid).toMatchObject({ paymentDate: '2026-10-29', note: 'Chờ chứng từ' });
+    const corrected = await service.update(id(5), id(3), { paid: true, paymentDate: '2026-10-28', paymentVersion: paid.paymentVersion }, id(99));
+    expect((await row()).paymentDate).toBe('2026-10-28');
+    const cleared = await service.update(id(5), id(3), { paid: false, paymentVersion: corrected.paymentVersion }, id(99));
+    expect(cleared).toMatchObject({ paid: false, paymentDate: null, note: 'Chờ chứng từ' });
+    expect((await service.list()).rows.filter(r => r.lecturerId === id(4) || r.courseOfferingId === id(6)).every(r => !r.paid && !r.note)).toBe(true);
+  });
+
+  it('keeps historical paid rows without invented dates and allows note edits or filling in the actual date', async () => {
+    await db.query(`INSERT INTO lecturer_payments(course_offering_id,lecturer_id,paid,created_at,updated_at)
+      VALUES(:offering,:lecturer,true,now(),now())`, { transaction: tx, replacements: { offering: id(5), lecturer: id(4) } });
+    const legacy = (await service.list({ lecturerId: id(4) })).rows[0];
+    expect(legacy).toMatchObject({ paid: true, paymentDate: null });
+    const note = await service.update(id(5), id(4), { paid: true, note: 'Cần đối chiếu', paymentVersion: legacy.paymentVersion }, id(99));
+    expect(note.paymentDate).toBeNull();
+    const fixed = await service.update(id(5), id(4), { paid: true, paymentDate: '2026-10-20', paymentVersion: note.paymentVersion }, id(99));
+    expect(fixed).toMatchObject({ paid: true, paymentDate: '2026-10-20', note: 'Cần đối chiếu' });
+    expect((await service.list({ from: '2026-11-03', to: '2026-11-03' })).rows).toHaveLength(2);
+  });
+
+  it('rejects stale versions, missing or impossible payment dates and oversized notes without changing saved data', async () => {
+    const current = (await service.list({ lecturerId: id(4) })).rows[0];
+    for (const input of [
+      { paid: true, paymentDate: '2026-02-30', paymentVersion: current.paymentVersion },
+      { paid: true, paymentDate: null, paymentVersion: current.paymentVersion },
+      { paid: true, note: 'x'.repeat(2001), paymentVersion: current.paymentVersion },
+      { paid: false, paymentVersion: null },
+    ]) await expect(service.update(id(5), id(4), input, id(99))).rejects.toThrow();
+    expect((await service.list({ lecturerId: id(4) })).rows[0]).toMatchObject({ paid: true, paymentDate: '2026-10-20', note: 'Cần đối chiếu' });
   });
 });

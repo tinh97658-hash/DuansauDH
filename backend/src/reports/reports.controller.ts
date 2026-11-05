@@ -32,7 +32,7 @@ export class ReportsController {
 
   @Post("lecturer-payments/batch-preview") @RequirePermissions("reports.view", "reports.payments.manage")
   previewPaymentBatch(@Body() dto: PreviewLecturerPaymentBatchDto, @CurrentUser() actor: any) {
-    return this.payments.previewBatch(dto.filters, dto.paid, actor.id);
+    return this.payments.previewBatch(dto.filters, dto.paid, actor.id, dto.paymentDate);
   }
 
   @Put("lecturer-payments/batch") @RequirePermissions("reports.view", "reports.payments.manage")
@@ -43,7 +43,7 @@ export class ReportsController {
   @Put("lecturer-payments/:offeringId/:lecturerId") @RequirePermissions("reports.view", "reports.payments.manage")
   updatePayment(@Param("offeringId", ParseUUIDPipe) offeringId: string,
     @Param("lecturerId", ParseUUIDPipe) lecturerId: string, @Body() dto: UpdateLecturerPaymentDto,
-    @CurrentUser() actor: any) { return this.payments.update(offeringId, lecturerId, dto.paid, actor.id); }
+    @CurrentUser() actor: any) { return this.payments.update(offeringId, lecturerId, dto, actor.id); }
 
   // Use the existing detail loaders under report permissions and existing group data scope.
   @Get("lecturer-payments/offerings/:id")
