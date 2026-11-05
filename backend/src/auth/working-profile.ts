@@ -16,7 +16,7 @@ export class WorkingProfileMiddleware implements NestMiddleware {
       request.workingProfiles=profiles;
       request.activeProfile=active;
       request.profileSelectionRequired=!active;
-      workingProfileStorage.run({staffId:request.user.id,roleId:active?.id||null,selectionRequired:!active,requestPath:request.originalUrl||request.url},()=>next());
+      workingProfileStorage.run({staffId:request.user.id,roleId:active?.id||null,selectionRequired:!active,requestPath:request.originalUrl||request.url,requestMethod:request.method},()=>next());
     }catch(error){next(error);}
   }
 }

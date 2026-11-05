@@ -5,6 +5,7 @@ export interface WorkingProfileContext {
   roleId: string | null;
   selectionRequired: boolean;
   requestPath?: string;
+  requestMethod?: string;
 }
 
 // Server-owned request context; never read a profile from a query/header/body.

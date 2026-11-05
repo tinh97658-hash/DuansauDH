@@ -51,6 +51,15 @@ function fixture() {
 }
 
 describe("operational dashboard permissions", () => {
+  it('shares grade tracking between entry and approval queues only within one request', async () => {
+    const f = fixture();
+    await f.service.operational(user(), '2026');
+    expect(f.gradebooks.tracking).toHaveBeenCalledTimes(1);
+    expect(f.gradebooks.tracking).toHaveBeenLastCalledWith(expect.any(Array), true);
+    await f.service.operational(user(), '2026', 'approvals');
+    expect(f.gradebooks.tracking).toHaveBeenCalledTimes(2);
+    expect(f.gradebooks.tracking).toHaveBeenLastCalledWith(expect.any(Array), false);
+  });
   it("uses effective permissions without a hidden scheduling assignment requirement", () => {
     expect(operationalPermissions(user(), new Set(DEFAULT_ROLE_PERMISSIONS[user().role]))).toEqual({ grouping: true, grades: true, approvals: true, studyLeaveApproval: true, majorTransferApproval: true, scheduling: true, progress: true, overview: true });
     expect(operationalPermissions(user("admin", false), new Set(DEFAULT_ROLE_PERMISSIONS[user("admin", false).role]))).toMatchObject({ scheduling: true, progress: true, grouping: true });

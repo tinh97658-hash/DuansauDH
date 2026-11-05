@@ -1,3 +1,4 @@
+import { isIsolatedScopeDatabase } from '../helpers/isolated-database.js';
 import { randomUUID } from 'node:crypto';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
@@ -13,7 +14,7 @@ describeDb('Working profiles through sessions, HTTP guards and PostgreSQL',()=>{
   let app:any,db:any,agent:any,origin:string,permissionIds:string[];
   const staffId=randomUUID(),viewer=randomUUID(),manager=randomUUID();
   beforeAll(async()=>{
-    if(!process.env.DATABASE_URL?.endsWith('/pgsms_group_scope_test'))throw new Error('Use the isolated test database.');
+    if(!isIsolatedScopeDatabase(process.env.DATABASE_URL))throw new Error('Use the isolated test database.');
     app=await NestFactory.create(AppModule,{logger:false});db=app.get(getConnectionToken());
     origin=String(app.get(ConfigService).get('FRONTEND_URL')).replace(/\/$/,'');
     app.use((req:any,_res:any,next:any)=>{req.user=Staff.build({id:staffId,name:'Profile test',email:staffId+'@example.invalid',role:'profile-test',status:'active',mustChangePassword:false});req.isAuthenticated=()=>true;next();});

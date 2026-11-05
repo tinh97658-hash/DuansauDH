@@ -14,6 +14,39 @@ function fixture(){
   ])};
   const roles={findOne:jest.fn()};return {staffRoles,roles,rbac:new RbacService(roles as any,staffRoles as any)};
 }
+it('shares fresh permission lookups within one HTTP read without caching across requests or profiles', async () => {
+  const {rbac,staffRoles}=fixture();
+  const context={staffId:'staff',roleId:'writer',selectionRequired:false,requestMethod:'GET'};
+  await workingProfileStorage.run(context, async()=>{
+    await Promise.all([rbac.effectiveAccess(staff,true),rbac.effectiveAccess(staff,true)]);
+    expect(staffRoles.findAll).toHaveBeenCalledTimes(1);
+    context.roleId='viewer';
+    expect((await rbac.effectiveAccess(staff,true)).groupScope?.readOnly).toBe(true);
+    expect(staffRoles.findAll).toHaveBeenCalledTimes(2);
+    rbac.invalidate('staff');await rbac.effectiveAccess(staff,true);
+    expect(staffRoles.findAll).toHaveBeenCalledTimes(3);
+  });
+  await workingProfileStorage.run({...context},()=>rbac.effectiveAccess(staff,true));
+  expect(staffRoles.findAll).toHaveBeenCalledTimes(4);
+});
+it('loads profile choices without their permission graph while keeping the access lookup complete', async()=>{
+  const {rbac,staffRoles}=fixture();
+  const profiles=await rbac.profiles(staff);
+  expect(profiles.map(profile=>profile.id)).toEqual(['viewer','writer']);
+  expect(profiles[0].readOnly).toBe(true);
+  expect(staffRoles.findAll).toHaveBeenLastCalledWith(expect.objectContaining({include:[expect.objectContaining({include:[]})]}));
+  await workingProfileStorage.run({staffId:'staff',roleId:'writer',selectionRequired:false},()=>rbac.effectiveAccess(staff,true));
+  expect(staffRoles.findAll.mock.calls.at(-1)![0].include[0].include.map((item:any)=>item.as)).toEqual(['permissions','permissionScopes']);
+});
+it('refreshes permissions on every write lookup even inside the same request', async()=>{
+  const {rbac,staffRoles}=fixture();
+  await workingProfileStorage.run({staffId:'staff',roleId:'writer',selectionRequired:false,requestMethod:'POST'},async()=>{
+    expect((await rbac.effectiveAccess(staff,true)).permissions.has('gradebook.submit')).toBe(true);
+    staffRoles.findAll.mockResolvedValue([]);
+    expect((await rbac.effectiveAccess(staff,true)).permissions.size).toBe(0);
+    expect(staffRoles.findAll).toHaveBeenCalledTimes(2);
+  });
+});
 it('uses only the selected profile and never unions writer permissions or readonly flags from another profile',async()=>{
   const {rbac}=fixture();
   const read=await workingProfileStorage.run({staffId:'staff',roleId:'viewer',selectionRequired:false},()=>rbac.effectiveAccess(staff));

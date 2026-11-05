@@ -50,14 +50,15 @@ it('shares authoritative component stages between tracking and options without w
   groups.findAll.mockResolvedValue([]);
   offerings.findAll.mockResolvedValue([offering]);
   sequelize.query.mockResolvedValue([{ id: 'o1', mode: 'new', eligibility_status: 'draft', heldIds: [], books: [] }]);
-  const get = jest.spyOn(service, 'get').mockResolvedValue({ totalRows: 5, unassessedRows: 1 } as never);
+  const summaries = jest.spyOn(service as any, 'componentReadiness').mockResolvedValue(new Map([['o1', { totalRows: 5, unassessedRows: 1 }]]));
+  const get = jest.spyOn(service, 'get');
   expect((await service.tracking([offering], true)).get('o1').gradebookStage).toBe('components_missing');
   expect((await service.options()).courseOfferings[0].gradebookStage).toBe('components_missing');
-  get.mockResolvedValue({ totalRows: 5, unassessedRows: 0 } as never);
+  summaries.mockResolvedValue(new Map([['o1', { totalRows: 5, unassessedRows: 0 }]]));
   expect((await service.options()).courseOfferings[0].gradebookStage).toBe('awaiting_exam');
-  get.mockResolvedValue({ totalRows: 0, unassessedRows: 0 } as never);
+  summaries.mockResolvedValue(new Map([['o1', { totalRows: 0, unassessedRows: 0 }]]));
   expect((await service.options()).courseOfferings[0].gradebookStage).toBe('review');
-  expect(get).toHaveBeenCalledWith(expect.objectContaining({ rosterScope: 'offering' }));
+  expect(get).not.toHaveBeenCalled();
 });
 
 it('tracks submitted approval stages and their submission times for dashboard requests', async () => {
@@ -67,6 +68,24 @@ it('tracks submitted approval stages and their submission times for dashboard re
   const tracking = await service.tracking([{ id: 'o1', status: 'completed' }]);
   expect(tracking.get('o1')).toMatchObject({ eligibilityStatus: 'submitted', resultStatus: 'not_available', eligibilitySubmittedAt: '2026-10-29T01:00:00Z' });
   expect(sequelize.query).toHaveBeenCalledWith(expect.stringContaining("w.eligibility_submission->>'at'"), expect.any(Object));
+});
+
+it('bounds component-summary database calls when many completed offerings need assessment', async () => {
+  const { service, links, sequelize, policies } = build();
+  const offerings = Array.from({ length: 50 }, (_, index) => ({ id: `o${index}`, subjectId: 's1',
+    subject: { id: 's1', program: 'masters' }, groupLinks: [{ classGroupId: 'g1' }] }));
+  links.findAll.mockResolvedValue(offerings.map(offering => ({ courseOfferingId: offering.id,
+    classGroup: { id: 'g1', academicYear: '2026' } })));
+  (policies as any).latestMany = jest.fn().mockResolvedValue(new Map([['s1:2026', LEGACY_GRADING_POLICY]]));
+  sequelize.query.mockResolvedValue(offerings.map(offering => ({ id: offering.id, totalRows: 10, unassessedRows: 1 })));
+  const get = jest.spyOn(service, 'get');
+  const result = await (service as any).componentReadiness(offerings);
+  expect(result.size).toBe(50);
+  expect(result.get('o49')).toMatchObject({ totalRows: 10, unassessedRows: 1 });
+  expect(links.findAll).toHaveBeenCalledTimes(1);
+  expect((policies as any).latestMany).toHaveBeenCalledTimes(1);
+  expect(sequelize.query).toHaveBeenCalledTimes(1);
+  expect(get).not.toHaveBeenCalled();
 });
 
 it.each(["group", "offering"] as const)("blocks grade writes before teaching completion for %s scope while keeping grades readable", async rosterScope => {

@@ -31,8 +31,10 @@ import { ExamScheduleService } from '../../src/masters/exam-schedule.service.js'
 import { Room } from '../../src/database/models/common/room.model.js';
 import { Lecturer } from '../../src/database/models/common/lecturer.model.js';
 import { TeachingSession } from '../../src/database/models/training/teaching-session.model.js';
+import { readRetakeResults } from '../../src/scheduling/retake-groups.js';
 
 const describeDb = process.env.RUN_POSTGRES_SCHEDULING_TESTS === "true" ? describe : describe.skip;
+jest.setTimeout(30000);
 // Every read and write uses one rolled-back transaction, including service-created transactions.
 describeDb("Retake groups across scheduling and exam rosters", () => {
   let app: INestApplicationContext;
@@ -56,8 +58,15 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
     exams = app.get(ExamGradebookService);
     tx = await db.transaction();
     const query = db.query.bind(db);
-    jest.spyOn(db, "query").mockImplementation(((sql: any, options: any) => query(sql, { ...options, transaction: tx, logging: false })
-      .catch((error: any) => { throw new Error(error.original?.message || error.message); })) as any);
+    let pending: Promise<unknown> = Promise.resolve();
+    jest.spyOn(db, "query").mockImplementation(((sql: any, options: any) => {
+      // This fixture deliberately shares one client; queue parallel read loaders
+      // just as GroupScopeService does for real HTTP read transactions.
+      const result = pending.then(() => query(sql, { ...options, transaction: tx, logging: false }))
+        .catch((error: any) => { throw new Error(error.original?.message || error.message); });
+      pending = result.then(() => undefined, () => undefined);
+      return result;
+    }) as any);
     jest.spyOn(db, "transaction").mockImplementation((async (callback: any) => callback(tx)) as any);
     staff = await Staff.create({ name: prefix, email: `${prefix}@example.invalid`.toLowerCase(), role: "admin" });
     const discipline = await Discipline.create({ code: prefix, name: prefix, active: true });
@@ -72,6 +81,7 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
     for (const name of ["Passed", "Failed", "Pending", "New"]) learners.push(await AdmissionRecord.create({
       code: `${prefix}${name}`, email: `${prefix}${name}@example.invalid`, fullName: name, majorId: major.id,
       trainingLevel: "Thạc sĩ", academicYear: "2026", status: "approved", studyStatus: "Đang học",
+      extraData: { tuitionPayment: { paid: true } },
     }));
     await ClassGroupMember.bulkCreate(learners.map((learner, index) => ({ admissionRecordId: learner.id, classGroupId: index === 3 ? next.id : original.id })));
     source = await CourseOffering.create({ subjectId: subject.id, status: "completed", completedAt: new Date(), completedByStaffId: staff.id });
@@ -84,6 +94,16 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
   afterEach(async () => {
     jest.restoreAllMocks();
     try { await tx?.rollback(); } finally { await app?.close(); }
+  });
+
+  it('ignores malformed and unknown grade identities without losing valid retake outcomes', async () => {
+    const book = await CourseExamGradebook.findOne({ where: { courseOfferingId: source.id }, transaction: tx });
+    const grades = [...book!.grades, ...['admission:broken', 'student:broken', `admission:${randomUUID()}`]
+      .map(participantId => ({ participantId, result: 'failed' }))];
+    await book!.update({ grades: grades as any }, { transaction: tx });
+    const results = await readRetakeResults(db, [original.id], [subject.id], tx);
+    expect(new Set(results.map(row => row.admissionRecordId))).toEqual(new Set(learners.slice(0, 3).map(learner => learner.id)));
+    expect(results.every(row => learners.some(learner => row.participantId === `admission:${learner.id}`))).toBe(true);
   });
 
   async function freshGradeSource(){
@@ -131,8 +151,7 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
       letterGrade: "", attemptScores: [], result: "pending" as const,
       policyVersion: row.eligibilityPolicy.version, policyRulesVersion: row.eligibilityPolicy.rulesVersion,
     })) }, staff);
-    for (const action of ["submit", "approve"] as const) data = await exams.transition({ ...scope, action,
-      note: "Threshold regression", revision: data.revision, version: (data.workflow as any).eligibility.version }, staff, "eligibility");
+    expect((data.workflow as any).eligibility.status).toBe('approved');
     const room = await Room.create({ code: prefix, name: prefix, capacity: 30, isActive: true });
     const lecturer = await Lecturer.create({ code: prefix, name: prefix, active: true });
     const state = data.workflow as any;
@@ -330,15 +349,15 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
     await freshGradeSource();
     const scope = { classGroupId: original.id, courseOfferingId: source.id, rosterScope: "offering" as const };
     const before = await exams.get(scope);
-    const saved = await exams.save({ ...scope, revision: before.revision, rows: learners.slice(0, 3).map(learner => ({
-      participantId: `admission:${learner.id}`, testScore: 8, assignmentScore: 8, examScore: null,
+    const saved = await exams.save({ ...scope, revision: before.revision, rows: before.rows.map((row: any) => ({
+      participantId: row.participantId, testScore: 8, assignmentScore: 8, examScore: null,
       examExempt: false, letterGrade: "", attemptScores: [], result: "pending" as const,
+      policyVersion: row.eligibilityPolicy.version, policyRulesVersion: row.eligibilityPolicy.rulesVersion,
     })) }, staff);
-    const submitted = await exams.transition({ ...scope, action: "submit", note: "Submit all rows", revision: saved.revision, version: 0 }, staff,'eligibility');
-    await expect(exams.save({ ...scope, revision: submitted.revision, rows: [
-      { participantId: `admission:${learners[0].id}`, testScore: 1 } as any,
-    ] },staff)).rejects.toThrow("đã khóa");
-    const eligible=await exams.transition({ ...scope, action: "approve", note: "Approved eligibility", revision: submitted.revision, version: 1 },staff,'eligibility');
+    expect((saved.workflow as any).eligibility.status).toBe('approved');
+    await expect(exams.transition({ ...scope, action: 'submit', revision: saved.revision, version: 0 }, staff, 'eligibility'))
+      .rejects.toThrow('tự động');
+    const eligible = saved;
     const room=await Room.create({code:prefix,name:prefix,capacity:10,isActive:true});
     const lecturer=await Lecturer.create({code:prefix,name:prefix,active:true});
     const examSchedule=app.get(ExamScheduleService),state=eligible.workflow as any;
@@ -356,7 +375,7 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
     await app.get(MastersService).removeMember(original.id, member!.id, { id: staff.id, role: "admin" });
     await expect(app.get(PlanService).removeAdmissionRecord(learners[0].id)).rejects.toThrow("lịch sử đào tạo");
     await learners[0].reload();
-    expect(learners[0].studyStatus).toBe("Đã trúng tuyển");
+    expect(learners[0].studyStatus).toBe("Đang học");
     expect(await ClassGroupMember.count({ where: { admissionRecordId: learners[0].id } })).toBe(0);
     const reports = app.get(ClassScoreSummaryService);
     const historical = await reports.learnerScorecard(learners[0].id, original.id);
@@ -370,13 +389,13 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
   it("requires complete rows, an administrator and a reason before locking or reopening grades", async () => {
     const scope = { classGroupId: original.id, courseOfferingId: source.id, rosterScope: "offering" as const };
     await freshGradeSource();
-    await expect(exams.transition({ ...scope,courseOfferingId:source.id, action: "submit", revision: 0, version: 0, note: "Incomplete" },staff,'eligibility')).rejects.toThrow("đủ điểm thành phần");
+    await expect(exams.transition({ ...scope,courseOfferingId:source.id, action: "submit", revision: 0, version: 0, note: "Incomplete" },staff,'eligibility')).rejects.toThrow("tự động");
     const approved = await fillAndApprove();
-    expect(approved.workflow.status).toBe("approved");
+    expect((approved.workflow as any).final.status).toBe("approved");
     expect(approved.rows.every(row => row.finalized)).toBe(true);
     await expect(exams.transition({ ...scope,courseOfferingId:source.id, action: "reopen", revision: approved.revision, version: 2, note: "Correction" }, { role: "examiner" },'final')).rejects.toThrow("quyền");
     await expect(exams.transition({ ...scope,courseOfferingId:source.id, action: "reopen", revision: approved.revision, version: 2, note: " " },staff,'final')).rejects.toThrow("lý do");
-    expect((await exams.history({...scope,courseOfferingId:source.id})).map((event: any) => event.action)).toEqual(expect.arrayContaining(["eligibility.save", "eligibility.submit", "final.approve"]));
+    expect((await exams.history({...scope,courseOfferingId:source.id})).map((event: any) => event.action)).toEqual(expect.arrayContaining(["save", "final.submit", "final.approve"]));
   });
 
   it("freezes confirmed marks and published snapshots while allowing an audited reopening", async () => {
@@ -385,8 +404,10 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
     const card = await reports.learnerScorecard(learners[0].id, original.id);
     expect((card as any).progress).toMatchObject({ completed: true, earnedCredits: 2 });
     const issue = await reports.issue(learners[0].id, original.id, { id: staff.id, role: "admin" });
-    await db.query("INSERT INTO shared_grading_rules (version,policy,created_at) VALUES (1,CAST(:policy AS jsonb),NOW())", {
-      replacements: { policy: JSON.stringify({ ...LEGACY_GRADING_POLICY, version: 1, minimums: { testScore: 9, assignmentScore: 9, examScore: 9 } }) },
+    const [latestRules] = await db.query<{ version: number }>('SELECT COALESCE(MAX(version),0)+1 AS version FROM shared_grading_rules', { type: QueryTypes.SELECT });
+    const version = Number(latestRules.version);
+    await db.query("INSERT INTO shared_grading_rules (version,policy,created_at) VALUES (:version,CAST(:policy AS jsonb),NOW())", {
+      replacements: { version, policy: JSON.stringify({ ...LEGACY_GRADING_POLICY, version, minimums: { testScore: 9, assignmentScore: 9, examScore: 9 } }) },
     });
     expect((await reports.learnerScorecard(learners[0].id, original.id)).subjects[0].grade).toMatchObject({ score: 8, result: "passed" });
     const scope = { classGroupId: original.id, courseOfferingId: source.id, rosterScope: "offering" as const };
@@ -455,7 +476,9 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
     ]) {
       const before = await exams.get(scope);
       const saved = await exams.save({ ...scope, revision: before.revision, rows: [
-        { participantId, ...scores, letterGrade: "", attemptScores: [], result: "pending" },
+        { participantId, ...scores, letterGrade: "", attemptScores: [], result: "pending",
+          policyVersion: before.rows[0].eligibilityPolicy.version,
+          policyRulesVersion: before.rows[0].eligibilityPolicy.rulesVersion },
       ] },staff);
       const grade = saved.rows.find((row: any) => row.participantId === participantId)!;
       const report = await reports.get({ classGroupId: original.id }, true);

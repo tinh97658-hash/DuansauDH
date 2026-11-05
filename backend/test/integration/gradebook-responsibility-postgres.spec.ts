@@ -1,3 +1,4 @@
+import { isIsolatedScopeDatabase } from '../helpers/isolated-database.js';
 import { randomUUID } from 'node:crypto';
 import { QueryTypes, Transaction } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
@@ -9,7 +10,7 @@ describeDb('Gradebook responsibility through real PostgreSQL RLS',()=>{
   const q=(sql:string,replacements:any={})=>db.query<any>(sql,{transaction:tx,replacements,type:QueryTypes.SELECT})
     .catch(error=>{throw new Error(error.original?.message||error.message);});
   beforeAll(()=>{
-    if(!process.env.DATABASE_URL?.endsWith('/pgsms_group_scope_test'))throw new Error('Use the isolated pgsms_group_scope_test database.');
+    if(!isIsolatedScopeDatabase(process.env.DATABASE_URL))throw new Error('Use the isolated pgsms_group_scope_test database.');
     db=new Sequelize(process.env.DATABASE_URL,{logging:false});
   });
   beforeEach(async()=>{

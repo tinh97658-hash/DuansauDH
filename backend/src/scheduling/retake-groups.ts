@@ -6,6 +6,7 @@ import { resolveSavedExamGrade } from "../masters/exam-grade-calculation.js";
 import type { CourseExamGrade } from "../database/models/training/course-exam-gradebook.model.js";
 import type { GradingPolicy } from "../masters/grading-policy.js";
 import { foreignLanguageExemptGrade, foreignLanguageSubjectSql } from "../masters/foreign-language-exemption.js";
+import { participantRecordMatchSql } from '../common/participant-identity.js';
 
 export interface RetakeResult {
   classGroupId: string; subjectId: string; participantId: string; admissionRecordId: string;
@@ -135,8 +136,7 @@ export async function readRetakeResults(db: Sequelize, groupIds: string[], subje
     JOIN course_offering_class_groups link ON link.course_offering_id = offering.id AND link.class_group_id = book.class_group_id
     CROSS JOIN LATERAL jsonb_array_elements(book.grades) grade
     JOIN LATERAL (SELECT a.* FROM admission_records a
-      WHERE grade->>'participantId' = 'admission:' || a.id::text
-        OR grade->>'participantId' = 'student:' || a.student_id::text
+      WHERE ${participantRecordMatchSql('a', "grade->>'participantId'")}
       ORDER BY CASE WHEN grade->>'participantId' = 'admission:' || a.id::text THEN 0 ELSE 1 END, a.created_at DESC, a.id
       LIMIT 1) ar ON true
     CROSS JOIN LATERAL (SELECT CASE WHEN ar.student_id IS NOT NULL THEN 'student:' || ar.student_id::text
@@ -158,7 +158,7 @@ export async function readRetakeResults(db: Sequelize, groupIds: string[], subje
     JOIN course_offerings offering ON offering.id = link.course_offering_id
     CROSS JOIN LATERAL unnest(link.participant_ids) participant_id
     JOIN LATERAL (SELECT a.* FROM admission_records a
-      WHERE participant_id = 'admission:' || a.id::text OR participant_id = 'student:' || a.student_id::text
+      WHERE ${participantRecordMatchSql('a', 'participant_id')}
       ORDER BY a.created_at DESC, a.id LIMIT 1) ar ON true
     WHERE link.class_group_id IN (:groupIds) AND offering.subject_id IN (:subjectIds)
       AND ${studyEligibleRecordSql('ar')}

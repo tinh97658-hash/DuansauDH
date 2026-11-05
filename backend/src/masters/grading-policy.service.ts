@@ -35,6 +35,28 @@ export class GradingPolicyService {
     return { ...shared, version: weights.version, weights: { ...weights.weights }, rulesVersion: shared.version };
   }
 
+  async latestMany(keys: Array<{ subjectId: string; year: string }>, transaction?: Transaction) {
+    const result = new Map<string, GradingPolicy>();
+    if (!keys.length) return result;
+    const rows = await this.sequelize.query<{ subjectId: string; year: string; policy: GradingPolicy }>(`
+      SELECT DISTINCT ON (p.subject_id, p.academic_year)
+        p.subject_id AS "subjectId", p.academic_year AS year, p.policy
+      FROM course_grading_policies p
+      JOIN jsonb_to_recordset(CAST(:keys AS jsonb)) AS wanted("subjectId" uuid, year text)
+        ON wanted."subjectId" = p.subject_id AND wanted.year = p.academic_year
+      ORDER BY p.subject_id, p.academic_year, p.version DESC`,
+    { type: QueryTypes.SELECT, transaction, replacements: { keys: JSON.stringify(keys) } });
+    const shared = await this.shared(transaction);
+    const weights = new Map(rows.map(row => [`${row.subjectId}:${row.year}`, row.policy]));
+    for (const key of keys) {
+      const policy = weights.get(`${key.subjectId}:${key.year}`) || LEGACY_GRADING_POLICY;
+      result.set(`${key.subjectId}:${key.year}`, {
+        ...shared, version: policy.version, weights: { ...policy.weights }, rulesVersion: shared.version,
+      });
+    }
+    return result;
+  }
+
   async save(dto: SaveGradingPoliciesDto, actorId?: string) {
     if (!dto.rows.length && !dto.shared) throw new BadRequestException("Chưa có cấu hình cần lưu.");
     const keys = dto.rows.map(row => `${row.subjectId}:${row.year}`);

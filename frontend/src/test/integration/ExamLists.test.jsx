@@ -449,7 +449,9 @@ it("refreshes a profile exemption as checked and passed, discards a stale draft,
   expect(screen.getByLabelText("Kết quả điểm HV001")).toHaveValue("passed");
   expect(screen.getByLabelText("Điểm kiểm tra HV001")).toHaveValue("");
   expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Cập nhật cả bảng" })).toBeDisabled();
+  // A fully assessed exempt roster can still finalize automatic eligibility,
+  // even after the obsolete editable draft has been discarded.
+  expect(screen.getByRole("button", { name: "Cập nhật cả bảng" })).toBeEnabled();
   expect(axios.put).not.toHaveBeenCalled();
   Object.assign(gradeRows[0], { profileForeignLanguageExempt: false, examExempt: false, result: "pending" });
   fireEvent(window, new CustomEvent("exam-gradebook-saved", { detail: { source: "profile" } }));
@@ -531,7 +533,7 @@ it("selects subject names and local curriculum codes while keeping the entire sh
   fireEvent.mouseDown(screen.getByLabelText("Chuyên ngành"));
   fireEvent.click(within(screen.getByRole("listbox")).getByText("Công nghệ thông tin"));
   await waitFor(() => expect(screen.getByLabelText("Môn")).toHaveTextContent("ITAI - Trí tuệ nhân tạo"));
-  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g2", courseOfferingId: "ai", rosterScope: "offering" }) });
+  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { signal: expect.any(AbortSignal), params: expect.objectContaining({ classGroupId: "g2", courseOfferingId: "ai", rosterScope: "offering" }) });
   fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
   fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /Lớp Tiếng anh/ }));
   await waitFor(() => expect(screen.getByLabelText("Môn")).toHaveTextContent("HPTA - Tiếng anh"));
@@ -711,7 +713,7 @@ it("selects separate offerings of the same subject with an optional year filter"
   expect(screen.getByLabelText("Tên lớp học phần")).toHaveTextContent("An toàn thông tin");
   fireEvent.mouseDown(screen.getByLabelText("Chuyên ngành"));
   fireEvent.click(within(screen.getByRole("listbox")).getByText("Quản trị kinh doanh"));
-  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g2", courseOfferingId: "o2", pageSize: 15 }) }));
+  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { signal: expect.any(AbortSignal), params: expect.objectContaining({ classGroupId: "g2", courseOfferingId: "o2", pageSize: 15 }) }));
   expect(screen.getByLabelText("Môn")).toHaveTextContent("Marketing");
   expect(screen.getByLabelText("Năm")).toHaveTextContent("Tất cả năm");
   fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
@@ -720,18 +722,18 @@ it("selects separate offerings of the same subject with an optional year filter"
   expect(within(classes).getByRole("option", { name: /Marketing 2026/ })).toBeInTheDocument();
   expect(within(classes).getByRole("option", { name: /Marketing 2025/ })).toBeInTheDocument();
   fireEvent.click(within(classes).getByRole("option", { name: /Quản trị 2025/ }));
-  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g3", courseOfferingId: "o4", pageSize: 15 }) }));
+  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { signal: expect.any(AbortSignal), params: expect.objectContaining({ classGroupId: "g3", courseOfferingId: "o4", pageSize: 15 }) }));
   expect(screen.getByLabelText("Môn")).toHaveTextContent("Quản trị chiến lược");
   fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
   fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /Marketing 2025/ }));
   await waitFor(() => expect(screen.getByLabelText("Tên lớp học phần")).toHaveTextContent("Marketing"));
-  expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g3", courseOfferingId: "o3" }) });
+  expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/\/exam-lists$/), { signal: expect.any(AbortSignal), params: expect.objectContaining({ classGroupId: "g3", courseOfferingId: "o3" }) });
   fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
   fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /Marketing 2026/ }));
-  await waitFor(() => expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g2", courseOfferingId: "o2" }) }));
+  await waitFor(() => expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/\/exam-lists$/), { signal: expect.any(AbortSignal), params: expect.objectContaining({ classGroupId: "g2", courseOfferingId: "o2" }) }));
   fireEvent.mouseDown(screen.getByLabelText("Năm"));
   fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: "2025" }));
-  await waitFor(() => expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g3", courseOfferingId: "o3" }) }));
+  await waitFor(() => expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/\/exam-lists$/), { signal: expect.any(AbortSignal), params: expect.objectContaining({ classGroupId: "g3", courseOfferingId: "o3" }) }));
   fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
   expect(within(screen.getByRole("listbox")).queryByRole("option", { name: /Marketing 2026/ })).not.toBeInTheDocument();
   fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /Marketing 2025/ }));
@@ -804,6 +806,7 @@ it("keeps the class and draft on stay and switches classes only after discarding
   chooseOther();
   fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Bỏ thay đổi và tiếp tục' }));
   await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), {
+    signal: expect.any(AbortSignal),
     params: expect.objectContaining({ classGroupId: 'g1', courseOfferingId: 'o2' }),
   }));
   expect(screen.getByLabelText('Tên lớp học phần')).toHaveTextContent('Lớp thứ hai');
@@ -1003,7 +1006,7 @@ it("requests only 15 students per page and saves drafts from different pages tog
   fireEvent.click(screen.getByRole("button", { name: /^Trang 1$/ }));
   expect(await screen.findByLabelText("Điểm kiểm tra HV001")).toHaveValue("7");
   expect(screen.queryByTestId("exam-print-table")).not.toBeInTheDocument();
-  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ page: 2, pageSize: 15 }) });
+  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { signal: expect.any(AbortSignal), params: expect.objectContaining({ page: 2, pageSize: 15 }) });
   fireEvent.click(screen.getByRole("button", { name: "Cập nhật cả bảng" }));
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ rows: [
     expect.objectContaining({ participantId: "student:1", testScore: 7 }),

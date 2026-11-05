@@ -148,7 +148,8 @@ export default function ExamLists() {
 
   useEffect(() => {
     let active = true;
-    axios.get(`${API_BASE_URL}/masters/exam-lists/options`)
+    const controller = new AbortController();
+    axios.get(`${API_BASE_URL}/masters/exam-lists/options`, { signal: controller.signal })
       .then((options) => {
         if (!active) return;
         const list = options.data.groups || [];
@@ -161,11 +162,12 @@ export default function ExamLists() {
       })
       .catch((failure) => active && setError(errorMessage(failure, "Không thể tải danh sách lớp. Hãy tải lại trang.")))
       .finally(() => active && setOptionsLoading(false));
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, []);
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     setRows([]);
     setUnassessedRows(null);
     if (!groupId || !offeringId) { setLoading(false); return () => { active = false; }; }
@@ -173,7 +175,7 @@ export default function ExamLists() {
     axios.get(`${API_BASE_URL}/masters/exam-lists`, { params: {
       classGroupId: groupId, courseOfferingId: offeringId, rosterScope: "offering", page, pageSize: PAGE_SIZE, mode, search,
       ...(mode === "exam" ? { includeIds: examIncludeIds, excludeIds: examExcludeIds } : {}),
-    } })
+    }, signal: controller.signal })
       .then(({ data }) => { if (active) {
         setWorkflow(data.workflow || { status: "draft", version: 0 });
         if (data.offering) setLoadedOffering({ id: offeringId, status: data.offering.status, examScheduling: data.offering.examScheduling });
@@ -197,7 +199,7 @@ export default function ExamLists() {
       } })
       .catch((failure) => active && setError(errorMessage(failure, "Không thể tải bảng điểm.")))
       .finally(() => active && setLoading(false));
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, [groupId, offeringId, page, mode, search, examIncludeIds, examExcludeIds, policyRevision]);
 
   useEffect(() => {
@@ -212,10 +214,11 @@ export default function ExamLists() {
   useEffect(() => {
     if (!catalogRevision) return undefined;
     let active = true;
-    axios.get(`${API_BASE_URL}/masters/exam-lists/options`)
+    const controller = new AbortController();
+    axios.get(`${API_BASE_URL}/masters/exam-lists/options`, { signal: controller.signal })
       .then(({ data }) => { if (active) { setGroups(data.groups || []); setSubjects(data.courseOfferings || []); } })
       .catch((failure) => active && setError(errorMessage(failure, "Không thể làm mới thông tin học phần.")));
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, [catalogRevision]);
 
   const majors = [...new Map(groups.filter((group) => group.majorId).map((group) => [group.majorId, { id: group.majorId, name: group.major?.name || group.major?.code || group.majorId }])).values()];
