@@ -29,12 +29,12 @@
 .sl-create-figma .v20-scope-step b{width:auto;height:21px;margin:0;padding:0;flex:0 0 auto;border:0;border-radius:0;background:transparent;color:#1689b4;font-size:11.5px}
 .sl-create-figma .sl-combo{margin:0 0 2px}
 .sl-create-figma .sl-combo input,.sl-create-figma .sl-create-year{display:block;width:100%;height:var(--sl-scope-control-height);box-sizing:border-box;padding:0 42px 0 13px;border:1px solid #b9cad8;border-radius:7px;background-color:#fff;color:var(--text-primary);font-family:var(--app-font-family);font-size:13.5px;font-weight:500;line-height:normal}
-.sl-create-figma .sl-create-year{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M2 2l4 4 4-4' fill='none' stroke='%23607486' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;background-size:12px 8px;cursor:pointer}
+.sl-create-figma .sl-create-year{appearance:none;-webkit-appearance:none;background-image:var(--app-chevron);background-repeat:no-repeat;background-position:right 11px center;background-size:12px 8px;cursor:pointer}
 .sl-create-figma .sl-create-year.sl-placeholder,.sl-create-figma .sl-create-year:disabled{color:var(--text-muted);opacity:1}
 .sl-create-figma .sl-create-year:disabled{cursor:not-allowed;background-color:#fff}
 .sl-create-figma .sl-create-year .MuiSelect-select{display:flex;align-items:center;box-sizing:border-box;height:100%;min-height:0;padding:0;background:transparent}
 .sl-create-figma .sl-create-year.Mui-focused{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
-.sl-create-figma .sl-combo>button{top:1px;height:34px;width:38px;border-radius:0 7px 7px 0;color:transparent;font-size:0;background-color:#fff;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M2 2l4 4 4-4' fill='none' stroke='%23607486' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:center;background-size:12px 8px}
+.sl-create-figma .sl-combo>button{top:1px;height:34px;width:38px;border-radius:0 7px 7px 0;color:transparent;font-size:0;background-color:#fff;background-image:var(--app-chevron);background-repeat:no-repeat;background-position:center;background-size:12px 8px}
 .sl-create-figma .sl-combo input:focus,.sl-create-figma .sl-create-year:focus{outline:0;border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
 .sl-create-figma .sl-combo-list{top:38px;right:auto;left:0;width:max-content;min-width:100%;max-width:420px;max-height:260px;border:1px solid #b9cad8;border-radius:7px;box-shadow:0 12px 28px rgba(23,62,117,.18);overflow-x:hidden}
 .sl-create-figma .sl-combo-list button{min-height:42px;gap:18px;padding:10px 13px;align-items:center;color:#173e75;font-size:13.5px;line-height:1.35}
@@ -188,8 +188,8 @@
 .sl-schedule-view .sl-combo{margin:0 0 2px}
 .sl-schedule-view .sl-combo input,.sl-schedule-view .sl-year-select,.sl-schedule-view .sl-search{display:block;width:100%;height:var(--sl-scope-control-height);box-sizing:border-box;border:1px solid #bfcedb;border-radius:4px;color:#172b3a;font-size:13px;font-weight:400}
 .sl-schedule-view .sl-combo input,.sl-schedule-view .sl-year-select{padding:0 38px 0 12px}
-.sl-schedule-view .sl-combo>button{top:1px;height:32px;border-radius:4px;color:transparent;font-size:0;background-color:#fff;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M2 2l4 4 4-4' fill='none' stroke='%23607486' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:center;background-size:12px 8px}
-.sl-schedule-view .sl-year-select{margin:0;appearance:none;-webkit-appearance:none;background-color:#fff;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M2 2l4 4 4-4' fill='none' stroke='%23607486' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;background-size:12px 8px}
+.sl-schedule-view .sl-combo>button{top:1px;height:32px;border-radius:4px;color:transparent;font-size:0;background-color:#fff;background-image:var(--app-chevron);background-repeat:no-repeat;background-position:center;background-size:12px 8px}
+.sl-schedule-view .sl-year-select{margin:0;appearance:none;-webkit-appearance:none;background-color:#fff;background-image:var(--app-chevron);background-repeat:no-repeat;background-position:right 11px center;background-size:12px 8px}
 .sl-schedule-view .sl-combo input:focus,.sl-schedule-view .sl-year-select:focus{outline:0;border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
 .sl-schedule-view .sl-year-select.sl-placeholder{color:var(--text-muted)}
 .sl-schedule-view .sl-worklist{min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:6px var(--sl-scope-inline) 12px;background:#fff}
@@ -402,7 +402,7 @@
 .sl-session-editor-dialog .sl-unit-field .sl-combo-list button{font:inherit;font-weight:400;color:#172b3a}
 .sl-session-editor-dialog .sl-lecturer-trigger{position:relative;padding-right:38px}
 .sl-session-editor-dialog .sl-unit-field .sl-combo>button,
-.sl-session-editor-dialog .sl-lecturer-trigger b{position:absolute;top:1px;right:1px;width:36px;height:40px;color:transparent;font-size:0;background-color:transparent;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M2 2l4 4 4-4' fill='none' stroke='%23526a82' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:center;background-size:12px 8px}
+.sl-session-editor-dialog .sl-lecturer-trigger b{position:absolute;top:1px;right:1px;width:36px;height:40px;color:transparent;font-size:0;background-color:transparent;background-image:var(--app-chevron);background-repeat:no-repeat;background-position:center;background-size:12px 8px}
 .sl-session-editor-dialog .sl-lecturer-trigger b{pointer-events:none}
 .sl-session-editor-dialog .v20-field textarea{height:110px;min-height:110px;padding:11px 12px;resize:none}
 .sl-session-editor-dialog .v20-field textarea::placeholder{color:#9aa8b4}

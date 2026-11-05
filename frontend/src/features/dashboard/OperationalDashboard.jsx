@@ -2,14 +2,7 @@ import AppSelect from "../../components/AppSelect";
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import axios from "axios";
-import GroupsOutlined from "@mui/icons-material/GroupsOutlined";
-import CalendarMonthOutlined from "@mui/icons-material/CalendarMonthOutlined";
-import AssignmentOutlined from "@mui/icons-material/AssignmentOutlined";
-import PendingActionsOutlined from "@mui/icons-material/PendingActionsOutlined";
-import WarningAmberOutlined from "@mui/icons-material/WarningAmberOutlined";
-import CheckCircleOutline from "@mui/icons-material/CheckCircleOutline";
-import ArrowForwardOutlined from "@mui/icons-material/ArrowForwardOutlined";
-import RefreshOutlined from "@mui/icons-material/RefreshOutlined";
+import { ArrowPathIcon, ArrowRightIcon, CalendarDaysIcon, CheckCircleIcon, ClipboardDocumentListIcon, ClockIcon, ExclamationTriangleIcon, UsersIcon } from "../../components/AppIcons";
 import { API_BASE_URL } from "../../config/http";
 import { useGradebookRevision } from "../../utils/gradebookRevision";
 import "./operationalDashboard.css";
@@ -17,13 +10,13 @@ import "./operationalDashboard.css";
 const currentYear = new Date().getFullYear();
 const programLabels = { masters: "Thạc sĩ", doctoral: "Tiến sĩ" };
 const definitions = [
-  { key: "studyLeaveApproval", source: "studyLeaveApproval", inboxOnly: true, title: "Chờ duyệt bảo lưu", action: "Duyệt / Từ chối", unit: "yêu cầu", Icon: PendingActionsOutlined, tone: "amber" },
-  { key: "majorTransferApproval", source: "majorTransferApproval", inboxOnly: true, title: "Chờ duyệt chuyển chuyên ngành", action: "Duyệt / Từ chối", unit: "yêu cầu", Icon: AssignmentOutlined, tone: "violet" },
-  { key: "resultApproval", permission: "approvals", source: "approvals", title: "Chờ duyệt khóa điểm", healthyTitle: "Duyệt khóa điểm", action: "Duyệt khóa điểm", healthy: "Không có yêu cầu chờ duyệt khóa điểm", unit: "lớp", Icon: AssignmentOutlined, tone: "violet" },
-  { key: "grouping", source: "grouping", title: "Học viên chưa phân nhóm", healthyTitle: "Phân nhóm học viên", action: "Phân nhóm", healthy: "Không còn học viên chờ phân nhóm", unit: "học viên", Icon: GroupsOutlined, tone: "teal" },
-  { key: "scheduling", source: "teaching", title: "Lớp chưa xếp lịch", healthyTitle: "Xếp lịch học", action: "Xếp lịch", healthy: "Không còn lớp chờ xếp lịch", unit: "lớp học phần", Icon: CalendarMonthOutlined, tone: "blue" },
-  { key: "grades", source: "grades", title: "Chờ nhập điểm thành phần", healthyTitle: "Nhập điểm thành phần", action: "Nhập điểm", healthy: "Không có lớp chờ nhập điểm thành phần", unit: "lớp", Icon: AssignmentOutlined, tone: "violet" },
-  { key: "progress", source: "teaching", title: "Tiến độ cần kiểm tra", healthyTitle: "Kiểm tra tiến độ", action: "Kiểm tra", healthy: "Không có buổi học chờ xác nhận", unit: "buổi chờ xác nhận", Icon: PendingActionsOutlined, tone: "amber" },
+  { key: "studyLeaveApproval", source: "studyLeaveApproval", inboxOnly: true, title: "Chờ duyệt bảo lưu", action: "Duyệt / Từ chối", unit: "yêu cầu", Icon: ClockIcon, tone: "amber" },
+  { key: "majorTransferApproval", source: "majorTransferApproval", inboxOnly: true, title: "Chờ duyệt chuyển chuyên ngành", action: "Duyệt / Từ chối", unit: "yêu cầu", Icon: ClipboardDocumentListIcon, tone: "violet" },
+  { key: "resultApproval", permission: "approvals", source: "approvals", title: "Chờ duyệt khóa điểm", healthyTitle: "Duyệt khóa điểm", action: "Duyệt khóa điểm", healthy: "Không có yêu cầu chờ duyệt khóa điểm", unit: "lớp", Icon: ClipboardDocumentListIcon, tone: "violet" },
+  { key: "grouping", source: "grouping", title: "Học viên chưa phân nhóm", healthyTitle: "Phân nhóm học viên", action: "Phân nhóm", healthy: "Không còn học viên chờ phân nhóm", unit: "học viên", Icon: UsersIcon, tone: "teal" },
+  { key: "scheduling", source: "teaching", title: "Lớp chưa xếp lịch", healthyTitle: "Xếp lịch học", action: "Xếp lịch", healthy: "Không còn lớp chờ xếp lịch", unit: "lớp học phần", Icon: CalendarDaysIcon, tone: "blue" },
+  { key: "grades", source: "grades", title: "Chờ nhập điểm thành phần", healthyTitle: "Nhập điểm thành phần", action: "Nhập điểm", healthy: "Không có lớp chờ nhập điểm thành phần", unit: "lớp", Icon: ClipboardDocumentListIcon, tone: "violet" },
+  { key: "progress", source: "teaching", title: "Tiến độ cần kiểm tra", healthyTitle: "Kiểm tra tiến độ", action: "Kiểm tra", healthy: "Không có buổi học chờ xác nhận", unit: "buổi chờ xác nhận", Icon: ClockIcon, tone: "amber" },
 ];
 const metricOf = (source, key) => source?.data?.[key] || (source?.data && ["eligibilityReopen", "eligibilityApproval", "resultApproval"].includes(key)
   ? { count: 0, itemCount: 0, items: [], href: "/masters/exam-lists" } : source?.data);
@@ -31,7 +24,7 @@ const metricOf = (source, key) => source?.data?.[key] || (source?.data && ["elig
 function SourceState({ source, onRetry, compact = false }) {
   if (source?.status === "not_implemented") return <p className="od-unavailable">{source.message || "Chức năng chưa được triển khai."}</p>;
   if (!source || source.status === "loading") return <div className={`od-loading${compact ? " od-loading-compact" : ""}`} role="status" aria-label="Đang tải công việc"><span /><span /></div>;
-  if (source.status === "error") return <div className="od-source-error" role="alert"><span>Chưa tải được dữ liệu.</span><button type="button" onClick={onRetry}><RefreshOutlined />Thử lại</button></div>;
+  if (source.status === "error") return <div className="od-source-error" role="alert"><span>Chưa tải được dữ liệu.</span><button type="button" onClick={onRetry}><ArrowPathIcon />Thử lại</button></div>;
   return null;
 }
 
@@ -45,13 +38,13 @@ export function ActionCard({ definition, source, onRetry }) {
       <div className="od-card-content">
         <h2>{ready && metric.count === 0 ? healthyTitle : title}</h2>
         {ready ? metric.count > 0 ? <div className="od-card-value"><strong>{metric.count.toLocaleString("vi-VN")}</strong><span>{unit}{key === "grouping" ? " đang chờ" : ""}</span></div>
-          : <p className="od-healthy-text"><CheckCircleOutline aria-hidden="true" /><span>{healthy}</span></p>
+          : <p className="od-healthy-text"><CheckCircleIcon aria-hidden="true" /><span>{healthy}</span></p>
           : <SourceState source={source} onRetry={onRetry} compact />}
       </div>
     </div>
     {ready && <div className="od-card-footer">
       {metric.count > 0 && <span className="od-card-state">Cần xử lý</span>}
-      <Link className="od-card-action" to={metric.href}>{metric.count > 0 ? action : "Xem chi tiết"}<ArrowForwardOutlined /></Link>
+      <Link className="od-card-action" to={metric.href}>{metric.count > 0 ? action : "Xem chi tiết"}<ArrowRightIcon /></Link>
     </div>}
   </article>;
 }
@@ -69,12 +62,12 @@ function WorkCategory({ definition, source, onRetry }) {
         <Link to={item.href}><span className="od-item-copy"><strong>{item.title}</strong>{item.detail && <small>{item.detail}</small>}</span>
           {item.count != null && <span className="od-row-metric">
             <span className="od-item-count">{item.count} {item.unit}</span></span>}
-          <span className="od-row-action">{definition.action}<ArrowForwardOutlined aria-hidden="true" /></span>
+          <span className="od-row-action">{definition.action}<ArrowRightIcon aria-hidden="true" /></span>
         </Link>
       </li>)}</ul>
       <div className="od-category-footer">
         {metric.itemCount > metric.items.length && <span>Hiển thị {metric.items.length}/{metric.itemCount} mục</span>}
-        <Link to={metric.href}>{definition.key === "grades" ? "Mở bảng điểm cần xử lý" : "Xem tất cả"}<ArrowForwardOutlined /></Link>
+        <Link to={metric.href}>{definition.key === "grades" ? "Mở bảng điểm cần xử lý" : "Xem tất cả"}<ArrowRightIcon /></Link>
       </div>
     </>}
   </section>;
@@ -94,19 +87,19 @@ function WarningPanel({ teachingSource, gradesSource, permissions, year, program
   };
   const ready = (!permissions.progress || teachingSource?.status === 'ready') && (!permissions.grades || gradesSource?.status === 'ready');
   return <aside className="od-panel od-warnings" aria-labelledby="od-warning-title">
-    <div className="od-panel-heading"><h2 id="od-warning-title"><WarningAmberOutlined aria-hidden="true" />CẢNH BÁO</h2>{count > 0 && <span className="od-warning-badge">{count} lớp</span>}</div>
+    <div className="od-panel-heading"><h2 id="od-warning-title"><ExclamationTriangleIcon aria-hidden="true" />CẢNH BÁO</h2>{count > 0 && <span className="od-warning-badge">{count} lớp</span>}</div>
     <div className="od-warning-content">
       {permissions.progress && teachingSource?.status !== 'ready' && <SourceState source={teachingSource} onRetry={() => onRetry('teaching')} />}
       {permissions.grades && gradesSource?.status !== 'ready' && <SourceState source={gradesSource} onRetry={() => onRetry('grades')} />}
       {ready && count === 0
-      ? <div className="od-warning-healthy"><CheckCircleOutline aria-hidden="true" /><div><strong>Không có cảnh báo</strong><p>Chưa phát hiện vấn đề cần xử lý.</p></div></div>
+      ? <div className="od-warning-healthy"><CheckCircleIcon aria-hidden="true" /><div><strong>Không có cảnh báo</strong><p>Chưa phát hiện vấn đề cần xử lý.</p></div></div>
       : groups.filter(group => group.items.length > 0).map(group => <section className="od-warning-group" key={group.key} aria-label={group.title}>
         <h3>{group.title}<span className="od-warning-badge">{group.count ?? group.items.length} {group.unit || 'lớp'}</span></h3>
         <ul className="od-warning-list">{group.items.map((item) => <li key={item.id}><Link to={item.href} aria-label={[item.title, item.detail].filter(Boolean).join(". ")}>
-          <span className="od-warning-icon"><WarningAmberOutlined aria-hidden="true" /></span>
-          <span className="od-item-copy"><strong title={item.title}>{item.title}</strong><small title={item.detail}>{item.detail}</small></span><ArrowForwardOutlined aria-hidden="true" />
+          <span className="od-warning-icon"><ExclamationTriangleIcon aria-hidden="true" /></span>
+          <span className="od-item-copy"><strong title={item.title}>{item.title}</strong><small title={item.detail}>{item.detail}</small></span><ArrowRightIcon aria-hidden="true" />
         </Link></li>)}</ul>
-        {groupHrefs[group.key] && <div className="od-category-footer od-warning-group-footer"><Link to={groupHrefs[group.key]}>Xem tất cả<ArrowForwardOutlined /></Link></div>}
+        {groupHrefs[group.key] && <div className="od-category-footer od-warning-group-footer"><Link to={groupHrefs[group.key]}>Xem tất cả<ArrowRightIcon /></Link></div>}
       </section>)}</div>
   </aside>;
 }
@@ -184,7 +177,7 @@ export default function OperationalDashboard() {
       }}>{years.map((value) => <option key={value}>{value}</option>)}</AppSelect></label></div>
       <div className="od-summary-content">
     {loading ? <div className="od-cards" aria-label="Đang tải tổng quan">{[0, 1, 2, 3].map((key) => <div key={key} className="od-card"><SourceState /></div>)}</div>
-      : state.error ? <div className="od-panel od-page-error" role="alert"><WarningAmberOutlined /><span>Không thể tải tổng quan công việc.</span><button type="button" onClick={() => setRevision((value) => value + 1)}>Thử lại</button></div>
+      : state.error ? <div className="od-panel od-page-error" role="alert"><ExclamationTriangleIcon /><span>Không thể tải tổng quan công việc.</span><button type="button" onClick={() => setRevision((value) => value + 1)}>Thử lại</button></div>
         : <>
           {cards.length > 0 && <section className="od-cards" aria-label="Công việc theo quyền truy cập" style={{ "--od-columns": Math.min(4, cards.length), "--od-small-columns": Math.min(2, cards.length) }}>{cards.map((definition) => <ActionCard key={definition.key} definition={definition}
             source={state.sources[definition.source]} onRetry={() => retry(definition.source)} />)}</section>}
@@ -192,10 +185,10 @@ export default function OperationalDashboard() {
       </div>
     </div>
     {!loading && !state.error && <>
-          {!permitted.length && <div className="od-panel od-no-access"><AssignmentOutlined /><div><h2>Chưa có tác vụ được giao</h2><p>Tài khoản hiện chưa có quyền xử lý các hàng đợi công việc này.</p></div></div>}
+          {!permitted.length && <div className="od-panel od-no-access"><ClipboardDocumentListIcon /><div><h2>Chưa có tác vụ được giao</h2><p>Tài khoản hiện chưa có quyền xử lý các hàng đợi công việc này.</p></div></div>}
           {(work.length > 0 || showWarnings) && <div className={`od-main${showWarnings && work.length ? "" : " od-main-single"}`}>
-            {work.length > 0 && <section className="od-panel" aria-labelledby="od-work-title"><div className="od-panel-heading"><h2 id="od-work-title"><AssignmentOutlined aria-hidden="true" />VIỆC CẦN XỬ LÝ</h2><span>{programLabel} · {year}</span></div>
-              {workHealthy ? <div className="od-empty"><CheckCircleOutline /><strong>Không có mục chờ xử lý</strong><span>Mọi đầu việc trong phạm vi hiện tại đã hoàn thành.</span></div>
+            {work.length > 0 && <section className="od-panel" aria-labelledby="od-work-title"><div className="od-panel-heading"><h2 id="od-work-title"><ClipboardDocumentListIcon aria-hidden="true" />VIỆC CẦN XỬ LÝ</h2><span>{programLabel} · {year}</span></div>
+              {workHealthy ? <div className="od-empty"><CheckCircleIcon /><strong>Không có mục chờ xử lý</strong><span>Mọi đầu việc trong phạm vi hiện tại đã hoàn thành.</span></div>
                 : work.map((definition) => <WorkCategory key={definition.key} definition={definition} source={state.sources[definition.source]} onRetry={() => retry(definition.source)} />)}
             </section>}
             {showWarnings && <WarningPanel teachingSource={state.sources.teaching} gradesSource={state.sources.grades} permissions={permissions} year={year} program={program} onRetry={retry} />}

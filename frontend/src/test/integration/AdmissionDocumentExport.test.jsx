@@ -19,15 +19,7 @@ const render = (ui, options) => renderWithPermissions(ui, ["admission.manage"], 
 vi.mock("axios", () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), isCancel: vi.fn(() => false), defaults: {} } }));
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
 jest.mock("react-toastify", () => ({ ToastContainer: () => null, toast: { success: jest.fn(), error: jest.fn() } }));
-jest.mock("@mui/icons-material", () => ({
-  AddPhotoAlternateRounded: () => null, ArrowBackRounded: () => null, CheckCircleRounded: () => null,
-  DeleteRounded: () => null, FolderSpecialRounded: () => null, PersonRounded: () => null,
-  RefreshRounded: () => null, SaveRounded: () => null, SchoolRounded: () => null,
-  WarningAmberRounded: () => null, WorkspacePremiumRounded: () => null, SwapHorizRounded: () => null,
-  HistoryRounded: () => null, AddRounded: () => null, DeleteOutlineRounded: () => null,
-  EditRounded: () => null, FactCheckRounded: () => null, MenuBookRounded: () => null,
-  RuleRounded: () => null, CloseRounded: () => null, VisibilityRounded: () => null, SearchRounded: () => null,
-}));
+
 jest.setTimeout(20000);
 const major = { id: "major", name: "Khoa học máy tính", program: "masters" };
 const record = {

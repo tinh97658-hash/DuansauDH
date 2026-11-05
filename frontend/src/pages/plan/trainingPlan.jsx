@@ -1,3 +1,4 @@
+import { DocumentCheckIcon, BookOpenIcon, CheckCircleIcon, CheckIcon, LightBulbIcon, PencilSquareIcon, PlusIcon, QueueListIcon, RectangleStackIcon, StopIcon, TrashIcon, XMarkIcon } from "../../components/AppIcons";
 import { usePermissions } from "../../features/accounts/usePermissions";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
@@ -10,18 +11,6 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField,
   Tooltip, Typography,
 } from "@mui/material";
-import AddRounded from "@mui/icons-material/AddRounded";
-import CheckBoxOutlineBlankRounded from "@mui/icons-material/CheckBoxOutlineBlankRounded";
-import CheckBoxRounded from "@mui/icons-material/CheckBoxRounded";
-import CheckRounded from "@mui/icons-material/CheckRounded";
-import CloseRounded from "@mui/icons-material/CloseRounded";
-import DeleteOutlineRounded from "@mui/icons-material/DeleteOutlineRounded";
-import DeleteRounded from "@mui/icons-material/DeleteRounded";
-import EditRounded from "@mui/icons-material/EditRounded";
-import LibraryBooksRounded from "@mui/icons-material/LibraryBooksRounded";
-import PlaylistAddRounded from "@mui/icons-material/PlaylistAddRounded";
-import SaveRounded from "@mui/icons-material/SaveRounded";
-import ClassRounded from "@mui/icons-material/ClassRounded";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
 import InlineReportExport from "../../components/InlineReportExport";
@@ -1136,12 +1125,12 @@ const TrainingPlan = () => {
             }}
           >
             <Tab
-              icon={<LibraryBooksRounded sx={{ fontSize: 18 }} />}
+              icon={<RectangleStackIcon sx={{ fontSize: 18 }} />}
               iconPosition="start"
               label={`1. Danh mục học phần chuyên ngành (${subjects.length} môn)`}
             />
             <Tab
-              icon={<ClassRounded sx={{ fontSize: 18 }} />}
+              icon={<BookOpenIcon sx={{ fontSize: 18 }} />}
               iconPosition="start"
               label={`2. Chương trình đào tạo theo khóa (${curriculumGroups.length} khóa · ${curriculums.length} CTĐT)`}
             />
@@ -1204,7 +1193,7 @@ const TrainingPlan = () => {
                 <Button
                   variant="contained"
                   size="small"
-                  startIcon={<AddRounded />}
+                  startIcon={<PlusIcon />}
                   onClick={handleStartAddSubject}
                   sx={{
                     height: 32,
@@ -1257,7 +1246,7 @@ const TrainingPlan = () => {
                       Chưa có học phần nào cho chuyên ngành <strong>{selectedMajor?.name}</strong>.
                       {isAdmin && (
                         <Box sx={{ mt: 1 }}>
-                          <Button size="small" variant="outlined" startIcon={<AddRounded />} onClick={handleStartAddSubject}>
+                          <Button size="small" variant="outlined" startIcon={<PlusIcon />} onClick={handleStartAddSubject}>
                             Bấm để nhập dòng đầu tiên
                           </Button>
                         </Box>
@@ -1374,12 +1363,12 @@ const TrainingPlan = () => {
                             <Stack direction="row" spacing={0.5} justifyContent="center">
                               <Tooltip title="Lưu (Enter)">
                                 <IconButton size="small" color="primary" onClick={handleSaveEditSubject}>
-                                  <SaveRounded fontSize="small" />
+                                  <DocumentCheckIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="Hủy (Esc)">
                                 <IconButton size="small" color="inherit" onClick={handleCancelEditSubject}>
-                                  <CloseRounded fontSize="small" />
+                                  <XMarkIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
                             </Stack>
@@ -1466,9 +1455,9 @@ const TrainingPlan = () => {
                               sx={{ p: 0.5 }}
                             >
                               {row.majorAssignment ? (
-                                <CheckBoxRounded fontSize="small" sx={{ color: "#0788B8" }} />
+                                <CheckCircleIcon fontSize="small" sx={{ color: "#0788B8" }} />
                               ) : (
-                                <CheckBoxOutlineBlankRounded fontSize="small" sx={{ color: "#DFE4E8" }} />
+                                <StopIcon fontSize="small" sx={{ color: "#DFE4E8" }} />
                               )}
                             </IconButton>
                           </Tooltip>
@@ -1482,7 +1471,7 @@ const TrainingPlan = () => {
                               sx={{ p: 0.5 }}
                             >
                               {row.isRequired ? (
-                                <CheckRounded fontSize="small" sx={{ color: "#137B3B", fontWeight: 900 }} />
+                                <CheckIcon fontSize="small" sx={{ color: "#137B3B", fontWeight: 900 }} />
                               ) : (
                                 <Typography variant="caption" sx={{ color: "#8A9AAA" }}>—</Typography>
                               )}
@@ -1522,7 +1511,7 @@ const TrainingPlan = () => {
                                     color="primary"
                                     onClick={(e) => { e.stopPropagation(); handleStartEditSubject(row); }}
                                   >
-                                    <EditRounded fontSize="small" />
+                                    <PencilSquareIcon fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
                               </Stack>
@@ -1641,12 +1630,12 @@ const TrainingPlan = () => {
                       <Stack direction="row" spacing={0.5} justifyContent="center">
                         <Tooltip title="Lưu & Thêm tiếp (Enter)">
                           <IconButton size="small" color="primary" onClick={() => handleSaveSubjectDraft(true)}>
-                            <SaveRounded fontSize="small" />
+                            <DocumentCheckIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Hủy (Esc)">
                           <IconButton size="small" color="inherit" onClick={handleCancelAddSubject}>
-                            <CloseRounded fontSize="small" />
+                            <XMarkIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                       </Stack>
@@ -1660,7 +1649,7 @@ const TrainingPlan = () => {
           {/* Table Footer Instructions */}
           <Stack direction="row" spacing={3} sx={{ mt: 1.5, color: "#607486", fontSize: 12 }}>
             <Typography variant="caption">
-              💡 <strong>Mẹo thao tác Excel:</strong> Bấm <strong>Tab</strong> để chuyển ô · Bấm <strong>Enter</strong> để lưu và tạo dòng tiếp theo · Bấm <strong>Esc</strong> để hủy · Bấm đúp vào dòng để sửa.
+              <LightBulbIcon fontSize="inherit" /> <strong>Mẹo thao tác Excel:</strong> Bấm <strong>Tab</strong> để chuyển ô · Bấm <strong>Enter</strong> để lưu và tạo dòng tiếp theo · Bấm <strong>Esc</strong> để hủy · Bấm đúp vào dòng để sửa.
             </Typography>
           </Stack>
         </Box>
@@ -1701,7 +1690,7 @@ const TrainingPlan = () => {
                   <Button
                     size="small"
                     variant="contained"
-                    startIcon={<AddRounded />}
+                    startIcon={<PlusIcon />}
                     onClick={handleOpenCreateCurriculum}
                     disabled={curriculumCodeLoading}
                     sx={{
@@ -1837,7 +1826,7 @@ const TrainingPlan = () => {
                                             onClick={() => handleDeleteCurriculum(c)}
                                             sx={{ p: 0.5 }}
                                           >
-                                            <DeleteRounded sx={{ fontSize: 16 }} />
+                                            <TrashIcon sx={{ fontSize: 16 }} />
                                           </IconButton>
                                         </span>
                                       </Tooltip>
@@ -1881,7 +1870,7 @@ const TrainingPlan = () => {
                     <Button
                       size="small"
                       variant="contained"
-                      startIcon={<AddRounded />}
+                      startIcon={<PlusIcon />}
                       onClick={handleOpenCreateCurriculum}
                       disabled={curriculumCodeLoading}
                       sx={{
@@ -1942,7 +1931,7 @@ const TrainingPlan = () => {
                         <Button
                           size="small"
                           variant="contained"
-                          startIcon={<AddRounded />}
+                          startIcon={<PlusIcon />}
                           onClick={handleOpenAddSubjects}
                           disabled={matrixSaving || curriculumInUse}
                           sx={{
@@ -1966,7 +1955,7 @@ const TrainingPlan = () => {
                             size="small"
                             variant="outlined"
                             color="error"
-                            startIcon={<DeleteOutlineRounded />}
+                            startIcon={<TrashIcon />}
                             onClick={handleClearAllSubjectsFromCurriculum}
                             disabled={matrixSaving || curriculumInUse}
                             sx={{ height: 32, flex: 1, px: 1.25, fontSize: 11, fontWeight: 700, textTransform: "none", borderRadius: "8px", whiteSpace: "nowrap" }}
@@ -2095,7 +2084,7 @@ const TrainingPlan = () => {
                                       }}
                                       sx={{ p: 0.5 }}
                                     >
-                                      <DeleteRounded sx={{ fontSize: 16 }} />
+                                      <TrashIcon sx={{ fontSize: 16 }} />
                                     </IconButton>
                                   </Tooltip>
                                 </TableCell>
@@ -2325,7 +2314,7 @@ const TrainingPlan = () => {
               <Button
                 size="small"
                 variant="contained"
-                startIcon={<PlaylistAddRounded />}
+                startIcon={<QueueListIcon />}
                 disabled={selectedCatalogSubjectIds.length === 0 || matrixSaving}
                 onClick={handleAddSubjectsToCurriculum}
                 sx={{

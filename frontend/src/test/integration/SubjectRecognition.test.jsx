@@ -5,15 +5,7 @@ import { toast } from "react-toastify";
 import { MemoryRouter } from "react-router-dom";
 
 // Decorative icons are not the contract under test; avoid importing the full icon catalog.
-jest.mock("@mui/icons-material", () => ({
-  AddPhotoAlternateRounded: () => null, ArrowBackRounded: () => null, CheckCircleRounded: () => null,
-  DeleteRounded: () => null, FolderSpecialRounded: () => null, PersonRounded: () => null,
-  PictureAsPdfRounded: () => null, RefreshRounded: () => null, SaveRounded: () => null,
-  SchoolRounded: () => null, WarningAmberRounded: () => null, WorkspacePremiumRounded: () => null,
-  SwapHorizRounded: () => null, HistoryRounded: () => null, AddRounded: () => null,
-  DeleteOutlineRounded: () => null, EditRounded: () => null, FactCheckRounded: () => null,
-  MenuBookRounded: () => null, RuleRounded: () => null,
-}));
+
 jest.setTimeout(15000);
 
 vi.mock("axios", () => ({ default: {

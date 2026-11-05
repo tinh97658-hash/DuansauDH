@@ -1,7 +1,7 @@
+import { CalendarDaysIcon, EyeIcon, XMarkIcon } from "../../components/AppIcons";
 import { notify } from "../../utils/notify";
 import { usePermissions } from "../accounts/usePermissions";
 import React, { useState } from "react";
-import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
 import { api, groupsOf, message, Modal, Notice, offeringTitle, rows, subjectLabel, useLoad } from "./shared";
 import { vietnameseDate, vietnameseDayLabel, isSessionPast } from "../../utils/schedulingCalendar";
 import { personNameParts } from "../../utils/personName";
@@ -62,7 +62,7 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
       onDeleted={() => { onSaved?.(); onClose(); }} onScheduleDeleted={() => { detail.reload(); sessions.reload(); unresolved.reload(); onSaved?.(); }} />}
     {canManage && value.status === "active" && <>{onSelect && <button className="sl-btn" onClick={() => onSelect(value)}>Xếp lịch / Xếp thêm</button>}<button className="sl-btn sl-btn-primary" disabled={saving || detail.loading || !!detail.error || unresolved.loading || !!unresolved.error || !summary.heldCount} onClick={() => { setError(""); unresolved.reload(); setCompleting(true); }}>Xác nhận hoàn thành giảng dạy</button></>}
   </>}>
-    <header className="sl-offering-hero"><div><div className="sl-eyebrow">LỚP HỌC PHẦN</div><h2>{offeringTitle(value)}</h2><strong>{subjectLabel(value)}</strong><p>{groupsOf(value).length} lớp/nhóm · {value.participantCount ?? 0} học viên</p></div><div className="sl-offering-hero-actions"><button className="sl-drawer-close" aria-label="Đóng" disabled={saving} onClick={onClose}>×</button><span className={`sl-state ${value.status === "completed" ? "sl-complete" : "sl-progress"}`}>{value.status === "completed" ? "HOÀN THÀNH" : "ĐANG DẠY"}</span></div></header>
+    <header className="sl-offering-hero"><div><div className="sl-eyebrow">LỚP HỌC PHẦN</div><h2>{offeringTitle(value)}</h2><strong>{subjectLabel(value)}</strong><p>{groupsOf(value).length} lớp/nhóm · {value.participantCount ?? 0} học viên</p></div><div className="sl-offering-hero-actions"><button className="sl-drawer-close" aria-label="Đóng" disabled={saving} onClick={onClose}><XMarkIcon fontSize="small" /></button><span className={`sl-state ${value.status === "completed" ? "sl-complete" : "sl-progress"}`}>{value.status === "completed" ? "HOÀN THÀNH" : "ĐANG DẠY"}</span></div></header>
     <div className={`sl-offering-content ${activeTab === "people" ? "sl-offering-content-people" : ""}`}>{detail.error && <Notice error={detail.error} />}{error && <Notice error={error} />}
       {value.scheduleWriteBlockedReason && <Notice>{value.scheduleWriteBlockedReason === 'READ_ONLY' ? 'Vai trò đang bật Chỉ xem: không thể sửa lịch hoặc hoàn thành giảng dạy.' : 'Bạn được xem lớp này nhưng chưa có quyền thao tác lịch trong phạm vi của lớp.'}</Notice>}
       {value.status === "completed" && <p>Học viên có kết quả Không đạt được tự động tổng hợp thành nhóm Học lại theo lớp gốc tại Tạo lớp học phần.</p>}
@@ -147,7 +147,7 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
               <p>Chưa có buổi học nào được xếp lịch cho lớp học phần này.</p>
               {canManage && value.status === "active" && onSelect && (
                 <button type="button" className="sl-btn sl-btn-primary sl-offering-empty-action" onClick={() => onSelect(value)}>
-                  🗓️ Xếp lịch ngay
+                  <CalendarDaysIcon fontSize="inherit" /> Xếp lịch ngay
                 </button>
               )}
             </>
@@ -215,7 +215,7 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
                             className="sl-session-details-button"
                             onClick={(e) => { e.stopPropagation(); onOpenSession(session); }}
                           >
-                            <VisibilityOutlined aria-hidden="true" />
+                            <EyeIcon aria-hidden="true" />
                             Chi tiết
                           </button>
                         ) : onSelect ? (

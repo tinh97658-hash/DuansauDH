@@ -11,12 +11,7 @@ vi.mock("../../utils/reportExport", () => ({ downloadReport: vi.fn() }));
 vi.mock("../../features/scheduling/classProgressBatchExport", () => ({ downloadClassProgressBatch: vi.fn() }));
 
 vi.mock("axios");
-jest.mock("@mui/icons-material", () => ({
-  SearchRounded: () => null,
-  WarningAmberRounded: () => null,
-  CheckCircleRounded: () => null,
-  ErrorOutlineRounded: () => null,
-}));
+
 vi.mock(import("../../components/FeatureLayout"), () => ({ default: function Layout({ children }) { return <div>{children}</div>; } }));
 jest.mock("../../features/scheduling/OfferingDetails", () => ({
   default: function Details({ offering, onClose, user, onSaved }) {

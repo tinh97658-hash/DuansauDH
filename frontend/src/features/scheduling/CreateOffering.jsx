@@ -1,8 +1,8 @@
+import { ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, CheckIcon, MagnifyingGlassIcon } from "../../components/AppIcons";
 import { usePermissions } from "../accounts/usePermissions";
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import YearSelect from "./YearSelect";
-import successCircle from "../../assets/create-offering-success.svg";
 import { api, intersectDays, message, normalize, Notice, rows, SearchSelect, suggestOfferingName, unique, useLoad } from "./shared";
 import { isCommonMajor } from "../../utils/majorScope";
 import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
@@ -158,7 +158,7 @@ export default function CreateOffering({ user }) {
   if (created) {
     return <section className="sl-create-flow-page sl-create-success-page">
       <div className="sl-create-success-card">
-        <div className="sl-create-success-icon"><img src={successCircle} alt="" /><span>✓</span></div>
+        <div className="sl-create-success-icon"><CheckCircleIcon style={{ width: 54, height: 54, color: "#137B3B" }} /></div>
         <div className="sl-create-success-kicker">ĐÃ TẠO LỚP HỌC PHẦN</div>
         <h1>{created.name || effectiveOfferingName}</h1>
         <p>{participatingMajors} · Năm {participatingYears || year}</p>
@@ -171,7 +171,7 @@ export default function CreateOffering({ user }) {
         </div>
         <div className="sl-create-success-actions">
           <button onClick={() => { resetSelection(); setSubject(""); setOfferingName(""); setIsCustomName(false); }}>Tạo lớp học phần khác</button>
-          <button className="sl-primary" aria-label="Sang Xếp lịch" onClick={() => navigate(`/masters/schedule?offeringId=${created.id}`)}>Sang Xếp lịch →</button>
+          <button className="sl-primary" aria-label="Sang Xếp lịch" onClick={() => navigate(`/masters/schedule?offeringId=${created.id}`)}>Sang Xếp lịch <ArrowRightIcon fontSize="inherit" /></button>
         </div>
       </div>
     </section>;
@@ -226,7 +226,7 @@ export default function CreateOffering({ user }) {
             </div>
           </section>
         </div>
-        <footer><div><button disabled={saving} onClick={() => setRoster(null)}>←&nbsp; Quay lại chỉnh sửa</button><button className="sl-primary" aria-label="Xác nhận tạo lớp" disabled={saving} onClick={create}>{saving ? "Đang lưu..." : "Xác nhận tạo lớp học phần"}</button></div></footer>
+        <footer><div><button disabled={saving} onClick={() => setRoster(null)}><ArrowLeftIcon fontSize="inherit" /> Quay lại chỉnh sửa</button><button className="sl-primary" aria-label="Xác nhận tạo lớp" disabled={saving} onClick={create}>{saving ? "Đang lưu..." : "Xác nhận tạo lớp học phần"}</button></div></footer>
       </div>
     </section>;
   }
@@ -256,7 +256,7 @@ export default function CreateOffering({ user }) {
       </div>
       <div className="sl-worklist">
         <div className="sl-create-subject-title"><div className="v20-scope-step"><b>4</b>HỌC PHẦN CÒN CẦN TỔ CHỨC</div><span>{candidates.loading && majorId && year ? "…" : filteredSubjects.length}</span></div>
-        <div className="sl-create-subject-search"><span>⌕</span><input aria-label="Tìm học phần" placeholder="Tìm học phần..." value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+        <div className="sl-create-subject-search"><span><MagnifyingGlassIcon fontSize="inherit" /></span><input aria-label="Tìm học phần" placeholder="Tìm học phần..." value={query} onChange={(event) => setQuery(event.target.value)} /></div>
         {candidates.loading && majorId && year ? <Notice>Đang tải học phần...</Notice> : candidates.error ? <Notice error={candidates.error} /> : majorId && year ? <div className="sl-create-subject-list">{filteredSubjects.map((item) => {
           // Liên ngành chỉ là quyền ghép nhóm; nhãn "Môn chung" dành cho khối kiến thức chung (KC).
           const isCommon = item.subject.subjectType === "KC";
@@ -341,7 +341,7 @@ export default function CreateOffering({ user }) {
                     title={group.canOrganize === false ? 'Nhóm ngoài phạm vi tổ chức lớp được cấp.' : undefined}
                     onClick={() => toggleGroup(group)}
                   >
-                    <span className="sl-create-checkbox">{picked ? "✓" : ""}</span>
+                    <span className="sl-create-checkbox">{picked ? <CheckIcon fontSize="inherit" /> : null}</span>
                     <span className="sl-group-info">
                       <span className="sl-group-title-row">
                         <span className="sl-group-label-text">{groupLabel(group)}</span>
@@ -424,7 +424,7 @@ export default function CreateOffering({ user }) {
               disabled={!canEdit || !effectiveOfferingName.trim() || !groupIds.length || !days.length || preview.loading || !!preview.error || !preview.data?.participantCount}
               onClick={openConfirmation}
             >
-              Tiếp tục →
+              Tiếp tục <ArrowRightIcon fontSize="inherit" />
             </button>
           </div>
         </div>

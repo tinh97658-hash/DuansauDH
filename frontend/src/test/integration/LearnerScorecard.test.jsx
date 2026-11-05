@@ -12,15 +12,7 @@ const render = (ui, options) => renderWithPermissions(ui, ["reports.export", "ad
 vi.mock("axios", () => ({ default: { get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn(), defaults: {} } }));
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
 jest.mock("react-toastify", () => ({ ToastContainer: () => null, toast: { success: jest.fn(), error: jest.fn() } }));
-jest.mock("@mui/icons-material", () => ({
-  AddPhotoAlternateRounded: () => null, ArrowBackRounded: () => null, CheckCircleRounded: () => null,
-  DeleteRounded: () => null, FolderSpecialRounded: () => null, PersonRounded: () => null,
-  RefreshRounded: () => null, SaveRounded: () => null, SchoolRounded: () => null,
-  WarningAmberRounded: () => null, WorkspacePremiumRounded: () => null, SwapHorizRounded: () => null,
-  HistoryRounded: () => null, AddRounded: () => null, DeleteOutlineRounded: () => null,
-  EditRounded: () => null, FactCheckRounded: () => null, MenuBookRounded: () => null,
-  RuleRounded: () => null, VisibilityRounded: () => null, SearchRounded: () => null, DownloadRounded: () => null,
-}));
+
 jest.setTimeout(20000);
 
 it("explains missing coursework without making a graduation decision", async () => {

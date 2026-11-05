@@ -1,6 +1,6 @@
+import { CheckIcon, UserIcon } from "../../components/AppIcons";
 import React from "react";
 import { Box, Paper, Typography } from "@mui/material";
-import PersonRounded from "@mui/icons-material/PersonRounded";
 import "./admissionPrint.css";
 
 function DocumentField({ field, inline = false }) {
@@ -95,7 +95,7 @@ export default function AdmissionPrintTemplate({ document }) {
           <img src={document.photo} alt="Ảnh 3x4" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
           <Box sx={{ p: 0.5 }}>
-            <PersonRounded sx={{ fontSize: 24, color: "#94A3B8", mb: 0.3 }} />
+            <UserIcon sx={{ fontSize: 24, color: "#94A3B8", mb: 0.3 }} />
             <Typography sx={{ fontFamily: "inherit", fontSize: "9.5px", fontStyle: "normal", color: "#64748B", lineHeight: 1.15 }}>
               Ảnh 3x4<br />(Đóng dấu giáp lai)
             </Typography>
@@ -170,7 +170,7 @@ export default function AdmissionPrintTemplate({ document }) {
                   flexShrink: 0,
                 }}
               >
-                {isChecked ? "✓" : ""}
+                {isChecked ? <CheckIcon fontSize="inherit" /> : null}
               </span>
               <span>{doc.label}</span>
             </div>

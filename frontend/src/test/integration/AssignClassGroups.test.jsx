@@ -11,10 +11,7 @@ import ResizableSplit from "../../components/ResizableSplit";
 vi.mock("axios", () => ({ default: { get: vi.fn(), post: vi.fn(), delete: vi.fn(), defaults: {} } }));
 vi.mock("react-toastify", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() }, ToastContainer: () => null }));
 vi.mock("../../components/FeatureLayout", () => ({ default: ({ children }) => <div>{children}</div> }));
-vi.mock(import("@mui/icons-material"), () => ({
-  ArrowBackRounded: () => null, ArrowForwardRounded: () => null, CheckCircleOutlineRounded: () => null, WarningAmberRounded: () => null,
-  DeleteOutlineRounded: () => null, GroupWorkRounded: () => null, PersonRounded: () => null, SearchRounded: () => null,
-}));
+
 
 const year = String(new Date().getFullYear());
 const majors = [
@@ -506,7 +503,7 @@ describe("AssignClassGroups summary and assignment", () => {
     return screen.getByTestId("url").textContent;
   };
   const openInlineCreate = async () => {
-    fireEvent.click(screen.getByRole("button", { name: "+ Tạo mới" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tạo mới" }));
     const dialog = await screen.findByRole("dialog");
     await waitFor(() => expect(within(dialog).getByRole("button", { name: "Tạo 1 nhóm" })).toBeEnabled());
     return dialog;

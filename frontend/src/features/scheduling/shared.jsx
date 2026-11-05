@@ -1,3 +1,4 @@
+import { ChevronDownIcon, XMarkIcon } from "../../components/AppIcons";
 import React, { useEffect, useId, useRef, useState } from "react";
 import axios from "axios";
 import { Dialog } from "@mui/material";
@@ -119,7 +120,7 @@ export function Modal({ title, children, onClose, busy = false, wide = false, dr
   const titleId = useId();
   return <Dialog className="app-popup" open hideBackdrop={transparentBackdrop} onClose={busy ? undefined : onClose} maxWidth={false} aria-labelledby={titleId}
     PaperProps={{ id, className: `scheduling-v20 v20-dialog ${wide ? "v20-wide" : ""} ${drawer ? "v20-drawer" : ""} ${className}` }}>
-    {hideHeader ? <h2 id={titleId} className="sl-sr-only">{title}</h2> : <header className="v20-dialog-head"><h2 id={titleId}>{title}</h2><button className="sl-btn" aria-label="Đóng" disabled={busy} onClick={onClose}>×</button></header>}
+    {hideHeader ? <h2 id={titleId} className="sl-sr-only">{title}</h2> : <header className="v20-dialog-head"><h2 id={titleId}>{title}</h2><button className="sl-btn" aria-label="Đóng" disabled={busy} onClick={onClose}><XMarkIcon fontSize="small" /></button></header>}
     <div className={`v20-dialog-body ${bodyClassName}`}>{children}</div>
     {actions && <footer className="v20-dialog-foot">{actions}</footer>}
   </Dialog>;
@@ -137,7 +138,7 @@ export function SearchSelect({ label, value, options, onChange, placeholder = "C
     <input aria-label={label} role="combobox" aria-expanded={open} aria-controls={`options-${label}`} autoComplete="off" disabled={disabled}
       value={open ? query : options.find((item) => item.id === value)?.name || ""} placeholder={placeholder}
       onFocus={() => { setQuery(""); setOpen(true); }} onChange={(event) => { setQuery(event.target.value); setOpen(true); }} />
-    <button aria-label={`Mở ${label}`} disabled={disabled} onClick={() => { setQuery(""); setOpen(!open); }}>▾</button>
+    <button aria-label={`Mở ${label}`} disabled={disabled} onClick={() => { setQuery(""); setOpen(!open); }}><ChevronDownIcon style={{ width: 14, height: 14, color: "#607486" }} /></button>
     {open && <div className="sl-combo-list sl-show" id={`options-${label}`} role="listbox" aria-label={label}>
       {options.filter((item) => normalize(item.name + " " + (item.code || "")).includes(normalize(query))).map((item) => <button key={item.id} role="option" aria-selected={item.id === value} onClick={() => { onChange(item.id); setOpen(false); }}>{item.name}<small>{item.code}</small></button>)}
     </div>}

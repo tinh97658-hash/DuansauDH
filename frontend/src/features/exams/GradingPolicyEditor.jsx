@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Alert, Box, Button, FormControlLabel, IconButton, Stack, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
-import DeleteRounded from "@mui/icons-material/DeleteRounded";
+import { TrashIcon } from "../../components/AppIcons";
 import { calculatePolicyGrade, clonePolicy, DEFAULT_GRADING_POLICY, numericPolicy, POLICY_COMPONENTS, policyError } from "./gradingPolicy";
 
 export default function GradingPolicyEditor({ subject, policy, mode, onApply, readOnly = false, shared = false }) {
@@ -43,7 +43,7 @@ export default function GradingPolicyEditor({ subject, policy, mode, onApply, re
               inputProps={{ "aria-label": `Điểm chữ mức ${index + 1}`, maxLength: 10 }} /></TableCell>
             <TableCell>{field(`Thang 4 mức ${index + 1}`, band.grade4, value => editBand(index, "grade4", value), 4, draft.useDefaultBands, false)}</TableCell>
             <TableCell align="center"><IconButton size="small" color="error" disabled={readOnly || draft.useDefaultBands || bands.length <= 1} onClick={() => setDraft(current => ({ ...current, bands: current.bands.filter((_, position) => position !== index) }))}
-              aria-label={`Xóa mức quy đổi ${index + 1}`} title="Xóa mức quy đổi" sx={{ "&.Mui-disabled": { color: "error.main", opacity: 0.4 } }}><DeleteRounded fontSize="small" /></IconButton></TableCell>
+              aria-label={`Xóa mức quy đổi ${index + 1}`} title="Xóa mức quy đổi" sx={{ "&.Mui-disabled": { color: "error.main", opacity: 0.4 } }}><TrashIcon fontSize="small" /></IconButton></TableCell>
           </TableRow>)}</TableBody>
         </Table></TableContainer>
         {!draft.useDefaultBands && <Button variant="outlined" disabled={readOnly || bands.length >= 20} onClick={() => setDraft(current => ({ ...current, bands: [...current.bands, { minimum: "", letter: "", grade4: "" }] }))}>Thêm mức quy đổi</Button>}

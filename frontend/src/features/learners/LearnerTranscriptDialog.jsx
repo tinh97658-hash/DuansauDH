@@ -3,8 +3,7 @@ import axios from "axios";
 import { Alert, Button, Checkbox, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
   FormControlLabel, InputAdornment, Radio, RadioGroup, TextField, Tooltip } from "@mui/material";
 import { ExportDownloadIcon as DownloadRounded } from "../../components/ReportExportIcons";
-import SearchRounded from "@mui/icons-material/SearchRounded";
-import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
+import { EyeIcon, MagnifyingGlassIcon } from "../../components/AppIcons";
 import { PdfFileIcon } from "../../components/ReportExportIcons";
 import { WordFileIcon } from "../../components/ReportExportIcons";
 import { API_BASE_URL } from "../../config/http";
@@ -152,7 +151,7 @@ export default function LearnerTranscriptDialog({ classGroupId, onClose }) {
         {selectedStudent && !canExportSingle && <p className="transcript-format-note">{missingProfile}</p>}
         <TextField className="transcript-search" fullWidth size="small" placeholder="Tìm theo mã HV, họ tên..." value={search} disabled={loading || !!error || exporting}
           onChange={event => setSearch(event.target.value)} inputProps={{ maxLength: 200, "aria-label": "Tìm theo mã HV, họ tên..." }}
-          InputProps={{ startAdornment: <InputAdornment position="start"><SearchRounded aria-hidden="true" /></InputAdornment> }} />
+          InputProps={{ startAdornment: <InputAdornment position="start"><MagnifyingGlassIcon aria-hidden="true" /></InputAdornment> }} />
       </div>
       {loading && <div className="transcript-empty" role="status"><CircularProgress size={24} /> Đang tải danh sách học viên...</div>}
       {error && <Alert severity="error" action={<Button onClick={() => setReload(value => value + 1)}>Thử lại</Button>}>{error}</Alert>}
@@ -164,7 +163,7 @@ export default function LearnerTranscriptDialog({ classGroupId, onClose }) {
           return <div className={`transcript-roster-row${selected.has(student.participantId) ? " is-selected" : ""}`} key={student.participantId}>
             <FormControlLabel control={<Checkbox disabled={exporting} checked={selected.has(student.participantId)} onChange={() => toggle(student.participantId)} />}
               label={<span className="transcript-student-label"><strong>{student.code || "—"}</strong><span>{student.fullName || [student.lastName, student.firstName].filter(Boolean).join(" ") || "—"}</span></span>} />
-            <Tooltip title={canPreview ? "" : missingProfile}><span className="transcript-preview-action"><Button className="transcript-preview-button" startIcon={<VisibilityOutlined />} disabled={!canPreview || !!previewing || exporting}
+            <Tooltip title={canPreview ? "" : missingProfile}><span className="transcript-preview-action"><Button className="transcript-preview-button" startIcon={<EyeIcon />} disabled={!canPreview || !!previewing || exporting}
               onClick={() => preview(student)} aria-label={`Xem trước ${student.code || student.fullName}`}>
               {previewing === student.participantId ? "Đang mở..." : "Xem trước"}
             </Button></span></Tooltip>

@@ -191,7 +191,7 @@ Các biến chính:
 | `WEB_PORT` | `3100` | Cổng web trên máy host |
 | `PORT` | `3001` | Cổng backend |
 | `DB_HOST` | `127.0.0.1` | Host PostgreSQL cho backend chạy ngoài Docker |
-| `DB_PORT` | `55432` | Cổng PostgreSQL local, chỉ bind vào `127.0.0.1` |
+| `DB_PORT` | `15432` | Cổng PostgreSQL local, chỉ bind vào `127.0.0.1` |
 | `DB_ADMIN_PORT` | `5051` | Cổng pgAdmin trên máy host |
 | `POSTGRES_DB` | `pgsms` | Tên database |
 | `POSTGRES_USER` | `pgsms` | Tài khoản PostgreSQL |
@@ -270,7 +270,7 @@ Password: giá trị POSTGRES_PASSWORD trong .env
 ```
 
 pgAdmin kết nối database bằng hostname `db` trên Docker network. PostgreSQL cũng
-được bind riêng vào `127.0.0.1:55432` để backend development trên máy có thể kết
+được bind riêng vào `127.0.0.1:15432` để backend development trên máy có thể kết
 nối; cổng này không mở ra mạng LAN.
 
 ## Chạy toàn bộ ứng dụng (thủ công)
@@ -299,7 +299,13 @@ docker compose up -d db pgadmin
 docker compose ps
 ```
 
-PostgreSQL local sẽ nhận kết nối tại `127.0.0.1:55432`.
+PostgreSQL local sẽ nhận kết nối tại `127.0.0.1:15432`.
+
+Nếu Docker báo `ports are not available` hoặc `bind: An attempt was made to
+access a socket in a way forbidden by its access permissions`, kiểm tra các
+dải cổng Windows đang giữ bằng `netsh interface ipv4 show excludedportrange protocol=tcp`.
+Đặt `DB_PORT` trong `.env` thành một cổng trống ngoài các dải đó, chạy lại
+`docker compose up -d db` rồi khởi động lại backend để nạp cổng mới.
 
 ### Terminal 2 - Backend
 

@@ -10,10 +10,7 @@ const render = (ui, options) => renderWithPermissions(ui, ["masters.manage"], op
 
 jest.mock("axios");
 jest.mock("../../components/FeatureLayout", () => ({ children }) => <div>{children}</div>);
-vi.mock(import("@mui/icons-material"), () => ({
-  AddRounded: () => null, DeleteRounded: () => null, EditRounded: () => null,
-  GroupWorkRounded: () => null, SearchRounded: () => null,
-}));
+
 
 const year = String(new Date().getFullYear());
 const major = { id: "major-1", code: "CNTT", name: "Công nghệ thông tin" };

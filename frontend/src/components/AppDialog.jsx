@@ -1,3 +1,4 @@
+import { XMarkIcon } from "./AppIcons";
 import React from "react";
 import {
   Button,
@@ -114,9 +115,7 @@ const AppDialog = ({
                 borderRadius: "4px",
                 "&:hover": { bgcolor: "rgba(0, 0, 0, 0.06)", color: "inherit" },
               }}
-            >
-              ×
-            </IconButton>
+            ><XMarkIcon fontSize="small" /></IconButton>
           )}
         </DialogTitle>
       )}

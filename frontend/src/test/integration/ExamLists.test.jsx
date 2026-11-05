@@ -22,10 +22,7 @@ jest.mock("axios");
 jest.setTimeout(60000);
 // Large MUI tables can take longer than Testing Library's default 1s on CI/desktop.
 configure({ asyncUtilTimeout: 10000 });
-jest.mock("@mui/icons-material", () => ({
-  DownloadRounded: () => null, ListAltRounded: () => null,
-  SaveRounded: () => null, SearchRounded: () => null,
-}));
+
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
 // Animation timers are unrelated to grade entry/export and slow down large page fixtures.
 const testTheme = createTheme({ components: { MuiButtonBase: { defaultProps: { disableRipple: true } } } });

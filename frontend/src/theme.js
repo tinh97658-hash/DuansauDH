@@ -1,6 +1,8 @@
 import { createTheme } from "@mui/material/styles";
 import { dropdownMenuStyles } from "./utils/dropdownGeometry";
 import DropdownPopper from "./components/DropdownPopper";
+import React from "react";
+import { ArrowDownIcon, CheckCircleIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ExclamationTriangleIcon, InformationCircleIcon, MinusIcon, StopIcon, XCircleIcon, XMarkIcon } from "./components/AppIcons";
 
 export const APP_FONT_FAMILY = '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif';
 export const TABLE_BORDER_COLOR = "#687C8E";
@@ -83,6 +85,16 @@ export const theme = createTheme({
     button: { textTransform: "none", fontWeight: 600, fontSize: "12.5px" },
   },
   components: {
+    MuiCheckbox: {
+      defaultProps: {
+        icon: React.createElement(StopIcon),
+        checkedIcon: React.createElement(CheckCircleIcon),
+        indeterminateIcon: React.createElement(MinusIcon),
+      },
+    },
+    MuiNativeSelect: { defaultProps: { IconComponent: ChevronDownIcon } },
+    MuiTableSortLabel: { defaultProps: { IconComponent: ArrowDownIcon } },
+    MuiPaginationItem: { defaultProps: { components: { previous: ChevronLeftIcon, next: ChevronRightIcon } } },
     MuiCssBaseline: {
       styleOverrides: {
         // InputBase normally inserts these global rules for every input mount.
@@ -236,6 +248,7 @@ export const theme = createTheme({
       },
     },
     MuiSelect: {
+      defaultProps: { IconComponent: ChevronDownIcon },
       styleOverrides: {
         icon: { color: '#526576' },
         select: {
@@ -293,7 +306,7 @@ export const theme = createTheme({
       },
     },
     MuiAutocomplete: {
-      defaultProps: { PopperComponent: DropdownPopper },
+      defaultProps: { PopperComponent: DropdownPopper, popupIcon: React.createElement(ChevronDownIcon), clearIcon: React.createElement(XMarkIcon, { fontSize: "small" }) },
       styleOverrides: {
         paper: { maxHeight: 'var(--app-dropdown-max-height, 360px)', overflowY: 'auto' },
         listbox: { maxHeight: 'var(--app-dropdown-max-height, 360px)' },
@@ -450,6 +463,15 @@ export const theme = createTheme({
       },
     },
     MuiAlert: {
+      defaultProps: {
+        iconMapping: {
+          success: React.createElement(CheckCircleIcon),
+          info: React.createElement(InformationCircleIcon),
+          warning: React.createElement(ExclamationTriangleIcon),
+          error: React.createElement(XCircleIcon),
+        },
+        components: { CloseIcon: XMarkIcon },
+      },
       styleOverrides: {
         root: ({ ownerState, theme }) => ({
           borderRadius: 0,

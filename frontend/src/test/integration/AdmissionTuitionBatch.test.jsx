@@ -7,11 +7,7 @@ import AdmissionRecords from "../../pages/plan/admissionRecords";
 const render = (ui, options) => renderWithPermissions(ui, ["admission.manage"], options);
 
 jest.mock("axios", () => ({ get: jest.fn(), put: jest.fn(), isCancel: jest.fn(() => false), defaults: {} }));
-jest.mock("@mui/icons-material", () => ({
-  AddPhotoAlternateRounded: () => null, AddRounded: () => null, CheckCircleRounded: () => null,
-  CloseRounded: () => null, DeleteRounded: () => null, EditRounded: () => null,
-  PersonRounded: () => null, PrintRounded: () => null, VisibilityRounded: () => null, SearchRounded: () => null,
-}));
+
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
 jest.mock("react-toastify", () => ({ ToastContainer: () => null, toast: { success: jest.fn(), error: jest.fn() } }));
 let rows;

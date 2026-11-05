@@ -12,13 +12,7 @@ import {
   Select, Stack, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Tooltip, Typography,
 } from "@mui/material";
-import ArrowBackRounded from "@mui/icons-material/ArrowBackRounded";
-import ArrowForwardRounded from "@mui/icons-material/ArrowForwardRounded";
-import CheckCircleOutlineRounded from "@mui/icons-material/CheckCircleOutlineRounded";
-import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
-import DeleteOutlineRounded from "@mui/icons-material/DeleteOutlineRounded";
-import GroupWorkRounded from "@mui/icons-material/GroupWorkRounded";
-import PersonRounded from "@mui/icons-material/PersonRounded";
+import { ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, ExclamationTriangleIcon, PlusIcon, TrashIcon, UserGroupIcon, UserIcon } from "../../components/AppIcons";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
 import InlineReportExport from "../../components/InlineReportExport";
@@ -426,7 +420,7 @@ const AssignClassGroups = () => {
         </Box>
         {!majorsError && (loading || majorsLoading || !dataReady && !error) ? <Box sx={{ p: 3, textAlign: "center" }}><CircularProgress size={24} aria-label="Đang tải tổng quan" /></Box>
           : !error && !majorsError && (summary.length === 0 ? <Box className="assignment-summary-empty">
-            <CheckCircleOutlineRounded aria-hidden="true" />
+            <CheckCircleIcon aria-hidden="true" />
             <Typography variant="body2" sx={{ fontWeight: 600 }}>Không còn học viên chờ phân nhóm</Typography>
             <Typography variant="caption" color="text.secondary">Tất cả học viên trong phạm vi hiện tại đã được phân nhóm.</Typography>
           </Box> : <Box component="ul" aria-label="Tổng quan phân nhóm" className="assignment-summary-list">
@@ -443,7 +437,7 @@ const AssignClassGroups = () => {
                       onClick={() => navigateScope(selectedYear, discipline.id, row.major.id)}>
                       <span className="assignment-summary-name">{majorLabels.labels.get(row.major.id)}</span>
                       <span className="assignment-summary-action"><span className="assignment-summary-count">{row.unassigned} HV</span>
-                        <ArrowForwardRounded fontSize="small" aria-hidden="true" /></span>
+                        <ArrowRightIcon fontSize="small" aria-hidden="true" /></span>
                     </button>
                   </li>)}
                 </ul>
@@ -468,12 +462,12 @@ const AssignClassGroups = () => {
           }}>
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 0.75, color: "#111827" }}>
-                <PersonRounded sx={{ color: "#1685B5", fontSize: 19 }} />
+                <UserIcon sx={{ color: "#1685B5", fontSize: 19 }} />
                 Học viên chưa phân nhóm
                 <Chip size="small" label={`${filteredStudents.length} HV`} sx={{ ml: 0.25, height: 22, bgcolor: "#EAF6FC", color: "#0788B8", fontWeight: 700 }} />
               </Typography>
 
-              <Button size="small" startIcon={<ArrowBackRounded />} disabled={actionLoading}
+              <Button size="small" startIcon={<ArrowLeftIcon />} disabled={actionLoading}
                 aria-label="Quay lại tổng quan" className="assignment-overview-action"
                 onClick={() => setSearchParams(new URLSearchParams({ year: selectedYear }))}>Tổng quan</Button>
             </Box>
@@ -493,12 +487,12 @@ const AssignClassGroups = () => {
               <Typography id="assignment-selection-status" variant="body2" color="text.secondary" aria-live="polite">
                 {selectedStudentIds.length ? <>Đã chọn <strong>{selectedStudentIds.length}</strong> học viên</> : "Chưa chọn học viên"}
                 {currentTargetGroup ? ` · Nhóm còn ${remainingCapacity} chỗ` : " · Chưa có nhóm để phân"}
-                {overCapacity && <span className="assignment-overflow"> · <WarningAmberRounded aria-hidden="true" />Vượt {selectedStudentIds.length - remainingCapacity} học viên</span>}
+                {overCapacity && <span className="assignment-overflow"> · <ExclamationTriangleIcon aria-hidden="true" />Vượt {selectedStudentIds.length - remainingCapacity} học viên</span>}
               </Typography>
               <Button
                 variant="contained"
                 size="small"
-                endIcon={<ArrowForwardRounded />}
+                endIcon={<ArrowRightIcon />}
                 onClick={handleAssignSelected}
                 aria-describedby="assignment-selection-status"
                 disabled={!canEditTarget || selectedStudentIds.length === 0 || !currentTargetGroup || loading || groupsLoading || !!error || actionLoading || overCapacity}
@@ -593,7 +587,7 @@ const AssignClassGroups = () => {
           }}>
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 0.75, color: "#111827" }}>
-                <GroupWorkRounded sx={{ color: "#168B7C", fontSize: 19 }} />
+                <UserGroupIcon sx={{ color: "#168B7C", fontSize: 19 }} />
                 Nhóm mục tiêu
               </Typography>
             </Box>
@@ -644,13 +638,13 @@ const AssignClassGroups = () => {
               </Select>
             </FormControl>
 
-            {!groupsLoading && !error && (targetGroups.length === 0 || allGroupsFull || targetIsFull) && <Alert severity="warning" icon={<WarningAmberRounded />} className="assignment-operational-alert">
+            {!groupsLoading && !error && (targetGroups.length === 0 || allGroupsFull || targetIsFull) && <Alert severity="warning" icon={<ExclamationTriangleIcon />} className="assignment-operational-alert">
               <Typography variant="body2" className="assignment-alert-title">{targetGroups.length === 0 ? "Chưa có nhóm đang mở"
                 : allGroupsFull ? "Các nhóm hiện tại đã đủ sĩ số" : "Nhóm hiện tại đã đủ sĩ số."}</Typography>
               <Typography variant="body2">{targetGroups.length === 0 ? "Chuyên ngành này hiện chưa có nhóm có thể tiếp nhận học viên."
                 : hasAvailableAlternative ? "Vẫn còn nhóm khác có thể tiếp nhận học viên."
                   : "Không còn nhóm đang mở nào còn chỗ trong chuyên ngành này."}</Typography>
-              {!hasAvailableAlternative && <Button size="small" onClick={quickCreate} disabled={!canManageGroups || actionLoading || postCreateLoading}>+ Tạo mới</Button>}
+              {!hasAvailableAlternative && <Button size="small" startIcon={<PlusIcon />} onClick={quickCreate} disabled={!canManageGroups || actionLoading || postCreateLoading}>Tạo mới</Button>}
             </Alert>}
             {createFeedback && <Alert severity="warning" sx={{ mb: 1 }} action={pendingCreatedReload && <Button
               size="small" disabled={!canManageGroups || postCreateLoading}
@@ -739,7 +733,7 @@ const AssignClassGroups = () => {
                               onClick={() => setPendingRemoval({ ...m, groupId: targetGroupId, groupCode: currentTargetGroup.code })}
                               disabled={!canEditTarget || actionLoading}
                             >
-                              <DeleteOutlineRounded fontSize="small" />
+                              <TrashIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
                         </TableCell>

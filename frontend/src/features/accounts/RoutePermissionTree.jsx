@@ -1,10 +1,6 @@
 import React, { useState } from 'react';
+import { FolderIcon, DocumentTextIcon, ArrowRightIcon, ChevronDownIcon, ChevronRightIcon } from '../../components/AppIcons';
 import { Box, Checkbox, IconButton, Tooltip, Typography } from '@mui/material';
-import FolderOutlined from '@mui/icons-material/FolderOutlined';
-import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
-import SubdirectoryArrowRightRounded from '@mui/icons-material/SubdirectoryArrowRightRounded';
-import ExpandMoreRounded from '@mui/icons-material/ExpandMoreRounded';
-import ChevronRightRounded from '@mui/icons-material/ChevronRightRounded';
 
 const COLUMNS_TEMPLATE = 'minmax(320px, 1fr) 92px 104px';
 
@@ -86,9 +82,9 @@ export default function RoutePermissionTree({ permissions, checked, onChange, as
               }
               sx={{ mr: 0.5, p: 0.5, color: isSection ? '#0788B8' : '#5C768D' }}
             >
-              {open ? <ExpandMoreRounded fontSize="small" /> : <ChevronRightRounded fontSize="small" />}
+              {open ? <ChevronDownIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
             </IconButton>
-            <FolderOutlined sx={{ color: isSection ? '#0788B8' : '#5C768D', fontSize: isSection ? 20 : 18, mr: 1, flexShrink: 0 }} />
+            <FolderIcon sx={{ color: isSection ? '#0788B8' : '#5C768D', fontSize: isSection ? 20 : 18, mr: 1, flexShrink: 0 }} />
             <Typography sx={{ fontWeight: isSection ? 700 : 600, fontSize: isSection ? 13 : 12.5, color: isSection ? '#173E75' : '#2D3748' }}>
               {label}
             </Typography>
@@ -132,7 +128,7 @@ export default function RoutePermissionTree({ permissions, checked, onChange, as
           }}
         >
           <Box sx={{ ...cellNameSx, pl: 6 }}>
-            <DescriptionOutlined sx={{ color: '#0788B8', fontSize: 16, mr: 1, flexShrink: 0, opacity: 0.85 }} />
+            <DocumentTextIcon sx={{ color: '#0788B8', fontSize: 16, mr: 1, flexShrink: 0, opacity: 0.85 }} />
             <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>
               {page.name}
             </Typography>
@@ -163,7 +159,7 @@ export default function RoutePermissionTree({ permissions, checked, onChange, as
             }}
           >
             <Box sx={{ ...cellNameSx, pl: 8.5 }}>
-              <SubdirectoryArrowRightRounded sx={{ color: '#8DA2B5', fontSize: 15, mr: 0.75, flexShrink: 0 }} />
+              <ArrowRightIcon sx={{ color: '#8DA2B5', fontSize: 15, mr: 0.75, flexShrink: 0 }} />
               <Tooltip title={permission.description || permission.code} placement="top-start">
                 <Typography sx={{ fontSize: 12.5, color: '#475569', cursor: 'default' }}>
                   {permission.name}

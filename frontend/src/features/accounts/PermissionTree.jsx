@@ -1,11 +1,6 @@
 import React, { useState } from 'react';
+import { FolderIcon, FolderOpenIcon, DocumentTextIcon, ArrowRightIcon, ChevronDownIcon, ChevronRightIcon } from '../../components/AppIcons';
 import { Box, Checkbox, IconButton, Switch, Tooltip, Typography } from '@mui/material';
-import FolderOutlined from '@mui/icons-material/FolderOutlined';
-import FolderOpenOutlined from '@mui/icons-material/FolderOpenOutlined';
-import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
-import SubdirectoryArrowRightRounded from '@mui/icons-material/SubdirectoryArrowRightRounded';
-import ExpandMoreRounded from '@mui/icons-material/ExpandMoreRounded';
-import ChevronRightRounded from '@mui/icons-material/ChevronRightRounded';
 
 export function buildPermissionModules(catalog) {
   const result = new Map();
@@ -128,12 +123,12 @@ export default function PermissionTree({ modules, checked, onToggle, onModuleCha
                   }
                   sx={{ mr: 0.5, p: 0.5, color: enabled ? '#0788B8' : '#5C768D' }}
                 >
-                  {open ? <ExpandMoreRounded fontSize="small" /> : <ChevronRightRounded fontSize="small" />}
+                  {open ? <ChevronDownIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
                 </IconButton>
                 {open ? (
-                  <FolderOpenOutlined sx={{ fontSize: 20, color: '#0788B8', mr: 1, flexShrink: 0 }} />
+                  <FolderOpenIcon sx={{ fontSize: 20, color: '#0788B8', mr: 1, flexShrink: 0 }} />
                 ) : (
-                  <FolderOutlined sx={{ fontSize: 20, color: '#5C768D', mr: 1, flexShrink: 0 }} />
+                  <FolderIcon sx={{ fontSize: 20, color: '#5C768D', mr: 1, flexShrink: 0 }} />
                 )}
                 <Typography sx={{ fontWeight: 700, fontSize: 13, color: enabled ? '#173E75' : '#2D3748' }}>
                   {module.name}
@@ -186,9 +181,9 @@ export default function PermissionTree({ modules, checked, onToggle, onModuleCha
                     >
                       <Box sx={{ ...cellNameSx, pl: isRead ? 5 : 7.5 }}>
                         {isRead ? (
-                          <DescriptionOutlined sx={{ color: '#0788B8', fontSize: 16, mr: 1, flexShrink: 0, opacity: 0.85 }} />
+                          <DocumentTextIcon sx={{ color: '#0788B8', fontSize: 16, mr: 1, flexShrink: 0, opacity: 0.85 }} />
                         ) : (
-                          <SubdirectoryArrowRightRounded sx={{ color: '#8DA2B5', fontSize: 15, mr: 0.75, flexShrink: 0 }} />
+                          <ArrowRightIcon sx={{ color: '#8DA2B5', fontSize: 15, mr: 0.75, flexShrink: 0 }} />
                         )}
                         <Tooltip title={permission.description || permission.code} placement="top-start">
                           <Typography

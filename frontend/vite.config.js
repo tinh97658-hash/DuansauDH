@@ -2,14 +2,6 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import svgr from "vite-plugin-svgr";
 import path from "node:path";
-import fs from "node:fs";
-
-// Discover the icons actually used by the app before the dev server starts.
-// This avoids optimizer reloads when a lazily loaded page first imports an icon.
-const sourceDir = path.resolve(__dirname, "src");
-const iconDependencies = [...new Set(fs.readdirSync(sourceDir, { recursive: true })
-  .filter(file => /\.[jt]sx?$/.test(file) && !/(^|[\\/])test[\\/]/.test(file))
-  .flatMap(file => [...fs.readFileSync(path.join(sourceDir, file), "utf8").matchAll(/from\s*["'](@mui\/icons-material\/[^"']+)["']/g)].map(match => match[1])))];
 
 export default defineConfig(({ mode }) => {
   const envDir = path.resolve(__dirname, "..");
@@ -29,11 +21,6 @@ export default defineConfig(({ mode }) => {
       transformed = transformed.replace(
         /(?:jest|vi)\.mock\(\s*["']axios["']\s*,\s*\(\)\s*=>\s*\(\{([\s\S]*?)\}\)\s*\);/g,
         (match, body) => /\bdefault\s*:/.test(body) ? match : `vi.mock("axios", () => ({ default: { ${body} } }));`,
-      );
-      // Remove @mui/icons-material mock so real esbuild-bundled icons are used
-      transformed = transformed.replace(
-        /(?:jest|vi)\.mock\(\s*["']@mui\/icons-material["'][\s\S]*?\);/g,
-        ""
       );
       // Normalize FeatureLayout mocks
       transformed = transformed.replace(
@@ -86,7 +73,7 @@ export default defineConfig(({ mode }) => {
     optimizeDeps: {
       // Initialize MUI's styling engine in the same pre-bundle as its components.
       // Icon/deep imports can otherwise evaluate Popper before styled is ready.
-      include: ["@emotion/react", "@emotion/styled", "@mui/material", "@mui/material/styles", ...iconDependencies],
+      include: ["@emotion/react", "@emotion/styled", "@mui/material", "@mui/material/styles", "@heroicons/react/24/outline"],
       esbuildOptions: {
         loader: {
           ".js": "jsx",

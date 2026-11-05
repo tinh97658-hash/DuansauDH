@@ -14,7 +14,7 @@ import OfferingDetails from "../../features/scheduling/OfferingDetails";
 import { addDays, formatDateKey, getBusinessTodayKey, mondayOf, vietnameseDate } from "../../utils/schedulingCalendar";
 
 jest.mock("axios");
-jest.mock("@mui/icons-material", () => new Proxy({}, { get: () => () => null }));
+
 jest.mock("../../components/FeatureLayout", () => function Layout({ children }) { return <div>{children}</div>; });
 const offering = { id: "offering", subject: { id: "s", code: "HP01", name: "Khai thác cảng", credits: 2 }, status: "active", participantCount: 20,
   groupLinks: [{ classGroupId: "g", classGroup: { id: "g", code: "KTHH-2026", majorId: "m", academicYear: "2026", allowedWeekdays: [1, 2, 3, 4, 5, 6, 0] } }], sessionSummary: { heldCount: 2 } };
@@ -294,7 +294,7 @@ it("keeps Day Focus and its weekday while navigating weeks until the explicit we
   await screen.findByRole("region", { name: nextFridayFocus });
   fireEvent.click(screen.getByRole("button", { name: "Tuần sau" }));
   await screen.findByRole("region", { name: futureFridayFocus });
-  fireEvent.click(screen.getByRole("button", { name: "← Tuần" }));
+  fireEvent.click(screen.getByRole("button", { name: "Tuần" }));
 
   expect(screen.getByRole("table", { name: "Lịch học theo tuần" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: `Xem lịch ${vietnameseDate(futureFridayDate)}: 0 lớp` })).toBeInTheDocument();
@@ -357,7 +357,7 @@ it("summarizes a busy day in the week and exposes every session in day focus", a
   fireEvent.click(within(focus).getByRole("button", { name: /Lớp buổi 7/ }));
   expect(screen.getByRole("dialog")).toHaveTextContent("CHI TIẾT BUỔI HỌC");
   fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Đóng chi tiết buổi học" }));
-  fireEvent.click(screen.getByRole("button", { name: "← Tuần" }));
+  fireEvent.click(screen.getByRole("button", { name: "Tuần" }));
   expect(screen.getByRole("table", { name: "Lịch học theo tuần" })).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: new RegExp(`Xem lịch .*: 7 lớp`) }));
@@ -466,12 +466,12 @@ it("shows all pending confirmations independently of the displayed week and sort
   expect(cards[1]).toHaveTextContent("12/09/2026");
   expect(cards[1]).toHaveTextContent("Lớp mới hơn");
   expect(within(dialog).getAllByRole("button", { name: "Không diễn ra" })).toHaveLength(2);
-  expect(within(dialog).getAllByRole("button", { name: "✓ Đã diễn ra" })).toHaveLength(2);
+  expect(within(dialog).getAllByRole("button", { name: "Đã diễn ra" })).toHaveLength(2);
   expect(axios.get).toHaveBeenCalledWith(`${API_BASE_URL}/scheduling/pending-teaching-sessions`, { withCredentials: true });
   fireEvent.click(within(dialog).getAllByRole("button", { name: "Không diễn ra" })[0]);
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(`${API_BASE_URL}/scheduling/teaching-sessions/older/confirmation`, { status: "not_held" }, { withCredentials: true }));
-  await waitFor(() => expect(within(dialog).getAllByRole("button", { name: "✓ Đã diễn ra" })[1]).toBeEnabled());
-  fireEvent.click(within(dialog).getAllByRole("button", { name: "✓ Đã diễn ra" })[1]);
+  await waitFor(() => expect(within(dialog).getAllByRole("button", { name: "Đã diễn ra" })[1]).toBeEnabled());
+  fireEvent.click(within(dialog).getAllByRole("button", { name: "Đã diễn ra" })[1]);
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(`${API_BASE_URL}/scheduling/teaching-sessions/newer/confirmation`, { status: "held" }, { withCredentials: true }));
 });
 it("preserves editing for API session projections without clock fields", async () => {
@@ -848,7 +848,7 @@ it("shows the add affordance and saves another class in an occupied period with 
   await waitFor(() => expect(add).toBeEnabled());
   const slot = add.closest(".sl-slot");
   expect(within(slot).getByRole("button", { name: /Lớp khác cùng buổi.*ĐÃ XẾP/ })).toBeInTheDocument();
-  expect(within(slot).getByText("+ Xếp buổi")).toBeVisible();
+  expect(within(slot).getByText("Xếp buổi")).toBeVisible();
   fireEvent.click(add);
   const dialog = screen.getByRole("dialog");
   await waitFor(() => expect(within(dialog).getByRole("button", { name: "Lưu buổi học" })).toBeEnabled());

@@ -4,11 +4,7 @@ import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress, Divider, FormControlLabel,
   IconButton, InputAdornment, Paper, Stack, TextField, Tooltip, Typography,
 } from "@mui/material";
-import AddRounded from "@mui/icons-material/AddRounded";
-import DeleteRounded from "@mui/icons-material/DeleteRounded";
-import EditRounded from "@mui/icons-material/EditRounded";
-import SaveRounded from "@mui/icons-material/SaveRounded";
-import SearchRounded from "@mui/icons-material/SearchRounded";
+import { DocumentCheckIcon, PencilSquareIcon, PlusIcon, TrashIcon, MagnifyingGlassIcon } from "../../components/AppIcons";
 import FeatureLayout from "../../components/FeatureLayout";
 import AppDialog from "../../components/AppDialog";
 import PopupFormField from "../../components/PopupFormField";
@@ -260,7 +256,7 @@ const Roles = () => {
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <SearchRounded fontSize="small" sx={{ color: '#8DA2B5' }} />
+                <MagnifyingGlassIcon fontSize="small" sx={{ color: '#8DA2B5' }} />
               </InputAdornment>
             ),
           }}
@@ -268,7 +264,7 @@ const Roles = () => {
         {canManage && (
           <Button
             variant="contained"
-            startIcon={<SaveRounded />}
+            startIcon={<DocumentCheckIcon />}
             disabled={saving || !dirty || !allPermissions.length}
             onClick={savePermissions}
             sx={{ whiteSpace: 'nowrap', textTransform: 'none', fontWeight: 600, px: 2 }}
@@ -306,7 +302,7 @@ const Roles = () => {
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.5, py: 1, bgcolor: "#F5F9FC", borderBottom: "1px solid #DCE6EF" }}>
               <Typography sx={{ fontWeight: 700, fontSize: 13, color: "#173E75" }}>DANH SÁCH VAI TRÒ</Typography>
               <Stack direction="row" spacing={1} alignItems="center">
-                {canManage && <Tooltip title="Thêm vai trò"><IconButton size="small" color="primary" aria-label="Thêm vai trò" onClick={openCreateRole} disabled={saving || dirty}><AddRounded fontSize="small" /></IconButton></Tooltip>}
+                {canManage && <Tooltip title="Thêm vai trò"><IconButton size="small" color="primary" aria-label="Thêm vai trò" onClick={openCreateRole} disabled={saving || dirty}><PlusIcon fontSize="small" /></IconButton></Tooltip>}
               </Stack>
             </Stack>
             <Stack divider={<Divider flexItem />}>
@@ -349,7 +345,7 @@ const Roles = () => {
                   </Box>
                   {canManage && (
                     <Stack direction="row" spacing={1}>
-                      <Button size="small" variant="outlined" startIcon={<EditRounded />} onClick={openEditRole} disabled={saving || dirty} sx={{ textTransform: "none", fontWeight: 600 }}>Sửa</Button>
+                      <Button size="small" variant="outlined" startIcon={<PencilSquareIcon />} onClick={openEditRole} disabled={saving || dirty} sx={{ textTransform: "none", fontWeight: 600 }}>Sửa</Button>
                       {selectedRole.active !== false && (
                         <Button size="small" variant="outlined" color="warning" onClick={() => toggleActive(selectedRole)} disabled={saving || dirty} sx={{ textTransform: "none", fontWeight: 600 }}>Tạm ẩn</Button>
                       )}
@@ -357,7 +353,7 @@ const Roles = () => {
                         <Button size="small" variant="outlined" color="success" onClick={() => toggleActive(selectedRole)} disabled={saving || dirty} sx={{ textTransform: "none", fontWeight: 600 }}>Kích hoạt</Button>
                       )}
                       {!selectedRole.isSystem && (
-                        <Button size="small" variant="outlined" color="error" startIcon={<DeleteRounded />} onClick={() => setDeleteTarget(selectedRole)} disabled={saving || dirty || (selectedRole.staffCount || 0) > 0} sx={{ textTransform: "none", fontWeight: 600 }}>Xóa</Button>
+                        <Button size="small" variant="outlined" color="error" startIcon={<TrashIcon />} onClick={() => setDeleteTarget(selectedRole)} disabled={saving || dirty || (selectedRole.staffCount || 0) > 0} sx={{ textTransform: "none", fontWeight: 600 }}>Xóa</Button>
                       )}
                     </Stack>
                   )}

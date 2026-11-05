@@ -9,7 +9,7 @@ import Lecturers from "../../pages/system/lecturers";
 const render = (ui, options) => renderWithPermissions(ui, ["catalog.manage"], options);
 
 jest.mock("axios");
-jest.mock("@mui/icons-material", () => new Proxy({}, { get: () => () => null }));
+
 jest.mock("../../components/FeatureLayout", () => ({ children }) => <div>{children}</div>);
 beforeEach(renderToastHost);
 

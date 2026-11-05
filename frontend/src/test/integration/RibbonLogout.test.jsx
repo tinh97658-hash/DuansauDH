@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render as baseRender, screen, waitFor } from "@testing-library/react";
 import axios from "axios";
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router-dom";
 import RibbonHeader from "../../components/RibbonHeader";
@@ -19,6 +19,12 @@ const renderPage = (forced = false, dirty = false) => render(<RouterProvider rou
   ],
 }], { initialEntries: ["/system/change-password"] })} />);
 
+const render = (...args) => {
+  const result = baseRender(...args);
+  const toggle = screen.queryByRole("button", { name: "Mở menu tác vụ" });
+  if (toggle) fireEvent.click(toggle);
+  return result;
+};
 describe("Ribbon current-session POST logout", () => {
   beforeEach(() => { jest.clearAllMocks(); });
   it.each([
@@ -29,10 +35,10 @@ describe("Ribbon current-session POST logout", () => {
     fireEvent.click(await screen.findByRole("button", { name: label })); fireEvent.click(await screen.findByText("Bỏ thay đổi và tiếp tục"));
     await waitFor(() => expect(screen.getByTestId("route").textContent).toBe(destination));
   });
-  it("cancels logout before POST when confirmation is declined", async () => {
+  it.each(["Thoát chương trình", "Đăng xuất"])("confirms unsaved changes before logout from %s", async (label) => {
     axios.post.mockResolvedValue({ status: 204 }); renderPage(false, true);
-    fireEvent.click(screen.getByRole("button", { name: "Thoát chương trình" })); fireEvent.click(await screen.findByText("Ở lại")); expect(axios.post).not.toHaveBeenCalled();
-    fireEvent.click(await screen.findByRole("button", { name: "Thoát chương trình" })); fireEvent.click(await screen.findByText("Bỏ thay đổi và tiếp tục"));
+    fireEvent.click(screen.getByRole("button", { name: label })); fireEvent.click(await screen.findByText("Ở lại")); expect(axios.post).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole("button", { name: label })); fireEvent.click(await screen.findByText("Bỏ thay đổi và tiếp tục"));
     expect(await screen.findByRole("heading", { name: "Login page" })).toBeInTheDocument();
   });
   it.each([false, true])("permissionless Staff, forced password=%s, POSTs with credentials before navigation", async forced => {

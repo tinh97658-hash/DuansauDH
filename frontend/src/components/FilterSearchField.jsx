@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, InputAdornment, TextField } from "@mui/material";
-import SearchRounded from "@mui/icons-material/SearchRounded";
+import { MagnifyingGlassIcon } from "./AppIcons";
 
 /**
  * Search control shared by page-level filter bars.
@@ -47,7 +47,7 @@ const FilterSearchField = ({
         ...InputProps,
         startAdornment: InputProps?.startAdornment ?? (
           <InputAdornment position="start">
-            <SearchRounded sx={{ width: 16, height: 16, color: "#5B6F87" }} />
+            <MagnifyingGlassIcon sx={{ width: 16, height: 16, color: "#5B6F87" }} />
           </InputAdornment>
         ),
       }}

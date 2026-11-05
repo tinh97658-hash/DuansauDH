@@ -9,7 +9,7 @@ import { alphabeticalOptionGroups } from "../../utils/optionGroups";
 const render = (ui, options) => renderWithPermissions(ui, ["catalog.manage"], options);
 
 jest.mock("axios", () => ({ get: jest.fn(), put: jest.fn(), post: jest.fn(), defaults: {} }));
-jest.mock("@mui/icons-material", () => new Proxy({}, { get: () => () => null }));
+
 jest.mock("../../components/FeatureLayout", () => ({ children }) => <div>{children}</div>);
 
 const units = [{ id: "unit-1", name: "Đơn vị từ API", active: true }, { id: "inactive", name: "Đơn vị ngừng dùng", active: false }];

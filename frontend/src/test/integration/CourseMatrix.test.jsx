@@ -295,10 +295,10 @@ it("excludes completed offerings from the active board, matrix, KPIs, filters, a
   fireEvent.change(screen.getByLabelText("Tình trạng lịch"), { target: { value: "all" } });
 
   const unscheduledRow = within(matrix).getByRole("row", { name: /SUBJECT-UNSCHEDULED.*Học phần unscheduled/ });
-  const schedule = within(unscheduledRow).getByRole("button", { name: "Xếp lịch →" });
+  const schedule = within(unscheduledRow).getByRole("button", { name: "Xếp lịch" });
   fireEvent.click(schedule);
   expect(screen.getByLabelText("Vị trí hiện tại")).toHaveTextContent("/masters/schedule?offeringId=unscheduled");
-  const addSchedule = screen.getByRole("button", { name: "Xếp thêm →" });
+  const addSchedule = screen.getByRole("button", { name: "Xếp thêm" });
   fireEvent.click(addSchedule);
   expect(screen.getByLabelText("Vị trí hiện tại")).toHaveTextContent("/masters/schedule?offeringId=scheduled");
 
@@ -309,11 +309,11 @@ it("excludes completed offerings from the active board, matrix, KPIs, filters, a
   cleanup();
   renderMatrix([activeScheduled, completedOnlySubject], { role: "supervisor", canManageScheduling: true }, ["scheduling.view"]);
   await openMatrix();
-  expect(screen.queryByRole("button", { name: "Xếp thêm →" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Xếp lịch →" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Xếp thêm" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Xếp lịch" })).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: "Dạng cột theo khóa" }));
-  expect(screen.queryByRole("button", { name: "Xếp lịch →" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Xếp lịch" })).not.toBeInTheDocument();
 });
 
 it("uses the existing empty state when every fetched offering is completed", async () => {

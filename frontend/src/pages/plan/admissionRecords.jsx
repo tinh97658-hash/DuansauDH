@@ -15,13 +15,7 @@ import {
   Stack, TableBody, TableCell, TableContainer, TableRow,
   TextField, Tooltip, Typography,
 } from "@mui/material";
-import AddPhotoAlternateRounded from "@mui/icons-material/AddPhotoAlternateRounded";
-import AddRounded from "@mui/icons-material/AddRounded";
-import CheckCircleRounded from "@mui/icons-material/CheckCircleRounded";
-import CloseRounded from "@mui/icons-material/CloseRounded";
-import EditRounded from "@mui/icons-material/EditRounded";
-import PersonRounded from "@mui/icons-material/PersonRounded";
-import VisibilityRounded from "@mui/icons-material/VisibilityRounded";
+import { CheckCircleIcon, EyeIcon, PencilSquareIcon, PhotoIcon, PlusIcon, UserIcon, XMarkIcon } from "../../components/AppIcons";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
 import InlineReportExport from "../../components/InlineReportExport";
@@ -717,7 +711,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
               <Button
                 variant="contained"
                 size="small"
-                startIcon={<AddRounded />}
+                startIcon={<PlusIcon />}
                 onClick={handleOpenAdd}
                 sx={{
                   height: 40,
@@ -773,7 +767,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                     Chưa có hồ sơ tuyển sinh nào theo điều kiện lọc.
                     {isAdmin && !isMastersList && (
                       <Box sx={{ mt: 1.5 }}>
-                        <Button size="small" variant="outlined" startIcon={<AddRounded />} onClick={handleOpenAdd}>
+                        <Button size="small" variant="outlined" startIcon={<PlusIcon />} onClick={handleOpenAdd}>
                           Nhập hồ sơ mới ngay
                         </Button>
                       </Box>
@@ -940,7 +934,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                         {isAdmin && (
                           <Tooltip title="Sửa hồ sơ">
                             <IconButton size="small" color="inherit" aria-label={`Sửa hồ sơ ${r.code || r.fullName}`} onClick={() => handleOpenEdit(r)}>
-                              <EditRounded sx={{ fontSize: 17, color: "#607486" }} />
+                              <PencilSquareIcon sx={{ fontSize: 17, color: "#607486" }} />
                             </IconButton>
                           </Tooltip>
                         )}
@@ -992,13 +986,13 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
           }}
         >
           <Stack direction="row" spacing={1} alignItems="center">
-            <PersonRounded sx={{ color: "inherit", fontSize: 20 }} />
+            <UserIcon sx={{ color: "inherit", fontSize: 20 }} />
             <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "inherit", fontSize: 14, letterSpacing: "0.3px" }}>
               {formData.id ? "SỬA HỒ SƠ HỌC VIÊN" : "HỒ SƠ HỌC VIÊN - QUẢN LÝ HỌC VIÊN"}
             </Typography>
           </Stack>
           <IconButton size="small" onClick={() => setIsFormOpen(false)} sx={{ color: "inherit", "&:hover": { bgcolor: "rgba(0, 0, 0, 0.06)" } }}>
-            <CloseRounded fontSize="small" />
+            <XMarkIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
 
@@ -1040,7 +1034,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                   <Button
                     size="small"
                     variant="outlined"
-                    startIcon={<AddPhotoAlternateRounded sx={{ fontSize: 14 }} />}
+                    startIcon={<PhotoIcon sx={{ fontSize: 14 }} />}
                     onClick={() => fileInputRef.current?.click()}
                     sx={{ height: 26, fontSize: 11, fontWeight: 600, textTransform: "none", mb: 0.5, width: "100%" }}
                   >
@@ -1568,7 +1562,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
         <DialogActions sx={{ px: 3, py: 1.5, bgcolor: "#F0F4F8", borderTop: "1px solid #DFE4E8", justifyContent: "center", gap: 2 }}>
           <Button
             variant="contained"
-            startIcon={<CheckCircleRounded />}
+            startIcon={<CheckCircleIcon />}
             onClick={handleSaveForm}
             disabled={saving}
             sx={{
@@ -1589,7 +1583,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
           {formData.id && (
             <Button
               variant="outlined"
-              startIcon={<VisibilityRounded />}
+              startIcon={<EyeIcon />}
               onClick={() => {
                 setIsFormOpen(false);
                 navigate(recordDetailUrl(formData.id));
@@ -1614,7 +1608,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
           <Button
             variant="outlined"
             color="error"
-            startIcon={<CloseRounded />}
+            startIcon={<XMarkIcon />}
             onClick={() => setIsFormOpen(false)}
             sx={{
               height: 36,

@@ -9,10 +9,7 @@ import {
   MenuItem, Paper, Stack, TableBody, TableCell, TableContainer,
   TableRow, Tooltip, Typography,
 } from "@mui/material";
-import AddRounded from "@mui/icons-material/AddRounded";
-import DeleteRounded from "@mui/icons-material/DeleteRounded";
-import EditRounded from "@mui/icons-material/EditRounded";
-import GroupWorkRounded from "@mui/icons-material/GroupWorkRounded";
+import { PencilSquareIcon, PlusIcon, TrashIcon, UserGroupIcon } from "../../components/AppIcons";
 import { API_BASE_URL } from "../../config/http";
 import FeatureLayout from "../../components/FeatureLayout";
 import InlineReportExport from "../../components/InlineReportExport";
@@ -283,7 +280,7 @@ const CreateClassGroups = () => {
           {isAdmin && (
             <Button
               variant="contained"
-              startIcon={<AddRounded />}
+              startIcon={<PlusIcon />}
               onClick={openAdd}
               disabled={majorsLoading || loading}
               sx={{ height: 40, px: 2, bgcolor: "#0788B8", borderRadius: "4px", boxShadow: "none", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}
@@ -389,19 +386,19 @@ const CreateClassGroups = () => {
                             color="success"
                             onClick={() => navigate(`/masters/assign-class-groups?groupId=${row.id}&majorId=${row.majorId || ""}&year=${row.academicYear || ""}`)}
                           >
-                            <GroupWorkRounded fontSize="small" />
+                            <UserGroupIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         {isAdmin && row.canEdit !== false && (
                           <>
                             <Tooltip title="Chỉnh sửa">
                               <IconButton size="small" color="primary" onClick={() => openEdit(row)}>
-                                <EditRounded fontSize="small" />
+                                <PencilSquareIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
                             <Tooltip title="Xóa">
                               <IconButton size="small" color="error" onClick={() => setDeletingGroup(row)}>
-                                <DeleteRounded fontSize="small" />
+                                <TrashIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
                           </>

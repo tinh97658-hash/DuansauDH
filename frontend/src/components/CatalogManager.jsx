@@ -9,9 +9,7 @@ import {
   Switch, TableBody, TableCell, TableContainer, TableRow, TextField,
   Tooltip, Typography, ListSubheader,
 } from "@mui/material";
-import AddRounded from "@mui/icons-material/AddRounded";
-import DeleteRounded from "@mui/icons-material/DeleteRounded";
-import EditRounded from "@mui/icons-material/EditRounded";
+import { PencilSquareIcon, PlusIcon, TrashIcon } from "./AppIcons";
 import { API_BASE_URL } from "../config/http";
 import FeatureLayout from "./FeatureLayout";
 import AppDialog from "./AppDialog";
@@ -426,7 +424,7 @@ const CatalogManager = ({
           {isAdmin && (
             <Button
               variant="contained"
-              startIcon={<AddRounded />}
+              startIcon={<PlusIcon />}
               onClick={openAdd}
               sx={{
                 height: 40,
@@ -494,8 +492,8 @@ const CatalogManager = ({
                 </TableCell>}
                 {showActions && (
                   <TableCell align="center" onDoubleClick={(event) => event.stopPropagation()}>
-                    {showEditAction && <Tooltip title={inlineEdit ? "" : "Sửa"}><IconButton aria-label="Sửa" size="small" color="primary" onClick={inlineEdit ? undefined : () => openEdit(row)} onDoubleClick={inlineEdit ? () => openEdit(row) : undefined}><EditRounded fontSize="small" /></IconButton></Tooltip>}
-                    {showDeleteAction && <Tooltip title="Xóa"><IconButton size="small" color="error" onClick={() => setDeleting(row)}><DeleteRounded fontSize="small" /></IconButton></Tooltip>}
+                    {showEditAction && <Tooltip title={inlineEdit ? "" : "Sửa"}><IconButton aria-label="Sửa" size="small" color="primary" onClick={inlineEdit ? undefined : () => openEdit(row)} onDoubleClick={inlineEdit ? () => openEdit(row) : undefined}><PencilSquareIcon fontSize="small" /></IconButton></Tooltip>}
+                    {showDeleteAction && <Tooltip title="Xóa"><IconButton size="small" color="error" onClick={() => setDeleting(row)}><TrashIcon fontSize="small" /></IconButton></Tooltip>}
                   </TableCell>
                 )}
               </TableRow>

@@ -41,11 +41,11 @@ it("cycles DEFAULT → ASC → DESC → DEFAULT immediately while preserving the
   fireEvent.click(sortButton("Sắp xếp theo số buổi"));
   expect(cards()).toEqual(["offering-B", "offering-D", "offering-C", "offering-A"]);
   expect(sortButton("Số buổi tăng dần")).toHaveAttribute("aria-pressed", "true");
-  expect(within(sortButton("Số buổi tăng dần")).getByTestId("ArrowUpwardRoundedIcon")).toBeInTheDocument();
+  expect(sortButton("Số buổi tăng dần").querySelector('[data-heroicon="ArrowUpIcon"]')).toBeInTheDocument();
   expect(badge()).toHaveTextContent("4");
   fireEvent.click(sortButton("Số buổi tăng dần"));
   expect(cards()).toEqual(["offering-A", "offering-C", "offering-B", "offering-D"]);
-  expect(within(sortButton("Số buổi giảm dần")).getByTestId("ArrowDownwardRoundedIcon")).toBeInTheDocument();
+  expect(sortButton("Số buổi giảm dần").querySelector('[data-heroicon="ArrowDownIcon"]')).toBeInTheDocument();
   fireEvent.click(sortButton("Số buổi giảm dần"));
   expect(cards()).toEqual(["offering-A", "offering-B", "offering-C", "offering-D"]);
   expect(sortButton("Sắp xếp theo số buổi")).toHaveAttribute("aria-pressed", "false");

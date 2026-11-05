@@ -7,7 +7,7 @@ import { notifySubjectCatalogChanged } from "../../utils/subjectCatalog";
 import { clonePolicy } from "../../features/exams/gradingPolicy";
 
 jest.mock("axios");
-jest.mock("@mui/icons-material", () => ({ SearchRounded: () => null }));
+
 jest.setTimeout(60000);
 const majors = [{ id: "m1", name: "Công nghệ thông tin" }, { id: "m2", name: "Cơ khí" }];
 const catalog = [

@@ -1,3 +1,4 @@
+import { ChevronLeftIcon, ChevronRightIcon } from "./AppIcons";
 import React, { useState } from "react";
 import { Popover } from "@mui/material";
 import AppSelect from "./AppSelect";
@@ -40,14 +41,14 @@ export default function DateCalendar({ anchorEl, value, min, max, onSelect, onCl
     anchorOrigin={{ vertical: "bottom", horizontal: "right" }} transformOrigin={{ vertical: "top", horizontal: "right" }}
     PaperProps={{ className: "app-date-calendar", role: "dialog", "aria-label": `Chọn ngày${label ? `: ${label}` : ""}` }}>
     <div className="app-date-calendar-header">
-      <button type="button" aria-label="Tháng trước" disabled={!!min && month <= min.slice(0, 7)} onClick={() => moveMonth(-1)}>‹</button>
+      <button type="button" aria-label="Tháng trước" disabled={!!min && month <= min.slice(0, 7)} onClick={() => moveMonth(-1)}><ChevronLeftIcon fontSize="inherit" /></button>
       <AppSelect aria-label="Tháng" value={monthNumber} onChange={event => setMonth(`${year}-${String(event.target.value).padStart(2, "0")}`)}>
         {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>Tháng {i + 1}</option>)}
       </AppSelect>
       <AppSelect aria-label="Năm" value={year} onChange={event => setMonth(`${event.target.value}-${String(monthNumber).padStart(2, "0")}`)}>
         {Array.from({ length: lastYear - firstYear + 1 }, (_, i) => <option key={i} value={firstYear + i}>{firstYear + i}</option>)}
       </AppSelect>
-      <button type="button" aria-label="Tháng sau" disabled={!!max && month >= max.slice(0, 7)} onClick={() => moveMonth(1)}>›</button>
+      <button type="button" aria-label="Tháng sau" disabled={!!max && month >= max.slice(0, 7)} onClick={() => moveMonth(1)}><ChevronRightIcon fontSize="inherit" /></button>
     </div>
     <div className="app-date-calendar-grid" role="group" aria-label={`Tháng ${monthNumber}/${year}`}>
       {["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map(day => <span key={day}>{day}</span>)}

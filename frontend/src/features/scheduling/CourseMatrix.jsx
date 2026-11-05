@@ -1,16 +1,10 @@
+import { ArrowRightIcon, CalendarDaysIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, MagnifyingGlassIcon, Square3Stack3DIcon, Squares2X2Icon, TableCellsIcon, ViewColumnsIcon } from "../../components/AppIcons";
 import AppSelect from "../../components/AppSelect";
 import InlineReportExport from "../../components/InlineReportExport";
 import { useReportExport } from "../../components/ReportExportContext";
 import { usePermissions } from "../accounts/usePermissions";
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import CalendarMonthRounded from "@mui/icons-material/CalendarMonthRounded";
-import GridViewRounded from "@mui/icons-material/GridViewRounded";
-import LayersRounded from "@mui/icons-material/LayersRounded";
-import PendingActionsRounded from "@mui/icons-material/PendingActionsRounded";
-import SearchRounded from "@mui/icons-material/SearchRounded";
-import TableChartRounded from "@mui/icons-material/TableChartRounded";
-import ViewColumnRounded from "@mui/icons-material/ViewColumnRounded";
 import { api, groupsOf, labelOf, Notice, offeringTitle, rows, subjectLabel, unique, useLoad } from "./shared";
 import { getBusinessTodayKey } from "../../utils/schedulingCalendar";
 import OfferingDetails from "./OfferingDetails";
@@ -141,19 +135,19 @@ export default function CourseMatrix({ user }) {
         <div className="sl-matrix-toolbar-head">
           <div className="sl-matrix-kpi-bar" role="region" aria-label="Chỉ số tổng quan">
             <div className="sl-matrix-kpi kpi-info">
-              <span className="sl-matrix-kpi-icon"><LayersRounded aria-hidden="true" /></span>
+              <span className="sl-matrix-kpi-icon"><Square3Stack3DIcon aria-hidden="true" /></span>
               <div><strong>{kpis.total}</strong><span>Tổng số lớp học phần</span></div>
             </div>
             <div className="sl-matrix-kpi kpi-warn">
-              <span className="sl-matrix-kpi-icon"><PendingActionsRounded aria-hidden="true" /></span>
+              <span className="sl-matrix-kpi-icon"><ClockIcon aria-hidden="true" /></span>
               <div><strong>{kpis.unscheduled}</strong><span>Chưa xếp lịch</span></div>
             </div>
             <div className="sl-matrix-kpi kpi-progress">
-              <span className="sl-matrix-kpi-icon"><CalendarMonthRounded aria-hidden="true" /></span>
+              <span className="sl-matrix-kpi-icon"><CalendarDaysIcon aria-hidden="true" /></span>
               <div><strong>{kpis.scheduled}</strong><span>Đang học / Đã xếp lịch</span></div>
             </div>
             <div className="sl-matrix-kpi kpi-cross">
-              <span className="sl-matrix-kpi-icon"><GridViewRounded aria-hidden="true" /></span>
+              <span className="sl-matrix-kpi-icon"><Squares2X2Icon aria-hidden="true" /></span>
               <div><strong>{kpis.crossCohort}</strong><span>Ghép liên khóa</span></div>
             </div>
           </div>
@@ -164,7 +158,7 @@ export default function CourseMatrix({ user }) {
               onClick={() => setViewMode("board")}
               aria-pressed={viewMode === "board"}
             >
-              <ViewColumnRounded aria-hidden="true" /> Dạng cột theo khóa
+              <ViewColumnsIcon aria-hidden="true" /> Dạng cột theo khóa
             </button>
             <button
               type="button"
@@ -172,7 +166,7 @@ export default function CourseMatrix({ user }) {
               onClick={() => setViewMode("pivot")}
               aria-pressed={viewMode === "pivot"}
             >
-              <TableChartRounded aria-hidden="true" /> Bảng ma trận môn
+              <TableCellsIcon aria-hidden="true" /> Bảng ma trận môn
             </button>
           </div>
         </div>
@@ -180,7 +174,7 @@ export default function CourseMatrix({ user }) {
           <div className="sl-matrix-filter-item sl-matrix-search-item">
             <label htmlFor="matrix-search-input">Tìm kiếm</label>
             <div className="sl-matrix-search-wrap">
-              <SearchRounded aria-hidden="true" />
+              <MagnifyingGlassIcon aria-hidden="true" />
               <input
                 id="matrix-search-input"
                 className="sl-search-input"
@@ -395,7 +389,7 @@ function OfferingCard({ offering, canEdit, canDelete, onChanged, onSelectOfferin
             className="sl-matrix-schedule-link"
             onClick={() => onSelectOffering(offering.id)}
           >
-            Xếp lịch →
+            Xếp lịch <ArrowRightIcon fontSize="inherit" />
           </button>
         )}
       </div>
@@ -418,8 +412,8 @@ function OfferingStatus({ offering }) {
   }
   return (
     <span className={`sl-matrix-status status-${category}`}>
-      {category === "completed" ? <><span aria-hidden="true">✓</span> Hoàn thành</>
-        : <><span aria-hidden="true">●</span> Chưa xếp lịch</>}
+      {category === "completed" ? <><CheckIcon fontSize="inherit" /> Hoàn thành</>
+        : <><CalendarDaysIcon fontSize="inherit" /> Chưa xếp lịch</>}
     </span>
   );
 }
@@ -464,12 +458,12 @@ function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, canDelete,
         <div className="sl-matrix-cohort-window" role="group" aria-label="Chuyển khoảng khóa">
           {windowStart > 0 && (
             <button type="button" aria-label="Xem khóa mới hơn"
-              onClick={() => setWindowStart((start) => Math.max(0, start - 1))}>‹</button>
+              onClick={() => setWindowStart((start) => Math.max(0, start - 1))}><ChevronLeftIcon fontSize="inherit" /></button>
           )}
           <span aria-live="polite">Khóa {visibleCohorts[0]} – {visibleCohorts[visibleCohorts.length - 1]}</span>
           {windowStart < lastStart && (
             <button type="button" aria-label="Xem khóa cũ hơn"
-              onClick={() => setWindowStart((start) => Math.min(lastStart, start + 1))}>›</button>
+              onClick={() => setWindowStart((start) => Math.min(lastStart, start + 1))}><ChevronRightIcon fontSize="inherit" /></button>
           )}
         </div>
       )}
@@ -573,7 +567,7 @@ function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, canDelete,
                                         className="sl-pivot-schedule-btn sl-matrix-schedule-link"
                                         onClick={() => onSelectOffering(offering.id)}
                                       >
-                                        {total ? "Xếp thêm →" : "Xếp lịch →"}
+                                        {total ? "Xếp thêm" : "Xếp lịch"} <ArrowRightIcon fontSize="inherit" />
                                       </button>
                                     )}
                                   </div>
