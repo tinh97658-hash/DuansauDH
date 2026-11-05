@@ -1,3 +1,4 @@
+import { ArrowDownIcon, ArrowLeftIcon, ArrowUpIcon, ArrowsUpDownIcon, CalendarDaysIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, MinusIcon, PlusIcon } from "../../components/AppIcons";
 import { notify } from "../../utils/notify";
 import { usePermissions } from "../accounts/usePermissions";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -5,10 +6,6 @@ import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { Tooltip } from "@mui/material";
 import YearSelect from "./YearSelect";
-import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
-import SwapVertRounded from "@mui/icons-material/SwapVertRounded";
-import ArrowUpwardRounded from "@mui/icons-material/ArrowUpwardRounded";
-import ArrowDownwardRounded from "@mui/icons-material/ArrowDownwardRounded";
 import { api, groupsOf, intersectDays, labelOf, message, Modal, normalize, Notice, offeringTitle, rows, SearchSelect, unique, useLoad } from "./shared";
 
 import { addDays, formatDateKey, getBusinessTodayKey, getBusinessWallTime, isSessionPast, isSessionStartedInBusinessTimezone, periodTimes, mondayOf, vietnameseDate, vietnameseDayMonth, vietnameseWeekdayShort, weekDaysFrom } from "../../utils/schedulingCalendar";
@@ -26,16 +23,16 @@ import { dashboardScheduleQueue, matchesDashboardScheduleQueue } from "../dashbo
 const subjectLabel = (offering) => offering?.subject?.name || "Học phần";
 
 const SESSION_SORT_STATES = {
-  default: { next: "asc", label: "Sắp xếp theo số buổi", Icon: SwapVertRounded },
-  asc: { next: "desc", label: "Số buổi tăng dần", Icon: ArrowUpwardRounded },
-  desc: { next: "default", label: "Số buổi giảm dần", Icon: ArrowDownwardRounded },
+  default: { next: "asc", label: "Sắp xếp theo số buổi", Icon: ArrowsUpDownIcon },
+  asc: { next: "desc", label: "Số buổi tăng dần", Icon: ArrowUpIcon },
+  desc: { next: "default", label: "Số buổi giảm dần", Icon: ArrowDownIcon },
 };
 
 const WEEK_SLOT_LIMIT = 4;
 const DAY_FOCUS_STATUS_LANES = [
-  { key: "planned", label: "ĐÃ XẾP", symbol: "○" },
-  { key: "held", label: "ĐÃ DIỄN RA", symbol: "✓" },
-  { key: "not", label: "KHÔNG DIỄN RA", symbol: "—" },
+  { key: "planned", label: "ĐÃ XẾP", Icon: CalendarDaysIcon },
+  { key: "held", label: "ĐÃ DIỄN RA", Icon: CheckIcon },
+  { key: "not", label: "KHÔNG DIỄN RA", Icon: MinusIcon },
 ];
 
 function SessionMagnifier({ session, stateClass, className, onClick, children }) {
@@ -337,10 +334,10 @@ export default function Schedule({ user }) {
   };
   const sessionStatusKey = (session) => session.status === "held" ? "held" : session.status === "not_held" ? "not" : isSessionPast({ ...session, endTime: session.period === "MORNING" ? "12:00" : "23:59" }) ? "wait" : "planned";
   const dayFocusStatusKey = (session) => session.status === "held" ? "held" : session.status === "not_held" ? "not" : "planned";
-  const sessionState = (session) => ({ held: ["sl-held", "✓ ĐÃ DIỄN RA"], not: ["sl-not", "— KHÔNG DIỄN RA"], wait: ["sl-wait", "● CHỜ XÁC NHẬN"], planned: ["", "○ ĐÃ XẾP"] }[sessionStatusKey(session)]);
+  const sessionState = (session) => ({ held: ["sl-held", "ĐÃ DIỄN RA", CheckIcon], not: ["sl-not", "KHÔNG DIỄN RA", MinusIcon], wait: ["sl-wait", "CHỜ XÁC NHẬN", ClockIcon], planned: ["", "ĐÃ XẾP", CalendarDaysIcon] }[sessionStatusKey(session)]);
   const sessionCard = (session, compact = false) => {
-    const [style, state] = sessionState(session);
-    return <SessionMagnifier key={session.id} session={session} stateClass={style} className={`sl-session ${compact ? "sl-session-compact" : ""} ${style}`} onClick={() => openSession(session)}><strong>{offeringTitle(session.courseOffering)}</strong><span>{subjectLabel(session.courseOffering)}</span><small>{session.lecturer?.name || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><em>{state}</em></SessionMagnifier>;
+    const [style, state, StateIcon] = sessionState(session);
+    return <SessionMagnifier key={session.id} session={session} stateClass={style} className={`sl-session ${compact ? "sl-session-compact" : ""} ${style}`} onClick={() => openSession(session)}><strong>{offeringTitle(session.courseOffering)}</strong><span>{subjectLabel(session.courseOffering)}</span><small>{session.lecturer?.name || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><em><StateIcon fontSize="inherit" /> {state}</em></SessionMagnifier>;
   };
   const dayFocusSessionCard = (session) => {
     const style = { held: "sl-held", not: "sl-not", planned: "" }[dayFocusStatusKey(session)];
@@ -399,17 +396,17 @@ export default function Schedule({ user }) {
     if (!reason) return null;
     const details = <div className="sl-conflict-tooltip"><strong>Không thể xếp {period === "MORNING" ? "sáng" : "chiều"} {vietnameseDate(slot.date)}</strong><p>{reason}</p>{!sessions.loading && !sessions.error && slot.conflicts.map(row => <div key={row.id}><b>{offeringTitle(row.courseOffering)}</b><span>{row.schedulingConflict === "STUDENT_CONFLICT" ? "Có học viên học trùng" : groupsOf(row.courseOffering).filter(group => selectedGroupIds.has(group.id)).map(group => group.code || group.name).join(", ")}</span></div>)}<p>{sessions.error ? "Vui lòng tải lại lịch trước khi xếp." : "Vui lòng chọn buổi khác."}</p></div>;
     if (part === "details") return details;
-    const badge = <button type="button" className="sl-slot-blocked-reason" aria-disabled="true" onClick={event => { event.preventDefault(); event.stopPropagation(); }}><span aria-hidden="true">🔒 </span>{reason}</button>;
+    const badge = <button type="button" className="sl-slot-blocked-reason" aria-disabled="true" onClick={event => { event.preventDefault(); event.stopPropagation(); }}><LockClosedIcon fontSize="inherit" />{reason}</button>;
     return part === "badge" ? badge : <Tooltip title={details} arrow placement="top" enterDelay={150}>{badge}</Tooltip>;
   };
   const addSessionButton = (day, period, existingSlot) => {
     const slot = existingSlot || slotState(day, period);
     const availability = schedulingAvailability(slot);
-    return availability.visible && <button type="button" className="v20-add-slot" aria-label={`Xếp ${period === "MORNING" ? "Sáng" : "Chiều"} ${slot.date}`} disabled={!availability.enabled} onClick={() => openSlotScheduler(slot, period)}>+ Xếp buổi</button>;
+    return availability.visible && <button type="button" className="v20-add-slot" aria-label={`Xếp ${period === "MORNING" ? "Sáng" : "Chiều"} ${slot.date}`} disabled={!availability.enabled} onClick={() => openSlotScheduler(slot, period)}><PlusIcon fontSize="inherit" /> Xếp buổi</button>;
   };
   const focusedDay = focusedDate ? weekDays.find((day) => formatDateKey(day) === focusedDate) : null;
   return <section className={`sl-workspace sl-schedule-view ${sidebarCollapsed ? "sl-sidebar-collapsed" : ""}`} aria-label="Không gian xếp lịch"><aside className="sl-left" data-collapsed={sidebarCollapsed}>
-    <button type="button" className="sl-sidebar-toggle" aria-label={sidebarCollapsed ? "Mở phạm vi làm việc" : "Thu gọn phạm vi làm việc"} aria-expanded={!sidebarCollapsed} onClick={() => setSidebarCollapsed((value) => !value)}>{sidebarCollapsed ? "›" : "‹"}</button>
+    <button type="button" className="sl-sidebar-toggle" aria-label={sidebarCollapsed ? "Mở phạm vi làm việc" : "Thu gọn phạm vi làm việc"} aria-expanded={!sidebarCollapsed} onClick={() => setSidebarCollapsed((value) => !value)}>{sidebarCollapsed ? <ChevronRightIcon fontSize="inherit" /> : <ChevronLeftIcon fontSize="inherit" />}</button>
     <div className="sl-sidebar-content"><div className="sl-scope"><div className="sl-eyebrow">PHẠM VI LÀM VIỆC</div>
     <div className="sl-schedule-scope-fields">
       <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>1</b>NGÀNH</div><SearchSelect label="Ngành" value={disciplineId} placeholder="Tất cả ngành" options={[{ id: "", name: "Tất cả ngành" }, ...disciplines.map((item) => ({ ...item, name: item.name, code: "" }))]} onChange={(value) => changeScope(() => { setDiscipline(value); setMajor(""); setYear(""); })} /></div>
@@ -419,7 +416,7 @@ export default function Schedule({ user }) {
     {!canEdit && <div className="sl-attention">Chưa có quyền sửa lịch hoặc vai trò đang bị khóa chỉ xem. Quản trị viên cấu hình tại Vai trò & phân quyền.</div>}
     {dashboardQueue && <div className="sl-attention">{dashboardQueue === "unscheduled" ? "Đang xem lớp chưa có buổi học" : "Đang xem lớp có buổi chờ xác nhận"}<button type="button" className="sl-btn" onClick={() => { const next = new URLSearchParams(params); next.delete("queue"); setParams(next); }}>Bỏ lọc công việc</button></div>}
     {majors.error && <Notice error={majors.error} />}
-  </div><div className="sl-worklist"><div className="sl-search-wrap"><span>⌕</span><input className="sl-search" aria-label="Tìm môn / lớp" placeholder="Tìm lớp học phần..." value={query} onChange={(event) => setQuery(event.target.value)} /></div><div className="sl-card-scroll">{offerings.loading ? <Notice>Đang tải lớp học phần...</Notice> : offerings.error ? <Notice error={offerings.error} /> : <section className="sl-section"><h2><span>LỚP HỌC PHẦN</span><span className="sl-offering-sort-actions">
+  </div><div className="sl-worklist"><div className="sl-search-wrap"><span><MagnifyingGlassIcon fontSize="inherit" /></span><input className="sl-search" aria-label="Tìm môn / lớp" placeholder="Tìm lớp học phần..." value={query} onChange={(event) => setQuery(event.target.value)} /></div><div className="sl-card-scroll">{offerings.loading ? <Notice>Đang tải lớp học phần...</Notice> : offerings.error ? <Notice error={offerings.error} /> : <section className="sl-section"><h2><span>LỚP HỌC PHẦN</span><span className="sl-offering-sort-actions">
       <Tooltip title={sessionSortLabel} arrow placement="top">
         <button type="button" className="sl-offering-sort" aria-label={sessionSortLabel} aria-pressed={sessionSort !== "default"}
           onClick={() => setSessionSort((current) => SESSION_SORT_STATES[current].next)}><SessionSortIcon aria-hidden="true" /></button>
@@ -430,18 +427,18 @@ export default function Schedule({ user }) {
     return <article key={offering.id} id={`offering-${offering.id}`} className={`sl-card ${selectedId === offering.id ? "sl-selected" : ""}`}>
       <div className="sl-card-heading"><button className="sl-btn sl-btn-link sl-card-detail" onClick={() => setDetails(offering)}><strong>{offeringTitle(offering)}</strong><span>{subjectLabel(offering)}</span><small>{groupsOf(offering).length} lớp/nhóm · {offering.participantCount ?? 0} HV</small></button>
         {suggestClosing && <Tooltip title={closingMessage} arrow placement="top" enterDelay={0} enterNextDelay={0}>
-          <button type="button" className="sl-close-suggestion" aria-label={closingMessage} onClick={() => setDetails(offering)}><WarningAmberRounded aria-hidden="true" /></button>
+          <button type="button" className="sl-close-suggestion" aria-label={closingMessage} onClick={() => setDetails(offering)}><ExclamationTriangleIcon aria-hidden="true" /></button>
         </Tooltip>}
       </div>
       <div className="sl-card-foot"><div className="sl-card-copy"><strong>Đã diễn ra {summary.heldCount || 0} buổi</strong><span className={!summary.futurePlannedCount ? "sl-no-week" : ""}>{summary.futurePlannedCount ? `Có ${summary.futurePlannedCount} lịch sắp tới` : "Chưa có lịch tuần này"}</span></div>{canEdit && (offering.canWriteSchedule ?? offering.scopeWritable) !== false && offering.status === "active" && <button className="sl-btn sl-btn-primary sl-btn-sm" onClick={() => select(offering)}>Xếp lịch</button>}</div>
     </article>;
   })}{!listed.length && <Notice>Không có lớp học phần trong phạm vi đã chọn.</Notice>}</section>}</div></div></div></aside>
-  <section className="sl-right"><div className="sl-schedule-head"><h1>XẾP LỊCH</h1><div className="sl-week"><button aria-label="Tuần trước" onClick={() => changeWeek(formatDateKey(addDays(week, -7)))}>‹</button><strong>{vietnameseDate(week)} — {vietnameseDate(end)}</strong><button aria-label="Tuần sau" onClick={() => changeWeek(formatDateKey(addDays(week, 7)))}>›</button></div>
+  <section className="sl-right"><div className="sl-schedule-head"><h1>XẾP LỊCH</h1><div className="sl-week"><button aria-label="Tuần trước" onClick={() => changeWeek(formatDateKey(addDays(week, -7)))}><ChevronLeftIcon fontSize="inherit" /></button><strong>{vietnameseDate(week)} — {vietnameseDate(end)}</strong><button aria-label="Tuần sau" onClick={() => changeWeek(formatDateKey(addDays(week, 7)))}><ChevronRightIcon fontSize="inherit" /></button></div>
     <div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" label="Xuất báo cáo" disabled={sessions.loading || !!sessions.error || majors.loading || !!majors.error || offerings.loading || !!offerings.error} showFileIcons onWord={downloadWord} onExcel={downloadExcel} onPdf={openPdfPreview} onError={(failure) => notify.error(message(failure))} /><button className="sl-btn sl-today" disabled={week === currentWeek && !focusedDate} onClick={() => changeWeek(currentWeek)}>Tuần này</button>{canEdit && <PendingConfirmationButton count={pending.data?.length} loading={pending.loading} error={pending.error} open={pendingOpen} controls="schedule-pending-dialog" onClick={() => setPendingOpen(true)} />}</div>
   </div>{selecting && <div className="sl-selected-strip"><span className="sl-selected-tag">ĐANG XẾP</span><strong className="sl-selected-offering" title={offeringTitle(selected)}>{offeringTitle(selected)}</strong><span className="sl-selected-meta">{selected.subject?.code ? `${selected.subject.code} · ` : ""}{groupsOf(selected).length} lớp/nhóm · {selected.participantCount ?? 0} HV</span><button type="button" className="sl-btn sl-selected-clear" onClick={() => setSelected("")}>Bỏ chọn</button></div>}
     {sessions.error && <Notice error={sessions.error} />}{error && <Notice error={error} />}
     <div className={`sl-calendar-wrap ${selecting ? "sl-selecting" : ""}`} aria-busy={sessions.loading}>{focusedDay ? <section className="sl-day-focus" aria-label={`Lịch ngày ${vietnameseDate(focusedDate)}`}>
-      <header className="sl-day-focus-head"><button type="button" className="sl-focus-back" onClick={() => setFocusedDate("")}>← Tuần</button><strong>{vietnameseWeekdayShort(focusedDay)} · {vietnameseDate(focusedDate)} · {sessionsOn(focusedDate).length} lớp</strong></header>
+      <header className="sl-day-focus-head"><button type="button" className="sl-focus-back" onClick={() => setFocusedDate("")}><ArrowLeftIcon fontSize="inherit" /> Tuần</button><strong>{vietnameseWeekdayShort(focusedDay)} · {vietnameseDate(focusedDate)} · {sessionsOn(focusedDate).length} lớp</strong></header>
       <nav className="sl-day-focus-tabs" aria-label="Chọn ngày trong tuần">{weekDays.map((day) => {
         const date = formatDateKey(day);
         const count = sessionsOn(date).length;
@@ -455,7 +452,7 @@ export default function Schedule({ user }) {
         items.forEach((session) => grouped[dayFocusStatusKey(session)].push(session));
         return <section className={`sl-day-focus-period ${past ? "sl-past" : ""} ${incompatible ? "sl-incompatible" : ""}`} aria-label={`${periodLabel} · ${items.length} lớp`} key={period}><header><h2>{periodLabel}</h2><span>{items.length} lớp</span></header><div className="sl-day-focus-period-body">
           {sessions.loading && !sessions.data ? <span className="v20-hint">Đang tải...</span> : <>
-            {!!items.length && <div className="sl-status-board" aria-label={`Trạng thái ${periodLabel}`}>{DAY_FOCUS_STATUS_LANES.map((lane) => <section className={`sl-status-lane sl-status-lane-${lane.key}`} aria-label={`${lane.label} · ${grouped[lane.key].length} lớp`} key={lane.key}><header><strong><i aria-hidden="true">{lane.symbol}</i>{lane.label}</strong><b>{grouped[lane.key].length}</b></header><div className="sl-status-lane-list">{grouped[lane.key].map(dayFocusSessionCard)}{!grouped[lane.key].length && <span className="sl-lane-empty">Không có lớp</span>}</div></section>)}</div>}
+            {!!items.length && <div className="sl-status-board" aria-label={`Trạng thái ${periodLabel}`}>{DAY_FOCUS_STATUS_LANES.map((lane) => <section className={`sl-status-lane sl-status-lane-${lane.key}`} aria-label={`${lane.label} · ${grouped[lane.key].length} lớp`} key={lane.key}><header><strong><i aria-hidden="true"><lane.Icon fontSize="inherit" /></i>{lane.label}</strong><b>{grouped[lane.key].length}</b></header><div className="sl-status-lane-list">{grouped[lane.key].map(dayFocusSessionCard)}{!grouped[lane.key].length && <span className="sl-lane-empty">Không có lớp</span>}</div></section>)}</div>}
             {!items.length && <span className="sl-focus-empty">{past ? "Buổi đã qua" : "Chưa có lịch"}</span>}
           </>}
           {blockedSlot(slot, period)}
@@ -483,7 +480,7 @@ export default function Schedule({ user }) {
           {blockedSlot(slot, period, "badge")}
           {sessions.loading && !sessions.data ? <span className="v20-hint">Đang tải...</span> : items.slice(0, WEEK_SLOT_LIMIT).map((session) => sessionCard(session, true))}
           {items.length > WEEK_SLOT_LIMIT && <WeekOverflowPreview date={date} dayLabel={vietnameseWeekdayShort(day)} period={period} hiddenSessions={items.slice(WEEK_SLOT_LIMIT)} onOpenDay={() => setFocusedDate(date)} />}
-          {availability.visible && <span className={`v20-add-slot sl-week-slot-affordance${availability.enabled ? "" : " sl-disabled"}`} aria-hidden="true">+ Xếp buổi</span>}
+          {availability.visible && <span className={`v20-add-slot sl-week-slot-affordance${availability.enabled ? "" : " sl-disabled"}`} aria-hidden="true"><PlusIcon fontSize="inherit" /> Xếp buổi</span>}
           {!items.length && !selecting && !sessions.loading && <span className="v20-hint">{past ? "Buổi đã qua" : "Chưa có lịch"}</span>}
         </div></div></Tooltip>;
       })}</React.Fragment>)}
@@ -502,7 +499,7 @@ export default function Schedule({ user }) {
           return <article className="sl-pending-card" key={session.id}>
             <div className="sl-pending-date"><strong>{vietnameseDate(session.sessionDate)}</strong><span>{session.period === "MORNING" ? "SÁNG" : "CHIỀU"}</span></div>
             <div className="sl-pending-copy"><h3 title={title}>{title}</h3><span>{subjectLabel(session.courseOffering)}</span></div>
-            <div className="sl-pending-side"><small>{session.lecturer?.name || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><div className="sl-pending-actions"><button className="sl-btn" disabled={saving} onClick={() => confirmation(session, "not_held")}>Không diễn ra</button><button className="sl-btn sl-btn-primary" disabled={saving} onClick={() => confirmation(session, "held")}>✓ Đã diễn ra</button></div></div>
+            <div className="sl-pending-side"><small>{session.lecturer?.name || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><div className="sl-pending-actions"><button className="sl-btn" disabled={saving} onClick={() => confirmation(session, "not_held")}>Không diễn ra</button><button className="sl-btn sl-btn-primary" disabled={saving} onClick={() => confirmation(session, "held")}><CheckIcon fontSize="inherit" /> Đã diễn ra</button></div></div>
           </article>;
         }) : <Notice>Không có buổi chờ xác nhận.</Notice>}
     </>}

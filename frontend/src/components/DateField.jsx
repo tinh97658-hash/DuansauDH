@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { IconButton, InputAdornment, TextField } from "@mui/material";
-import CalendarMonthOutlined from "@mui/icons-material/CalendarMonthOutlined";
+import { CalendarDaysIcon } from "./AppIcons";
 import DateCalendar from "./DateCalendar";
 import "./dateField.css";
 import { DATE_PLACEHOLDER, formatDate, parseDisplayDate } from "../utils/dateFormat";
@@ -45,7 +45,7 @@ export default function DateField({ value = "", onChange, inputProps = {}, Input
       endAdornment: <InputAdornment position="end">{InputProps.endAdornment}
           <IconButton size="small" type="button" disabled={disabled || readOnly || InputProps.readOnly}
             aria-label={`Chọn ngày${props.label ? `: ${props.label}` : ""}`} aria-haspopup="dialog" aria-expanded={!!calendarAnchor}
-            onClick={event => setCalendarAnchor(event.currentTarget)}><CalendarMonthOutlined fontSize="small" /></IconButton>
+            onClick={event => setCalendarAnchor(event.currentTarget)}><CalendarDaysIcon fontSize="small" /></IconButton>
       </InputAdornment> }} />
     {calendarAnchor && !disabled && !readOnly && !InputProps.readOnly && <DateCalendar anchorEl={calendarAnchor}
       value={value} min={min} max={max} label={textInputProps["aria-label"] || props.label}

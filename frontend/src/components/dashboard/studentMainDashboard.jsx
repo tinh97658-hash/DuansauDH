@@ -3,7 +3,7 @@ import {
   Accordion, AccordionDetails, AccordionSummary, Box, Card, CardContent,
   List, ListItem, ListItemText, Typography
 } from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { ChevronDownIcon } from "../AppIcons";
 
 const sections = [
   ["Thông tin học viên", ["Thông tin cá nhân và mã học viên", "Chương trình, hình thức và thời gian đào tạo", "Đề tài và giảng viên hướng dẫn"]],
@@ -21,7 +21,7 @@ const StudentDashboard = () => (
         </Typography>
         {sections.map(([title, items]) => (
           <Accordion key={title} variant="outlined" sx={{ mb: 1, borderColor: "#DFE4E8", "&:before": { display: "none" } }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: "#173E75" }} />}>
+            <AccordionSummary expandIcon={<ChevronDownIcon sx={{ color: "#173E75" }} />}>
               <Typography sx={{ fontWeight: 600, fontSize: 15, color: "#173E75" }}>{title}</Typography>
             </AccordionSummary>
             <AccordionDetails sx={{ bgcolor: "#FAFBFC", pt: 1, pb: 1 }}>

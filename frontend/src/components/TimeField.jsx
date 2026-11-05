@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Popover } from "@mui/material";
-import AccessTimeRounded from "@mui/icons-material/AccessTimeRounded";
+import { ClockIcon } from "./AppIcons";
 import { normalizeTimeInput } from "../utils/schedulingCalendar";
 import "./timeField.css";
 
@@ -40,7 +40,7 @@ export default function TimeField({ value = "", onChange, disabled, readOnly, on
         onBlur={event => { setDraft(normalizeTimeInput(draft) || value); onBlur?.(event); }} />
       <button type="button" className="app-time-trigger" aria-label={`Chọn giờ: ${label}`} aria-haspopup="dialog"
         aria-expanded={!!anchor && !disabled && !readOnly} disabled={disabled || readOnly}
-        onClick={event => setAnchor(event.currentTarget)}><AccessTimeRounded fontSize="small" /></button>
+        onClick={event => setAnchor(event.currentTarget)}><ClockIcon fontSize="small" /></button>
     </span>
     {anchor && !disabled && !readOnly && <Popover open anchorEl={anchor} onClose={() => setAnchor(null)}
       anchorOrigin={{ vertical: "bottom", horizontal: "right" }} transformOrigin={{ vertical: "top", horizontal: "right" }}

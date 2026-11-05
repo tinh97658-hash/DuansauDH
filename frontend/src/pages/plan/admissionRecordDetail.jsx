@@ -19,22 +19,7 @@ import {
   IconButton, MenuItem, Paper, Select,
   Stack, TextField, Tooltip, Typography, Tabs, Tab,
 } from "@mui/material";
-import AddPhotoAlternateRounded from "@mui/icons-material/AddPhotoAlternateRounded";
-import ArrowBackRounded from "@mui/icons-material/ArrowBackRounded";
-import CheckCircleRounded from "@mui/icons-material/CheckCircleRounded";
-import DeleteRounded from "@mui/icons-material/DeleteRounded";
-import FolderSpecialRounded from "@mui/icons-material/FolderSpecialRounded";
-import PersonRounded from "@mui/icons-material/PersonRounded";
-import RefreshRounded from "@mui/icons-material/RefreshRounded";
-import SaveRounded from "@mui/icons-material/SaveRounded";
-import SchoolRounded from "@mui/icons-material/SchoolRounded";
-import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
-import WorkspacePremiumRounded from "@mui/icons-material/WorkspacePremiumRounded";
-import SwapHorizRounded from "@mui/icons-material/SwapHorizRounded";
-import HistoryRounded from "@mui/icons-material/HistoryRounded";
-import AddRounded from "@mui/icons-material/AddRounded";
-import EditRounded from "@mui/icons-material/EditRounded";
-import MenuBookRounded from "@mui/icons-material/MenuBookRounded";
+import { AcademicCapIcon, DocumentCheckIcon, ArrowLeftIcon, ArrowPathIcon, ArrowsRightLeftIcon, BookOpenIcon, CheckCircleIcon, ClockIcon, ExclamationTriangleIcon, FolderIcon, PencilSquareIcon, PhotoIcon, PlusIcon, TrashIcon, TrophyIcon, UserIcon } from "../../components/AppIcons";
 import { API_BASE_URL } from "../../config/http";
 import { getSelectableMajors, normalizeMajorsResponse, selectMajorForLevel } from "../../utils/majors";
 import {
@@ -849,7 +834,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
           <Button
             variant="outlined"
             size="small"
-            startIcon={<ArrowBackRounded />}
+            startIcon={<ArrowLeftIcon />}
             onClick={handleBackClick}
             sx={{
               height: 34,
@@ -868,7 +853,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
 
           <Tooltip title="Tải lại dữ liệu">
             <span><IconButton size="small" onClick={fetchData} disabled={loading} sx={{ border: "1px solid #DFE4E8", borderRadius: "4px", p: "6px" }}>
-              <RefreshRounded fontSize="small" sx={{ color: "#607486" }} />
+              <ArrowPathIcon fontSize="small" sx={{ color: "#607486" }} />
             </IconButton></span>
           </Tooltip>
 
@@ -921,7 +906,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
 
           {isDirty ? (
             <Chip
-              icon={<WarningAmberRounded sx={{ fontSize: "16px !important", color: "#B45309" }} />}
+              icon={<ExclamationTriangleIcon sx={{ fontSize: "16px !important", color: "#B45309" }} />}
               label="Có thay đổi chưa lưu"
               size="small"
               sx={{
@@ -936,7 +921,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
             />
           ) : (
             <Chip
-              icon={<CheckCircleRounded sx={{ fontSize: "16px !important", color: "#16A34A" }} />}
+              icon={<CheckCircleIcon sx={{ fontSize: "16px !important", color: "#16A34A" }} />}
               label="Đã lưu tất cả"
               size="small"
               variant="outlined"
@@ -957,7 +942,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
           {canRequestTransfer && <Button
             variant="outlined"
             size="small"
-            startIcon={<SwapHorizRounded />}
+            startIcon={<ArrowsRightLeftIcon />}
             onClick={() => {
               setTransferForm({ toMajorId: "", reason: "" });
               setTransferDisciplineId("");
@@ -974,7 +959,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
           <Button
             variant="contained"
             size="small"
-            startIcon={<SaveRounded />}
+            startIcon={<DocumentCheckIcon />}
             onClick={handleSave}
             disabled={saving || !isDirty}
             sx={{
@@ -1026,7 +1011,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
           <Box sx={{ display: detailTab === "profile" ? "block" : "none" }}>
           <Paper variant="outlined" sx={{ ...sectionCardSx, mb: 2 }}>
             <Typography sx={sectionTitleSx}>
-              <HistoryRounded sx={{ color: "#0788B8", fontSize: 20 }} />
+              <ClockIcon sx={{ color: "#0788B8", fontSize: 20 }} />
               Lịch sử chuyển chuyên ngành
             </Typography>
             {transferHistory.length === 0 ? (
@@ -1076,12 +1061,12 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
           <Paper variant="outlined" sx={{ ...sectionCardSx, mb: 2 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1} sx={{ mb: 1 }}>
               <Typography sx={{ ...sectionTitleSx, mb: 0 }}>
-                <MenuBookRounded sx={{ color: "#0788B8", fontSize: 20 }} />
+                <BookOpenIcon sx={{ color: "#0788B8", fontSize: 20 }} />
                 Học phần đã học trong chương trình đào tạo ({visibleStudiedSubjects.length})
               </Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap">
                 <Chip size="small" color="success" variant="outlined" label={`Đã tích lũy: ${recognizedCredits} tín chỉ`} />
-                <Button size="small" variant="contained" startIcon={<AddRounded />} onClick={() => openLearningDialog(null)} disabled={learningSaving || learningLoading || !!learningError}>
+                <Button size="small" variant="contained" startIcon={<PlusIcon />} onClick={() => openLearningDialog(null)} disabled={learningSaving || learningLoading || !!learningError}>
                   Thêm kết quả học phần
                 </Button>
               </Stack>
@@ -1107,7 +1092,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
           {/* =================================================================== */}
           <Paper variant="outlined" sx={sectionCardSx}>
             <Typography sx={sectionTitleSx}>
-              <PersonRounded sx={{ color: "#0788B8", fontSize: 20 }} />
+              <UserIcon sx={{ color: "#0788B8", fontSize: 20 }} />
               I. Thông tin cá nhân & liên lạc
             </Typography>
 
@@ -1304,7 +1289,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                     <img src={formData.photo} alt="Ảnh 3x4" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   ) : (
                     <Stack alignItems="center" spacing={0.5}>
-                      <PersonRounded sx={{ fontSize: 36, color: "#CBD5E1" }} />
+                      <UserIcon sx={{ fontSize: 36, color: "#CBD5E1" }} />
                       <Typography variant="caption" sx={{ color: "#94A3B8", fontSize: 10.5 }}>Chưa có ảnh</Typography>
                     </Stack>
                   )}
@@ -1316,7 +1301,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                   <Button
                     variant="outlined"
                     size="small"
-                    startIcon={<AddPhotoAlternateRounded />}
+                    startIcon={<PhotoIcon />}
                     onClick={() => fileInputRef.current?.click()}
                     sx={{
                       fontSize: 12,
@@ -1331,7 +1316,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                   </Button>
                   {formData.photo && (
                     <IconButton size="small" color="error" onClick={handleRemovePhoto} sx={{ border: "1px solid #FCA5A5", borderRadius: "4px", p: "3px" }}>
-                      <DeleteRounded fontSize="small" />
+                      <TrashIcon fontSize="small" />
                     </IconButton>
                   )}
                 </Stack>
@@ -1344,7 +1329,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
           {/* =================================================================== */}
           <Paper variant="outlined" sx={sectionCardSx}>
             <Typography sx={sectionTitleSx}>
-              <SchoolRounded sx={{ color: "#0788B8", fontSize: 20 }} />
+              <AcademicCapIcon sx={{ color: "#0788B8", fontSize: 20 }} />
               II. Thể thức & chương trình đào tạo
             </Typography>
 
@@ -1574,7 +1559,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
           {/* =================================================================== */}
           <Paper variant="outlined" sx={sectionCardSx}>
             <Typography sx={sectionTitleSx}>
-              <WorkspacePremiumRounded sx={{ color: "#0788B8", fontSize: 20 }} />
+              <TrophyIcon sx={{ color: "#0788B8", fontSize: 20 }} />
               III. Văn bằng đại học & năng lực đầu vào
             </Typography>
 
@@ -1737,7 +1722,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
           {/* =================================================================== */}
           <Paper variant="outlined" sx={sectionCardSx}>
             <Typography sx={sectionTitleSx}>
-              <FolderSpecialRounded sx={{ color: "#0788B8", fontSize: 20 }} />
+              <FolderIcon sx={{ color: "#0788B8", fontSize: 20 }} />
               IV. Danh mục hồ sơ & giấy tờ đính kèm
             </Typography>
 
@@ -1808,7 +1793,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
             <DocumentExportMenu {...documentActions} />
             <Button
               variant="contained"
-              startIcon={<SaveRounded />}
+              startIcon={<DocumentCheckIcon />}
               onClick={handleSave}
               disabled={saving || !isDirty}
               sx={{

@@ -1,4 +1,5 @@
 :root {
+  --app-chevron: url("./assets/icons/hero-chevron-down.svg");
   --app-font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
   --canvas-bg: #F5F7F8;
   --surface-bg: #FFFFFF;

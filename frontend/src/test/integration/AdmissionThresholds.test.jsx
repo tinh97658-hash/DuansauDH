@@ -7,7 +7,7 @@ import { CssBaseline, ThemeProvider } from "@mui/material";
 import theme from "../../theme";
 import { AuthSessionContext } from "../../context/AuthSession";
 vi.mock("axios", () => ({ default: { get: vi.fn(), put: vi.fn(), post: vi.fn(), defaults: {} } }));
-jest.mock("@mui/icons-material", () => new Proxy({}, { get: () => () => null }));
+
 jest.mock("../../components/FeatureLayout", () => ({ children }) => <div>{children}</div>);
 const round = { id: "round-1", name: "Đợt 2/2026", academicYear: "2026", majorThresholds: [{ majorId: "major-1", cutoff: 15 }, { majorId: "major-2", cutoff: 17 }] };
 const majors = [{ id: "major-1", name: "Công nghệ thông tin", code: "CNTT", program: "masters", active: true }, { id: "major-2", name: "Quản trị kinh doanh", code: "QTKD", program: "masters", active: true }];

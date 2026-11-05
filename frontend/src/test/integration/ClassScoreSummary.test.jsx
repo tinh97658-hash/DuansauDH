@@ -20,7 +20,7 @@ jest.mock("../../utils/documentFiles", async () => ({ ...await vi.importActual("
 jest.mock("../../pages/reports/classScoreSummaryExcel", async (importOriginal) => ({
   ...await importOriginal(), createClassScoreWorkbook: jest.fn(),
 }));
-jest.mock("@mui/icons-material", () => ({ DownloadRounded: () => null, SearchRounded: () => null }));
+
 
 const groups = [
   { id: "g1", code: "CNTT2026.1.1", academicYear: "2026", major: { id: "m1", name: "Công nghệ thông tin", disciplineId: "d1", discipline: { id: "d1", name: "Kỹ thuật" } } },

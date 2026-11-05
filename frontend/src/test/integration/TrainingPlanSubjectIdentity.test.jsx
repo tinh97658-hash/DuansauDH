@@ -7,13 +7,7 @@ import { toast } from "react-toastify";
 // Decorative icons are not the identity contract under test; avoid importing the full icon catalog.
 const render = (ui, options) => renderWithPermissions(ui, ["plan.manage"], options);
 
-jest.mock("@mui/icons-material", () => ({
-  AddRounded: () => null, CheckBoxOutlineBlankRounded: () => null, CheckBoxRounded: () => null,
-  CheckRounded: () => null, CloseRounded: () => null, DeleteOutlineRounded: () => null, DeleteRounded: () => null,
-  EditRounded: () => null, LibraryBooksRounded: () => null, RefreshRounded: () => null,
-  SaveRounded: () => null, SearchRounded: () => null, ClassRounded: () => null, PlaylistAddRounded: () => null,
-  StarRounded: () => null, StarOutlineRounded: () => null,
-}));
+
 const clickAndWait = async (element) => {
   await act(async () => { fireEvent.click(element); await new Promise((resolve) => setTimeout(resolve, 0)); });
 };

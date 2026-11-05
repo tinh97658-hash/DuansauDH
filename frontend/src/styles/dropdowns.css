@@ -1,4 +1,17 @@
 /* Shared rules include portal menus, which sit outside #root and page containers. */
+body select[data-app-select] {
+  appearance: none;
+  background-image: var(--app-chevron);
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+  padding-right: 32px;
+}
+body .sl-combo > button:has([data-heroicon]) {
+  background-image: none !important;
+  display: grid;
+  place-items: center;
+}
 body :is(.MuiMenu-paper, .MuiAutocomplete-paper, .document-export-options, .tp-year-menu, .sl-combo-list, .sl-lecturer-popover) {
   background:#fff; color:var(--text-primary); box-sizing:border-box; overflow-x:hidden;
   border:1px solid var(--dropdown-border); border-radius:var(--control-radius);

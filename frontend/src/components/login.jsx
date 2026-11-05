@@ -1,13 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import ArrowForwardRounded from "@mui/icons-material/ArrowForwardRounded";
-import EmailOutlined from "@mui/icons-material/EmailOutlined";
-import LocationOnOutlined from "@mui/icons-material/LocationOnOutlined";
-import PhoneRounded from "@mui/icons-material/PhoneRounded";
-import LockOutlined from "@mui/icons-material/LockOutlined";
-import VisibilityOffRounded from "@mui/icons-material/VisibilityOffRounded";
-import VisibilityRounded from "@mui/icons-material/VisibilityRounded";
+import { ArrowRightIcon, EnvelopeIcon, EyeIcon, EyeSlashIcon, LockClosedIcon, MapPinIcon, PhoneIcon } from "./AppIcons";
 import { BRAND } from "../config/branding";
 import { API_BASE_URL } from "../config/http";
 import "../styles/login-page.css";
@@ -183,7 +177,7 @@ const Login = () => {
                 <span className="vmu-login-field-hint">@vimaru.edu.vn</span>
               </div>
               <div className="vmu-login-input-wrap">
-                <EmailOutlined className="vmu-login-input-icon" aria-hidden="true" />
+                <EnvelopeIcon className="vmu-login-input-icon" aria-hidden="true" />
                 <input
                   id="vmu-email"
                   name="email"
@@ -207,7 +201,7 @@ const Login = () => {
                 </label>
               </div>
               <div className="vmu-login-input-wrap">
-                <LockOutlined className="vmu-login-input-icon" aria-hidden="true" />
+                <LockClosedIcon className="vmu-login-input-icon" aria-hidden="true" />
                 <input
                   id="vmu-password"
                   name="password"
@@ -226,7 +220,7 @@ const Login = () => {
                   aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                   aria-pressed={showPassword}
                 >
-                  {showPassword ? <VisibilityRounded /> : <VisibilityOffRounded />}
+                  {showPassword ? <EyeIcon /> : <EyeSlashIcon />}
                 </button>
               </div>
             </div>
@@ -242,7 +236,7 @@ const Login = () => {
                 {submitting ? (
                   <span className="vmu-login-spinner" aria-hidden="true" />
                 ) : (
-                  <ArrowForwardRounded fontSize="small" />
+                  <ArrowRightIcon fontSize="small" />
                 )}
               </div>
             </button>
@@ -283,11 +277,11 @@ const Login = () => {
             aria-label="Xem địa chỉ Nhà A6, Trường Đại học Hàng hải Việt Nam trên Google Maps (mở tab mới)"
             title="Xem địa chỉ trên Google Maps"
           >
-            <LocationOnOutlined aria-hidden="true" />
+            <MapPinIcon aria-hidden="true" />
             <span>Phòng 203, Nhà A6, 484 Lạch Tray, Hải Phòng</span>
           </a>
           <div className="vmu-pill">
-            <PhoneRounded aria-hidden="true" />
+            <PhoneIcon aria-hidden="true" />
             <span>HOTLINE: 0225.3.735.879</span>
             <span className="vmu-pill-divider">|</span>
             <span className="vmu-pill-clock">{currentTime || "GMT+7"}</span>
@@ -297,7 +291,7 @@ const Login = () => {
         {/* Thẻ liên hệ ở chân ảnh */}
         <div className="vmu-login-right-bottom">
           <div className="vmu-contact-card">
-            <EmailOutlined aria-hidden="true" />
+            <EnvelopeIcon aria-hidden="true" />
             <div>
               <div className="vmu-contact-label">EMAIL CÔNG VỤ VIỆN SĐH</div>
               <a className="vmu-contact-email" href="mailto:sdh@vimaru.edu.vn">

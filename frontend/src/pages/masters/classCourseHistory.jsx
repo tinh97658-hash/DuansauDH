@@ -3,8 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useSearchParams } from "react-router-dom";
 import { Alert, Box, CircularProgress, Tooltip } from "@mui/material";
-import SearchRounded from "@mui/icons-material/SearchRounded";
-import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
+import { ExclamationTriangleIcon, MagnifyingGlassIcon } from "../../components/AppIcons";
 import FeatureLayout from "../../components/FeatureLayout";
 import DocumentExportMenu from "../../components/DocumentExportMenu";
 import ClassProgressExportDialog from "../../features/scheduling/ClassProgressExportDialog";
@@ -86,7 +85,7 @@ function StatusBadge({ subject, offering, onOpen }) {
   const content = <>
     <span>{label}</span>
     {warnings.map(warning => <Tooltip key={warning.text} title={warning.text} describeChild arrow placement="top" enterDelay={0} enterNextDelay={0}>
-      <span className={`tp-warning tp-${warning.tone}-warning`} role="img" aria-label={warning.text} tabIndex={canOpen ? undefined : 0}><WarningAmberRounded aria-hidden="true" /></span>
+      <span className={`tp-warning tp-${warning.tone}-warning`} role="img" aria-label={warning.text} tabIndex={canOpen ? undefined : 0}><ExclamationTriangleIcon aria-hidden="true" /></span>
     </Tooltip>)}
   </>;
   return <span className="tp-status-cell">
@@ -320,7 +319,7 @@ export default function ClassCourseHistory() {
           <option value="all">Tất cả</option>
           {Object.entries(statusInfo).map(([value, info]) => <option value={value} key={value}>{info.label}</option>)}
         </SelectFilter>
-        <label className="tp-filter"><span>Tìm kiếm</span><div className="tp-search"><SearchRounded /><input aria-label="Tìm kiếm" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm mã, học phần, giảng viên..." disabled={!report} /></div></label>
+        <label className="tp-filter"><span>Tìm kiếm</span><div className="tp-search"><MagnifyingGlassIcon /><input aria-label="Tìm kiếm" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm mã, học phần, giảng viên..." disabled={!report} /></div></label>
         <div className="page-export-inline" data-export-exclude="true" style={{ "--export-control-height": "38px" }}>
           <DocumentExportMenu disabled={exportDisabled} onWord={() => beginExport("word")} onExcel={() => beginExport("excel")} onPdf={() => beginExport("pdf")} />
         </div>
@@ -367,7 +366,7 @@ export default function ClassCourseHistory() {
       <div className="tp-offering-list">{offeringChoice.offerings.map(offering => <button type="button" className="tp-offering-option" key={offering.id} onClick={() => setSelectedOffering(offering)}>
         <span className="tp-offering-name"><strong>{offering.name}</strong><small>{offering.studyRole === "primary" ? "Lớp chính" : "Lớp học lại"} · {offering.memberCount} học viên</small></span>
         <span className="tp-offering-progress"><span className={`tp-status tp-${(statusInfo[offering.status] || statusInfo.not_started).tone}`}>{(statusInfo[offering.status] || statusInfo.not_started).label}</span><small>{offering.heldSessionCount} buổi đã học · {offering.plannedSessionCount} buổi đã xếp lịch</small>
-          {offering.status === "completed" && offering.needsGradeEntry && <span className="tp-picker-grade-warning"><WarningAmberRounded aria-hidden="true" /> Hãy nhập điểm môn học</span>}
+          {offering.status === "completed" && offering.needsGradeEntry && <span className="tp-picker-grade-warning"><ExclamationTriangleIcon aria-hidden="true" /> Hãy nhập điểm môn học</span>}
         </span>
       </button>)}</div>
     </Modal>}

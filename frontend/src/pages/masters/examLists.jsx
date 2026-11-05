@@ -7,11 +7,7 @@ import { dashboardGradeScope } from "../../features/dashboard/navigation";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, MenuItem, Paper, Stack, TableBody, TableCell, TableContainer, TableRow, TextField, Tooltip, Typography } from "@mui/material";
-import ListAltRounded from "@mui/icons-material/ListAltRounded";
-import SaveRounded from "@mui/icons-material/SaveRounded";
-import SettingsRounded from "@mui/icons-material/SettingsRounded";
-import CalendarMonthOutlined from "@mui/icons-material/CalendarMonthOutlined";
-import HistoryRounded from "@mui/icons-material/HistoryRounded";
+import { DocumentCheckIcon, CalendarDaysIcon, ClipboardDocumentListIcon, ClockIcon, Cog6ToothIcon } from "../../components/AppIcons";
 import GradeSettingsDialog from "../../features/exams/GradeSettingsDialog";
 import GradebookHistoryDialog from "../../features/exams/GradebookHistoryDialog";
 import GradebookStageNotice from "../../features/exams/GradebookStageNotice";
@@ -493,7 +489,7 @@ export default function ExamLists() {
       <div className="exam-workspace-controls exam-no-print">
       <div className="exam-main-toolbar">
         <div className="exam-mode-switch" role="group" aria-label="Chế độ bảng điểm">
-          {Object.entries(modes).map(([key, label]) => <Button key={key} startIcon={<ListAltRounded />} disabled={saving || exporting} variant={mode === key ? "contained" : "outlined"} aria-pressed={mode === key} onClick={() => selectMode(key)}>{label}</Button>)}
+          {Object.entries(modes).map(([key, label]) => <Button key={key} startIcon={<ClipboardDocumentListIcon />} disabled={saving || exporting} variant={mode === key ? "contained" : "outlined"} aria-pressed={mode === key} onClick={() => selectMode(key)}>{label}</Button>)}
         </div>
         <div className="exam-toolbar-status">
           {busy ? <Typography role="status">Đang tải...</Typography> : !selectedEntry ? <Typography role="status">Chưa chọn lớp học phần</Typography> : <>
@@ -513,22 +509,22 @@ export default function ExamLists() {
         {newWorkflow&&canApproveGrades&&workflow.eligibility.canReopen&&workflow.final.status!=='approved'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','reopen')}>{workflow.eligibility.reopenRequest?'Duyệt mở lại tư cách':'Mở lại tư cách'}</Button>}
         {newWorkflow&&canApproveGrades&&workflow.eligibility.reopenRequest&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('eligibility','reject_reopen')}>Từ chối mở lại tư cách</Button>}
         {newWorkflow&&workflow.eligibility.status==='approved'&&<>
-          {can('gradebook.view')&&workflow.final.status!=='approved'&&loadedOffering?.id===offeringId&&loadedOffering.examScheduling?.candidateCount>0&&(loadedOffering.examScheduling.remainingCount>0||workflow.final.status==='not_available')&&<Button startIcon={<CalendarMonthOutlined />} component={Link} to={`/masters/exam-schedule?offeringId=${offeringId}`}>{loadedOffering.examScheduling.remainingCount>0?'Xếp lịch thi':'Xem lịch thi'}</Button>}
+          {can('gradebook.view')&&workflow.final.status!=='approved'&&loadedOffering?.id===offeringId&&loadedOffering.examScheduling?.candidateCount>0&&(loadedOffering.examScheduling.remainingCount>0||workflow.final.status==='not_available')&&<Button startIcon={<CalendarDaysIcon />} component={Link} to={`/masters/exam-schedule?offeringId=${offeringId}`}>{loadedOffering.examScheduling.remainingCount>0?'Xếp lịch thi':'Xem lịch thi'}</Button>}
           {!blank&&canSubmitGrades&&workflow.final.status==='draft'&&<Button disabled={busy||saving||dirtyCount>0} onClick={()=>beginWorkflow('final','submit')}>Gửi duyệt kết quả</Button>}
           {!blank&&canApproveGrades&&workflow.final.status==='submitted'&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('final','approve')}>Duyệt kết quả</Button>}
           {!blank&&canApproveGrades&&['submitted','approved'].includes(workflow.final.status)&&<Button disabled={busy||saving} onClick={()=>beginWorkflow('final','reopen')}>Mở lại kết quả</Button>}
         </>}
-        {!blank && <Button startIcon={<HistoryRounded />} disabled={!offeringId || saving} onClick={loadHistory}>Lịch sử điểm</Button>}
+        {!blank && <Button startIcon={<ClockIcon />} disabled={!offeringId || saving} onClick={loadHistory}>Lịch sử điểm</Button>}
           {blank && <DocumentExportMenu label="Danh sách thi" title="Xuất lịch thi kết thúc học phần" disabled={!groupId || !offeringId || !total || busy || saving || exporting || !examPrintReady}
             onWord={() => exportFile("word")} onExcel={() => exportFile("excel")} onPdf={() => exportFile("pdf")} />}
           {!blank && <Tooltip title={dirtyCount ? "Lưu các điểm đang chỉnh sửa trước khi xuất phiếu ký" : "Xuất phiếu theo dõi tình hình học tập — BM.02-QT.SDH.03"}><span>
             <DocumentExportMenu label="Xuất báo cáo" title="Xuất phiếu theo dõi tình hình học tập — BM.02-QT.SDH.03" disabled={!groupId || !offeringId || !totalRows || busy || saving || exporting || !!dirtyCount}
               onWord={() => exportSigningSheet("word")} onExcel={() => exportSigningSheet("excel")} onPdf={() => exportSigningSheet("pdf")} />
           </span></Tooltip>}
-          {!blank && <Button startIcon={<SaveRounded />} disabled={!workflowEditable || !canSubmitGrades || !teachingCompleted || !dirtyCount || saving || exporting || busy} onClick={save}>{saving ? "Đang lưu..." : "Cập nhật cả bảng"}</Button>}
+          {!blank && <Button startIcon={<DocumentCheckIcon />} disabled={!workflowEditable || !canSubmitGrades || !teachingCompleted || !dirtyCount || saving || exporting || busy} onClick={save}>{saving ? "Đang lưu..." : "Cập nhật cả bảng"}</Button>}
           <Tooltip title="Cài đặt điểm số">
             <span><IconButton aria-label="Cài đặt điểm số" disabled={optionsLoading} onClick={() => setSettingsOpen(true)} size="small"
-              sx={{ color: "#173E75", width: 34, height: 34, "&:hover": { bgcolor: "#EDF4FA" } }}><SettingsRounded fontSize="small" /></IconButton></span>
+              sx={{ color: "#173E75", width: 34, height: 34, "&:hover": { bgcolor: "#EDF4FA" } }}><Cog6ToothIcon fontSize="small" /></IconButton></span>
           </Tooltip>
         </div>
       </div>

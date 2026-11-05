@@ -22,9 +22,9 @@ beforeEach(()=>{examClock.value='2026-10-19 07:00:00';vi.clearAllMocks();data={q
 const renderPage=()=>renderWithPermissions(<MemoryRouter useTransitions={false}><ExamSchedule/></MemoryRouter>,['gradebook.view','scheduling.write']);
 const choose=(label,name)=>{fireEvent.focus(screen.getByRole('combobox',{name:label}));fireEvent.click(screen.getByRole('option',{name}));};
 const add=(n,o)=>{fireEvent.focus(screen.getByRole('combobox',{name:`Thêm học phần đợt ${n}`}));fireEvent.click(screen.getByRole('option',{name:`${o.name} · ${o.candidateCount} TS`}));};
-async function open(){renderPage();await waitFor(()=>expect(screen.getByRole('button',{name:'+ Tạo buổi thi ghép'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'+ Tạo buổi thi ghép'}));await waitFor(()=>expect(screen.getByRole('button',{name:'301 · 30 chỗ'})).toBeEnabled());choose('Đơn vị','Viện Đào tạo SĐH');choose('Giám thị','Nguyễn An');fireEvent.click(screen.getByRole('button',{name:'301 · 30 chỗ'}));}
+async function open(){renderPage();await waitFor(()=>expect(screen.getByRole('button',{name:'Tạo buổi thi ghép'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Tạo buổi thi ghép'}));await waitFor(()=>expect(screen.getByRole('button',{name:'301 · 30 chỗ'})).toBeEnabled());choose('Đơn vị','Viện Đào tạo SĐH');choose('Giám thị','Nguyễn An');fireEvent.click(screen.getByRole('button',{name:'301 · 30 chỗ'}));}
 it('creates a mixed parallel and sequential arrangement with immutable per-offering snapshots',async()=>{
- await open();add(1,a);add(1,b);fireEvent.click(screen.getByRole('button',{name:'+ Thêm đợt thi'}));add(2,c);add(2,d);
+ await open();add(1,a);add(1,b);fireEvent.click(screen.getByRole('button',{name:'Thêm đợt thi'}));add(2,c);add(2,d);
  expect(screen.getByText(/Thi đồng thời:/)).toHaveTextContent('30 thí sinh');
  expect(screen.getByText(/Thi đồng thời:/)).toHaveTextContent('54 lượt dự thi');
  fireEvent.click(screen.getByRole('button',{name:'Lưu buổi thi'}));
@@ -37,14 +37,14 @@ it('moves populated and empty rounds with the selected period and uses it for ne
  fireEvent.change(screen.getByRole('combobox',{name:'Buổi thi'}),{target:{value:'AFTERNOON'}});
  add(1,a);
  fireEvent.change(screen.getByLabelText(`Kết thúc ${a.name}`),{target:{value:'14:50'}});
- fireEvent.click(screen.getByRole('button',{name:'+ Thêm đợt thi'}));
+ fireEvent.click(screen.getByRole('button',{name:'Thêm đợt thi'}));
  expect(screen.getByLabelText('Bắt đầu đợt 2')).toHaveValue('14:50');
  fireEvent.change(screen.getByRole('combobox',{name:'Buổi thi'}),{target:{value:'MORNING'}});
  expect(screen.getByLabelText('Bắt đầu đợt 1')).toHaveValue('08:00');
  expect(screen.getByLabelText(`Kết thúc ${a.name}`)).toHaveValue('08:50');
  expect(screen.getByLabelText('Bắt đầu đợt 2')).toHaveValue('08:50');
  fireEvent.click(screen.getByRole('button',{name:'Bỏ đợt 2'}));
- fireEvent.click(screen.getByRole('button',{name:'+ Thêm đợt thi'}));
+ fireEvent.click(screen.getByRole('button',{name:'Thêm đợt thi'}));
  expect(screen.getByLabelText('Bắt đầu đợt 2')).toHaveValue('08:50');
  add(2,c);
  fireEvent.change(screen.getByRole('combobox',{name:'Buổi thi'}),{target:{value:'AFTERNOON'}});
@@ -63,7 +63,7 @@ it('rejects duplicate learners before adding a group and allows a later non-over
  expect(screen.getByRole('alert')).toHaveClass('ep-candidate-warning');
  expect(screen.getByRole('alert').textContent).toBe('Không thể ghép các môn này cùng đợt thi vì có 15 thí sinh trùng lịch.Hãy chọn đợt hoặc giờ thi khác không trùng lịch.');
  expect(screen.getByText(/Thi đồng thời:/)).toHaveTextContent('15 lượt dự thi');
- fireEvent.click(screen.getByRole('button',{name:'+ Thêm đợt thi'}));add(2,c);
+ fireEvent.click(screen.getByRole('button',{name:'Thêm đợt thi'}));add(2,c);
  expect(screen.queryByRole('alert')).toBeNull();expect(screen.getByRole('button',{name:'Lưu buổi thi'})).toBeEnabled();
  fireEvent.change(screen.getAllByRole('combobox',{name:`Chuyển đợt ${c.name}`})[1],{target:{value:'1'}});
  expect(screen.getByRole('alert')).toHaveClass('ep-candidate-warning');
@@ -83,7 +83,7 @@ it('blocks learners already booked in another arrangement and reports their coun
  expect(screen.getByRole('button',{name:'Lưu buổi thi'})).toBeEnabled();
 });
 it('warns in yellow and blocks saving when an edited end time overlaps another subject',async()=>{
- await open();add(1,a);fireEvent.click(screen.getByRole('button',{name:'+ Thêm đợt thi'}));add(2,c);
+ await open();add(1,a);fireEvent.click(screen.getByRole('button',{name:'Thêm đợt thi'}));add(2,c);
  fireEvent.change(screen.getAllByLabelText(`Kết thúc ${a.name}`)[0],{target:{value:'09:30'}});
  expect(screen.getByText(/Không thể ghép các môn này/).closest('[role="alert"]')).toHaveClass('ep-candidate-warning');
  expect(screen.getByText(/Không thể ghép các môn này/)).toHaveTextContent('có 15 thí sinh trùng lịch.');
@@ -108,7 +108,7 @@ it('blocks insufficient capacity and rounds overlapping the previous longest exa
  expect(screen.getByRole('button',{name:'Lưu buổi thi'})).toBeDisabled();expect(screen.getByText(/Phòng 301: KHÔNG ĐỦ CHỖ/)).toBeInTheDocument();
  fireEvent.click(screen.getByRole('button',{name:'Gỡ Kinh tế'}));
  fireEvent.change(screen.getByLabelText(`Kết thúc ${a.name}`),{target:{value:'10:00'}});
- fireEvent.click(screen.getByRole('button',{name:'+ Thêm đợt thi'}));add(2,d);
+ fireEvent.click(screen.getByRole('button',{name:'Thêm đợt thi'}));add(2,d);
  fireEvent.change(screen.getByLabelText('Bắt đầu đợt 2'),{target:{value:'09:30'}});
  expect(screen.getByRole('button',{name:'Lưu buổi thi'})).toBeDisabled();expect(screen.getByRole('alert')).toHaveTextContent('đợt trước kết thúc');
 });
@@ -122,17 +122,17 @@ it('retains the composed form and server conflict details on a stale save',async
 const session=(o,id,extra={})=>({...o,id,courseOfferingId:o.id,arrangementId:'arrangement',arrangementVersion:0,roundNo:1,version:0,examDate:'2026-10-19',startTime:'08:00',endTime:'09:00',roomId:'room',roomCode:'301',lecturerId:'lecturer',lecturerName:'Nguyễn An',status:'scheduled',canEdit:true,...extra});
 it('places the compose button beside the heading and hides expired calendar actions on clock updates',async()=>{
  examClock.value='2026-10-19 08:00:59';renderPage();
- const composeButton=await screen.findByRole('button',{name:'+ Tạo buổi thi ghép'});
+ const composeButton=await screen.findByRole('button',{name:'Tạo buổi thi ghép'});
  expect(composeButton.closest('.sl-schedule-head')).toContainElement(screen.getByRole('heading',{name:'XẾP LỊCH THI'}));
  fireEvent.click(await screen.findByRole('button',{name:/CNTT 2026.1.1 15 TS Triết học/}));
  const morning=screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'}),afternoon=screen.getByRole('button',{name:'Chọn 19/10/2026 Chiều'});
  expect(morning).toBeEnabled();
  examClock.value='2026-10-19 08:01:00';fireEvent.focus(window);
  expect(morning).toBeDisabled();expect(afternoon).toBeEnabled();
- expect(within(morning.closest('.sl-slot')).queryByRole('button',{name:'+ Xếp lịch'})).toBeNull();
+ expect(within(morning.closest('.sl-slot')).queryByRole('button',{name:'Xếp lịch'})).toBeNull();
  examClock.value='2026-10-19 14:01:00';fireEvent.focus(window);
  expect(afternoon).toBeDisabled();
- expect(within(afternoon.closest('.sl-slot')).queryByRole('button',{name:'+ Xếp lịch'})).toBeNull();
+ expect(within(afternoon.closest('.sl-slot')).queryByRole('button',{name:'Xếp lịch'})).toBeNull();
  expect(screen.getByRole('button',{name:'Chọn 20/10/2026 Sáng'})).toBeEnabled();
 });
 it.each([
@@ -140,8 +140,8 @@ it.each([
  ['2026-10-19 14:01:00','2026-10-20','MORNING','08:00'],
 ])('defaults composition to the next available period at %s',async(now,date,period,start)=>{
  examClock.value=now;renderPage();
- await waitFor(()=>expect(screen.getByRole('button',{name:'+ Tạo buổi thi ghép'})).toBeEnabled());
- fireEvent.click(screen.getByRole('button',{name:'+ Tạo buổi thi ghép'}));
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Tạo buổi thi ghép'})).toBeEnabled());
+ fireEvent.click(screen.getByRole('button',{name:'Tạo buổi thi ghép'}));
  expect(screen.getByLabelText('Ngày thi')).toHaveValue(formatDate(date));
  expect(screen.getByRole('combobox',{name:'Buổi thi'})).toHaveValue(period);
  expect(screen.getByLabelText('Bắt đầu đợt 1')).toHaveValue(start);

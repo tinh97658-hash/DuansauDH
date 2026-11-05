@@ -1,9 +1,6 @@
 import React, { useState } from "react";
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
-import HistoryOutlined from "@mui/icons-material/HistoryOutlined";
-import CloseRounded from "@mui/icons-material/CloseRounded";
-import KeyboardArrowDownRounded from "@mui/icons-material/KeyboardArrowDownRounded";
-import KeyboardArrowUpRounded from "@mui/icons-material/KeyboardArrowUpRounded";
+import { ChevronDownIcon, ChevronUpIcon, ClockIcon, XMarkIcon } from "../../components/AppIcons";
 import { formatDateTime } from "../../utils/dateFormat";
 import { formatScore, RESULT_LABELS } from "./gradebook";
 import "./gradebookHistory.css";
@@ -49,7 +46,7 @@ function HistoryEntry({ event, index }) {
       <TableCell><span className={`gh-action gh-action-${actionTone(event.action)}`}>{ACTION_LABELS[event.action] || event.action || "—"}</span></TableCell>
       <TableCell className="gh-note">{event.note || <span className="gh-muted">—</span>}</TableCell>
       <TableCell>{rows.length ? <Button size="small" className="gh-expand" aria-expanded={expanded} aria-controls={detailId}
-        endIcon={expanded ? <KeyboardArrowUpRounded /> : <KeyboardArrowDownRounded />} onClick={() => setExpanded(value => !value)}>
+        endIcon={expanded ? <ChevronUpIcon /> : <ChevronDownIcon />} onClick={() => setExpanded(value => !value)}>
         {expanded ? "Thu gọn" : `Xem kết quả (${rows.length})`}
       </Button> : <span className="gh-muted gh-no-grades">Không có bản ghi điểm</span>}</TableCell>
     </TableRow>
@@ -78,7 +75,7 @@ export default function GradebookHistoryDialog({ events, onClose }) {
     <DialogTitle className="gh-titlebar" component="div">
       <div className="gh-title-copy"><h2 id="gradebook-history-title">Lịch sử bảng điểm</h2>
         <p id="gradebook-history-description">Theo dõi thay đổi điểm và các lần gửi duyệt, mở lại bảng điểm.</p></div>
-      <IconButton aria-label="Đóng lịch sử bảng điểm" onClick={onClose} size="small"><CloseRounded /></IconButton>
+      <IconButton aria-label="Đóng lịch sử bảng điểm" onClick={onClose} size="small"><XMarkIcon /></IconButton>
     </DialogTitle>
     <div className="gh-summary"><span><strong>{events.length}</strong> hoạt động được ghi nhận</span><span>Thời gian · Người thực hiện · Nội dung thay đổi</span></div>
     <DialogContent className="gh-content">
@@ -87,7 +84,7 @@ export default function GradebookHistoryDialog({ events, onClose }) {
           <colgroup>{["5%", "15%", "20%", "20%", "25%", "15%"].map((width,index)=><col key={index} style={{width}}/>)}</colgroup>
           <TableHead><TableRow>{["STT", "Thời gian", "Người thực hiện", "Thao tác", "Ghi chú / Lý do", "Chi tiết điểm"].map(label => <TableCell key={label} scope="col" align={label === "STT" ? "center" : "left"}>{label}</TableCell>)}</TableRow></TableHead>
           <TableBody>{events.length ? events.map((event, index) => <HistoryEntry key={event.id} event={event} index={index} />)
-            : <TableRow><TableCell colSpan={6}><div className="gh-empty"><HistoryOutlined aria-hidden="true" /><strong>Chưa có lịch sử bảng điểm.</strong><span>Các thay đổi và thao tác duyệt sẽ được ghi nhận tại đây.</span></div></TableCell></TableRow>}</TableBody>
+            : <TableRow><TableCell colSpan={6}><div className="gh-empty"><ClockIcon aria-hidden="true" /><strong>Chưa có lịch sử bảng điểm.</strong><span>Các thay đổi và thao tác duyệt sẽ được ghi nhận tại đây.</span></div></TableCell></TableRow>}</TableBody>
         </Table>
       </TableContainer>
     </DialogContent>

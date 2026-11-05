@@ -6,9 +6,7 @@ import Rooms from "../../pages/system/rooms";
 
 const render = (ui, options) => renderWithPermissions(ui, ["catalog.manage"], options);
 
-jest.mock("@mui/icons-material", () => ({
-  AddRounded: () => null, EditRounded: () => null, SearchRounded: () => null,
-}));
+
 const renderPage = async () => {
   await act(async () => { render(<MemoryRouter useTransitions={false}><Rooms /></MemoryRouter>); });
 };

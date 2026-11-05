@@ -1,3 +1,4 @@
+import { PlusIcon } from "../../components/AppIcons";
 import AppSelect from "../../components/AppSelect";
 import React,{useEffect,useRef,useState} from 'react';
 import axios from 'axios';
@@ -92,7 +93,7 @@ export default function ExamArrangementEditor({initial={},members=[],queue=[],ro
    <SearchSelect label={`Thêm học phần đợt ${n}`} value="" placeholder="Thêm lớp học phần đã duyệt..." disabled={periodClosed||roundLocked||saving||availability.loading||!!availability.error} options={queue.filter(o=>!groups.some(g=>g.courseOfferingId===o.id)).map(o=>({id:o.id,name:`${o.name} · ${o.candidateCount} TS`}))} onChange={value=>add(value,n)}/>
   </section>;})}
   {conflictCount>0&&<div ref={warningRef} role="alert" className="ep-candidate-warning"><div>{warningText}</div><div>Hãy chọn đợt hoặc giờ thi khác không trùng lịch.</div></div>}
-  <button className="sl-btn" disabled={saving||periodClosed} onClick={()=>{const n=Math.max(0,...rounds)+1;setRounds(rs=>[...rs,n]);setRoundStarts(s=>({...s,[n]:end|| (form.period==='MORNING'?'08:00':'14:00')}));}}>+ Thêm đợt thi</button>
+  <button className="sl-btn" disabled={saving||periodClosed} onClick={()=>{const n=Math.max(0,...rounds)+1;setRounds(rs=>[...rs,n]);setRoundStarts(s=>({...s,[n]:end|| (form.period==='MORNING'?'08:00':'14:00')}));}}><PlusIcon fontSize="inherit" /> Thêm đợt thi</button>
   <label className="v20-field">Ghi chú chung<textarea aria-label="Ghi chú chung" maxLength={2000} value={form.note} disabled={saving} onChange={e=>change('note',e.target.value)}/></label>
   <div className="ep-validation" aria-live="polite">{problems.filter(p=>!p.startsWith('Tr\u00f9ng gi\u1edd th\u00ed sinh')).map(p=><span role="alert" key={p}>{p}</span>)}{selectedRoom&&roomReason(selectedRoom)&&<span role="alert">Phòng {selectedRoom.code}: {roomReason(selectedRoom)}</span>}{lecturerBusy&&<span role="alert">Giám thị đã có buổi thi trùng giờ.</span>}{availability.loading&&<span role="status">Đang kiểm tra lịch…</span>}{availability.error&&<span role="alert">{availability.error} <button className="sl-btn" onClick={()=>setRetry(n=>n+1)}>Thử lại</button></span>}</div>
  </ExamDialogLayout>;

@@ -2,8 +2,7 @@ import React, { useState } from "react";
 import { Alert, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel,
   InputAdornment, Radio, RadioGroup, TextField } from "@mui/material";
 import { ExportDownloadIcon as DownloadRounded } from "../../components/ReportExportIcons";
-import SearchRounded from "@mui/icons-material/SearchRounded";
-import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
+import { EyeIcon, MagnifyingGlassIcon } from "../../components/AppIcons";
 import { PdfFileIcon } from "../../components/ReportExportIcons";
 import { WordFileIcon } from "../../components/ReportExportIcons";
 import { ExcelFileIcon } from "../../components/ReportExportIcons";
@@ -53,14 +52,14 @@ export default function ClassProgressExportDialog({ classes, selectedIds, onSele
         </div>
         <TextField className="transcript-search" fullWidth size="small" placeholder="Tìm theo mã lớp, tên lớp..." value={search} disabled={exporting}
           onChange={event => setSearch(event.target.value)} inputProps={{ maxLength: 200, "aria-label": "Tìm lớp cần xuất" }}
-          InputProps={{ startAdornment: <InputAdornment position="start"><SearchRounded aria-hidden="true" /></InputAdornment> }} />
+          InputProps={{ startAdornment: <InputAdornment position="start"><MagnifyingGlassIcon aria-hidden="true" /></InputAdornment> }} />
       </div>
       {error && <Alert severity="error">{error}</Alert>}
       <div className="transcript-roster" aria-label="Danh sách lớp cần xuất">
         {visible.map(group => <div className={`transcript-roster-row${selectedIds.includes(group.id) ? " is-selected" : ""}`} key={group.id}>
           <FormControlLabel control={<Checkbox disabled={exporting} checked={selectedIds.includes(group.id)} onChange={() => toggle(group.id)} />}
             label={<span className="transcript-student-label"><strong>{group.code || group.name}</strong><span>Khóa {group.academicYear || "—"}</span></span>} />
-          <Button className="transcript-preview-button" startIcon={<VisibilityOutlined />} disabled={disabled || exporting}
+          <Button className="transcript-preview-button" startIcon={<EyeIcon />} disabled={disabled || exporting}
             onClick={() => onPreview(group)} aria-label={`Xem trước ${group.code || group.name}`}>Xem trước</Button>
         </div>)}
         {!visible.length && <p className="transcript-empty">Không có lớp phù hợp với tìm kiếm.</p>}

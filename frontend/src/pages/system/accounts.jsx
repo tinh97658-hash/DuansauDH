@@ -5,14 +5,7 @@ import {
   IconButton, InputAdornment, MenuItem, Paper, Select, Stack, TableBody, TableCell, TableContainer,
   TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
-import AddRounded from "@mui/icons-material/AddRounded";
-import ContentCopyRounded from "@mui/icons-material/ContentCopyRounded";
-import EditRounded from "@mui/icons-material/EditRounded";
-import EventAvailableRounded from "@mui/icons-material/EventAvailableRounded";
-import KeyRounded from "@mui/icons-material/KeyRounded";
-import LockOpenRounded from "@mui/icons-material/LockOpenRounded";
-import LockRounded from "@mui/icons-material/LockRounded";
-import LogoutRounded from "@mui/icons-material/LogoutRounded";
+import { ArrowRightStartOnRectangleIcon, CalendarDateRangeIcon, DocumentDuplicateIcon, KeyIcon, LockClosedIcon, LockOpenIcon, PencilSquareIcon, PlusIcon } from "../../components/AppIcons";
 import FeatureLayout from "../../components/FeatureLayout";
 import AppDialog from "../../components/AppDialog";
 import ConfirmDialog from "../../components/ConfirmDialog";
@@ -228,7 +221,7 @@ const Accounts = () => {
           </FilterSelectField>
           {canManage && (
             <Button
-              variant="contained" startIcon={<AddRounded />} onClick={openCreate}
+              variant="contained" startIcon={<PlusIcon />} onClick={openCreate}
               sx={{ height: 38, px: 2, width: { xs: "100%", md: 190 }, flexShrink: 0, bgcolor: "#0788B8", borderRadius: "7px", boxShadow: "none", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}
             >
               Thêm tài khoản
@@ -273,13 +266,13 @@ const Accounts = () => {
                   <Chip size="small" label={ACCOUNT_STATUS_LABELS[account.status] || account.status} color={account.status === "active" ? "success" : "default"} />
                 </TableCell>
                 <TableCell align="center">
-                  {canManage && <Tooltip title="Sửa tài khoản"><IconButton size="small" color="primary" aria-label={`Sửa ${account.email}`} onClick={() => openEdit(account)} disabled={busy}><EditRounded fontSize="small" /></IconButton></Tooltip>}
+                  {canManage && <Tooltip title="Sửa tài khoản"><IconButton size="small" color="primary" aria-label={`Sửa ${account.email}`} onClick={() => openEdit(account)} disabled={busy}><PencilSquareIcon fontSize="small" /></IconButton></Tooltip>}
                   {canManage && (account.status === "active"
-                    ? <Tooltip title="Khóa tài khoản"><IconButton size="small" color="warning" aria-label={`Khóa ${account.email}`} onClick={() => setStatusTarget(account)} disabled={busy}><LockRounded fontSize="small" /></IconButton></Tooltip>
-                    : <Tooltip title="Mở khóa tài khoản"><IconButton size="small" color="success" aria-label={`Mở khóa ${account.email}`} onClick={() => setStatusTarget(account)} disabled={busy}><LockOpenRounded fontSize="small" /></IconButton></Tooltip>)}
-                  {canReset && <Tooltip title="Đặt lại mật khẩu"><IconButton size="small" aria-label={`Đặt lại mật khẩu ${account.email}`} onClick={() => { setResetTarget(account); setResetForm({ auto: true, password: "" }); setResetError(""); }} disabled={busy}><KeyRounded fontSize="small" /></IconButton></Tooltip>}
-                  {canManage && <Tooltip title="Buộc đăng xuất"><IconButton size="small" color="error" aria-label={`Buộc đăng xuất ${account.email}`} onClick={() => setRevokeTarget(account)} disabled={busy}><LogoutRounded fontSize="small" /></IconButton></Tooltip>}
-                  {canAssign && <Tooltip title={account.canManageScheduling ? "Đang phụ trách xếp lịch" : "Phân công phụ trách xếp lịch"}><span><IconButton size="small" color="info" aria-label={`Phân công xếp lịch ${account.email}`} onClick={() => setAssignTarget(account)} disabled={busy || account.canManageScheduling}><EventAvailableRounded fontSize="small" /></IconButton></span></Tooltip>}
+                    ? <Tooltip title="Khóa tài khoản"><IconButton size="small" color="warning" aria-label={`Khóa ${account.email}`} onClick={() => setStatusTarget(account)} disabled={busy}><LockClosedIcon fontSize="small" /></IconButton></Tooltip>
+                    : <Tooltip title="Mở khóa tài khoản"><IconButton size="small" color="success" aria-label={`Mở khóa ${account.email}`} onClick={() => setStatusTarget(account)} disabled={busy}><LockOpenIcon fontSize="small" /></IconButton></Tooltip>)}
+                  {canReset && <Tooltip title="Đặt lại mật khẩu"><IconButton size="small" aria-label={`Đặt lại mật khẩu ${account.email}`} onClick={() => { setResetTarget(account); setResetForm({ auto: true, password: "" }); setResetError(""); }} disabled={busy}><KeyIcon fontSize="small" /></IconButton></Tooltip>}
+                  {canManage && <Tooltip title="Buộc đăng xuất"><IconButton size="small" color="error" aria-label={`Buộc đăng xuất ${account.email}`} onClick={() => setRevokeTarget(account)} disabled={busy}><ArrowRightStartOnRectangleIcon fontSize="small" /></IconButton></Tooltip>}
+                  {canAssign && <Tooltip title={account.canManageScheduling ? "Đang phụ trách xếp lịch" : "Phân công phụ trách xếp lịch"}><span><IconButton size="small" color="info" aria-label={`Phân công xếp lịch ${account.email}`} onClick={() => setAssignTarget(account)} disabled={busy || account.canManageScheduling}><CalendarDateRangeIcon fontSize="small" /></IconButton></span></Tooltip>}
                 </TableCell>
               </TableRow>
             ))}
@@ -373,7 +366,7 @@ const Accounts = () => {
           <Box className="account-credential-field">
             <Typography component="label" htmlFor="created-account-password">Mật khẩu</Typography>
             <TextField id="created-account-password" className="account-credential-password" value={credentials?.password || ""} fullWidth size="small" InputProps={{ readOnly: true,
-              endAdornment: <InputAdornment position="end"><Tooltip title="Sao chép mật khẩu"><IconButton onClick={copyPassword} aria-label="Sao chép mật khẩu" edge="end"><ContentCopyRounded fontSize="small" /></IconButton></Tooltip></InputAdornment>,
+              endAdornment: <InputAdornment position="end"><Tooltip title="Sao chép mật khẩu"><IconButton onClick={copyPassword} aria-label="Sao chép mật khẩu" edge="end"><DocumentDuplicateIcon fontSize="small" /></IconButton></Tooltip></InputAdornment>,
             }} />
           </Box>
         </Stack>

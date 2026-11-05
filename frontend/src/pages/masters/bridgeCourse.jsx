@@ -8,9 +8,7 @@ import {
   FormControl, IconButton, MenuItem, Paper, Select, Stack, TableBody,
   TableCell, TableContainer, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
-import AddRounded from "@mui/icons-material/AddRounded";
-import DeleteRounded from "@mui/icons-material/DeleteRounded";
-import EditRounded from "@mui/icons-material/EditRounded";
+import { PencilSquareIcon, PlusIcon, TrashIcon } from "../../components/AppIcons";
 import FeatureLayout from "../../components/FeatureLayout";
 import InlineReportExport from "../../components/InlineReportExport";
 import { tableReport } from "../../utils/reportExport";
@@ -191,7 +189,7 @@ export default function BridgeCourse() {
       <FilterSelectField label="Trạng thái" value={status} onChange={(e) => setStatus(e.target.value)} sx={{ flex: "1 1 155px", minWidth: 155 }}><MenuItem value="ALL">Tất cả</MenuItem>{Object.entries(STATES).map(([k, v]) => <MenuItem key={k} value={k}>{v[0]}</MenuItem>)}</FilterSelectField>
       <FilterSearchField placeholder="Tìm học viên, học phần..." value={search} onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: 220, flex: 1 }} />
       <Stack direction="row" spacing={1} useFlexGap alignItems="center" sx={{ flexShrink: 0, maxWidth: "100%", flexWrap: "wrap" }}>
-        {admin && <Button variant="contained" startIcon={<AddRounded />} onClick={create} sx={{ height: 40, px: 2, bgcolor: "#0788B8", borderRadius: "4px", boxShadow: "none", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}>Đăng ký học phần</Button>}
+        {admin && <Button variant="contained" startIcon={<PlusIcon />} onClick={create} sx={{ height: 40, px: 2, bgcolor: "#0788B8", borderRadius: "4px", boxShadow: "none", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}>Đăng ký học phần</Button>}
         <InlineReportExport />
       </Stack>
     </Stack></Paper>
@@ -222,8 +220,8 @@ export default function BridgeCourse() {
                 <TableCell><Chip size="small" variant="outlined" label={(RESULTS[r.result] || RESULTS.pending)[0]} color={(RESULTS[r.result] || RESULTS.pending)[1]} sx={{ borderRadius: "4px" }} /></TableCell>
                 {admin && (
                   <TableCell align="center">
-                    <IconButton size="small" color="primary" onClick={() => edit(r)}><EditRounded fontSize="small" /></IconButton>
-                    <IconButton size="small" color="error" onClick={() => setDeleting(r)}><DeleteRounded fontSize="small" /></IconButton>
+                    <IconButton size="small" color="primary" onClick={() => edit(r)}><PencilSquareIcon fontSize="small" /></IconButton>
+                    <IconButton size="small" color="error" onClick={() => setDeleting(r)}><TrashIcon fontSize="small" /></IconButton>
                   </TableCell>
                 )}
               </TableRow>

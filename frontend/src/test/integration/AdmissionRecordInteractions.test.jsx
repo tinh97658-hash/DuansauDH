@@ -11,11 +11,7 @@ import theme from "../../theme";
 const render = (ui, options) => renderWithPermissions(ui, ["admission.manage"], options);
 
 vi.mock("axios");
-vi.mock("@mui/icons-material", () => ({
-  AddPhotoAlternateRounded: () => null, AddRounded: () => null, CheckCircleRounded: () => null,
-  CloseRounded: () => null, DeleteRounded: () => null, EditRounded: () => null,
-  PersonRounded: () => null, VisibilityRounded: () => null, SearchRounded: () => null,
-}));
+
 vi.mock("../../components/FeatureLayout", () => ({ default: ({ children }) => <div>{children}</div> }));
 vi.mock("react-toastify", () => ({ ToastContainer: () => null, toast: { success: vi.fn(), error: vi.fn() } }));
 

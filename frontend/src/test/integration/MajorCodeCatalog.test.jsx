@@ -8,12 +8,7 @@ const render = (ui, options) => renderWithPermissions(ui, ["catalog.manage"], op
 
 jest.mock("axios");
 jest.mock("../../components/FeatureLayout", () => ({ children }) => <div>{children}</div>);
-jest.mock("@mui/icons-material", () => ({
-  AddRounded: require("@mui/icons-material/AddRounded").default,
-  DeleteRounded: require("@mui/icons-material/DeleteRounded").default,
-  EditRounded: require("@mui/icons-material/EditRounded").default,
-  SearchRounded: require("@mui/icons-material/SearchRounded").default,
-}));
+
 
 const major = { id: "m1", code: "CNTT", name: "Công nghệ thông tin", disciplineId: "d1", program: "masters", active: true };
 

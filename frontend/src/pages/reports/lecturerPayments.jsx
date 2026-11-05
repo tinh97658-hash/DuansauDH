@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { Alert, CircularProgress } from '@mui/material';
-import SearchRounded from '@mui/icons-material/SearchRounded';
+import { MagnifyingGlassIcon } from "../../components/AppIcons";
 import FeatureLayout from '../../components/FeatureLayout';
 import AppSelect from '../../components/AppSelect';
 import OfferingDetails from '../../features/scheduling/OfferingDetails';
@@ -115,7 +115,7 @@ export default function LecturerPayments() {
           <AppSelect aria-label="Trạng thái thanh toán" value={filters.paymentStatus} onChange={event => change('paymentStatus', event.target.value)}>
             <option value="all">Tất cả</option><option value="paid">Đã thanh toán</option><option value="unpaid">Chưa thanh toán</option>
           </AppSelect></label>
-        <label className="tp-filter"><span>Tìm kiếm</span><div className="tp-search"><SearchRounded />
+        <label className="tp-filter"><span>Tìm kiếm</span><div className="tp-search"><MagnifyingGlassIcon />
           <input aria-label="Tìm kiếm" placeholder="Giảng viên, lớp học phần…" value={filters.search} onChange={event => change('search', event.target.value)} /></div></label>
       </section>
       {invalidDates && <Alert severity="warning">Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.</Alert>}

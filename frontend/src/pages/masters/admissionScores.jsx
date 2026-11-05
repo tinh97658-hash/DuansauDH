@@ -2,10 +2,7 @@ import { usePermissions } from "../../features/accounts/usePermissions";
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { Alert, Box, Button, Chip, CircularProgress, FormControlLabel, MenuItem, Paper, Stack, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
-import AddRounded from "@mui/icons-material/AddRounded";
-import EditRounded from "@mui/icons-material/EditRounded";
-import InfoOutlined from "@mui/icons-material/InfoOutlined";
-import RefreshRounded from "@mui/icons-material/RefreshRounded";
+import { ArrowPathIcon, InformationCircleIcon, PencilSquareIcon, PlusIcon } from "../../components/AppIcons";
 import BulkAdmissionWorkflow from "../../features/admission/BulkAdmissionWorkflow";
 import AdmissionRoundManager from "../../features/admission/AdmissionRoundManager";
 import FeatureLayout from "../../components/FeatureLayout";
@@ -162,10 +159,10 @@ export default function AdmissionScores() {
           </FilterSelectField>
           <Stack direction="row" gap={1} flexWrap="wrap" sx={{ "& .MuiButton-root": { height: 38, whiteSpace: "nowrap", borderRadius: "4px" } }}>
             <Button size="small" variant="outlined" disabled={workflowBusy || saving} onClick={() => setRoundManagerOpen(true)}>Quản lý đợt</Button>
-            <Button size="small" variant="outlined" startIcon={<RefreshRounded />} onClick={() => runWithDiscardCheck(refreshRounds)} disabled={roundsLoading || loading || workflowBusy || saving}>Tải lại</Button>
+            <Button size="small" variant="outlined" startIcon={<ArrowPathIcon />} onClick={() => runWithDiscardCheck(refreshRounds)} disabled={roundsLoading || loading || workflowBusy || saving}>Tải lại</Button>
             {admin && <>
-              <Button size="small" variant="outlined" startIcon={<EditRounded />} disabled={!data || loading || workflowBusy || saving} onClick={() => runWithDiscardCheck(() => openForm(data.round))}>Sửa đợt</Button>
-              <Button size="small" variant="contained" startIcon={<AddRounded />} disabled={workflowBusy || saving} onClick={() => runWithDiscardCheck(() => openForm(null))} sx={{ bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F" } }}>Tạo đợt xét tuyển</Button>
+              <Button size="small" variant="outlined" startIcon={<PencilSquareIcon />} disabled={!data || loading || workflowBusy || saving} onClick={() => runWithDiscardCheck(() => openForm(data.round))}>Sửa đợt</Button>
+              <Button size="small" variant="contained" startIcon={<PlusIcon />} disabled={workflowBusy || saving} onClick={() => runWithDiscardCheck(() => openForm(null))} sx={{ bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F" } }}>Tạo đợt xét tuyển</Button>
             </>}
           </Stack>
           <InlineReportExport height={38} />
@@ -267,7 +264,7 @@ export default function AdmissionScores() {
             </Stack>
           </Box>
           <Box sx={{ p: 1.25, bgcolor: "#EFF6FB", border: "1px solid #CDE0F0", borderRadius: "4px", display: "flex", gap: 1.25, alignItems: "flex-start" }}>
-            <InfoOutlined sx={{ fontSize: 18, color: "#0788B8", mt: "1px", flexShrink: 0 }} />
+            <InformationCircleIcon sx={{ fontSize: 18, color: "#0788B8", mt: "1px", flexShrink: 0 }} />
             <Typography sx={{ fontSize: "12px", color: "#244360", lineHeight: "17px" }}>
               Đợt áp dụng cho tất cả ngành thạc sĩ trong năm. Nhập điểm ngưỡng từng ngành ở bảng sau khi tạo đợt.
             </Typography>

@@ -9,15 +9,7 @@ import AdminAdmissionRecordDetail from "../../pages/plan/admissionRecordDetail";
 // after a decision. Match the existing full-page integration tests' timeout.
 jest.setTimeout(15000);
 
-jest.mock("@mui/icons-material", () => ({
-  AddPhotoAlternateRounded: () => null, ArrowBackRounded: () => null, CheckCircleRounded: () => null,
-  DeleteRounded: () => null, FolderSpecialRounded: () => null, PersonRounded: () => null,
-  PictureAsPdfRounded: () => null, RefreshRounded: () => null, SaveRounded: () => null,
-  SchoolRounded: () => null, WarningAmberRounded: () => null, WorkspacePremiumRounded: () => null,
-  SwapHorizRounded: () => null, HistoryRounded: () => null, AddRounded: () => null,
-  DeleteOutlineRounded: () => null, EditRounded: () => null, FactCheckRounded: () => null,
-  MenuBookRounded: () => null, RuleRounded: () => null,
-}));
+
 vi.mock("axios", () => ({ default: { get: jest.fn(), post: jest.fn(), put: jest.fn(), defaults: {} } }));
 jest.mock("react-router-dom", () => ({
   useParams: () => ({ id: "record-1" }), useNavigate: () => jest.fn(),

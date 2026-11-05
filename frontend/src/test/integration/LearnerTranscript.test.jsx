@@ -19,7 +19,7 @@ jest.mock("../../features/learners/learnerTranscriptPdf", () => ({ createLearner
 jest.mock("../../features/learners/learnerTranscriptBatch", async (importOriginal) => ({ fetchClassTranscripts: jest.fn(), generateTranscriptDocuments: jest.fn(), selectTranscriptScorecards: (await importOriginal()).selectTranscriptScorecards }));
 jest.mock("../../features/learners/learnerTranscriptZip", () => ({ packTranscriptZip: jest.fn() }));
 jest.mock("../../utils/documentFiles", async (importOriginal) => ({ ...await importOriginal(), downloadDocumentFile: jest.fn() }));
-jest.mock("@mui/icons-material", () => ({ SearchRounded: () => null }));
+
 jest.setTimeout(20000);
 
 const group = { id: "g1", code: "CLASS1", academicYear: "2026", major: { id: "m1", name: "Major", disciplineId: "d1", discipline: { id: "d1", name: "Discipline" } } };

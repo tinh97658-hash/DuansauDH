@@ -71,7 +71,7 @@ body .app-popup .ep-arrangement-fields :is(.v20-field>input,.v20-field>select,.s
 body .app-popup .ep-arrangement-fields .sl-combo>input{padding-right:32px}
 body .app-popup .ep-arrangement-fields .sl-combo>button{height:46px}
 body .app-popup .ep-arrangement-fields .sl-combo-list{top:calc(100% + 4px)}
-body .app-popup .ep-arrangement-dialog{--ep-chevron:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23526774' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")}
+body .app-popup .ep-arrangement-dialog{--ep-chevron:var(--app-chevron)}
 body .app-popup .ep-arrangement-dialog select{appearance:none;background-image:var(--ep-chevron);background-repeat:no-repeat;background-position:right 12px center;background-size:16px;padding-right:40px}
 body .app-popup .ep-arrangement-dialog .sl-combo>button{display:block;top:1px;right:1px;width:40px;padding:0;border:0;border-radius:0 4px 4px 0;background:transparent var(--ep-chevron) center/16px no-repeat;color:transparent;font-size:0;cursor:pointer}
 body .app-popup .ep-arrangement-dialog .sl-combo>input{padding-right:42px}
