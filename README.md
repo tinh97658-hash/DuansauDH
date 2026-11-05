@@ -2,6 +2,12 @@
 
 Hệ thống nội bộ của **Viện Đào tạo Sau đại học – Trường Đại học Hàng hải Việt Nam**, phục vụ quản lý hồ sơ, tiến độ và các lần nộp báo cáo của học viên, nghiên cứu sinh. Hệ thống không hỗ trợ đăng ký tài khoản công khai; tài khoản được cấp và quản lý nội bộ. Toàn bộ lớp dữ liệu sử dụng PostgreSQL.
 
+## Quản lý năm đào tạo
+
+Vào **Hệ thống → Danh mục đào tạo → Năm đào tạo** để thêm/sửa năm và ngày bắt đầu, hoặc bật/tắt năm trong danh sách chọn. Combobox năm của hồ sơ tuyển sinh/học viên và chương trình đào tạo lấy dữ liệu từ danh mục này.
+
+Migration `098-training-years` tạo danh mục, giữ các năm đang có trong hồ sơ/lớp và khởi tạo ngày bắt đầu là **01/01** của từng năm. Cần chỉnh lại ngày bắt đầu theo thực tế. Khi cập nhật môi trường khác, chạy `npm run db:migrate` rồi khởi động lại backend.
+
 ## Công nghệ
 
 Phân quyền theo hồ sơ làm việc, cây module và quyền xem/ghi: xem [hướng dẫn phân quyền](docs/working-profiles-permission-tree.md).

@@ -5,6 +5,7 @@ import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
 import type { EffectiveAccess } from './rbac.service.js';
 import { workingProfileStorage } from './profile-context.js';
+import { authorizationPath } from './request-path.js';
 
 @Injectable()
 export class GroupScopeService implements OnModuleInit {
@@ -50,7 +51,7 @@ export class GroupScopeService implements OnModuleInit {
     add('record', body.admissionRecordId); add('record', body.admissionRecordIds);
     add('offering', body.courseOfferingId);
     if (organizing) add('offering', body.sourceCourseOfferingId);
-    const path: string = request.originalUrl?.split('?')[0] || '';
+    const path = authorizationPath(request.originalUrl || request.url || '');
     const segments = path.split('/').filter(Boolean);
     const resourceKinds: Record<string, string> = {
       'class-groups': 'group', classes: 'group', groups: 'group',

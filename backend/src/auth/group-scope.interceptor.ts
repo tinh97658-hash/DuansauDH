@@ -3,6 +3,7 @@ import { Observable } from 'rxjs';
 import { Staff } from '../database/models/staff.model.js';
 import { RbacService } from './rbac.service.js';
 import { GroupScopeService } from './group-scope.service.js';
+import { authorizationPath } from './request-path.js';
 
 @Injectable()
 export class GroupScopeInterceptor implements NestInterceptor {
@@ -12,7 +13,7 @@ export class GroupScopeInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest();
     if (!(request.user instanceof Staff)) return next.handle();
     const access = await this.rbac.effectiveAccess(request.user, !['GET', 'HEAD', 'OPTIONS'].includes(request.method));
-    const path = request.originalUrl?.split('?')[0] || '';
+    const path = authorizationPath(request.originalUrl || request.url || '');
     if (access.groupScope?.restrictView && /\/accounts\/(audit-logs|change-logs)(\/|$)/.test(path)) {
       throw new ForbiddenException('Nhật ký toàn hệ thống không khả dụng khi vai trò bị giới hạn xem theo nhóm.');
     }

@@ -132,17 +132,17 @@ export class AccountsService {
         roleIds.map((roleId) => ({ staffId: staff.id, roleId })),
         { transaction },
       );
+      await this.audit.record({
+        actorStaffId: actorId, targetStaffId: staff.id, action: 'account.create',
+        metadata: { email, roleIds, primaryRoleId: primaryRole.id, passwordGenerated: generated,
+          roleChanges: { before: { roleIds: [], primaryRoleCode: null },
+            after: { roleIds, primaryRoleCode: primaryRole.code }, addedRoleIds: roleIds, removedRoleIds: [] } },
+        ...context,
+      }, transaction);
       return staff;
     });
 
     this.rbac.invalidate(created.id);
-    await this.audit.record({
-      actorStaffId: actorId,
-      targetStaffId: created.id,
-      action: "account.create",
-      metadata: { email, roleIds, primaryRoleId: primaryRole.id, passwordGenerated: generated },
-      ...context,
-    });
 
     return {
       message: "Tạo tài khoản thành công",
@@ -164,6 +164,7 @@ export class AccountsService {
     let nextRoleIds: string[] | undefined;
     let primaryCode: string | undefined;
     await this.sequelize.transaction(async (transaction) => {
+      let roleChanges: Record<string, unknown> | undefined;
       let rolesChanged = false;
       let addedRoleIds: string[] = [];
       let removedRoleIds: string[] = [];
@@ -174,6 +175,7 @@ export class AccountsService {
         await staff.reload({ transaction, lock: Transaction.LOCK.UPDATE });
         const memberships = await this.staffRoles.findAll({ where: { staffId: id }, attributes: ["roleId"], transaction });
         const previousRoleIds = new Set(memberships.map((membership) => membership.roleId));
+        const previousPrimaryCode = staff.role;
         nextRoleIds = dto.roleIds ? [...new Set(dto.roleIds)] : [...previousRoleIds];
         addedRoleIds = nextRoleIds.filter(roleId => !previousRoleIds.has(roleId));
         removedRoleIds = [...previousRoleIds].filter(roleId => !nextRoleIds.includes(roleId));
@@ -191,6 +193,8 @@ export class AccountsService {
         );
         primaryCode = primaryRole.code;
         rolesChanged = primaryCode !== staff.role || assignmentsChanged;
+        roleChanges = { before: { roleIds: [...previousRoleIds], primaryRoleCode: previousPrimaryCode },
+          after: { roleIds: nextRoleIds, primaryRoleCode: primaryCode }, addedRoleIds, removedRoleIds };
       }
       const changes: Record<string, unknown> = {};
       if (dto.name !== undefined) changes.name = dto.name.trim();
@@ -208,16 +212,15 @@ export class AccountsService {
         await staff.increment("sessionVersion", { transaction });
         await this.administrationSafety.assertRetained(transaction);
       }
+      // Commit the account mutation and its before/after audit together.
+      await this.audit.record({
+        actorStaffId: actorId, targetStaffId: id, action: 'account.update',
+        metadata: { name: dto.name, email, roleIds: nextRoleIds, primaryRoleCode: primaryCode, roleChanges },
+        ...context,
+      }, transaction);
     });
 
     this.rbac.invalidate(id);
-    await this.audit.record({
-      actorStaffId: actorId,
-      targetStaffId: id,
-      action: "account.update",
-      metadata: { name: dto.name, email, roleIds: nextRoleIds, primaryRoleCode: primaryCode },
-      ...context,
-    });
     return { message: "Cập nhật tài khoản thành công", data: await this.detail(id) };
   }
 

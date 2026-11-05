@@ -56,6 +56,7 @@ export const ribbons = {
       action("Hình thức đào tạo", "/system/training-modes", ClipboardDocumentCheckIcon, "var(--icon-olive)", { permissions: ["catalog.view"] }),
       action("Ngành đào tạo", "/system/disciplines", BuildingLibraryIcon, "var(--icon-primary)", { permissions: ["catalog.view"] }),
       action("Chuyên ngành", "/system/majors", BookOpenIcon, "var(--icon-warning)", { permissions: ["catalog.view"] }),
+      action("Năm đào tạo", "/system/training-years", CalendarDaysIcon, "var(--icon-teal)", { permissions: ["catalog.view"] }),
       action("Trình độ đào tạo", "/system/training-levels", TrophyIcon, "var(--icon-purple)", { permissions: ["catalog.view"] }),
       action("Trạng thái học", "/system/study-statuses", CheckCircleIcon, "var(--icon-teal)", { permissions: ["catalog.view"] }),
       action("Bổ sung kiến thức", "/system/bridge-knowledge", ClipboardDocumentCheckIcon, "var(--icon-primary)", { permissions: ["catalog.view"] }),

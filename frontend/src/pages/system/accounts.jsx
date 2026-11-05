@@ -296,6 +296,9 @@ const Accounts = () => {
           <div className="account-editor-field"><label htmlFor="account-editor-email">Email công vụ</label><TextField id="account-editor-email" type="email" value={form.email} onChange={(event) => setForm((previous) => ({ ...previous, email: event.target.value }))} fullWidth size="small" disabled={saving} /></div>
           <Box>
             <Typography id="account-editor-roles" className="account-editor-label">Vai trò được gán</Typography>
+            <Typography sx={{ fontSize: 12, color: '#92400E', mb: 1 }}>
+              Quyền quản lý tài khoản tương đương đặc quyền quản trị: được gán mọi vai trò, bao gồm Quản trị hệ thống, cho bản thân hoặc người khác.
+            </Typography>
             <Paper role="group" aria-labelledby="account-editor-roles" variant="outlined" sx={{ p: 1, maxHeight: 200, overflowY: "auto", borderColor: "#D7E4EE", borderRadius: 0 }}>
               {editorRoleOptions.length ? editorRoleOptions.map((role) => (
                 <FormControlLabel
@@ -339,6 +342,7 @@ const Accounts = () => {
       >
         <Stack spacing={1.5} className="account-editor-fields">
           {resetError && <Alert severity="error">{resetError}</Alert>}
+          <Typography sx={{ fontSize: 12, color: '#92400E' }}>Quyền này cho phép đặt lại mật khẩu cả tài khoản Quản trị hệ thống.</Typography>
           <Typography sx={{ fontSize: 13.5 }}>Đặt lại mật khẩu cho <strong>{resetTarget?.email}</strong>. Người dùng sẽ bị đăng xuất và phải đổi mật khẩu ở lần đăng nhập kế tiếp.</Typography>
           <FormControlLabel
             control={<Checkbox size="small" checked={resetForm.auto} onChange={(event) => setResetForm((previous) => ({ ...previous, auto: event.target.checked }))} disabled={busy} />}

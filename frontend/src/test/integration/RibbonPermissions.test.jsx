@@ -8,7 +8,7 @@ const routesByPermission = {
   "account.view": ["/system/accounts"],
   "role.view": ["/system/roles"],
   "audit.view": ["/system/audit-logs"],
-  "catalog.view": ["ethnicities", "nationalities", "wards", "cities", "lecturers", "units", "rooms", "training-mode-groups", "training-modes", "disciplines", "majors", "training-levels", "study-statuses", "bridge-knowledge"].map(s => "/system/" + s),
+  "catalog.view": ["ethnicities", "nationalities", "wards", "cities", "lecturers", "units", "rooms", "training-mode-groups", "training-modes", "disciplines", "majors", "training-years", "training-levels", "study-statuses", "bridge-knowledge"].map(s => "/system/" + s),
   "plan.view": ["/plan/training-plan", "/plan/annual-fees", "/masters/study-leaves"],
   "admission.view": ["/plan/admission-targets", "/plan/admission-records", "/masters/admission-scores", "/masters/admitted-records"],
   "masters.view": ["bridge-course", "create-class-groups", "assign-class-groups", "english-exam", "english-scores", "english-certification", "final-defense", "graduation-docs"].map(s => "/masters/" + s),
@@ -99,8 +99,8 @@ describe("Ribbon read/navigation permission contracts", () => {
     expect(calendar).toHaveAttribute("aria-current", "page");
     expect(group.querySelectorAll(".ribbon-action")).toHaveLength(3);
   });
-  it("classifies all 64 actions against the independent contract", () => {
-    expect(items).toHaveLength(64);expect(expected.size).toBe(64);
+  it("classifies all 65 actions against the independent contract", () => {
+    expect(items).toHaveLength(65);expect(expected.size).toBe(65);
     for (const item of items) {
       expect(expected.has(item.route)).toBe(true);
       expect(item.permissions || []).toEqual(expected.get(item.route));

@@ -22,6 +22,7 @@ import { District } from "./models/common/district.model.js";
 import { Ward } from "./models/common/ward.model.js";
 import { TrainingModeGroup } from "./models/common/training-mode-group.model.js";
 import { TrainingMode } from "./models/common/training-mode.model.js";
+import { TrainingYear } from "./models/common/training-year.model.js";
 import { TrainingLevel } from "./models/common/training-level.model.js";
 import { Discipline } from "./models/common/discipline.model.js";
 import { Major } from "./models/common/major.model.js";
@@ -75,7 +76,7 @@ export const databaseModels = [
   // RBAC & quản lý tài khoản
   Role, Permission, RolePermission, RolePermissionScope, StaffRole, AuthAuditLog, DbChangeLog,
   // Common
-  Ethnicity, Nationality, City, District, Ward, TrainingModeGroup, TrainingMode, TrainingLevel,
+  Ethnicity, Nationality, City, District, Ward, TrainingModeGroup, TrainingMode, TrainingLevel, TrainingYear,
   Discipline, Major, StudyStatus, BridgeKnowledgeSubject, Lecturer, Unit, Room, TrainingProgram,
   // Plan
   TrainingPlan, AdmissionTarget, AnnualFee, AdmissionRecord, AdmissionRound, AdmissionEvaluation, AdmissionEvaluationHistory,

@@ -160,11 +160,18 @@ export default function RoutePermissionTree({ permissions, checked, onChange, as
           >
             <Box sx={{ ...cellNameSx, pl: 8.5 }}>
               <ArrowRightIcon sx={{ color: '#8DA2B5', fontSize: 15, mr: 0.75, flexShrink: 0 }} />
-              <Tooltip title={permission.description || permission.code} placement="top-start">
-                <Typography sx={{ fontSize: 12.5, color: '#475569', cursor: 'default' }}>
-                  {permission.name}
-                </Typography>
-              </Tooltip>
+              <Box>
+                <Tooltip title={permission.description || permission.code} placement="top-start">
+                  <Typography sx={{ fontSize: 12.5, color: '#475569', cursor: 'default' }}>
+                    {permission.name}
+                  </Typography>
+                </Tooltip>
+                {['.account-manage', '.account-password-reset'].some(suffix => permission.code.endsWith(suffix)) && (
+                  <Typography sx={{ fontSize: 12, color: '#92400E', mt: 0.5 }}>
+                    {(permission.description || '').replace(/^\/[^ ]+ · /, '')}
+                  </Typography>
+                )}
+              </Box>
             </Box>
             <Box sx={cellActionSx}>
               <Typography variant="caption" sx={{ color: '#CBD5E1', fontSize: 13, userSelect: 'none' }}>—</Typography>

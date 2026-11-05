@@ -28,6 +28,18 @@ it('completes an academic read only after its protected transaction commits', as
   expect(transactions).toEqual(['begin', 'commit']);
 });
 
+it.each([
+  ['/MASTERS/EXAM-LISTS/', 'gradebook', 'gradebook.view'],
+  ['/Masters/Exam-Schedule/?year=2026', 'exam', 'exams.view'],
+])('preserves academic RLS context for mixed-case URL %s', async (path, domain, permission) => {
+  const { interceptor, context, scope } = setup();
+  const request = context.switchToHttp().getRequest();
+  context.switchToHttp = () => ({ getRequest: () => ({ ...request, originalUrl: path }) });
+  await lastValueFrom(await interceptor.intercept(context, { handle: () => of({}) }));
+  expect(scope.current()).toMatchObject({ academicDomain: domain, academicPermission: permission });
+  expect(scope.withReadTransaction).toHaveBeenCalledTimes(1);
+});
+
 it('rolls back read errors and disconnected subscriptions', async () => {
   const failed = setup();
   const stream = await failed.interceptor.intercept(failed.context, { handle: () => throwError(() => new Error('failed read')) });

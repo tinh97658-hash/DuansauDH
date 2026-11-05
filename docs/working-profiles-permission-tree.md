@@ -12,6 +12,18 @@ Mỗi vai trò đang được gán cho nhân viên là một hồ sơ làm việ
 
 ## Cấu hình quyền
 
+### Đặc quyền quản trị tài khoản
+
+`account.manage` là đặc quyền tương đương quản trị viên: được tạo/sửa/khóa tài khoản và gán mọi vai trò đang hoạt động, bao gồm Quản trị hệ thống, cho bản thân hoặc người khác. Đây là chủ đích của hệ thống; chỉ cấp cho người được tin cậy như quản trị viên. `account.password.reset` được cấp riêng và cho phép đặt lại mật khẩu cả tài khoản quản trị. Giao diện hiển thị rõ phạm vi của hai quyền này.
+
+Nhật ký tạo/cập nhật tài khoản lưu người thực hiện, tài khoản đích và các UUID vai trò, mã vai trò chính trước/sau, cùng danh sách vai trò thêm/gỡ. Thay đổi tài khoản và nhật ký tương ứng được ghi trong cùng transaction; ghi nhật ký lỗi thì thay đổi không được commit.
+
+### Kiểm tra API và dashboard
+
+Kiểm tra quyền và phạm vi dữ liệu dùng cùng dạng đường dẫn để so sánh, không phân biệt chữ hoa/thường và dấu `/` cuối. URL và ID đưa vào handler không bị sửa. API ghi chưa có mapping quyền trang bị từ chối; API đổi mật khẩu của chính người dùng là ngoại lệ tường minh và vẫn dùng kiểm tra mật khẩu hiện tại. Quận/huyện vẫn được đọc để tra cứu khi sửa phường/xã; API ghi quận/huyện cũ chưa có trang phân quyền riêng bị chặn.
+
+Dashboard yêu cầu cả quyền nghiệp vụ và quyền xem/hành động của trang tương ứng. Bỏ quyền xem trang hoặc hành động nhập/duyệt/xếp lịch sẽ ẩn phần công việc tương ứng và không tải dữ liệu của phần đó.
+
 Trang **Vai trò** có danh sách vai trò bên trái, cây **Module → Tab/Hành động** bên phải và hai cột **Xem / Ghi**.
 
 - Bật module mở hộp gợi ý bật các tab xem; không tự cấp quyền ghi.

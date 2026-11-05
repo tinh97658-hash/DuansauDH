@@ -6,11 +6,16 @@ import { RequirePermissions } from "../common/permissions.decorator.js";
 import { PermissionsGuard } from "../common/permissions.guard.js";
 import { CreateCatalogDto, CreateRoomDto, UpdateCatalogDto, UpdateRoomDto } from "./dto/catalog.dto.js";
 import { SystemService } from "./system.service.js";
+import { TrainingYearDto, UpdateTrainingYearDto } from "./dto/training-year.dto.js";
 
 @Controller("system")
 @UseGuards(AuthenticatedGuard, PermissionsGuard)
 export class SystemController {
   constructor(private readonly system: SystemService, private readonly rbac: RbacService) {}
+
+  @Get("training-years") trainingYears() { return this.system.listTrainingYears(); }
+  @Post("training-years") @RequirePermissions("catalog.manage") createTrainingYear(@Body() dto: TrainingYearDto) { return this.system.saveTrainingYear(dto); }
+  @Put("training-years/:id") @RequirePermissions("catalog.manage") updateTrainingYear(@Param("id") id: string, @Body() dto: UpdateTrainingYearDto) { return this.system.saveTrainingYear(dto, id); }
 
   @Get("unit-info") unitInfo() { return this.system.unitInfo(); }
   @Get("license") license() { return this.system.license(); }

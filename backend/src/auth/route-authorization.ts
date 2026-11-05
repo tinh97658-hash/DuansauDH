@@ -1,9 +1,11 @@
 import { PERMISSION_ROUTES,routeActionCode,routeViewCode } from './route-permissions.js';
+import { authorizationPath } from './request-path.js';
 
 // These are server resource mappings. No URL supplied by the client chooses its
 // authorization context. Shared lookup endpoints retain their existing guards.
 export function permissionRoutesForRequest(path:string,method:string){
-  path=path.split('?')[0].replace(/\/$/,'');
+  path=authorizationPath(path);
+  method=method.toUpperCase();
   const paths=(...paths:string[])=>PERMISSION_ROUTES.filter(route=>paths.includes(route.path));
   if(path.startsWith('/scheduling/')){
     if(path.includes('class-curriculum-progress'))return paths('/masters/class-course-history','/masters/course-matrix');
@@ -29,7 +31,7 @@ export function permissionRoutesForRequest(path:string,method:string){
     return paths('/plan/admission-records','/masters/admitted-records','/masters/admission-scores','/masters/study-leaves');
   if(/^\/(?:plan\/)?study-leaves(?:\/|$)/.test(path))return paths('/masters/study-leaves');
   if(/^\/reports\/(learner-scorecard|transcript-issues)(?:\/|$)/.test(path))return paths('/reports/class-score-summary');
-  if(path.startsWith('/accounts/me')||path==='/roles/permissions')return [];
+  if(path==='/accounts/me/permissions'||path==='/accounts/me/password'||path==='/roles/permissions')return [];
   if(path==='/data/tobereviewed'||path==='/data/submitreview')return paths('/reviewer');
   if(/^\/accounts\/(audit-logs|change-logs)/.test(path))return paths('/system/audit-logs');
   if(method==='GET'&&path.startsWith('/system/')&&PERMISSION_ROUTES.some(route=>route.path===path&&route.read.includes('catalog.view')))return [];
@@ -42,7 +44,10 @@ export function permissionRoutesForRequest(path:string,method:string){
 
 export function routePermissionAllowed(permissions:Set<string>,path:string,method:string,capabilities:string[]){
   const routes=permissionRoutesForRequest(path,method);
-  if(!routes.length)return true;
+  // Shared reads keep their existing capability guards. Unmapped mutations
+  // must never inherit a broad write grant from a different page.
+  if(!routes.length)return ['GET','HEAD','OPTIONS'].includes(method.toUpperCase())
+    || (authorizationPath(path)==='/accounts/me/password' && method.toUpperCase()==='PATCH');
   const actions=capabilities.filter(code=>!code.endsWith('.view')&&!code.startsWith('module.'));
   return routes.some(route=>permissions.has(routeViewCode(route.path))&&actions.every(action=>
     route.actions.includes(action)&&permissions.has(routeActionCode(route.path,action))));

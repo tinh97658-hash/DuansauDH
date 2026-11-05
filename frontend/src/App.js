@@ -48,6 +48,7 @@ const Disciplines = lazyPage(() => import("./pages/system/disciplines"), ["/syst
 const TrainingModeGroups = lazyPage(() => import("./pages/system/trainingModeGroups"), ["/system/training-mode-groups"]);
 const TrainingModes = lazyPage(() => import("./pages/system/trainingModes"), ["/system/training-modes"]);
 const Majors = lazyPage(() => import("./pages/system/majors"), ["/system/majors"]);
+const TrainingYears = lazyPage(() => import("./pages/system/trainingYears"), ["/system/training-years"]);
 const TrainingLevels = lazyPage(() => import("./pages/system/trainingLevels"), ["/system/training-levels"]);
 const StudyStatuses = lazyPage(() => import("./pages/system/studyStatuses"), ["/system/study-statuses"]);
 const BridgeKnowledge = lazyPage(() => import("./pages/system/bridgeKnowledge"), ["/system/bridge-knowledge"]);
@@ -149,6 +150,7 @@ const router = createBrowserRouter(createRoutesFromElements(
               <Route path="system/training-modes" element={<TrainingModes />} />
               <Route path="system/disciplines" element={<Disciplines />} />
               <Route path="system/majors" element={<Majors />} />
+              <Route path="system/training-years" element={<TrainingYears />} />
               <Route path="system/training-levels" element={<TrainingLevels />} />
               <Route path="system/study-statuses" element={<StudyStatuses />} />
               <Route path="system/bridge-knowledge" element={<BridgeKnowledge />} />

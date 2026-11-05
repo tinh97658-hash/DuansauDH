@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
-import { Op } from "sequelize";
+import { Op, type Transaction } from "sequelize";
 import { AuthAuditLog } from "../database/models/auth-audit-log.model.js";
 import { Staff } from "../database/models/staff.model.js";
 
@@ -49,7 +49,7 @@ const serialize = (log: AuthAuditLog) => {
 export class AuditService {
   constructor(@InjectModel(AuthAuditLog) private readonly logs: typeof AuthAuditLog) {}
 
-  record(entry: AuditEntry) {
+  record(entry: AuditEntry, transaction?: Transaction) {
     return this.logs.create({
       actorStaffId: entry.actorStaffId ?? null,
       targetStaffId: entry.targetStaffId ?? null,
@@ -57,7 +57,7 @@ export class AuditService {
       metadata: entry.metadata ?? null,
       ip: entry.ip ?? null,
       userAgent: entry.userAgent ?? null,
-    } as any);
+    } as any, ...(transaction ? [{ transaction }] : []));
   }
 
   async list(query: AuditQuery) {

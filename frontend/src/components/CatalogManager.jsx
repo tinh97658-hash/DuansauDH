@@ -13,6 +13,7 @@ import { PencilSquareIcon, PlusIcon, TrashIcon } from "./AppIcons";
 import { API_BASE_URL } from "../config/http";
 import FeatureLayout from "./FeatureLayout";
 import AppDialog from "./AppDialog";
+import DateField from "./DateField";
 import ConfirmDialog from "./ConfirmDialog";
 import { personNameParts } from "../utils/personName";
 import FilterSearchField from "./FilterSearchField";
@@ -551,6 +552,9 @@ const CatalogManager = ({
                     />
                   );
                 }
+                if (f.type === "date") return <CompactField key={f.key} label={f.label} htmlFor={`catalog-${f.key}`}>
+                  <DateField id={`catalog-${f.key}`} value={form[f.key]} onChange={setField(f.key)} fullWidth size="small" inputProps={{ "aria-label": f.label }} sx={compactControlSx} />
+                </CompactField>;
                 if (f.type === "number") {
                   return (
                     <CompactField key={f.key} label={f.label.toUpperCase()} htmlFor={`catalog-${f.key}`}>

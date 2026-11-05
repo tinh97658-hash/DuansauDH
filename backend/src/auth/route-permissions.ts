@@ -15,6 +15,7 @@ export const PERMISSION_ROUTES:PermissionRoute[] = [
   {"path":"/system/training-modes","name":"Hình thức đào tạo","section":"HỆ THỐNG","group":"DANH MỤC ĐÀO TẠO","read":["catalog.view"],"actions":["catalog.manage"]},
   {"path":"/system/disciplines","name":"Ngành đào tạo","section":"HỆ THỐNG","group":"DANH MỤC ĐÀO TẠO","read":["catalog.view"],"actions":["catalog.manage"]},
   {"path":"/system/majors","name":"Chuyên ngành","section":"HỆ THỐNG","group":"DANH MỤC ĐÀO TẠO","read":["catalog.view"],"actions":["catalog.manage"]},
+  {"path":"/system/training-years","name":"Năm đào tạo","section":"HỆ THỐNG","group":"DANH MỤC ĐÀO TẠO","read":["catalog.view"],"actions":["catalog.manage"]},
   {"path":"/system/training-levels","name":"Trình độ đào tạo","section":"HỆ THỐNG","group":"DANH MỤC ĐÀO TẠO","read":["catalog.view"],"actions":["catalog.manage"]},
   {"path":"/system/study-statuses","name":"Trạng thái học","section":"HỆ THỐNG","group":"DANH MỤC ĐÀO TẠO","read":["catalog.view"],"actions":["catalog.manage"]},
   {"path":"/system/bridge-knowledge","name":"Bổ sung kiến thức","section":"HỆ THỐNG","group":"DANH MỤC ĐÀO TẠO","read":["catalog.view"],"actions":["catalog.manage"]},

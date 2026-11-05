@@ -1,5 +1,6 @@
 import { usePermissions } from "../../features/accounts/usePermissions";
 import DateField from "../../components/DateField";
+import useTrainingYears from "../../hooks/useTrainingYears";
 import { formatDate } from "../../utils/dateFormat";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -37,7 +38,6 @@ import {
 
 const currentYear = new Date().getFullYear();
 const PAGE_SIZE = 15;
-const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
 
 const TRAINING_LEVELS = [
   { value: "Thạc sĩ", label: "Thạc sĩ" },
@@ -209,6 +209,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
   const recordDetailUrl = id => `${recordDetailBase}/${id}${isStudyManagement ? "?returnView=records" : ""}`;
   // Global Filter State
   const [year, setYear] = useState(isStudyManagement ? "" : String(currentYear));
+  const years = useTrainingYears(year, setYear);
   const [levelFilter, setLevelFilter] = useState(isMastersList ? "Thạc sĩ" : "ALL");
   const [disciplineFilter, setDisciplineFilter] = useState("");
   const [majorFilter, setMajorFilter] = useState("ALL");
@@ -624,7 +625,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="flex-end" sx={{ width: { xs: "100%", md: "auto" }, minWidth: 0, flex: "1 1 0%", flexWrap: { xs: "wrap", md: "nowrap" } }}>
             <FilterSelectField disabled={saving} label="Năm" value={year} onChange={(e) => { setYear(e.target.value); setClassGroupFilter(""); }} sx={{ flex: "1 1 108px", minWidth: 108 }}>
                 {isStudyManagement && <MenuItem value="">Tất cả năm</MenuItem>}
-                {YEARS.map((y) => (
+                {years.map((y) => (
                   <MenuItem key={y} value={y} sx={{ fontSize: 12 }}>
                     {y}
                   </MenuItem>

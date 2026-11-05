@@ -8,6 +8,7 @@ import { databaseModels } from "../../src/database/database.module.js";
 import { DashboardService, operationalPermissions } from "../../src/dashboard/dashboard.service.js";
 import { OperationalDashboardQuery } from "../../src/dashboard/dashboard.controller.js";
 import { businessCalendarDaysSince } from '../../src/scheduling/scheduling-time.js';
+import { routeViewCode, routeActionCode } from '../../src/auth/route-permissions.js';
 
 let db: Sequelize;
 beforeAll(() => { db = new Sequelize({ dialect: "postgres", database: "test", logging: false, models: databaseModels }); });
@@ -51,6 +52,17 @@ function fixture() {
 }
 
 describe("operational dashboard permissions", () => {
+  it('does not load sections when broad grants remain but page read or action grants are missing', async () => {
+    for (const missing of [routeViewCode('/masters/exam-lists'), routeActionCode('/masters/exam-lists','gradebook.approve')]) {
+      const f = fixture();
+      const permissions = new Set(['gradebook.view','gradebook.approve',routeViewCode('/masters/exam-lists'),routeActionCode('/masters/exam-lists','gradebook.approve')]);
+      permissions.delete(missing);
+      f.rbac.effectiveAccess.mockResolvedValue({ permissions, roleCodes: ['custom'] });
+      expect((await f.service.operational(user('custom'), '2026', 'approvals')).sources).toEqual({});
+      expect(f.scheduling.listCourseOfferings).not.toHaveBeenCalled();
+      expect(f.gradebooks.tracking).not.toHaveBeenCalled();
+    }
+  });
   it('shares grade tracking between entry and approval queues only within one request', async () => {
     const f = fixture();
     await f.service.operational(user(), '2026');
@@ -80,7 +92,7 @@ describe("operational dashboard permissions", () => {
   });
   it("uses custom grants and ignores a legacy admin role after revocation", async () => {
     const f = fixture();
-    f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(["masters.view", "masters.manage"]), roleCodes: ["custom"] });
+    f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(["masters.view", "masters.manage", routeViewCode('/masters/assign-class-groups'), routeActionCode('/masters/assign-class-groups','masters.manage')]), roleCodes: ["custom"] });
     const granted = await f.service.operational(user("custom", false), "2026");
     expect(granted.permissions.grouping).toBe(true);
     expect(granted.sources.grouping.status).toBe("ready");
@@ -118,7 +130,7 @@ describe("operational dashboard permissions", () => {
     const f = fixture();
     f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['masters.view', 'masters.manage', 'scheduling.view', 'gradebook.view', 'gradebook.approve']), roleCodes: ['custom'] });
     expect((await f.service.operational(user(), '2026', undefined, 'doctoral')).sources).toEqual({});
-    expect(operationalPermissions(user(), new Set(['doctoral.view', 'doctoral.manage']), false, 'doctoral')).toMatchObject({ grouping: true, grades: false });
+    expect(operationalPermissions(user(), new Set(['doctoral.view', 'doctoral.manage', routeViewCode('/doctoral/assign-class-groups')]), false, 'doctoral')).toMatchObject({ grouping: true, grades: false });
     expect(operationalPermissions(user(), new Set(['doctoral.view', 'masters.manage']), false, 'doctoral').grouping).toBe(false);
   });
 });
@@ -174,7 +186,7 @@ describe("operational dashboard aggregation", () => {
     expect(f.requests.query).not.toHaveBeenCalled();
     expect(operationalPermissions(user(), new Set(DEFAULT_ROLE_PERMISSIONS.admin), true)).toMatchObject({ studyLeaveApproval: false, majorTransferApproval: false });
     expect(operationalPermissions(user(), new Set(['studyleave.approve', 'majortransfer.approve']))).toMatchObject({ studyLeaveApproval: false, majorTransferApproval: false });
-    f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['plan.view', 'admission.view', 'studyleave.approve']), roleCodes: ['custom'] });
+    f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['plan.view', 'admission.view', 'studyleave.approve', routeViewCode('/masters/study-leaves'), routeActionCode('/masters/study-leaves','studyleave.approve')]), roleCodes: ['custom'] });
     const result = await f.service.operational(user(), '2026');
     expect(result.sources.studyLeaveApproval.status).toBe('ready');
     expect(result.sources.majorTransferApproval).toBeUndefined();
@@ -226,7 +238,7 @@ describe("operational dashboard aggregation", () => {
 
   it('requires approval permission independently of entry permission and respects read-only scope', async () => {
     const f = fixture();
-    f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['gradebook.view', 'gradebook.approve']), roleCodes: ['custom'] });
+    f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['gradebook.view', 'gradebook.approve', routeViewCode('/masters/exam-lists'), routeActionCode('/masters/exam-lists','gradebook.approve')]), roleCodes: ['custom'] });
     const result = await f.service.operational(user('custom'), '2026', 'approvals');
     expect(result.permissions).toMatchObject({ approvals: true, grades: false });
     expect(result.sources.approvals.status).toBe('ready');

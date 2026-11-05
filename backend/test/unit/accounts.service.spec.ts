@@ -45,6 +45,22 @@ const build = () => {
 };
 
 describe("AccountsService", () => {
+  it('records role removals and primary role changes in the mutation transaction, and propagates audit failures', async () => {
+    const f = build();
+    f.staff.findByPk.mockResolvedValue(staffRecord({ role: 'old-role' }));
+    f.staffRoles.findAll.mockResolvedValue([{ roleId: 'old' }, { roleId: 'retained' }]);
+    f.roles.findAll.mockResolvedValue([{ id: 'retained', code: 'retained-role', active: true }]);
+    f.audit.record.mockRejectedValue(new Error('audit unavailable'));
+    await expect(f.service.update('actor', 's1', { roleIds: ['retained'], primaryRoleId: 'retained' }, {})).rejects.toThrow('audit unavailable');
+    expect(f.audit.record).toHaveBeenCalledWith(expect.objectContaining({
+      actorStaffId: 'actor', targetStaffId: 's1', action: 'account.update', metadata: expect.objectContaining({ roleChanges: {
+        before: { roleIds: ['old','retained'], primaryRoleCode: 'old-role' },
+        after: { roleIds: ['retained'], primaryRoleCode: 'retained-role' },
+        addedRoleIds: [], removedRoleIds: ['old'],
+      } }),
+    }), {});
+    expect(f.rbac.invalidate).not.toHaveBeenCalled();
+  });
   it("tạo tài khoản sinh mật khẩu, bắt đổi mật khẩu và gán vai trò", async () => {
     const { service, staff, roles, staffRoles, audit, rbac } = build();
     staff.findOne.mockResolvedValue(null);
@@ -64,7 +80,7 @@ describe("AccountsService", () => {
     expect(result.generatedPassword).toMatch(/^[A-Za-z0-9_-]{12}$/);
     expect(staffRoles.bulkCreate).toHaveBeenCalledWith([{ staffId: "s-new", roleId: "r-admin" }], { transaction: {} });
     expect(rbac.invalidate).toHaveBeenCalledWith("s-new");
-    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: "account.create", targetStaffId: "s-new" }));
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: "account.create", targetStaffId: "s-new" }), {});
   });
 
   it("không cho trùng email", async () => {
