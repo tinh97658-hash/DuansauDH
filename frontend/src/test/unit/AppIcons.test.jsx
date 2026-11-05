@@ -17,14 +17,15 @@ it("renders Heroicons paths while preserving MUI styling, refs and accessible ti
   expect(icon).toHaveClass("MuiSvgIcon-fontSizeSmall", "MuiSvgIcon-colorPrimary");
 });
 
-it("uses Heroicons for themed form indicators and hides decorative icons from accessibility names", () => {
+it("keeps checked boxes square and hides decorative form icons from accessibility names", () => {
   const { container } = render(<ThemeProvider theme={theme}>
     <Alert severity="warning">Cần kiểm tra</Alert>
     <Checkbox checked readOnly inputProps={{ "aria-label": "Đã chọn" }} />
     <TextField select label="Trạng thái" value="active" onChange={() => {}}><MenuItem value="active">Hoạt động</MenuItem></TextField>
   </ThemeProvider>);
   expect(container.querySelector('.MuiAlert-icon [data-heroicon="ExclamationTriangleIcon"]')).toBeInTheDocument();
-  expect(container.querySelector('.MuiCheckbox-root [data-heroicon="CheckCircleIcon"]')).toBeInTheDocument();
+  expect(container.querySelector('.MuiCheckbox-root [data-testid="CheckBoxIcon"]')).toBeInTheDocument();
+  expect(container.querySelector('.MuiCheckbox-root [data-heroicon="CheckCircleIcon"]')).not.toBeInTheDocument();
   expect(container.querySelector('.MuiSelect-icon[data-heroicon="ChevronDownIcon"]')).toBeInTheDocument();
   expect(screen.queryByRole("img")).not.toBeInTheDocument();
   expect(screen.getByRole("checkbox", { name: "Đã chọn" })).toBeChecked();

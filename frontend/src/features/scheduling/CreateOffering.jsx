@@ -158,7 +158,7 @@ export default function CreateOffering({ user }) {
   if (created) {
     return <section className="sl-create-flow-page sl-create-success-page">
       <div className="sl-create-success-card">
-        <div className="sl-create-success-icon"><CheckCircleIcon style={{ width: 54, height: 54, color: "#137B3B" }} /></div>
+        <div className="sl-create-success-icon"><CheckCircleIcon style={{ width: 54, height: 54, color: "var(--icon-success)" }} /></div>
         <div className="sl-create-success-kicker">ĐÃ TẠO LỚP HỌC PHẦN</div>
         <h1>{created.name || effectiveOfferingName}</h1>
         <p>{participatingMajors} · Năm {participatingYears || year}</p>

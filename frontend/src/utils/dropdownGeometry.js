@@ -28,15 +28,25 @@ export function dropdownMenuGeometry(anchorEl, { allowFlip = true, menuHeight = 
 export function dropdownMenuStyles(anchorEl) {
   const anchor = dropdownAnchor(anchorEl);
   const requestedWidth = Number(anchor?.getAttribute?.('data-dropdown-min-width'));
-  const geometry = dropdownMenuGeometry(anchorEl, { minWidth: Number.isFinite(requestedWidth) ? Math.max(0, requestedWidth) : 0 });
+  const geometry = dropdownMenuGeometry(anchorEl, {
+    allowFlip: anchor?.getAttribute?.('data-dropdown-placement') !== 'bottom',
+    minWidth: Number.isFinite(requestedWidth) ? Math.max(0, requestedWidth) : 0,
+  });
   if (!geometry) return {};
+  const bounds = anchor.getBoundingClientRect();
+  const upwards = geometry.top < bounds.top;
+  const view = anchor.ownerDocument?.defaultView || window;
   return {
     width: `${geometry.width}px !important`,
     minWidth: `${geometry.width}px !important`,
     maxWidth: `${geometry.width}px !important`,
-    left: `${geometry.left}px !important`, top: `${geometry.top}px !important`,
+    left: `${geometry.left}px !important`,
+    // Anchor the bottom edge when opening above; the actual list can be much
+    // shorter than the maximum height used to choose the available side.
+    top: upwards ? 'auto !important' : `${geometry.top}px !important`,
+    bottom: upwards ? `${view.innerHeight - bounds.top + 4}px !important` : 'auto !important',
     maxHeight: `${geometry.maxHeight}px !important`, minHeight: '0 !important',
-    margin: '0 !important', transformOrigin: 'top left !important', overflowY: 'auto',
+    margin: '0 !important', transformOrigin: `${upwards ? 'bottom' : 'top'} left !important`, overflowY: 'auto',
     boxSizing: 'border-box',
   };
 }

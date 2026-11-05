@@ -21,7 +21,7 @@ const StudentDashboard = () => (
         </Typography>
         {sections.map(([title, items]) => (
           <Accordion key={title} variant="outlined" sx={{ mb: 1, borderColor: "#DFE4E8", "&:before": { display: "none" } }}>
-            <AccordionSummary expandIcon={<ChevronDownIcon sx={{ color: "#173E75" }} />}>
+            <AccordionSummary expandIcon={<ChevronDownIcon sx={{ color: "var(--icon-blue)" }} />}>
               <Typography sx={{ fontWeight: 600, fontSize: 15, color: "#173E75" }}>{title}</Typography>
             </AccordionSummary>
             <AccordionDetails sx={{ bgcolor: "#FAFBFC", pt: 1, pb: 1 }}>

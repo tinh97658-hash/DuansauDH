@@ -77,12 +77,12 @@ describe("Ribbon read/navigation permission contracts", () => {
     expect(tileMarkup()).toEqual(admin);
     expect(screen.getByRole('button', { name: 'Phân nhóm học viên' })).toHaveAttribute('aria-current', 'page');
   });
-  it('keeps the teaching tile purple and changes only the exam scheduling tile to muted rose',()=>{
+  it('keeps distinct high contrast tones for teaching and exam scheduling',()=>{
     render(view(session(['scheduling.view','gradebook.view']),'/masters/exam-lists'));
     const teaching=screen.getByRole('button',{name:'Xếp lịch'}),exam=screen.getByRole('button',{name:'Xếp lịch thi'});
-    expect(teaching.style.getPropertyValue('--ribbon-icon-color')).toBe('#7b5fac');
-    expect(exam.style.getPropertyValue('--ribbon-icon-color')).toBe('#b75c75');
-    expect(screen.getByRole('button',{name:'Danh sách thi, điểm thi'}).style.getPropertyValue('--ribbon-icon-color')).toBe('#a04f86');
+    expect(teaching.style.getPropertyValue('--ribbon-icon-color')).toBe('var(--icon-purple)');
+    expect(exam.style.getPropertyValue('--ribbon-icon-color')).toBe('var(--icon-rose)');
+    expect(screen.getByRole('button',{name:'Danh sách thi, điểm thi'}).style.getPropertyValue('--ribbon-icon-color')).toBe('var(--icon-rose)');
     expect(exam.querySelector('[data-heroicon="CalendarDaysIcon"]')).toBeInTheDocument();exam.focus();expect(exam).toHaveFocus();
   });
   it("reflows the Masters grade group with a distinct calendar icon and unchanged gradebook icon", () => {

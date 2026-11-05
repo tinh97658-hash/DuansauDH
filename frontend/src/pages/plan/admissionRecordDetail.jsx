@@ -3,6 +3,8 @@ import { formatDateTime } from "../../utils/dateFormat";
 import DateField from "../../components/DateField";
 import AdmissionEvaluationPanel from "../../features/admission/AdmissionEvaluationPanel";
 import { PROFILE_CATEGORIES, profileCategoryLabel } from "../../features/admission/profileCategories";
+import { RELIGIONS } from "../../features/admission/religions";
+import { STUDY_STATUS_OPTIONS } from "../../features/admission/studyManagement";
 import AdmissionTuitionCheckbox from "../../features/admission/AdmissionTuitionCheckbox";
 import LearnerScorecard from "../../features/learners/LearnerScorecard";
 import LearningTables from "../../features/learners/LearningTables";
@@ -55,15 +57,15 @@ const TRAINING_LEVELS = [
 
 const TRAINING_MODE_GROUPS = [
   "Chính quy",
-  "Vừa làm vừa học",
-  "Vừa học vừa làm",
   "Đào tạo từ xa",
+  "Vừa làm - Vừa học",
 ];
 
 const TRAINING_MODES = [
+  "Cử tuyển",
+  "Đào tạo liên thông",
   "Đào tạo thông thường",
-  "Định hướng nghiên cứu",
-  "Định hướng ứng dụng",
+  "Đào tạo văn bằng 2",
 ];
 
 // Nguồn học của kết quả học phần cá nhân
@@ -105,25 +107,9 @@ const emptyLearningForm = () => ({
 
 const RECEIPT_TYPES = [
   "Trực tiếp",
-  "Qua bưu điện",
-  "Trực tuyến",
-  "Đại diện nộp",
+  "Online",
 ];
 
-
-const STUDY_STATUSES = [
-  "Nộp hồ sơ đầu vào",
-  "Đủ điều kiện dự tuyển",
-  "Đã trúng tuyển",
-  "Không trúng tuyển",
-  "Đang học",
-  "Bảo lưu",
-  "Đang bảo lưu",
-  "Bảo lưu quá hạn",
-  "Thôi học",
-  "Tạm hoãn",
-  "Từ chối",
-];
 
 const CITIES = [
   "Thành phố Hải Phòng",
@@ -142,11 +128,8 @@ const CITIES = [
 
 const DEGREE_TYPES = [
   "Chính quy",
-  "Vừa làm vừa học",
-  "Tại chức",
-  "Liên thông",
-  "Văn bằng 2",
-  "Du học / Nước ngoài",
+  "Vừa làm - Vừa học",
+  "Đào tạo từ xa",
 ];
 
 const GRAD_CLASSIFICATIONS = [
@@ -238,23 +221,28 @@ const mapRecordToFormState = (data, majorList = []) => {
     email: data.email || "",
     nationality: data.nationality || "Việt Nam",
     ethnicity: data.ethnicity || "Kinh",
+    religion: data.religion || "Không",
     photo: data.photo || "",
 
     trainingLevel: data.trainingLevel || "Thạc sĩ",
     majorId,
     majorName,
-    trainingModeGroup: data.trainingModeGroup || "Chính quy",
+    trainingModeGroup: ["Vừa làm vừa học", "Vừa học vừa làm"].includes(data.trainingModeGroup)
+      ? "Vừa làm - Vừa học"
+      : data.trainingModeGroup || "Chính quy",
     trainingModeName: data.trainingModeName || "Đào tạo thông thường",
     language: data.language || "Tiếng Việt",
     isExemptForeignLanguage: Boolean(data.isExemptForeignLanguage),
-    receiptType: data.receiptType || "Trực tiếp",
+    receiptType: data.receiptType === "Trực tuyến" ? "Online" : data.receiptType || "Trực tiếp",
     profileCategory: profileCategoryLabel(data.profileCategory),
     studyStatus: data.studyStatus || "Nộp hồ sơ đầu vào",
     admissionDate: data.admissionDate || "",
 
     gradSchool: data.gradSchool || "Trường Đại học Hàng hải Việt Nam",
     gradMajor: data.gradMajor || "",
-    gradDegreeType: data.gradDegreeType || "Chính quy",
+    gradDegreeType: ["Vừa làm vừa học", "Vừa học vừa làm"].includes(data.gradDegreeType)
+      ? "Vừa làm - Vừa học"
+      : data.gradDegreeType || "Chính quy",
     gradYear: data.gradYear || "",
     gpa: data.gpa || "",
     gradClassification: data.gradClassification || "Khá",
@@ -853,7 +841,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
 
           <Tooltip title="Tải lại dữ liệu">
             <span><IconButton size="small" onClick={fetchData} disabled={loading} sx={{ border: "1px solid #DFE4E8", borderRadius: "4px", p: "6px" }}>
-              <ArrowPathIcon fontSize="small" sx={{ color: "#607486" }} />
+              <ArrowPathIcon fontSize="small" sx={{ color: "var(--icon-muted)" }} />
             </IconButton></span>
           </Tooltip>
 
@@ -906,7 +894,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
 
           {isDirty ? (
             <Chip
-              icon={<ExclamationTriangleIcon sx={{ fontSize: "16px !important", color: "#B45309" }} />}
+              icon={<ExclamationTriangleIcon sx={{ fontSize: "16px !important", color: "var(--icon-warning)" }} />}
               label="Có thay đổi chưa lưu"
               size="small"
               sx={{
@@ -921,7 +909,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
             />
           ) : (
             <Chip
-              icon={<CheckCircleIcon sx={{ fontSize: "16px !important", color: "#16A34A" }} />}
+              icon={<CheckCircleIcon sx={{ fontSize: "16px !important", color: "var(--icon-success)" }} />}
               label="Đã lưu tất cả"
               size="small"
               variant="outlined"
@@ -1011,7 +999,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
           <Box sx={{ display: detailTab === "profile" ? "block" : "none" }}>
           <Paper variant="outlined" sx={{ ...sectionCardSx, mb: 2 }}>
             <Typography sx={sectionTitleSx}>
-              <ClockIcon sx={{ color: "#0788B8", fontSize: 20 }} />
+              <ClockIcon sx={{ color: "var(--icon-primary)", fontSize: 20 }} />
               Lịch sử chuyển chuyên ngành
             </Typography>
             {transferHistory.length === 0 ? (
@@ -1061,7 +1049,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
           <Paper variant="outlined" sx={{ ...sectionCardSx, mb: 2 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1} sx={{ mb: 1 }}>
               <Typography sx={{ ...sectionTitleSx, mb: 0 }}>
-                <BookOpenIcon sx={{ color: "#0788B8", fontSize: 20 }} />
+                <BookOpenIcon sx={{ color: "var(--icon-primary)", fontSize: 20 }} />
                 Học phần đã học trong chương trình đào tạo ({visibleStudiedSubjects.length})
               </Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap">
@@ -1092,7 +1080,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
           {/* =================================================================== */}
           <Paper variant="outlined" sx={sectionCardSx}>
             <Typography sx={sectionTitleSx}>
-              <UserIcon sx={{ color: "#0788B8", fontSize: 20 }} />
+              <UserIcon sx={{ color: "var(--icon-primary)", fontSize: 20 }} />
               I. Thông tin cá nhân & liên lạc
             </Typography>
 
@@ -1218,6 +1206,21 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                 </Box>
 
                 <Box>
+                  <Typography component="label" id="admission-detail-religion-label" sx={fieldLabelSx}>Tôn giáo</Typography>
+                  <Select
+                    labelId="admission-detail-religion-label"
+                    size="small"
+                    fullWidth
+                    data-dropdown-placement="bottom"
+                    value={formData.religion}
+                    onChange={(e) => setFormData((p) => ({ ...p, religion: e.target.value }))}
+                    sx={selectSx}
+                  >
+                    {RELIGIONS.map((religion) => <MenuItem key={religion} value={religion}>{religion}</MenuItem>)}
+                  </Select>
+                </Box>
+
+                <Box>
                   <Typography sx={fieldLabelSx}>Quốc tịch</Typography>
                   <TextField
                     size="small"
@@ -1289,7 +1292,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                     <img src={formData.photo} alt="Ảnh 3x4" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   ) : (
                     <Stack alignItems="center" spacing={0.5}>
-                      <UserIcon sx={{ fontSize: 36, color: "#CBD5E1" }} />
+                      <UserIcon sx={{ fontSize: 36, color: "var(--icon-muted)" }} />
                       <Typography variant="caption" sx={{ color: "#94A3B8", fontSize: 10.5 }}>Chưa có ảnh</Typography>
                     </Stack>
                   )}
@@ -1329,7 +1332,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
           {/* =================================================================== */}
           <Paper variant="outlined" sx={sectionCardSx}>
             <Typography sx={sectionTitleSx}>
-              <AcademicCapIcon sx={{ color: "#0788B8", fontSize: 20 }} />
+              <AcademicCapIcon sx={{ color: "var(--icon-primary)", fontSize: 20 }} />
               II. Thể thức & chương trình đào tạo
             </Typography>
 
@@ -1461,6 +1464,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                 <Select
                   size="small"
                   fullWidth
+                  data-dropdown-placement="bottom"
                   value={formData.receiptType}
                   onChange={(e) => setFormData((p) => ({ ...p, receiptType: e.target.value }))}
                   sx={selectSx}
@@ -1477,6 +1481,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                   labelId="admission-detail-category-label"
                   size="small"
                   fullWidth
+                  data-dropdown-placement="bottom"
                   value={formData.profileCategory}
                   onChange={(e) => setFormData((p) => ({ ...p, profileCategory: e.target.value }))}
                   sx={selectSx}
@@ -1492,11 +1497,13 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                 <Select
                   size="small"
                   fullWidth
+                  data-dropdown-placement="bottom"
                   value={formData.studyStatus}
                   onChange={(e) => setFormData((p) => ({ ...p, studyStatus: e.target.value }))}
                   sx={selectSx}
                 >
-                  {STUDY_STATUSES.map((s) => (
+                  {!STUDY_STATUS_OPTIONS.includes(formData.studyStatus) && <MenuItem value={formData.studyStatus} sx={{ display: "none" }}>{formData.studyStatus}</MenuItem>}
+                  {STUDY_STATUS_OPTIONS.map((s) => (
                     <MenuItem key={s} value={s} disabled={(["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học"].includes(s)
                       || ["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học"].includes(record.studyStatus)
                       || (formData.trainingLevel === "Thạc sĩ" && ["Đã trúng tuyển", "Không trúng tuyển", "Đang học"].includes(s))) && s !== record.studyStatus}>{s}</MenuItem>
@@ -1559,7 +1566,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
           {/* =================================================================== */}
           <Paper variant="outlined" sx={sectionCardSx}>
             <Typography sx={sectionTitleSx}>
-              <TrophyIcon sx={{ color: "#0788B8", fontSize: 20 }} />
+              <TrophyIcon sx={{ color: "var(--icon-primary)", fontSize: 20 }} />
               III. Văn bằng đại học & năng lực đầu vào
             </Typography>
 
@@ -1722,7 +1729,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
           {/* =================================================================== */}
           <Paper variant="outlined" sx={sectionCardSx}>
             <Typography sx={sectionTitleSx}>
-              <FolderIcon sx={{ color: "#0788B8", fontSize: 20 }} />
+              <FolderIcon sx={{ color: "var(--icon-primary)", fontSize: 20 }} />
               IV. Danh mục hồ sơ & giấy tờ đính kèm
             </Typography>
 

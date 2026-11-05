@@ -138,7 +138,7 @@ export function SearchSelect({ label, value, options, onChange, placeholder = "C
     <input aria-label={label} role="combobox" aria-expanded={open} aria-controls={`options-${label}`} autoComplete="off" disabled={disabled}
       value={open ? query : options.find((item) => item.id === value)?.name || ""} placeholder={placeholder}
       onFocus={() => { setQuery(""); setOpen(true); }} onChange={(event) => { setQuery(event.target.value); setOpen(true); }} />
-    <button aria-label={`Mở ${label}`} disabled={disabled} onClick={() => { setQuery(""); setOpen(!open); }}><ChevronDownIcon style={{ width: 14, height: 14, color: "#607486" }} /></button>
+    <button aria-label={`Mở ${label}`} disabled={disabled} onClick={() => { setQuery(""); setOpen(!open); }}><ChevronDownIcon style={{ width: 14, height: 14, color: "var(--icon-muted)" }} /></button>
     {open && <div className="sl-combo-list sl-show" id={`options-${label}`} role="listbox" aria-label={label}>
       {options.filter((item) => normalize(item.name + " " + (item.code || "")).includes(normalize(query))).map((item) => <button key={item.id} role="option" aria-selected={item.id === value} onClick={() => { onChange(item.id); setOpen(false); }}>{item.name}<small>{item.code}</small></button>)}
     </div>}

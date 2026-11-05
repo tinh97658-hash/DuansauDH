@@ -38,7 +38,7 @@
 .sl-create-list-head b{min-width:23px;padding:2px 7px;border-radius:12px;background:#dfe8ee;color:#34586f;text-align:center}
 .sl-create-guide-v15{height:100%;display:grid;place-items:center;padding:44px;background:#eef2f5;text-align:center}
 .sl-create-guide-v15>div{max-width:520px}
-.sl-create-guide-v15 .sl-guide-icon{width:52px;height:52px;margin:0 auto 13px;display:grid;place-items:center;border:1px solid #a8bdcb;border-radius:50%;background:#fff;color:#2d6c95;font-size:24px}
+.sl-create-guide-v15 .sl-guide-icon{width:52px;height:52px;margin:0 auto 13px;display:grid;place-items:center;border:1px solid #a8bdcb;border-radius:50%;background:#fff;color:var(--icon-blue);font-size:24px}
 .sl-create-guide-v15 h2{margin:6px 0 8px;color:#24465d;font-size:20px}
 .sl-create-guide-v15 p{margin:0;color:#637682;line-height:1.6}
 .sl-create-studio{height:100%;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;border:1px solid #c3ced6;background:#fff}

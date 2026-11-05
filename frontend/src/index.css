@@ -1,4 +1,18 @@
 :root {
+  /* Dark foregrounds for icons on white, hover and pastel surfaces. */
+  --icon-neutral: #243746;
+  --icon-muted: #354959;
+  --icon-primary: #00445E;
+  --icon-blue: #173E75;
+  --icon-teal: #005047;
+  --icon-purple: #503078;
+  --icon-rose: #78264F;
+  --icon-olive: #3F4B12;
+  --icon-success: #0B5128;
+  --icon-warning: #703800;
+  --icon-danger: #8C2222;
+  --icon-disabled: #526576;
+  --icon-on-solid: #FFFFFF;
   --app-chevron: url("./assets/icons/hero-chevron-down.svg");
   --app-font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
   --canvas-bg: #F5F7F8;

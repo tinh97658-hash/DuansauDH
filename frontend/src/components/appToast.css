@@ -1,6 +1,15 @@
 /* Keep the catalog's original Toastify light surface, spacing, close and progress styling. */
+.app-toast {
+  --toastify-color-success: var(--icon-success);
+  --toastify-color-error: var(--icon-danger);
+  --toastify-color-warning: var(--icon-warning);
+  --toastify-icon-color-success: var(--icon-success);
+  --toastify-icon-color-error: var(--icon-danger);
+  --toastify-icon-color-warning: var(--icon-warning);
+  --toastify-icon-color-info: var(--icon-primary);
+}
 .app-toast.Toastify__toast--success { color: var(--toastify-color-success); }
 .app-toast.Toastify__toast--error { color: var(--toastify-color-error); }
 .app-toast.Toastify__toast--warning { color: var(--toastify-color-warning); }
-.app-toast.Toastify__toast--warning .Toastify__toast-body > div:last-child { color: #A56615; }
+.app-toast.Toastify__toast--warning .Toastify__toast-body > div:last-child { color: var(--icon-warning); }
 .app-toast .Toastify__close-button { color: currentColor; }

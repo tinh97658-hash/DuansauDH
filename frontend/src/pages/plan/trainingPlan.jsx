@@ -1455,9 +1455,9 @@ const TrainingPlan = () => {
                               sx={{ p: 0.5 }}
                             >
                               {row.majorAssignment ? (
-                                <CheckCircleIcon fontSize="small" sx={{ color: "#0788B8" }} />
+                                <CheckCircleIcon fontSize="small" sx={{ color: "var(--icon-primary)" }} />
                               ) : (
-                                <StopIcon fontSize="small" sx={{ color: "#DFE4E8" }} />
+                                <StopIcon fontSize="small" sx={{ color: "var(--icon-muted)" }} />
                               )}
                             </IconButton>
                           </Tooltip>
@@ -1471,7 +1471,7 @@ const TrainingPlan = () => {
                               sx={{ p: 0.5 }}
                             >
                               {row.isRequired ? (
-                                <CheckIcon fontSize="small" sx={{ color: "#137B3B", fontWeight: 900 }} />
+                                <CheckIcon fontSize="small" sx={{ color: "var(--icon-success)", fontWeight: 900 }} />
                               ) : (
                                 <Typography variant="caption" sx={{ color: "#8A9AAA" }}>—</Typography>
                               )}
@@ -2164,7 +2164,7 @@ const TrainingPlan = () => {
               color: "#425466",
               fontSize: 13,
               lineHeight: 1.55,
-              "& .MuiAlert-icon": { color: "#0788B8", py: 0.25 },
+              "& .MuiAlert-icon": { color: "var(--icon-primary)", py: 0.25 },
               "& .MuiAlert-message": { py: 0.25 },
             }}
           >
