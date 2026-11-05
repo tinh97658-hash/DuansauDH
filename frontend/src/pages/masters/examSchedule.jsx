@@ -32,16 +32,19 @@ export default function ExamSchedule(){
  const [week,setWeek]=useState(()=>formatDateKey(mondayOf(getBusinessTodayKey()))),[revision,setRevision]=useState(0);
  const [data,setData]=useState({queue:[],approvedOfferings:[],sessions:[],rooms:[]}),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState('');
  const [loadError,setLoadError]=useState('');
+ const [hasLoaded,setHasLoaded]=useState(false);
  const [filters,setFilters]=useState({discipline:'',major:'',year:'',search:''});
  const [sidebarCollapsed,setSidebarCollapsed]=useState(false);
- const [offeringId,setOfferingId]=useState(params.get('offeringId')||''),[detail,setDetail]=useState(null),[editor,setEditor]=useState(null),[aggregate,setAggregate]=useState(null),[reason,setReason]=useState(null),[pendingOpen,setPendingOpen]=useState(false);
+ const [selectedIds,setSelectedIds]=useState(()=>params.get('offeringId')?[params.get('offeringId')]:[]);
+ const [mergeMode,setMergeMode]=useState(false);
+ const [detail,setDetail]=useState(null),[editor,setEditor]=useState(null),[aggregate,setAggregate]=useState(null),[reason,setReason]=useState(null),[pendingOpen,setPendingOpen]=useState(false);
  const wallTime=useExamWallTime(),last=formatDateKey(addDays(week,6)),today=wallTime.slice(0,10);
  useEffect(()=>{if(!canView)return;const refresh=()=>{if(document.visibilityState!=='hidden')setRevision(n=>n+1);};
   const timer=setInterval(refresh,60000);window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);
   return()=>{clearInterval(timer);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};
  },[canView]);
  useEffect(()=>{if(!canView){setLoading(false);return;}let active=true;setLoading(true);setError('');setLoadError('');
-  axios.get(`${API_BASE_URL}/masters/exam-schedule`,{params:{from:week,to:last},withCredentials:true}).then(({data:next})=>{if(active)setData(next);}).catch(e=>{if(active){const message=errorText(e);setError(message);setLoadError(message);}}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};
+  axios.get(`${API_BASE_URL}/masters/exam-schedule`,{params:{from:week,to:last},withCredentials:true}).then(({data:next})=>{if(active){setData(next);setHasLoaded(true);}}).catch(e=>{if(active){const message=errorText(e);setError(message);setLoadError(message);}}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};
  },[week,last,revision,canView]);
  // Historical sessions retain academic context even when their old snapshot is no longer current.
  const offerings=[...new Map([...data.sessions.map(s=>({...s,id:s.courseOfferingId})),...(data.approvedOfferings||[])].map(o=>[o.id,o])).values()];
@@ -56,8 +59,13 @@ export default function ExamSchedule(){
  const downloadExport=async(format)=>{const snapshot=printSchedule();downloadScheduleFile(await (format==='docx'?createScheduleWord(snapshot):createScheduleExcel(snapshot)),`lich-thi-${week}-${last}.${format}`);};
  const queue=data.queue.filter(matching);
  const pending=filteredSessions.filter(s=>s.pendingConfirmation);
- const selected=data.queue.find(o=>o.id===offeringId&&matching(o));
- const changeFilter=(key,value)=>{setFilters(current=>({...current,[key]:value,...(key==='discipline'?{major:'',year:''}:key==='major'?{year:''}:{})}));setOfferingId('');};
+ const selectedOfferings=data.queue.filter(o=>selectedIds.includes(o.id)),selected=selectedOfferings[0];
+ const selectedCandidates=new Set(selectedOfferings.flatMap(o=>o.candidateKeys||o.candidateIds||o.candidates?.map(c=>c.participantId)||[]));
+ const selectedCount=selectedCandidates.size||selectedOfferings.reduce((sum,o)=>sum+Number(o.candidateCount||0),0);
+ useEffect(()=>{if(hasLoaded)setSelectedIds(ids=>ids.filter(id=>data.queue.some(o=>o.id===id)));},[data.queue,hasLoaded]);
+ const clearSelection=()=>{setSelectedIds([]);setMergeMode(false);};
+ const toggleOffering=(id,merge=false)=>{if(!canView||loading||saving)return;setSelectedIds(ids=>ids.includes(id)?ids.filter(value=>value!==id):[...ids,id]);if(merge)setMergeMode(true);setError('');};
+ const changeFilter=(key,value)=>{setFilters(current=>({...current,[key]:value,...(key==='discipline'?{major:'',year:''}:key==='major'?{year:''}:{})}));};
  const openDetail=session=>{setAggregate(null);setPendingOpen(false);setDetail(session);setError('');};
  const mutate=async(action,target,note='',form,refreshAvailability,keepDetail=false)=>{if(!canWrite||saving)return false;setSaving(true);setError('');
   try{const base=`${API_BASE_URL}/masters/exam-sessions`,options={withCredentials:true};
@@ -65,21 +73,21 @@ export default function ExamSchedule(){
     const offering=editor?.offering||offerings.find(o=>o.id===target?.courseOfferingId),payload={...form,courseOfferingId:offering.id,snapshotId:target?.snapshotId||offering.snapshotId,eligibilityVersion:offering.eligibilityVersion,...(target?{version:target.version}:{})};
     if(target)await axios.put(`${base}/${target.id}`,payload,options);else await axios.post(base,payload,options);
    }else await axios.post(`${base}/${target.id}/${action==='cancel'?'cancel':'confirm'}`,{version:target.version,note,...(action==='cancel'?{}:{status:action})},options);
-   setEditor(null);if(!keepDetail)setDetail(null);setReason(null);setOfferingId('');setRevision(n=>n+1);notifyGradebookSaved();return true;
+   setEditor(null);if(!keepDetail)setDetail(null);setReason(null);clearSelection();setRevision(n=>n+1);notifyGradebookSaved();return true;
   }catch(e){notify.error(errorText(e));refreshAvailability?.();return false;}finally{setSaving(false);}
  };
  const close=setter=>()=>{if(!saving){setter(null);setError('');}};
  const compose=(session,initial={})=>{if(!canWrite||session?.canEdit===false)return;const members=session?data.sessions.filter(s=>(s.arrangementId||s.id)===(session.arrangementId||session.id)):[];setDetail(null);setError('');setEditor({mode:'arrangement',members,initial:{...(!session?nextExamSlot():{}),...initial}});};
- const openEditor=(session,slot)=>{if(session?.canEdit===false)return;if(!session&&slot&&isExamPeriodClosed(slot.date,slot.period))return;if(session?.arrangementId&&(session.externalInvigilatorName||data.sessions.filter(s=>s.arrangementId===session.arrangementId).length>1)){compose(session);return;}const offering=offerings.find(o=>o.id===(session?.courseOfferingId||offeringId));if(!offering||!canWrite||(session?.examDate||slot?.date)<getBusinessTodayKey())return;setDetail(null);setError('');setEditor({session,slot,offering});};
+ const openEditor=(session,slot)=>{if(session?.canEdit===false)return;if(!session&&slot&&isExamPeriodClosed(slot.date,slot.period))return;if(!session&&slot&&selected&&(mergeMode||selectedOfferings.length>1)){compose(null,{examDate:slot.date,startTime:slot.start,endTime:undefined,offerings:selectedOfferings});return;}if(session?.arrangementId&&(session.externalInvigilatorName||data.sessions.filter(s=>s.arrangementId===session.arrangementId).length>1)){compose(session);return;}const offering=offerings.find(o=>o.id===(session?.courseOfferingId||selected?.id));if(!offering||!canWrite||(session?.examDate||slot?.date)<getBusinessTodayKey())return;setDetail(null);setError('');setEditor({session,slot,offering});};
  const saveArrangement=async(form,id,refresh,keepDetail=false)=>{if(!canWrite||saving)return false;setSaving(true);setError('');try{
   const url=`${API_BASE_URL}/masters/exam-arrangements`,options={withCredentials:true};
   if(id)await axios.put(`${url}/${id}`,form,options);else await axios.post(url,form,options);
   if(keepDetail&&form.examDate)setWeek(formatDateKey(mondayOf(form.examDate)));
-  setEditor(null);if(!keepDetail)setDetail(null);setOfferingId('');setRevision(n=>n+1);notifyGradebookSaved();return true;
+  setEditor(null);if(!keepDetail)setDetail(null);clearSelection();setRevision(n=>n+1);notifyGradebookSaved();return true;
  }catch(e){notify.error(errorText(e));refresh?.();return false;}finally{setSaving(false);}};
  const detailMembers=detail?data.sessions.filter(s=>detail.arrangementId?s.arrangementId===detail.arrangementId:s.id===detail.id):[];
  if(!canView)return <FeatureLayout title="Xếp lịch thi"><div role="alert">Bạn không có quyền xem lịch thi.</div></FeatureLayout>;
- return <FeatureLayout title="Xếp lịch thi" maxWidth={1920} hideHeader workspaceMode><div className="scheduling-v20 v20-workspace v20-schedule-workspace">
+ return <FeatureLayout title="Xếp lịch thi" maxWidth={1920} hideHeader workspaceMode contentPadding={0}><div className="scheduling-v20 v20-workspace v20-schedule-workspace">
   <section className={`sl-workspace sl-schedule-view exam-planner${sidebarCollapsed?' sl-sidebar-collapsed':''}`} aria-label="Không gian xếp lịch thi">
    <aside className="sl-left" aria-label="Phạm vi làm việc" data-collapsed={sidebarCollapsed}><button type="button" className="sl-sidebar-toggle" aria-label={sidebarCollapsed?'Mở phạm vi làm việc':'Thu gọn phạm vi làm việc'} aria-expanded={!sidebarCollapsed} onClick={()=>setSidebarCollapsed(value=>!value)}>{sidebarCollapsed ? <ChevronRightIcon fontSize="inherit" /> : <ChevronLeftIcon fontSize="inherit" />}</button><div className="sl-sidebar-content">
     <div className="sl-scope"><div className="sl-eyebrow">PHẠM VI LÀM VIỆC</div><div className="sl-schedule-scope-fields">
@@ -90,13 +98,22 @@ export default function ExamSchedule(){
     <div className="sl-worklist"><div className="sl-search-wrap"><span aria-hidden="true"><MagnifyingGlassIcon fontSize="inherit" /></span><input className="sl-search" aria-label="Tìm kiếm" placeholder="Tìm lớp học phần..." value={filters.search} onChange={e=>changeFilter('search',e.target.value)}/></div>
      <div className="sl-card-scroll"><aside className="sl-section ep-queue" aria-label="Chưa xếp lịch"><h2><span>CHƯA XẾP LỊCH</span><b>{queue.length}</b></h2>
       {loading?<p role="status">Đang tải lịch thi…</p>:!queue.length&&<p>Không có danh sách cần xếp thi trong phạm vi này.</p>}
-      {queue.map(o=><button key={o.id} className={selected?.id===o.id?'ep-active':''} aria-label={`${o.name} ${o.candidateCount} TS ${o.subjectName}`} aria-pressed={selected?.id===o.id} onClick={()=>{setOfferingId(o.id);setError('');}}><strong title={o.name}>{examOfferingLabel(o)}</strong><b>{o.candidateCount} TS</b><span>{o.subjectName}</span></button>)}
+      {canWrite&&<p className="ep-selection-help">{mergeMode?'Tích chọn các lớp cần ghép, rồi chọn ô Sáng / Chiều trên lịch.':'Tích chọn nhiều lớp để ghép thi, hoặc bấm tên lớp để xếp riêng.'}</p>}
+      {queue.map(o=><div key={o.id} className={`ep-queue-card${selectedIds.includes(o.id)?' ep-active':''}`}>
+       {canWrite&&<input type="checkbox" aria-label={`Chọn lớp ${o.name} · ${o.subjectName}`} checked={selectedIds.includes(o.id)} disabled={loading||saving} onChange={()=>toggleOffering(o.id,true)} />}
+       <button type="button" className="ep-queue-select" disabled={loading||saving} aria-label={`${o.name} ${o.candidateCount} TS ${o.subjectName}`} aria-pressed={selectedIds.includes(o.id)} onClick={()=>toggleOffering(o.id)}><strong title={o.name}>{examOfferingLabel(o)}</strong><b>{o.candidateCount} TS</b><span>{o.subjectName}</span></button>
+      </div>)}
      </aside></div>
     </div>
    </div></aside>
    <section className="sl-right ep-calendar" aria-label="Lịch thi tuần">
-    <div className="sl-schedule-head"><div className="ep-heading-actions"><h1>XẾP LỊCH THI</h1>{canWrite&&<button className="sl-btn sl-btn-primary" disabled={loading||saving} onClick={()=>compose(null,{offering:selected})}><PlusIcon fontSize="inherit" /> Tạo buổi thi ghép</button>}</div><div className="sl-week"><button aria-label="Tuần trước" onClick={()=>setWeek(formatDateKey(addDays(week,-7)))}><ChevronLeftIcon fontSize="inherit" /></button><strong>{formatExamDate(week)} – {formatExamDate(last)}</strong><button aria-label="Tuần sau" onClick={()=>setWeek(formatDateKey(addDays(week,7)))}><ChevronRightIcon fontSize="inherit" /></button></div><div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" disabled={loading||saving||!!error} onWord={()=>downloadExport('docx')} onExcel={()=>downloadExport('xlsx')} onPdf={()=>exportSchedule(printSchedule())} onError={e=>setError(e.message||'Không thể xuất lịch thi.')}/><button className="sl-btn sl-today" onClick={()=>setWeek(formatDateKey(mondayOf(getBusinessTodayKey())))}>Tuần này</button><PendingConfirmationButton count={pending.length} loading={loading} error={loadError} open={pendingOpen} controls="exam-pending-dialog" onClick={()=>setPendingOpen(true)} /></div></div>
-    {selected&&<div className="sl-selected-strip"><span className="sl-selected-tag">ĐANG XẾP</span><strong className="sl-selected-offering" title={selected.name}>{examOfferingLabel(selected)}</strong><span className="sl-selected-meta">{selected.candidateCount} TS</span><button className="sl-btn sl-selected-clear" onClick={()=>setOfferingId('')}>Bỏ chọn</button></div>}
+    <div className="sl-schedule-head"><div className="ep-heading-actions"><h1>XẾP LỊCH THI</h1></div><div className="sl-week"><button aria-label="Tuần trước" onClick={()=>setWeek(formatDateKey(addDays(week,-7)))}><ChevronLeftIcon fontSize="inherit" /></button><strong>{formatExamDate(week)} – {formatExamDate(last)}</strong><button aria-label="Tuần sau" onClick={()=>setWeek(formatDateKey(addDays(week,7)))}><ChevronRightIcon fontSize="inherit" /></button></div><div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" disabled={loading||saving||!!error} onWord={()=>downloadExport('docx')} onExcel={()=>downloadExport('xlsx')} onPdf={()=>exportSchedule(printSchedule())} onError={e=>setError(e.message||'Không thể xuất lịch thi.')}/><button className="sl-btn sl-today" onClick={()=>setWeek(formatDateKey(mondayOf(getBusinessTodayKey())))}>Tuần này</button><PendingConfirmationButton showIcon={false} count={hasLoaded?pending.length:undefined} loading={loading} error={loadError} open={pendingOpen} controls="exam-pending-dialog" onClick={()=>setPendingOpen(true)} /></div></div>
+    {!!selectedOfferings.length&&<div className="sl-selected-strip ep-selection-strip" aria-label="Các lớp đang chọn">
+     <span className="sl-selected-tag">{mergeMode||selectedOfferings.length>1?'ĐANG GHÉP':'ĐANG XẾP'}</span>
+     <div className="ep-selected-classes">{selectedOfferings.map(o=><span className="ep-selected-class" key={o.id}><span title={o.subjectName}>{examOfferingLabel(o)}</span><button type="button" aria-label={`Bỏ chọn lớp ${o.name} · ${o.subjectName}`} disabled={saving} onClick={()=>toggleOffering(o.id)}>Bỏ</button></span>)}</div>
+     <span className="sl-selected-meta">{selectedOfferings.length} lớp · {selectedCount} thí sinh</span>
+     <button className="sl-btn sl-selected-clear" disabled={saving} onClick={clearSelection}>Bỏ chọn tất cả</button>
+    </div>}
     {error&&!editor&&!reason&&<div role="alert" className="v20-error">{error}</div>}{!canWrite&&<div className="v20-hint">Chế độ chỉ xem — cần quyền “Xếp, sửa và xác nhận lịch thi” để thay đổi ca thi.</div>}
     <div className="sl-calendar-wrap ep-calendar-scroll"><div className="sl-calendar ep-period-calendar" role="table" aria-label="Lịch thi theo tuần"><div className="sl-corner">BUỔI</div>
      {Array.from({length:7},(_,i)=>{const date=formatDateKey(addDays(week,i)),isToday=date===today;return <div className={`sl-day${isToday?' sl-is-today':''}`} key={date} aria-current={isToday?'date':undefined}><strong>{['T2','T3','T4','T5','T6','T7','CN'][i]}</strong><span>{formatExamDate(date,true)}</span>{isToday&&<i className="sl-today-indicator" aria-label="Hôm nay" title="Hôm nay"/>}</div>;})}

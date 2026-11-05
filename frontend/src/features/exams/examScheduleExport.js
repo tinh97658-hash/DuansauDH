@@ -1,3 +1,4 @@
+import {examInvigilatorName} from './examInvigilators';
 import { examPeriods } from "./examCalendar";
 
 function examTimeSummary(session) {
@@ -20,7 +21,7 @@ export function buildExamScheduleDocument({ week, end, sessions = [] }) {
     names((session.groups || []).map(group => group.majorName)),
     names((session.groups || []).map(group => group.code || group.name)) || session.name || "",
     session.subjectName || "",
-    session.externalInvigilatorName || session.lecturerName || "Chưa có giảng viên",
+    [examInvigilatorName(session),examInvigilatorName(session,true)].filter(Boolean).join("; ") || "Chưa phân công",
     examTimeSummary(session),
     session.roomCode || "Chưa có phòng",
     session.note || "",

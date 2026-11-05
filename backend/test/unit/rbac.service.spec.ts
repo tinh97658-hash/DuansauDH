@@ -14,6 +14,19 @@ describe("RbacService", () => {
     return { service, roles, staffRoles };
   };
 
+  it('reads current grants on the caller transaction, including legacy role fallback, instead of cached access', async () => {
+    const { service, roles, staffRoles } = build();
+    const staff = { id: 'staff', role: 'admin' };
+    roles.findOne.mockResolvedValue(role('admin', ['gradebook.submit']));
+    await service.effectiveAccess(staff);
+    roles.findOne.mockResolvedValue(role('admin', ['gradebook.view']));
+    const transaction = {} as any;
+    const access = await service.effectiveAccess(staff, true, transaction);
+    expect(staffRoles.findAll).toHaveBeenLastCalledWith(expect.objectContaining({ transaction }));
+    expect(roles.findOne).toHaveBeenLastCalledWith(expect.objectContaining({ transaction }));
+    expect([...access.permissions]).toEqual(['gradebook.view']);
+  });
+
   it.each(['supervisor', 'custom', 'examiner'])('requires explicit approval grants for a %s role without hardcoded role-name restrictions', async code => {
     const { service, staffRoles } = build();
     staffRoles.findAll.mockResolvedValue([{ role: role(code, ['studyleave.request', 'majortransfer.request']) }]);

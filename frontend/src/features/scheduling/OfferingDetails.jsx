@@ -1,3 +1,4 @@
+import {formatLecturerName} from '../../utils/lecturerName';
 import { CalendarDaysIcon, EyeIcon, XMarkIcon } from "../../components/AppIcons";
 import { notify } from "../../utils/notify";
 import { usePermissions } from "../accounts/usePermissions";
@@ -191,7 +192,7 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
                       <strong>{session.room?.code || "Chưa xếp"}</strong>
                     </td>
                     <td className="sl-session-centered">
-                      <strong>{session.lecturer?.name || "Chưa phân công"}</strong>
+                      <strong>{formatLecturerName(session.lecturer) || "Chưa phân công"}</strong>
                     </td>
                     <td style={{ textAlign: "center" }}>
                       <span style={{

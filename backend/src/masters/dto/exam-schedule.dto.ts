@@ -15,7 +15,10 @@ export class ScheduleExamDto {
   @Matches(/^(?:[01]\d|2[0-3]):[0-5]\d$/) startTime!:string;
   @Matches(/^(?:[01]\d|2[0-3]):[0-5]\d$/) endTime!:string;
   @IsUUID() roomId!:string;
-  @IsUUID() lecturerId!:string;
+  @IsOptional() @IsUUID() lecturerId?:string;
+  @IsOptional() @IsUUID() secondLecturerId?:string;
+  @IsOptional() @IsString() @MaxLength(255) secondExternalInvigilatorName?:string;
+  @IsOptional() @IsString() @MaxLength(255) secondExternalUnitName?:string;
   @IsOptional() @IsString() @MaxLength(2000) note?:string;
 }
 export class RescheduleExamDto extends ScheduleExamDto {
@@ -48,6 +51,9 @@ export class SaveExamArrangementDto {
   @IsIn(['MORNING','AFTERNOON']) period!:'MORNING'|'AFTERNOON';
   @IsUUID() roomId!:string;
   @IsOptional() @IsUUID() lecturerId?:string;
+  @IsOptional() @IsUUID() secondLecturerId?:string;
+  @IsOptional() @IsString() @MaxLength(255) secondExternalInvigilatorName?:string;
+  @IsOptional() @IsString() @MaxLength(255) secondExternalUnitName?:string;
   @IsOptional() @IsString() @MaxLength(255) externalInvigilatorName?:string;
   @IsOptional() @IsString() @MaxLength(255) externalUnitName?:string;
   @IsOptional() @IsString() @MaxLength(2000) note?:string;

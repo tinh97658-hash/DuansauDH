@@ -1,18 +1,36 @@
-ServerSide/node_modules
-ServerSide/dist
-ServerSide/.env.auth
-ServerSide/config.env
 # Dependencies and generated builds (keep package manifests and lockfiles)
-.env
-/node_modules/
-/backend/node_modules/
-/backend/dist/
-/backend/coverage/
-/frontend/node_modules/
-/frontend/build/
-/frontend/dist/
-/frontend/coverage/
+node_modules/
+dist/
+build/
+coverage/
 *.tsbuildinfo
+.pnp.*
+
+# Local credentials; commit only explicitly named configuration templates
+.env
+.env.*
+!.env.example
+!.env.*.example
+config.env
+config.env.*
+!config.env.example
+*.key
+*.p12
+*.pfx
+
+# Tool caches and disposable test/browser output
+.cache/
+.vite/
+.nyc_output/
+.eslintcache
+.stylelintcache
+test-results/
+playwright-report/
+blob-report/
+*.lcov
+*.tmp
+*.tmp.*
+*.temp
 
 # Machine-specific editor settings; shared tasks/launch/extensions can be committed
 /.vscode/*
@@ -21,6 +39,10 @@ ServerSide/config.env
 !/.vscode/extensions.json
 .DS_Store
 Thumbs.db
+.idea/
+*.swp
+*.swo
+*~
 
 # Local diagnostics, database backups and generated verification reports
 /.tmp/
@@ -28,6 +50,8 @@ Thumbs.db
 *.log
 *.dump
 *.dmp
+*.bak
+/backups/
 /pgsms-full-backup-*/
 /pgsms-full-backup-*.zip
 /frontend-*-results.json
@@ -41,9 +65,6 @@ Thumbs.db
 
 # Generated audit/test snapshots; keep Markdown reports and verification scripts
 /security-review/*.json
-.env.*
-!.env.example
-!.env.*.example
 
 # Local transcript implementation diary and retired comparison fonts
 /TRANSCRIPT-EXPORT-CONTINUOUS-IMPLEMENTATION.md

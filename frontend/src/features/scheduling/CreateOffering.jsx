@@ -246,7 +246,7 @@ export default function CreateOffering({ user }) {
           </div>
           <div className="sl-create-scope-field sl-create-scope-year">
             <div className="v20-scope-step"><b>3</b>KHÓA / NĂM HỌC</div>
-            <YearSelect className={`sl-create-year${year ? "" : " sl-placeholder"}`} label="Khóa / Năm học" role="button"
+            <YearSelect className={`sl-create-year${year ? "" : " sl-placeholder"}`} menuClassName="sl-create-year-menu" label="Khóa / Năm học" role="button"
               value={year} years={years} placeholder="Chọn khóa / năm" disabled={!majorId || groups.loading}
               onChange={value => changeScope(() => setYear(value))} />
             {groups.error && <Notice error={groups.error} />}
@@ -351,14 +351,16 @@ export default function CreateOffering({ user }) {
                         {(group.unstudiedCount ?? (group.isRetake ? 0 : group.memberCount)) > 0 && (
                           <span className="sl-badge sl-study-first">{group.unstudiedCount ?? group.memberCount} chưa học</span>
                         )}
-                        <span className={`sl-badge sl-major-badge ${isCrossMajor ? "sl-badge-cross-major" : ""}`}>
-                          {groupMajorName(group)}
-                        </span>
-                        {group.academicYear && (
-                          <span className={`sl-badge sl-cohort-badge ${isCrossCohort ? "sl-cohort-other" : ""}`}>
-                            Khóa {group.academicYear}
+                        <span className="sl-major-cohort-pair">
+                          <span className={`sl-badge sl-major-badge ${isCrossMajor ? "sl-badge-cross-major" : ""}`}>
+                            {groupMajorName(group)}
                           </span>
-                        )}
+                          {group.academicYear && (
+                            <span className={`sl-badge sl-cohort-badge ${isCrossCohort ? "sl-cohort-other" : ""}`}>
+                              Khóa {group.academicYear}
+                            </span>
+                          )}
+                        </span>
                       </span>
                     </span>
                     <span className="sl-create-group-count">

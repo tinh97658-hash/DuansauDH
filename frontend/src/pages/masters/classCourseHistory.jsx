@@ -1,3 +1,4 @@
+import {formatLecturerName} from '../../utils/lecturerName';
 import AppSelect from "../../components/AppSelect";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
@@ -245,7 +246,7 @@ export default function ClassCourseHistory() {
   const visibleSubjects = useMemo(() => subjectRows.filter((row) => {
     const classSubjects = Object.values(row.byClass).filter((subject) => subject.curriculumSubjectId);
     if (status !== "all" && !classSubjects.some((subject) => subject.status === status)) return false;
-    const lecturers = classSubjects.flatMap((subject) => subject.sessions || []).map((session) => session.lecturer?.name || "").join(" ");
+    const lecturers = classSubjects.flatMap((subject) => subject.sessions || []).map((session) => formatLecturerName(session.lecturer) || "").join(" ");
     return !search.trim() || normalize(`${row.code || ""} ${row.name} ${lecturers}`).includes(normalize(search));
   }), [search, status, subjectRows]);
 

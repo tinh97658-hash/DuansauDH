@@ -1,3 +1,4 @@
+import {formatLecturerName} from '../../utils/lecturerName';
 import { ArrowDownIcon, ArrowLeftIcon, ArrowUpIcon, ArrowsUpDownIcon, CalendarDaysIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, MinusIcon, PlusIcon } from "../../components/AppIcons";
 import { notify } from "../../utils/notify";
 import { usePermissions } from "../accounts/usePermissions";
@@ -44,7 +45,7 @@ function SessionMagnifier({ session, stateClass, className, onClick, children })
   const previewId = `session-magnifier-${session.id}`;
   const title = offeringTitle(session.courseOffering);
   const subject = subjectLabel(session.courseOffering);
-  const lecturer = session.lecturer?.name || "Chưa có giảng viên";
+  const lecturer = formatLecturerName(session.lecturer) || "Chưa có giảng viên";
   const room = session.room?.code || "Chưa có phòng";
 
   const close = () => {
@@ -337,7 +338,7 @@ export default function Schedule({ user }) {
   const sessionState = (session) => ({ held: ["sl-held", "ĐÃ DIỄN RA", CheckIcon], not: ["sl-not", "KHÔNG DIỄN RA", MinusIcon], wait: ["sl-wait", "CHỜ XÁC NHẬN", ClockIcon], planned: ["", "ĐÃ XẾP", CalendarDaysIcon] }[sessionStatusKey(session)]);
   const sessionCard = (session, compact = false) => {
     const [style, state, StateIcon] = sessionState(session);
-    return <SessionMagnifier key={session.id} session={session} stateClass={style} className={`sl-session ${compact ? "sl-session-compact" : ""} ${style}`} onClick={() => openSession(session)}><strong>{offeringTitle(session.courseOffering)}</strong><span>{subjectLabel(session.courseOffering)}</span><small>{session.lecturer?.name || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><em><StateIcon fontSize="inherit" /> {state}</em></SessionMagnifier>;
+    return <SessionMagnifier key={session.id} session={session} stateClass={style} className={`sl-session ${compact ? "sl-session-compact" : ""} ${style}`} onClick={() => openSession(session)}><strong>{offeringTitle(session.courseOffering)}</strong><span>{subjectLabel(session.courseOffering)}</span><small>{formatLecturerName(session.lecturer) || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><em><StateIcon fontSize="inherit" /> {state}</em></SessionMagnifier>;
   };
   const dayFocusSessionCard = (session) => {
     const style = { held: "sl-held", not: "sl-not", planned: "" }[dayFocusStatusKey(session)];
@@ -434,7 +435,7 @@ export default function Schedule({ user }) {
     </article>;
   })}{!listed.length && <Notice>Không có lớp học phần trong phạm vi đã chọn.</Notice>}</section>}</div></div></div></aside>
   <section className="sl-right"><div className="sl-schedule-head"><h1>XẾP LỊCH</h1><div className="sl-week"><button aria-label="Tuần trước" onClick={() => changeWeek(formatDateKey(addDays(week, -7)))}><ChevronLeftIcon fontSize="inherit" /></button><strong>{vietnameseDate(week)} — {vietnameseDate(end)}</strong><button aria-label="Tuần sau" onClick={() => changeWeek(formatDateKey(addDays(week, 7)))}><ChevronRightIcon fontSize="inherit" /></button></div>
-    <div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" label="Xuất báo cáo" disabled={sessions.loading || !!sessions.error || majors.loading || !!majors.error || offerings.loading || !!offerings.error} showFileIcons onWord={downloadWord} onExcel={downloadExcel} onPdf={openPdfPreview} onError={(failure) => notify.error(message(failure))} /><button className="sl-btn sl-today" disabled={week === currentWeek && !focusedDate} onClick={() => changeWeek(currentWeek)}>Tuần này</button>{canEdit && <PendingConfirmationButton count={pending.data?.length} loading={pending.loading} error={pending.error} open={pendingOpen} controls="schedule-pending-dialog" onClick={() => setPendingOpen(true)} />}</div>
+    <div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" label="Xuất báo cáo" disabled={sessions.loading || !!sessions.error || majors.loading || !!majors.error || offerings.loading || !!offerings.error} showFileIcons onWord={downloadWord} onExcel={downloadExcel} onPdf={openPdfPreview} onError={(failure) => notify.error(message(failure))} /><button className="sl-btn sl-today" disabled={week === currentWeek && !focusedDate} onClick={() => changeWeek(currentWeek)}>Tuần này</button>{canEdit && <PendingConfirmationButton showIcon={false} count={pending.data?.length} loading={pending.loading} error={pending.error} open={pendingOpen} controls="schedule-pending-dialog" onClick={() => setPendingOpen(true)} />}</div>
   </div>{selecting && <div className="sl-selected-strip"><span className="sl-selected-tag">ĐANG XẾP</span><strong className="sl-selected-offering" title={offeringTitle(selected)}>{offeringTitle(selected)}</strong><span className="sl-selected-meta">{selected.subject?.code ? `${selected.subject.code} · ` : ""}{groupsOf(selected).length} lớp/nhóm · {selected.participantCount ?? 0} HV</span><button type="button" className="sl-btn sl-selected-clear" onClick={() => setSelected("")}>Bỏ chọn</button></div>}
     {sessions.error && <Notice error={sessions.error} />}{error && <Notice error={error} />}
     <div className={`sl-calendar-wrap ${selecting ? "sl-selecting" : ""}`} aria-busy={sessions.loading}>{focusedDay ? <section className="sl-day-focus" aria-label={`Lịch ngày ${vietnameseDate(focusedDate)}`}>
@@ -499,7 +500,7 @@ export default function Schedule({ user }) {
           return <article className="sl-pending-card" key={session.id}>
             <div className="sl-pending-date"><strong>{vietnameseDate(session.sessionDate)}</strong><span>{session.period === "MORNING" ? "SÁNG" : "CHIỀU"}</span></div>
             <div className="sl-pending-copy"><h3 title={title}>{title}</h3><span>{subjectLabel(session.courseOffering)}</span></div>
-            <div className="sl-pending-side"><small>{session.lecturer?.name || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><div className="sl-pending-actions"><button className="sl-btn" disabled={saving} onClick={() => confirmation(session, "not_held")}>Không diễn ra</button><button className="sl-btn sl-btn-primary" disabled={saving} onClick={() => confirmation(session, "held")}><CheckIcon fontSize="inherit" /> Đã diễn ra</button></div></div>
+            <div className="sl-pending-side"><small>{formatLecturerName(session.lecturer) || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><div className="sl-pending-actions"><button className="sl-btn" disabled={saving} onClick={() => confirmation(session, "not_held")}>Không diễn ra</button><button className="sl-btn sl-btn-primary" disabled={saving} onClick={() => confirmation(session, "held")}><CheckIcon fontSize="inherit" /> Đã diễn ra</button></div></div>
           </article>;
         }) : <Notice>Không có buổi chờ xác nhận.</Notice>}
     </>}

@@ -1,3 +1,4 @@
+import {examInvigilatorName} from './examInvigilators';
 import React,{useState} from 'react';
 import {Link} from 'react-router-dom';
 import {Modal} from '../scheduling/shared';
@@ -39,7 +40,8 @@ export default function ExamSessionDialog({members,queue,rooms,lecturers,units,c
      <div><dt>Ngày thi</dt><dd>{formatExamDate(seed.examDate)}</dd></div>
      <div><dt>Buổi / Giờ thi</dt><dd>{start<'13:00'?'Sáng':'Chiều'} · {start.slice(0,5)}–{end.slice(0,5)}</dd></div>
      <div><dt>Phòng thi</dt><dd>{seed.roomCode}{seed.roomName?` · ${seed.roomName}`:''}</dd></div>
-     <div><dt>Giám thị</dt><dd>{seed.externalInvigilatorName||seed.lecturerName||'Chưa phân công'}{seed.externalUnitName&&<small>{seed.externalUnitName}</small>}</dd></div>
+     <div><dt>Cán bộ coi thi 1</dt><dd>{examInvigilatorName(seed)||'Chưa phân công'}{seed.externalUnitName&&<small>{seed.externalUnitName}</small>}</dd></div>
+     <div><dt>Cán bộ coi thi 2</dt><dd>{examInvigilatorName(seed,true)||'Chưa phân công'}{seed.secondExternalUnitName&&<small>{seed.secondExternalUnitName}</small>}</dd></div>
     </dl>
     <p className="ep-session-counts">{new Set(active.map(g=>g.roundNo||1)).size} đợt · {classes.size} lớp · {active.length} nhóm có hiệu lực · Tối đa {examGroupsPeak(active)} thí sinh đồng thời</p>
     <div className="ep-round-table"><table className="v20-table ep-session-detail-table" aria-label="Các học phần trong buổi thi">

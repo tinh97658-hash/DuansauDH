@@ -189,7 +189,7 @@ export class SchedulingService {
     const sessions = offeringIds.length === 0 ? [] : await this.teachingSessions.findAll({
       where: { courseOfferingId: { [Op.in]: offeringIds } },
       include: [
-        { model: Lecturer, as: "lecturer", attributes: ["id", "code", "name"] },
+        { model: Lecturer, as: "lecturer", attributes: ["id", "code", "name", "academicRank", "academicDegree"] },
         { model: Room, as: "room", attributes: ["id", "code", "name"] },
       ],
       order: [["sessionDate", "ASC"], ["startTime", "ASC"], ["id", "ASC"]],
@@ -343,7 +343,7 @@ export class SchedulingService {
             sessionDate: session.sessionDate,
             period: session.period,
             status: session.status,
-            lecturer: session.lecturer ? { name: session.lecturer.name } : null,
+            lecturer: session.lecturer ? { name: session.lecturer.name, academicRank: session.lecturer.academicRank, academicDegree: session.lecturer.academicDegree } : null,
             room: session.room ? { code: session.room.code } : null,
           })),
         };
@@ -1506,7 +1506,7 @@ export class SchedulingService {
           },
         ],
       },
-      { model: Lecturer, as: "lecturer", attributes: ["id", "code", "name", "disciplineId", "majorId", "active"] },
+      { model: Lecturer, as: "lecturer", attributes: ["id", "code", "name", "academicRank", "academicDegree", "disciplineId", "majorId", "active"] },
       { model: Room, as: "room", attributes: ["id", "code", "name", "capacity", "isActive"] },
       { model: Staff, as: "confirmedBy", attributes: ["id", "name", "email"] },
     ];
@@ -1666,6 +1666,8 @@ export class SchedulingService {
         id: existing.lecturer.id,
         code: existing.lecturer.code,
         name: existing.lecturer.name,
+        academicRank: existing.lecturer.academicRank,
+        academicDegree: existing.lecturer.academicDegree,
       } : null,
       room: existing.room ? {
         id: existing.room.id,
@@ -1733,7 +1735,7 @@ export class SchedulingService {
           },
         ],
       },
-      { model: Lecturer, as: "lecturer", attributes: ["id", "code", "name"] },
+      { model: Lecturer, as: "lecturer", attributes: ["id", "code", "name", "academicRank", "academicDegree"] },
       { model: Room, as: "room", attributes: ["id", "code", "name"] }],
       transaction,
       order: [["startTime", "ASC"], ["id", "ASC"]],

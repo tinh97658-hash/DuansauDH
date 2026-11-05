@@ -1,15 +1,57 @@
 /* Shared rules include portal menus, which sit outside #root and page containers. */
-body select[data-app-select] {
+body select:not([multiple]),
+body .tp-year-trigger {
   appearance: none;
-  background-image: var(--app-chevron);
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 16px;
-  padding-right: 32px;
+  background-image: var(--app-chevron) !important;
+  background-repeat: no-repeat !important;
+  background-position: right var(--dropdown-chevron-inset) center !important;
+  background-size: var(--dropdown-chevron-size) var(--dropdown-chevron-size) !important;
+  padding-right: var(--dropdown-text-inset) !important;
 }
+body select[aria-expanded="true"], body .tp-year-trigger[aria-expanded="true"] { background-image: var(--app-chevron-up) !important; }
+
+/* One glyph size across select fields, custom pickers, menus and disclosures. */
+body :is([data-heroicon="ChevronDownIcon"], [data-heroicon="ChevronUpIcon"]) {
+  width: var(--dropdown-chevron-size) !important;
+  height: var(--dropdown-chevron-size) !important;
+  min-width: var(--dropdown-chevron-size);
+  flex-shrink: 0;
+  stroke-width: 1.5;
+  color: var(--icon-muted) !important;
+}
+body :is(.MuiButton-contained, .sl-btn-primary) :is([data-heroicon="ChevronDownIcon"], [data-heroicon="ChevronUpIcon"]) { color: inherit !important; }
+body .Mui-disabled :is([data-heroicon="ChevronDownIcon"], [data-heroicon="ChevronUpIcon"]),
+body :is(.MuiSelect-icon.Mui-disabled, .MuiNativeSelect-icon.Mui-disabled) { color: var(--icon-disabled) !important; }
+body :is(.MuiSelect-icon, .MuiNativeSelect-icon) {
+  right: var(--dropdown-chevron-inset) !important;
+  top: calc(50% - var(--dropdown-chevron-size) / 2) !important;
+  pointer-events: none;
+}
+body .MuiInputBase-root :is(.MuiSelect-select.MuiSelect-select, .MuiNativeSelect-select.MuiNativeSelect-select) {
+  padding-right: var(--dropdown-text-inset) !important;
+}
+/* YearSelect used to draw a background arrow in addition to its MUI indicator. */
+body .MuiInputBase-root:has(.MuiSelect-icon) { background-image: none !important; }
+body select.MuiNativeSelect-select { background-image: none !important; }
+body .MuiAutocomplete-popupIndicator { padding: 6px; }
+body .sl-combo>button {
+  width: var(--dropdown-text-inset) !important;
+  background-size: var(--dropdown-chevron-size) var(--dropdown-chevron-size) !important;
+}
+body .sl-combo>input, body .sl-lecturer-trigger { padding-right: var(--dropdown-text-inset) !important; }
+body .sl-combo:has(>input[aria-expanded="true"])>button [data-heroicon="ChevronDownIcon"] { transform: rotate(180deg); }
+body .sl-lecturer-trigger b {
+  position: absolute; right: 0; top: 0; bottom: 0;
+  width: var(--dropdown-text-inset) !important;
+  height: auto !important;
+  font-size: 0 !important; color: transparent;
+  background: var(--app-chevron) center / var(--dropdown-chevron-size) var(--dropdown-chevron-size) no-repeat !important;
+  pointer-events: none;
+}
+body .sl-lecturer-trigger[aria-expanded="true"] b { background-image: var(--app-chevron-up) !important; }
 body .sl-combo > button:has([data-heroicon]) {
   background-image: none !important;
-  display: grid;
+  display: grid !important;
   place-items: center;
 }
 body :is(.MuiMenu-paper, .MuiAutocomplete-paper, .document-export-options, .tp-year-menu, .sl-combo-list, .sl-lecturer-popover) {

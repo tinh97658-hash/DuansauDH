@@ -22,7 +22,7 @@ beforeEach(()=>{examClock.value='2026-10-19 07:00:00';vi.clearAllMocks();data={q
 const renderPage=()=>renderWithPermissions(<MemoryRouter useTransitions={false}><ExamSchedule/></MemoryRouter>,['exams.view','exams.write']);
 const choose=(label,name)=>{fireEvent.focus(screen.getByRole('combobox',{name:label}));fireEvent.click(screen.getByRole('option',{name}));};
 const add=(n,o)=>{fireEvent.focus(screen.getByRole('combobox',{name:`Thêm học phần đợt ${n}`}));fireEvent.click(screen.getByRole('option',{name:`${o.name} · ${o.candidateCount} TS`}));};
-async function open(){renderPage();await waitFor(()=>expect(screen.getByRole('button',{name:'Tạo buổi thi ghép'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Tạo buổi thi ghép'}));await waitFor(()=>expect(screen.getByRole('button',{name:'301 · 30 chỗ'})).toBeEnabled());choose('Đơn vị','Viện Đào tạo SĐH');choose('Giám thị','Nguyễn An');fireEvent.click(screen.getByRole('button',{name:'301 · 30 chỗ'}));}
+async function open(){renderPage();const first=data.queue[0];const checkbox=await screen.findByRole('checkbox',{name:`Chọn lớp ${first.name} · ${first.subjectName}`});await waitFor(()=>expect(checkbox).toBeEnabled());fireEvent.click(checkbox);fireEvent.click(screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'}));fireEvent.click(screen.getByRole('button',{name:`Gỡ ${first.subjectName}`}));await waitFor(()=>expect(screen.getByRole('button',{name:'301 · 30 chỗ'})).toBeEnabled());choose('Đơn vị','Viện Đào tạo SĐH');choose('Cán bộ coi thi 1','Nguyễn An');fireEvent.click(screen.getByRole('button',{name:'301 · 30 chỗ'}));}
 it('creates a mixed parallel and sequential arrangement with immutable per-offering snapshots',async()=>{
  await open();add(1,a);add(1,b);fireEvent.click(screen.getByRole('button',{name:'Thêm đợt thi'}));add(2,c);add(2,d);
  expect(screen.getByText(/Thi đồng thời:/)).toHaveTextContent('30 thí sinh');
@@ -120,10 +120,46 @@ it('retains the composed form and server conflict details on a stale save',async
  expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/masters/exam-arrangements'),expect.objectContaining({groups:[expect.objectContaining({courseOfferingId:'a',snapshotId:'snapshot-a'})]}),{withCredentials:true});
 });
 const session=(o,id,extra={})=>({...o,id,courseOfferingId:o.id,arrangementId:'arrangement',arrangementVersion:0,roundNo:1,version:0,examDate:'2026-10-19',startTime:'08:00',endTime:'09:00',roomId:'room',roomCode:'301',lecturerId:'lecturer',lecturerName:'Nguyễn An',status:'scheduled',canEdit:true,...extra});
-it('places the compose button beside the heading and hides expired calendar actions on clock updates',async()=>{
+it('selects multiple classes in the queue and opens the selected period with their snapshots ready to save',async()=>{
+ renderPage();
+ const first=await screen.findByRole('checkbox',{name:`Chọn lớp ${a.name} · ${a.subjectName}`});
+ fireEvent.click(first);
+ fireEvent.change(screen.getByLabelText('Tìm kiếm'),{target:{value:b.name}});
+ fireEvent.click(screen.getByRole('checkbox',{name:`Chọn lớp ${b.name} · ${b.subjectName}`}));
+ expect(screen.getByLabelText('Các lớp đang chọn')).toHaveTextContent('2 lớp · 24 thí sinh');
+ fireEvent.change(screen.getByLabelText('Tìm kiếm'),{target:{value:''}});
+ expect(first).toBeChecked();
+ fireEvent.click(screen.getByRole('button',{name:'Chọn 20/10/2026 Chiều'}));
+ const dialog=screen.getByRole('dialog',{name:'TẠO BUỔI THI'});
+ expect(within(dialog).getByLabelText('Ngày thi')).toHaveValue('20/10/2026');
+ expect(within(dialog).getByLabelText('Bắt đầu đợt 1')).toHaveValue('14:00');
+ expect(within(dialog).getByRole('table')).toHaveTextContent(a.subjectName);
+ expect(within(dialog).getByRole('table')).toHaveTextContent(b.subjectName);
+ await waitFor(()=>expect(within(dialog).getByRole('button',{name:'301 · 30 chỗ'})).toBeEnabled());
+ choose('Đơn vị','Viện Đào tạo SĐH');choose('Cán bộ coi thi 1','Nguyễn An');
+ fireEvent.click(within(dialog).getByRole('button',{name:'301 · 30 chỗ'}));
+ fireEvent.click(within(dialog).getByRole('button',{name:'Lưu buổi thi'}));
+ await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/masters/exam-arrangements'),expect.objectContaining({examDate:'2026-10-20',period:'AFTERNOON',groups:[
+  expect.objectContaining({courseOfferingId:a.id,snapshotId:a.snapshotId,startTime:'14:00',endTime:'15:00'}),
+  expect.objectContaining({courseOfferingId:b.id,snapshotId:b.snapshotId,startTime:'14:00',endTime:'15:00'}),
+ ]}),{withCredentials:true}));
+ expect(screen.queryByLabelText('Các lớp đang chọn')).not.toBeInTheDocument();
+});
+it('removes individual selected classes and clears all choices without writing a schedule',async()=>{
+ renderPage();
+ fireEvent.click(await screen.findByRole('checkbox',{name:`Chọn lớp ${a.name} · ${a.subjectName}`}));
+ fireEvent.click(screen.getByRole('checkbox',{name:`Chọn lớp ${b.name} · ${b.subjectName}`}));
+ fireEvent.click(screen.getByRole('button',{name:`Bỏ chọn lớp ${a.name} · ${a.subjectName}`}));
+ expect(screen.getByLabelText('Các lớp đang chọn')).toHaveTextContent('1 lớp · 9 thí sinh');
+ expect(screen.getByRole('checkbox',{name:`Chọn lớp ${a.name} · ${a.subjectName}`})).not.toBeChecked();
+ fireEvent.click(screen.getByRole('button',{name:'Bỏ chọn tất cả'}));
+ expect(screen.queryByLabelText('Các lớp đang chọn')).not.toBeInTheDocument();
+ expect(axios.post).not.toHaveBeenCalled();
+});
+it('uses queue selection without a redundant compose button and hides expired calendar actions on clock updates',async()=>{
  examClock.value='2026-10-19 08:00:59';renderPage();
- const composeButton=await screen.findByRole('button',{name:'Tạo buổi thi ghép'});
- expect(composeButton.closest('.sl-schedule-head')).toContainElement(screen.getByRole('heading',{name:'XẾP LỊCH THI'}));
+ expect(screen.queryByRole('button',{name:'Tạo buổi thi ghép'})).not.toBeInTheDocument();
+ expect(screen.getByRole('heading',{name:'XẾP LỊCH THI'})).toBeInTheDocument();
  fireEvent.click(await screen.findByRole('button',{name:/CNTT 2026.1.1 15 TS Triết học/}));
  const morning=screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'}),afternoon=screen.getByRole('button',{name:'Chọn 19/10/2026 Chiều'});
  expect(morning).toBeEnabled();
@@ -140,8 +176,9 @@ it.each([
  ['2026-10-19 14:01:00','2026-10-20','MORNING','08:00'],
 ])('defaults composition to the next available period at %s',async(now,date,period,start)=>{
  examClock.value=now;renderPage();
- await waitFor(()=>expect(screen.getByRole('button',{name:'Tạo buổi thi ghép'})).toBeEnabled());
- fireEvent.click(screen.getByRole('button',{name:'Tạo buổi thi ghép'}));
+ await screen.findByRole('checkbox',{name:`Chọn lớp ${a.name} · ${a.subjectName}`});
+ fireEvent.click(screen.getByRole('checkbox',{name:`Chọn lớp ${a.name} · ${a.subjectName}`}));
+ fireEvent.click(screen.getByRole('button',{name:`Chọn ${formatDate(date)} ${period==='MORNING'?'Sáng':'Chiều'}`}));
  expect(screen.getByLabelText('Ngày thi')).toHaveValue(formatDate(date));
  expect(screen.getByRole('combobox',{name:'Buổi thi'})).toHaveValue(period);
  expect(screen.getByLabelText('Bắt đầu đợt 1')).toHaveValue(start);
@@ -180,7 +217,7 @@ it('edits only an unlocked group in the same dialog and keeps the form on a reje
  const dialog=screen.getByRole('dialog',{name:'CHI TIẾT BUỔI THI'});
  fireEvent.click(within(dialog).getByRole('button',{name:'Chỉnh sửa buổi thi'}));
  expect(screen.getAllByRole('dialog')).toHaveLength(1);expect(dialog).toBeInTheDocument();
- expect(screen.getByLabelText('Ngày thi')).toBeDisabled();expect(screen.getByRole('combobox',{name:'Giám thị'})).toBeDisabled();
+ expect(screen.getByLabelText('Ngày thi')).toBeDisabled();expect(screen.getByRole('combobox',{name:'Cán bộ coi thi 1'})).toBeDisabled();
  expect(screen.getByLabelText(`Kết thúc ${held.name}`)).toBeDisabled();
  expect(screen.getByLabelText(`Kết thúc ${future.name}`)).toBeEnabled();
  fireEvent.change(screen.getByLabelText(`Kết thúc ${future.name}`),{target:{value:'10:30'}});
@@ -275,9 +312,9 @@ it('uses the requested morning and afternoon hours when composing an arrangement
 it('saves typed external unit and invigilator names without a lecturer ID',async()=>{
  await open();add(1,a);
  fireEvent.change(screen.getByRole('combobox',{name:'Đơn vị'}),{target:{value:'Trung tâm Khảo thí ngoài viện'}});
- expect(screen.getByRole('combobox',{name:'Giám thị'})).toHaveValue('');
- expect(screen.getByRole('button',{name:'Lưu buổi thi'})).toBeDisabled();
- fireEvent.change(screen.getByRole('combobox',{name:'Giám thị'}),{target:{value:'  Lê Văn Bình  '}});
+ expect(screen.getByRole('combobox',{name:'Cán bộ coi thi 1'})).toHaveValue('');
+ expect(screen.getByRole('button',{name:'Lưu buổi thi'})).toBeEnabled();
+ fireEvent.change(screen.getByRole('combobox',{name:'Cán bộ coi thi 1'}),{target:{value:'  Lê Văn Bình  '}});
  fireEvent.click(screen.getByRole('button',{name:'Lưu buổi thi'}));
  await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/masters/exam-arrangements'),expect.objectContaining({lecturerId:undefined,externalUnitName:'Trung tâm Khảo thí ngoài viện',externalInvigilatorName:'Lê Văn Bình'}),{withCredentials:true}));
 });
@@ -288,17 +325,17 @@ it('only suggests the two postgraduate units and lecturers from the selected uni
  fireEvent.focus(screen.getByRole('combobox',{name:'Đơn vị'}));
  const unitOptions=within(screen.getByRole('listbox',{name:'Đơn vị'}));
  expect(unitOptions.getAllByRole('option').map(o=>o.textContent)).toEqual(['Viện Đào tạo SĐH','Viện Đào tạo Sau đại học']);
- choose('Giám thị','Nguyễn An');
- fireEvent.focus(screen.getByRole('combobox',{name:'Giám thị'}));
- expect(within(screen.getByRole('listbox',{name:'Giám thị'})).getAllByRole('option').map(o=>o.textContent)).toEqual(['Nguyễn An']);
+ choose('Cán bộ coi thi 1','Nguyễn An');
+ fireEvent.focus(screen.getByRole('combobox',{name:'Cán bộ coi thi 1'}));
+ expect(within(screen.getByRole('listbox',{name:'Cán bộ coi thi 1'})).getAllByRole('option').map(o=>o.textContent)).toEqual(['Nguyễn An']);
  choose('Đơn vị','Viện Đào tạo Sau đại học');
- expect(screen.getByRole('combobox',{name:'Giám thị'})).toHaveValue('');
- fireEvent.focus(screen.getByRole('combobox',{name:'Giám thị'}));
- expect(within(screen.getByRole('listbox',{name:'Giám thị'})).getAllByRole('option').map(o=>o.textContent)).toEqual(['Trần Bình']);
+ expect(screen.getByRole('combobox',{name:'Cán bộ coi thi 1'})).toHaveValue('');
+ fireEvent.focus(screen.getByRole('combobox',{name:'Cán bộ coi thi 1'}));
+ expect(within(screen.getByRole('listbox',{name:'Cán bộ coi thi 1'})).getAllByRole('option').map(o=>o.textContent)).toEqual(['Trần Bình']);
  fireEvent.change(screen.getByRole('combobox',{name:'Đơn vị'}),{target:{value:'Khoa Công nghệ thông tin'}});
  expect(within(screen.getByRole('listbox',{name:'Đơn vị'})).queryAllByRole('option')).toHaveLength(0);
- fireEvent.change(screen.getByRole('combobox',{name:'Giám thị'}),{target:{value:'Lê Minh'}});
- expect(within(screen.getByRole('listbox',{name:'Giám thị'})).queryAllByRole('option')).toHaveLength(0);
+ fireEvent.change(screen.getByRole('combobox',{name:'Cán bộ coi thi 1'}),{target:{value:'Lê Minh'}});
+ expect(within(screen.getByRole('listbox',{name:'Cán bộ coi thi 1'})).queryAllByRole('option')).toHaveLength(0);
  fireEvent.click(screen.getByRole('button',{name:'Lưu buổi thi'}));
  await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/masters/exam-arrangements'),expect.objectContaining({lecturerId:undefined,externalUnitName:'Khoa Công nghệ thông tin',externalInvigilatorName:'Lê Minh'}),{withCredentials:true}));
 });
@@ -308,7 +345,7 @@ it('restores external names when editing a single-group arrangement',async()=>{
  const detail=screen.getByRole('dialog',{name:'CHI TIẾT BUỔI THI'});expect(detail).toHaveTextContent('Lê Văn Bình');
  fireEvent.click(screen.getByRole('button',{name:'Chỉnh sửa buổi thi'}));expect(screen.getAllByRole('dialog')).toHaveLength(1);expect(detail).toBeInTheDocument();
  expect(screen.getByRole('combobox',{name:'Đơn vị'})).toHaveValue('Trung tâm Khảo thí');
- expect(screen.getByRole('combobox',{name:'Giám thị'})).toHaveValue('Lê Văn Bình');
+ expect(screen.getByRole('combobox',{name:'Cán bộ coi thi 1'})).toHaveValue('Lê Văn Bình');
  await waitFor(()=>expect(screen.getByRole('button',{name:'Lưu thay đổi'})).toBeEnabled());
  fireEvent.click(screen.getByRole('button',{name:'Lưu thay đổi'}));
  await waitFor(()=>expect(axios.put).toHaveBeenCalledWith(expect.stringContaining('/masters/exam-arrangements/arrangement'),expect.objectContaining({externalInvigilatorName:'Lê Văn Bình',externalUnitName:'Trung tâm Khảo thí'}),{withCredentials:true}));

@@ -8,6 +8,7 @@ import {up as workflowUp} from '../../src/database/migrations/066-masters-exam-w
 import {up as lecturerUp} from '../../src/database/migrations/067-exam-session-lecturer.js';
 import {up as arrangementsUp,down as arrangementsDown} from '../../src/database/migrations/068-exam-arrangements.js';
 import {up as externalInvigilatorsUp} from '../../src/database/migrations/069-external-exam-invigilators.js';
+import {up as twoInvigilatorsUp} from '../../src/database/migrations/098-two-exam-invigilators.js';
 
 const describeDb=process.env.RUN_POSTGRES_EXAM_ARRANGEMENT_TESTS==='true'?describe:describe.skip;
 describeDb('Grouped exam reservations on PostgreSQL',()=>{
@@ -34,7 +35,7 @@ describeDb('Grouped exam reservations on PostgreSQL',()=>{
     CREATE TABLE course_offerings(id uuid PRIMARY KEY,subject_id uuid,name text,status text,gradebook_status text DEFAULT 'draft',gradebook_snapshot jsonb,gradebook_version int DEFAULT 0);
     CREATE TABLE course_exam_gradebooks(course_offering_id uuid,grades jsonb);
     CREATE TABLE rooms(id uuid PRIMARY KEY,capacity int,is_active boolean,code text,name text);
-    CREATE TABLE lecturers(id uuid PRIMARY KEY,active boolean,code text,name text,unit_id uuid);
+    CREATE TABLE lecturers(id uuid PRIMARY KEY,active boolean,code text,name text,unit_id uuid,academic_rank text,academic_degree text);
     CREATE TABLE units(id uuid,code text,name text,active boolean,sort_order int);
     CREATE TABLE course_offering_class_groups(course_offering_id uuid,class_group_id uuid);
     CREATE TABLE class_groups(id uuid,name text,code text,academic_year text,major_id uuid);
@@ -54,6 +55,7 @@ describeDb('Grouped exam reservations on PostgreSQL',()=>{
     VALUES(:session,:offering,:snapshot,'2098-01-01','08:00','09:00',:room,:lecturer,:actor,:actor)`,{session,offering:legacy.courseOfferingId,snapshot:legacy.snapshotId,room,lecturer,actor:actorId});
   await arrangementsUp({context:db.getQueryInterface()});
   await externalInvigilatorsUp({context:db.getQueryInterface()});
+  await twoInvigilatorsUp({context:db.getQueryInterface()});
   expect((await sql('SELECT arrangement_id,round_no FROM course_exam_sessions WHERE id=:id',{id:session}))[0]).toEqual({arrangement_id:session,round_no:1});
   service=new ExamScheduleService(db,new ExamWorkflowService(db,rbac),rbac);
  },30000);
@@ -146,6 +148,37 @@ describeDb('Grouped exam reservations on PostgreSQL',()=>{
    {lecturerId:undefined,externalInvigilatorName:'Giám thị',externalUnitName:'   '},
    {externalInvigilatorName:'Giám thị',externalUnitName:'Đơn vị'},
   ])await expect(service.saveArrangement(null,payload([a],extra),actor)).rejects.toThrow();
+ });
+ it('allows no invigilators and persists, lists and clears two assignments',async()=>{
+  const a=await offering(['optional_a']);
+  const saved=await service.saveArrangement(null,payload([a],{lecturerId:undefined}),actor);
+  const second=randomUUID();await sql('INSERT INTO lecturers(id,active,name) VALUES(:id,true,:name)',{id:second,name:'Second staff'});
+  const edit={...a,id:saved.sessionIds[0],version:0};
+  await service.saveArrangement(saved.id,payload([edit],{version:0,secondLecturerId:second}),actor);
+  await sql("UPDATE lecturers SET academic_rank='PGS',academic_degree='TS' WHERE id=:id",{id:lecturer});
+  await sql("UPDATE lecturers SET academic_degree='ThS' WHERE id=:id",{id:second});
+  const listed=await service.list({from:date,to:date});
+  expect(listed.sessions.find(s=>s.id===edit.id)).toMatchObject({lecturerId:lecturer,lecturerAcademicRank:'PGS',lecturerAcademicDegree:'TS',secondLecturerId:second,secondLecturerName:'Second staff',secondLecturerAcademicDegree:'ThS'});
+  expect(listed.lecturers.find(l=>l.id===second)).toMatchObject({academicDegree:'ThS'});
+  await service.saveArrangement(saved.id,payload([{...edit,version:1}],{version:1,lecturerId:undefined}),actor);
+  expect((await sql('SELECT lecturer_id,second_lecturer_id FROM course_exam_sessions WHERE id=:id',{id:edit.id}))[0]).toEqual({lecturer_id:null,second_lecturer_id:null});
+ });
+ it('checks conflicts across both invigilator positions and rejects duplicate staff',async()=>{
+  const a=await offering(['two_a']),b=await offering(['two_b']);
+  const second=randomUUID(),otherRoom=randomUUID();
+  await sql('INSERT INTO lecturers(id,active) VALUES(:id,true); INSERT INTO rooms(id,capacity,is_active) VALUES(:room,30,true)',{id:second,room:otherRoom});
+  await service.saveArrangement(null,payload([a],{secondLecturerId:second}),actor);
+  await expect(service.saveArrangement(null,payload([b],{roomId:otherRoom,lecturerId:second}),actor)).rejects.toMatchObject({response:{code:'EXAM_LECTURER_CONFLICT'}});
+  await expect(service.saveArrangement(null,payload([b],{roomId:otherRoom,lecturerId:undefined,secondLecturerId:lecturer}),actor)).rejects.toMatchObject({response:{code:'EXAM_LECTURER_CONFLICT'}});
+  await expect(service.saveArrangement(null,payload([b],{secondLecturerId:lecturer}),actor)).rejects.toThrow('hai người');
+ });
+ it('persists an external second invigilator and reserves that identity in either position',async()=>{
+  const a=await offering(['second_external_a']),b=await offering(['second_external_b']);
+  const saved=await service.saveArrangement(null,payload([a],{secondExternalInvigilatorName:'Outside staff',secondExternalUnitName:'Testing unit'}),actor);
+  const [row]=await sql('SELECT second_external_invigilator_name,second_external_unit_name FROM course_exam_sessions WHERE id=:id',{id:saved.sessionIds[0]});
+  expect(row).toEqual({second_external_invigilator_name:'Outside staff',second_external_unit_name:'Testing unit'});
+  const otherRoom=randomUUID();await sql('INSERT INTO rooms(id,capacity,is_active) VALUES(:id,30,true)',{id:otherRoom});
+  await expect(service.saveArrangement(null,payload([b],{roomId:otherRoom,lecturerId:undefined,externalInvigilatorName:'outside  staff',externalUnitName:'testing unit'}),actor)).rejects.toMatchObject({response:{code:'EXAM_LECTURER_CONFLICT'}});
  });
  it.each(['MORNING','AFTERNOON'])('rejects closed %s periods before attempting to schedule',async(period)=>{
   const a=await offering(['expired_'+period]);

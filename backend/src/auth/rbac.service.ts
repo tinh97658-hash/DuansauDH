@@ -7,6 +7,7 @@ import { Role } from "../database/models/role.model.js";
 import { StaffRole } from "../database/models/staff-role.model.js";
 import { permissionAssignableToRole } from "./permissions.js";
 import { workingProfileStorage, type WorkingProfileContext } from './profile-context.js';
+import type { Transaction } from 'sequelize';
 import { effectiveProfilePermissions } from './permission-tree.js';
 
 export interface EffectiveAccess {
@@ -42,10 +43,13 @@ export class RbacService {
     else this.cache.clear();
   }
 
-  async effectiveAccess(staff: { id: string; role?: string; sessionVersion?: number }, fresh = false): Promise<EffectiveAccess> {
+  async effectiveAccess(staff: { id: string; role?: string; sessionVersion?: number }, fresh = false, transaction?: Transaction): Promise<EffectiveAccess> {
     const profile=workingProfileStorage.getStore();
     const scoped=profile?.staffId===staff.id;
     if(scoped&&(!profile.roleId||profile.selectionRequired))return {permissions:new Set(),roleCodes:[],groupScope:{restrictView:true,restrictEdit:true,readOnly:true}};
+    // A write may already hold the academic mutex. Read current grants on its
+    // connection instead of opening a scoped transaction waiting on that mutex.
+    if (transaction) return this.compute(staff, transaction);
     const key = `${staff.id}:${staff.sessionVersion ?? 0}:${scoped?profile.roleId:'internal'}`;
     if (scoped && ['GET', 'HEAD', 'OPTIONS'].includes(profile.requestMethod || '')) {
       // Guards and read services resolve the same active profile repeatedly.
@@ -67,17 +71,19 @@ export class RbacService {
     return access;
   }
 
-  async availableRoles(staff: {id:string;role?:string}, withPermissions = true) {
+  async availableRoles(staff: {id:string;role?:string}, withPermissions = true, transaction?: Transaction) {
     const include = withPermissions
       ? [{ model: Permission, as: "permissions" }, { model: RolePermissionScope, as: "permissionScopes" }] : [];
     const assignments = await this.staffRoles.findAll({
       where: { staffId: staff.id },
+      transaction,
       include: [{ model: Role, as: "role", include }],
     });
     let roleModels = assignments.map((assignment) => assignment.role).filter(Boolean) as Role[];
     if (!assignments.length && staff.role) {
       const fallback = await this.roles.findOne({
         where: { code: staff.role },
+        transaction,
         include,
       });
       if (fallback) roleModels = [fallback];
@@ -91,8 +97,8 @@ export class RbacService {
       scopeLabel:role.restrictGroupView?'Lớp được phân công phụ trách':'Theo phạm vi quyền được cấp',readOnly:role.groupReadOnly===true}));
   }
 
-  private async compute(staff: { id: string; role?: string }) {
-    let roleModels=await this.availableRoles(staff);
+  private async compute(staff: { id: string; role?: string }, transaction?: Transaction) {
+    let roleModels=await this.availableRoles(staff, true, transaction);
     const profile=workingProfileStorage.getStore();
     const scoped=profile?.staffId===staff.id;
     if(scoped)roleModels=roleModels.filter(role=>role.id===profile.roleId);

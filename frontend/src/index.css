@@ -14,6 +14,10 @@
   --icon-disabled: #526576;
   --icon-on-solid: #FFFFFF;
   --app-chevron: url("./assets/icons/hero-chevron-down.svg");
+  --app-chevron-up: url("./assets/icons/hero-chevron-up.svg");
+  --dropdown-chevron-size: 16px;
+  --dropdown-chevron-inset: 10px;
+  --dropdown-text-inset: 36px;
   --app-font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
   --canvas-bg: #F5F7F8;
   --surface-bg: #FFFFFF;

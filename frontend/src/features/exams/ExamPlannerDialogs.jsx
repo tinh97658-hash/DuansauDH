@@ -1,3 +1,5 @@
+import SecondExamInvigilator from './SecondExamInvigilator';
+import {examInvigilators,examInvigilatorBusy,duplicateExamInvigilators,secondInvigilatorValid,secondInvigilatorPayload} from './examInvigilators';
 import { CheckIcon } from "../../components/AppIcons";
 import React,{useEffect,useState} from 'react';
 import axios from 'axios';
@@ -26,7 +28,7 @@ export function CandidateList({item}){
 }
 export function ExamEditor({session,offering,slot,rooms,lecturers=[],units=[],canWrite,saving,error,onClose,onSave,onCompose,embedded=false}){
  const wallTime=useExamWallTime();
- const [form,setForm]=useState({examDate:session?.examDate||slot.date,startTime:session?.startTime.slice(0,5)||slot.start,endTime:session?.endTime.slice(0,5)||slot.end,roomId:session?.roomId||'',lecturerId:session?.lecturerId||'',note:session?.note||''});
+ const [form,setForm]=useState({examDate:session?.examDate||slot.date,startTime:session?.startTime.slice(0,5)||slot.start,endTime:session?.endTime.slice(0,5)||slot.end,roomId:session?.roomId||'',secondLecturerId:session?.secondLecturerId||'',secondExternalInvigilatorName:session?.secondExternalInvigilatorName||'',secondExternalUnitName:session?.secondExternalUnitName||'',lecturerId:session?.lecturerId||'',note:session?.note||''});
  const [unitId,setUnitId]=useState(()=>{const lecturer=lecturers.find(l=>l.id===session?.lecturerId);return lecturer&&units.some(unit=>unit.id===lecturer.unitId&&isExamUnit(unit))?lecturer.unitId:'';});
  const [availability,setAvailability]=useState({sessions:[],loading:true,error:''}),[retry,setRetry]=useState(0);
  useEffect(()=>{if(!form.examDate){setAvailability({sessions:[],loading:false,error:''});return;}let active=true;setAvailability({sessions:[],loading:true,error:''});
@@ -37,14 +39,14 @@ export function ExamEditor({session,offering,slot,rooms,lecturers=[],units=[],ca
  const candidateIds=new Set(item.candidateKeys||item.candidateIds||[]),candidateConflicts=new Set(conflicts.flatMap(s=>(s.candidateKeys||s.candidateIds||[]).filter(id=>candidateIds.has(id))));
  const room=rooms.find(r=>r.id===form.roomId),reason=room?examRoomReason(room,count,conflicts):'';
  const validTime=validExamHours(form.startTime,form.endTime),pastDate=form.examDate&&form.examDate<getBusinessTodayKey(),periodClosed=isExamPeriodClosed(form.examDate,form.startTime<'13:00'?'MORNING':'AFTERNOON',wallTime);
- const lecturer=lecturers.find(l=>l.id===form.lecturerId),lecturerBusy=conflicts.some(s=>s.lecturerId===form.lecturerId);
+ const lecturer=lecturers.find(l=>l.id===form.lecturerId),lecturerBusy=examInvigilators(form).some(p=>examInvigilatorBusy(p,conflicts));
  const visibleUnits=units.filter(unit=>isExamUnit(unit)&&(unit.active!==false||unit.id===unitId)).sort((a,b)=>a.name.localeCompare(b.name,'vi'));
  const filteredLecturers=lecturers.filter(l=>visibleUnits.some(unit=>unit.id===unitId)&&l.unitId===unitId&&(l.active||l.id===form.lecturerId))
   .map(l=>({...l,unit:units.find(unit=>unit.id===l.unitId)||null}));
- const valid=canWrite&&form.examDate&&!pastDate&&!periodClosed&&validTime&&room&&!reason&&lecturer?.active&&filteredLecturers.some(l=>l.id===form.lecturerId)&&!lecturerBusy&&!candidateConflicts.size&&!availability.loading&&!availability.error;
+ const valid=canWrite&&form.examDate&&!pastDate&&!periodClosed&&validTime&&room&&!reason&&(!form.lecturerId||(lecturer?.active&&filteredLecturers.some(l=>l.id===form.lecturerId)))&&secondInvigilatorValid(form,lecturers)&&!duplicateExamInvigilators(form)&&!lecturerBusy&&!candidateConflicts.size&&!availability.loading&&!availability.error;
  const floors=[...new Set(rooms.map(roomFloor))].sort((a,b)=>(a??99)-(b??99));
  const change=(key,value)=>setForm(current=>({...current,[key]:value}));
- return <ExamDialogLayout embedded={embedded} wide className="sl-session-editor-dialog ep-editor" bodyClassName="sl-session-editor-body" title={session?'SỬA LỊCH THI':'XẾP LỊCH THI'} busy={saving} onClose={onClose} actions={<><button className="sl-btn" disabled={saving} onClick={onClose}>{embedded?'Hủy chỉnh sửa':'Hủy'}</button><button className="sl-btn sl-btn-primary" disabled={!valid||saving} onClick={()=>onSave(form,()=>setRetry(n=>n+1))}>{embedded?'Lưu thay đổi':session?'Lưu lịch':'Xếp lịch'}</button></>}>
+ return <ExamDialogLayout embedded={embedded} wide className="sl-session-editor-dialog ep-editor" bodyClassName="sl-session-editor-body" title={session?'SỬA LỊCH THI':'XẾP LỊCH THI'} busy={saving} onClose={onClose} actions={<><button className="sl-btn" disabled={saving} onClick={onClose}>{embedded?'Hủy chỉnh sửa':'Hủy'}</button><button className="sl-btn sl-btn-primary" disabled={!valid||saving} onClick={()=>onSave({...form,lecturerId:form.lecturerId||undefined,...secondInvigilatorPayload(form)},()=>setRetry(n=>n+1))}>{embedded?'Lưu thay đổi':session?'Lưu lịch':'Xếp lịch'}</button></>}>
   {error&&<div role="alert" className="v20-error">{error}</div>}
   <div className="v20-composer">
    <section className="sl-editor-info"><h4>THÔNG TIN CA THI</h4><strong>{item.name}</strong><p>{item.subjectName}</p>
@@ -56,11 +58,14 @@ export function ExamEditor({session,offering,slot,rooms,lecturers=[],units=[],ca
       placeholder="Nhập để tìm đơn vị..." disabled={!canWrite||saving}
       onChange={value=>{if(value!==unitId){setUnitId(value);change('lecturerId','');}}}/>
     </label>
-    <label className="v20-field">Giảng viên
-     <LecturerPicker key={unitId} value={form.lecturerId} lecturers={filteredLecturers} offering={offering||session}
-      conflicts={conflicts} disabled={!unitId||!canWrite||saving||availability.loading||!!availability.error}
+    <label className="v20-field">Cán bộ coi thi 1
+     <LecturerPicker key={unitId} label="Cán bộ coi thi 1" placeholder="Chọn cán bộ coi thi 1" value={form.lecturerId} lecturers={filteredLecturers.map(l=>({...l,active:l.id===form.secondLecturerId?false:l.active}))} offering={offering||session}
+      conflicts={conflicts.flatMap(s=>[s,{...s,lecturerId:s.secondLecturerId}])} disabled={!unitId||!canWrite||saving||availability.loading||!!availability.error}
       onChange={value=>change('lecturerId',value)}/>
     </label>
+    {form.lecturerId&&<button className="sl-btn" disabled={saving} onClick={()=>change('lecturerId','')}>Bỏ chọn cán bộ coi thi 1</button>}
+    <SecondExamInvigilator form={form} onChange={values=>setForm(f=>({...f,...values}))} lecturers={lecturers} units={visibleUnits} busy={conflicts} disabled={!canWrite||saving||availability.loading||!!availability.error}/>
+    {duplicateExamInvigilators(form)&&<p role="alert">Hai cán bộ coi thi phải là hai người khác nhau.</p>}
     {!lecturers.some(l=>l.active)&&<div className="v20-hint">Chưa có giảng viên đang hoạt động. Khai báo tại Hệ thống → Giảng viên.</div>}
     {unitId&&lecturers.some(l=>l.active)&&!filteredLecturers.some(l=>l.active)&&<div className="v20-hint">Đơn vị này chưa có giảng viên đang hoạt động.</div>}
     <label className="v20-field">Ghi chú<textarea aria-label="Ghi chú" value={form.note} maxLength={2000} disabled={saving} onChange={e=>change('note',e.target.value)}/></label>

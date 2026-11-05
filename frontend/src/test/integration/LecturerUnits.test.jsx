@@ -77,6 +77,14 @@ it("keeps a previously selected inactive unit available on edit", async () => {
     expect.objectContaining({ unitId: "inactive" }), expect.any(Object)));
 });
 
+it('displays academic titles while keeping the editable name unchanged',async()=>{
+ rows=[legacy];render(<Lecturers/>);
+ const family=await screen.findByText('PGS.TS Nguyễn');
+ expect(within(family.closest('tr')).getByText('An')).toBeInTheDocument();
+ fireEvent.doubleClick(family.closest('tr'));
+ expect(within(screen.getByRole('dialog')).getByLabelText('Họ và tên')).toHaveValue('Nguyễn An');
+});
+
 it("uses IDs for recommendation and never guesses a unit from text, major or class group", () => {
   const offering = { subject: { major: { disciplineId: "d2" } } };
   const candidates = [

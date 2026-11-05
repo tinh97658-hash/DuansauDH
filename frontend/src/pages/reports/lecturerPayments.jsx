@@ -1,3 +1,4 @@
+import {formatLecturerName} from '../../utils/lecturerName';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { Alert, CircularProgress } from '@mui/material';
@@ -99,7 +100,7 @@ export default function LecturerPayments() {
   };
   const select = (field, label, items) => <label className="tp-filter tp-select-filter"><span>{label}</span>
     <AppSelect aria-label={label} value={filters[field]} onChange={event => change(field, event.target.value)}>
-      <option value="">Tất cả</option>{items.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+      <option value="">Tất cả</option>{items.map(item => <option key={item.id} value={item.id}>{field==='lecturerId'?formatLecturerName(item):item.name}</option>)}
     </AppSelect></label>;
 
   return <FeatureLayout title="Thống kê thanh toán giảng viên" exportConfig={false}>
@@ -124,10 +125,10 @@ export default function LecturerPayments() {
         <colgroup>{[4, 19, 45, 7, 13, 12].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup>
         <thead><tr>{headers.map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
         <tbody>{rows.map((row, index) => <tr key={rowKey(row)} data-payment-key={rowKey(row)} aria-busy={pending.has(rowKey(row))}>
-          <td>{index + 1}</td><td><span className="lp-cell-text" title={row.lecturerName}>{row.lecturerName}</span></td>
+          <td>{index + 1}</td><td><span className="lp-cell-text" title={formatLecturerName({...row,name:row.lecturerName})}>{formatLecturerName({...row,name:row.lecturerName})}</span></td>
           <td><button className="lp-link" title={row.offeringName} onClick={() => setOffering({ id: row.courseOfferingId, name: row.offeringName })}><span className="lp-cell-text">{row.offeringName}</span></button></td>
           <td>{row.sessionCount}</td><td>{dateLabel(row.completedAt)}</td>
-          <td><input type="checkbox" data-payment-toggle aria-label={`Đã thanh toán: ${row.lecturerName} – ${row.offeringName}`} checked={row.paid}
+          <td><input type="checkbox" data-payment-toggle aria-label={`Đã thanh toán: ${formatLecturerName({...row,name:row.lecturerName})} – ${row.offeringName}`} checked={row.paid}
             disabled={pending.has(rowKey(row)) || loading || !canManage} onChange={event => update(row, event.target.checked)} /></td>
         </tr>)}
           {!rows.length && <tr><td colSpan={6}>{loading ? <CircularProgress size={24} aria-label="Đang tải" /> : 'Không có dữ liệu phù hợp.'}</td></tr>}

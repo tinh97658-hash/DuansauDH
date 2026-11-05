@@ -23,7 +23,7 @@ describeDb('Lecturer payments PostgreSQL', () => {
     // Temporary fixtures shadow application tables; everything rolls back after this suite.
     await query(`CREATE TEMP TABLE course_offerings(id uuid PRIMARY KEY,subject_id uuid,name text,status text,completed_at timestamptz);
       CREATE TEMP TABLE subjects(id uuid PRIMARY KEY,name text);
-      CREATE TEMP TABLE lecturers(id uuid PRIMARY KEY,name text,unit_id uuid);
+      CREATE TEMP TABLE lecturers(id uuid PRIMARY KEY,name text,unit_id uuid,academic_rank text,academic_degree text);
       CREATE TEMP TABLE units(id uuid PRIMARY KEY,name text);
       CREATE TEMP TABLE teaching_sessions(id uuid PRIMARY KEY,course_offering_id uuid,lecturer_id uuid,status text,
         confirmed_at timestamptz,created_at timestamptz,session_date date,end_time time);
@@ -31,7 +31,7 @@ describeDb('Lecturer payments PostgreSQL', () => {
         updated_by_staff_id uuid,created_at timestamptz,updated_at timestamptz,PRIMARY KEY(course_offering_id,lecturer_id));`);
     await query(`INSERT INTO subjects VALUES (:subject,'Subject');
       INSERT INTO units VALUES (:unit,'Unit'),(:emptyUnit,'Empty unit'),(:uncompletedUnit,'Unit');
-      INSERT INTO lecturers VALUES (:l1,'An',:unit),(:l2,'Binh',NULL),(:uncompletedLecturer,'No completed class',:uncompletedUnit);
+      INSERT INTO lecturers(id,name,unit_id) VALUES (:l1,'An',:unit),(:l2,'Binh',NULL),(:uncompletedLecturer,'No completed class',:uncompletedUnit);
       INSERT INTO course_offerings VALUES (:o1,:subject,'Completed','completed','2026-11-02T18:00:00Z'),
         (:o2,:subject,'Other class','completed','2026-11-01T08:00:00Z'),(:o3,:subject,'Active','active',NULL);
       INSERT INTO teaching_sessions VALUES

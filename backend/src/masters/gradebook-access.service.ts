@@ -16,7 +16,7 @@ export class GradebookAccessService {
 
   async forActor(actor: unknown, transaction?: Transaction): Promise<GradebookAccess> {
     if (!(actor instanceof Staff) || !actor.id) throw new ForbiddenException('Không có quyền truy cập bảng điểm.');
-    const access = await this.rbac.effectiveAccess(actor, true);
+    const access = await this.rbac.effectiveAccess(actor, true, transaction);
     if (access.roleCodes.includes('admin')) return { groupIds: null, readOnly: access.groupScope?.readOnly === true };
     const groups = await this.db.query<{ id: string }>(`SELECT id FROM class_groups
       WHERE program='masters' AND responsible_staff_id=:staffId`,
