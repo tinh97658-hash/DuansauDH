@@ -12,8 +12,6 @@ const programLabels = { masters: "Thạc sĩ", doctoral: "Tiến sĩ" };
 const definitions = [
   { key: "studyLeaveApproval", source: "studyLeaveApproval", inboxOnly: true, title: "Chờ duyệt bảo lưu", action: "Duyệt / Từ chối", unit: "yêu cầu", Icon: ClockIcon, tone: "amber" },
   { key: "majorTransferApproval", source: "majorTransferApproval", inboxOnly: true, title: "Chờ duyệt chuyển chuyên ngành", action: "Duyệt / Từ chối", unit: "yêu cầu", Icon: ClipboardDocumentListIcon, tone: "violet" },
-  { key: "eligibilityReopen", permission: "approvals", source: "approvals", title: "Xin mở lại tư cách thi", action: "Duyệt mở lại", unit: "lớp", Icon: ClipboardDocumentListIcon, tone: "amber" },
-  { key: "eligibilityApproval", permission: "approvals", source: "approvals", title: "Chờ duyệt tư cách thi", healthyTitle: "Duyệt tư cách thi", action: "Duyệt tư cách", healthy: "Không có yêu cầu chờ duyệt tư cách thi", unit: "lớp", Icon: ClipboardDocumentListIcon, tone: "amber" },
   { key: "resultApproval", permission: "approvals", source: "approvals", title: "Chờ duyệt khóa điểm", healthyTitle: "Duyệt khóa điểm", action: "Duyệt khóa điểm", healthy: "Không có yêu cầu chờ duyệt khóa điểm", unit: "lớp", Icon: ClipboardDocumentListIcon, tone: "violet" },
   { key: "grouping", source: "grouping", title: "Học viên chưa phân nhóm", healthyTitle: "Phân nhóm học viên", action: "Phân nhóm", healthy: "Không còn học viên chờ phân nhóm", unit: "học viên", Icon: UsersIcon, tone: "teal" },
   { key: "scheduling", source: "teaching", title: "Lớp chưa xếp lịch", healthyTitle: "Xếp lịch học", action: "Xếp lịch", healthy: "Không còn lớp chờ xếp lịch", unit: "lớp học phần", Icon: CalendarDaysIcon, tone: "blue" },

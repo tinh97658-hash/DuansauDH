@@ -71,6 +71,8 @@ export default defineConfig(({ mode }) => {
       exclude: [],
     },
     optimizeDeps: {
+      // Only scan the app entry, not legacy build/public HTML in this workspace.
+      entries: ["index.html"],
       // Initialize MUI's styling engine in the same pre-bundle as its components.
       // Icon/deep imports can otherwise evaluate Popper before styled is ready.
       include: ["@emotion/react", "@emotion/styled", "@mui/material", "@mui/material/styles", "@heroicons/react/24/outline"],
@@ -84,6 +86,9 @@ export default defineConfig(({ mode }) => {
       port,
       host: "0.0.0.0",
       strictPort: false,
+      watch: {
+        ignored: ["**/build/**", "**/node_modules-before-*/**"],
+      },
     },
     preview: {
       port,

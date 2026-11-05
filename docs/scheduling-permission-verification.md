@@ -1,5 +1,7 @@
 # Kiểm chứng phạm vi tự động Toàn viện — 28/10/2026
 
+Ghi chú cập nhật: phạm vi nhập điểm hiện theo migration `092`; quyền lịch thi đã tách khỏi lịch học theo migration `093`. Xem [Quyền nhập điểm](gradebook-permissions.md) và [Phân quyền lịch thi](exam-schedule-permissions.md). Phần dưới lưu lại kết quả kiểm chứng chính sách cũ.
+
 Quy tắc mới thay thế scope theo phân công trong phiên bản 082/083. Mỗi quyền thực sự được cấp thuộc lịch học hoặc thi/điểm có scope `institution`; không cấp thêm hành động. Áp dụng cả vai trò cũ, vai trò mới và tài khoản không phụ trách nhóm.
 
 ## Kiểm thử

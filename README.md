@@ -4,6 +4,8 @@ Hệ thống nội bộ của **Viện Đào tạo Sau đại học – Trườn
 
 ## Công nghệ
 
+Phân quyền theo hồ sơ làm việc, cây module và quyền xem/ghi: xem [hướng dẫn phân quyền](docs/working-profiles-permission-tree.md).
+
 Dữ liệu demo nhập điểm, lịch sử giảng dạy và tạo lịch thi: xem [hướng dẫn demo thi](docs/exam-demo.md), chạy riêng bằng `npm --prefix backend run db:seed:exam-demo`.
 
 - Frontend: React 18, React Router 6, Material UI, Ant Design, Bootstrap và Axios.
@@ -283,6 +285,48 @@ Sau khi khởi động xong:
 - API liveness: `http://localhost:3001/health/live`
 - API readiness: `http://localhost:3001/health/ready`
 - pgAdmin: `http://localhost:5051`
+
+## Chạy development từ thư mục gốc
+
+Mở PowerShell tại thư mục chứa `package.json`, `backend` và `frontend`:
+
+```powershell
+npm run install:all
+docker compose up -d db pgadmin
+npm run db:migrate
+npm run dev
+```
+
+`install:all` cài dependency cho cả thư mục gốc, backend và frontend; chỉ cần chạy
+khi mới lấy dự án hoặc dependency thay đổi. `dev` chạy cả backend và frontend
+trong cùng terminal. Nhấn `Ctrl+C` để dừng cả hai. Nếu một dịch vụ dừng, bộ chạy
+cũng dừng dịch vụ còn lại. Dừng các phiên development cũ trước khi chạy lệnh này
+để tránh trùng cổng.
+
+Các lệnh sau đều chạy được từ thư mục gốc:
+
+| Lệnh | Chức năng |
+| --- | --- |
+| `npm run dev` / `npm run start:dev` | Chạy backend và frontend ở chế độ development |
+| `npm run dev:backend` | Chỉ chạy backend ở watch mode |
+| `npm run dev:frontend` | Chỉ chạy frontend Vite |
+| `npm run build` | Build backend và frontend |
+| `npm run build:backend` / `npm run build:frontend` | Build riêng từng phần |
+| `npm start` | Chạy backend bằng Nest CLI |
+| `npm run start:prod` | Chạy backend đã build |
+| `npm run preview` | Xem thử frontend đã build |
+| `npm run typecheck` | Kiểm tra kiểu TypeScript của backend |
+| `npm run db:migrate` | Áp dụng migration còn thiếu |
+| `npm run db:migrate:status` | Xem trạng thái migration |
+| `npm run db:migrate:undo` | Rollback migration gần nhất; cần backup trước |
+| `npm run db:seed:common` / `npm run db:seed:auth` | Seed danh mục chung / phân quyền |
+| `npm test` | Chạy test backend và frontend |
+
+Tất cả script `db:*` trong `backend/package.json` đều có lệnh tương ứng ở thư
+mục gốc, bao gồm các lệnh seed và preview. Các đối số bổ sung được chuyển tiếp
+tới backend, ví dụ `npm run db:seed:bulk -- --preview`. Chạy `npm run` để xem
+danh sách đầy đủ. Seed demo hoặc dữ liệu thử nghiệm chỉ chạy khi có nhu cầu.
+`dev` không tự chạy migration hoặc seed.
 
 ## Chạy development tách backend và frontend
 

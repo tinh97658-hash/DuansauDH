@@ -16,6 +16,7 @@ const managementColumns = [
   { key: "createdAt", label: "Thời gian", width: 180, minWidth: 150 },
   { key: "action", label: "Hành động", width: 200, minWidth: 150 },
   { key: "actor", label: "Người thực hiện", width: 220, minWidth: 150 },
+  { key: "profile", label: "Hồ sơ làm việc", width: 200, minWidth: 140 },
   { key: "target", label: "Đối tượng", width: 220, minWidth: 150 },
   { key: "ip", label: "Địa chỉ IP", width: 140, minWidth: 110 },
   { key: "metadata", label: "Chi tiết", width: 280, minWidth: 180 },
@@ -27,6 +28,7 @@ const changeColumns = [
   { key: "tableName", label: "Bảng dữ liệu", width: 220, minWidth: 160 },
   { key: "rowPk", label: "Khóa bản ghi", width: 180, minWidth: 140 },
   { key: "actor", label: "Người thực hiện", width: 220, minWidth: 150 },
+  { key: "profile", label: "Hồ sơ làm việc", width: 200, minWidth: 140 },
   { key: "changedColumns", label: "Cột thay đổi", width: 220, minWidth: 160 },
   { key: "payload", label: "Dữ liệu", width: 280, minWidth: 180 },
 ];
@@ -117,6 +119,7 @@ const ManagementLogs = () => {
                 <TableCell>{formatTime(log.createdAt)}</TableCell>
                 <TableCell>{auditActionLabel(log.action)}</TableCell>
                 <TableCell>{renderActor(log.actor)}</TableCell>
+                <TableCell title={log.actorProfileId||''}>{log.actorProfile?.name||'—'}</TableCell>
                 <TableCell>{renderActor(log.target)}</TableCell>
                 <TableCell>{log.ip || "—"}</TableCell>
                 <TableCell>{renderMetadata(log.metadata)}</TableCell>
@@ -201,6 +204,7 @@ const DataChangeLogs = () => {
                 <TableCell>{tableLabel(log.tableName)}</TableCell>
                 <TableCell sx={{ fontFamily: "monospace", fontSize: 12 }}>{log.rowPk || "—"}</TableCell>
                 <TableCell>{renderChangeActor(log)}</TableCell>
+                <TableCell title={log.actorProfileId||''}>{log.actorProfile?.name||'—'}</TableCell>
                 <TableCell>{renderChangedColumns(log.changedColumns)}</TableCell>
                 <TableCell>{renderMetadata(payloadOf(log))}</TableCell>
               </TableRow>

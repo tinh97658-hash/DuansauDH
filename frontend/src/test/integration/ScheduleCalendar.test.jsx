@@ -467,7 +467,7 @@ it("shows all pending confirmations independently of the displayed week and sort
   expect(cards[1]).toHaveTextContent("Lớp mới hơn");
   expect(within(dialog).getAllByRole("button", { name: "Không diễn ra" })).toHaveLength(2);
   expect(within(dialog).getAllByRole("button", { name: "Đã diễn ra" })).toHaveLength(2);
-  expect(axios.get).toHaveBeenCalledWith(`${API_BASE_URL}/scheduling/pending-teaching-sessions`, { withCredentials: true });
+  expect(axios.get).toHaveBeenCalledWith(`${API_BASE_URL}/scheduling/pending-teaching-sessions`, { withCredentials: true, signal: expect.any(AbortSignal) });
   fireEvent.click(within(dialog).getAllByRole("button", { name: "Không diễn ra" })[0]);
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(`${API_BASE_URL}/scheduling/teaching-sessions/older/confirmation`, { status: "not_held" }, { withCredentials: true }));
   await waitFor(() => expect(within(dialog).getAllByRole("button", { name: "Đã diễn ra" })[1]).toBeEnabled());

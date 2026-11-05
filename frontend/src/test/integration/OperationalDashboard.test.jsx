@@ -201,7 +201,7 @@ it('retries a failed learner request queue without losing the other requests', a
   expect(screen.getByRole('region', { name: 'Chờ duyệt chuyển chuyên ngành' })).toHaveTextContent('Trần Thị Bình');
 });
 
-it('shows both approval queues to approvers and links directly to the submitted gradebooks', async () => {
+it('shows final approval and hides the retired eligibility approval queue', async () => {
   const data = approvalFixture();
   axios.get.mockResolvedValue({ data });
   await open();
@@ -209,9 +209,7 @@ it('shows both approval queues to approvers and links directly to the submitted 
   expect(screen.queryByRole('article', { name: 'Chờ duyệt tư cách thi' })).not.toBeInTheDocument();
   expect(screen.queryByRole('article', { name: 'Chờ duyệt khóa điểm' })).not.toBeInTheDocument();
   const inbox = screen.getByRole('region', { name: 'VIỆC CẦN XỬ LÝ' });
-  const eligibility = within(inbox).getByRole('region', { name: 'Chờ duyệt tư cách thi' });
-  expect(eligibility).toHaveTextContent('1 lớp');
-  expect(within(eligibility).getByRole('link', { name: /Lớp chờ duyệt tư cách/ })).toHaveAttribute('href', data.sources.approvals.data.eligibilityApproval.href);
+  expect(within(inbox).queryByRole('region', { name: 'Chờ duyệt tư cách thi' })).not.toBeInTheDocument();
   const results = within(inbox).getByRole('region', { name: 'Chờ duyệt khóa điểm' });
   fireEvent.click(within(results).getByRole('link', { name: /Lớp chờ khóa điểm/ }));
   expect(screen.getByTestId('location')).toHaveTextContent('/masters/exam-lists?year=2026&offeringId=final&groupId=g1');
@@ -224,15 +222,12 @@ it('hides approval notifications from staff without approval permission', async 
   expect(screen.queryByText('Lớp chờ khóa điểm')).not.toBeInTheDocument();
 });
 
-it('shows eligibility reopening requests only in the work inbox and links to admin review', async () => {
+it('hides retired eligibility reopening requests', async () => {
   const data = approvalFixture();
   data.sources.approvals.data.eligibilityReopen = {count:1,itemCount:1,href:'/masters/exam-lists?year=2026&offeringId=reopen&groupId=g1',items:[{id:'reopen',title:'Lớp xin mở lại tư cách',detail:'Cần sửa điểm thành phần',href:'/masters/exam-lists?year=2026&offeringId=reopen&groupId=g1'}]};
   axios.get.mockResolvedValue({data});await open();
-  const request = within(screen.getByRole('region',{name:'VIỆC CẦN XỬ LÝ'})).getByRole('region',{name:'Xin mở lại tư cách thi'});
-  expect(request).toHaveTextContent('Cần sửa điểm thành phần');
+  expect(within(screen.getByRole('region',{name:'VIỆC CẦN XỬ LÝ'})).queryByRole('region',{name:'Xin mở lại tư cách thi'})).not.toBeInTheDocument();
   expect(screen.queryByRole('article',{name:'Xin mở lại tư cách thi'})).not.toBeInTheDocument();
-  fireEvent.click(within(request).getByRole('link',{name:/Lớp xin mở lại tư cách/}));
-  expect(screen.getByTestId('location')).toHaveTextContent('offeringId=reopen&groupId=g1');
 });
 
 it('refreshes requests sent from another device and removes approved requests without a page reload', async () => {

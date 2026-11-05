@@ -1,3 +1,4 @@
+import { gradebookRosterSql } from "./exam-roster-query.js";
 import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import { Sequelize } from "sequelize-typescript";
@@ -28,6 +29,7 @@ import { RbacService } from "../auth/rbac.service.js";
 import { assertGradebookWorkflowAccess } from "./gradebook-workflow-access.js";
 import { ExamWorkflowService } from './exam-workflow.service.js';
 import { gradebookStage, gradebookCompletionStatus, legacyExamGradesComplete, resolveApprovedExamRows, unresolvedExamRows } from './exam-tracking.js';
+import { GradebookAccessService } from './gradebook-access.service.js';
 
 export const emptyExamGrade = (participantId: string): CourseExamGrade => ({
   participantId, eligible: null, examExempt: false, testScore: null, assignmentScore: null,
@@ -46,7 +48,37 @@ export class ExamGradebookService {
     @Optional() private readonly policies?: GradingPolicyService,
     @Optional() private readonly rbac?: RbacService,
     @Optional() private readonly workflow?: ExamWorkflowService,
+    @Optional() private readonly access?: GradebookAccessService,
   ) {}
+
+  async optionsForActor(actor: unknown) {
+    if (!this.access) return this.options();
+    const access=await this.access.forActor(actor);
+    const allowed=await this.access.offeringIds(access);
+    const result=await this.options();
+    const courseOfferings=result.courseOfferings.filter(offering=>allowed===null||allowed.has(offering.id));
+    const visibleGroups=new Set(courseOfferings.flatMap(offering=>offering.groupLinks.map((link:any)=>link.classGroupId)));
+    return {...result,courseOfferings,groups:result.groups.filter(group=>access.groupIds===null||access.groupIds.has(group.id)||visibleGroups.has(group.id))};
+  }
+
+  async subjectsForActor(classGroupId: string, actor: unknown) {
+    if (!this.access) return this.subjects(classGroupId);
+    const access=await this.access.forActor(actor);
+    const allowed=await this.access.offeringIds(access);
+    return (await this.subjects(classGroupId)).filter(offering=>allowed===null||allowed.has(offering.id));
+  }
+
+  async getForActor(query: ExamGradebookQueryDto, actor: unknown) {
+    if (!this.access) return this.get(query);
+    const access=await this.access.assertOffering(actor,query.courseOfferingId);
+    const result=await this.get(query);
+    return {...result,rows:result.rows.map(row=>({...row,canEditGrade:this.access!.canEdit(access)}))};
+  }
+
+  async historyForActor(query: ExamGradebookQueryDto, actor: unknown) {
+    if(this.access)await this.access.assertOffering(actor,query.courseOfferingId);
+    return this.history(query);
+  }
 
   async options() {
     const groups = await this.groups.findAll({
@@ -72,6 +104,61 @@ export class ExamGradebookService {
     }) };
   }
 
+  private async componentReadiness(offerings: any[]) {
+    const result = new Map<string, { totalRows: number; unassessedRows: number }>();
+    if (!offerings.length) return result;
+    // A small ownership scope is cheaper to read directly than to plan a batch.
+    if (offerings.length <= 2) {
+      for (const offering of offerings) {
+        const groupId = offering.groupLinks?.[0]?.classGroupId || offering.groupLinks?.[0]?.classGroup?.id;
+        if (groupId) result.set(offering.id, await this.get({
+          classGroupId: groupId, courseOfferingId: offering.id, rosterScope: 'offering', page: 1, pageSize: 15,
+        }));
+      }
+      return result;
+    }
+    const links = await this.links.findAll({
+      where: { courseOfferingId: { [Op.in]: offerings.map(offering => offering.id) } },
+      include: [{ model: ClassGroup, as: 'classGroup', where: { program: 'masters' }, required: true,
+        include: [examCurriculumInclude] }], order: [['classGroupId', 'ASC']],
+    });
+    const groupsByOffering = new Map<string, ClassGroup[]>();
+    for (const link of links) {
+      const groups = groupsByOffering.get(link.courseOfferingId) || [];
+      groups.push(link.classGroup);
+      groupsByOffering.set(link.courseOfferingId, groups);
+    }
+    const keys = offerings.flatMap(offering => (groupsByOffering.get(offering.id) || []).map(group => ({
+      subjectId: examSubjectForGroup(group, offering.subject).id || offering.subjectId,
+      year: group.academicYear || '',
+    })));
+    const policies = this.policies ? await this.policies.latestMany(keys) : new Map<string, GradingPolicy>();
+    const inputs = offerings.flatMap(offering => {
+      const groups = groupsByOffering.get(offering.id) || [];
+      if (!groups.length) return [];
+      return [{ offeringId: offering.id, subjectId: offering.subjectId, groupIds: groups.map(group => group.id),
+        individualGroupId: groups[0].id, policies: Object.fromEntries(groups.map(group => [group.id,
+          policies.get(`${examSubjectForGroup(group, offering.subject).id || offering.subjectId}:${group.academicYear || ''}`) || LEGACY_GRADING_POLICY])) }];
+    });
+    if (!inputs.length) return result;
+    // Use the same roster/exemption/eligibility SQL as get(), omitting sorting and page rows.
+    // Substitutions are application-owned SQL expressions, never request values.
+    const expressions: Record<string, string> = {
+      offeringId: 'readiness_input."offeringId"', subjectId: 'readiness_input."subjectId"',
+      individualGroupId: 'readiness_input."individualGroupId"', policies: 'readiness_input.policies',
+    };
+    const roster = gradebookRosterSql(true, true).replace(/IN \(:groupIds\)/g, '= ANY(readiness_input."groupIds")')
+      .replace(/:(offeringId|subjectId|individualGroupId|policies)\b/g,
+      (_match, key: string) => expressions[key]);
+    const rows = await this.sequelize.query<{ id: string; totalRows: number; unassessedRows: number }>(`
+      SELECT readiness_input."offeringId" AS id, summary.*
+      FROM jsonb_to_recordset(CAST(:inputs AS jsonb)) AS readiness_input(
+        "offeringId" uuid, "subjectId" uuid, "groupIds" uuid[], "individualGroupId" uuid, policies jsonb)
+      CROSS JOIN LATERAL (${roster}) summary`,
+    { type: QueryTypes.SELECT, replacements: { inputs: JSON.stringify(inputs), foreignLanguageGrade: JSON.stringify(foreignLanguageExemptGrade()) } });
+    return new Map(rows.map(row => [row.id, row]));
+  }
+
   async tracking(offerings: any[], includeComponents = false) {
     const completed = offerings.filter(offering => offering.status === 'completed');
     const result = new Map<string, any>();
@@ -86,16 +173,19 @@ export class ExamGradebookService {
         COALESCE((SELECT jsonb_agg(jsonb_build_object('grades',b.grades) ORDER BY b.updated_at DESC,b.class_group_id)
           FROM course_exam_gradebooks b WHERE b.course_offering_id=o.id),'[]'::jsonb) AS books,
         ARRAY(SELECT c.participant_id FROM course_exam_session_candidates c JOIN course_exam_sessions es ON es.id=c.session_id
-          WHERE es.course_offering_id=o.id AND es.eligibility_snapshot_id=p.id AND es.status='held') AS "heldIds",
+          WHERE es.course_offering_id=o.id AND es.status='held') AS "heldIds",
         (SELECT MAX((es.exam_date+es.end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh') FROM course_exam_sessions es
-          WHERE es.course_offering_id=o.id AND es.eligibility_snapshot_id=p.id AND es.status='held') AS "examCompletedAt"
+          WHERE es.course_offering_id=o.id AND es.status='held') AS "examCompletedAt"
       FROM course_offerings o JOIN subjects s ON s.id=o.subject_id
       LEFT JOIN course_exam_workflows w ON w.course_offering_id=o.id
       LEFT JOIN course_exam_eligibility_snapshots p ON p.id=w.eligibility_snapshot_id AND p.course_offering_id=o.id
       WHERE o.id IN (:ids) AND o.status='completed' AND s.program='masters'
     `, { type: QueryTypes.SELECT, replacements: { ids: completed.map(offering => offering.id) } });
-    // Use the current roster/policy service for component entry; never count arbitrary saved JSON rows.
-    for (let index = 0; index < metadata.length; index += 2) await Promise.all(metadata.slice(index, index + 2).map(async state => {
+    const readiness = includeComponents ? await this.componentReadiness(completed.filter(offering => metadata.some(state =>
+      state.id === offering.id && state.mode !== 'legacy_preserved' && state.eligibility_status !== 'submitted'
+      && !(state.eligibility_status === 'approved' && Array.isArray(state.approvedRows)))))
+      : new Map<string, { totalRows: number; unassessedRows: number }>();
+    for (const state of metadata) {
       const approved = state.mode !== 'legacy_preserved' && state.eligibility_status === 'approved' && Array.isArray(state.approvedRows);
       const candidates = approved ? state.approvedRows.filter((row: any) => row.eligible === true && !row.examExempt) : [];
       const held = new Set(state.heldIds);
@@ -105,10 +195,8 @@ export class ExamGradebookService {
         : approved && state.approvedRows.length > 0 && !unresolvedExamRows(resolveApprovedExamRows(state.approvedRows, state.books, state.heldIds, state)).length;
       let componentsEntered: boolean | null = approved || state.eligibility_status === 'submitted' ? true : null;
       if (includeComponents && !componentsEntered && state.mode !== 'legacy_preserved') {
-        const offering = completed.find(offering => offering.id === state.id);
-        const groupId = offering?.groupLinks?.[0]?.classGroupId || offering?.groupLinks?.[0]?.classGroup?.id;
-        if (groupId) {
-          const book = await this.get({ classGroupId: groupId, courseOfferingId: state.id, rosterScope: 'offering', page: 1, pageSize: 15 });
+        const book = readiness.get(state.id);
+        if (book) {
           componentsEntered = book.totalRows > 0 && Number(book.unassessedRows) === 0;
           // Empty rosters cannot prove readiness to submit eligibility.
           if (!book.totalRows) componentsEntered = null;
@@ -125,7 +213,7 @@ export class ExamGradebookService {
         legacy: state.mode === 'legacy_preserved', candidateCount: candidates.length,
         completedTeachingAt: state.completedTeachingAt, componentScoreApprovedAt: approved ? state.componentScoreApprovedAt : null,
         examCompletedAt: examCompleted ? state.examCompletedAt : null });
-    }));
+    }
     return result;
   }
 
@@ -174,7 +262,7 @@ export class ExamGradebookService {
       const all=await this.workflow!.approvedRows(offering.id,state,transaction);
       const assigned = await this.workflow!.query(`SELECT DISTINCT c.participant_id, es.status FROM course_exam_sessions es
         JOIN course_exam_session_candidates c ON c.session_id=es.id
-        WHERE es.course_offering_id=:id AND es.eligibility_snapshot_id=:snapshot AND es.status IN ('scheduled','held')`,
+        WHERE es.course_offering_id=:id AND es.status IN ('scheduled','held')`,
         {id:offering.id,snapshot:state.eligibility_snapshot_id},transaction);
       const assignedIds = new Set(assigned.map(row=>row.participant_id));
       const candidates = all.filter((row:any)=>row.eligible===true&&!row.examExempt);
@@ -187,7 +275,7 @@ export class ExamGradebookService {
       const pageSize=Math.min(15,Math.max(1,query.pageSize||15)),page=Math.min(query.page||1,Math.max(1,Math.ceil(rows.length/pageSize)));
       return {group:{id:group.id,name:group.name,code:group.code,academicYear:group.academicYear},
         offering:{...(typeof offering.get==='function'?offering.get({plain:true}):offering),examScheduling,examGradesComplete,gradebookStage:stage,gradebookCompletionStatus:gradebookCompletionStatus(state,examGradesComplete)},workflow:this.workflow!.publicState(state),
-        revision:await this.workflow!.revision(offering.id,transaction),total:rows.length,totalRows:scoped.length,unassessedRows:0,page,pageSize,
+        revision:await this.workflow!.revision(offering.id,transaction),total:rows.length,totalRows:scoped.length,unassessedRows:scoped.filter((row:any)=>row.eligible==null&&!row.examExempt&&!row.profileForeignLanguageExempt&&!row.studyLeaveFailure).length,page,pageSize,
         eligibilityPolicy:all[0]?.eligibilityPolicy||LEGACY_GRADING_POLICY,rows:rows.slice((page-1)*pageSize,page*pageSize)};
     }
     const shared = query.rosterScope === "offering";
@@ -200,85 +288,7 @@ export class ExamGradebookService {
     const pageSize = Math.min(15, Math.max(1, query.pageSize || 15));
     const requestedPage = Math.max(1, query.page || 1);
     // Chỉ trả tối đa 15 hồ sơ. COUNT, tìm kiếm, lọc DS thi và khử trùng chạy trong PostgreSQL.
-    const [result] = await this.sequelize.query<any>(`
-      WITH book AS (
-        SELECT revision, grades, class_group_id, updated_at FROM course_exam_gradebooks
-        WHERE class_group_id IN (:groupIds) AND course_offering_id = :offeringId
-      ), identities AS (
-        SELECT cm.id member_id, ar.id admission_id, cm.class_group_id AS "classGroupId",
-          CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
-            THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text
-            WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END AS "participantId",
-          COALESCE(NULLIF(ar.code, ''), st.reg_no, '') AS code,
-          COALESCE(NULLIF(ar.full_name, ''), st.full_name, '') AS "fullName",
-          COALESCE(ar.last_name, '') AS "lastName", COALESCE(ar.first_name, '') AS "firstName",
-          COALESCE(ar.dob::text, '') AS dob, COALESCE(ar.gender, '') AS gender,
-          ar.study_status AS "studyStatus"
-        FROM academic_class_members cm
-        LEFT JOIN admission_records ar ON ar.id = cm.admission_record_id
-        LEFT JOIN students st ON st.id = cm.student_id
-        WHERE (cm.left_at IS NULL OR cm.left_at >= (SELECT created_at FROM course_offerings WHERE id = :offeringId)) AND cm.class_group_id IN (:groupIds)
-          AND ${enrolledOfferingMemberSql('cm.class_group_id', `(CASE WHEN COALESCE(cm.student_id, ar.student_id) IS NOT NULL
-            THEN 'student:' || COALESCE(cm.student_id, ar.student_id)::text ELSE 'admission:' || ar.id::text END)`, true)}
-        ${shared ? `UNION ALL
-        SELECT os.id, ar.id, CAST(:individualGroupId AS uuid),
-          CASE WHEN ar.student_id IS NOT NULL THEN 'student:' || ar.student_id::text ELSE 'admission:' || ar.id::text END,
-          COALESCE(NULLIF(ar.code, ''), st.reg_no, ''), COALESCE(NULLIF(ar.full_name, ''), st.full_name, ''),
-          COALESCE(ar.last_name, ''), COALESCE(ar.first_name, ''), COALESCE(ar.dob::text, ''), COALESCE(ar.gender, ''), ar.study_status
-        FROM course_offering_students os JOIN admission_records ar ON ar.id = os.admission_record_id
-        LEFT JOIN students st ON st.id = ar.student_id WHERE os.course_offering_id = :offeringId` : ""}
-      ), people AS (
-        SELECT DISTINCT ON ("participantId") "participantId", "classGroupId", code, "fullName", "lastName", "firstName", dob, gender, "studyStatus"
-        FROM identities WHERE "participantId" IS NOT NULL
-          AND (${notWithdrawnSql('"participantId"')} OR ${studyLeaveFailureParticipantSql('"participantId"')})
-          AND ${excludeRecognizedExamParticipant('"participantId"')}
-        ORDER BY "participantId", "classGroupId", admission_id NULLS LAST, member_id
-      ), grade_map AS (
-        SELECT DISTINCT ON (value->>'participantId') value->>'participantId' participant_id, value grade
-        FROM book, LATERAL jsonb_array_elements(book.grades)
-        ORDER BY value->>'participantId', book.updated_at DESC, book.class_group_id
-      ), roster AS (
-        SELECT p.*, COALESCE((SELECT failure.grade FROM (${studyLeaveFailureOutcomesSql()}) failure
-          WHERE failure.course_offering_id = :offeringId AND failure.participant_id = p."participantId" LIMIT 1),
-          CASE WHEN COALESCE(g.grade->>'finalized', 'false') <> 'true' AND ${profileForeignLanguageExemptSql('p."participantId"', ':subjectId', '(SELECT academic_year FROM class_groups WHERE id = p."classGroupId")')}
-          THEN COALESCE(g.grade, '{}'::jsonb) || CAST(:foreignLanguageGrade AS jsonb)
-          ELSE COALESCE(g.grade, '{}'::jsonb) END) grade,
-          COALESCE(CASE WHEN g.grade->>'finalized' = 'true' THEN g.grade->'eligibilityPolicy' END, CAST(:policies AS jsonb)->p."classGroupId"::text) AS policy FROM people p
-        LEFT JOIN grade_map g ON g.participant_id = p."participantId"
-      ), assessed AS (
-        SELECT roster.*, CASE
-          WHEN grade->>'studyLeaveFailure' = 'true' THEN false
-          WHEN grade->>'examExempt' = 'true' THEN false
-          WHEN jsonb_typeof(grade->'testScore') IS DISTINCT FROM 'number'
-            OR jsonb_typeof(grade->'assignmentScore') IS DISTINCT FROM 'number' THEN NULL
-          WHEN (grade->>'testScore')::numeric NOT BETWEEN 0 AND 10
-            OR (grade->>'assignmentScore')::numeric NOT BETWEEN 0 AND 10 THEN NULL
-          ELSE (grade->>'testScore')::numeric >= (policy->'minimums'->>'testScore')::numeric
-            AND (grade->>'assignmentScore')::numeric >= (policy->'minimums'->>'assignmentScore')::numeric
-        END AS eligibility FROM roster
-      ), filtered AS (
-        SELECT * FROM assessed
-        WHERE (:mode <> 'exam' OR (
-          ("participantId" = ANY(STRING_TO_ARRAY(:includeIds, ',')) OR eligibility = true)
-          AND grade->>'examExempt' IS DISTINCT FROM 'true'
-          AND grade->>'studyLeaveFailure' IS DISTINCT FROM 'true'
-          AND NOT ("participantId" = ANY(STRING_TO_ARRAY(:excludeIds, ',')))
-        ))
-          AND (:search = '' OR POSITION(LOWER(:search) IN LOWER(code || ' ' || "fullName")) > 0)
-      ), metadata AS (
-        SELECT (SELECT COUNT(*)::int FROM roster) AS "totalRows",
-          (SELECT COUNT(*)::int FROM assessed WHERE eligibility IS NULL) AS "unassessedRows",
-          (SELECT COUNT(*)::int FROM filtered) AS total,
-          COALESCE((SELECT SUM(revision)::int FROM book), 0) AS revision
-      ), paging AS (
-        SELECT *, LEAST(:page, GREATEST(1, CEIL(total::numeric / :pageSize)::int)) AS page FROM metadata
-      ), selected AS (
-        SELECT * FROM filtered
-        ORDER BY LOWER(COALESCE(NULLIF("firstName", ''), SUBSTRING(TRIM("fullName") FROM '[^ ]+$'))), LOWER("fullName"), "participantId"
-        LIMIT :pageSize OFFSET (SELECT (page - 1) * :pageSize FROM paging)
-      )
-      SELECT paging.*, COALESCE((SELECT jsonb_agg(to_jsonb(selected)) FROM selected), '[]'::jsonb) AS rows FROM paging
-    `, { type: QueryTypes.SELECT, transaction, replacements: {
+    const [result] = await this.sequelize.query<any>(gradebookRosterSql(shared), { type: QueryTypes.SELECT, transaction, replacements: {
       groupId: query.classGroupId, offeringId: query.courseOfferingId, subjectId: offering.subjectId,
       groupIds, individualGroupId: groupIds[0], policies: JSON.stringify(policies), foreignLanguageGrade: JSON.stringify(foreignLanguageExemptGrade()),
       page: requestedPage, pageSize, mode: query.mode || "all", search: (query.search || "").trim(),
@@ -306,7 +316,8 @@ export class ExamGradebookService {
   }
 
   async save(dto: SaveExamGradebookDto, actor?: any) {
-    if(this.workflow){await this.scope(dto);await this.workflow.save(dto,actor,tx=>this.allWorkflowRows(dto,tx));return this.get(dto);}
+    if(this.access)await this.access.assertOffering(actor,dto.courseOfferingId);
+    if(this.workflow){await this.scope(dto);await this.workflow.save(dto,actor,tx=>this.allWorkflowRows(dto,tx));return this.getForActor(dto,actor);}
     if (dto.rosterScope === "offering") return this.saveOffering(dto, actor);
     await this.sequelize.transaction(async (transaction) => {
       await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
@@ -414,7 +425,8 @@ export class ExamGradebookService {
   }
 
   async transition(dto: GradebookWorkflowDto, actor: any,phase:'eligibility'|'final'='eligibility') {
-    if(this.workflow){await this.scope(dto);await this.workflow.transition(dto,actor,phase,tx=>this.allWorkflowRows(dto,tx));return this.get({...dto,rosterScope:'offering'});}
+    if(this.access)await this.access.assertOffering(actor,dto.courseOfferingId);
+    if(this.workflow){await this.scope(dto);await this.workflow.transition(dto,actor,phase,tx=>this.allWorkflowRows(dto,tx));return this.getForActor({...dto,rosterScope:'offering'},actor);}
     if (['request_reopen','reject_reopen'].includes(dto.action)) throw new BadRequestException('Bảng điểm cũ không hỗ trợ xin mở lại tư cách.');
     await assertGradebookWorkflowAccess(actor, dto.action, this.rbac);
     if (dto.action === 'reopen' && !dto.note?.trim()) throw new BadRequestException("Nhập lý do hoặc căn cứ mở lại bảng điểm.");

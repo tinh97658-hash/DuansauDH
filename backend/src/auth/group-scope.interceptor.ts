@@ -18,6 +18,12 @@ export class GroupScopeInterceptor implements NestInterceptor {
     }
     const dataRoute = /\/(groups|masters|doctoral|plan|scheduling|reports|data)(\/|$)/.test(path);
     const write = !['GET', 'HEAD', 'OPTIONS'].includes(request.method);
+    // Only admissions endpoints receive the pre-class scope. Nested learner
+    // operations (marks, leaves, recognitions, transfers) retain their own scope.
+    const admissionRoute = /\/plan\/admission-rounds(?:\/[^/]+(?:\/(?:ranking|scores|preview|confirm))?)?$/.test(path)
+      || /\/plan\/admission-records(?:\/[^/]+(?:\/evaluation(?:\/decision)?)?)?$/.test(path);
+    const admissionAction = admissionRoute && !['learners', 'study-management'].includes(request.query?.admissionStage)
+      ? (write ? 'manage' as const : 'view' as const) : undefined;
     const schedulingView = !write && /\/scheduling\/(course-offerings|teaching-sessions|pending-teaching-sessions)(\/|$)/.test(path);
     const schedulingAction = /\/scheduling\//.test(path) && !/\/assignee$/.test(path)
       ? (!write ? 'view' : /\/(teaching-sessions)(\/|$)|\/completion$/.test(path) ? 'write' : 'organize') : undefined;
@@ -28,9 +34,9 @@ export class GroupScopeInterceptor implements NestInterceptor {
       : /\/masters\/(grading-policies|grading-rules)(\/|$)/.test(path) ? 'policy' : undefined;
     const academicPermission = academicDomain === 'gradebook'
       ? (!write ? 'gradebook.view' : /\/workflow$/.test(path) && ['approve', 'reopen', 'reject_reopen'].includes(request.body?.action) ? 'gradebook.approve' : 'gradebook.submit')
-      : academicDomain === 'exam' ? (write ? 'scheduling.write' : 'scheduling.view')
+      : academicDomain === 'exam' ? (write ? 'exams.write' : 'exams.view')
       : academicDomain === 'studyleave' ? (/\/actions$/.test(path) && request.body?.action !== 'request_extension' ? 'studyleave.approve' : 'studyleave.request') : academicDomain === 'policy' ? 'gradebook.policy' : undefined;
-    const academic = { academicDomain, academicPermission };
+    const academic = { academicDomain, academicPermission, admissionAction };
     if (this.scope.current()) Object.assign(this.scope.current()!, academic);
     if (dataRoute && write && access.groupScope?.readOnly) {
       throw new ForbiddenException('Vai trò đang bật Chỉ xem: không được thay đổi dữ liệu nhóm và học viên.');

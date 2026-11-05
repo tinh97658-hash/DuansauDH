@@ -1,3 +1,5 @@
+import { isIsolatedScopeDatabase } from '../helpers/isolated-database.js';
+import { ROUTE_PERMISSION_ENTRIES } from '../../src/auth/route-permissions.js';
 import { profileForeignLanguageExemptSql } from "../../src/masters/foreign-language-exemption.js";
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
@@ -41,7 +43,7 @@ describeDb('Group scope through PostgreSQL and pooled queries', () => {
   const query = (sql: string, replacements: any = {}) => db.query<any>(sql, { replacements, transaction: tx, type: QueryTypes.SELECT }).catch((error: any) => { throw new Error(error.original?.message || error.message); });
 
   beforeAll(async () => {
-    if (!process.env.DATABASE_URL?.endsWith('/pgsms_group_scope_test')) throw new Error('Use the isolated pgsms_group_scope_test database.');
+    if (!isIsolatedScopeDatabase(process.env.DATABASE_URL)) throw new Error('Use the isolated pgsms_group_scope_test database.');
     process.env.NODE_ENV = 'test';
     app = await NestFactory.create(AppModule, { logger: false });
     db = app.get(getConnectionToken()); scope = app.get(GroupScopeService);
@@ -54,12 +56,16 @@ describeDb('Group scope through PostgreSQL and pooled queries', () => {
     await app.init();
     await Discipline.create({ id: catalogIds.discipline, code: `S${catalogIds.discipline.slice(0, 8)}`, name: 'Scope test discipline' });
     await Major.create({ id: catalogIds.major, disciplineId: catalogIds.discipline, code: `S${catalogIds.major.slice(0, 8)}`, name: 'Scope test major', program: 'masters' });
-    for (const [id, name] of [[catalogIds.english, 'Tiếng Anh'], [catalogIds.subject, 'Scope test subject']]) {
-      await Subject.create({ id, code: `S${id.slice(0, 8)}`, name, majorId: catalogIds.major, program: 'masters' });
+    for (const [index, [id, name]] of [[catalogIds.english, 'Tiếng Anh'], [catalogIds.subject, 'Scope test subject']].entries()) {
+      await Subject.create({ id, code: `S${id.slice(0, 8)}`, codeNumber: index + 1, codeText: `S${id.slice(0, 8)}`, name, majorId: catalogIds.major, program: 'masters' });
     }
   });
   beforeEach(async () => {
-    jest.spyOn(app.get(RbacService), "effectiveAccess").mockImplementation(async () => httpAccess);
+    jest.spyOn(app.get(RbacService), "effectiveAccess").mockImplementation(async () => {
+      // These tests isolate group RLS; HTTP now also requires explicit route grants.
+      httpAccess.permissions = new Set([...httpAccess.permissions, ...ROUTE_PERMISSION_ENTRIES.map(entry => entry.code)]);
+      return httpAccess;
+    });
     tx = await db.transaction();
     staffId = randomUUID(); owned = randomUUID(); other = randomUUID(); unassigned = randomUUID();
     ownedRecord = randomUUID(); otherRecord = randomUUID();

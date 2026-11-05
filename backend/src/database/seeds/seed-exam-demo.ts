@@ -15,8 +15,8 @@ const originalCases = [
   ['Đang giảng dạy', 'Triết học', 0],
   ['Chưa nhập điểm thành phần', 'Tiếng Anh', 1],
   ['Đang nhập điểm thành phần', 'Phương pháp nghiên cứu khoa học', 2],
-  ['Đủ điểm, chưa gửi duyệt', 'Toán ứng dụng', 3],
-  ['Tư cách chờ duyệt', 'Cơ sở dữ liệu nâng cao', 4],
+  ['Đủ điểm thành phần, chờ xếp thi', 'Toán ứng dụng', 3],
+  ['Tư cách thi tự động', 'Cơ sở dữ liệu nâng cao', 4],
   ['Sẵn sàng tạo lịch thi – lớp ghép', 'Trí tuệ nhân tạo', 5],
   ['Sẵn sàng tạo lịch thi – lớp riêng', 'Mạng máy tính nâng cao', 5],
   ['Đã có lịch thi sắp tới', 'An toàn thông tin', 6],
@@ -35,7 +35,7 @@ const extraNames = [
   'Phân tích hệ thống', 'Quản trị dữ liệu', 'Kho dữ liệu', 'Hệ hỗ trợ quyết định', 'Truy hồi thông tin', 'Công nghệ web',
   'Công nghệ di động', 'Phương pháp tính', 'Thống kê ứng dụng', 'Nghiên cứu thực nghiệm', 'Đồ họa máy tính', 'Quản lý chất lượng phần mềm',
 ];
-const labels:Record<number,string> = {0:'Đang giảng dạy',1:'Chưa nhập điểm thành phần',2:'Đang nhập điểm thành phần',3:'Đủ điểm, chưa gửi duyệt',4:'Tư cách chờ duyệt',5:'Chờ xếp lịch thi',6:'Sắp thi – chờ thi và nhập điểm',7:'Đã thi – chờ nhập điểm thi',8:'Đã thi – đang nhập điểm',9:'Đủ điểm thi, chưa gửi duyệt',10:'Kết quả chờ duyệt',11:'Đã duyệt kết quả'};
+const labels:Record<number,string> = {0:'Đang giảng dạy',1:'Chưa nhập điểm thành phần',2:'Đang nhập điểm thành phần',3:'Đủ điểm thành phần, chờ xếp thi',4:'Tư cách thi tự động',5:'Chờ xếp lịch thi',6:'Sắp thi – chờ thi và nhập điểm',7:'Đã thi – chờ nhập điểm thi',8:'Đã thi – đang nhập điểm',9:'Đủ điểm thi, chưa gửi duyệt',10:'Kết quả chờ duyệt',11:'Đã duyệt kết quả'};
 const extraStages = [5,6,7,8,9,10,0,1,2,3,4,11];
 const cases:Array<readonly [string,string,number]> = [...originalCases,
   ...extraNames.map((name,n):[string,string,number]=>{
@@ -148,9 +148,7 @@ async function run() {
             await grades.save({...scope,revision:book.revision,rows:book.rows.filter((_,n)=>stage!==2||n<5).map((row:any,n:number)=>({participantId:row.participantId,testScore:n===11?3:6+n%5,assignmentScore:7+n%4,examScore:null,examExempt:false,letterGrade:'',attemptScores:[],result:'pending' as const,policyVersion:row.eligibilityPolicy.version,policyRulesVersion:row.eligibilityPolicy.rulesVersion}))},actor);
           }
           book=await read();
-          if(stage>=4&&book.workflow.eligibility.status==='draft') await transition('eligibility','submit');
           book=await read();
-          if(stage>=5&&book.workflow.eligibility.status==='submitted') await transition('eligibility','approve');
           if(stage>=6) {
             book=await read();
             const [existing]:any[]=await db.query('SELECT id,status FROM course_exam_sessions WHERE course_offering_id=:id ORDER BY created_at LIMIT 1',{replacements:{id:offering.id},type:QueryTypes.SELECT});
@@ -176,7 +174,7 @@ async function run() {
       const book=await read();
       report.push({name:offering.name,students:book.totalRows,eligibility:book.workflow.eligibility.status,final:book.workflow.final.status});
     }
-    const calendar=await schedule.list({from:date(-20),to:date(35)});
+    const calendar=await schedule.list({from:date(-20),to:date(35)},actor);
     const queue=calendar.queue.filter((item:any)=>String(item.name).startsWith(tag));
     console.table(report);
     console.log(JSON.stringify({created,offerings:cases.length,learners:132,teachingSessions:cases.length*9,readyForExam:queue.map((item:any)=>({name:item.name,candidates:item.remainingCount})),filter:{major:'DEMO-THI Công nghệ thông tin',year:'2026'}},null,2));

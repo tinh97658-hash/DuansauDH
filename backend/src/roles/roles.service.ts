@@ -13,6 +13,7 @@ import { StaffRole } from "../database/models/staff-role.model.js";
 import { AdministrationSafetyService } from "../auth/administration-safety.service.js";
 import { RbacService } from "../auth/rbac.service.js";
 import { CreateRoleDto, SetRolePermissionsDto, UpdateRoleDto } from "./dto/role.dto.js";
+import { permissionTreeMeta, permissionReadDependencies } from '../auth/permission-tree.js';
 
 export interface RequestContext {
   ip?: string | null;
@@ -88,7 +89,7 @@ export class RolesService {
     for (const permission of permissions) {
       const value: any = permission.get({ plain: true });
       if (!groups.has(value.group)) groups.set(value.group, []);
-      groups.get(value.group)!.push({ id: value.id, code: value.code, name: definitions.get(value.code)?.name ?? value.name, description: definitions.get(value.code)?.description ?? value.description ?? null, assignableRoleCodes: definitions.get(value.code)?.assignableRoleCodes });
+      groups.get(value.group)!.push({ id: value.id, code: value.code, name: definitions.get(value.code)?.name ?? value.name, description: definitions.get(value.code)?.description ?? value.description ?? null, assignableRoleCodes: definitions.get(value.code)?.assignableRoleCodes,...permissionTreeMeta(value.code) });
     }
     return [...groups.entries()].map(([group, items]) => ({ group, permissions: items }));
   }
@@ -114,8 +115,8 @@ export class RolesService {
         name: dto.name.trim(),
         description: dto.description?.trim() ?? null,
         isSystem: false,
-        restrictGroupView: dto.restrictGroupView ?? false,
-        restrictGroupEdit: dto.restrictGroupEdit ?? false,
+        restrictGroupView: dto.restrictGroupView ?? true,
+        restrictGroupEdit: dto.restrictGroupEdit ?? true,
         groupReadOnly: dto.groupReadOnly ?? false,
         active: true,
         sortOrder: 100,
@@ -176,6 +177,7 @@ export class RolesService {
       }
       if (scoped) { await this.saveScopes(id, scoped, transaction); await role.update({ schedulingScopeVersion: 1 }, { transaction }); }
       await this.administrationSafety.assertRetained(transaction);
+      await this.administrationSafety.assertActorRetained(actorId,transaction);
     });
 
     this.rbac.invalidate();
@@ -214,6 +216,7 @@ export class RolesService {
       }
       if (scoped) { await this.saveScopes(id, scoped, transaction); await role.update({ schedulingScopeVersion: 1 }, { transaction }); }
       await this.administrationSafety.assertRetained(transaction);
+      await this.administrationSafety.assertActorRetained(actorId,transaction);
     });
 
     this.rbac.invalidate();
@@ -239,6 +242,7 @@ export class RolesService {
       await this.rolePermissions.destroy({ where: { roleId: id }, transaction });
       await role.destroy({ transaction });
       await this.administrationSafety.assertRetained(transaction);
+      await this.administrationSafety.assertActorRetained(actorId,transaction);
     });
 
     this.rbac.invalidate();
@@ -270,9 +274,12 @@ export class RolesService {
   private async assertPermissionsExist(permissionIds: string[], roleCode: string) {
     const found = await this.permissions.count({ where: { id: { [Op.in]: permissionIds } } });
     const selected = await this.permissions.findAll({ where: { id: { [Op.in]: permissionIds } } });
-    if (selected.some(permission => !permissionAssignableToRole(permission.code, roleCode))) {
-      throw new BadRequestException('Quyền duyệt bảo lưu và chuyển chuyên ngành chỉ được cấp cho vai trò Quản trị hệ thống.');
-    }
     if (found !== permissionIds.length) throw new BadRequestException("Một số quyền không tồn tại.");
+    const codes=new Set(selected.map(permission=>permission.code));
+    for(const code of codes){
+      if(code.startsWith('module.'))continue;
+      const required=[`module.${permissionTreeMeta(code).moduleId}`,...permissionTreeMeta(code).requires];
+      if(required.some(value=>!codes.has(value)))throw new BadRequestException(`Quyền ${code} cần bật module cha và quyền xem liên quan trước.`);
+    }
   }
 }

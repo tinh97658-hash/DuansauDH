@@ -16,7 +16,7 @@ import {ExamScheduleQueryDto} from '../../src/masters/dto/exam-schedule.dto.js';
 import {GradingPolicyService} from '../../src/masters/grading-policy.service.js';
 
 const describeDb=process.env.RUN_POSTGRES_EXAM_TESTS==='true'?describe:describe.skip;
-describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
+describeDb('Automatic eligibility and final exam workflow and scheduling on PostgreSQL',()=>{
  let app:any,db:Sequelize,m:any,grades:ExamGradebookService,workflow:ExamWorkflowService,schedule:ExamScheduleService,f:any;
  let legacy:any[],legacyGrades:any[];
  const sql=async(q:string,replacements:any={})=>workflow.query(q,replacements);
@@ -46,7 +46,7 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
  async function transition(phase:'eligibility'|'final',action:'submit'|'approve'|'reopen',extra:any={}){
   const before=await read();return grades.transition({...f.scope,action,note:'QA exam workflow',revision:before.revision,version:(before.workflow as any)[phase].version,...extra},f.actor,phase);
  }
- async function approve(){await save();await transition('eligibility','submit');return transition('eligibility','approve');}
+ async function approve(){await save();return read();}
  async function exam(overrides:any={}){
   const state=(await read()).workflow as any;
   return schedule.schedule({courseOfferingId:f.offering.id,snapshotId:state.eligibility.snapshotId,eligibilityVersion:state.eligibility.version,
@@ -79,24 +79,24 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
  afterAll(async()=>{await app?.close();});
 
  it('persists and reloads the assigned exam lecturer and supports reassignment',async()=>{
-  await save();await transition('eligibility','submit');await transition('eligibility','approve');
+  await save();
   const e=await exam();
-  const find=async()=> (await schedule.list({from:'2099-05-04',to:'2099-05-05'})).sessions.find(s=>s.id===e.id);
+  const find=async()=> (await schedule.list({from:'2099-05-04',to:'2099-05-05'},f.actor)).sessions.find(s=>s.id===e.id);
   expect(await find()).toMatchObject({lecturerId:f.lecturer.id,lecturerName:f.lecturer.name});
   const peer=await fixture(),state=(await read()).workflow as any;
   await schedule.reschedule(e.id,{courseOfferingId:f.offering.id,snapshotId:state.eligibility.snapshotId,eligibilityVersion:state.eligibility.version,version:0,examDate:'2099-05-04',startTime:'08:00',endTime:'10:00',roomId:f.room.id,lecturerId:peer.lecturer.id},f.actor);
   expect(await find()).toMatchObject({lecturerId:peer.lecturer.id,lecturerName:peer.lecturer.name});
  });
  it('rejects missing and inactive lecturers without creating an exam',async()=>{
-  await save();await transition('eligibility','submit');await transition('eligibility','approve');
+  await save();
   await expect(exam({lecturerId:undefined})).rejects.toThrow('chọn giảng viên');
   await f.lecturer.update({active:false});
   await expect(exam()).rejects.toThrow('giảng viên đang hoạt động');
   expect(await sql('SELECT id FROM course_exam_sessions WHERE course_offering_id=:id',{id:f.offering.id})).toHaveLength(0);
  });
  it('serializes overlapping exam bookings for one lecturer across different rooms and rosters',async()=>{
-  await save();await transition('eligibility','submit');await transition('eligibility','approve');const first=f;
-  f=await fixture();await save();await transition('eligibility','submit');await transition('eligibility','approve');const second=f;
+  await save();const first=f;
+  f=await fixture();await save();const second=f;
   const payload=async(x:any)=>{const w=(await grades.get(x.scope)).workflow as any;return {courseOfferingId:x.offering.id,snapshotId:w.eligibility.snapshotId,eligibilityVersion:w.eligibility.version,examDate:'2099-08-01',startTime:'08:00',endTime:'10:00',roomId:x.room.id,lecturerId:first.lecturer.id};};
   const a=await payload(first),b=await payload(second),results=await Promise.allSettled([schedule.schedule(a,first.actor),schedule.schedule(b,second.actor)]);
   expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);
@@ -116,9 +116,9 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
   const offerings=[{id:f.offering.id,status:'completed',groupLinks:[{classGroupId:f.group.id}]}];
   const tracking=async()=> (await grades.tracking(offerings,true)).get(f.offering.id);
   expect(await tracking()).toMatchObject({componentsEntered:false,componentsApproved:false,examCompleted:false,examGradesComplete:false});
-  await save();expect(await tracking()).toMatchObject({componentsEntered:true,componentsApproved:false});
-  await transition('eligibility','submit');expect(await tracking()).toMatchObject({componentsEntered:true,componentsApproved:false});
-  await transition('eligibility','approve');const approved=await tracking();
+  await save();expect(await tracking()).toMatchObject({componentsEntered:true,componentsApproved:true});
+  expect(await tracking()).toMatchObject({componentsEntered:true,componentsApproved:true});
+  const approved=await tracking();
   const [snapshot]=await sql('SELECT created_at FROM course_exam_eligibility_snapshots WHERE course_offering_id=:id',{id:f.offering.id});
   expect(approved.componentScoreApprovedAt).toEqual(snapshot.created_at);expect(approved.componentsApproved).toBe(true);
   const e=await exam();expect((await tracking()).examCompleted).toBe(false);
@@ -140,20 +140,29 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
   for(const [index,l] of legacy.entries())expect(states.get(l.offering.id)).toMatchObject({legacy:true,componentsApproved:false,examCompleted:false,examGradesComplete:index===2,examCompletedAt:null});
  });
  it('accepts transformed Nest query DTO instances instead of treating them as SQL replacement objects',async()=>{
-  const result=await schedule.list(Object.assign(new ExamScheduleQueryDto(),{from:'2099-05-01',to:'2099-05-07'}));
+  const result=await schedule.list(Object.assign(new ExamScheduleQueryDto(),{from:'2099-05-01',to:'2099-05-07'}),f.actor);
   expect(result).toMatchObject({queue:expect.any(Array),rooms:expect.any(Array),sessions:expect.any(Array)});
  });
  it('blocks grade entry before teaching completion and exam marks during components',async()=>{
   await f.offering.update({status:'active',completedAt:null,completedByStaffId:null});await expect(save()).rejects.toThrow('hoàn thành');
-  await f.offering.update({status:'completed',completedAt:new Date(),completedByStaffId:f.actor.id});await expect(save({examScore:7})).rejects.toThrow('giai đoạn');
+  await f.offering.update({status:'completed',completedAt:new Date(),completedByStaffId:f.actor.id});await expect(save({examScore:7})).rejects.toThrow('Đã diễn ra');
  });
  it('requires both normal component marks and returns unresolved identities',async()=>{
-  await save({assignmentScore:null});await expect(transition('eligibility','submit')).rejects.toMatchObject({response:{unresolved:expect.arrayContaining([expect.objectContaining({participantId:'admission:'+f.people[0].id})])}});
+  const book=await save({assignmentScore:null});
+  expect((book.workflow as any).eligibility.status).toBe('draft');
+  expect(book.unassessedRows).toBeGreaterThan(0);
  });
- it('locks submitted components and rejects stale versions/revisions',async()=>{
-  await save();await transition('eligibility','submit');await expect(save()).rejects.toThrow('đã khóa');
-  await expect(transition('eligibility','approve',{version:0})).rejects.toThrow('Phiên bản');
-  await expect(transition('eligibility','approve',{revision:0})).rejects.toThrow('Điểm đã thay đổi');
+ it('keeps scheduled and held evidence when component edits create a new eligibility version',async()=>{
+  await approve();const examSession=await held(),before=await read();
+  const snapshotId=(before.workflow as any).eligibility.snapshotId;
+  await save({testScore:9});
+  const after=await read();
+  expect((after.workflow as any).eligibility.snapshotId).not.toBe(snapshotId);
+  expect(after.rows.every((row:any)=>row.examScoreEditable)).toBe(true);
+  expect((await sql('SELECT eligibility_snapshot_id FROM course_exam_sessions WHERE id=:id',{id:examSession.id}))[0].eligibility_snapshot_id).toBe(snapshotId);
+  const list=await schedule.list({from:'2000-01-01',to:'2000-01-07'},f.actor);
+  expect(list.queue.some((offering:any)=>offering.id===f.offering.id)).toBe(false);
+  await expect(exam()).rejects.toThrow('Không có thí sinh');
  });
  it('freezes identity, components, eligibility and policy, ignoring later profile/roster changes',async()=>{
   const approved=await approve(),ids=approved.rows.map((r:any)=>r.participantId);
@@ -165,7 +174,7 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
   await expect(db.query('UPDATE course_exam_eligibility_snapshots SET rows=rows WHERE id=:id',{replacements:{id:(approved.workflow as any).eligibility.snapshotId}})).rejects.toThrow('immutable');
  });
  it('marks approved ineligibility failed without inventing 0/F or putting the learner in DS thi',async()=>{
-  await save({testScore:1});await transition('eligibility','submit');const b=await transition('eligibility','approve');
+  await save({testScore:1});const b=await read();
   expect(b.rows[0]).toMatchObject({eligible:false,examScore:null,courseScore:null,grade4:null,letterGrade:'',result:'failed'});
   expect((await grades.get({...f.scope,mode:'exam'})).total).toBe(0);await expect(exam()).rejects.toThrow('Không có thí sinh');
   const books=await sql('SELECT grades FROM course_exam_gradebooks WHERE course_offering_id=:id',{id:f.offering.id});
@@ -174,20 +183,11 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
   expect(locked.rows.every((row:any)=>row.result==='failed'&&row.examScore===null&&row.courseScore===null)).toBe(true);
  });
  it('supports existing exemption completion without counting exempt people as exam candidates',async()=>{
-  await save({examExempt:true,testScore:null,assignmentScore:null});await transition('eligibility','submit');const b=await transition('eligibility','approve');
+  await save({examExempt:true,testScore:null,assignmentScore:null});const b=await read();
   expect(b.rows.every((r:any)=>r.examExempt)).toBe(true);expect((await grades.get({...f.scope,mode:'exam'})).total).toBe(0);
  });
- it('allows audited eligibility reopening before scheduling and blocks it when history exists',async()=>{
-  const approved=await approve();expect((approved.workflow as any).eligibility.canReopen).toBe(true);
-  const reopened=await transition('eligibility','reopen');expect((reopened.workflow as any).eligibility.canReopen).toBe(false);
-  await approve();const session=await exam();
-  expect(((await read()).workflow as any).eligibility.canReopen).toBe(false);
-  await expect(transition('eligibility','reopen')).rejects.toThrow('Lịch thi');
-  await schedule.cancel(session.id,{version:0,note:'Hủy lịch để điều chỉnh danh sách trước thi'},f.actor);
-  expect(((await read()).workflow as any).eligibility.canReopen).toBe(true);
- });
  it('requires approved eligibility, checks snapshot versions and uses candidate capacity',async()=>{
-  await expect(exam()).rejects.toThrow('chưa duyệt');await approve();
+  await expect(exam()).rejects.toThrow('chưa đủ điểm');await approve();
   await expect(exam({eligibilityVersion:0})).rejects.toThrow('phiên bản');
   await f.room.update({capacity:null});await expect(exam()).rejects.toMatchObject({response:{code:'EXAM_ROOM_CAPACITY'}});
   await f.room.update({capacity:1});await exam();
@@ -197,7 +197,7 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
  it('allows Held without a reason, retains history and unlocks only its candidates',async()=>{
   await approve();const e=await exam();await ended(e.id);
   await schedule.confirm(e.id,{version:0,status:'held'},f.actor);
-  const listed=await schedule.list({from:'2000-01-01',to:'2000-01-07'});
+  const listed=await schedule.list({from:'2000-01-01',to:'2000-01-07'},f.actor);
   const persisted=(await sql('SELECT status,note,confirmed_by FROM course_exam_sessions WHERE id=:id',{id:e.id}))[0];
   expect(persisted).toMatchObject({status:'held',note:'',confirmed_by:f.actor.id});
   expect((await read()).rows.every(r=>r.examScoreEditable)).toBe(true);
@@ -221,17 +221,19 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
  });
  it('does not unlock exam scores when time passes without explicit confirmation',async()=>{
   await approve();const e=await exam();await ended(e.id);
-  expect((await schedule.list({from:'2000-01-01',to:'2000-01-07'})).sessions.find(s=>s.id===e.id).pendingConfirmation).toBe(true);
-  await expect(saveExam()).rejects.toThrow('đã khóa');expect((await read()).rows[0].examScoreEditable).toBe(false);
+  expect((await schedule.list({from:'2000-01-01',to:'2000-01-07'},f.actor)).sessions.find(s=>s.id===e.id).pendingConfirmation).toBe(true);
+  await expect(saveExam()).rejects.toThrow('Đã diễn ra');expect((await read()).rows[0].examScoreEditable).toBe(false);
  });
  it('preserves not-held history, leaves scores locked and allows a new legitimate session',async()=>{
   await approve();const e=await exam();await ended(e.id);await schedule.confirm(e.id,{version:0,status:'not_held',note:'QA not held'},f.actor);
-  await expect(saveExam()).rejects.toThrow('đã khóa');const replacement=await exam();expect(replacement.id).not.toBe(e.id);
+  await expect(saveExam()).rejects.toThrow('Đã diễn ra');const replacement=await exam();expect(replacement.id).not.toBe(e.id);
   expect((await sql('SELECT status FROM course_exam_sessions WHERE id=:id',{id:e.id}))[0].status).toBe('not_held');
  });
- it('allows final grading only for held candidates, freezes components and keeps approvals separate',async()=>{
+ it('allows component corrections after held exams and locks only final results',async()=>{
   await approve();await held();const b=await saveExam();expect(b.rows[0].courseScore).toBe(7.5);
-  const row=b.rows[0];await expect(grades.save({...f.scope,revision:b.revision,rows:[{...row,testScore:1,examScore:7}]},f.actor)).rejects.toThrow('thành phần');
+  const row=b.rows[0];await grades.save({...f.scope,revision:b.revision,rows:[{...row,testScore:9,examScore:7,
+    policyVersion:row.eligibilityPolicy.version,policyRulesVersion:row.eligibilityPolicy.rulesVersion}]},f.actor);
+  expect((await read()).rows[0]).toMatchObject({testScore:9,examScore:7});
   await transition('final','submit');const final=await transition('final','approve');expect((final.workflow as any).final.status).toBe('approved');
   await expect(saveExam()).rejects.toThrow('đã khóa');const reopened=await transition('final','reopen');
   expect((reopened.workflow as any).eligibility.status).toBe('approved');expect((reopened.workflow as any).final.status).toBe('draft');
@@ -245,7 +247,7 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
  });
  it('cancels explicitly, preserves candidate history and allows safe eligibility reopening',async()=>{
   await approve();const e=await exam();await schedule.cancel(e.id,{version:0,note:'QA cancelled'},f.actor);
-  await transition('eligibility','reopen');expect((await sql('SELECT status FROM course_exam_sessions WHERE id=:id',{id:e.id}))[0].status).toBe('cancelled');
+  await save();expect((await sql('SELECT status FROM course_exam_sessions WHERE id=:id',{id:e.id}))[0].status).toBe('cancelled');
   expect((await sql('SELECT * FROM course_exam_session_candidates WHERE session_id=:id',{id:e.id}))).toHaveLength(2);
  });
  it('reschedules future sessions with optimistic versions and retains snapshot/candidates',async()=>{
@@ -262,9 +264,9 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
   expect(await sql('SELECT participant_id FROM course_exam_session_candidates WHERE session_id=:id',{id:replacement.id})).toHaveLength(2);
  });
  it('retains academic filter metadata on cancelled history after eligibility is reopened',async()=>{
-  await approve();const e=await exam();await schedule.cancel(e.id,{version:0,note:'Đổi kế hoạch'},f.actor);await transition('eligibility','reopen');
-  const listed=await schedule.list({from:'2099-05-01',to:'2099-05-07'}),historic=listed.sessions.find(s=>s.id===e.id);
-  expect(listed.approvedOfferings.some(o=>o.id===f.offering.id)).toBe(false);
+  await approve();const e=await exam();await schedule.cancel(e.id,{version:0,note:'Đổi kế hoạch'},f.actor);await save();
+  const listed=await schedule.list({from:'2099-05-01',to:'2099-05-07'},f.actor),historic=listed.sessions.find(s=>s.id===e.id);
+  expect(listed.approvedOfferings.some(o=>o.id===f.offering.id)).toBe(true);
   expect(historic).toMatchObject({subjectId:f.subject.id,subjectCode:f.subject.code,groups:[expect.objectContaining({id:f.group.id,majorId:f.group.majorId,disciplineId:expect.any(String),disciplineName:expect.any(String)})]});
  });
  it('requires real scheduling permissions independently of approval permission',async()=>{
@@ -274,7 +276,7 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
  });
  it('counts only approved eligible candidates for capacity, excluding ineligible classmates',async()=>{
   const b=await read();await grades.save({...f.scope,revision:b.revision,rows:b.rows.map((r:any,i:number)=>({participantId:r.participantId,testScore:i?1:8,assignmentScore:8,examScore:null,examExempt:false,letterGrade:'',attemptScores:[],result:'pending',policyVersion:r.eligibilityPolicy.version,policyRulesVersion:r.eligibilityPolicy.rulesVersion}))},f.actor);
-  await transition('eligibility','submit');await transition('eligibility','approve');await f.room.update({capacity:1});
+  await f.room.update({capacity:1});
   const e=await exam();expect(await sql('SELECT participant_id FROM course_exam_session_candidates WHERE session_id=:id',{id:e.id})).toHaveLength(1);
  });
  async function concurrentPair(sharedCandidates:boolean){
@@ -306,15 +308,10 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
  it('retains semantic actor/correlation audit and refuses destructive down migration',async()=>{
   const audit=app.get(AuditContextService);await audit.runAsStaff(f.actor,()=>approve());
   const events=await sql('SELECT action,actor FROM gradebook_events WHERE course_offering_id=:id',{id:f.offering.id});
-  expect(events.map(r=>r.action)).toEqual(expect.arrayContaining(['eligibility.save','eligibility.submit','eligibility.approve']));
+  expect(events.map(r=>r.action)).toEqual(expect.arrayContaining(['save']));
   expect(events.every(r=>r.actor.id===f.actor.id)).toBe(true);
   expect((await sql("SELECT * FROM db_change_logs WHERE table_name='course_exam_eligibility_snapshots' AND actor_staff_id=:id",{id:f.actor.id})).length).toBeGreaterThan(0);
   await expect(down({context:db.getQueryInterface()})).rejects.toThrow('downgrade refused');
- });
- it('rejects approval when policy changes after component submission',async()=>{
-  await save();await transition('eligibility','submit');
-  await db.query(`INSERT INTO course_grading_policies(id,subject_id,academic_year,version,policy,created_at) VALUES(:id,:subject,'2026',1,CAST(:policy AS jsonb),now())`,{replacements:{id:randomUUID(),subject:f.subject.id,policy:JSON.stringify({...LEGACY_GRADING_POLICY,version:1,weights:{testScore:10,assignmentScore:20,examScore:70}})}});
-  await expect(transition('eligibility','approve')).rejects.toThrow('cấu hình đã thay đổi');
  });
  it('uses configured weights and keeps frozen eligibility/policy through final reopening and report reads',async()=>{
   await db.query(`INSERT INTO course_grading_policies(id,subject_id,academic_year,version,policy,created_at) VALUES(:id,:subject,'2026',1,CAST(:policy AS jsonb),now())`,{replacements:{id:randomUUID(),subject:f.subject.id,policy:JSON.stringify({...LEGACY_GRADING_POLICY,version:1,weights:{testScore:10,assignmentScore:20,examScore:70}})}});
@@ -325,7 +322,7 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
    await db.query('INSERT INTO shared_grading_rules(version,policy,created_at) VALUES(:version,CAST(:policy AS jsonb),now())',{replacements:{version:ruleVersion,policy:JSON.stringify({...LEGACY_GRADING_POLICY,version:ruleVersion,minimums:{testScore:9,assignmentScore:9,examScore:9}})}});
    await transition('final','reopen');expect((await read()).rows[0]).toMatchObject({eligible:true,courseScore:6.6,result:'passed'});
    const card=await app.get(ClassScoreSummaryService).learnerScorecard(f.people[0].id,f.group.id);
-   expect(card.subjects[0].grade).toMatchObject({score:6.6,result:'passed',details:{eligibilityFrozen:true}});
+   expect(card.subjects[0].grade).toMatchObject({score:6.6,result:'passed',details:{eligibilityFrozen:false}});
   }finally{await db.query('DELETE FROM shared_grading_rules WHERE version=:version',{replacements:{version:ruleVersion}});}
  });
  it('prevents concurrent final mark overwrites using the grade revision',async()=>{
@@ -337,13 +334,13 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
  it.each([0,10,5.55])('accepts component and exam score boundary %s without zero coercion',async(score)=>{
   const rounded=Math.round((score+Number.EPSILON*10)*10)/10;
   await save({testScore:score,assignmentScore:score});expect((await read()).rows[0].testScore).toBe(rounded);
-  if(score<5)await save();await transition('eligibility','submit');await transition('eligibility','approve');await held();
+  if(score<5)await save();await held();
   const result=await saveExam(score);expect(result.rows[0].examScore).toBe(rounded);expect(result.rows[0].courseScore).not.toBeNull();
  });
  it.each([-0.01,10.01])('rejects out-of-range scores %s in each phase without changing persisted grades',async(score)=>{
   await save();const before=await read();
   await expect(save({testScore:score})).rejects.toThrow();await expect(save({assignmentScore:score})).rejects.toThrow();expect((await read()).revision).toBe(before.revision);
-  await transition('eligibility','submit');await transition('eligibility','approve');await held();const current=await read();
+  await held();const current=await read();
   await expect(saveExam(score)).rejects.toThrow();expect((await read()).revision).toBe(current.revision);
  });
  it.each([['08:00','10:00',true],['07:00','09:00',true],['09:00','11:00',true],['07:00','11:00',true],['10:00','11:00',false],['12:00','13:00',false]])('checks room interval %s–%s overlap=%s',async(start,end,conflict)=>{
@@ -370,13 +367,13 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
  it.each([['09:59:59',false],['10:00:00',true],['10:00:01',true]])('uses a controlled exact-end boundary at %s for explicit confirmation',async(clock,allowed)=>{
   await approve();const e=await exam();const original=workflow.query.bind(workflow);
   const spy=jest.spyOn(workflow,'query').mockImplementation((query,args,tx)=>original(query.replaceAll('clock_timestamp()',`TIMESTAMPTZ '2099-05-04 ${clock}+07'`),args,tx));
-  try{const list=await schedule.list({from:'2099-05-04',to:'2099-05-04'});expect(list.sessions.find(s=>s.id===e.id).pendingConfirmation).toBe(allowed);
+  try{const list=await schedule.list({from:'2099-05-04',to:'2099-05-04'},f.actor);expect(list.sessions.find(s=>s.id===e.id).pendingConfirmation).toBe(allowed);
    expect((await read()).rows[0].examScoreEditable).toBe(false);
    if(allowed)await schedule.confirm(e.id,{version:0,status:'held',note:'QA exact end'},f.actor);else await expect(schedule.confirm(e.id,{version:0,status:'held',note:'QA before end'},f.actor)).rejects.toThrow('chưa kết thúc');
   }finally{spy.mockRestore();}
  });
  it('retries semantic actions safely without duplicate snapshots, sessions or results',async()=>{
-  await save();await transition('eligibility','submit');await expect(transition('eligibility','submit')).rejects.toThrow();await transition('eligibility','approve');await expect(transition('eligibility','approve')).rejects.toThrow();
+  await save();await expect(transition('eligibility','submit')).rejects.toThrow();await expect(transition('eligibility','approve')).rejects.toThrow();
   const e=await exam();await expect(exam()).rejects.toThrow();await ended(e.id);await schedule.confirm(e.id,{version:0,status:'held',note:'QA'},f.actor);await expect(schedule.confirm(e.id,{version:1,status:'held',note:'QA retry'},f.actor)).rejects.toThrow();
   await saveExam();await transition('final','submit');await expect(transition('final','submit')).rejects.toThrow();await transition('final','approve');await expect(transition('final','approve')).rejects.toThrow();
   expect(await sql('SELECT id FROM course_exam_sessions WHERE course_offering_id=:id',{id:f.offering.id})).toHaveLength(1);
@@ -428,7 +425,7 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
   if(size===1)await m.ClassGroupMember.destroy({where:{admissionRecordId:f.people[1].id}});
   for(let i=2;i<size;i++){const person=await m.AdmissionRecord.create({code:'QA'+randomUUID().slice(0,12),fullName:'QA performance '+i,majorId:f.group.majorId,trainingLevel:'Thạc sĩ',academicYear:'2026',status:'approved',studyStatus:'Đang học'});await m.ClassGroupMember.create({admissionRecordId:person.id,classGroupId:f.group.id});}
   await f.room.update({capacity:size});await approve();const e=await exam();expect(await sql('SELECT participant_id FROM course_exam_session_candidates WHERE session_id=:id',{id:e.id})).toHaveLength(size);
-  const planner=await schedule.list({from:'2099-05-04',to:'2099-05-04'});expect(planner.sessions.find(s=>s.id===e.id).candidateCount).toBe(size);
+  const planner=await schedule.list({from:'2099-05-04',to:'2099-05-04'},f.actor);expect(planner.sessions.find(s=>s.id===e.id).candidateCount).toBe(size);
  });
  it('protects session snapshot foreign keys and immutable candidate associations',async()=>{
   const b=await approve(),e=await exam();
@@ -446,7 +443,7 @@ describeDb('Two-phase exam workflow and scheduling on PostgreSQL',()=>{
   const room=await m.Room.create({code:'QA'+randomUUID().slice(0,8),name:'QA identity room',capacity:2,isActive:true});
   f={...original,offering,room,scope:{...original.scope,courseOfferingId:offering.id}};
   const b=await read();await grades.save({...f.scope,revision:b.revision,rows:b.rows.map((r:any)=>({participantId:r.participantId,testScore:8,assignmentScore:8,examScore:null,examExempt:r.participantId!=='student:'+student.id,letterGrade:'',attemptScores:[],result:'pending',policyVersion:r.eligibilityPolicy.version,policyRulesVersion:r.eligibilityPolicy.rulesVersion}))},f.actor);
-  await transition('eligibility','submit');await transition('eligibility','approve');
+
   await expect(exam()).rejects.toMatchObject({response:{code:'EXAM_CANDIDATE_CONFLICT'}});
   const frozen=await grades.get(original.scope);expect(frozen.rows.some((r:any)=>r.participantId==='admission:'+original.people[0].id)).toBe(true);
  });

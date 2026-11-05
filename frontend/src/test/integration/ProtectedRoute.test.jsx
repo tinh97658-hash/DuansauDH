@@ -7,6 +7,23 @@ import ProtectedRoute from "../../components/ProtectedRoute";
 
 jest.mock("axios");
 
+it('requires selecting a working profile before rendering business pages',async()=>{
+  let selected=false;
+  axios.get.mockImplementation(url=>Promise.resolve({data:url==='/auth/session'?{
+    authenticated:true,user:{name:'Người dùng',role:'admin'},profiles:[{id:'viewer',name:'Xem điểm',scopeLabel:'Lớp phụ trách'},{id:'admin',name:'Quản trị',scopeLabel:'Toàn viện'}],
+    activeProfile:selected?{id:'viewer',name:'Xem điểm'}:null,profileSelectionRequired:!selected,
+  }:{permissions:['module.assessment','gradebook.view'],roles:['viewer']}}));
+  axios.post.mockImplementation(async()=>{selected=true;return {data:{}};});
+  render(<MemoryRouter useTransitions={false} initialEntries={['/private']}><Routes><Route element={<ProtectedRoute/>}>
+    <Route path="/private" element={<h1>Nghiệp vụ riêng</h1>}/><Route path="/" element={<h1>Hồ sơ đã chọn</h1>}/>
+  </Route></Routes></MemoryRouter>);
+  expect(await screen.findByRole('dialog')).toHaveTextContent('CHỌN HỒ SƠ LÀM VIỆC');
+  expect(screen.queryByText('Nghiệp vụ riêng')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Làm việc với Xem điểm'}));
+  expect(await screen.findByText('Hồ sơ đã chọn')).toBeInTheDocument();
+  expect(axios.post).toHaveBeenCalledWith('/auth/profiles/select',{profileId:'viewer'},{withCredentials:true});
+});
+
 function renderRoute() {
   return render(
     <MemoryRouter useTransitions={false} initialEntries={["/private"]}>
@@ -19,6 +36,18 @@ function renderRoute() {
     </MemoryRouter>,
   );
 }
+
+it('blocks a direct page URL when only another route has been granted',async()=>{
+  axios.get.mockImplementation(url=>Promise.resolve({data:url==='/auth/session'?{authenticated:true}:{
+    permissions:['scheduling.view','route.masters.schedule.view'],
+    routeCatalog:[{path:'/masters/schedule',actions:[]},{path:'/masters/course-offerings',actions:[]}],
+  }}));
+  render(<MemoryRouter initialEntries={['/masters/course-offerings']}><Routes><Route element={<ProtectedRoute/>}>
+    <Route path='/masters/course-offerings' element={<h1>Tạo lớp bí mật</h1>}/>
+  </Route></Routes></MemoryRouter>);
+  expect(await screen.findByRole('alert')).toHaveTextContent('không có quyền xem trang này');
+  expect(screen.queryByText('Tạo lớp bí mật')).not.toBeInTheDocument();
+});
 
 describe("ProtectedRoute", () => {
   const permissionsResponse = { data: { superadmin: false, permissions: [], roles: [] } };
@@ -58,7 +87,7 @@ describe("ProtectedRoute", () => {
 
   it("forces a staff member with an initial password to change it first", async () => {
     axios.get.mockImplementation((url) => url === "/auth/session"
-      ? Promise.resolve({ data: { authenticated: true, user: { role: "supervisor", mustChangePassword: true } } })
+      ? Promise.resolve({ data: { authenticated: true, user: { role: "supervisor", mustChangePassword: true },profileSelectionRequired:true,profiles:[{id:'a'},{id:'b'}] } })
       : Promise.resolve(permissionsResponse));
 
     render(

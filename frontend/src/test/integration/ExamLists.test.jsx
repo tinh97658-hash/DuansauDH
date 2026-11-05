@@ -60,7 +60,7 @@ it('keeps only the learning-follow-up export in the gradebook toolbar', async ()
 const data = { revision: 0, rows: [savedRow], total: 1, totalRows: 1, unassessedRows: 1, page: 1, pageSize: 15 };
 const paged = (gradeRows, params = {}) => {
   const include = (params.includeIds || "").split(","), exclude = (params.excludeIds || "").split(",");
-  const assessed = gradeRows.map(row=>phaseFixture==='legacy'?draftOf(row):draftOf({...row,workflowPhase:phaseFixture==='components'?'components':'final',eligibilityFrozen:phaseFixture!=='components',eligible:calculateExamEligibility(row),examScoreEditable:phaseFixture==='final'&&calculateExamEligibility(row)===true}));
+  const assessed = gradeRows.map(row=>phaseFixture==='legacy'?draftOf(row):draftOf({...row,workflowPhase:phaseFixture==='components'?'components':'final',eligibilityFrozen:phaseFixture==='locked',eligible:calculateExamEligibility(row),examScoreEditable:phaseFixture==='final'&&calculateExamEligibility(row)===true}));
   const found = assessed.filter(row => (params.mode !== "exam" || ((include.includes(row.participantId) || isExamCandidate(row)) && !exclude.includes(row.participantId))) &&
     (!params.search || `${row.code} ${row.fullName}`.toLowerCase().includes(params.search.toLowerCase())));
   const page = Math.min(params.page || 1, Math.max(1, Math.ceil(found.length / 15)));
@@ -70,7 +70,7 @@ const paged = (gradeRows, params = {}) => {
 };
 const setup = (role = "admin", gradeRows = data.rows,phase) => {
   phaseFixture=phase||(gradeRows.some(row=>row.examScore!=null)?'final':'components');
-  testPermissions = ['gradebook.view',...(role === "admin" ? ["gradebook.submit", "gradebook.approve"] : role === "examiner" ? ["gradebook.submit"] : [])];
+  testPermissions = ['gradebook.view','exams.view',...(role === "admin" ? ["gradebook.submit", "gradebook.approve"] : role === "examiner" ? ["gradebook.submit"] : [])];
   // A save must not mutate the shared baseline used by subsequent tests.
   gradeRows = gradeRows.map(row => row === savedRow ? { ...row, attemptScores: [...(row.attemptScores || [])] } : row);
   axios.put.mockImplementation(async (_, payload) => {
@@ -89,11 +89,64 @@ beforeEach(async () => {
   jest.clearAllMocks(); localStorage.clear(); setup();
 });
 
+it.each(['waiting','final'])('edits components without eligibility approval in %s',async phase=>{
+  setup('admin',[{...savedRow,testScore:8,assignmentScore:8}],phase);
+  render(<ExamLists/>);
+  const score=await screen.findByLabelText('Điểm kiểm tra HV001');
+  expect(score).toBeEnabled();
+  for(const name of ['Gửi duyệt tư cách','Duyệt tư cách','Xin mở lại tư cách','Mở lại tư cách']){
+    expect(screen.queryByRole('button',{name})).not.toBeInTheDocument();
+  }
+  fireEvent.change(score,{target:{value:'9'}});
+  fireEvent.click(screen.getByRole('button',{name:'Cập nhật cả bảng'}));
+  await waitFor(()=>expect(axios.put).toHaveBeenCalledWith(expect.stringContaining('/exam-lists'),
+    expect.objectContaining({rows:[expect.objectContaining({testScore:9})]})));
+  expect(axios.post).not.toHaveBeenCalled();
+});
+
+it('shows scheduling immediately after saving complete components',async()=>{
+  render(<ExamLists/>);
+  const score=await screen.findByLabelText('Điểm kiểm tra HV001');
+  const original=axios.put.getMockImplementation();
+  axios.put.mockImplementation(async(url,payload)=>{
+    const response=await original(url,payload);
+    return {data:{...response.data,workflow:workflowFor('waiting'),offering:{...response.data.offering,
+      examScheduling:{candidateCount:1,remainingCount:1}}}};
+  });
+  fireEvent.change(score,{target:{value:'8'}});
+  fireEvent.change(screen.getByLabelText('Điểm BTL/TL/KT HV001'),{target:{value:'8'}});
+  fireEvent.click(screen.getByRole('button',{name:'Cập nhật cả bảng'}));
+  expect(await screen.findByRole('link',{name:'Xếp lịch thi'})).toBeInTheDocument();
+  expect(score).toBeEnabled();
+  expect(axios.post).not.toHaveBeenCalled();
+});
+
+it.each(['waiting','final'])('allows editing the full merged roster for a responsible member in %s',async phase=>{
+  setup('admin',[
+    {...savedRow,testScore:8,assignmentScore:8,canEditGrade:true},
+    {...savedRow,participantId:'student:other',code:'HV002',testScore:7,assignmentScore:7,canEditGrade:true},
+  ],phase);
+  render(<ExamLists/>);
+  const owned=await screen.findByLabelText('Điểm kiểm tra HV001');
+  const other=screen.getByLabelText('Điểm kiểm tra HV002');
+  expect(owned).toBeEnabled();expect(other).toBeEnabled();
+  expect(screen.getByLabelText('Điểm BTL/TL/KT HV002')).toBeEnabled();
+  expect(screen.getByLabelText('Miễn thi HV002')).toBeEnabled();
+  expect(screen.getByText('HV002')).toBeInTheDocument();
+  expect(screen.queryByText('Chỉ xem')).not.toBeInTheDocument();
+  fireEvent.change(other,{target:{value:'10'}});
+  expect(other).toHaveValue('10');
+  fireEvent.change(owned,{target:{value:'9'}});
+  fireEvent.click(screen.getByRole('button',{name:'Cập nhật cả bảng'}));
+  await waitFor(()=>expect(axios.put).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({
+    rows:expect.arrayContaining([expect.objectContaining({participantId:'student:one',testScore:9}),
+      expect.objectContaining({participantId:'student:other',testScore:10})]),
+  })));
+});
+
 it.each([
-  ['components', 'draft', 'Gửi duyệt tư cách', 'eligibility', 'submit'],
-  ['components', 'submitted', 'Duyệt tư cách', 'eligibility', 'approve'],
   ['final', 'draft', 'Gửi duyệt kết quả', 'final', 'submit'],
-  ['final', 'submitted', 'Duyệt kết quả', 'final', 'approve'],
+  ['final', 'submitted', 'Duyệt và khóa điểm', 'final', 'approve'],
 ])('confirms %s / %s without asking for a reason', async (phase, status, label, endpoint, action) => {
   setup('admin', [{...savedRow, testScore:8, assignmentScore:8, examScore:phase==='final'?8:null}], phase);
   const original=axios.get.getMockImplementation();
@@ -155,7 +208,7 @@ it("keyboard arrows skip locked learners and keep focus at the editable grid edg
   expect(axios.put).not.toHaveBeenCalled();
 });
 
-it("keyboard arrows navigate exam marks while skipping approved component and calculated marks", async () => {
+it("keyboard arrows navigate editable components and exam marks while skipping calculated marks", async () => {
   setup('admin', [
     { ...savedRow, testScore: 8, assignmentScore: 8 },
     { ...savedRow, participantId: 'student:two', code: 'HV002', testScore: 7, assignmentScore: 7 },
@@ -163,9 +216,10 @@ it("keyboard arrows navigate exam marks while skipping approved component and ca
   render(<ExamLists />);
   const first = await screen.findByLabelText('Điểm thi hết môn HV001');
   expect(first).toBeEnabled();
-  expect(screen.getByLabelText('Điểm kiểm tra HV001')).toBeDisabled();
+  expect(screen.getByLabelText('Điểm kiểm tra HV001')).toBeEnabled();
   first.focus();
-  fireEvent.keyDown(first, { key: 'ArrowLeft' }); expect(first).toHaveFocus();
+  fireEvent.keyDown(first, { key: 'ArrowLeft' }); expect(screen.getByLabelText('Điểm BTL/TL/KT HV001')).toHaveFocus();
+  fireEvent.keyDown(document.activeElement, { key: 'ArrowRight' }); expect(first).toHaveFocus();
   fireEvent.keyDown(first, { key: 'ArrowRight' }); expect(first).toHaveFocus();
   fireEvent.keyDown(first, { key: 'ArrowDown' }); expect(screen.getByLabelText('Điểm thi hết môn HV002')).toHaveFocus();
   expect(axios.put).not.toHaveBeenCalled();
@@ -222,81 +276,6 @@ it.each([
  if(editable){fireEvent.change(input,{target:{value:'8.0'}});expect(input).toHaveValue('8.0');fireEvent.change(input,{target:{value:'11'}});expect(input).toHaveValue('8.0');fireEvent.click(screen.getByRole('button',{name:'Cập nhật cả bảng'}));await waitFor(()=>expect(axios.put).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/),expect.objectContaining({rows:expect.arrayContaining([expect.objectContaining({participantId:'student:one',examScore:8})])})));}
 });
 
-it("closes a rejected eligibility submission and shows an error toast with the unchanged gradebook", async () => {
-  const message = "Chưa đủ điểm thành phần để gửi duyệt tư cách.";
-  let rejectSubmission;
-  axios.post.mockImplementationOnce(() => new Promise((resolve, reject) => { rejectSubmission = reject; }));
-  render(<ExamLists />);
-  const score = await screen.findByLabelText("Điểm kiểm tra HV001", {}, { timeout: 10000 });
-  const originalScore = score.value;
-  fireEvent.click(screen.getByRole("button", { name: "Gửi duyệt tư cách" }));
-  const dialog = await screen.findByRole("dialog");
-  expect(within(dialog).queryByLabelText("Lý do hoặc căn cứ")).not.toBeInTheDocument();
-  fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận" }));
-  expect(dialog).toBeInTheDocument();
-  await act(async () => { rejectSubmission({ response: { status: 400, data: { message } } }); });
-  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-  const alert = await screen.findByText(message);
-  expect(alert).toHaveTextContent(message);
-  expect(alert.closest(".Toastify__toast")).toHaveClass("Toastify__toast--error");
-  expect(screen.getByLabelText("Điểm kiểm tra HV001")).toHaveValue(originalScore);
-  expect(screen.getByRole("button", { name: "Gửi duyệt tư cách" })).toBeEnabled();
-  expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/exam-lists/eligibility/workflow"),
-    expect.objectContaining({ action: "submit", note: "" }));
-});
-
-it("preserves eligibility submit, approve, approved DS and reopen in the gradebook", async () => {
-  const warn = jest.spyOn(toast, 'warn');
-  setup("admin", [{ ...savedRow, testScore: 8, assignmentScore: 8 }]);
-  const original = axios.get.getMockImplementation();
-  let workflow = workflowFor();
-  axios.get.mockImplementation(async (url, config) => {
-    const result = await original(url, config);
-    return url.endsWith("/exam-lists") ? { data: { ...result.data, workflow } } : result;
-  });
-  axios.post.mockImplementation(async (url, body) => {
-    expect(url).toContain("/eligibility");
-    const status = { submit: 'submitted', approve: 'approved', reopen: 'draft' }[body.action];
-    phaseFixture = status === 'approved' ? 'waiting' : 'components';
-    workflow = { ...workflowFor(phaseFixture), eligibility: { status, version: workflow.eligibility.version + 1, snapshotId: status === 'approved' ? 'approved-snapshot' : null, canReopen:status!=='draft' } };
-    return { data: {} };
-  });
-  render(<ExamLists />);
-  await screen.findByLabelText("Điểm kiểm tra HV001");
-  const reminder = await screen.findByText(/Vui lòng gửi duyệt tư cách thi/);
-  expect(reminder.closest('.Toastify__toast')).toHaveClass('exam-warning-toast');
-  expect(reminder.closest('.Toastify__toast-container')).toHaveClass('Toastify__toast-container--top-right');
-  const reminderId = reminder.closest('.Toastify__toast').id;
-  const transition = async (label, expected) => {
-    fireEvent.click(screen.getByRole('button', { name: label }));
-    const dialog = await screen.findByRole('dialog');
-    const note = within(dialog).queryByLabelText('Lý do hoặc căn cứ');
-    if (label.includes('Mở lại')) {
-      expect(within(dialog).getByRole('button', { name: 'Xác nhận' })).toBeDisabled();
-      fireEvent.change(note, { target: { value: 'Đã đối chiếu hồ sơ' } });
-    } else {
-      expect(note).not.toBeInTheDocument();
-      expect(within(dialog).getByRole('button', { name: 'Xác nhận' })).toBeEnabled();
-    }
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Xác nhận' }));
-    await screen.findByRole(expected === 'Xếp lịch thi' ? 'link' : 'button', { name: expected }, { timeout: 10000 });
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-  };
-  await transition('Gửi duyệt tư cách', 'Duyệt tư cách');
-  expect((await screen.findByText(/Tư cách thi đang chờ duyệt/)).closest('.Toastify__toast').id).toBe(reminderId);
-  await transition('Duyệt tư cách', 'Xếp lịch thi');
-  expect((await screen.findByText('Đã duyệt tư cách thi. Vui lòng xếp lịch thi cho danh sách đã duyệt.')).closest('.Toastify__toast').id).toBe(reminderId);
-  expect(screen.queryByText(/Tư cách thi đang chờ duyệt/)).not.toBeInTheDocument();
-  expect(warn).toHaveBeenCalledTimes(1);
-  fireEvent.click(screen.getByRole('button', { name: "Danh sách thi" }));
-  expect(await screen.findByRole('cell', { name: 'HV001' })).toBeInTheDocument();
-  await transition('Mở lại tư cách', 'Gửi duyệt tư cách');
-  expect(await screen.findByText(/Vui lòng gửi duyệt tư cách thi/)).toBeInTheDocument();
-  expect(screen.queryByText(/Đã duyệt tư cách thi\. Vui lòng xếp lịch thi/)).not.toBeInTheDocument();
-  expect(axios.post.mock.calls.map(([, body]) => body.action)).toEqual(['submit', 'approve', 'reopen']);
-  warn.mockRestore();
-});
-
 it.each([
   { capability: "gradebook.submit", grades: true, policy: false },
   { capability: "gradebook.approve", grades: false, policy: false },
@@ -315,56 +294,11 @@ it.each([
   render(<ExamLists />);
   const score = await screen.findByLabelText("Điểm kiểm tra HV001");
   await waitFor(() => grades ? expect(score).toBeEnabled() : expect(score).toBeDisabled());
-  expect(Boolean(screen.queryByRole("button", { name: "Gửi duyệt tư cách" }))).toBe(grades);
+  expect(Boolean(screen.queryByRole("button", { name: "Gửi duyệt tư cách" }))).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "Cài đặt điểm số" }));
   const input = await screen.findByLabelText("Tỷ trọng điểm kiểm tra QA01");
   await waitFor(() => policy ? expect(input).toBeEnabled() : expect(input).toBeDisabled());
   expect(Boolean(screen.queryByRole("button", { name: /^Lưu cấu hình/ }))).toBe(policy);
-});
-
-it.each([true,false])('shows the supervisor request to reopen eligibility only before scheduling (%s)', async canReopen => {
-  setup('supervisor', [savedRow], 'waiting'); testPermissions.push('gradebook.submit');
-  const original = axios.get.getMockImplementation();
-  axios.get.mockImplementation(async (url,config) => {
-    const result = await original(url,config);
-    return url.endsWith('/exam-lists') ? {data:{...result.data,workflow:{...result.data.workflow,eligibility:{...result.data.workflow.eligibility,canReopen}}}} : result;
-  });
-  render(<ExamLists/>);await screen.findByLabelText('Điểm kiểm tra HV001');
-  expect(screen.queryByRole('button',{name:'Mở lại tư cách'})).not.toBeInTheDocument();
-  if(canReopen) expect(screen.getByRole('button',{name:'Xin mở lại tư cách'})).toBeEnabled();
-  else expect(screen.queryByRole('button',{name:'Xin mở lại tư cách'})).not.toBeInTheDocument();
-});
-
-it('sends a supervisor eligibility reopen request with a reason and keeps scores locked while pending', async () => {
-  setup('supervisor', [savedRow], 'waiting'); testPermissions.push('gradebook.submit');
-  const original = axios.get.getMockImplementation();let request = null;
-  axios.get.mockImplementation(async (url,config) => {
-    const result = await original(url,config);
-    return url.endsWith('/exam-lists') ? {data:{...result.data,workflow:{...result.data.workflow,eligibility:{...result.data.workflow.eligibility,reopenRequest:request}}}} : result;
-  });
-  axios.post.mockImplementation(async()=>{request={note:'Sửa điểm theo biên bản'};return {data:{}};});
-  render(<ExamLists/>);await screen.findByLabelText('Điểm kiểm tra HV001');
-  fireEvent.click(screen.getByRole('button',{name:'Xin mở lại tư cách'}));
-  const dialog=await screen.findByRole('dialog');
-  expect(dialog).toHaveTextContent('Xin mở lại tư cách thi');
-  expect(within(dialog).getByRole('button',{name:'Xác nhận'})).toBeDisabled();
-  fireEvent.change(within(dialog).getByLabelText('Lý do hoặc căn cứ'),{target:{value:'Sửa điểm theo biên bản'}});
-  fireEvent.click(within(dialog).getByRole('button',{name:'Xác nhận'}));
-  await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/exam-lists/eligibility/workflow'),expect.objectContaining({action:'request_reopen',note:'Sửa điểm theo biên bản',version:2,revision:0})));
-  expect(await screen.findByText('Chờ duyệt mở lại tư cách')).toHaveAttribute('title', 'Sửa điểm theo biên bản');
-  expect(screen.queryByRole('button',{name:'Xin mở lại tư cách'})).not.toBeInTheDocument();
-  expect(screen.getByLabelText('Điểm kiểm tra HV001')).toBeDisabled();
-});
-
-it.each([['Duyệt mở lại tư cách','reopen'],['Từ chối mở lại tư cách','reject_reopen']])('allows admin to handle a pending request: %s',async(label,action)=>{
-  setup('admin',[savedRow],'waiting');const original=axios.get.getMockImplementation();
-  axios.get.mockImplementation(async(url,config)=>{const result=await original(url,config);return url.endsWith('/exam-lists')?{data:{...result.data,workflow:{...result.data.workflow,eligibility:{...result.data.workflow.eligibility,reopenRequest:{note:'Sửa điểm'}}}}}:result;});
-  axios.post.mockResolvedValue({data:{}});
-  render(<ExamLists/>);await screen.findByLabelText('Điểm kiểm tra HV001');
-  fireEvent.click(screen.getByRole('button',{name:label}));const dialog=await screen.findByRole('dialog');
-  fireEvent.change(within(dialog).getByLabelText('Lý do hoặc căn cứ'),{target:{value:'Theo biên bản'}});
-  fireEvent.click(within(dialog).getByRole('button',{name:'Xác nhận'}));
-  await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/exam-lists/eligibility/workflow'),expect.objectContaining({action})));
 });
 
 it("locks approved grades and requires an explicit reopening reason", async () => {
@@ -396,31 +330,11 @@ it("locks approved grades and requires an explicit reopening reason", async () =
   await waitFor(() => expect(screen.getByLabelText("Điểm thi hết môn HV001")).toBeEnabled());
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   expect(screen.queryByRole('button',{name:'Mở lại tư cách'})).not.toBeInTheDocument();
-  expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeDisabled();
+  expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeEnabled();
   expect(screen.getByRole('status')).toHaveTextContent('Đủ điểm thi · Cần gửi duyệt kết quả');
   fireEvent.mouseDown(screen.getByLabelText('Tên lớp học phần'));
   expect(screen.getByText('Chờ gửi duyệt kết quả')).toBeInTheDocument();
   expect(screen.queryByText('Đã hoàn tất')).not.toBeInTheDocument();
-});
-
-it("allows an examiner to submit but not approve a complete gradebook", async () => {
-  setup("examiner", [{ ...savedRow, testScore: 8, assignmentScore: 8 }]);
-  const original = axios.get.getMockImplementation();
-  let workflow = workflowFor();
-  axios.get.mockImplementation(async (url, config) => {
-    const result = await original(url, config);
-    return url.endsWith("/exam-lists") ? { data: { ...result.data, workflow } } : result;
-  });
-  axios.post.mockImplementation(async () => { workflow = {...workflowFor(),status:'submitted',eligibility:{status:'submitted',version:1}}; return { data: {} }; });
-  render(<ExamLists />);
-  await screen.findByLabelText("Điểm kiểm tra HV001");
-  fireEvent.click(screen.getByRole("button", { name: "Gửi duyệt tư cách" }));
-  const dialog = await screen.findByRole("dialog");
-  expect(within(dialog).queryByLabelText("Lý do hoặc căn cứ")).not.toBeInTheDocument();
-  fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận" }));
-  await waitFor(() => expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeDisabled());
-  expect(screen.queryByRole('button', { name: 'Gửi duyệt tư cách' })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Duyệt tư cách" })).not.toBeInTheDocument();
 });
 
 it.each([
@@ -535,7 +449,9 @@ it("refreshes a profile exemption as checked and passed, discards a stale draft,
   expect(screen.getByLabelText("Kết quả điểm HV001")).toHaveValue("passed");
   expect(screen.getByLabelText("Điểm kiểm tra HV001")).toHaveValue("");
   expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Cập nhật cả bảng" })).toBeDisabled();
+  // A fully assessed exempt roster can still finalize automatic eligibility,
+  // even after the obsolete editable draft has been discarded.
+  expect(screen.getByRole("button", { name: "Cập nhật cả bảng" })).toBeEnabled();
   expect(axios.put).not.toHaveBeenCalled();
   Object.assign(gradeRows[0], { profileForeignLanguageExempt: false, examExempt: false, result: "pending" });
   fireEvent(window, new CustomEvent("exam-gradebook-saved", { detail: { source: "profile" } }));
@@ -617,7 +533,7 @@ it("selects subject names and local curriculum codes while keeping the entire sh
   fireEvent.mouseDown(screen.getByLabelText("Chuyên ngành"));
   fireEvent.click(within(screen.getByRole("listbox")).getByText("Công nghệ thông tin"));
   await waitFor(() => expect(screen.getByLabelText("Môn")).toHaveTextContent("ITAI - Trí tuệ nhân tạo"));
-  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g2", courseOfferingId: "ai", rosterScope: "offering" }) });
+  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { signal: expect.any(AbortSignal), params: expect.objectContaining({ classGroupId: "g2", courseOfferingId: "ai", rosterScope: "offering" }) });
   fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
   fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /Lớp Tiếng anh/ }));
   await waitFor(() => expect(screen.getByLabelText("Môn")).toHaveTextContent("HPTA - Tiếng anh"));
@@ -755,7 +671,7 @@ it("downloads only the exam tab's columns and searched students", async () => {
     expect(screen.getByRole("button", { name: reportExportName() })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Danh sách thi" }));
     const examSheet = await exportExamExcel();
-    expect(examSheet.getRow(4).values.slice(1)).toEqual(screen.getAllByRole("columnheader").map(cell => cell.textContent.replace(/^(Tư cách đã duyệt|Đã duyệt)$/, 'Tư cách')));
+    expect(examSheet.getRow(4).values.slice(1)).toEqual(screen.getAllByRole("columnheader").map(cell => cell.textContent.replace(/^Tư cách thi$/, 'Tư cách')));
     expect(examSheet.rowCount).toBe(13);
     expect(examSheet.getCell("B5").value).toBe("HV001");
     expect(examSheet.getCell("B6").value).toBe("HV003");
@@ -797,7 +713,7 @@ it("selects separate offerings of the same subject with an optional year filter"
   expect(screen.getByLabelText("Tên lớp học phần")).toHaveTextContent("An toàn thông tin");
   fireEvent.mouseDown(screen.getByLabelText("Chuyên ngành"));
   fireEvent.click(within(screen.getByRole("listbox")).getByText("Quản trị kinh doanh"));
-  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g2", courseOfferingId: "o2", pageSize: 15 }) }));
+  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { signal: expect.any(AbortSignal), params: expect.objectContaining({ classGroupId: "g2", courseOfferingId: "o2", pageSize: 15 }) }));
   expect(screen.getByLabelText("Môn")).toHaveTextContent("Marketing");
   expect(screen.getByLabelText("Năm")).toHaveTextContent("Tất cả năm");
   fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
@@ -806,18 +722,18 @@ it("selects separate offerings of the same subject with an optional year filter"
   expect(within(classes).getByRole("option", { name: /Marketing 2026/ })).toBeInTheDocument();
   expect(within(classes).getByRole("option", { name: /Marketing 2025/ })).toBeInTheDocument();
   fireEvent.click(within(classes).getByRole("option", { name: /Quản trị 2025/ }));
-  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g3", courseOfferingId: "o4", pageSize: 15 }) }));
+  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { signal: expect.any(AbortSignal), params: expect.objectContaining({ classGroupId: "g3", courseOfferingId: "o4", pageSize: 15 }) }));
   expect(screen.getByLabelText("Môn")).toHaveTextContent("Quản trị chiến lược");
   fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
   fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /Marketing 2025/ }));
   await waitFor(() => expect(screen.getByLabelText("Tên lớp học phần")).toHaveTextContent("Marketing"));
-  expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g3", courseOfferingId: "o3" }) });
+  expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/\/exam-lists$/), { signal: expect.any(AbortSignal), params: expect.objectContaining({ classGroupId: "g3", courseOfferingId: "o3" }) });
   fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
   fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /Marketing 2026/ }));
-  await waitFor(() => expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g2", courseOfferingId: "o2" }) }));
+  await waitFor(() => expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/\/exam-lists$/), { signal: expect.any(AbortSignal), params: expect.objectContaining({ classGroupId: "g2", courseOfferingId: "o2" }) }));
   fireEvent.mouseDown(screen.getByLabelText("Năm"));
   fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: "2025" }));
-  await waitFor(() => expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ classGroupId: "g3", courseOfferingId: "o3" }) }));
+  await waitFor(() => expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/\/exam-lists$/), { signal: expect.any(AbortSignal), params: expect.objectContaining({ classGroupId: "g3", courseOfferingId: "o3" }) }));
   fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
   expect(within(screen.getByRole("listbox")).queryByRole("option", { name: /Marketing 2026/ })).not.toBeInTheDocument();
   fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /Marketing 2025/ }));
@@ -890,6 +806,7 @@ it("keeps the class and draft on stay and switches classes only after discarding
   chooseOther();
   fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Bỏ thay đổi và tiếp tục' }));
   await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), {
+    signal: expect.any(AbortSignal),
     params: expect.objectContaining({ classGroupId: 'g1', courseOfferingId: 'o2' }),
   }));
   expect(screen.getByLabelText('Tên lớp học phần')).toHaveTextContent('Lớp thứ hai');
@@ -918,12 +835,6 @@ it("loads a class roster and saves component marks only with the current revisio
  fireEvent.click(screen.getByRole("button",{name:"Cập nhật cả bảng"}));
  await waitFor(()=>expect(axios.put).toHaveBeenCalledWith(expect.stringContaining("/masters/exam-lists"),expect.objectContaining({classGroupId:"g1",courseOfferingId:"o1",revision:0,rows:[expect.objectContaining({participantId:"student:one",testScore:8,assignmentScore:8,examScore:null,courseScore:null})]})));
  expect(await screen.findByText("Đã cập nhật bảng điểm cho 1 học viên.")).toBeInTheDocument();expect(savedEvent).toHaveBeenCalledTimes(1);
- const reminder=await screen.findByText(/Vui lòng gửi duyệt tư cách thi/);
- expect(reminder.closest('.Toastify__toast')).toHaveClass('exam-warning-toast');
- expect(reminder.closest('.Toastify__toast-container')).toHaveClass('Toastify__toast-container--top-right');
- const reminderId=reminder.closest('.Toastify__toast').id;
- fireEvent.change(screen.getByLabelText('Điểm kiểm tra HV001'),{target:{value:'7'}});
- await waitFor(()=>expect(toast.isActive(reminderId)).toBe(false));
  expect(localStorage.getItem("exam-gradebook-revision")).toBeTruthy();
 });
 
@@ -1095,7 +1006,7 @@ it("requests only 15 students per page and saves drafts from different pages tog
   fireEvent.click(screen.getByRole("button", { name: /^Trang 1$/ }));
   expect(await screen.findByLabelText("Điểm kiểm tra HV001")).toHaveValue("7");
   expect(screen.queryByTestId("exam-print-table")).not.toBeInTheDocument();
-  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { params: expect.objectContaining({ page: 2, pageSize: 15 }) });
+  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/exam-lists$/), { signal: expect.any(AbortSignal), params: expect.objectContaining({ page: 2, pageSize: 15 }) });
   fireEvent.click(screen.getByRole("button", { name: "Cập nhật cả bảng" }));
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ rows: [
     expect.objectContaining({ participantId: "student:1", testScore: 7 }),
@@ -1230,10 +1141,10 @@ it("opens the exact dashboard gradebook scope instead of the first available cla
   })), { timeout: 5000 });
 });
 
-it.each(['waiting','final'])('unlocks only exam marks in the held final stage (%s)',async phase=>{
+it.each(['waiting','final'])('allows component edits and requires a held exam for exam marks (%s)',async phase=>{
  setup('admin',[{...savedRow,testScore:8,assignmentScore:8}],phase);render(<ExamLists/>);
- expect(await screen.findByLabelText('Điểm kiểm tra HV001')).toBeDisabled();expect(screen.getByLabelText('Điểm BTL/TL/KT HV001')).toBeDisabled();
- expect(screen.getByText('Tư cách đã duyệt')).toBeInTheDocument();
+ expect(await screen.findByLabelText('Điểm kiểm tra HV001')).toBeEnabled();expect(screen.getByLabelText('Điểm BTL/TL/KT HV001')).toBeEnabled();
+ expect(screen.getByText('Tư cách thi', {selector:'th *'})).toBeInTheDocument();
  const exam=screen.getByLabelText('Điểm thi hết môn HV001');
  if(phase==='waiting'){expect(exam).toBeDisabled();expect(screen.queryByRole('button',{name:'Gửi duyệt kết quả'})).toBeNull();}
  else{expect(exam).toBeEnabled();fireEvent.change(exam,{target:{value:'9'}});expect(screen.getByLabelText('Điểm học phần HV001')).toHaveValue('8.5');
@@ -1244,9 +1155,18 @@ it.each(['waiting','final'])('unlocks only exam marks in the held final stage (%
 });
 
 it('submits final results through a separate endpoint and version',async()=>{
- setup('examiner',[{...savedRow,testScore:8,assignmentScore:8,examScore:8}],'final');render(<ExamLists/>);
+ setup('examiner',[{...savedRow,testScore:8,assignmentScore:8,examScore:8}],'final');
+ const original=axios.get.getMockImplementation();let submitted=false;
+ axios.get.mockImplementation(async(url,config)=>{
+  const response=await original(url,config);
+  if(url.endsWith('/exam-lists')&&submitted)return {data:{...response.data,workflow:{...response.data.workflow,
+    status:'submitted',final:{status:'submitted',version:1}}}};
+  return response;
+ });
+ axios.post.mockImplementation(async()=>{submitted=true;return {data:{}};});
+ render(<ExamLists/>);
  fireEvent.click(await screen.findByRole('button',{name:'Gửi duyệt kết quả'}));
  const dialog=await screen.findByRole('dialog');expect(within(dialog).queryByLabelText('Lý do hoặc căn cứ')).not.toBeInTheDocument();
  fireEvent.click(within(dialog).getByRole('button',{name:'Xác nhận'}));await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/exam-lists/final/workflow'),expect.objectContaining({version:0,action:'submit'})));
- expect(screen.getByLabelText('Điểm kiểm tra HV001')).toBeDisabled();
+ await waitFor(()=>expect(screen.getByLabelText('Điểm kiểm tra HV001')).toBeDisabled());
 });

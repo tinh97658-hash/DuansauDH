@@ -320,7 +320,7 @@ it("selects a valid major and its newest available year on initial load", async 
   expect(await chooseScope()).toBeInTheDocument();
   expect(screen.queryByText(/Vui lòng chọn/)).not.toBeInTheDocument();
   expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/class-curriculum-progress"), {
-    params: { majorId: major.id, academicYear: "2027" }, withCredentials: true,
+    params: { majorId: major.id, academicYear: "2027" }, withCredentials: true, signal: expect.any(AbortSignal),
   });
 });
 
@@ -351,7 +351,7 @@ it("preserves a valid URL major and years and synchronizes its parent even when 
   await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent(`disciplineId=${discipline.id}`));
   expect(screen.getByTestId("location")).toHaveTextContent("context=keep");
   await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/class-curriculum-progress"), {
-    params: { majorId: major.id, academicYear: "2028" }, withCredentials: true,
+    params: { majorId: major.id, academicYear: "2028" }, withCredentials: true, signal: expect.any(AbortSignal),
   }));
 });
 
@@ -394,7 +394,7 @@ it("renders catalog subjects once with one dynamic status column per class", asy
   expect(within(table).queryByRole("columnheader", { name: /Buổi/ })).not.toBeInTheDocument();
   expect(screen.queryByText(/\d+\s*\/\s*\d+\s*buổi/i)).not.toBeInTheDocument();
   expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/class-curriculum-progress"), {
-    params: { majorId: major.id, academicYear: "2027" }, withCredentials: true,
+    params: { majorId: major.id, academicYear: "2027" }, withCredentials: true, signal: expect.any(AbortSignal),
   });
 });
 
@@ -478,7 +478,7 @@ it("allows selecting multiple academic years and combines their progress", async
   mockData({ catalog: [...makeClasses(), ...classes2028, ...classes2026] });
   mount();
   await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/class-curriculum-progress"), {
-    params: { majorId: major.id, academicYear: "2026" }, withCredentials: true,
+    params: { majorId: major.id, academicYear: "2026" }, withCredentials: true, signal: expect.any(AbortSignal),
   }));
   fireEvent.click(screen.getByLabelText("Khóa / năm học"));
   fireEvent.click(screen.getByLabelText("2027"));
@@ -510,7 +510,7 @@ it("prefers the current year and recomputes it when the major changes", async ()
   expect(screen.getByLabelText("Ngành")).toHaveValue(secondMajor.disciplineId);
   expect(screen.getByLabelText("Khóa / năm học")).toHaveTextContent(currentYear);
   await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/class-curriculum-progress"), {
-    params: { majorId: secondMajor.id, academicYear: currentYear }, withCredentials: true,
+    params: { majorId: secondMajor.id, academicYear: currentYear }, withCredentials: true, signal: expect.any(AbortSignal),
   }));
 });
 

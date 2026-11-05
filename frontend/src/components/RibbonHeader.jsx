@@ -6,6 +6,7 @@ import { AcademicCapIcon, AdjustmentsHorizontalIcon, ArrowDownOnSquareIcon, Arro
 import { API_BASE_URL } from "../config/http";
 import { BRAND } from "../config/branding";
 import { useAuthSession } from "../context/AuthSession";
+import { routeViewCode } from '../features/accounts/routePermissions';
 import { preloadPage } from "../utils/lazyPage";
 import "../styles/ribbon-header.css";
 
@@ -86,7 +87,7 @@ export const ribbons = {
     ]),
     group("QUẢN LÝ ĐIỂM", [
       action("Danh sách thi, điểm thi", "/masters/exam-lists", ClipboardDocumentListIcon, "var(--icon-rose)", { permissions: ["gradebook.view"] }),
-      action('Xếp lịch thi', '/masters/exam-schedule', CalendarDaysIcon, 'var(--icon-rose)', { anyPermissions: ['gradebook.view','scheduling.view'] }),
+      action('Xếp lịch thi', '/masters/exam-schedule', CalendarDaysIcon, 'var(--icon-rose)', { permissions: ['exams.view'] }),
       action("Tổng hợp điểm của lớp", "/reports/class-score-summary", DocumentChartBarIcon, "var(--icon-teal)", { permissions: ["reports.view"] }),
     ]),
     group("THỦ TỤC ĐẦU RA", [
@@ -143,7 +144,7 @@ const RibbonHeader = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const session = useAuthSession();
-  const sessionRole = session ? session.user?.role || "student" : null;
+  const sessionRole = session ? session.activeProfile?.code || session.user?.role || "student" : null;
   const [activeTab, setActiveTab] = useState(() => tabForPath(location.pathname));
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -209,7 +210,8 @@ const RibbonHeader = () => {
   const hasPermission = (permission) => access
     ? (access.permissions || []).includes(permission)
     : false;
-  const canSee = (item) => (!item.roles || item.roles.includes(role)) && (!item.permissions || item.permissions.every(hasPermission)) && (!item.anyPermissions || item.anyPermissions.some(hasPermission));
+  const canSee = (item) => (!item.roles || item.roles.includes(role)) && (!item.permissions || item.permissions.every(hasPermission)) && (!item.anyPermissions || item.anyPermissions.some(hasPermission))
+    && (!access?.routeCatalog||!item.permissions||hasPermission(routeViewCode(item.route)));
   const visibleTabs = tabs.filter(([id]) => ribbons[id].some(section => section.actions.some(canSee)));
   const selectedTab = activeTab === null ? null : visibleTabs.some(([id]) => id === activeTab) ? activeTab : visibleTabs[0]?.[0];
   const searchTerm = normalizeSearch(searchQuery);
@@ -312,9 +314,12 @@ const RibbonHeader = () => {
           {!filteredTabs.length && <p className="ribbon-search-empty" role="status">Không tìm thấy chức năng phù hợp.</p>}
         </div>
         {logoutError && <div className="ribbon-logout-error" role="alert">{logoutError}</div>}
-        <div className="ribbon-sidebar-footer">
+        <div className="ribbon-sidebar-footer" title={`Hồ sơ: ${session?.activeProfile?.name || roleNames[role] || role}`}>
           <div className="ribbon-user-avatar">{avatar}</div>
-          <div className="ribbon-user-info"><span className="ribbon-user-name">{userName}</span><span className="ribbon-user-role">{session?.user?.name || session?.user?.fullName ? roleNames[role] || role : BRAND.institute}</span></div>
+          <div className="ribbon-user-info"><span className="ribbon-user-name">{userName}</span><span className="ribbon-user-role">{session?.activeProfile?.name || (session?.user?.name || session?.user?.fullName ? roleNames[role] || role : BRAND.institute)}</span>
+          {session?.activeProfile && <span className="ribbon-user-role">{session.activeProfile.scopeLabel}</span>}
+          {session?.chooseProfile && (session.profiles || []).length > 1 && <button type="button" className="sl-btn" onClick={async () => { if (await confirmLeave()) session.chooseProfile(); }}>Đổi phiên làm việc</button>}
+          </div>
           <button type="button" className="ribbon-footer-logout" aria-label="Đăng xuất" title="Đăng xuất" disabled={loggingOut} onClick={() => runAction({ action: "logout" })}><ArrowRightStartOnRectangleIcon /></button>
         </div>
       </aside>

@@ -13,7 +13,8 @@ const routesByPermission = {
   "admission.view": ["/plan/admission-targets", "/plan/admission-records", "/masters/admission-scores", "/masters/admitted-records"],
   "masters.view": ["bridge-course", "create-class-groups", "assign-class-groups", "english-exam", "english-scores", "english-certification", "final-defense", "graduation-docs"].map(s => "/masters/" + s),
   "scheduling.view": ["course-offerings", "schedule", "course-matrix"].map(s => "/masters/" + s),
-  "gradebook.view": ["/masters/exam-lists", "/masters/exam-schedule"],
+  "gradebook.view": ["/masters/exam-lists"],
+  "exams.view": ["/masters/exam-schedule"],
   "reports.view": ["/reports/lecturer-payments", "/reports/class-score-summary", ...["class-lists", "course-scores", "ministerial-report", "temp-score-masters", "temp-score-doctoral", "diploma-appendix-masters", "diploma-appendix-doctoral"].map(s => "/reports/" + s)],
   "doctoral.view": ["admission-scores", "create-class-groups", "assign-class-groups", "exam-eligibility", "exam-scores", "exam-lists", "overview-topics", "university-workshops", "faculty-defense", "closed-review", "university-defense", "graduation-docs"].map(s => "/doctoral/" + s),
 };
@@ -33,7 +34,7 @@ const render = (...args) => {
 };
 describe("Ribbon read/navigation permission contracts", () => {
   it("filters across groups without accents while respecting permissions", () => {
-    render(view(session(["scheduling.view"]), "/masters/schedule"));
+    render(view(session(["scheduling.view", "exams.view"]), "/masters/schedule"));
     const search = screen.getByRole("searchbox", { name: "Tìm kiếm chức năng" });
     fireEvent.change(search, { target: { value: "xep lich thi" } });
     expect(screen.getByRole("button", { name: "Xếp lịch thi" })).toBeInTheDocument();
@@ -78,7 +79,7 @@ describe("Ribbon read/navigation permission contracts", () => {
     expect(screen.getByRole('button', { name: 'Phân nhóm học viên' })).toHaveAttribute('aria-current', 'page');
   });
   it('keeps distinct high contrast tones for teaching and exam scheduling',()=>{
-    render(view(session(['scheduling.view','gradebook.view']),'/masters/exam-lists'));
+    render(view(session(['scheduling.view','gradebook.view','exams.view']),'/masters/exam-lists'));
     const teaching=screen.getByRole('button',{name:'Xếp lịch'}),exam=screen.getByRole('button',{name:'Xếp lịch thi'});
     expect(teaching.style.getPropertyValue('--ribbon-icon-color')).toBe('var(--icon-purple)');
     expect(exam.style.getPropertyValue('--ribbon-icon-color')).toBe('var(--icon-rose)');
@@ -86,7 +87,7 @@ describe("Ribbon read/navigation permission contracts", () => {
     expect(exam.querySelector('[data-heroicon="CalendarDaysIcon"]')).toBeInTheDocument();exam.focus();expect(exam).toHaveFocus();
   });
   it("reflows the Masters grade group with a distinct calendar icon and unchanged gradebook icon", () => {
-    render(view(session(["masters.view", "gradebook.view", "reports.view"]), "/masters/exam-schedule"));
+    render(view(session(["masters.view", "gradebook.view", "exams.view", "reports.view"]), "/masters/exam-schedule"));
     const calendar = screen.getByRole("button", { name: "Xếp lịch thi" });
     const group = calendar.closest(".ribbon-group");
     expect(within(group).getAllByRole("button").map(button => button.textContent)).toEqual([
@@ -102,8 +103,7 @@ describe("Ribbon read/navigation permission contracts", () => {
     expect(items).toHaveLength(64);expect(expected.size).toBe(64);
     for (const item of items) {
       expect(expected.has(item.route)).toBe(true);
-      if (item.route === '/masters/exam-schedule') expect(item.anyPermissions).toEqual(['gradebook.view','scheduling.view']);
-      else expect(item.permissions || []).toEqual(expected.get(item.route));
+      expect(item.permissions || []).toEqual(expected.get(item.route));
       expect(item.roles).toBeUndefined();
     }
   });
@@ -125,7 +125,7 @@ describe("Ribbon read/navigation permission contracts", () => {
       for (const label of labels) seen.add(label);
       for (const section of container.querySelectorAll(".ribbon-group")) expect(section.querySelectorAll(".ribbon-action").length).toBeGreaterThan(0);
     }
-    const allowed = items.filter(item => item.route === '/masters/exam-schedule' ? permissions.some(p => ['scheduling.view','gradebook.view'].includes(p)) : expected.get(item.route).every(p => permissions.includes(p))).map(item => item.label);
+    const allowed = items.filter(item => expected.get(item.route).every(p => permissions.includes(p))).map(item => item.label);
     expect([...seen].sort()).toEqual(allowed.sort());
   });
   it("hides gated actions while access loads, then shows only loaded permissions", () => {

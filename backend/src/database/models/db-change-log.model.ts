@@ -6,6 +6,8 @@ import { AutoIncrement, Column, DataType, Model, PrimaryKey, Table } from "seque
  */
 @Table({ tableName: "db_change_logs", underscored: true, timestamps: false })
 export class DbChangeLog extends Model {
+  @Column(DataType.UUID) declare actorProfileId:string|null;
+  @Column(DataType.JSONB) declare actorProfile:Record<string,unknown>|null;
   @PrimaryKey
   @AutoIncrement
   @Column({ type: DataType.BIGINT, field: "id" })

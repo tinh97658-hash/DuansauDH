@@ -16,7 +16,12 @@ vi.mock('../../features/exams/examSchedule.css',()=>({}));
 vi.mock('../../utils/schedulingCalendar',async()=>({...await vi.importActual('../../utils/schedulingCalendar'),getBusinessTodayKey:()=> '2026-10-19',getBusinessWallTime:()=> '2026-10-19 07:00:00'}));
 const date='2026-10-19',offering={id:'offering',name:'Lớp QT 2026',subjectId:'subject',subjectName:'Quản trị',subjectCode:'QT',snapshotId:'snapshot',eligibilityVersion:2,candidateCount:2,candidateIds:['student:a','student:b'],remainingCount:2,groups:[{id:'group',name:'QTKD2026',academicYear:'2026',majorId:'major',majorName:'Quản trị kinh doanh',disciplineId:'discipline',disciplineName:'Kinh doanh'}]};
 const room={id:'room',name:'Phòng giảng đường',code:'301',capacity:2,isActive:true};let data;
-const renderPage=(permissions=['gradebook.view','scheduling.write'])=>renderWithPermissions(<MemoryRouter useTransitions={false}><ExamSchedule/></MemoryRouter>,permissions);
+const renderPage=(permissions=['exams.view','exams.write'])=>renderWithPermissions(<MemoryRouter useTransitions={false}><ExamSchedule/></MemoryRouter>,permissions);
+
+it('does not use teaching or gradebook permissions to open the exam calendar',()=>{
+  renderPage(['scheduling.view','scheduling.write','gradebook.view']);
+  expect(screen.getByRole('alert')).toHaveTextContent('Bạn không có quyền xem lịch thi.');
+});
 const queueButton=()=>within(screen.getByRole('complementary',{name:'Chưa xếp lịch'})).getByRole('button',{name:/Lớp QT/});
 const open=async()=>{fireEvent.click(await within(screen.getByRole('complementary',{name:'Chưa xếp lịch'})).findByRole('button',{name:/Lớp QT/}));fireEvent.click(screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'}));await screen.findByRole('dialog',{name:'XẾP LỊCH THI'});await waitFor(()=>expect(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/})).toBeEnabled());};
 const chooseScope=(label,name)=>{fireEvent.focus(screen.getByRole('combobox',{name:label}));fireEvent.click(screen.getByRole('option',{name}));};
@@ -33,7 +38,7 @@ it('exports the filtered exam week through the shared PDF preview',async()=>{
  const tab={sessionStorage:{setItem:vi.fn()},location:{replace:vi.fn()},close:vi.fn()};
  const popup=vi.spyOn(window,'open').mockReturnValue(tab);
  try{
-  renderPage(['gradebook.view']);await waitFor(()=>expect(screen.getByRole('button',{name:'Xuất báo cáo'})).toBeEnabled());
+  renderPage(['exams.view']);await waitFor(()=>expect(screen.getByRole('button',{name:'Xuất báo cáo'})).toBeEnabled());
   fireEvent.change(screen.getByRole('textbox',{name:'Tìm kiếm'}),{target:{value:'Quản trị'}});
   fireEvent.click(screen.getByRole('button',{name:'Xuất báo cáo'}));
   expect(screen.getByRole('menuitem',{name:'Word (.docx)'})).toBeInTheDocument();
@@ -82,7 +87,7 @@ it('recalculates occupied rooms when another calendar date is selected',async()=
 it('blocks candidate conflict and keeps authoritative server error/form on failure',async()=>{
  axios.post.mockRejectedValue({response:{status:409,data:{message:'Thí sinh trùng ca thi trên máy chủ'}}});renderPage();await open();selectRoom();fireEvent.click(screen.getByRole('button',{name:'Xếp lịch'}));expect((await screen.findByText('Thí sinh trùng ca thi trên máy chủ')).closest('.Toastify__toast')).toHaveClass('Toastify__toast--error');expect(screen.getByRole('dialog',{name:'XẾP LỊCH THI'})).toBeInTheDocument();expect(lecturerButton()).toHaveTextContent('Nguyễn An');
 });
-it('keeps read-only calendar controls disabled',async()=>{renderPage(['gradebook.view']);await screen.findByRole('button',{name:/Lớp QT/});fireEvent.click(queueButton());expect(screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'})).toBeDisabled();expect(screen.queryByRole('dialog')).toBeNull();});
+it('keeps read-only calendar controls disabled',async()=>{renderPage(['exams.view']);await screen.findByRole('button',{name:/Lớp QT/});fireEvent.click(queueButton());expect(screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'})).toBeDisabled();expect(screen.queryByRole('dialog')).toBeNull();});
 it('shows two direct full-width cards, then +N with hover preview and full-list drilldown',async()=>{
  data.sessions=Array.from({length:4},(_,i)=>session({id:'s'+i,name:'Lớp '+i,roomCode:'30'+i}));renderPage();const more=await screen.findByRole('button',{name:'+1 ca khác'});expect(document.querySelectorAll('.ep-event')).toHaveLength(3);fireEvent.mouseOver(more);expect(await screen.findByRole('tooltip')).toHaveTextContent('QTKD2026');fireEvent.click(more);const list=screen.getByRole('dialog',{name:/CÁC CA THI/});expect(within(list).getAllByRole('row')).toHaveLength(5);fireEvent.click(within(list).getByRole('button',{name:'Lớp 3'}));expect(within(screen.getByRole('dialog',{name:'CHI TIẾT BUỔI THI'})).getByRole('button',{name:/Danh sách thí sinh.*Lớp 3/})).toBeInTheDocument();
 });
@@ -120,7 +125,7 @@ it('asks for Not Held reason only after choosing that action',async()=>{
 });
 it('sorts pending cards by time, preserves detail access and disables confirmation for read-only users',async()=>{
  data.sessions=[session({id:'later',name:'Lớp muộn',startTime:'11:00',pendingConfirmation:true}),session({id:'early',name:'Lớp sớm',pendingConfirmation:true})];
- renderPage(['gradebook.view']);fireEvent.click(await screen.findByRole('button',{name:'Chờ xác nhận (2)'}));
+ renderPage(['exams.view']);fireEvent.click(await screen.findByRole('button',{name:'Chờ xác nhận (2)'}));
  const dialog=screen.getByRole('dialog'),cards=within(dialog).getAllByRole('article');expect(cards[0]).toHaveTextContent('Lớp sớm');expect(cards[1]).toHaveTextContent('Lớp muộn');
  for(const card of cards){expect(within(card).getByRole('button',{name:'Không diễn ra'})).toBeDisabled();expect(within(card).getByRole('button',{name:'Đã diễn ra'})).toBeDisabled();}
  fireEvent.click(within(cards[0]).getByRole('button',{name:'Lớp sớm'}));expect(within(screen.getByRole('dialog',{name:'CHI TIẾT BUỔI THI'})).getByRole('button',{name:/Danh sách thí sinh.*Lớp sớm/})).toBeInTheDocument();expect(axios.post).not.toHaveBeenCalled();

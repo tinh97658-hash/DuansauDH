@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { PERMISSION_ROUTES } from '../auth/route-permissions.js';
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import bcrypt from "bcrypt";
 import { randomBytes } from "node:crypto";
@@ -8,6 +9,7 @@ import { AuditService } from "../audit/audit.service.js";
 import { ChangeLogService } from "../audit/change-log.service.js";
 import { AdministrationSafetyService } from "../auth/administration-safety.service.js";
 import { RbacService } from "../auth/rbac.service.js";
+import { workingProfileStorage } from '../auth/profile-context.js';
 import { Role } from "../database/models/role.model.js";
 import { Staff } from "../database/models/staff.model.js";
 import { StaffRole } from "../database/models/staff-role.model.js";
@@ -175,6 +177,7 @@ export class AccountsService {
         nextRoleIds = dto.roleIds ? [...new Set(dto.roleIds)] : [...previousRoleIds];
         addedRoleIds = nextRoleIds.filter(roleId => !previousRoleIds.has(roleId));
         removedRoleIds = [...previousRoleIds].filter(roleId => !nextRoleIds.includes(roleId));
+        if(actorId===id&&removedRoleIds.includes(workingProfileStorage.getStore()?.roleId||''))throw new ConflictException('Không thể tự gỡ hồ sơ làm việc đang sử dụng. Hãy chuyển sang hồ sơ quản trị khác.');
         const roles = await this.resolveRoles(nextRoleIds, transaction);
         this.assertAssignableRoles(roles, previousRoleIds);
         const assignmentsChanged = previousRoleIds.size !== nextRoleIds.length || nextRoleIds.some((roleId) => !previousRoleIds.has(roleId));
@@ -336,7 +339,7 @@ export class AccountsService {
   async mePermissions(user: unknown) {
     if (!(user instanceof Staff)) return { permissions: [] as string[], roles: [] as string[] };
     const access = await this.rbac.effectiveAccess(user);
-    return { permissions: [...access.permissions], roles: access.roleCodes, groupScope: access.groupScope,
+    return { routeCatalog: PERMISSION_ROUTES,permissions: [...access.permissions], roles: access.roleCodes, groupScope: access.groupScope,
       schedulingPolicyVersion: 2, academicScope: "institution", academicGrants: access.academicGrants ?? [], schedulingGrants: access.schedulingGrants ?? [] };
   }
 

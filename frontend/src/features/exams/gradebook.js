@@ -27,16 +27,17 @@ export const formatAttemptScores = value => {
   return scores.map(score => formatScore(score)).filter(Boolean).join(", ");
 };
 export const calculateGrade = (row) => {
-  const ineligible = row.eligibilityFrozen && row.eligible === false && !row.examExempt && !row.profileForeignLanguageExempt;
+  const ineligible = (row.eligibilityFrozen || row.workflowPhase === 'final') && row.eligible === false && !row.examExempt && !row.profileForeignLanguageExempt;
   if (row.finalized) return { courseScore: numericScore(row.courseScore), grade4: numericScore(row.grade4),
     letterGrade: row.letterGrade || "", result: ineligible && (!row.result || row.result === 'pending') ? 'failed' : row.result || "pending" };
-  if(row.workflowPhase==='components'||(row.eligibilityFrozen&&row.eligible===false))return {courseScore:null,grade4:null,letterGrade:'',result:row.studyLeaveFailure?'failed':row.profileForeignLanguageExempt?'passed':row.examExempt?'exempt':ineligible?'failed':'pending'};
+  if(row.workflowPhase==='components'||((row.eligibilityFrozen||row.workflowPhase==='final')&&row.eligible===false))return {courseScore:null,grade4:null,letterGrade:'',result:row.studyLeaveFailure?'failed':row.profileForeignLanguageExempt?'passed':row.examExempt?'exempt':ineligible?'failed':'pending'};
   return calculatePolicyGrade(row, row.gradingPolicy || DEFAULT_GRADING_POLICY);
 };
 export const updateGradeDraft = (row, patch = {}) => {
   const rawScores = rawComponentScores(row);
   for (const key of COMPONENT_KEYS) if (Object.prototype.hasOwnProperty.call(patch, key)) rawScores[key] = numericScore(patch[key]);
   const draft = { ...row, ...patch, rawScores };
+  if (draft.workflowPhase && !draft.eligibilityFrozen) draft.eligible = calculateExamEligibility(draft);
   const grade = calculateGrade(draft);
   const eligible = draft.eligibilityFrozen?draft.eligible:calculateExamEligibility(draft);
   return { ...draft, ...grade, eligible, attemptScores: !draft.workflowPhase && !draft.studyLeaveFailure && !draft.examExempt && eligible === false ? "0.0" : formatScore(draft.examScore), courseScore: formatScore(grade.courseScore), grade4: formatScore(grade.grade4, 4) };

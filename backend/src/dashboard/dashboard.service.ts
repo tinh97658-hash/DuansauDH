@@ -1,4 +1,5 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
+import { GroupScopeService } from '../auth/group-scope.service.js';
 import { RbacService } from "../auth/rbac.service.js";
 import { canWriteScheduling } from "../common/scheduling-write.guard.js";
 import { Staff } from "../database/models/staff.model.js";
@@ -43,6 +44,7 @@ export class DashboardService {
     private readonly rbac: RbacService,
     private readonly gradebooks: ExamGradebookService,
     private readonly db: Sequelize,
+    @Optional() private readonly scope?: GroupScopeService,
   ) {}
 
   private async learnerRequests(year: string, kind: "studyLeaveApproval" | "majorTransferApproval") {
@@ -120,9 +122,8 @@ export class DashboardService {
     };
   }
 
-  private async grades(year: string, offeringsPromise: Promise<any[]>) {
-    const offerings = await offeringsPromise;
-    const tracking = await this.gradebooks.tracking(offerings, true);
+  private async grades(year: string, offeringsPromise: Promise<any[]>, trackingPromise: Promise<Map<string, any>>) {
+    const [offerings, tracking] = await Promise.all([offeringsPromise, trackingPromise]);
     const warningGroups = [
       { key: 'components', title: 'CHỜ NHẬP ĐIỂM THÀNH PHẦN', items: [] as any[] },
       { key: 'exam', title: 'CHỜ TỔ CHỨC THI', items: [] as any[] },
@@ -150,9 +151,8 @@ export class DashboardService {
       href: items[0]?.href || href("/masters/exam-lists", { year }) };
   }
 
-  private async approvals(year: string, offeringsPromise: Promise<any[]>) {
-    const offerings = await offeringsPromise;
-    const tracking = await this.gradebooks.tracking(offerings);
+  private async approvals(year: string, offeringsPromise: Promise<any[]>, trackingPromise: Promise<Map<string, any>>) {
+    const [offerings, tracking] = await Promise.all([offeringsPromise, trackingPromise]);
     const eligibility: any[] = [], results: any[] = [], reopens: any[] = [];
     for (const offering of offerings) {
       const state = tracking.get(offering.id);
@@ -186,15 +186,20 @@ export class DashboardService {
     const majors = () => majorsPromise ||= this.system.listMajors("masters").then((rows) => rows.map(plain));
     // Share only within this request, preserving each user's scope and fresh data on refresh.
     let offeringsPromise: Promise<any[]> | undefined;
-    const offerings = () => offeringsPromise ||= this.scheduling.listCourseOfferings({ program: "masters", academicYear: year }).then(rows => rows.map(plain));
+    const read = <T>(work: () => Promise<T>) => this.scope ? this.scope.withReadTransaction(work) : work();
+    const offerings = () => offeringsPromise ||= read(() =>
+      this.scheduling.listCourseOfferings({ program: "masters", academicYear: year })).then(rows => rows.map(plain));
+    let trackingPromise: Promise<Map<string, any>> | undefined;
+    const tracking = () => trackingPromise ||= offerings().then(rows =>
+      read(() => this.gradebooks.tracking(rows, permissions.grades && (!section || section === 'grades'))));
     // Each program supplies the same section contract. Add doctoral providers here as
     // those workflows ship; never fall back to masters data or fabricated zero counts.
     const providers: Record<DashboardProgram, Partial<Record<DashboardSection, () => Promise<any>>>> = {
       masters: {
         grouping: () => this.grouping(year, majors()),
         teaching: () => this.teaching(year, permissions, offerings()),
-        grades: () => this.grades(year, offerings()),
-        approvals: () => this.approvals(year, offerings()),
+        grades: () => this.grades(year, offerings(), tracking()),
+        approvals: () => this.approvals(year, offerings(), tracking()),
         studyLeaveApproval: () => this.learnerRequests(year, "studyLeaveApproval"),
         majorTransferApproval: () => this.learnerRequests(year, "majorTransferApproval"),
       },

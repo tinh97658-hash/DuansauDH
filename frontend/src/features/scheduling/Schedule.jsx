@@ -281,14 +281,14 @@ export default function Schedule({ user }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const canEdit = can("scheduling.write");
-  const offerings = useLoad(async () => rows(await api.get("/scheduling/course-offerings?program=masters&includeConflicts=true")), []);
-  const majors = useLoad(async () => rows(await api.get("/system/majors?program=masters")), []);
+  const offerings = useLoad(async signal => rows(await api.get("/scheduling/course-offerings?program=masters&includeConflicts=true", { signal })), []);
+  const majors = useLoad(async signal => rows(await api.get("/system/majors?program=masters", { signal })), []);
   const disciplines = disciplinesFromMajors(majors.data || []);
   const visibleMajors = majorsForDiscipline(majors.data || [], disciplineId);
   const visibleMajorIds = new Set(visibleMajors.map((major) => major.id));
   const end = formatDateKey(addDays(week, 6));
-  const sessions = useLoad(async () => rows(await api.get(`/scheduling/teaching-sessions?${new URLSearchParams({ from: week, to: end })}`)), [week, end]);
-  const pending = useLoad(async () => canEdit ? rows(await api.get("/scheduling/pending-teaching-sessions")).filter(row => (row.courseOffering?.canWriteSchedule ?? row.courseOffering?.scopeWritable) !== false) : [], [canEdit]);
+  const sessions = useLoad(async signal => rows(await api.get(`/scheduling/teaching-sessions?${new URLSearchParams({ from: week, to: end })}`, { signal })), [week, end]);
+  const pending = useLoad(async signal => canEdit ? rows(await api.get("/scheduling/pending-teaching-sessions", { signal })).filter(row => (row.courseOffering?.canWriteSchedule ?? row.courseOffering?.scopeWritable) !== false) : [], [canEdit]);
   const all = offerings.data || [];
   const selected = all.find((offering) => offering.id === selectedId);
   useEffect(() => {

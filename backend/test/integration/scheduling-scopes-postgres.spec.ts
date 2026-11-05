@@ -286,26 +286,28 @@ describeDb('Scheduling grants: PostgreSQL RLS and actual HTTP requests', () => {
     expect(institution.body.canWriteSchedule).toBe(true);
     await request(app.getHttpServer()).get('/masters/exam-lists/options').set('x-test-actor', ids.staffA).expect(403);
   });
-  it('reads institution grade rosters with no group assignment and keeps approval independent', async () => {
+  it('hides grade rosters without a class assignment and keeps approval independent', async () => {
     const options = await request(app.getHttpServer()).get('/masters/exam-lists/options').set('x-test-actor',ids.staffD).expect(200);
-    expect(options.body.groups.map((g:any)=>g.id)).toEqual(expect.arrayContaining([ids.groupA,ids.groupB,ids.other]));
-    expect(options.body.courseOfferings.map((o:any)=>o.id)).toEqual(expect.arrayContaining([ids.offering,ids.unrelated]));
+    expect(options.body.groups).toEqual([]);
+    expect(options.body.courseOfferings).toEqual([]);
     const parameters={classGroupId:ids.groupA,courseOfferingId:ids.offering,rosterScope:'offering'};
-    const roster=await request(app.getHttpServer()).get('/masters/exam-lists').query(parameters).set('x-test-actor',ids.staffD).expect(200);
-    expect(roster.body.totalRows).toBe(2);
+    await request(app.getHttpServer()).get('/masters/exam-lists').query(parameters).set('x-test-actor',ids.staffD).expect(403);
     await request(app.getHttpServer()).post('/masters/exam-lists/eligibility/workflow').set('x-test-actor',ids.staffD)
       .send({...parameters,action:'approve',revision:0,version:0,note:'Forbidden'}).expect(403);
-    await request(app.getHttpServer()).get('/masters/exam-schedule').query({from:'2099-01-01',to:'2099-01-07'}).set('x-test-actor',ids.staffA).expect(200);
+    await request(app.getHttpServer()).get('/masters/exam-schedule').query({from:'2099-01-01',to:'2099-01-07'}).set('x-test-actor',ids.staffA).expect(403);
   });
-  it('writes grades for an unassigned group while preventing profile, teaching and approval changes', async () => {
+  it('writes all member classes of a related merged offering and prevents profile, teaching and approval changes', async () => {
+    await query('UPDATE class_groups SET responsible_staff_id=:staff WHERE id=:id RETURNING id',{staff:ids.staffD,id:ids.groupA});
     await scoped(ids.staffD,'');
     await query("SELECT set_config('app.academic_domain','gradebook',true),set_config('app.academic_permission','gradebook.submit',true)");
     expect(await query('SELECT id FROM class_groups WHERE id=:id FOR UPDATE',{id:ids.groupB})).toHaveLength(1);
     expect(await query('SELECT id FROM course_offerings WHERE id=:id FOR UPDATE',{id:ids.offering})).toHaveLength(1);
     await query('INSERT INTO course_exam_workflows(course_offering_id) VALUES(:id) RETURNING course_offering_id',{id:ids.offering});
     expect(await query(`INSERT INTO course_exam_gradebooks(id,class_group_id,course_offering_id,revision,grades,created_at,updated_at)
-      VALUES(:id,:group,:offering,1,'[]'::jsonb,now(),now()) RETURNING id`,{id:randomUUID(),group:ids.groupB,offering:ids.offering})).toHaveLength(1);
-    for(const sql of ["UPDATE course_exam_workflows SET eligibility_status='approved' WHERE course_offering_id=:id",
+      VALUES(:id,:group,:offering,1,'[]'::jsonb,now(),now()) RETURNING id`,{id:randomUUID(),group:ids.groupA,offering:ids.offering})).toHaveLength(1);
+    expect(await query(`INSERT INTO course_exam_gradebooks(id,class_group_id,course_offering_id,revision,grades,created_at,updated_at)
+      VALUES(:id,:group,:offering,1,'[]',now(),now()) RETURNING id`,{id:randomUUID(),group:ids.groupB,offering:ids.offering})).toHaveLength(1);
+    for(const sql of ["UPDATE course_exam_workflows SET result_status='approved' WHERE course_offering_id=:id",
       "UPDATE course_offerings SET name='forged' WHERE id=:id", "UPDATE class_groups SET name='forged' WHERE id=:group",
       "UPDATE admission_records SET full_name='forged' WHERE id=:record RETURNING id"]){
       const result=await db.transaction({transaction:tx},savepoint=>db.query(sql,{replacements:{id:ids.offering,group:ids.groupB,record:ids.recordB},transaction:savepoint})).then(value=>value,()=>null);
@@ -342,21 +344,6 @@ describeDb('Scheduling grants: PostgreSQL RLS and actual HTTP requests', () => {
     const completed = await request(app.getHttpServer()).put(`/scheduling/course-offerings/${ids.offering}/completion`).send({ cancelPlannedSessions: true, expectedPlannedSessionIds: plannedIds }).expect(200);
     expect(completed.body.status).toBe('completed');
     expect(completed.body).not.toHaveProperty('gradebookSnapshot');
-    const parameters={classGroupId:ids.groupA,courseOfferingId:ids.offering,rosterScope:'offering'};
-    const book=await request(app.getHttpServer()).get('/masters/exam-lists').query(parameters).set('x-test-actor',ids.staffD).expect(200);
-    const rows=book.body.rows.map((r:any)=>({participantId:r.participantId,testScore:8,assignmentScore:8,examScore:null,
-      examExempt:false,letterGrade:'',attemptScores:[],result:'pending',policyVersion:r.eligibilityPolicy.version,policyRulesVersion:r.eligibilityPolicy.rulesVersion}));
-    const saved=await request(app.getHttpServer()).put('/masters/exam-lists').set('x-test-actor',ids.staffD)
-      .send({...parameters,revision:book.body.revision,rows});
-    expect({status:saved.status,body:saved.status===200?null:saved.body}).toEqual({status:200,body:null});
-    expect(saved.body.rows).toHaveLength(2);
-    expect(saved.body.rows.every((row:any)=>row.testScore===8)).toBe(true);
-    await db.query('UPDATE roles SET group_read_only=true WHERE id=:id',{replacements:{id:ids.roleD},transaction:null});
-    try {
-      await request(app.getHttpServer()).put('/masters/exam-lists').set('x-test-actor',ids.staffD)
-        .send({...parameters,revision:saved.body.revision,rows}).expect(403);
-    } finally { await db.query('UPDATE roles SET group_read_only=false WHERE id=:id',{replacements:{id:ids.roleD},transaction:null}); }
-
     expect(await query(`SELECT actor_staff_id FROM auth_audit_logs WHERE actor_staff_id=:actor AND action='scheduling.course_offerings.update' AND metadata->>'statusAfter'='completed'`, { actor: ids.staffA })).toEqual([{ actor_staff_id: ids.staffA }]);
   });
 });

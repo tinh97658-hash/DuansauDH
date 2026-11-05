@@ -40,7 +40,11 @@ export const SYSTEM_ROLES: RoleDefinition[] = [
   },
 ];
 
+import { permissionModules,permissionTreeMeta } from './permission-tree.js';
+import { ROUTE_PERMISSION_ENTRIES } from './route-permissions.js';
 export const PERMISSIONS: PermissionDefinition[] = [
+  ...[...new Map(Object.values(permissionModules).map(value=>[value.id,value])).values()].map(module=>({
+    code:`module.${module.id}`,group:module.name,name:`Mở module ${module.name}`,description:'Cổng truy cập module. Quyền xem và ghi từng tab được cấp riêng.'})),
   // ===== Tài khoản & phân quyền =====
   { code: "account.view", group: "Tài khoản & phân quyền", name: "Xem tài khoản nhân sự", description: "Xem danh sách và thông tin tài khoản nhân sự; không tự cho phép tạo, sửa hoặc khóa tài khoản." },
   { code: "account.manage", group: "Tài khoản & phân quyền", name: "Quản lý tài khoản nhân sự", description: "Tạo, sửa, khóa hoặc mở tài khoản và gán vai trò. Cấp thêm quyền xem tài khoản để sử dụng màn hình quản lý." },
@@ -74,18 +78,20 @@ export const PERMISSIONS: PermissionDefinition[] = [
   // ===== Lớp học phần & xếp lịch =====
   { code: "scheduling.view", group: "Lớp học phần & xếp lịch", name: "Xem lớp học phần, lịch học", description: "Xem lớp học phần, danh sách học viên và lịch học toàn viện, không cần phân công nhóm." },
   { code: "scheduling.organize", group: "Lớp học phần & xếp lịch", name: "Tổ chức lớp học phần", description: "Tạo, quản lý và xóa lớp học phần theo điều kiện nghiệp vụ. Không cần được phân công quản lý lịch; quyền sửa lịch học được cấp riêng." },
-  { code: "scheduling.write", group: "Lớp học phần & xếp lịch", name: "Xếp, sửa và xác nhận lịch", description: "Xếp, sửa, xóa, xác nhận buổi học và hoàn thành giảng dạy toàn viện, không cần phân công nhóm. Khóa Chỉ xem luôn chặn ghi. Không bao gồm tổ chức lớp hoặc nhập, duyệt điểm." },
+  { code: "scheduling.write", group: "Lớp học phần & xếp lịch", name: "Xếp, sửa và xác nhận lịch học", description: "Xếp, sửa, xóa, xác nhận buổi học và hoàn thành giảng dạy toàn viện. Chỉ xem luôn chặn ghi. Không bao gồm xếp lịch thi, tổ chức lớp hoặc nhập, duyệt điểm." },
   { code: "scheduling.assign", group: "Lớp học phần & xếp lịch", name: "Phân công người quản lý lịch đào tạo", description: "Chọn người đầu mối phụ trách lịch đào tạo; phân công mới chuyển trách nhiệm từ người cũ. Không tự cấp quyền tạo lớp hoặc sửa lịch; các quyền nghiệp vụ được chọn riêng." },
 
   // ===== Thi & điểm =====
   { code: "gradebook.view", group: "Thi & điểm", name: "Xem danh sách thi, bảng điểm", description: "Xem danh sách thi và bảng điểm; không tự cho phép nhập điểm hoặc duyệt điểm." },
   { code: "gradebook.submit", group: "Thi & điểm", name: "Nhập và gửi duyệt điểm", description: "Nhập, lưu và gửi duyệt điểm. Cấp thêm quyền xem bảng điểm để thao tác trên giao diện; không bao gồm quyền duyệt hoặc mở lại điểm." },
   { code: "gradebook.approve", group: "Thi & điểm", name: "Duyệt, khóa và mở lại điểm", description: "Duyệt, khóa và mở lại điểm theo quy trình. Cấp thêm quyền xem bảng điểm; không thay thế quyền nhập và gửi duyệt." },
+  { code: "exams.view", group: "Thi & điểm", name: "Xem lịch thi", description: "Xem lịch thi của lớp phụ trách và toàn bộ lớp ghép có lớp mình phụ trách. Admin xem toàn bộ. Không bao gồm quyền thay đổi lịch thi." },
+  { code: "exams.write", group: "Thi & điểm", name: "Xếp, sửa và xác nhận lịch thi", description: "Tạo, sửa, hủy và xác nhận ca thi của lớp phụ trách hoặc lớp ghép có lớp mình phụ trách. Cấp thêm quyền Xem lịch thi để dùng giao diện. Không bao gồm lịch học hoặc nhập điểm; Chỉ xem luôn chặn ghi." },
   { code: "gradebook.policy", group: "Thi & điểm", name: "Cấu hình quy chế chấm điểm", description: "Cấu hình quy chế tính điểm và điều kiện đạt. Cần quyền xem nghiệp vụ Thạc sĩ để mở phần cấu hình tương ứng." },
   { code: "studyleave.request", group: "Bảo lưu & chuyển chuyên ngành", name: "Tạo yêu cầu bảo lưu", description: "Tạo yêu cầu bảo lưu và đề nghị gia hạn. Không được duyệt hoặc từ chối. Cần thêm quyền xem kế hoạch, CTĐT." },
-  { code: "studyleave.approve", group: "Bảo lưu & chuyển chuyên ngành", name: "Duyệt, từ chối và xử lý bảo lưu", description: "Chỉ dành cho quản trị hệ thống: duyệt, từ chối bảo lưu hoặc gia hạn, tiếp nhận học lại và xác nhận thôi học.", assignableRoleCodes: ["admin"] },
+  { code: "studyleave.approve", group: "Bảo lưu & chuyển chuyên ngành", name: "Duyệt, từ chối và xử lý bảo lưu", description: "Duyệt, từ chối bảo lưu hoặc gia hạn, tiếp nhận học lại và xác nhận thôi học." },
   { code: "majortransfer.request", group: "Bảo lưu & chuyển chuyên ngành", name: "Tạo yêu cầu chuyển chuyên ngành", description: "Tạo yêu cầu chuyển chuyên ngành trong phạm vi được phép. Không được duyệt hoặc từ chối. Cần thêm quyền xem hồ sơ." },
-  { code: "majortransfer.approve", group: "Bảo lưu & chuyển chuyên ngành", name: "Duyệt, từ chối chuyển chuyên ngành", description: "Chỉ dành cho quản trị hệ thống: duyệt hoặc từ chối yêu cầu chuyển chuyên ngành.", assignableRoleCodes: ["admin"] },
+  { code: "majortransfer.approve", group: "Bảo lưu & chuyển chuyên ngành", name: "Duyệt, từ chối chuyển chuyên ngành", description: "Duyệt hoặc từ chối yêu cầu chuyển chuyên ngành." },
 
   // ===== Báo cáo & thống kê =====
   { code: "reports.view", group: "Báo cáo & thống kê", name: "Xem báo cáo", description: "Xem báo cáo, bảng tổng hợp và bảng điểm cá nhân trong phạm vi dữ liệu được phép." },
@@ -96,16 +102,23 @@ export const PERMISSIONS: PermissionDefinition[] = [
   { code: "supervision.review", group: "Hướng dẫn & phản biện", name: "Duyệt hồ sơ được phân công", description: "Xem và xử lý hồ sơ được phân công hướng dẫn, phản biện. Quyền này khác với phụ trách nhóm và quản lý điểm thi." },
 ];
 
+for(const entry of ROUTE_PERMISSION_ENTRIES){
+  const capability=PERMISSIONS.find(permission=>permission.code===entry.capability);
+  PERMISSIONS.push({code:entry.code,group:entry.route.section,
+    name:entry.capability?capability!.name:`Xem ${entry.route.name}`,
+    description:`${entry.route.path}${entry.capability?' · '+capability!.description:''}`,
+    assignableRoleCodes:capability?.assignableRoleCodes});
+}
 export const PERMISSION_CODES: string[] = PERMISSIONS.map((permission) => permission.code);
-export const permissionAssignableToRole = (code: string, roleCode: string) => {
-  const allowed = PERMISSIONS.find(permission => permission.code === code)?.assignableRoleCodes;
-  return !allowed || allowed.includes(roleCode);
-};
+export const permissionAssignableToRole = (_code: string, _roleCode: string) => true;
 
-const VIEW_PERMISSIONS = ["catalog.view", "plan.view", "admission.view", "masters.view", "doctoral.view", "scheduling.view", "gradebook.view", "reports.view"];
+const VIEW_PERMISSIONS = ["catalog.view", "plan.view", "admission.view", "masters.view", "doctoral.view", "scheduling.view", "gradebook.view", "exams.view", "reports.view"];
+const withModules=(codes:string[])=>[...new Set([...codes,...ROUTE_PERMISSION_ENTRIES.filter(entry=>
+  entry.route.read.every(code=>codes.includes(code))&&(!entry.capability||codes.includes(entry.capability))).map(entry=>entry.code)]
+  .flatMap(code=>[`module.${permissionTreeMeta(code).moduleId}`,code]))];
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   admin: PERMISSION_CODES,
-  supervisor: [...VIEW_PERMISSIONS, "supervision.review", "scheduling.write"],
-  examiner: [...VIEW_PERMISSIONS, "scheduling.write", "gradebook.submit", "gradebook.policy"],
+  supervisor: withModules([...VIEW_PERMISSIONS, "supervision.review", "scheduling.write", "exams.write"]),
+  examiner: withModules([...VIEW_PERMISSIONS, "scheduling.write", "exams.write", "gradebook.submit", "gradebook.policy"]),
 };

@@ -31,6 +31,8 @@ const serialize = (log: DbChangeLog) => {
     newData: redactCredentials(value.newData),
     changedColumns: value.changedColumns,
     actorStaffId: value.actorStaffId,
+    actorProfileId:value.actorProfileId,
+    actorProfile:value.actorProfile,
     actorEmail: value.actorEmail,
     requestId: value.requestId,
     ip: value.ip,

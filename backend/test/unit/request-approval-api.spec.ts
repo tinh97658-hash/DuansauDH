@@ -24,10 +24,12 @@ it.each([
   await expect(apiAccess(controller, method as string, 'supervisor', ['admission.manage'])).rejects.toThrow(ForbiddenException);
 });
 
-it.each(['approve', 'reject'])('requires an admin role with an explicit grant for %s', async action => {
+it.each(['approve', 'reject'])('requires an explicit approval grant for %s independently of the role name', async action => {
   for (const role of ['supervisor', 'custom']) {
-    await expect(apiAccess(StudyLeaveController, 'action', role, ['plan.view', 'studyleave.request', 'studyleave.approve'], { action })).rejects.toThrow(ForbiddenException);
-    await expect(apiAccess(PlanController, 'decideMajorTransfer', role, ['admission.manage', 'majortransfer.request', 'majortransfer.approve'])).rejects.toThrow(ForbiddenException);
+    await expect(apiAccess(StudyLeaveController, 'action', role, ['plan.view', 'studyleave.request'], { action })).rejects.toThrow(ForbiddenException);
+    await expect(apiAccess(PlanController, 'decideMajorTransfer', role, ['admission.manage', 'majortransfer.request'])).rejects.toThrow(ForbiddenException);
+    await expect(apiAccess(StudyLeaveController, 'action', role, ['plan.view', 'studyleave.approve'], { action })).resolves.toBe(true);
+    await expect(apiAccess(PlanController, 'decideMajorTransfer', role, ['majortransfer.approve'])).resolves.toBe(true);
   }
   await expect(apiAccess(StudyLeaveController, 'action', 'admin', ['plan.view', 'studyleave.approve'], { action })).resolves.toBe(true);
   await expect(apiAccess(PlanController, 'decideMajorTransfer', 'admin', ['majortransfer.approve'])).resolves.toBe(true);

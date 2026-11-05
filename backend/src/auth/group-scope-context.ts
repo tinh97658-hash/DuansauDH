@@ -8,6 +8,7 @@ export interface GroupScopeContext {
   restrictView: boolean;
   restrictEdit: boolean;
   readOnly: boolean;
+  admissionAction?: 'view' | 'manage';
   schedulingView?: boolean;
   schedulingAction?: 'view' | 'write' | 'organize';
   schedulingGrants?: import('./scheduling-scopes.js').ScopedGrant[];

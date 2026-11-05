@@ -13,11 +13,10 @@ export function gradebookStage(offering: any, state: any = {}) {
   }
   if (state.result_status === 'approved') return 'completed';
   if (state.result_status === 'submitted') return 'result_pending';
-  if (state.eligibility_status === 'submitted') return 'eligibility_pending';
   if (state.eligibility_status === 'approved') {
     if (!Array.isArray(state.approvedRows) || !state.approvedRows.length) return 'review';
     if (state.approvedRows.some((row: any) => row.eligible == null
-      && !row.examExempt && !row.profileForeignLanguageExempt && !row.studyLeaveFailure)) return 'review';
+      && !row.examExempt && !row.profileForeignLanguageExempt && !row.studyLeaveFailure)) return 'components_missing';
     const candidates = state.approvedRows.filter((row: any) => row.eligible === true && !row.examExempt);
     const held = new Set(state.heldIds || []);
     // A partly held offering still needs exams for its remaining candidates.
@@ -26,7 +25,7 @@ export function gradebookStage(offering: any, state: any = {}) {
     const rows = resolveApprovedExamRows(state.approvedRows, state.books || [], state.heldIds || [], state);
     return unresolvedExamRows(rows).length ? 'exam_missing' : 'result_ready';
   }
-  if (state.componentsEntered === true) return 'eligibility_ready';
+  if (state.componentsEntered === true) return 'awaiting_exam';
   if (state.componentsEntered === false) return 'components_missing';
   return 'review';
 }
@@ -52,13 +51,14 @@ export function resolveApprovedExamRows(frozenRows: any[], books: any[], heldIds
       ? calculateExamGrade({ ...frozen, examScore }, frozen.gradingPolicy, frozen.eligibilityPolicy)
       : { ...emptyResult, ...(frozen.studyLeaveFailure ? { result: 'failed' } : frozen.profileForeignLanguageExempt ? { result: 'passed' } : frozen.examExempt ? { result: 'exempt' } : frozen.eligible === false ? { result: 'failed' } : {}) };
     return { ...frozen, ...calculated, examScore: frozen.eligible === true ? examScore : null, attemptScores: examScore == null ? [] : [examScore],
-      notes: previous?.notes ?? frozen.notes, eligibilityFrozen: true,
+      notes: previous?.notes ?? frozen.notes, eligibilityFrozen: ['submitted','approved'].includes(state.result_status),
       examScoreEditable: frozen.eligible === true && held.has(frozen.participantId) && state.result_status === 'draft',
       workflowPhase: 'final', finalized: state.result_status === 'approved' };
   });
 }
 
-export const unresolvedExamRows = (rows: any[]) => rows.filter(row => row.eligible === true && !row.examExempt && (row.examScore == null || row.result === 'pending'));
+export const unresolvedExamRows = (rows: any[]) => rows.filter(row => !row.examExempt && !row.profileForeignLanguageExempt && !row.studyLeaveFailure
+  && (row.eligible == null || (row.eligible === true && (row.examScore == null || row.result === 'pending'))));
 
 // An approved historical gradebook can prove finished marks, but cannot supply a missing exam date.
 export function legacyExamGradesComplete(status: string, snapshot: any) {

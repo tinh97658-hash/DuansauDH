@@ -54,8 +54,27 @@ uri.pathname = '/pgsms_group_scope_test';
       await require('../dist/database/migrations/084-automatic-institution-academic-scope.js').up({ context: db.getQueryInterface() });
       console.log('Applied migration 084 to isolated test database.');
     }
+    for (const [name, helper] of [
+      ['091-automatic-exam-eligibility', 'app_exam_final_approval()'],
+      ['092-gradebook-responsibility-scope', 'app_gradebook_offering_visible(uuid)'],
+      ['093-exam-schedule-permissions', 'app_exam_arrangement_related(uuid)'],
+      ['094-working-profiles-permission-tree','app_profile_role_allowed(uuid)'],
+      ['096-unassigned-admission-scope','app_admission_unassigned_allowed(uuid,boolean)'],
+    ]) {
+      const [ready] = await db.query('SELECT to_regprocedure(:helper) AS ready', { replacements: { helper } });
+      if (!ready[0].ready || (name.startsWith('092-') && process.argv.includes('--refresh-gradebook'))) {
+        await require(`../dist/database/migrations/${name}.js`).up({ context: db.getQueryInterface() });
+        console.log(`Applied migration ${name} to isolated test database.`);
+      }
+      else if(name.startsWith('094-'))await db.query(require(`../dist/database/migrations/${name}.js`).PROFILE_PERMISSION_GUARD_SQL);
+    }
+    const [routePermissions]=await db.query("SELECT id FROM permissions WHERE code='route.system.roles.view'");
+    if(!routePermissions.length||process.argv.includes('--refresh-routes')){
+      await require('../dist/database/migrations/095-route-permissions.js').up({context:db.getQueryInterface()});
+      console.log('Applied migration 095 to isolated test database.');
+    }
   } finally { await db.close(); }
-  const result = spawnSync(process.execPath, [require.resolve('jest/bin/jest'), '--config', 'test/jest.config.cjs', '--runInBand', ...process.argv.slice(2).filter(arg => arg !== '--refresh')], {
+  const result = spawnSync(process.execPath, [require.resolve('jest/bin/jest'), '--config', 'test/jest.config.cjs', '--runInBand', ...process.argv.slice(2).filter(arg => !['--refresh','--refresh-gradebook','--refresh-routes'].includes(arg))], {
     cwd: path.join(root, 'backend'), stdio: 'inherit', env: { ...process.env, DATABASE_URL: uri.toString(), POSTGRES_DB: 'pgsms_group_scope_test', NODE_ENV: 'test', RUN_GROUP_SCOPE_POSTGRES_TESTS: 'true', RUN_SCHEDULING_SCOPE_POSTGRES_TESTS: 'true', RUN_POSTGRES_SCHEDULING_TESTS: 'true' },
   });
   process.exitCode = result.status ?? 1;

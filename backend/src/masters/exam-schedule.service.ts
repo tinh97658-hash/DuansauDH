@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import { Transaction } from 'sequelize';
@@ -8,16 +8,23 @@ import { RbacService } from '../auth/rbac.service.js';
 import { ExamWorkflowService } from './exam-workflow.service.js';
 import { ConfirmExamDto, ExamScheduleQueryDto, ExamSessionActionDto, RescheduleExamDto, ScheduleExamDto, SaveExamArrangementDto } from './dto/exam-schedule.dto.js';
 import {activeExam, validateExamArrangement,externalInvigilatorKey,examRoomFits} from './exam-arrangement.js';
+import { GradebookAccessService } from './gradebook-access.service.js';
 
 @Injectable()
 export class ExamScheduleService {
-  constructor(@InjectConnection() private readonly db:Sequelize,private readonly workflow:ExamWorkflowService,private readonly rbac:RbacService){}
+  constructor(@InjectConnection() private readonly db:Sequelize,private readonly workflow:ExamWorkflowService,private readonly rbac:RbacService,
+    @Optional() private readonly access?:GradebookAccessService){}
   private query(sql:string,args:any={},tx?:Transaction){return this.workflow.query(sql,args,tx);}
-  private async authorize(actor:any){if(!(actor instanceof Staff))throw new ForbiddenException('Bạn không có quyền xếp lịch thi.');const access=await this.rbac.effectiveAccess(actor,true);if(!access.permissions.has('scheduling.write')||access.groupScope?.readOnly)throw new ForbiddenException('Bạn không có quyền xếp lịch thi.');}
-  async list(query:ExamScheduleQueryDto){
+  private async authorize(actor:any){if(!(actor instanceof Staff))throw new ForbiddenException('Bạn không có quyền xếp lịch thi.');const access=await this.rbac.effectiveAccess(actor,true);if(!access.permissions.has('exams.write')||access.groupScope?.readOnly)throw new ForbiddenException('Bạn không có quyền xếp lịch thi.');}
+  async list(query:ExamScheduleQueryDto,actor?:any){
+    let allowed:Set<string>|null=null;
+    if(this.access){
+      if(!(actor instanceof Staff)||(await this.rbac.effectiveAccess(actor,true)).permissions.has('exams.view')!==true)throw new ForbiddenException('Bạn không có quyền xem lịch thi.');
+      allowed=await this.access.offeringIds(await this.access.forActor(actor));
+    }
     const bounds=await this.query(`SELECT (CAST(:to AS date) - CAST(:from AS date)) BETWEEN 0 AND 62 ok`,query);
     if(!bounds[0]?.ok)throw new BadRequestException('Khoảng lịch tối đa 63 ngày.');
-    const queue=await this.query(`SELECT o.id,o.name,s.name AS "subjectName",s.id AS "subjectId",s.code AS "subjectCode",
+    let queue=await this.query(`SELECT o.id,o.name,s.name AS "subjectName",s.id AS "subjectId",s.code AS "subjectCode",
       w.eligibility_version AS "eligibilityVersion",p.id AS "snapshotId",
       (SELECT jsonb_agg(r->>'participantId') FROM jsonb_array_elements(p.rows) r WHERE r->>'eligible'='true' AND r->>'examExempt' IS DISTINCT FROM 'true') AS "candidateIds",
       (SELECT jsonb_agg(jsonb_build_object('participantId',r->>'participantId','code',r->>'code','fullName',r->>'fullName')) FROM jsonb_array_elements(p.rows) r WHERE r->>'eligible'='true' AND r->>'examExempt' IS DISTINCT FROM 'true') AS candidates,
@@ -26,11 +33,11 @@ export class ExamScheduleService {
       (SELECT count(*)::int FROM jsonb_array_elements(p.rows) r WHERE r->>'eligible'='true' AND r->>'examExempt' IS DISTINCT FROM 'true') AS "candidateCount",
       (SELECT count(*)::int FROM jsonb_array_elements(p.rows) r WHERE r->>'eligible'='true' AND r->>'examExempt' IS DISTINCT FROM 'true' AND NOT EXISTS(
         SELECT 1 FROM course_exam_sessions es JOIN course_exam_session_candidates c ON c.session_id=es.id
-        WHERE es.course_offering_id=o.id AND es.eligibility_snapshot_id=p.id AND es.status IN ('scheduled','held') AND c.participant_id=r->>'participantId')) AS "remainingCount"
+        WHERE es.course_offering_id=o.id AND es.status IN ('scheduled','held') AND c.participant_id=r->>'participantId')) AS "remainingCount"
       FROM course_exam_workflows w JOIN course_offerings o ON o.id=w.course_offering_id JOIN subjects s ON s.id=o.subject_id
       JOIN course_exam_eligibility_snapshots p ON p.id=w.eligibility_snapshot_id
       WHERE w.mode='new' AND w.eligibility_status='approved' AND o.status='completed' ORDER BY o.name,o.id`);
-    const sessions=await this.query(`SELECT es.*,es.exam_date::text AS "examDate",es.start_time::text AS "startTime",es.end_time::text AS "endTime",
+    let sessions=await this.query(`SELECT es.*,es.exam_date::text AS "examDate",es.start_time::text AS "startTime",es.end_time::text AS "endTime",
       es.course_offering_id AS "courseOfferingId",es.eligibility_snapshot_id AS "snapshotId",es.room_id AS "roomId",es.lecturer_id AS "lecturerId",COALESCE(l.name,es.external_invigilator_name) AS "lecturerName",
       es.external_invigilator_name AS "externalInvigilatorName",es.external_unit_name AS "externalUnitName",
       es.arrangement_id AS "arrangementId",es.round_no AS "roundNo",a.version AS "arrangementVersion",a.note AS "arrangementNote",w.eligibility_version AS "eligibilityVersion",
@@ -46,6 +53,13 @@ export class ExamScheduleService {
       FROM course_exam_sessions es JOIN course_exam_arrangements a ON a.id=es.arrangement_id LEFT JOIN course_exam_workflows w ON w.course_offering_id=es.course_offering_id JOIN course_offerings o ON o.id=es.course_offering_id JOIN subjects s ON s.id=o.subject_id JOIN rooms r ON r.id=es.room_id LEFT JOIN lecturers l ON l.id=es.lecturer_id JOIN course_exam_eligibility_snapshots p ON p.id=es.eligibility_snapshot_id
       WHERE es.arrangement_id IN (SELECT x.arrangement_id FROM course_exam_sessions x WHERE x.exam_date BETWEEN :from::date AND :to::date OR (x.status='scheduled' AND (x.exam_date+x.end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp()))
       ORDER BY es.exam_date,es.start_time,es.id`,query);
+    if(allowed!==null){
+      const visible=allowed;
+      const mixed=new Set(sessions.filter(session=>!visible.has(session.courseOfferingId)).map(session=>session.arrangementId));
+      queue=queue.filter(offering=>visible.has(offering.id));
+      sessions=sessions.filter(session=>visible.has(session.courseOfferingId)).map(session=>({...session,
+        canEdit:session.canEdit&&!mixed.has(session.arrangementId)}));
+    }
     const rooms=await this.query('SELECT id,code,name,capacity,is_active AS "isActive" FROM rooms ORDER BY code,id');
     const lecturers=await this.query('SELECT id,code,name,active,unit_id AS "unitId" FROM lecturers ORDER BY name,id');
     const units=await this.query('SELECT id,code,name,active FROM units ORDER BY sort_order,name,id');
@@ -103,15 +117,25 @@ export class ExamScheduleService {
       // All mutations lock offerings before the arrangement, then resources.
       // Sorting gives concurrent multi-offering requests a consistent lock order.
       const states=new Map<string,any>();
-      for(const offering of [...offeringIds].sort())states.set(offering,(await this.workflow.lock(offering,tx)).state);
+      for(const offering of [...offeringIds].sort()){
+        if(this.access)await this.access.assertOffering(actor,offering,tx);
+        states.set(offering,(await this.workflow.lock(offering,tx)).state);
+      }
       let existing:any[]=[];
       if(arrangementId){
         const [parent]=await this.query('SELECT * FROM course_exam_arrangements WHERE id= :id FOR UPDATE',{id},tx);
         if(!parent)throw new NotFoundException('Không tìm thấy buổi thi.');
         this.checkVersion(parent,dto.version!);
+        // Inspect every member before FOR UPDATE: write RLS intentionally hides
+        // unowned sessions from locking reads, but they still block parent edits.
+        if(this.access){
+          const references=await this.query('SELECT DISTINCT course_offering_id FROM course_exam_sessions WHERE arrangement_id=:id',{id},tx);
+          for(const reference of references)await this.access.assertOffering(actor,reference.course_offering_id,tx);
+        }
         existing=await this.query(`SELECT *,exam_date::text AS "examDate",start_time::text AS "startTime",end_time::text AS "endTime",
           (exam_date+start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'>clock_timestamp() AS future
           FROM course_exam_sessions WHERE arrangement_id= :id ORDER BY id FOR UPDATE`,{id},tx);
+        if(this.access)for(const offering of new Set(existing.map(session=>session.course_offering_id)))await this.access.assertOffering(actor,offering,tx);
         if(existing.filter(activeExam).some(s=>!dto.groups.some(g=>g.id===s.id)))
           throw new ConflictException('Không được bỏ nhóm thi đang có hiệu lực. Hãy hủy riêng nhóm và nhập lý do.');
       }else if(dto.groups.some(g=>g.id))throw new BadRequestException('Nhóm thi mới không được có mã lịch cũ.');
@@ -128,8 +152,8 @@ export class ExamScheduleService {
         }else{
           await this.periodOpen(dto.examDate,dto.period,tx);
           await this.future(dto.examDate,g.startTime,tx);
-          if(state.mode!=='new'||state.eligibility_status!=='approved'||state.eligibility_version!==g.eligibilityVersion||state.eligibility_snapshot_id!==g.snapshotId)
-            throw new ConflictException('Danh sách thi chưa duyệt hoặc phiên bản đã thay đổi.');
+          if(state.mode!=='new'||state.eligibility_status!=='approved'||state.eligibility_version!==g.eligibilityVersion||(!old&&state.eligibility_snapshot_id!==g.snapshotId))
+            throw new ConflictException('Danh sách thi chưa đủ điểm thành phần hoặc phiên bản đã thay đổi.');
           const [offering]=await this.query('SELECT status FROM course_offerings WHERE id= :id',{id:g.courseOfferingId},tx);
           if(offering?.status!=='completed')throw new ConflictException('Lớp học phần chưa hoàn thành giảng dạy.');
         }
@@ -138,10 +162,9 @@ export class ExamScheduleService {
           WHERE p.id= :id AND p.course_offering_id= :offering`,{id:g.snapshotId,offering:g.courseOfferingId},tx);
         if(!snapshot)throw new ConflictException('Danh sách thi không thuộc lớp học phần.');
         const rows=snapshot.rows.filter((r:any)=>r.eligible===true&&!r.examExempt);
-        const candidates=old?(await this.query('SELECT participant_id FROM course_exam_session_candidates WHERE session_id= :id',{id:old.id},tx)).map(r=>r.participant_id):rows.map((r:any)=>r.participantId);
+        const assigned=old?[]:await this.query(`SELECT c.participant_id FROM course_exam_sessions es JOIN course_exam_session_candidates c ON c.session_id=es.id WHERE es.course_offering_id=:offering AND es.status IN ('scheduled','held')`,{offering:g.courseOfferingId},tx);
+        const candidates=old?(await this.query('SELECT participant_id FROM course_exam_session_candidates WHERE session_id= :id',{id:old.id},tx)).map(r=>r.participant_id):rows.map((r:any)=>r.participantId).filter((id:string)=>!assigned.some(c=>c.participant_id===id));
         if(!candidates.length)throw new ConflictException('Không có thí sinh cần thi.');
-        if(!old&&(await this.query(`SELECT id FROM course_exam_sessions WHERE course_offering_id= :offering AND eligibility_snapshot_id= :snapshot AND status IN ('scheduled','held') LIMIT 1`,{offering:g.courseOfferingId,snapshot:g.snapshotId},tx)).length)
-          throw new ConflictException('Danh sách đã được xếp thi.');
         const aliasNames:Record<string,string>={};
         prepared.push({...g,old,locked,rows,candidates,aliases:await this.aliases(candidates,tx,rows,aliasNames),aliasNames,label:`${snapshot.name} / ${snapshot.subject}`});
       }
@@ -178,7 +201,7 @@ export class ExamScheduleService {
           WHERE s.status IN ('scheduled','held') AND s.arrangement_id<> :id AND s.exam_date= :date::date
             AND s.start_time< :end::time AND s.end_time> :start::time AND c.participant_id IN (:candidates)`,
           {id,date:dto.examDate,start:g.startTime,end:g.endTime,candidates:g.aliases},tx);
-        if(clashes.length)throw new ConflictException({code:'EXAM_CANDIDATE_CONFLICT',message:`Thí sinh của ${g.label} bị trùng giờ ${g.startTime}–${g.endTime}: ${clashes.map(c=>`${g.aliasNames[c.participant_id]||c.participant_id} (${c.name} / ${c.subject})`).join(', ')}.`});
+        if(clashes.length)throw new ConflictException({code:'EXAM_CANDIDATE_CONFLICT',message:`Thí sinh của ${g.label} đã có lịch thi khác trùng giờ ${g.startTime}–${g.endTime}.`});
       }
       if(busy)throw new ConflictException({code:'EXAM_LECTURER_CONFLICT',message:'Giám thị đã có buổi thi trùng giờ.'});
       if(!arrangementId)await this.db.query('INSERT INTO course_exam_arrangements(id,note) VALUES(:id,:note)',{transaction:tx,replacements:{id,note:dto.note||''}});
@@ -208,6 +231,7 @@ export class ExamScheduleService {
     await this.authorize(actor);
     const [s]=await this.query(`SELECT s.*,a.version AS "arrangementVersion",(s.exam_date+s.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'>clock_timestamp() AS future FROM course_exam_sessions s JOIN course_exam_arrangements a ON a.id=s.arrangement_id WHERE s.id= :id`,{id});
     if(!s)throw new NotFoundException('Không tìm thấy ca thi.');
+    if(this.access)await this.access.assertOffering(actor,s.course_offering_id);
     const siblings=await this.query(`SELECT id FROM course_exam_sessions WHERE arrangement_id= :id AND status IN ('scheduled','held')`,{id:s.arrangement_id});
     if(siblings.length!==1||s.status!=='scheduled')throw new ConflictException('Hãy sửa lịch trong buổi thi chung để giữ đồng bộ phòng và giám thị.');
     if(!s.future)throw new ConflictException({code:'EXAM_START_PASSED',message:'Không thể sửa ca thi đã bắt đầu.'});
@@ -224,6 +248,7 @@ export class ExamScheduleService {
       // Offering first, matching all workflow/scheduling lock orders.
       const [ref]=await this.query('SELECT course_offering_id,arrangement_id FROM course_exam_sessions WHERE id= :id',{id},tx);
       if(!ref)throw new NotFoundException('Không tìm thấy ca thi.');
+      if(this.access)await this.access.assertOffering(actor,ref.course_offering_id,tx);
       await this.workflow.lock(ref.course_offering_id,tx);
       await this.query('SELECT id FROM course_exam_arrangements WHERE id= :id FOR UPDATE',{id:ref.arrangement_id},tx);
       const s=await this.session(id,tx);this.checkVersion(s,dto.version);

@@ -132,9 +132,10 @@ export default function ClassCourseHistory() {
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     Promise.all([
-      axios.get(`${API_BASE_URL}/system/majors?program=masters`, { withCredentials: true }),
-      axios.get(`${API_BASE_URL}/plan/classes?program=masters`, { withCredentials: true }),
+      axios.get(`${API_BASE_URL}/system/majors?program=masters`, { withCredentials: true, signal: controller.signal }),
+      axios.get(`${API_BASE_URL}/plan/classes?program=masters`, { withCredentials: true, signal: controller.signal }),
     ]).then(([majorResponse, groupResponse]) => {
       if (!active) return;
       setMajors(asList(majorResponse.data));
@@ -142,7 +143,7 @@ export default function ClassCourseHistory() {
       setError("");
     }).catch(() => active && setError("Không thể tải danh mục ngành và lớp."))
       .finally(() => active && setLoadingCatalog(false));
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, []);
 
   const disciplines = useMemo(() => disciplinesFromMajors(majors), [majors]);
@@ -190,6 +191,7 @@ export default function ClassCourseHistory() {
       return undefined;
     }
     let active = true;
+    const controller = new AbortController();
     setReport(null);
     setOfferings([]);
     setSelectedOffering(null);
@@ -199,10 +201,10 @@ export default function ClassCourseHistory() {
     Promise.all(academicYears.map(async (academicYear) => {
       const [progressResponse, offeringResponse] = await Promise.all([
         axios.get(`${API_BASE_URL}/scheduling/class-curriculum-progress`, {
-          params: { majorId, academicYear }, withCredentials: true,
+          params: { majorId, academicYear }, withCredentials: true, signal: controller.signal,
         }),
         axios.get(`${API_BASE_URL}/scheduling/course-offerings`, {
-          params: { program: "masters", majorId, academicYear }, withCredentials: true,
+          params: { program: "masters", majorId, academicYear }, withCredentials: true, signal: controller.signal,
         }).catch(() => ({ data: [] })),
       ]);
       return { report: progressResponse.data, offerings: asList(offeringResponse.data) };
@@ -212,7 +214,7 @@ export default function ClassCourseHistory() {
       setOfferings(responses.flatMap((response) => response.offerings));
     }).catch(() => active && setError("Không thể tải dữ liệu theo dõi tiến độ."))
       .finally(() => active && setLoadingReport(false));
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, [academicYears, loadingCatalog, majorId, visibleMajors, years, revision]);
 
   useEffect(() => {

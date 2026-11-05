@@ -54,7 +54,7 @@ export default function AdmissionScores() {
   const [search, setSearch] = useState(""), [filter, setFilter] = useState("all"), [majorFilter, setMajorFilter] = useState("all");
   const [thresholdDrafts, setThresholdDrafts] = useState({});
   const [discardAction, setDiscardAction] = useState(null);
-  const [showEligible, setShowEligible] = useState(false);
+  const [showOldRecords, setShowOldRecords] = useState(false);
   const [roundManagerOpen, setRoundManagerOpen] = useState(false), [roundsLoading, setRoundsLoading] = useState(false);
   const thresholdsDirty = Object.keys(thresholdDrafts).length > 0;
   const loadRounds = useCallback(async () => {
@@ -141,12 +141,15 @@ export default function AdmissionScores() {
     finally { setSaving(false); }
   };
   const rows = (data?.rows || []).filter((row) => {
-    const matchesView = showEligible
-      ? !row.stale && row.meetsCutoff === true && row.decision !== "rejected"
-      : row.decision === "pending";
+    if (!showOldRecords && row.decision !== "pending") return false;
     const matches = `${row.fullName} ${row.code || ""}`.toLocaleLowerCase("vi").includes(search.toLocaleLowerCase("vi"));
-    return matchesView && matches && (majorFilter === "all" || row.majorId === majorFilter) && (filter === "all" || (filter === "eligible" ? !row.stale && row.meetsCutoff === true
-      : filter === "below" ? row.meetsCutoff === false : filter === "unscored" ? row.total == null : row.decision === filter));
+    if (!matches) return false;
+    if (majorFilter !== "all" && row.majorId !== majorFilter) return false;
+    if (filter !== "all") {
+      return filter === "eligible" ? !row.stale && row.meetsCutoff === true
+        : filter === "below" ? row.meetsCutoff === false : filter === "unscored" ? row.total == null : row.decision === filter;
+    }
+    return true;
   });
   return <FeatureLayout title="Điểm xét tuyển thạc sĩ" group="Thủ tục đầu vào" hideHeader={false} desc="Chọn đợt xét tuyển toàn viện, nhập điểm ngưỡng từng ngành và điểm hồ sơ để lọc danh sách đạt ngưỡng.">
     <Stack spacing={2}>
@@ -196,15 +199,18 @@ export default function AdmissionScores() {
           <FilterSelectField label="Lọc ngành" value={majorFilter} onChange={(event) => setMajorFilter(event.target.value)} sx={{ width: { xs: "100%", sm: 240 }, maxWidth: "100%" }}>
             <MenuItem value="all">Tất cả ngành</MenuItem>{majors.map((major) => <MenuItem key={major.id} value={major.id}>{major.name}</MenuItem>)}
           </FilterSelectField>
-          <FilterSelectField label="Lọc hồ sơ" value={filter} onChange={(event) => setFilter(event.target.value)} sx={{ width: { xs: "100%", sm: 220 }, maxWidth: "100%" }}>
-            {[["all", "Tất cả"], ["eligible", "Đạt ngưỡng"], ["below", "Dưới ngưỡng"], ["unscored", "Chưa nhập điểm"], ["pending", "Chưa duyệt"], ["admitted", "Đã trúng tuyển"]].map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
+          <FilterSelectField label="Lọc hồ sơ" value={filter} onChange={(event) => {
+            setFilter(event.target.value);
+            if (["admitted", "rejected"].includes(event.target.value)) setShowOldRecords(true);
+          }} sx={{ width: { xs: "100%", sm: 220 }, maxWidth: "100%" }}>
+            {[["all", "Tất cả"], ["eligible", "Đạt ngưỡng"], ["below", "Dưới ngưỡng"], ["unscored", "Chưa nhập điểm"], ["pending", "Chưa duyệt"], ["admitted", "Đã trúng tuyển"], ["rejected", "Không trúng tuyển"]].map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
           </FilterSelectField>
         </Stack>
-        <BulkAdmissionWorkflow data={data} visibleRows={rows} paginationKey={`${roundId}:${search}:${filter}:${majorFilter}:${showEligible}`} admin={admin} loading={loading || saving} thresholdsDirty={thresholdsDirty} onRefresh={loadRanking} onDirtyChange={setScoresDirty} onBusyChange={setWorkflowBusy}
+        <BulkAdmissionWorkflow data={data} visibleRows={rows} paginationKey={`${roundId}:${search}:${filter}:${majorFilter}:${showOldRecords}`} admin={admin} loading={loading || saving} thresholdsDirty={thresholdsDirty} onRefresh={loadRanking} onDirtyChange={setScoresDirty} onBusyChange={setWorkflowBusy}
           recordViewControl={<FormControlLabel sx={{ m: 0, "& .MuiFormControlLabel-label": { fontSize: 12 } }}
-            label={showEligible ? "Hồ sơ đủ điều kiện" : "Hồ sơ chờ xét tuyển"}
-            control={<Switch checked={showEligible} disabled={loading || saving || workflowBusy}
-              onChange={(event) => setShowEligible(event.target.checked)} inputProps={{ role: "switch", "aria-label": "Hiển thị hồ sơ đủ điều kiện" }}
+            label="Hiển thị cả hồ sơ cũ (đã duyệt)"
+            control={<Switch checked={showOldRecords} disabled={loading || saving || workflowBusy}
+              onChange={(event) => { setShowOldRecords(event.target.checked); setFilter("all"); }} inputProps={{ role: "switch", "aria-label": "Hiển thị cả hồ sơ cũ (đã duyệt)" }}
               sx={{ "& .MuiSwitch-switchBase": { color: "#c62828" }, "& .MuiSwitch-track": { backgroundColor: "#c62828", opacity: 0.45 },
                 "& .MuiSwitch-switchBase.Mui-checked": { color: "#16803c" },
                 "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: "#16803c", opacity: 0.5 } }} />} />} />

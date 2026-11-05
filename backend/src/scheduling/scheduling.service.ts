@@ -215,13 +215,13 @@ export class SchedulingService {
             WHEN ar.id IS NOT NULL THEN 'admission:' || ar.id::text END AS participant_id
         FROM class_group_members cm LEFT JOIN admission_records ar ON ar.id = cm.admission_record_id
         WHERE cm.class_group_id IN (:groupIds)
-      ), saved_grades AS (
+      ), saved_grades AS MATERIALIZED (
         SELECT DISTINCT ON (book.course_offering_id, grade->>'participantId')
           book.course_offering_id, grade->>'participantId' AS participant_id, grade
         FROM course_exam_gradebooks book CROSS JOIN LATERAL jsonb_array_elements(book.grades) grade
         WHERE book.course_offering_id IN (:completedOfferingIds)
         ORDER BY book.course_offering_id, grade->>'participantId', book.updated_at DESC, book.class_group_id
-      ), completed_grades AS (
+      ), completed_grades AS MATERIALIZED (
         SELECT saved.* FROM saved_grades saved
         WHERE jsonb_typeof(grade->'courseScore') = 'number'
           OR grade->>'result' = 'exempt' OR grade->>'examExempt' = 'true'
@@ -570,7 +570,15 @@ export class SchedulingService {
     if (scope?.staffId && scope.schedulingAction) {
       const ids = [...new Set(offerings.map(row => row.id).filter(Boolean))];
       const capabilities = ids.length ? await this.sequelize.query<{ id: string; write: boolean; organize: boolean; participantCount: number }>(
-        "SELECT id, app_schedule_allowed(id,'scheduling.write') AS write, app_schedule_allowed(id,'scheduling.organize') AS organize, app_schedule_count(id) AS \"participantCount\" FROM course_offerings WHERE id IN (:ids)",
+        `WITH institution AS MATERIALIZED (
+          SELECT app_institution_permission('scheduling.write',true) AS can_write,
+            app_institution_permission('scheduling.organize',true) AS can_organize
+        )
+        SELECT id,
+          CASE WHEN institution.can_write THEN true ELSE app_schedule_allowed(id,'scheduling.write') END AS write,
+          CASE WHEN institution.can_organize THEN true ELSE app_schedule_allowed(id,'scheduling.organize') END AS organize,
+          app_schedule_count(id) AS "participantCount"
+        FROM course_offerings CROSS JOIN institution WHERE id IN (:ids)`,
         { replacements: { ids }, type: QueryTypes.SELECT, transaction },
       ) : [];
       const byId = new Map(capabilities.map(row => [row.id, row]));

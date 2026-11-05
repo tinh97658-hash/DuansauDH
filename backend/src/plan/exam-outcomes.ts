@@ -1,4 +1,5 @@
 import { notWithdrawnSql } from './study-leave-policy.js';
+import { participantUuidSql } from '../common/participant-identity.js';
 
 // Rank the learning attempt before edits to its gradebook. Expressions are
 // application-owned SQL, never request input. Updates only break ties within
@@ -36,7 +37,7 @@ export function examOutcomesSql() {
     book.updated_at recorded_at, offering.created_at attempted_at, entry.value grade
     FROM course_exam_gradebooks book JOIN course_offerings offering ON offering.id = book.course_offering_id
     CROSS JOIN LATERAL jsonb_array_elements(book.grades) entry(value)
-    LEFT JOIN admission_records identity ON entry.value->>'participantId' = 'admission:' || identity.id::text
+    LEFT JOIN admission_records identity ON identity.id = ${participantUuidSql("entry.value->>'participantId'", 'admission')}
     WHERE ${notWithdrawnSql("entry.value->>'participantId'", 'offering.id')}
     UNION ALL ${studyLeaveFailureOutcomesSql()}`;
 }

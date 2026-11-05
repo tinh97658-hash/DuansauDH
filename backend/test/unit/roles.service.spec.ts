@@ -28,7 +28,7 @@ const build = () => {
   const sequelize = { transaction: jest.fn((callback: any) => callback({})) };
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const rbac = { invalidate: jest.fn() };
-  const administrationSafety = { lock: jest.fn(), assertRetained: jest.fn() };
+  const administrationSafety = { lock: jest.fn(), assertRetained: jest.fn(),assertActorRetained:jest.fn() };
 
   const service = new RolesService(
     roles as any, permissions as any, rolePermissions as any, staffRoles as any,
@@ -38,15 +38,27 @@ const build = () => {
 };
 
 describe("RolesService", () => {
-  it.each(['create', 'update', 'setPermissions'])('rejects assigning approval permissions to non-admin roles via %s', async method => {
-    const { service, permissions, roles, rolePermissions } = build();
-    roles.findByPk.mockResolvedValue(roleRecord({ code: 'supervisor' }));
-    permissions.count.mockResolvedValue(1);
-    permissions.findAll.mockResolvedValue([{ id: 'approve', code: 'studyleave.approve' }]);
-    const dto = { code: 'new-role', name: 'Vai trò mới', permissionIds: ['approve'] };
-    const operation = method === 'create' ? service.create('actor', dto as any, {}) : method === 'update' ? service.update('actor', 'r1', dto as any, {}) : service.setPermissions('actor', 'r1', dto as any, {});
-    await expect(operation).rejects.toThrow('chỉ được cấp');
-    expect(rolePermissions.bulkCreate).not.toHaveBeenCalled();
+  it.each([
+    [{ id: 'write', code: 'exams.write' }],
+    [{ id: 'root', code: 'module.assessment' }, { id: 'write', code: 'exams.write' }],
+  ])('rejects an action without its module or read prerequisite: %j', async (...grants: any[]) => {
+    const { service, permissions } = build();
+    permissions.count.mockResolvedValue(grants.length);
+    permissions.findAll.mockResolvedValue(grants);
+    await expect((service as any).assertPermissionsExist(grants.map(value => value.id), 'custom'))
+      .rejects.toThrow(BadRequestException);
+  });
+  it('allows approval permissions to be assigned to any role including non-admin', async () => {
+    const { service, permissions } = build();
+    permissions.count.mockResolvedValue(4);
+    permissions.findAll.mockResolvedValue([
+      { id: 'plan-root', code: 'module.plan' },
+      { id: 'view', code: 'plan.view' },
+      { id: 'root', code: 'module.learner-status' },
+      { id: 'approve', code: 'studyleave.approve' },
+    ]);
+    await expect((service as any).assertPermissionsExist(['plan-root', 'view', 'root', 'approve'], 'supervisor'))
+      .resolves.not.toThrow();
   });
   it('ignores obsolete client scope choices and derives scope from granted actions', async () => {
     const { service, permissions } = build();

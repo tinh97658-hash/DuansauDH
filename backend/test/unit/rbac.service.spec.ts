@@ -14,11 +14,14 @@ describe("RbacService", () => {
     return { service, roles, staffRoles };
   };
 
-  it.each(['supervisor', 'custom', 'examiner'])('never resolves admin-only approvals from a %s role, including incorrect persisted grants', async code => {
+  it.each(['supervisor', 'custom', 'examiner'])('requires explicit approval grants for a %s role without hardcoded role-name restrictions', async code => {
     const { service, staffRoles } = build();
+    staffRoles.findAll.mockResolvedValue([{ role: role(code, ['studyleave.request', 'majortransfer.request']) }]);
+    expect([...(await service.effectiveAccess({ id: 's1', role: code }, true)).permissions])
+      .toEqual(['studyleave.request', 'majortransfer.request']);
     staffRoles.findAll.mockResolvedValue([{ role: role(code, ['studyleave.request', 'majortransfer.request', 'studyleave.approve', 'majortransfer.approve']) }]);
     const access = await service.effectiveAccess({ id: 's1', role: code }, true);
-    expect([...access.permissions]).toEqual(['studyleave.request', 'majortransfer.request']);
+    expect([...access.permissions]).toEqual(['studyleave.request', 'majortransfer.request', 'studyleave.approve', 'majortransfer.approve']);
   });
   it('requires approval grants on the admin role instead of bypassing the permission matrix', async () => {
     const { service, staffRoles } = build();

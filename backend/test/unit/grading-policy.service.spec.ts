@@ -16,6 +16,19 @@ const build = () => {
   return { service, subjects, sequelize, transaction, row };
 };
 
+it('loads latest weights by subject/year while sharing current rules and preserving legacy defaults', async () => {
+  const { service, sequelize } = build();
+  const shared = { ...structuredClone(LEGACY_GRADING_POLICY), version: 4, courseMinimum: 6 };
+  const specific = { ...structuredClone(LEGACY_GRADING_POLICY), version: 2, weights: { testScore: 20, assignmentScore: 30, examScore: 50 } };
+  sequelize.query.mockResolvedValueOnce([{ subjectId: 's1', year: '2026', policy: specific }]).mockResolvedValueOnce([{ policy: shared }]);
+  const result = await service.latestMany([{ subjectId: 's1', year: '2026' }, { subjectId: 's1', year: '2025' }]);
+  expect(result.get('s1:2026')).toMatchObject({ version: 2, rulesVersion: 4, courseMinimum: 6, weights: specific.weights });
+  expect(result.get('s1:2025')).toMatchObject({ version: LEGACY_GRADING_POLICY.version, rulesVersion: 4, weights: LEGACY_GRADING_POLICY.weights });
+  expect(sequelize.query).toHaveBeenCalledTimes(2);
+  expect(await service.latestMany([])).toEqual(new Map());
+  expect(sequelize.query).toHaveBeenCalledTimes(2);
+});
+
 it("saves a new immutable policy version without writing to any gradebook", async () => {
   const { service, sequelize, row, transaction } = build();
   row.weights = { testScore: 20, assignmentScore: 30, examScore: 50 };

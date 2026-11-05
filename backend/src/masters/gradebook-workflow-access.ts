@@ -1,6 +1,8 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import type { RbacService } from "../auth/rbac.service.js";
 import { Staff } from "../database/models/staff.model.js";
+import { workingProfileStorage } from '../auth/profile-context.js';
+import { routeActionCode } from '../auth/route-permissions.js';
 
 const ACTION_PERMISSIONS = {
   submit: "gradebook.submit",
@@ -27,4 +29,6 @@ export async function assertGradebookWorkflowAccess(
   if (!access.permissions.has(permission) || access.groupScope?.readOnly) {
     throw new ForbiddenException("Bạn không có quyền thực hiện thao tác này");
   }
+  if(workingProfileStorage.getStore()&&!access.permissions.has(routeActionCode('/masters/exam-lists',permission)))
+    throw new ForbiddenException('Hồ sơ không có quyền thực hiện hành động trên trang bảng điểm.');
 }
