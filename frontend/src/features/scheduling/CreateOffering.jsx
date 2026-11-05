@@ -76,7 +76,7 @@ export default function CreateOffering({ user }) {
     };
   }, [roster]);
 
-  const majors = useLoad(async () => rows(await api.get("/system/majors?program=masters")).filter((item) => item.active !== false && !isCommonMajor(item)), []);
+  const majors = useLoad(async signal => rows(await api.get("/system/majors?program=masters", { signal })).filter((item) => item.active !== false && !isCommonMajor(item)), []);
   const disciplines = disciplinesFromMajors(majors.data || []);
   const visibleMajors = majorsForDiscipline(majors.data || [], disciplineId);
   const groups = useLoad(async signal => majorId ? rows(await api.get(`/scheduling/class-groups/options?${new URLSearchParams({ majorId })}`, { signal })) : [], [majorId]);

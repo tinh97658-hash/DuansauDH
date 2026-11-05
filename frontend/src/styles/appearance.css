@@ -1,0 +1,102 @@
+/* Do not zoom/transform the page or change sticky offsets, grid tracks or
+   column widths. Text buttons grow vertically to contain their labels.
+   Important layer rules also cover lazy-loaded page styles and portal content.
+   At 100% the original typography is used without overrides. */
+@layer app-text-size {
+  @media screen {
+    html[data-font-size]:not([data-font-size="100"]) body :is(
+      p, label, button:not(.MuiIconButton-root), a, input, select, textarea,
+      td, th, li, .MuiTypography-root, .MuiInputBase-root, .MuiChip-root,
+      .MuiMenuItem-root, .MuiAlert-message, .MuiFormHelperText-root,
+      .ribbon-user-name, .ribbon-user-role,
+      .ribbon-title, .ribbon-breadcrumb, .sl-session, .sl-other,
+      .sl-day, .sl-period, .sl-empty
+    ):not(:where(
+      .report-preview, .report-preview *, .transcript-print-document, .transcript-print-document *,
+      .report-print-sheet, .report-print-sheet *, .document-report-table, .document-report-table *,
+      [id="printable-a4-sheet"], [id="printable-a4-sheet"] *,
+      .a4-paper-sheet, .a4-paper-sheet *, .sl-print-sheet, .sl-print-sheet *,
+      .gradebook-document, .gradebook-document *, .subject-signing-sheet, .subject-signing-sheet *,
+      .progress-form-sheet, .progress-form-sheet *, .exam-print-sheet, .exam-print-sheet *,
+      [data-preserve-font-size], [data-preserve-font-size] *, .sl-combo > button, svg, svg *
+    )) {
+      font-size: calc(var(--app-reading-base, 12.5px) * var(--app-text-scale)) !important;
+      overflow-wrap: anywhere;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .app-popup { --app-reading-base: 15px; }
+
+    /* Headings keep a separate size from body text. */
+    html[data-font-size]:not([data-font-size="100"]) :is(h1, h2, h3, h4, h5, h6, .MuiDialogTitle-root):not(:where(
+      .report-preview *, .transcript-print-document *, .report-print-sheet *, [id="printable-a4-sheet"] *,
+      .a4-paper-sheet *, .sl-print-sheet *, .gradebook-document *, .subject-signing-sheet *,
+      .progress-form-sheet *, .exam-print-sheet *, [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      font-size: calc(18px * var(--app-text-scale)) !important;
+      overflow-wrap: anywhere;
+    }
+
+    /* Text may wrap inside ordinary cells. Keep all position/width rules,
+       especially sticky columns and multi-row sticky headers, on their pages. */
+    html[data-font-size]:not([data-font-size="100"]) :is(td, th):not(:where(
+      .report-preview *, .transcript-print-document *, .report-print-sheet *,
+      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
+      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
+      [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      white-space: normal !important;
+      overflow-wrap: anywhere !important;
+    }
+
+    /* Typography renders captions as inline spans. Their own nowrap rule can
+       otherwise exceed the cell even when the cell itself allows wrapping. */
+    html[data-font-size]:not([data-font-size="100"]) :is(td, th) .MuiTypography-root:not(:where(
+      .report-preview *, .transcript-print-document *, .report-print-sheet *,
+      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
+      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
+      [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      display: block;
+      min-width: 0;
+      max-width: 100%;
+      white-space: normal !important;
+      overflow-wrap: anywhere !important;
+    }
+
+    /* Single-line controls retain their bounds and their dropdown arrow inset.
+       Inputs keep native scrolling so the full value remains editable. */
+    html[data-font-size]:not([data-font-size="100"]) :is(.MuiSelect-select, .MuiAutocomplete-input, .MuiChip-label, .ribbon-breadcrumb strong) {
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) :is(.MuiButton-root, .sl-btn, .btn, .document-export-trigger):not(:where(
+      .MuiIconButton-root, .sl-drawer-close,
+      .report-preview *, .transcript-print-document *, .report-print-sheet *,
+      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
+      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
+      [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      /* A fixed height clips wrapped labels when the font grows. A minimum
+         preserves a usable target while allowing every line to fit. */
+      height: auto !important;
+      min-height: calc(1.5em + 12px) !important;
+      max-height: none !important;
+      line-height: 1.5 !important;
+      white-space: normal !important;
+      overflow-wrap: anywhere !important;
+      max-width: 100% !important;
+    }
+
+    /* Scheduling cards have bounded areas; scroll their content rather than
+       allowing text to cover adjacent slots or the drag/drop target. */
+    html[data-font-size]:not([data-font-size="100"]) :is(.sl-session, .sl-other) {
+      min-width: 0;
+      max-width: 100%;
+      overflow: auto;
+    }
+  }
+}

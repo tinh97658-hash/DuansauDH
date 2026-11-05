@@ -1,5 +1,6 @@
 import { ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassIcon, PlusIcon } from "../../components/AppIcons";
-import React,{useEffect,useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
+import {listenForBackgroundRefresh} from '../../utils/backgroundRefresh';
 import {useSearchParams} from 'react-router-dom';
 import axios from 'axios';
 import { notify } from '../../utils/notify';
@@ -39,12 +40,14 @@ export default function ExamSchedule(){
  const [mergeMode,setMergeMode]=useState(false);
  const [detail,setDetail]=useState(null),[editor,setEditor]=useState(null),[aggregate,setAggregate]=useState(null),[reason,setReason]=useState(null),[pendingOpen,setPendingOpen]=useState(false);
  const wallTime=useExamWallTime(),last=formatDateKey(addDays(week,6)),today=wallTime.slice(0,10);
- useEffect(()=>{if(!canView)return;const refresh=()=>{if(document.visibilityState!=='hidden')setRevision(n=>n+1);};
-  const timer=setInterval(refresh,60000);window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);
-  return()=>{clearInterval(timer);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};
+ const requestState=useRef({inFlight:false,at:0});
+ useEffect(()=>{if(!canView)return;
+  return listenForBackgroundRefresh(()=>setRevision(n=>n+1),{interval:60000,minInterval:60000,
+   canRefresh:()=>!requestState.current.inFlight&&Date.now()-requestState.current.at>=60000});
  },[canView]);
  useEffect(()=>{if(!canView){setLoading(false);return;}let active=true;setLoading(true);setError('');setLoadError('');
-  axios.get(`${API_BASE_URL}/masters/exam-schedule`,{params:{from:week,to:last},withCredentials:true}).then(({data:next})=>{if(active){setData(next);setHasLoaded(true);}}).catch(e=>{if(active){const message=errorText(e);setError(message);setLoadError(message);}}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};
+  const controller=new AbortController();requestState.current={inFlight:true,at:Date.now()};
+  axios.get(`${API_BASE_URL}/masters/exam-schedule`,{params:{from:week,to:last},withCredentials:true,signal:controller.signal}).then(({data:next})=>{if(active){setData(next);setHasLoaded(true);}}).catch(e=>{if(active){const message=errorText(e);setError(message);setLoadError(message);}}).finally(()=>{if(active){requestState.current.inFlight=false;setLoading(false);}});return()=>{active=false;controller.abort();};
  },[week,last,revision,canView]);
  // Historical sessions retain academic context even when their old snapshot is no longer current.
  const offerings=[...new Map([...data.sessions.map(s=>({...s,id:s.courseOfferingId})),...(data.approvedOfferings||[])].map(o=>[o.id,o])).values()];

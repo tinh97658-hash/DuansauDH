@@ -1,5 +1,4 @@
-/* Opt-in styling also reaches dialogs mounted in MUI portals. The full student
-   profile form deliberately does not opt in. Keep print layouts intact. */
+/* Shared dialog appearance, including dialogs mounted in MUI portals. */
 @media screen {
   .app-popup {
     --popup-title-bg: #b4cae6;
@@ -281,5 +280,60 @@
   body .app-popup :is(.MuiDialogActions-root, .v20-dialog-foot) {
     padding: 12px 16px;
     gap: 8px;
+  }
+}
+
+/* All dialog variants nearly fill the viewport, including page-specific sx dimensions,
+   scheduling drawers, nested confirmations, and dialogs without app-popup.
+   Keep this screen-only so document print geometry is unchanged. */
+@layer app-fullscreen-dialogs {
+  @media screen {
+    .MuiDialog-root { --app-dialog-gap: clamp(8px, 1.2vw, 16px); }
+
+    .MuiDialog-container {
+      padding: var(--app-dialog-gap) !important;
+      align-items: stretch !important;
+    }
+
+    .MuiDialog-container::after { display: none !important; }
+
+    .MuiDialog-paper {
+      position: relative !important;
+      inset: auto !important;
+      display: flex !important;
+      flex-direction: column !important;
+      margin: 0 !important;
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
+      height: calc(100vh - 2 * var(--app-dialog-gap)) !important;
+      height: calc(100dvh - 2 * var(--app-dialog-gap)) !important;
+      min-height: 0 !important;
+      max-height: calc(100vh - 2 * var(--app-dialog-gap)) !important;
+      max-height: calc(100dvh - 2 * var(--app-dialog-gap)) !important;
+      border: 1px solid #b8c7d6 !important;
+      overflow: hidden !important;
+    }
+
+    .MuiDialog-paper > :is(.MuiDialogTitle-root, .v20-dialog-head, .MuiDialogActions-root, .v20-dialog-foot) {
+      flex: 0 0 auto !important;
+    }
+
+    .MuiDialog-paper > :is(.MuiDialogContent-root, .v20-dialog-body) {
+      flex: 1 1 auto !important;
+      min-height: 0 !important;
+      min-width: 0 !important;
+      max-height: none !important;
+    }
+
+    .MuiDialogActions-root, .v20-dialog-foot { flex-wrap: wrap !important; }
+
+    /* The offering table previously stopped at 260px, wasting the remaining
+       content area. Its parent already provides vertical scrolling. */
+    .MuiDialog-paper .sl-offering-sessions-wrap { max-height: none !important; }
+
+    /* On narrow screens keep the seven schedule columns readable and scroll
+       horizontally instead of squeezing each heading into individual letters. */
+    .MuiDialog-paper .sl-offering-sessions-wrap table { min-width: 900px !important; }
   }
 }

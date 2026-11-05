@@ -64,8 +64,8 @@ export default function CourseMatrix({ user }) {
 
   const canEdit = can("scheduling.write");
   const canDelete = can("scheduling.organize");
-  const offerings = useLoad(async () => rows(await api.get("/scheduling/course-offerings?program=masters")), []);
-  const majors = useLoad(async () => rows(await api.get("/system/majors?program=masters")), []);
+  const offerings = useLoad(async signal => rows(await api.get("/scheduling/course-offerings?program=masters", { signal })), []);
+  const majors = useLoad(async signal => rows(await api.get("/system/majors?program=masters", { signal })), []);
   const disciplines = useMemo(() => disciplinesFromMajors(majors.data || []), [majors.data]);
   const visibleMajors = useMemo(() => majorsForDiscipline(majors.data || [], disciplineId), [disciplineId, majors.data]);
   const visibleMajorIds = useMemo(() => new Set(visibleMajors.map((major) => major.id)), [visibleMajors]);

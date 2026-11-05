@@ -1,4 +1,4 @@
-import { fireEvent, render as baseRender, screen, within } from "@testing-library/react";
+import { fireEvent, render as baseRender, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import RibbonHeader, { ribbons } from "../../components/RibbonHeader";
 import { AuthSessionContext } from "../../context/AuthSession";
@@ -20,7 +20,7 @@ const routesByPermission = {
 };
 const expected = new Map(Object.entries(routesByPermission).flatMap(([permission, routes]) => routes.map(route => [route, [permission]])));
 expected.set("/masters/class-course-history", ["plan.view", "scheduling.view"]);
-for (const route of ["/system/unit-info", "/system/license", "/system/change-password", "/system/check-update", null]) expected.set(route, []);
+for (const route of ["/system/appearance", "/system/unit-info", "/system/license", "/system/change-password", "/system/check-update", null]) expected.set(route, []);
 const items = Object.values(ribbons).flatMap(sections => sections.flatMap(section => section.actions));
 const session = (permissions, role = "custom") => ({ user: { role }, access: permissions === null ? null : { permissions, roles: [] } });
 const view = (value, route = "/") => <MemoryRouter useTransitions={false} initialEntries={[route]}><AuthSessionContext.Provider value={value}><RibbonHeader /></AuthSessionContext.Provider></MemoryRouter>;
@@ -33,6 +33,22 @@ const render = (...args) => {
   return result;
 };
 describe("Ribbon read/navigation permission contracts", () => {
+  it("collapses subgroup labels independently and reveals matching actions during search", () => {
+    render(view(session(["masters.view", "scheduling.view"]), "/masters/schedule"));
+    const heading = screen.getByRole("button", { name: "THỦ TỤC ĐẦU VÀO" });
+    expect(heading).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(heading);
+    expect(heading).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "Học bổ sung kiến thức" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Xếp lịch" })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "hoc bo sung" } });
+    expect(screen.getByRole("button", { name: "Học bổ sung kiến thức" })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "" } });
+    expect(heading).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(heading);
+    expect(screen.getByRole("button", { name: "Học bổ sung kiến thức" })).toBeInTheDocument();
+  });
+
   it("filters across groups without accents while respecting permissions", () => {
     render(view(session(["scheduling.view", "exams.view"]), "/masters/schedule"));
     const search = screen.getByRole("searchbox", { name: "Tìm kiếm chức năng" });
@@ -90,7 +106,7 @@ describe("Ribbon read/navigation permission contracts", () => {
     render(view(session(["masters.view", "gradebook.view", "exams.view", "reports.view"]), "/masters/exam-schedule"));
     const calendar = screen.getByRole("button", { name: "Xếp lịch thi" });
     const group = calendar.closest(".ribbon-group");
-    expect(within(group).getAllByRole("button").map(button => button.textContent)).toEqual([
+    expect(within(group.querySelector(".ribbon-actions")).getAllByRole("button").map(button => button.textContent)).toEqual([
       "Danh sách thi, điểm thi", "Xếp lịch thi", "Tổng hợp điểm của lớp",
     ]);
     expect(screen.queryByRole("button", { name: "Xét tư cách thi hết môn" })).not.toBeInTheDocument();
@@ -99,8 +115,8 @@ describe("Ribbon read/navigation permission contracts", () => {
     expect(calendar).toHaveAttribute("aria-current", "page");
     expect(group.querySelectorAll(".ribbon-action")).toHaveLength(3);
   });
-  it("classifies all 65 actions against the independent contract", () => {
-    expect(items).toHaveLength(65);expect(expected.size).toBe(65);
+  it("classifies all 66 actions against the independent contract", () => {
+    expect(items).toHaveLength(66);expect(expected.size).toBe(66);
     for (const item of items) {
       expect(expected.has(item.route)).toBe(true);
       expect(item.permissions || []).toEqual(expected.get(item.route));
@@ -132,7 +148,7 @@ describe("Ribbon read/navigation permission contracts", () => {
     const { container, rerender } = render(view(session(null, "admin"), "/plan/admission-records"));
     const utilities = items.filter(item => expected.get(item.route).length === 0).map(item => item.label).sort();
     expect(visibleLabels(container).sort()).toEqual(utilities);
-    expect(screen.getByRole("navigation").querySelectorAll(".ribbon-tab-toggle")).toHaveLength(1);
+    expect(screen.getByRole("navigation", { name: "Nhóm chức năng" }).querySelectorAll(".ribbon-tab-toggle")).toHaveLength(1);
     rerender(view(session(["admission.view"], "admin"), "/plan/admission-records"));
     expect(screen.getByRole("button", { name: "Nhập hồ sơ tuyển sinh" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("button", { name: "Kế hoạch đào tạo" })).not.toBeInTheDocument();
@@ -155,7 +171,7 @@ describe("Ribbon read/navigation permission contracts", () => {
     rerender(view(session([])));
     expect(screen.queryByRole("button", { name: "ĐÀO TẠO TIẾN SĨ" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "HỆ THỐNG" })).toHaveClass("active");
-    expect(visibleLabels(container)).toHaveLength(5);
+    expect(visibleLabels(container)).toHaveLength(6);
   });
   it("supports a verified fallback identity without inferring admin permissions", async () => {
     const original = global.fetch;
@@ -164,8 +180,70 @@ describe("Ribbon read/navigation permission contracts", () => {
       const { container } = render(<MemoryRouter useTransitions={false}><RibbonHeader /></MemoryRouter>);
       fireEvent.click(await screen.findByRole("button", { name: "Mở menu tác vụ" }));
       expect(screen.getByRole("button", { name: "Đổi mật khẩu" })).toBeInTheDocument();
-      expect(visibleLabels(container)).toHaveLength(5);
+      expect(visibleLabels(container)).toHaveLength(6);
       expect(screen.queryByText("Tài khoản nhân sự")).not.toBeInTheDocument();
     } finally { global.fetch = original; }
+  });
+});
+
+describe("Breadcrumb quick navigation", () => {
+  const open = name => {
+    const trigger = within(screen.getByRole("navigation", { name: "Vị trí hiện tại" })).getByRole("button", { name });
+    trigger.getBoundingClientRect = () => ({ top: 0, bottom: 30, left: 60, right: 260, width: 200, height: 30 });
+    trigger.focus();
+    fireEvent.click(trigger);
+    return trigger;
+  };
+
+  it("shows the three sibling account routes and navigates to the selected one", async () => {
+    baseRender(view(session(["account.view", "role.view", "audit.view"]), "/system/accounts"));
+    open("Tài khoản & phân quyền");
+    const menu = screen.getByRole("menu", { name: "Truy cập nhanh: Tài khoản & phân quyền" });
+    expect(within(menu).getAllByRole("menuitem").map(item => item.textContent)).toEqual([
+      "Tài khoản nhân sự", "Vai trò & phân quyền", "Nhật ký thao tác",
+    ]);
+    expect(within(menu).getByRole("menuitem", { name: "Tài khoản nhân sự" })).toHaveAttribute("aria-current", "page");
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Vai trò & phân quyền" }));
+    await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
+    expect(within(screen.getByRole("navigation", { name: "Vị trí hiện tại" })).getByText("Vai trò & phân quyền")).toHaveAttribute("aria-current", "page");
+  });
+
+  it("lists the root's child routes in groups while respecting effective permissions", () => {
+    baseRender(view(session(["account.view"]), "/system/accounts"));
+    open("Hệ thống");
+    const menu = screen.getByRole("menu", { name: "Truy cập nhanh: Hệ thống" });
+    expect(within(menu).getByRole("menuitem", { name: "Tài khoản nhân sự" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Cài đặt giao diện" })).toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "Vai trò & phân quyền" })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "Nhật ký thao tác" })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "Thoát chương trình" })).not.toBeInTheDocument();
+  });
+
+  it("supports keyboard dismissal and restores focus to the breadcrumb", async () => {
+    baseRender(view(session(["account.view"]), "/system/accounts"));
+    const trigger = open("Tài khoản & phân quyền");
+    const menu = screen.getByRole("menu");
+    expect(within(menu).getAllByRole("menuitem")).toHaveLength(1);
+    fireEvent.keyDown(menu, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("removes the group menu immediately on outside click without flashing all root routes", () => {
+    baseRender(view(session(["masters.view", "scheduling.view", "gradebook.view", "exams.view", "reports.view"]), "/masters/exam-lists"));
+    const trigger = open("Quản lý điểm");
+    const menu = screen.getByRole("menu");
+    expect(within(menu).getAllByRole("menuitem").map(item => item.textContent)).toEqual([
+      "Danh sách thi, điểm thi", "Xếp lịch thi", "Tổng hợp điểm của lớp",
+    ]);
+    fireEvent.click(document.querySelector("#ribbon-breadcrumb-menu .MuiBackdrop-root"));
+    expect(screen.queryByRole("menu", { hidden: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { hidden: true })).not.toBeInTheDocument();
+    expect(document.querySelector("#ribbon-breadcrumb-menu")).not.toBeInTheDocument();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveFocus();
+    fireEvent.click(trigger);
+    expect(screen.getByRole("menu")).toHaveAccessibleName("Truy cập nhanh: Quản lý điểm");
+    expect(screen.getAllByRole("menuitem")).toHaveLength(3);
   });
 });

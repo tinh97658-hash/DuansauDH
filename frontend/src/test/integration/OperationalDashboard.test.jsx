@@ -184,7 +184,9 @@ it('refreshes learner requests and removes resolved requests on focus', async ()
   const data = learnerRequestFixture();
   for (const key of ['studyLeaveApproval', 'majorTransferApproval']) data.sources[key].data = { count: 0, itemCount: 0, items: [], href: '/masters/study-leaves' };
   axios.get.mockResolvedValue({ data });
+  const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 31000);
   await act(async () => { window.dispatchEvent(new Event('focus')); });
+  clock.mockRestore();
   expect(screen.queryByRole('region', { name: 'Chờ duyệt bảo lưu' })).not.toBeInTheDocument();
   expect(screen.queryByRole('region', { name: 'Chờ duyệt chuyển chuyên ngành' })).not.toBeInTheDocument();
 });
@@ -240,7 +242,7 @@ it('refreshes requests sent from another device and removes approved requests wi
     const cleared = approvalFixture();
     Object.values(cleared.sources.approvals.data).forEach(metric => { metric.count = 0; metric.items = []; metric.itemCount = 0; });
     axios.get.mockResolvedValue({ data: cleared });
-    await act(async () => { window.dispatchEvent(new Event('focus')); });
+    await act(async () => { vi.advanceTimersByTime(30000); window.dispatchEvent(new Event('focus')); });
     expect(screen.queryByRole('region', { name: 'Chờ duyệt khóa điểm' })).not.toBeInTheDocument();
     expect(screen.queryByText('Lớp chờ khóa điểm')).not.toBeInTheDocument();
   } finally { vi.useRealTimers(); }

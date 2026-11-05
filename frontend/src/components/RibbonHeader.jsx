@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
+import { ListItemIcon, ListItemText, ListSubheader, Menu, MenuItem } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useConfirmGradeLeave, useDiscardUnsavedGrades } from "./UnsavedChangesGuard";
 import { AcademicCapIcon, AdjustmentsHorizontalIcon, ArrowDownOnSquareIcon, ArrowRightStartOnRectangleIcon, ArrowUpTrayIcon, BanknotesIcon, Bars3Icon, BookOpenIcon, BuildingLibraryIcon, BuildingOffice2Icon, BuildingOfficeIcon, CalendarDaysIcon, CalendarIcon, ChartBarIcon, CheckBadgeIcon, CheckCircleIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClipboardDocumentCheckIcon, ClipboardDocumentListIcon, ClockIcon, DocumentChartBarIcon, DocumentCheckIcon, DocumentPlusIcon, DocumentTextIcon, FlagIcon, FolderOpenIcon, HomeModernIcon, InformationCircleIcon, LanguageIcon, LockClosedIcon, MagnifyingGlassIcon, PaperAirplaneIcon, ScaleIcon, ShieldCheckIcon, Squares2X2Icon, TableCellsIcon, TrophyIcon, UserCircleIcon, UserGroupIcon, UserPlusIcon, UsersIcon } from "./AppIcons";
@@ -31,6 +32,9 @@ const breadcrumbLabel = (value) => value.charAt(0) + value.slice(1).toLocaleLowe
 
 export const ribbons = {
   system: [
+    group("CÀI ĐẶT HỆ THỐNG", [
+      action("Cài đặt giao diện", "/system/appearance", AdjustmentsHorizontalIcon, "var(--icon-primary)"),
+    ]),
     group("TÀI KHOẢN & PHÂN QUYỀN", [
       action("Tài khoản nhân sự", "/system/accounts", UsersIcon, "var(--icon-teal)", { permissions: ["account.view"] }),
       action("Vai trò & phân quyền", "/system/roles", ShieldCheckIcon, "var(--icon-purple)", { permissions: ["role.view"] }),
@@ -148,7 +152,9 @@ const RibbonHeader = () => {
   const sessionRole = session ? session.activeProfile?.code || session.user?.role || "student" : null;
   const [activeTab, setActiveTab] = useState(() => tabForPath(location.pathname));
   const [menuOpen, setMenuOpen] = useState(false);
+  const [breadcrumbMenu, setBreadcrumbMenu] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [collapsedGroups, setCollapsedGroups] = useState({});
   const menuToggleRef = useRef(null);
   const sidebarRef = useRef(null);
   const searchRef = useRef(null);
@@ -178,6 +184,7 @@ const RibbonHeader = () => {
     if (sidebarRef.current?.contains(document.activeElement)) menuToggleRef.current?.focus();
     setMenuOpen(false);
     setSearchQuery("");
+    setBreadcrumbMenu(null);
   }, [path, location.search]);
 
   useEffect(() => {
@@ -224,6 +231,14 @@ const RibbonHeader = () => {
   const currentTab = visibleTabs.find(([id]) => ribbons[id].some(section => section.actions.some(item => canSee(item) && isRibbonRouteActive(path, item.route))));
   const currentGroup = currentTab && ribbons[currentTab[0]].find(section => section.actions.some(item => canSee(item) && isRibbonRouteActive(path, item.route)));
   const currentAction = currentGroup?.actions.find(item => canSee(item) && isRibbonRouteActive(path, item.route));
+  const breadcrumbGroups = (!breadcrumbMenu ? [] : breadcrumbMenu.level === "group" ? [currentGroup] : currentTab ? ribbons[currentTab[0]] : [])
+    .filter(Boolean).map(section => ({ ...section, actions: section.actions.filter(item => item.route && canSee(item)) }))
+    .filter(section => section.actions.length);
+  const breadcrumbMenuLabel = breadcrumbMenu?.level === "group" ? currentGroup?.label : currentTab?.[1];
+  const openBreadcrumbMenu = (event, level) => {
+    setMenuOpen(false);
+    setBreadcrumbMenu({ anchorEl: event.currentTarget, level });
+  };
   const userName = session?.user?.name || session?.user?.fullName || roleNames[role] || role;
   const avatar = role === "admin" ? "AD" : "NV";
   const renderAction = (item) => {
@@ -259,14 +274,39 @@ const RibbonHeader = () => {
     <header className={`ribbon-header${menuOpen ? " ribbon-menu-open" : ""}`}>
       <div className="ribbon-titlebar">
         <div className="ribbon-topbar-start">
-          <div className="ribbon-breadcrumb" aria-label="Vị trí hiện tại">
-            <span>{currentTab ? breadcrumbLabel(currentTab[1]) : BRAND.institute}</span>
-            {currentGroup && <><ChevronRightIcon aria-hidden="true" /><span>{breadcrumbLabel(currentGroup.label)}</span></>}
+          <nav className="ribbon-breadcrumb" aria-label="Vị trí hiện tại">
+            {currentTab ? <button type="button" className="ribbon-breadcrumb-trigger" data-dropdown-min-width="320"
+              aria-haspopup="menu" aria-expanded={breadcrumbMenu?.level === "tab"}
+              aria-controls={breadcrumbMenu?.level === "tab" ? "ribbon-breadcrumb-menu" : undefined}
+              onClick={event => openBreadcrumbMenu(event, "tab")}>{breadcrumbLabel(currentTab[1])}</button> : <span>{BRAND.institute}</span>}
+            {currentGroup && <><ChevronRightIcon aria-hidden="true" /><button type="button" className="ribbon-breadcrumb-trigger" data-dropdown-min-width="320"
+              aria-haspopup="menu" aria-expanded={breadcrumbMenu?.level === "group"}
+              aria-controls={breadcrumbMenu?.level === "group" ? "ribbon-breadcrumb-menu" : undefined}
+              onClick={event => openBreadcrumbMenu(event, "group")}>{breadcrumbLabel(currentGroup.label)}</button></>}
             {currentAction && <><ChevronRightIcon aria-hidden="true" /><strong aria-current="page">{currentAction.label}</strong></>}
-          </div>
+          </nav>
         </div>
         <div className="ribbon-user-avatar" title={`${userName} · ${roleNames[role] || role}`}>{avatar}</div>
       </div>
+      {breadcrumbMenu && <Menu id="ribbon-breadcrumb-menu" anchorEl={breadcrumbMenu.anchorEl} open={Boolean(breadcrumbGroups.length)}
+        onClose={() => setBreadcrumbMenu(null)} anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        PaperProps={{ className: "ribbon-breadcrumb-menu" }}
+        MenuListProps={{ "aria-label": `Truy cập nhanh: ${breadcrumbMenuLabel ? breadcrumbLabel(breadcrumbMenuLabel) : ""}` }}>
+        {breadcrumbGroups.flatMap(section => [
+          ...(breadcrumbMenu?.level === "tab" ? [<ListSubheader key={`group-${section.label}`}>{breadcrumbLabel(section.label)}</ListSubheader>] : []),
+          ...section.actions.map(item => {
+            const Icon = item.icon;
+            return <MenuItem key={item.route} selected={isRibbonRouteActive(path, item.route)}
+              aria-current={isRibbonRouteActive(path, item.route) ? "page" : undefined}
+              onPointerEnter={() => preloadPage(item.route)} onFocus={() => preloadPage(item.route)}
+              onClick={() => { setBreadcrumbMenu(null); runAction(item); }}>
+              <ListItemIcon><Icon style={{ width: 20, height: 20, color: item.color }} /></ListItemIcon>
+              <ListItemText primary={item.label} />
+            </MenuItem>;
+          }),
+        ])}
+      </Menu>}
       <button
         ref={menuToggleRef}
         type="button"
@@ -304,10 +344,17 @@ const RibbonHeader = () => {
                   setActiveTab(selectedTab === id && !searchTerm ? null : id);
                 }}><TabIcon /><span>{label}</span><ChevronDownIcon className={`ribbon-section-chevron${expanded ? " expanded" : ""}`} /></button>
                 <div id={`ribbon-section-${id}`} className="ribbon-commands" role="region" aria-label="Tác vụ chức năng" hidden={!expanded}>
-                  {expanded && groups.map(itemGroup => <section className="ribbon-group" key={itemGroup.label}>
-                    <div className="ribbon-group-label">{itemGroup.label}</div>
-                    <div className="ribbon-actions">{itemGroup.actions.map(renderAction)}</div>
-                  </section>)}
+                  {expanded && groups.map(itemGroup => {
+                    const groupId = `ribbon-group-${id}-${ribbons[id].findIndex(section => section.label === itemGroup.label)}`;
+                    const groupExpanded = Boolean(searchTerm) || !collapsedGroups[groupId];
+                    return <section className="ribbon-group" key={itemGroup.label}>
+                      <button type="button" className="ribbon-group-label" aria-expanded={groupExpanded} aria-controls={groupId}
+                        disabled={Boolean(searchTerm)} onClick={() => setCollapsedGroups(previous => ({ ...previous, [groupId]: !previous[groupId] }))}>
+                        <span>{itemGroup.label}</span><ChevronDownIcon className={`ribbon-group-chevron${groupExpanded ? " expanded" : ""}`} aria-hidden="true" />
+                      </button>
+                      <div id={groupId} className="ribbon-actions" hidden={!groupExpanded}>{itemGroup.actions.map(renderAction)}</div>
+                    </section>;
+                  })}
                 </div>
               </div>;
             })}

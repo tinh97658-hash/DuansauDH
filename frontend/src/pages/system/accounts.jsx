@@ -222,7 +222,7 @@ const Accounts = () => {
           {canManage && (
             <Button
               variant="contained" startIcon={<PlusIcon />} onClick={openCreate}
-              sx={{ height: 38, px: 2, width: { xs: "100%", md: 190 }, flexShrink: 0, bgcolor: "#0788B8", borderRadius: "7px", boxShadow: "none", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}
+              sx={{ minHeight: 38, px: 2, width: { xs: "100%", md: "auto" }, minWidth: { md: 190 }, flexShrink: 0, bgcolor: "#0788B8", borderRadius: "7px", boxShadow: "none", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}
             >
               Thêm tài khoản
             </Button>

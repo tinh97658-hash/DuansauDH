@@ -7,6 +7,7 @@ import theme from "./theme";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppToaster from "./components/AppToaster";
 import UnsavedChangesGuard from "./components/UnsavedChangesGuard";
+import { AppearanceSettingsProvider } from "./context/AppearanceSettings";
 
 const PageLoader = () => (
   <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
@@ -32,6 +33,7 @@ const StudentDashBoardPage = lazyPage(() => import("./pages/studentDashboard"), 
 
 // ===== HỆ THỐNG =====
 const UnitInfo = lazyPage(() => import("./pages/system/unitInfo"), ["/system/unit-info"]);
+const Appearance = lazyPage(() => import("./pages/system/appearance"), ["/system/appearance"]);
 const License = lazyPage(() => import("./pages/system/license"), ["/system/license"]);
 const ChangePassword = lazyPage(() => import("./pages/system/changePassword"), ["/system/change-password"]);
 const Accounts = lazyPage(() => import("./pages/system/accounts"), ["/system/accounts"]);
@@ -133,6 +135,7 @@ const router = createBrowserRouter(createRoutesFromElements(
 
               {/* HỆ THỐNG */}
               <Route path="system/unit-info" element={<UnitInfo />} />
+              <Route path="system/appearance" element={<Appearance />} />
               <Route path="system/license" element={<License />} />
               <Route path="system/change-password" element={<ChangePassword />} />
               <Route path="system/accounts" element={<Accounts />} />
@@ -221,11 +224,11 @@ const router = createBrowserRouter(createRoutesFromElements(
 ));
 
 function App() {
-  return <ThemeProvider theme={theme}>
+  return <AppearanceSettingsProvider><ThemeProvider theme={theme}>
     <CssBaseline />
     <AppToaster />
     <Suspense fallback={<PageLoader />}><RouterProvider router={router} /></Suspense>
-  </ThemeProvider>;
+  </ThemeProvider></AppearanceSettingsProvider>;
 }
 
 export default App;

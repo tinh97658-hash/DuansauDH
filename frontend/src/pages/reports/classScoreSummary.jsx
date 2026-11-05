@@ -58,9 +58,10 @@ export default function ClassScoreSummary() {
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     setLoadingOptions(true);
     setOptionsError("");
-    axios.get(`${endpoint}/options`).then(({ data }) => {
+    axios.get(`${endpoint}/options`, { signal: controller.signal }).then(({ data }) => {
       if (!active) return;
       const available = data.groups || [];
       const years = [...new Set(available.map(group => group.academicYear || ""))].sort((a, b) => b.localeCompare(a, "vi", { numeric: true }));
@@ -75,7 +76,7 @@ export default function ClassScoreSummary() {
       setReport(null);
     }).catch(error => { if (active) setOptionsError(errorMessage(error, "Không tải được danh sách lớp.")); })
       .finally(() => { if (active) setLoadingOptions(false); });
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, [optionsReload]);
 
   useEffect(() => {
@@ -85,16 +86,20 @@ export default function ClassScoreSummary() {
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
+    // Keep the rendered table while the user types; only the debounced value
+    // may start a request and replace its contents.
+    if (search.trim() !== debouncedSearch) return () => { active = false; controller.abort(); };
     setReport(null);
     setError("");
     setSelectedId("");
-    if (!classGroupId || loadingOptions || search.trim() !== debouncedSearch) { setLoading(false); return () => { active = false; }; }
+    if (!classGroupId || loadingOptions) { setLoading(false); return () => { active = false; controller.abort(); }; }
     setLoading(true);
-    axios.get(endpoint, { params: { classGroupId, search: debouncedSearch, page, pageSize: PAGE_SIZE } }).then(({ data }) => {
+    axios.get(endpoint, { params: { classGroupId, search: debouncedSearch, page, pageSize: PAGE_SIZE }, signal: controller.signal }).then(({ data }) => {
       if (active) setReport(data);
     }).catch(error => { if (active) setError(errorMessage(error, "Không tải được bảng điểm.")); })
       .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, [classGroupId, loadingOptions, reload, debouncedSearch, search, page, catalogRevision, gradebookRevision]);
 
   const years = useMemo(() => [...new Set(groups.map(group => group.academicYear || ""))]
@@ -176,9 +181,9 @@ export default function ClassScoreSummary() {
           <div><h1 className="css-title">TỔNG HỢP ĐIỂM CỦA LỚP</h1><p>Bảng điểm toàn bộ chương trình đào tạo{currentReport?.group?.name ? ` · ${currentReport.group.name}` : ""}</p></div>
           {currentReport && <Chip size="small" label={`${currentReport.total} học viên`} sx={{ bgcolor: "var(--table-header-bg)", color: "var(--secondary)" }} />}
         </div>
-      {busy && <div className="css-empty" role="status"><CircularProgress size={24} /><span>Đang tải bảng điểm...</span></div>}
+      {(loadingOptions || loading) && <div className="css-empty" role="status"><CircularProgress size={24} /><span>Đang tải bảng điểm...</span></div>}
       {!busy && !optionsError && !groups.length && <div className="css-empty">Chưa có lớp học viên. Hãy tạo lớp và phân học viên vào lớp trước.</div>}
-      {!busy && currentReport && <>
+      {!loadingOptions && !loading && currentReport && <>
         {!currentReport.curriculum && <Alert severity="warning">Lớp chưa được gán chương trình đào tạo. Hãy chọn CTĐT cho lớp để xem đầy đủ các học phần.</Alert>}
         {currentReport.curriculum && !subjects.length && <Alert severity="info">Chương trình đào tạo chưa có học phần.</Alert>}
         <TableContainer className="css-table-scroll">
@@ -212,7 +217,7 @@ export default function ClassScoreSummary() {
         </TableContainer>
         <ListPagination aria-label="Phân trang học viên" count={currentReport.total}
           page={(currentReport.page || page) - 1} pageSize={PAGE_SIZE} onPageChange={next => setPage(next + 1)}
-          disabled={exporting} recordLabel="học viên" showSinglePageSummary />
+          disabled={busy || exporting} recordLabel="học viên" showSinglePageSummary />
       </>}
       </Paper>
     </section>

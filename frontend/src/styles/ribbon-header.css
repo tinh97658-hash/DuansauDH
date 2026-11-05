@@ -30,6 +30,13 @@
 .ribbon-breadcrumb > span { flex-shrink: 0; font-size: 11px; }
 .ribbon-breadcrumb svg { width: 18px; height: 18px; flex-shrink: 0; }
 .ribbon-breadcrumb strong { color: var(--secondary, #173E75); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ribbon-breadcrumb-trigger { border: 0; padding: 5px 6px; background: transparent; color: inherit; font: inherit; font-size: 11px; text-align: left; cursor: pointer; max-width: 100%; }
+.ribbon-breadcrumb-trigger:hover, .ribbon-breadcrumb-trigger[aria-expanded="true"] { background: #eaf2f7; color: var(--primary); }
+.ribbon-breadcrumb-trigger:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.ribbon-breadcrumb-menu { min-width: min(320px, calc(100vw - 16px)); max-width: calc(100vw - 16px); }
+.ribbon-breadcrumb-menu .MuiListItemText-root { min-width: 0; }
+.ribbon-breadcrumb-menu .MuiTypography-root { white-space: normal; overflow-wrap: anywhere; }
+.ribbon-breadcrumb-menu .MuiListSubheader-root { position: static; color: var(--text-secondary); background: var(--muted-surface); line-height: 1.5; padding-top: 8px; padding-bottom: 8px; font-weight: 700; }
 .ribbon-menu-open .ribbon-titlebar { padding-left: calc(min(340px, calc(100vw - 52px)) + 68px); }
 
 .ribbon-brand-group {
@@ -220,8 +227,14 @@
 .ribbon-commands { padding: 0 0 0 14px; }
 .ribbon-group { padding: 16px 0; border-bottom: 1px solid #edf2f7; }
 .ribbon-group:last-child { border-bottom: 0; }
-.ribbon-group-label { padding: 0 7px 9px; color: #607486; font-size: 11px; font-weight: 700; letter-spacing: .3px; }
+.ribbon-group-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 0 7px 9px; border: 0; background: transparent; color: #607486; font-family: inherit; font-size: 11px; font-weight: 700; letter-spacing: .3px; text-align: left; cursor: pointer; }
+.ribbon-group-label:hover { color: var(--icon-primary); }
+.ribbon-group-label:focus-visible { outline: 2px solid var(--icon-primary); outline-offset: 2px; border-radius: 3px; }
+.ribbon-group-label:disabled { cursor: default; }
+.ribbon-group-chevron { width: 14px; height: 14px; flex-shrink: 0; transform: rotate(-90deg); }
+.ribbon-group-chevron.expanded { transform: rotate(0); }
 .ribbon-actions { display: flex; flex-direction: column; gap: 3px; }
+.ribbon-actions[hidden] { display: none; }
 .ribbon-action {
   display: flex;
   align-items: center;

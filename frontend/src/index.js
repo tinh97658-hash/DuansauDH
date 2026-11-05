@@ -5,6 +5,7 @@ import "./index.css";
 import "./styles/tables.css";
 import "./styles/dialogs.css";
 import "./styles/dropdowns.css";
+import "./styles/appearance.css";
 import "./config/http";
 import App from "./App";
 

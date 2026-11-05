@@ -18,6 +18,26 @@ const date='2026-10-19',offering={id:'offering',name:'Lớp QT 2026',subjectId:'
 const room={id:'room',name:'Phòng giảng đường',code:'301',capacity:2,isActive:true};let data;
 const renderPage=(permissions=['exams.view','exams.write'])=>renderWithPermissions(<MemoryRouter useTransitions={false}><ExamSchedule/></MemoryRouter>,permissions);
 
+it('coalesces stale focus events and aborts requests when changing weeks',async()=>{
+ renderPage();await screen.findByRole('button',{name:/Lớp QT 2026 2 TS/});
+ const initialSignal=axios.get.mock.calls.find(([url])=>url.endsWith('/masters/exam-schedule'))[1].signal;
+ let resolve;
+ axios.get.mockImplementation(()=>new Promise(done=>{resolve=done;}));
+ const now=Date.now(),clock=vi.spyOn(Date,'now').mockReturnValue(now+61000);
+ try{
+  await act(async()=>{fireEvent.focus(window);fireEvent(document,new Event('visibilitychange'));});
+  expect(axios.get.mock.calls.filter(([url])=>url.endsWith('/masters/exam-schedule'))).toHaveLength(2);
+  expect(initialSignal.aborted).toBe(true);
+  const pendingSignal=axios.get.mock.calls.at(-1)[1].signal;
+  clock.mockReturnValue(now+122000);
+  await act(async()=>{fireEvent.focus(window);});
+  expect(axios.get.mock.calls.filter(([url])=>url.endsWith('/masters/exam-schedule'))).toHaveLength(2);
+  fireEvent.click(screen.getByRole('button',{name:'Tuần sau'}));
+  expect(pendingSignal.aborted).toBe(true);
+  await act(async()=>{resolve({data});});
+ }finally{clock.mockRestore();}
+});
+
 it('saves an exam without selecting either invigilator',async()=>{
  renderPage();await open();fireEvent.click(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/}));
  fireEvent.click(screen.getByRole('button',{name:'Xếp lịch'}));

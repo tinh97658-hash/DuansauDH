@@ -2,6 +2,12 @@
 
 Hệ thống nội bộ của **Viện Đào tạo Sau đại học – Trường Đại học Hàng hải Việt Nam**, phục vụ quản lý hồ sơ, tiến độ và các lần nộp báo cáo của học viên, nghiên cứu sinh. Hệ thống không hỗ trợ đăng ký tài khoản công khai; tài khoản được cấp và quản lý nội bộ. Toàn bộ lớp dữ liệu sử dụng PostgreSQL.
 
+## Cài đặt cỡ chữ giao diện
+
+Vào **Hệ thống → Cài đặt hệ thống → Cài đặt giao diện** để chọn cỡ chữ từ **90% đến 150%**, mỗi mức cách nhau 10%. Thay đổi áp dụng ngay, lưu trên trình duyệt hiện tại và có nút **Khôi phục mặc định**. Cài đặt này dành cho từng trình duyệt, không thay đổi cấu hình của người dùng khác.
+
+Nội dung dài xuống dòng trong ô bảng; các vùng một dòng giữ giới hạn hiển thị. Chỉ điều chỉnh chữ, giữ nguyên độ rộng cột, vị trí cột cố định và điểm neo menu. Các mẫu in và tệp xuất giữ cỡ chữ theo mẫu.
+
 ## Quản lý năm đào tạo
 
 Vào **Hệ thống → Danh mục đào tạo → Năm đào tạo** để thêm/sửa năm và ngày bắt đầu, hoặc bật/tắt năm trong danh sách chọn. Combobox năm của hồ sơ tuyển sinh/học viên và chương trình đào tạo lấy dữ liệu từ danh mục này.

@@ -5,6 +5,7 @@ import { Dialog } from "@mui/material";
 import { API_BASE_URL } from "../../config/http";
 import "./reference.css";
 import "./workspace.css";
+import { listenForBackgroundRefresh } from "../../utils/backgroundRefresh";
 
 export const api = {
   get: async (path, options = {}) => (await axios.get(`${API_BASE_URL}${path}`, { ...options, withCredentials: true })).data,
@@ -70,7 +71,7 @@ export const intersectDays = (groups) => groups.length ? [1, 2, 3, 4, 5, 6, 0].f
 export function useLoad(loader, dependencies) {
   const [state, setState] = useState({ data: null, loading: true, error: "" });
   const [revision, setRevision] = useState(0);
-  const lastRevalidation = useRef(0);
+  const lastRequest = useRef(0);
   const inFlight = useRef(false);
   const previousDependencies = useRef(null);
   const backgroundRefresh = useRef(false);
@@ -78,6 +79,7 @@ export function useLoad(loader, dependencies) {
     let active = true;
     const controller = new AbortController();
     inFlight.current = true;
+    lastRequest.current = Date.now();
     const scopeChanged = !previousDependencies.current || dependencies.length !== previousDependencies.current.length
       || dependencies.some((value, index) => !Object.is(value, previousDependencies.current[index]));
     previousDependencies.current = [...dependencies];
@@ -96,19 +98,10 @@ export function useLoad(loader, dependencies) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...dependencies, revision]);
   useEffect(() => {
-    const revalidate = (event) => {
-      if (event?.type === "focus" && event.target !== window) return;
-      if (inFlight.current || document.visibilityState === "hidden" || Date.now() - lastRevalidation.current < 250) return;
-      lastRevalidation.current = Date.now();
+    return listenForBackgroundRefresh(() => {
       backgroundRefresh.current = true;
       setRevision((value) => value + 1);
-    };
-    window.addEventListener("focus", revalidate);
-    document.addEventListener("visibilitychange", revalidate);
-    return () => {
-      window.removeEventListener("focus", revalidate);
-      document.removeEventListener("visibilitychange", revalidate);
-    };
+    }, { canRefresh: () => !inFlight.current && Date.now() - lastRequest.current >= 30000 });
   }, []);
   return { ...state, reload: () => { backgroundRefresh.current = false; setRevision((value) => value + 1); } };
 }
@@ -122,7 +115,9 @@ export function Modal({ title, children, onClose, busy = false, wide = false, dr
     PaperProps={{ id, className: `scheduling-v20 v20-dialog ${wide ? "v20-wide" : ""} ${drawer ? "v20-drawer" : ""} ${className}` }}>
     {hideHeader ? <h2 id={titleId} className="sl-sr-only">{title}</h2> : <header className="v20-dialog-head"><h2 id={titleId}>{title}</h2><button className="sl-btn" aria-label="Đóng" disabled={busy} onClick={onClose}><XMarkIcon fontSize="small" /></button></header>}
     <div className={`v20-dialog-body ${bodyClassName}`}>{children}</div>
-    {actions && <footer className="v20-dialog-foot">{actions}</footer>}
+    {(actions || (actions === undefined && onClose)) && <footer className="v20-dialog-foot">{actions === undefined
+      ? <button type="button" className="sl-btn" disabled={busy} onClick={onClose}>Đóng</button>
+      : actions}</footer>}
   </Dialog>;
 }
 export function SearchSelect({ label, value, options, onChange, placeholder = "Chọn...", disabled = false }) {
