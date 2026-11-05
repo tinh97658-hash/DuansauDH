@@ -103,8 +103,16 @@ describe("Batch A API contracts with real guards and ValidationPipe", () => {
       await request(app.getHttpServer()).post(`/masters/exam-sessions/${id}/cancel`).send({version:0,note:'QA'}).expect(allowed?201:403);
       await request(app.getHttpServer()).post(`/masters/exam-sessions/${id}/confirm`).send({version:0,note:'QA',status:'held'}).expect(allowed?201:403);
     });
-    it.each([{examDate:'2026-02-30'},{examDate:'0000-01-01'},{startTime:'24:00'},{endTime:'10:70'},{snapshotId:'wrong'},{eligibilityVersion:-1},{lecturerId:undefined},{lecturerId:'wrong'}])('rejects invalid scheduling fields %p before service',async patch=>{
+    it.each([{examDate:'2026-02-30'},{examDate:'0000-01-01'},{startTime:'24:00'},{endTime:'10:70'},{snapshotId:'wrong'},{eligibilityVersion:-1},{lecturerId:'wrong'},{secondLecturerId:'wrong'}])('rejects invalid scheduling fields %p before service',async patch=>{
       permissions=new Set(['exams.write']);await request(app.getHttpServer()).post('/masters/exam-sessions').send({...valid,...patch}).expect(400);expect(examSchedule.schedule).not.toHaveBeenCalled();
+    });
+    it('allows creating and editing a schedule without assigned invigilators',async()=>{
+      permissions=new Set(['exams.write']);
+      const {lecturerId,...unassigned}=valid;
+      await request(app.getHttpServer()).post('/masters/exam-sessions').send(unassigned).expect(201);
+      expect(examSchedule.schedule).toHaveBeenCalledWith(expect.not.objectContaining({lecturerId:expect.anything()}),user);
+      await request(app.getHttpServer()).put(`/masters/exam-sessions/${id}`).send({...unassigned,version:0}).expect(200);
+      expect(examSchedule.reschedule).toHaveBeenCalledWith(id,expect.not.objectContaining({lecturerId:expect.anything()}),user);
     });
     it('rejects invalid confirmation decisions and IDs',async()=>{
       permissions=new Set(['exams.write']);await request(app.getHttpServer()).post(`/masters/exam-sessions/${id}/confirm`).send({version:0,note:'QA',status:'completed'}).expect(400);
