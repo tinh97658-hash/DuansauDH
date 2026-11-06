@@ -29,9 +29,9 @@ describe("Ribbon current-session POST logout", () => {
   beforeEach(() => { jest.clearAllMocks(); sessionStorage.removeItem('sdh.sidebar.open'); });
   it('expands the compact footer before allowing logout', () => {
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' }));
+    fireEvent.keyDown(document, { key: 'Escape' });
     fireEvent.click(screen.getByRole('button', { name: 'Đăng xuất' }));
-    expect(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' })).toBeInTheDocument();
+    expect(document.querySelector('.ribbon-sidebar')).toHaveClass('is-expanded');
     expect(axios.post).not.toHaveBeenCalled();
   });
   it.each([

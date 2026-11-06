@@ -38,7 +38,8 @@ describe("Ribbon read/navigation permission contracts", () => {
     const { container } = baseRender(view(session(['scheduling.view']), '/masters/schedule'));
     expect(screen.getByRole('button', { name: 'Mở menu tác vụ' })).toBeInTheDocument();
     fireEvent.click(container.querySelector(selector));
-    expect(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' })).toBeInTheDocument();
+    expect(document.querySelector('.ribbon-sidebar')).toHaveClass('is-expanded');
+    expect(document.querySelector('.ribbon-menu-tab')).toBeNull();
     expect(screen.getByRole('button', { name: 'Xếp lịch' })).toHaveAttribute('aria-current', 'page');
   });
 
@@ -46,7 +47,7 @@ describe("Ribbon read/navigation permission contracts", () => {
     const clicked = jest.fn();
     render(<>{view(session(['scheduling.view']), '/masters/schedule')}<button onClick={clicked}>Nội dung trang</button></>);
     fireEvent.click(screen.getByRole('searchbox'));
-    expect(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' })).toBeInTheDocument();
+    expect(document.querySelector('.ribbon-sidebar')).toHaveClass('is-expanded');
     const outside = screen.getByRole('button', { name: 'Nội dung trang' });
     outside.focus();
     fireEvent.click(outside);
@@ -71,7 +72,7 @@ describe("Ribbon read/navigation permission contracts", () => {
     fireEvent.pointerLeave(sidebar);
     fireEvent.blur(sidebar, { relatedTarget: document.body });
     expect(document.documentElement).toHaveAttribute('data-ribbon-sidebar', 'expanded');
-    fireEvent.click(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' }));
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(document.documentElement).toHaveAttribute('data-ribbon-sidebar', 'compact');
     expect(sidebar).toBeVisible();
     expect(screen.queryByRole('searchbox')).toBeNull();
@@ -94,11 +95,11 @@ describe("Ribbon read/navigation permission contracts", () => {
   it("keeps the sidebar open on navigation and restores that choice when the page remounts", () => {
     const first = render(view(session(['scheduling.view']), '/masters/schedule'));
     fireEvent.click(screen.getByRole('button', { name: 'Tạo lớp học phần' }));
-    expect(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' })).toBeInTheDocument();
+    expect(document.querySelector('.ribbon-sidebar')).toHaveClass('is-expanded');
     expect(sessionStorage.getItem('sdh.sidebar.open')).toBe('true');
     first.unmount();
     baseRender(view(session(['scheduling.view']), '/masters/course-offerings'));
-    expect(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' })).toBeInTheDocument();
+    expect(document.querySelector('.ribbon-sidebar')).toHaveClass('is-expanded');
     expect(screen.getByRole('button', { name: 'Tạo lớp học phần' })).toHaveAttribute('aria-current', 'page');
   });
 

@@ -3,7 +3,7 @@ import axios from "axios";
 import { ListItemIcon, ListItemText, ListSubheader, Menu, MenuItem } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useConfirmGradeLeave, useDiscardUnsavedGrades } from "./UnsavedChangesGuard";
-import { AcademicCapIcon, AdjustmentsHorizontalIcon, ArrowDownOnSquareIcon, ArrowRightStartOnRectangleIcon, ArrowUpTrayIcon, BanknotesIcon, Bars3Icon, BookOpenIcon, BuildingLibraryIcon, BuildingOffice2Icon, BuildingOfficeIcon, CalendarDaysIcon, CalendarIcon, ChartBarIcon, CheckBadgeIcon, CheckCircleIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClipboardDocumentCheckIcon, ClipboardDocumentListIcon, ClockIcon, DocumentChartBarIcon, DocumentCheckIcon, DocumentPlusIcon, DocumentTextIcon, FlagIcon, FolderOpenIcon, HomeModernIcon, InformationCircleIcon, LanguageIcon, LockClosedIcon, MagnifyingGlassIcon, PaperAirplaneIcon, ScaleIcon, ShieldCheckIcon, Squares2X2Icon, TableCellsIcon, TrophyIcon, UserCircleIcon, UserGroupIcon, UserPlusIcon, UsersIcon } from "./AppIcons";
+import { AcademicCapIcon, AdjustmentsHorizontalIcon, ArrowDownOnSquareIcon, ArrowRightStartOnRectangleIcon, ArrowUpTrayIcon, BanknotesIcon, Bars3Icon, BookOpenIcon, BuildingLibraryIcon, BuildingOffice2Icon, BuildingOfficeIcon, CalendarDaysIcon, CalendarIcon, ChartBarIcon, CheckBadgeIcon, CheckCircleIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon, ClipboardDocumentListIcon, ClockIcon, DocumentChartBarIcon, DocumentCheckIcon, DocumentPlusIcon, DocumentTextIcon, FlagIcon, FolderOpenIcon, HomeModernIcon, InformationCircleIcon, LanguageIcon, LockClosedIcon, MagnifyingGlassIcon, PaperAirplaneIcon, ScaleIcon, ShieldCheckIcon, Squares2X2Icon, TableCellsIcon, TrophyIcon, UserCircleIcon, UserGroupIcon, UserPlusIcon, UsersIcon } from "./AppIcons";
 import { API_BASE_URL } from "../config/http";
 import { BRAND } from "../config/branding";
 import { useAuthSession } from "../context/AuthSession";
@@ -165,10 +165,11 @@ const RibbonHeader = () => {
   const searchRef = useRef(null);
   const searchRequestedRef = useRef(false);
   const focusRequestedRef = useRef(false);
+  const restoreToggleFocusRef = useRef(false);
   const closeMenu = () => {
     setMenuOpen(false);
     setSearchQuery("");
-    menuToggleRef.current?.focus();
+    restoreToggleFocusRef.current = true;
   };
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
@@ -218,6 +219,10 @@ const RibbonHeader = () => {
   }, [path, location.search]);
 
   useEffect(() => {
+    if (!menuOpen && restoreToggleFocusRef.current) {
+      menuToggleRef.current?.focus();
+      restoreToggleFocusRef.current = false;
+    }
     if (menuOpen) {
       if (searchRequestedRef.current) searchRef.current?.focus();
       else if (focusRequestedRef.current) sidebarRef.current?.querySelector(".ribbon-tab-toggle.active")?.focus();
@@ -337,20 +342,19 @@ const RibbonHeader = () => {
           }),
         ])}
       </Menu>}
-      <button
+      {!menuOpen && <button
         ref={menuToggleRef}
         type="button"
-        className={`ribbon-menu-tab${menuOpen ? " is-open" : ""}`}
-        aria-label={menuOpen ? "Thu gọn menu tác vụ" : "Mở menu tác vụ"}
-        aria-expanded={menuOpen}
+        className="ribbon-menu-tab"
+        aria-label="Mở menu tác vụ"
+        aria-expanded={false}
         aria-controls="ribbon-sidebar"
         onClick={() => {
-          if (menuOpen) closeMenu();
-          else { focusRequestedRef.current = true; setMenuOpen(true); }
+          focusRequestedRef.current = true; setMenuOpen(true);
         }}
       >
-        {menuOpen ? <ChevronLeftIcon /> : desktop ? <img src={BRAND.logoUrl} alt="" /> : <Bars3Icon />}<span>Menu</span>
-      </button>
+        {desktop ? <img src={BRAND.logoUrl} alt="" /> : <Bars3Icon />}<span>Menu</span>
+      </button>}
       {menuOpen && !desktop && <div className="ribbon-menu-backdrop" aria-hidden="true" onClick={closeMenu} />}
       <aside id="ribbon-sidebar" ref={sidebarRef} className={`ribbon-sidebar${menuOpen ? ' is-expanded' : ' is-compact'}`} aria-label="Menu chức năng" hidden={!desktop && !menuOpen}
         onClickCapture={event => {

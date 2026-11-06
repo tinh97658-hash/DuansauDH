@@ -162,7 +162,6 @@ html[data-ribbon-sidebar] #root {
   cursor: pointer;
 }
 .ribbon-menu-tab { transition: left 200ms ease, background-color 150ms ease; }
-.ribbon-menu-tab.is-open { left: calc(var(--ribbon-expanded-width) - 44px); }
 .ribbon-menu-tab > span { display: none; }
 .ribbon-menu-tab:hover { background: var(--table-hover-bg); }
 .ribbon-menu-tab svg { width: 22px; height: 22px; }
@@ -199,7 +198,7 @@ html[data-ribbon-sidebar] #root {
   gap: 10px;
   height: var(--ribbon-header-height);
   min-height: var(--ribbon-header-height);
-  padding: 6px 48px 6px 14px;
+  padding: 6px 14px;
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-light);
 }
@@ -318,7 +317,7 @@ html[data-ribbon-sidebar] #root {
 }
 @media (max-width: 760px) {
   .ribbon-titlebar { gap: 8px; padding-right: 14px; padding-left: 68px; }
-  .ribbon-menu-tab:not(.is-open) { color: var(--icon-primary); background: #fff; }
+  .ribbon-menu-tab { color: var(--icon-primary); background: #fff; }
   .ribbon-topbar-start { gap: 10px; }
   .ribbon-breadcrumb { flex-wrap: wrap; gap: 4px 6px; padding: 10px 0; }
   .ribbon-breadcrumb > span { flex-shrink: 1; }
