@@ -7,7 +7,7 @@ import { DATE_PLACEHOLDER, formatDate, parseDisplayDate } from "../utils/dateFor
 
 /** Fixed day/month/year display, with ISO values for existing form handlers. */
 export default function DateField({ value = "", onChange, inputProps = {}, InputProps = {},
-  disabled, error, helperText, onBlur, min: minimum, max: maximum, readOnly: isReadOnly, ...props }) {
+  disabled, error, helperText, onBlur, onAccept, min: minimum, max: maximum, readOnly: isReadOnly, ...props }) {
   const [draft, setDraft] = useState(() => formatDate(value, ""));
   const [calendarAnchor, setCalendarAnchor] = useState(null);
   const lastEmitted = useRef(value);
@@ -49,6 +49,6 @@ export default function DateField({ value = "", onChange, inputProps = {}, Input
       </InputAdornment> }} />
     {calendarAnchor && !disabled && !readOnly && !InputProps.readOnly && <DateCalendar anchorEl={calendarAnchor}
       value={value} min={min} max={max} label={textInputProps["aria-label"] || props.label}
-      onSelect={next => change({ target: { value: next } }, true)} onClose={() => setCalendarAnchor(null)} />}
+      onSelect={next => { change({ target: { value: next } }, true); onAccept?.(next); }} onClose={() => setCalendarAnchor(null)} />}
   </>;
 }

@@ -38,4 +38,12 @@ describe('Lecturer payment authorization and validation', () => {
     await expect(new LecturerPaymentService(db as any).list({ from: '2026-11-03', to: '2026-11-01' })).rejects.toThrow();
     expect(db.query).not.toHaveBeenCalled();
   });
+  it('validates explicit versions, calendar dates and note length, including independent note edits', async () => {
+    const valid = { paid: false, paymentVersion: null, note: 'Chờ đối chiếu' };
+    expect(await validate(Object.assign(new UpdateLecturerPaymentDto(), valid))).toHaveLength(0);
+    for (const change of [ { paymentVersion: undefined }, { paymentDate: '2026-02-30' },
+      { paymentDate: '2026-11-04T00:00:00Z' }, { note: null }, { note: 'x'.repeat(2001) } ]) {
+      expect(await validate(Object.assign(new UpdateLecturerPaymentDto(), valid, change))).not.toHaveLength(0);
+    }
+  });
 });

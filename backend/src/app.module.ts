@@ -27,6 +27,7 @@ import { RolesModule } from "./roles/roles.module.js";
 import { SchedulingModule } from "./scheduling/scheduling.module.js";
 import { SystemModule } from "./system/system.module.js";
 import { DashboardModule } from "./dashboard/dashboard.module.js";
+import { InboxModule } from './notifications/inbox.module.js';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { DashboardModule } from "./dashboard/dashboard.module.js";
     ReportsModule,
     SchedulingModule,
     DashboardModule,
+    InboxModule,
   ],
 })
 export class AppModule implements NestModule {

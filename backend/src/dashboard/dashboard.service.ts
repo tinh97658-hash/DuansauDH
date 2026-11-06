@@ -10,7 +10,9 @@ import { ExamGradebookService } from "../masters/exam-gradebook.service.js";
 import { businessCalendarDaysSince } from "../scheduling/scheduling-time.js";
 import { QueryTypes } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
-import { routeActionCode, routeViewCode } from '../auth/route-permissions.js';
+import { learnerStudyStatusSql } from '../plan/learner-study-status.js';
+import { getBusinessWallTime } from '../scheduling/scheduling-time.js';
+import { routeViewCode, routeActionCode } from '../auth/route-permissions.js';
 
 export type DashboardProgram = "masters" | "doctoral";
 
@@ -29,6 +31,11 @@ export const operationalPermissions = (user: unknown, permissions: Set<string>, 
     scheduling: !readOnly && can("scheduling.view", "scheduling.write") && schedule && canWriteScheduling(user, permissions),
     progress: !readOnly && can("scheduling.view", "scheduling.write") && schedule && canWriteScheduling(user, permissions),
     overview: can("scheduling.view") && ['/masters/course-offerings','/masters/schedule','/masters/course-matrix'].some(path => page(path)),
+    learnersOverview: can('admission.view') && page('/plan/admission-records'),
+    examsWrite: !readOnly && can('exams.view', 'exams.write') && page('/masters/exam-schedule', 'exams.write'),
+    gradebookView: can('gradebook.view') && page('/masters/exam-lists'),
+    leaveActivity: can('plan.view') && (can('studyleave.approve') || can('studyleave.request')) && page('/masters/study-leaves'),
+    transferActivity: can('admission.view') && (can('majortransfer.approve') || can('majortransfer.request')) && page('/plan/admission-records'),
   };
 };
 
@@ -36,7 +43,8 @@ const href = (path: string, params: Record<string, string>) => `${path}?${new UR
 const plain = (value: any) => typeof value?.get === "function" ? value.get({ plain: true }) : value;
 const scopeGroup = (offering: any, year: string) => (offering.groupLinks || []).map((link: any) => link.classGroup)
   .find((group: any) => group?.academicYear === year);
-export type DashboardSection = "grouping" | "teaching" | "grades" | "approvals" | "studyLeaveApproval" | "majorTransferApproval";
+export type DashboardSection = "grouping" | "teaching" | "grades" | "approvals" | "studyLeaveApproval" | "majorTransferApproval"
+  | "learnersChart" | "sessionsChart" | "completionChart" | "activity";
 
 @Injectable()
 export class DashboardService {
@@ -85,11 +93,11 @@ export class DashboardService {
     const items = eligibleMajors.map((major) => ({
       id: major.id, title: major.name,
       detail: major.discipline?.name || "", unit: "HV",
-      count: learners.filter((learner) => learner.majorId === major.id && !learner.assignedGroup).length,
+      count: new Set(learners.filter((learner) => learner.majorId === major.id && !learner.assignedGroup).map(learner => learner.id)).size,
       href: href("/masters/assign-class-groups", { year, disciplineId: major.disciplineId || major.discipline.id, majorId: major.id }),
     })).filter((item) => item.count > 0).sort((a, b) => b.count - a.count || a.title.localeCompare(b.title, "vi"));
     return { count: items.reduce((sum, item) => sum + item.count, 0), itemCount: items.length,
-      href: href("/masters/assign-class-groups", { year }), items: items.slice(0, 5) };
+      href: href("/masters/assign-class-groups", { year }), items };
   }
 
   private async teaching(year: string, permissions: ReturnType<typeof operationalPermissions>, offeringsPromise: Promise<any[]>) {
@@ -108,7 +116,7 @@ export class DashboardService {
       .sort((a, b) => Number(b.sessionSummary.pendingCount) - Number(a.sessionSummary.pendingCount));
     return {
       ...(permissions.scheduling ? { scheduling: { count: unscheduled.length, itemCount: unscheduled.length,
-        href: href("/masters/schedule", { year, queue: "unscheduled" }), items: unscheduled.slice(0, 5).map(item) } } : {}),
+        href: href("/masters/schedule", { year, queue: "unscheduled" }), items: unscheduled.map(item) } } : {}),
       ...(permissions.progress ? { progress: { count: pending.reduce((sum, offering) => sum + Number(offering.sessionSummary.pendingCount), 0), itemCount: pending.length,
         href: href("/masters/schedule", { year, queue: "pending-confirmation" }),
         items: pending.map((offering) => ({ ...item(offering),
@@ -125,13 +133,22 @@ export class DashboardService {
     };
   }
 
-  private async grades(year: string, offeringsPromise: Promise<any[]>, trackingPromise: Promise<Map<string, any>>) {
+  private async grades(year: string, offeringsPromise: Promise<any[]>, trackingPromise: Promise<Map<string, any>>, examsWrite = false) {
     const [offerings, tracking] = await Promise.all([offeringsPromise, trackingPromise]);
     const warningGroups = [
       { key: 'components', title: 'CHỜ NHẬP ĐIỂM THÀNH PHẦN', items: [] as any[] },
       { key: 'exam', title: 'CHỜ TỔ CHỨC THI', items: [] as any[] },
       { key: 'examGrades', title: 'CHỜ NHẬP ĐIỂM THI', items: [] as any[] },
+      { key: 'resultReady', title: 'ĐỦ KẾT QUẢ, CHỜ GỬI DUYỆT', items: [] as any[] },
     ];
+    const awaitingIds = offerings.filter(offering => tracking.get(offering.id)?.gradebookStage === 'awaiting_exam').map(offering => offering.id);
+    const examSessions = awaitingIds.length ? await this.db.query<any>(`SELECT course_offering_id AS "offeringId",
+      COUNT(*) FILTER (WHERE (exam_date+end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh' >= now())::int AS "upcomingCount",
+      MIN((exam_date+start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh') FILTER
+        (WHERE (exam_date+end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh' >= now()) AS "nextExamAt",
+      COUNT(*)::int AS "scheduledCount" FROM course_exam_sessions
+      WHERE course_offering_id IN (:ids) AND status='scheduled' GROUP BY course_offering_id`,
+      { type: QueryTypes.SELECT, replacements: { ids: awaitingIds } }) : [];
     for (const offering of offerings) {
       const state = tracking.get(offering.id);
       if (!state || state.legacy) continue;
@@ -139,18 +156,30 @@ export class DashboardService {
       if (state.gradebookStage === 'components_missing') { index = 0; at = state.completedTeachingAt; milestone = 'Hoàn thành môn học'; }
       else if (state.gradebookStage === 'awaiting_exam') { index = 1; at = state.componentScoreApprovedAt; milestone = 'Điểm thành phần được duyệt'; }
       else if (state.gradebookStage === 'exam_missing') { index = 2; at = state.examCompletedAt; milestone = 'Thi xong'; }
+      else if (state.gradebookStage === 'result_ready') { index = 3; at = null; milestone = 'Đã đủ kết quả, có thể gửi duyệt'; }
       else continue;
       const group = scopeGroup(offering, year);
-      const days = businessCalendarDaysSince(at);
+      const exam = examSessions.find(session => session.offeringId === offering.id);
+      const upcoming = Number(exam?.upcomingCount) > 0;
+      const eligibilityApproved = state.componentsApproved === true || state.eligibilityStatus === 'approved';
+      const openExamSchedule = index === 1 && examsWrite && eligibilityApproved;
+      const days = index === 1 && upcoming ? null : businessCalendarDaysSince(at);
       const params = { year, offeringId: offering.id, ...(group?.id ? { groupId: group.id } : {}), ...(group?.majorId ? { majorId: group.majorId } : {}) };
       warningGroups[index].items.push({ id: offering.id,
         title: [offering.subject?.name, offering.name || group?.code].filter(Boolean).join(' · '),
-        detail: days === null ? milestone : `${milestone} ${days} ngày trước`,
-        elapsedDays: days, href: href(index === 1 ? '/masters/exam-schedule' : '/masters/exam-lists', params) });
+        detail: index === 1 ? !eligibilityApproved ? state.eligibilityStatus === 'submitted' ? 'Danh sách thi đang chờ duyệt' : 'Cần gửi duyệt danh sách thi'
+          : upcoming ? 'Đã xếp lịch thi sắp tới' : Number(exam?.scheduledCount) > 0
+          ? 'Lịch thi đã qua giờ, cần kiểm tra xác nhận' : 'Chưa có lịch thi đang chờ tổ chức'
+          : days === null ? milestone : `${milestone} ${days} ngày trước`,
+        nextExamAt: upcoming ? exam.nextExamAt : null,
+        examScheduled: Number(exam?.scheduledCount) > 0, upcomingExam: upcoming,
+        action: openExamSchedule ? !Number(exam?.scheduledCount) ? 'Xếp lịch thi' : 'Xem lịch thi' : index === 3 ? 'Mở để gửi duyệt' : 'Mở bảng điểm',
+        elapsedDays: days, href: href(openExamSchedule ? '/masters/exam-schedule' : '/masters/exam-lists', params) });
     }
     for (const group of warningGroups) group.items.sort((a, b) => (b.elapsedDays ?? -1) - (a.elapsedDays ?? -1) || a.title.localeCompare(b.title, 'vi'));
     const items = warningGroups[0].items;
-    return { count: items.length, itemCount: items.length, items: items.slice(0, 5), warningGroups: warningGroups.slice(1),
+    return { count: items.length, itemCount: items.length, items, warningGroups: warningGroups.slice(1, 3),
+      stages: warningGroups.map((group, index) => ({ ...group, stage: ['components_missing', 'awaiting_exam', 'exam_missing', 'result_ready'][index], count: group.items.length })),
       href: items[0]?.href || href("/masters/exam-lists", { year }) };
   }
 
@@ -182,29 +211,139 @@ export class DashboardService {
     return { eligibilityApproval: metric(eligibility), resultApproval: metric(results), eligibilityReopen: metric(reopens) };
   }
 
+  private async learnersChart(year: string) {
+    // Reuse the learner screen's effective study status. One row per admission record, no membership join.
+    const rows = await this.db.query<any>(`SELECT r.status AS "admissionStatus",
+      ${learnerStudyStatusSql('r')} AS "studyStatus", COUNT(DISTINCT r.id)::int AS count
+      FROM admission_records r WHERE r.training_level='Thạc sĩ' AND r.academic_year=:year
+      GROUP BY r.status,${learnerStudyStatusSql('r')} ORDER BY count DESC`,
+      { type: QueryTypes.SELECT, replacements: { year } });
+    return { title: 'Tình trạng hồ sơ / học viên', unit: 'hồ sơ', kind: 'donut',
+      description: 'Mỗi hồ sơ được tính một lần theo trạng thái đào tạo hiện tại; nếu chưa có, dùng trạng thái xét tuyển.',
+      values: rows.map(row => ({ label: row.studyStatus || row.admissionStatus || 'Chưa xác định', count: Number(row.count) })) };
+  }
+
+  private async sessionsChart(year: string) {
+    const rows = await this.db.query<any>(`SELECT CASE WHEN ts.status='held' THEN 'Đã diễn ra'
+      WHEN ts.status='not_held' THEN 'Không diễn ra'
+      WHEN ts.session_date+ts.end_time < (now() AT TIME ZONE 'Asia/Ho_Chi_Minh') THEN 'Qua giờ, chưa xác nhận'
+      ELSE 'Sắp diễn ra' END AS label,COUNT(DISTINCT ts.id)::int AS count
+      FROM teaching_sessions ts JOIN course_offerings o ON o.id=ts.course_offering_id
+      JOIN subjects s ON s.id=o.subject_id
+      WHERE s.program='masters' AND ts.status IN ('planned','held','not_held')
+        AND ts.session_date >= date_trunc('week',now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+        AND ts.session_date < date_trunc('week',now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date+7
+        AND EXISTS(SELECT 1 FROM course_offering_class_groups link JOIN class_groups g ON g.id=link.class_group_id
+          WHERE link.course_offering_id=o.id AND g.program='masters' AND g.academic_year=:year)
+      GROUP BY label`, { type: QueryTypes.SELECT, replacements: { year } });
+    return { title: 'Buổi học trong tuần', unit: 'buổi', kind: 'donut',
+      description: 'Tuần hiện tại từ thứ Hai đến Chủ nhật, giờ Việt Nam. Chỉ tính buổi có lịch; không gồm lịch đã hủy.', values: rows };
+  }
+
+  private async completionChart(year: string) {
+    const rows = await this.db.query<any>(`WITH months AS (
+      SELECT generate_series(date_trunc('month',now() AT TIME ZONE 'Asia/Ho_Chi_Minh')-interval '5 months',
+        date_trunc('month',now() AT TIME ZONE 'Asia/Ho_Chi_Minh'),interval '1 month') AS month
+      ) SELECT to_char(m.month,'MM/YYYY') AS label,COUNT(DISTINCT o.id)::int AS count
+      FROM months m LEFT JOIN course_offerings o ON o.status='completed' AND o.completed_at IS NOT NULL
+        AND date_trunc('month',o.completed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')=m.month
+        AND EXISTS(SELECT 1 FROM subjects s WHERE s.id=o.subject_id AND s.program='masters')
+        AND EXISTS(SELECT 1 FROM course_offering_class_groups link JOIN class_groups g ON g.id=link.class_group_id
+          WHERE link.course_offering_id=o.id AND g.program='masters' AND g.academic_year=:year)
+      GROUP BY m.month ORDER BY m.month`, { type: QueryTypes.SELECT, replacements: { year } });
+    return { title: 'Hoàn thành giảng dạy', unit: 'lớp học phần', kind: 'bar',
+      description: 'Sáu tháng gần nhất theo ngày xác nhận hoàn thành. Mỗi lớp học phần chỉ tính một lần, kể cả lớp ghép.', values: rows };
+  }
+
+  private async gradeActivity(year: string) {
+    const rows = await this.db.query<any>(`SELECT e.id,e.action,e.created_at AS at,o.id AS "offeringId",o.name AS title,
+      (SELECT g.id FROM course_offering_class_groups link JOIN class_groups g ON g.id=link.class_group_id
+        WHERE link.course_offering_id=o.id AND g.academic_year=:year ORDER BY g.id LIMIT 1) AS "groupId"
+      FROM gradebook_events e JOIN course_offerings o ON o.id=e.course_offering_id JOIN subjects s ON s.id=o.subject_id
+      WHERE e.action IN ('result.submit','result.approve') AND s.program='masters'
+        AND EXISTS(SELECT 1 FROM course_offering_class_groups link JOIN class_groups g ON g.id=link.class_group_id
+          WHERE link.course_offering_id=o.id AND g.academic_year=:year AND g.program='masters')
+      ORDER BY e.created_at DESC,e.id DESC LIMIT 20`, { type: QueryTypes.SELECT, replacements: { year } });
+    return rows.map(row => ({ id: `grade:${row.id}`, title: row.title,
+      detail: row.action === 'result.submit' ? 'Bảng điểm đã gửi duyệt' : 'Bảng điểm đã duyệt / khóa', at: row.at,
+      href: href('/masters/exam-lists', { year, offeringId: row.offeringId, ...(row.groupId ? { groupId: row.groupId } : {}) }) }));
+  }
+
+  private async learnerActivity(year: string, leave: boolean) {
+    const rows = await this.db.query<any>(leave ? `SELECT l.id,r.id AS "recordId",r.full_name AS title,
+      event->>'action' AS action,event->>'at' AS at FROM study_leaves l
+      JOIN admission_records r ON r.id=l.admission_record_id CROSS JOIN LATERAL jsonb_array_elements(l.history) event
+      WHERE r.training_level='Thạc sĩ' AND r.academic_year=:year
+        AND event->>'action' IN ('requested','approve','reject','request_extension','approve_extension','reject_extension')
+      ORDER BY event->>'at' DESC,l.id LIMIT 20` : `SELECT t.id,r.id AS "recordId",r.full_name AS title,
+      t.status AS action,COALESCE(t.decided_at,t.requested_at) AS at FROM major_transfers t
+      JOIN admission_records r ON r.id=t.admission_record_id
+      WHERE r.training_level='Thạc sĩ' AND r.academic_year=:year ORDER BY COALESCE(t.decided_at,t.requested_at) DESC,t.id LIMIT 20`,
+      { type: QueryTypes.SELECT, replacements: { year } });
+    const labels: Record<string, string> = leave ? { requested: 'Yêu cầu bảo lưu', approve: 'Bảo lưu đã duyệt', reject: 'Bảo lưu bị từ chối',
+      request_extension: 'Yêu cầu gia hạn bảo lưu', approve_extension: 'Gia hạn đã duyệt', reject_extension: 'Gia hạn bị từ chối' }
+      : { pending: 'Yêu cầu chuyển chuyên ngành', approved: 'Chuyển chuyên ngành đã duyệt', rejected: 'Chuyển chuyên ngành bị từ chối' };
+    return rows.map(row => ({ id: `${leave ? 'leave' : 'transfer'}:${row.id}:${row.action}:${row.at}`, title: row.title,
+      detail: labels[row.action] || 'Yêu cầu đã được cập nhật', at: row.at,
+      href: href(leave ? `/masters/study-leaves/${row.recordId}` : `/plan/admission-records/${row.recordId}`, { tab: leave ? 'leave' : 'profile' }) }));
+  }
+
   async operational(user: unknown, year: string, section?: DashboardSection, program: DashboardProgram = "masters") {
-    const access = user instanceof Staff ? await this.rbac.effectiveAccess(user) : { permissions: new Set<string>(), groupScope: undefined };
+    const access = user instanceof Staff ? await this.rbac.effectiveAccess(user) : { permissions: new Set<string>(), roleCodes: [], groupScope: undefined };
     const permissions = operationalPermissions(user, access.permissions, access.groupScope?.readOnly, program);
+    // Enter the same existing read domains used by the destination endpoints. Never alter their rules.
+    const domainRead = <T>(domain: 'schedule' | 'gradebook' | 'admission' | 'leave' | 'default', work: () => Promise<T>): Promise<T> => {
+      if (!this.scope || !(user instanceof Staff)) return work();
+      return this.scope.run(user.id, access, () => {
+        const context = this.scope!.current();
+        if (context) Object.assign(context, domain === 'schedule' ? { schedulingAction: 'view', schedulingView: true }
+          : domain === 'gradebook' ? { academicDomain: 'gradebook', academicPermission: 'gradebook.view' }
+          : domain === 'admission' ? { admissionAction: 'view' }
+          : domain === 'leave' ? { academicDomain: 'studyleave', academicPermission: access.permissions.has('studyleave.approve') ? 'studyleave.approve' : 'studyleave.request' } : {});
+        return this.scope!.withReadTransaction(work);
+      }, domain === 'schedule', domain === 'schedule' ? 'view' : undefined);
+    };
     let majorsPromise: Promise<any[]> | undefined;
     const majors = () => majorsPromise ||= this.system.listMajors("masters").then((rows) => rows.map(plain));
     // Share only within this request, preserving each user's scope and fresh data on refresh.
-    let offeringsPromise: Promise<any[]> | undefined;
-    const read = <T>(work: () => Promise<T>) => this.scope ? this.scope.withReadTransaction(work) : work();
-    const offerings = () => offeringsPromise ||= read(() =>
-      this.scheduling.listCourseOfferings({ program: "masters", academicYear: year })).then(rows => rows.map(plain));
+    const offeringPromises = new Map<string, Promise<any[]>>();
+    const offerings = (domain: 'schedule' | 'gradebook' = 'gradebook') => {
+      // Without a scope adapter (unit tests), sharing is safe. Real HTTP readers stay in their own domain.
+      const key = this.scope ? domain : 'shared';
+      if (!offeringPromises.has(key)) offeringPromises.set(key, domainRead(domain, () =>
+        this.scheduling.listCourseOfferings({ program: "masters", academicYear: year })).then(rows =>
+          [...new Map(rows.map(row => { const value = plain(row); return [value.id, value] as const; })).values()]));
+      return offeringPromises.get(key)!;
+    };
     let trackingPromise: Promise<Map<string, any>> | undefined;
     const tracking = () => trackingPromise ||= offerings().then(rows =>
-      read(() => this.gradebooks.tracking(rows, permissions.grades && (!section || section === 'grades'))));
+      domainRead('gradebook', () => this.gradebooks.tracking(rows, permissions.grades && (!section || section === 'grades'))));
     // Each program supplies the same section contract. Add doctoral providers here as
     // those workflows ship; never fall back to masters data or fabricated zero counts.
     const providers: Record<DashboardProgram, Partial<Record<DashboardSection, () => Promise<any>>>> = {
       masters: {
-        grouping: () => this.grouping(year, majors()),
-        teaching: () => this.teaching(year, permissions, offerings()),
-        grades: () => this.grades(year, offerings(), tracking()),
+        grouping: () => domainRead('default', () => this.grouping(year, majors())),
+        teaching: () => this.teaching(year, permissions, offerings('schedule')),
+        grades: () => domainRead('gradebook', () => this.grades(year, offerings(), tracking(), permissions.examsWrite)),
         approvals: () => this.approvals(year, offerings(), tracking()),
-        studyLeaveApproval: () => this.learnerRequests(year, "studyLeaveApproval"),
-        majorTransferApproval: () => this.learnerRequests(year, "majorTransferApproval"),
+        studyLeaveApproval: () => domainRead('leave', () => this.learnerRequests(year, "studyLeaveApproval")),
+        majorTransferApproval: () => domainRead('default', () => this.learnerRequests(year, "majorTransferApproval")),
+        learnersChart: () => domainRead('admission', () => this.learnersChart(year)),
+        sessionsChart: () => domainRead('schedule', () => this.sessionsChart(year)),
+        completionChart: () => domainRead('schedule', () => this.completionChart(year)),
+        activity: async () => {
+          const loaders = [
+            ...(permissions.gradebookView ? [() => domainRead('gradebook', () => this.gradeActivity(year))] : []),
+            ...(permissions.leaveActivity ? [() => domainRead('leave', () => this.learnerActivity(year, true))] : []),
+            ...(permissions.transferActivity ? [() => domainRead('default', () => this.learnerActivity(year, false))] : []),
+          ];
+          const results = await Promise.allSettled(loaders.map(load => load()));
+          if (results.length && results.every(result => result.status === 'rejected')) throw new Error('Activity unavailable');
+          return { items: results.flatMap(result => result.status === 'fulfilled' ? result.value : [])
+            .filter(item => item.at && Number.isFinite(new Date(item.at).getTime()))
+            .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()).slice(0, 20),
+            partial: results.some(result => result.status === 'rejected'), readState: 'not_supported' };
+        },
       },
       doctoral: {},
     };
@@ -212,12 +351,14 @@ export class DashboardService {
       grouping: permissions.grouping, teaching: permissions.scheduling || permissions.progress || permissions.overview,
       grades: permissions.grades, approvals: permissions.approvals,
       studyLeaveApproval: permissions.studyLeaveApproval, majorTransferApproval: permissions.majorTransferApproval,
+      learnersChart: permissions.learnersOverview, sessionsChart: permissions.overview, completionChart: permissions.overview,
+      activity: permissions.gradebookView || permissions.leaveActivity || permissions.transferActivity,
     };
     const entries = (Object.keys(enabled) as DashboardSection[])
-      .filter(key => enabled[key] && (!section || section === key))
+      .filter(key => enabled[key] && (section ? section === key : key !== 'activity'))
       .map(key => [key, providers[program][key]] as const);
     const results = await Promise.allSettled(entries.map(([, loader]) => loader?.()));
-    return { year, program, permissions, sources: Object.fromEntries(entries.map(([key, loader], index) => {
+    return { year, program, permissions, generatedAt: getBusinessWallTime(), sources: Object.fromEntries(entries.map(([key, loader], index) => {
       const result = results[index];
       return [key, !loader ? { status: "not_implemented", message: "Chức năng dành cho hệ Tiến sĩ chưa được triển khai." }
         : result.status === "fulfilled" ? { status: "ready", data: result.value }

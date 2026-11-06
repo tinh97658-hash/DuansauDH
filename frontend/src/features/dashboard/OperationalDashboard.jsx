@@ -1,198 +1,286 @@
-import AppSelect from "../../components/AppSelect";
-import React, { useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import axios from "axios";
-import { ArrowPathIcon, ArrowRightIcon, CalendarDaysIcon, CheckCircleIcon, ClipboardDocumentListIcon, ClockIcon, ExclamationTriangleIcon, UsersIcon } from "../../components/AppIcons";
-import { API_BASE_URL } from "../../config/http";
-import { useGradebookRevision } from "../../utils/gradebookRevision";
-import { listenForBackgroundRefresh } from "../../utils/backgroundRefresh";
-import "./operationalDashboard.css";
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import DashboardSelect from './DashboardSelect';
+import DashboardColumns from './DashboardColumns';
+import AdaptiveTaskList from './AdaptiveTaskList';
+import { ArrowRightIcon, ChevronLeftIcon, CheckCircleIcon, ClipboardDocumentListIcon, ClipboardDocumentCheckIcon, ChartBarIcon, CalendarDaysIcon, ClockIcon, UsersIcon } from '../../components/AppIcons';
+import { useAuthSession } from '../../context/AuthSession';
+import { useDashboardData } from './useDashboardData';
+import './operationalDashboard.css';
 
+const programs = { masters: 'Thạc sĩ', doctoral: 'Tiến sĩ' };
 const currentYear = new Date().getFullYear();
-const programLabels = { masters: "Thạc sĩ", doctoral: "Tiến sĩ" };
-const definitions = [
-  { key: "studyLeaveApproval", source: "studyLeaveApproval", inboxOnly: true, title: "Chờ duyệt bảo lưu", action: "Duyệt / Từ chối", unit: "yêu cầu", Icon: ClockIcon, tone: "amber" },
-  { key: "majorTransferApproval", source: "majorTransferApproval", inboxOnly: true, title: "Chờ duyệt chuyển chuyên ngành", action: "Duyệt / Từ chối", unit: "yêu cầu", Icon: ClipboardDocumentListIcon, tone: "violet" },
-  { key: "resultApproval", permission: "approvals", source: "approvals", title: "Chờ duyệt khóa điểm", healthyTitle: "Duyệt khóa điểm", action: "Duyệt khóa điểm", healthy: "Không có yêu cầu chờ duyệt khóa điểm", unit: "lớp", Icon: ClipboardDocumentListIcon, tone: "violet" },
-  { key: "grouping", source: "grouping", title: "Học viên chưa phân nhóm", healthyTitle: "Phân nhóm học viên", action: "Phân nhóm", healthy: "Không còn học viên chờ phân nhóm", unit: "học viên", Icon: UsersIcon, tone: "teal" },
-  { key: "scheduling", source: "teaching", title: "Lớp chưa xếp lịch", healthyTitle: "Xếp lịch học", action: "Xếp lịch", healthy: "Không còn lớp chờ xếp lịch", unit: "lớp học phần", Icon: CalendarDaysIcon, tone: "blue" },
-  { key: "grades", source: "grades", title: "Chờ nhập điểm thành phần", healthyTitle: "Nhập điểm thành phần", action: "Nhập điểm", healthy: "Không có lớp chờ nhập điểm thành phần", unit: "lớp", Icon: ClipboardDocumentListIcon, tone: "violet" },
-  { key: "progress", source: "teaching", title: "Tiến độ cần kiểm tra", healthyTitle: "Kiểm tra tiến độ", action: "Kiểm tra", healthy: "Không có buổi học chờ xác nhận", unit: "buổi chờ xác nhận", Icon: ClockIcon, tone: "amber" },
+export const dashboardFilters = params => ({ year: /^\d{4}$/.test(params.get('year') || '') ? params.get('year') : String(currentYear),
+  program: params.get('program') === 'doctoral' ? 'doctoral' : 'masters' });
+const stages = ['components_missing', 'awaiting_exam', 'exam_missing', 'result_ready'];
+const stageTitles = ['Chưa hoàn thiện điểm thành phần', 'Chờ tổ chức thi', 'Thi xong, chờ nhập điểm thi', 'Đủ kết quả, chờ gửi duyệt'];
+const workDefinitions = [
+  { key: 'grouping', tab: 'grouping', source: 'grouping', title: 'Học viên chưa phân nhóm', description: 'Học viên đủ điều kiện đang chờ phân nhóm', unit: 'học viên', Icon: UsersIcon },
+  { key: 'scheduling', tab: 'teaching', source: 'teaching', title: 'Lớp học phần chưa xếp lịch', description: 'Bố trí các buổi học cho lớp học phần', unit: 'lớp học phần', Icon: CalendarDaysIcon },
+  { key: 'progress', tab: 'teaching', source: 'teaching', title: 'Buổi học chờ xác nhận', description: 'Buổi học đã qua giờ kết thúc, chưa xác nhận', unit: 'buổi', Icon: ClockIcon },
+  { key: 'grades', tab: 'grades', source: 'grades', title: 'Công việc liên quan đến điểm', description: 'Bốn giai đoạn nghiệp vụ, theo dõi riêng từng tầng', unit: 'lớp học phần', Icon: ClipboardDocumentListIcon },
 ];
-const metricOf = (source, key) => source?.data?.[key] || (source?.data && ["eligibilityReopen", "eligibilityApproval", "resultApproval"].includes(key)
-  ? { count: 0, itemCount: 0, items: [], href: "/masters/exam-lists" } : source?.data);
+const metricOf = (source, key) => key === 'scheduling' || key === 'progress' ? source?.data?.[key] : source?.data;
+const gradeGroups = data => stages.map((stage, index) => data?.stages?.find(group => group.stage === stage)
+  || { stage, title: stageTitles[index], count: 0, items: [] });
+const metricCount = (metric, key) => key === 'grades'
+  ? gradeGroups(metric).reduce((sum, group) => sum + group.count, 0) : metric?.count;
+const summaryLabels = { grouping: 'Chờ phân nhóm', scheduling: 'Chưa xếp lịch', progress: 'Chờ xác nhận buổi học', grades: 'Theo dõi điểm' };
 
-function SourceState({ source, onRetry, compact = false }) {
-  if (source?.status === "not_implemented") return <p className="od-unavailable">{source.message || "Chức năng chưa được triển khai."}</p>;
-  if (!source || source.status === "loading") return <div className={`od-loading${compact ? " od-loading-compact" : ""}`} role="status" aria-label="Đang tải công việc"><span /><span /></div>;
-  if (source.status === "error") return <div className="od-source-error" role="alert"><span>Chưa tải được dữ liệu.</span><button type="button" onClick={onRetry}><ArrowPathIcon />Thử lại</button></div>;
-  return null;
-}
+const workDestination = (definition, metric, year) => {
+  if (definition.key === 'grades') return `/masters/exam-lists?${new URLSearchParams({ year })}`;
+  if (metric?.href) return metric.href;
+  if (definition.key === 'grouping') return `/masters/assign-class-groups?${new URLSearchParams({ year })}`;
+  return `/masters/schedule?${new URLSearchParams({ year, queue: definition.key === 'progress' ? 'pending-confirmation' : 'unscheduled' })}`;
+};
 
-export function ActionCard({ definition, source, onRetry }) {
-  const { key, title, healthyTitle, action, healthy, unit, Icon, tone } = definition;
-  const metric = source?.status === "ready" ? metricOf(source, key) : null;
-  const ready = metric && Number.isFinite(metric.count);
-  return <article className={`od-card od-tone-${tone}${ready && metric.count === 0 ? " od-card-healthy" : ""}`} aria-label={title}>
-    <div className="od-card-body">
-      <span className="od-icon"><Icon aria-hidden="true" /></span>
-      <div className="od-card-content">
-        <h2>{ready && metric.count === 0 ? healthyTitle : title}</h2>
-        {ready ? metric.count > 0 ? <div className="od-card-value"><strong>{metric.count.toLocaleString("vi-VN")}</strong><span>{unit}{key === "grouping" ? " đang chờ" : ""}</span></div>
-          : <p className="od-healthy-text"><CheckCircleIcon aria-hidden="true" /><span>{healthy}</span></p>
-          : <SourceState source={source} onRetry={onRetry} compact />}
-      </div>
-    </div>
-    {ready && <div className="od-card-footer">
-      {metric.count > 0 && <span className="od-card-state">Cần xử lý</span>}
-      <Link className="od-card-action" to={metric.href}>{metric.count > 0 ? action : "Xem chi tiết"}<ArrowRightIcon /></Link>
-    </div>}
-  </article>;
-}
-
-function WorkCategory({ definition, source, onRetry }) {
-  const metric = source?.status === "ready" ? metricOf(source, definition.key) : null;
-  const grouping = definition.key === "grouping";
-  if (metric?.count === 0) return null;
-  return <section className={`od-work-category od-tone-${definition.tone}`} aria-label={definition.title}>
-    <div className="od-category-heading"><h3><definition.Icon />{grouping ? "Học viên chờ phân nhóm" : definition.key === 'grades' ? 'CHỜ NHẬP ĐIỂM THÀNH PHẦN' : definition.title}</h3>
-      {metric && <span className="od-category-count">{metric.count} {definition.unit}</span>}
-    </div>
-    {!metric ? <SourceState source={source} onRetry={onRetry} /> : <>
-      <ul className="od-work-list">{metric.items.map((item) => <li key={item.id}>
-        <Link to={item.href}><span className="od-item-copy"><strong>{item.title}</strong>{item.detail && <small>{item.detail}</small>}</span>
-          {item.count != null && <span className="od-row-metric">
-            <span className="od-item-count">{item.count} {item.unit}</span></span>}
-          <span className="od-row-action">{definition.action}<ArrowRightIcon aria-hidden="true" /></span>
-        </Link>
-      </li>)}</ul>
-      <div className="od-category-footer">
-        {metric.itemCount > metric.items.length && <span>Hiển thị {metric.items.length}/{metric.itemCount} mục</span>}
-        <Link to={metric.href}>{definition.key === "grades" ? "Mở bảng điểm cần xử lý" : "Xem tất cả"}<ArrowRightIcon /></Link>
-      </div>
-    </>}
+function SummaryCards({ permissions, sources, year }) {
+  const definitions = workDefinitions.filter(definition => permissions[definition.key]);
+  if (!definitions.length) return null;
+  return <section className="od-summary" aria-label="Chỉ số công việc" style={{ '--od-summary-columns': definitions.length }}>
+    {definitions.map(definition => {
+      const source = sources[definition.source];
+      const ready = source?.status === 'ready';
+      const metric = metricOf(source, definition.key);
+      const count = metricCount(metric, definition.key);
+      const href = ready ? workDestination(definition, metric, year) : null;
+      const Card = href ? Link : 'div';
+      const status = ready ? count === 0 ? 'Đã xử lý hết' : 'Cần xử lý' : source?.status === 'error' ? 'Chưa tải được' : source?.status === 'not_implemented' ? 'Chưa triển khai' : 'Đang tải';
+      return <article className="od-stat" key={definition.key} data-kind={definition.key}>
+        <Card className="od-stat-link" {...(href ? { to: href, 'aria-label': `Xem công việc: ${summaryLabels[definition.key]}` } : { 'aria-disabled': true })}>
+        <div className="od-stat-body"><h2>{summaryLabels[definition.key]}</h2>
+          <div className="od-stat-value"><strong>{ready ? count.toLocaleString('vi-VN') : '—'}</strong>
+            <span className="od-stat-icon"><definition.Icon aria-hidden="true" /></span></div>
+          <span className="od-stat-unit">{definition.unit}</span>
+        </div>
+        <span className="od-stat-footer">
+          <span className={`od-stat-status${ready && count === 0 ? ' od-stat-done' : ''}`}><span aria-hidden="true" />{status}</span>
+          <ArrowRightIcon aria-hidden="true" />
+        </span>
+        </Card>
+      </article>;
+    })}
   </section>;
 }
 
-function WarningPanel({ teachingSource, gradesSource, permissions, year, program, onRetry }) {
-  const progress = permissions.progress && teachingSource?.status === "ready" ? teachingSource.data.progress : null;
-  const groups = [
-    ...(progress ? [{ key: 'teaching', title: 'BUỔI HỌC CHƯA XÁC NHẬN', items: progress.items, count: progress.count, unit: 'buổi' }] : []),
-    ...(permissions.grades && gradesSource?.status === 'ready' ? (gradesSource.data.warningGroups || []).filter(group => ['exam', 'examGrades'].includes(group.key)) : []),
-  ];
-  const count = new Set(groups.flatMap(group => group.items.map(item => item.id))).size;
-  const groupHrefs = {
-    teaching: progress?.href,
-    exam: `/${program}/exam-schedule?${new URLSearchParams({ year })}`,
-    examGrades: `/${program}/exam-lists?${new URLSearchParams({ year })}`,
+export function SourceState({ source, onRetry }) {
+  if (source?.status === 'not_implemented') return <p className="od-muted">{source.message || 'Nghiệp vụ này chưa được triển khai.'}</p>;
+  if (source?.status === 'error') return <div className="od-source-error" role="alert">Chưa tải được dữ liệu.<button type="button" onClick={onRetry}>Thử lại</button></div>;
+  return <p className="od-muted" role="status">Đang tải dữ liệu…</p>;
+}
+
+function ApprovalRow({ item, measuring = false }) {
+  const Tag = measuring ? 'div' : 'li';
+  const detail = item.detail || (item.nextExamAt
+    ? `Lịch thi: ${new Date(item.nextExamAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}` : '');
+  return <Tag className="od-approval-row">
+    <div className="od-item-copy"><strong title={item.title}>{item.title}</strong>{detail && <small title={detail}>{detail}</small>}</div>
+    {item.href && (measuring ? <span className="od-item-action">Mở<ArrowRightIcon aria-hidden="true" /></span>
+      : <Link className="od-item-action" to={item.href} aria-label={`${item.action || 'Mở chức năng'}: ${item.title}`}>
+        <span>Mở</span><ArrowRightIcon aria-hidden="true" /></Link>)}
+  </Tag>;
+}
+
+function ApprovalList({ items = [], emptyRef }) {
+  const viewport = useRef(null), measurements = useRef(null);
+  const [capacity, setCapacity] = useState(1);
+  const [page, setPage] = useState(0);
+  useLayoutEffect(() => {
+    let frame;
+    const measure = () => {
+      // Use the tallest loaded row so every page fits, including long names.
+      const tallest = Math.max(1, ...Array.from(measurements.current?.children || [], row => row.getBoundingClientRect().height));
+      const next = Math.max(1, Math.floor((viewport.current?.clientHeight || 0) / tallest));
+      setCapacity(previous => previous === next ? previous : next);
+    };
+    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure); };
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null;
+    if (viewport.current) observer?.observe(viewport.current);
+    if (measurements.current) observer?.observe(measurements.current);
+    window.addEventListener('resize', schedule);
+    measure();
+    return () => { cancelAnimationFrame(frame); observer?.disconnect(); window.removeEventListener('resize', schedule); };
+  }, [items]);
+  const pages = Math.max(1, Math.ceil(items.length / capacity));
+  const current = Math.min(page, pages - 1), start = current * capacity;
+  return <div className="od-approval-list">
+    <div className="od-approval-viewport" ref={viewport}>
+      <div className="od-approval-measure" ref={measurements} aria-hidden="true" inert="">
+        {items.map(item => <ApprovalRow key={item.id} item={item} measuring />)}
+      </div>
+      {items.length ? <ul className="od-items" aria-label="Danh sách chờ phê duyệt">
+        {items.slice(start, start + capacity).map(item => <ApprovalRow key={item.id} item={item} />)}
+      </ul> : <p className="od-empty od-centered-empty" tabIndex={-1} ref={emptyRef}><CheckCircleIcon aria-hidden="true" /><span>Không có yêu cầu chờ phê duyệt</span></p>}
+    </div>
+    {items.length > 0 && <div className="od-approval-pagination">
+      {pages > 1 && <><span role="status">{start + 1}–{Math.min(start + capacity, items.length)}/{items.length} mục đã tải</span>
+        <nav aria-label="Trang chờ phê duyệt"><button type="button" disabled={current === 0} aria-label="Trang phê duyệt trước" onClick={() => setPage(current - 1)}><ChevronLeftIcon aria-hidden="true" /></button>
+          <button type="button" disabled={current === pages - 1} aria-label="Trang phê duyệt tiếp" onClick={() => setPage(current + 1)}><ArrowRightIcon aria-hidden="true" /></button></nav></>}
+    </div>}
+  </div>;
+}
+
+const tabLabels = { grouping: 'Phân nhóm', scheduling: 'Xếp lịch', progress: 'Xác nhận', grades: 'Điểm' };
+const stageLabels = ['Điểm thành phần', 'Tổ chức thi', 'Điểm thi', 'Gửi duyệt'];
+const emptyLabels = { grouping: 'Không có chuyên ngành chờ phân nhóm.', scheduling: 'Không có lớp chờ xếp lịch.',
+  progress: 'Không có lớp chờ xác nhận.', grades: 'Không có lớp chờ xử lý điểm.' };
+
+function WorkPanel({ permissions, sources, retry, tab, setTab, year }) {
+  const [selectedStage, setSelectedStage] = useState('');
+  const definitions = workDefinitions.filter(definition => permissions[definition.key]);
+  const active = definitions.some(definition => definition.key === tab) ? tab : definitions[0]?.key;
+  const definition = definitions.find(item => item.key === active);
+  const source = sources[definition?.source];
+  const metric = metricOf(source, active);
+  const groups = useMemo(() => gradeGroups(sources.grades?.data).filter(group => group.count > 0), [sources.grades?.data]);
+  const stage = groups.find(group => group.stage === selectedStage) || groups[0];
+  const items = useMemo(() => {
+    const loaded = active === 'grades' ? stage?.items || [] : metric?.items || [];
+    if (active === 'grouping' || active === 'progress') {
+      return loaded.filter(item => Number(item.count) > 0).slice().sort((a, b) => Number(b.count) - Number(a.count)
+        || a.title.localeCompare(b.title, 'vi') || String(a.id).localeCompare(String(b.id)));
+    }
+    return loaded;
+  }, [active, metric, stage]);
+  const itemCount = active === 'grades' ? stage?.count
+    : items.length === (metric?.items?.length || 0) ? metric?.itemCount : undefined;
+  const onTabKey = event => {
+    const index = definitions.findIndex(item => event.currentTarget.id === `od-tab-${item.key}`);
+    const next = event.key === 'ArrowRight' ? (index + 1) % definitions.length : event.key === 'ArrowLeft' ? (index - 1 + definitions.length) % definitions.length
+      : event.key === 'Home' ? 0 : event.key === 'End' ? definitions.length - 1 : -1;
+    if (next < 0) return;
+    event.preventDefault(); setTab(definitions[next].key); event.currentTarget.parentElement.children[next]?.focus();
   };
-  const ready = (!permissions.progress || teachingSource?.status === 'ready') && (!permissions.grades || gradesSource?.status === 'ready');
-  return <aside className="od-panel od-warnings" aria-labelledby="od-warning-title">
-    <div className="od-panel-heading"><h2 id="od-warning-title"><ExclamationTriangleIcon aria-hidden="true" />CẢNH BÁO</h2>{count > 0 && <span className="od-warning-badge">{count} lớp</span>}</div>
-    <div className="od-warning-content">
-      {permissions.progress && teachingSource?.status !== 'ready' && <SourceState source={teachingSource} onRetry={() => onRetry('teaching')} />}
-      {permissions.grades && gradesSource?.status !== 'ready' && <SourceState source={gradesSource} onRetry={() => onRetry('grades')} />}
-      {ready && count === 0
-      ? <div className="od-warning-healthy"><CheckCircleIcon aria-hidden="true" /><div><strong>Không có cảnh báo</strong><p>Chưa phát hiện vấn đề cần xử lý.</p></div></div>
-      : groups.filter(group => group.items.length > 0).map(group => <section className="od-warning-group" key={group.key} aria-label={group.title}>
-        <h3>{group.title}<span className="od-warning-badge">{group.count ?? group.items.length} {group.unit || 'lớp'}</span></h3>
-        <ul className="od-warning-list">{group.items.map((item) => <li key={item.id}><Link to={item.href} aria-label={[item.title, item.detail].filter(Boolean).join(". ")}>
-          <span className="od-warning-icon"><ExclamationTriangleIcon aria-hidden="true" /></span>
-          <span className="od-item-copy"><strong title={item.title}>{item.title}</strong><small title={item.detail}>{item.detail}</small></span><ArrowRightIcon aria-hidden="true" />
-        </Link></li>)}</ul>
-        {groupHrefs[group.key] && <div className="od-category-footer od-warning-group-footer"><Link to={groupHrefs[group.key]}>Xem tất cả<ArrowRightIcon /></Link></div>}
-      </section>)}</div>
-  </aside>;
+  return <section className="od-panel od-work" aria-labelledby="od-work-title">
+    <div className="od-panel-heading"><h2 className="od-panel-title" id="od-work-title"><span className="od-panel-title-icon od-panel-title-icon--work" aria-hidden="true"><ClipboardDocumentListIcon /></span><span className="od-panel-title-text">Công việc cần xử lý</span></h2></div>
+    <div className="od-tabs" role="tablist" aria-label="Nhóm công việc">{definitions.map(item => <button type="button" key={item.key}
+      id={`od-tab-${item.key}`} role="tab" aria-selected={active === item.key} aria-controls="od-work-content"
+      tabIndex={active === item.key ? 0 : -1} onKeyDown={onTabKey} onClick={() => setTab(item.key)}>{tabLabels[item.key]}</button>)}</div>
+    <div className="od-work-body" id="od-work-content" role="tabpanel" aria-labelledby={`od-tab-${active}`} tabIndex={0}>
+      {source?.status !== 'ready' ? <SourceState source={source} onRetry={() => retry(definition.source)} /> : <>
+        {active === 'grades' && groups.length > 1 && <div className="od-stage-picker" role="group" aria-label="Giai đoạn điểm">
+          {groups.map(group => <button type="button" key={group.stage} title={stageTitles[stages.indexOf(group.stage)]}
+            aria-pressed={stage.stage === group.stage} onClick={() => setSelectedStage(group.stage)}>
+            <span>{stageLabels[stages.indexOf(group.stage)]}</span><span className="od-count">{group.count}</span>
+          </button>)}
+        </div>}
+        {active === 'grades' && groups.length === 1 && <p className="od-stage-label" title={stageTitles[stages.indexOf(stage.stage)]}>
+          {stageLabels[stages.indexOf(stage.stage)]}
+        </p>}
+        <AdaptiveTaskList items={items} itemCount={itemCount} href={workDestination(definition, metric, year)}
+          kind={active} empty={emptyLabels[active]} contextKey={`${active}:${active === 'grades' ? stage?.stage || '' : ''}`} />
+      </>}
+    </div>
+  </section>;
+}
+
+function ApprovalPanel({ permissions, sources, retry }) {
+  const [selected, setSelected] = useState(null);
+  const focusHeading = useCallback(element => element?.focus(), []);
+  const groups = [
+    ...(permissions.approvals ? [{ key: 'results', source: 'approvals', title: 'Kết quả điểm chờ duyệt', Icon: ClipboardDocumentListIcon, metric: sources.approvals?.data?.resultApproval }] : []),
+    ...(permissions.studyLeaveApproval ? [{ key: 'leaves', source: 'studyLeaveApproval', title: 'Bảo lưu / gia hạn chờ duyệt', Icon: CalendarDaysIcon, metric: sources.studyLeaveApproval?.data }] : []),
+    ...(permissions.majorTransferApproval ? [{ key: 'transfers', source: 'majorTransferApproval', title: 'Chuyển chuyên ngành chờ duyệt', Icon: UsersIcon, metric: sources.majorTransferApproval?.data }] : []),
+  ];
+  const current = groups.find(group => group.key === selected);
+  const emptyDetail = current && sources[current.source]?.status === 'ready' && !current.metric?.items?.length;
+  const allClear = groups.every(group => sources[group.source]?.status === 'ready' && group.metric?.count === 0);
+  return <section className="od-panel od-approvals" aria-labelledby="od-approval-title">
+    <div className="od-panel-heading"><h2 className="od-panel-title" id="od-approval-title"><span className="od-panel-title-icon od-panel-title-icon--approval" aria-hidden="true"><ClipboardDocumentCheckIcon /></span><span className="od-panel-title-text">Chờ phê duyệt</span></h2></div>
+    {current ? <div className="od-approval-detail"><button className="od-back" type="button" onClick={() => setSelected(null)}><ChevronLeftIcon aria-hidden="true" />Tổng quan phê duyệt</button>
+      {!emptyDetail && <h3 tabIndex={-1} ref={focusHeading}>{current.title}</h3>}
+      {sources[current.source]?.status === 'ready' ? <ApprovalList key={current.key} items={current.metric?.items} emptyRef={focusHeading} />
+        : <SourceState source={sources[current.source]} onRetry={() => retry(current.source)} />}
+    </div> : <>
+      <ul className={`od-approval-groups${allClear ? ' od-approval-clear' : ''}`} style={{ '--od-approval-group-count': groups.length }}>{groups.map(group => <li key={group.key} data-pending={sources[group.source]?.status === 'ready' && group.metric?.count > 0}>
+      <button type="button" onClick={() => setSelected(group.key)}><span className="od-approval-icon"><group.Icon aria-hidden="true" /></span><span>{group.title}</span>
+        {sources[group.source]?.status === 'ready' && <strong>{group.metric?.count ?? 0}</strong>}<ArrowRightIcon aria-hidden="true" /></button>
+      {sources[group.source]?.status !== 'ready' && <SourceState source={sources[group.source]} onRetry={() => retry(group.source)} />}
+    </li>)}</ul></>}
+  </section>;
+}
+
+const colors = ['#10b5df', '#6978d6', '#e4a74c', '#20a58d', '#b776bc', '#8a99ab', '#d57d64'];
+function ChartFigure({ source, sourceKey, retry }) {
+  const data = source?.data;
+  const values = [...(data?.values || []).reduce((map, value) => map.set(value.label, (map.get(value.label) || 0) + Number(value.count)), new Map())]
+    .map(([label, count]) => ({ label, count }));
+  const total = values.reduce((sum, value) => sum + value.count, 0);
+  let position = 0;
+  const gradient = values.map((value, index) => { const start = position; position += total ? value.count / total * 100 : 0;
+    return `${colors[index % colors.length]} ${start}% ${position}%`; }).join(',');
+  return source?.status !== 'ready' ? <SourceState source={source} onRetry={() => retry(sourceKey)} /> : <figure aria-label={data.title}>
+      <figcaption><span>{data.title}</span><span className="od-chart-unit">Đơn vị: {data.unit}</span></figcaption>
+      {data.kind === 'bar' && values.length ? <div className="od-columns" aria-label="Số lớp hoàn thành theo tháng">{values.map(value => <div className="od-month" key={value.label}>
+        <div className="od-column-track"><strong style={{ bottom: `calc(${value.count / Math.max(...values.map(item => item.count), 1) * 100}% + 7px)` }}>{value.count}</strong>
+          <i aria-hidden="true" style={{ height: `${value.count / Math.max(...values.map(item => item.count), 1) * 100}%` }} /></div><span>{value.label}</span></div>)}</div>
+        : !total ? <p className="od-empty">Chưa có dữ liệu trong phạm vi này.</p>
+        : <div className="od-chart-body"><div className="od-donut" aria-hidden="true" style={{ background: `conic-gradient(${gradient})` }}><span><strong>{total}</strong>{data.unit}</span></div>
+          <ul className="od-legend">{values.map((value, index) => <li key={value.label}><i aria-hidden="true" style={{ background: colors[index % colors.length] }} /><span>{value.label}</span><strong>{value.count}</strong></li>)}</ul></div>}
+    </figure>;
+}
+
+function OverviewCharts({ sources, permissions, retry }) {
+  const [selected, setSelected] = useState('');
+  const topics = [ ...(permissions.learnersOverview ? [{ key: 'learnersChart', label: 'Hồ sơ / học viên trong khóa' }] : []),
+    ...(permissions.overview ? [{ key: 'sessionsChart', label: 'Buổi học trong tuần' }, { key: 'completionChart', label: 'Tiến độ giảng dạy' }] : [])
+  ].filter(topic => sources[topic.key]?.status !== 'not_implemented');
+  const key = topics.some(topic => topic.key === selected) ? selected : topics[0]?.key;
+  if (!key) return null;
+  return <section className="od-charts od-charts-single" aria-label="Thống kê đào tạo">
+    <section className="od-panel od-chart" aria-labelledby="od-chart-title">
+      <div className="od-panel-heading od-panel-heading--overview"><div><h2 className="od-panel-title" id="od-chart-title"><span className="od-panel-title-icon od-panel-title-icon--overview" aria-hidden="true"><ChartBarIcon /></span><span className="od-panel-title-text">Tổng quan đào tạo</span></h2></div>
+        <label className="od-chart-select"><span className="od-visually-hidden">Chủ đề</span><DashboardSelect aria-label="Chủ đề tổng quan" value={key} onChange={event => setSelected(event.target.value)}>
+          {topics.map(topic => <option key={topic.key} value={topic.key}>{topic.label}</option>)}</DashboardSelect></label></div>
+      <ChartFigure source={sources[key]} sourceKey={key} retry={retry} />
+    </section>
+  </section>;
 }
 
 export default function OperationalDashboard() {
   const [params, setParams] = useSearchParams();
-  const year = /^\d{4}$/.test(params.get("year") || "") ? params.get("year") : String(currentYear);
-  const program = params.get("program") === "doctoral" ? "doctoral" : "masters";
-  const programLabel = programLabels[program];
-  const [revision, setRevision] = useState(0);
-  const gradebookRevision = useGradebookRevision();
-  const [state, setState] = useState({ year, program, loading: true, permissions: null, sources: {}, error: false });
-  const generation = useRef(0);
-  const inFlight = useRef(false);
-  const lastRequest = useRef(0);
-  useEffect(() => {
-    const request = ++generation.current;
-    const controller = new AbortController();
-    inFlight.current = true;
-    lastRequest.current = Date.now();
-    setState(previous => previous.year === year && previous.program === program && previous.permissions
-      ? { ...previous, error: false } : { year, program, loading: true, permissions: null, sources: {}, error: false });
-    axios.get(`${API_BASE_URL}/dashboard/operational`, { params: { year, program }, withCredentials: true, signal: controller.signal })
-      .then(({ data }) => { if (request === generation.current) setState({ ...data, year, program, loading: false, error: false }); })
-      .catch(() => { if (request === generation.current) setState({ year, program, loading: false, permissions: null, sources: {}, error: true }); })
-      .finally(() => { if (request === generation.current) inFlight.current = false; });
-    return () => { controller.abort(); generation.current += 1; inFlight.current = false; };
-  }, [year, program, revision, gradebookRevision]);
-
-  useEffect(() => listenForBackgroundRefresh(() => setRevision(value => value + 1), {
-    interval: 30000,
-    canRefresh: () => !inFlight.current && Date.now() - lastRequest.current >= 30000,
-  }), []);
-
-  const retry = async (section) => {
-    const request = generation.current;
-    setState((previous) => ({ ...previous, sources: { ...previous.sources, [section]: { status: "loading" } } }));
-    try {
-      const { data } = await axios.get(`${API_BASE_URL}/dashboard/operational`, { params: { year, program, section }, withCredentials: true });
-      if (request === generation.current) setState((previous) => ({ ...previous, permissions: data.permissions, sources: { ...previous.sources, ...data.sources } }));
-    } catch (error) {
-      if (request === generation.current && [401, 403].includes(error.response?.status)) {
-        setState({ year, program, loading: false, permissions: null, sources: {}, error: true });
-        return;
-      }
-      if (request === generation.current) setState((previous) => ({ ...previous, sources: { ...previous.sources, [section]: { status: "error" } } }));
-    }
-  };
-  const loading = state.loading || state.year !== year || state.program !== program;
-  const permissions = !loading && state.permissions;
-  const permitted = definitions.filter((definition) => permissions?.[definition.permission || definition.key]);
-  const cards = permitted.filter((definition) => definition.source !== "approvals" && !definition.inboxOnly);
-  const work = permitted.filter((definition) => definition.key !== "progress");
-  const workHealthy = work.length > 0 && work.every((definition) => state.sources[definition.source]?.status === "ready" && metricOf(state.sources[definition.source], definition.key)?.count === 0);
-  const overviewSource = state.sources.teaching;
-  const showWarnings = permissions?.progress || permissions?.grades;
-  const overview = overviewSource?.status === "ready" ? overviewSource.data.overview : null;
-  const years = [...new Set([year, ...Array.from({ length: 6 }, (_, index) => String(currentYear - 3 + index))])].sort().reverse();
-
+  const { year, program } = dashboardFilters(params);
+  const session = useAuthSession();
+  const profileKey = `${session?.user?.id || ''}:${session?.activeProfile?.id || ''}`;
+  const scope = `${profileKey}:${year}:${program}`;
+  const [selection, setSelection] = useState({ scope, tab: 'grouping' });
+  const tab = selection.scope === scope ? selection.tab : 'grouping';
+  const selectTab = value => setSelection({ scope, tab: value });
+  const { state, retry } = useDashboardData(year, program);
+  const permissions = state.permissions || {};
+  const hasWork = workDefinitions.some(definition => permissions[definition.key]);
+  const hasApprovals = permissions.approvals || permissions.studyLeaveApproval || permissions.majorTransferApproval;
+  const hasCharts = (permissions.overview || permissions.learnersOverview) && ['learnersChart', 'sessionsChart', 'completionChart']
+    .some(key => state.sources[key] && state.sources[key].status !== 'not_implemented');
+  const years = [...new Set([year, ...Array.from({ length: 7 }, (_, index) => String(currentYear - 4 + index))])].sort().reverse();
+  const setFilter = (key, value) => { const next = new URLSearchParams(params); next.set(key, value); setParams(next); };
   return <div className="operational-dashboard">
-    <header className="od-header"><div><h1>Bảng điều khiển công việc</h1><p>Theo dõi các công việc cần xử lý và tình trạng nghiệp vụ theo năm tuyển sinh.</p></div>
-    </header>
-    <div className="od-summary-row">
+    <header className="od-header"><div>
+      <h1><span>Xin chào, </span><strong>{session?.user?.name || 'bạn'}</strong><span aria-hidden="true"> 👋</span></h1><p>Công việc cần quan tâm trong phạm vi của bạn</p></div>
       <div className="od-filters" role="group" aria-label="Bộ lọc dashboard">
-        <label className="od-filter">Hệ đào tạo<AppSelect aria-label="Hệ đào tạo" value={program} onChange={(event) => {
-          const next = new URLSearchParams(params); next.set("program", event.target.value); setParams(next);
-        }}>{Object.entries(programLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</AppSelect></label>
-        <label className="od-filter">Năm tuyển sinh<AppSelect aria-label="Năm tuyển sinh" value={year} onChange={(event) => {
-        const next = new URLSearchParams(params); next.set("year", event.target.value); setParams(next);
-      }}>{years.map((value) => <option key={value}>{value}</option>)}</AppSelect></label></div>
-      <div className="od-summary-content">
-    {loading ? <div className="od-cards" aria-label="Đang tải tổng quan">{[0, 1, 2, 3].map((key) => <div key={key} className="od-card"><SourceState /></div>)}</div>
-      : state.error ? <div className="od-panel od-page-error" role="alert"><ExclamationTriangleIcon /><span>Không thể tải tổng quan công việc.</span><button type="button" onClick={() => setRevision((value) => value + 1)}>Thử lại</button></div>
-        : <>
-          {cards.length > 0 && <section className="od-cards" aria-label="Công việc theo quyền truy cập" style={{ "--od-columns": Math.min(4, cards.length), "--od-small-columns": Math.min(2, cards.length) }}>{cards.map((definition) => <ActionCard key={definition.key} definition={definition}
-            source={state.sources[definition.source]} onRetry={() => retry(definition.source)} />)}</section>}
-        </>}
+        <label>Hệ đào tạo<DashboardSelect aria-label="Hệ đào tạo" value={program} onChange={event => setFilter('program', event.target.value)}>
+          {Object.entries(programs).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</DashboardSelect></label>
+        <label>Năm tuyển sinh<DashboardSelect aria-label="Năm tuyển sinh" value={year} onChange={event => setFilter('year', event.target.value)}>
+          {years.map(value => <option key={value}>{value}</option>)}</DashboardSelect></label>
       </div>
-    </div>
-    {!loading && !state.error && <>
-          {!permitted.length && <div className="od-panel od-no-access"><ClipboardDocumentListIcon /><div><h2>Chưa có tác vụ được giao</h2><p>Tài khoản hiện chưa có quyền xử lý các hàng đợi công việc này.</p></div></div>}
-          {(work.length > 0 || showWarnings) && <div className={`od-main${showWarnings && work.length ? "" : " od-main-single"}`}>
-            {work.length > 0 && <section className="od-panel" aria-labelledby="od-work-title"><div className="od-panel-heading"><h2 id="od-work-title"><ClipboardDocumentListIcon aria-hidden="true" />VIỆC CẦN XỬ LÝ</h2><span>{programLabel} · {year}</span></div>
-              {workHealthy ? <div className="od-empty"><CheckCircleIcon /><strong>Không có mục chờ xử lý</strong><span>Mọi đầu việc trong phạm vi hiện tại đã hoàn thành.</span></div>
-                : work.map((definition) => <WorkCategory key={definition.key} definition={definition} source={state.sources[definition.source]} onRetry={() => retry(definition.source)} />)}
-            </section>}
-            {showWarnings && <WarningPanel teachingSource={state.sources.teaching} gradesSource={state.sources.grades} permissions={permissions} year={year} program={program} onRetry={retry} />}
-          </div>}
-          {permissions?.overview && <section className="od-panel od-overview" aria-labelledby="od-overview-title"><div className="od-panel-heading"><h2 id="od-overview-title">TÌNH HÌNH ĐÀO TẠO</h2><span>Lớp học phần {programLabel.toLocaleLowerCase("vi-VN")} · {year}</span></div>
-            {overview ? <dl>{[["Lớp đang mở", overview.active], ["Đang giảng dạy", overview.inProgress], ["Chưa xếp buổi học", overview.unscheduled], ["Đã hoàn thành", overview.completed]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-              : <SourceState source={overviewSource} onRetry={() => retry("teaching")} />}
-          </section>}
-        </>}
+    </header>
+    {state.loading ? <div className="od-panel"><SourceState /></div> : state.error ? <div className="od-panel od-page-error" role="alert">Không thể tải tổng quan công việc.<button type="button" onClick={() => retry()}>Thử lại</button></div>
+      : <div className="od-content" key={scope}>
+        <DashboardColumns className={`od-layout${hasWork && (hasApprovals || hasCharts) ? '' : ' od-layout-single'}`}>
+        {hasWork && <div className="od-work-column">
+          <SummaryCards permissions={permissions} sources={state.sources} year={year} />
+          <WorkPanel permissions={permissions} sources={state.sources} retry={retry} tab={tab} setTab={selectTab} year={year} />
+        </div>}
+        {(hasApprovals || hasCharts) && <aside className="od-sidebar" aria-label="Phê duyệt và tổng quan">
+          {hasApprovals && <ApprovalPanel permissions={permissions} sources={state.sources} retry={retry} />}
+          {hasCharts && <OverviewCharts permissions={permissions} sources={state.sources} retry={retry} />}
+        </aside>}
+        {!hasWork && !hasApprovals && !hasCharts && <section className="od-panel od-no-access">
+          {Object.values(state.sources).some(source => source.status === 'not_implemented')
+            ? <><h2>Nội dung tổng quan chưa được triển khai</h2><p>Chưa có nguồn tổng quan phù hợp cho hệ đào tạo đang chọn.</p></>
+            : <><h2>Chưa có nội dung phù hợp với quyền hiện tại</h2><p>Hồ sơ đang chọn chưa có quyền xem hoặc xử lý các mục tổng quan này.</p></>}
+        </section>}
+        </DashboardColumns>
+      </div>}
   </div>;
 }

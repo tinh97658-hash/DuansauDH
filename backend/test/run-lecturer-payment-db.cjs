@@ -28,9 +28,17 @@ let created = false;
       migrations: { glob: path.join(root, 'dist/database/migrations/*.js').replace(/\\/g, '/') },
       context: db.getQueryInterface(), storage: new SequelizeStorage({ sequelize: db, tableName: 'sequelize_meta' }), logger: undefined,
     });
+    await migrator.up({ to: '093-exam-schedule-permissions.js' });
+    // 094 requires a functioning administrator. This fixture exists only in this disposable DB.
+    await db.query(`INSERT INTO staff(id,name,email,role,status,created_at,updated_at)
+      VALUES(gen_random_uuid(),'Payment test admin','payment-test@example.invalid','admin','active',now(),now());
+      INSERT INTO roles(id,code,name,active,created_at,updated_at)
+      VALUES(gen_random_uuid(),'admin','Payment test admin',true,now(),now()) ON CONFLICT(code) DO NOTHING;
+      INSERT INTO role_permissions(role_id,permission_id,created_at,updated_at)
+        SELECT r.id,p.id,now(),now() FROM roles r CROSS JOIN permissions p WHERE r.code='admin' ON CONFLICT DO NOTHING;`);
     await migrator.up();
-    console.log('All migrations, including 090, passed on a fresh disposable database.');
-    const result = spawnSync(process.execPath, [require.resolve('jest/bin/jest'), '--config', 'test/jest.config.cjs', '--runInBand', 'test/integration/lecturer-payment-postgres.spec.ts', 'test/integration/lecturer-payment-batch-postgres.spec.ts'], {
+    console.log('All migrations, including 098, passed on a fresh disposable database.');
+    const result = spawnSync(process.execPath, [require.resolve('jest/bin/jest'), '--config', 'test/jest.config.cjs', '--runInBand', 'test/integration/lecturer-payment-postgres.spec.ts', 'test/integration/lecturer-payment-batch-postgres.spec.ts', 'test/integration/lecturer-payment-details-migration.spec.ts'], {
       cwd: root, stdio: 'inherit', env: { ...process.env, DATABASE_URL: uri.toString(), RUN_LECTURER_PAYMENT_DB_TESTS: 'true', NODE_ENV: 'test' },
     });
     process.exitCode = result.status ?? 1;

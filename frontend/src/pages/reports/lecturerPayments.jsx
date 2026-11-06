@@ -1,10 +1,13 @@
 import {formatLecturerName} from '../../utils/lecturerName';
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { Alert, CircularProgress } from '@mui/material';
 import { MagnifyingGlassIcon } from "../../components/AppIcons";
 import FeatureLayout from '../../components/FeatureLayout';
 import AppSelect from '../../components/AppSelect';
+import DateField from '../../components/DateField';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import { getBusinessTodayKey } from '../../utils/schedulingCalendar';
 import OfferingDetails from '../../features/scheduling/OfferingDetails';
 import { usePermissions } from '../../features/accounts/usePermissions';
 import { useAuthSession } from '../../context/AuthSession';
@@ -13,12 +16,46 @@ import '../masters/classCourseHistory.css';
 import './lecturerPayments.css';
 
 const endpoint = `${API_BASE_URL}/reports/lecturer-payments`;
-const headers = ['STT', 'Giảng viên', 'Lớp học phần', 'Số buổi', 'Ngày hoàn thành', 'Đã thanh toán'];
+const headers = ['STT', 'Giảng viên', 'Lớp học phần', 'Lớp tham gia', 'Số buổi', 'Ngày hoàn thành', 'Đã thanh toán', 'Ngày thanh toán', 'Ghi chú'];
 const dateLabel = value => value ? new Date(value).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '—';
 const failureMessage = error => error.response?.data?.message || 'Không thể xử lý dữ liệu thanh toán.';
 const rowKey = row => `${row.courseOfferingId}:${row.lecturerId}`;
 const matchesStatus = (row, status) => status === 'all' || row.paid === (status === 'paid');
 
+// Keep unrelated rows and date fields stable while another pair is being edited.
+const PaymentRow = React.memo(function PaymentRow({ row, index, draft, disabled, busy, edit, commitField, toggle, setOffering }) {
+  const value = { ...row, ...draft };
+  const lecturerName = formatLecturerName({...row, name: row.lecturerName});
+  const name = `${lecturerName} – ${row.offeringName}`;
+  const groups = row.participatingGroups || [];
+  const groupNames = groups.map((group, groupIndex) => ({ key: group.id || group.code || groupIndex, name: group.name || group.code })).filter(group => group.name);
+  const participatingGroups = groupNames.length ? groupNames : [{ key: 'empty', name: '—' }];
+  const rowSpan = participatingGroups.length;
+  const needsDate = value.paid && !value.paymentDate;
+  return <><tr data-payment-key={rowKey(row)} aria-busy={busy}>
+  <td rowSpan={rowSpan}>{index + 1}</td><td rowSpan={rowSpan}><span className="lp-cell-text" title={lecturerName}>{lecturerName}</span></td>
+  <td rowSpan={rowSpan}><button className="lp-link" title={row.offeringName} onClick={() => setOffering({ id: row.courseOfferingId, name: row.offeringName })}><span className="lp-cell-text">{row.offeringName}</span></button></td>
+  <td><span className="lp-group-names" title={participatingGroups[0].name}>{participatingGroups[0].name}</span></td>
+  <td rowSpan={rowSpan}>{row.sessionCount}</td><td rowSpan={rowSpan}>{dateLabel(row.completedAt)}</td>
+  <td rowSpan={rowSpan}><input type="checkbox" data-payment-toggle aria-label={`Đã thanh toán: ${name}`} checked={value.paid}
+    disabled={disabled || (busy && draft?.paid !== undefined)} onChange={event => toggle(row, event.target.checked)} /></td>
+  <td rowSpan={rowSpan}><DateField size="small" value={value.paid ? value.paymentDate || '' : ''} disabled={disabled || !value.paid}
+    className="lp-payment-date" inputProps={{ 'aria-label': `Ngày thanh toán: ${name}` }}
+    onChange={event => edit(row, { paymentDate: event.target.value })}
+    onAccept={date => commitField(row, 'paymentDate', date)}
+    onBlur={() => commitField(row, 'paymentDate')}
+    onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); commitField(row, 'paymentDate'); } }} />
+    {needsDate && <span className="lp-missing-date">Cần bổ sung ngày</span>}</td>
+  <td rowSpan={rowSpan}><input className="lp-note" aria-label={`Ghi chú: ${name}`} title={value.note || ''}
+    maxLength={2000} disabled={disabled} value={value.note || ''} onChange={event => edit(row, { note: event.target.value })}
+    onBlur={() => commitField(row, 'note')}
+    onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); commitField(row, 'note'); } }} />
+    {busy && <span className="lp-saving" role="status">Đang lưu…</span>}
+    {draft?.error && <div className="lp-row-error" role="alert">{draft.error}</div>}</td>
+  </tr>{participatingGroups.slice(1).map(group => <tr key={group.key} className="lp-group-row" aria-busy={busy}>
+    <td><span className="lp-group-names" title={group.name}>{group.name}</span></td>
+  </tr>)}</>;
+});
 export default function LecturerPayments() {
   const session = useAuthSession();
   const { can, access } = usePermissions();
@@ -28,10 +65,14 @@ export default function LecturerPayments() {
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(new Set());
   const pendingRef = useRef(new Set());
+  const savedRef = useRef(new Map()), queuesRef = useRef(new Map()), submittedRef = useRef(new Map());
+  const draftsRef = useRef({});
   const tableRef = useRef(null), anchorRef = useRef(null);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
   const [offering, setOffering] = useState(null);
+  const [drafts, setDrafts] = useState({});
+  const [unpay, setUnpay] = useState(null);
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
   const canManage = can('reports.payments.manage') && !access?.groupScope?.readOnly;
@@ -53,7 +94,10 @@ export default function LecturerPayments() {
     if (filters.from && filters.to && filters.from > filters.to) { setRows([]); setLoading(false); return undefined; }
     setLoading(true);
     axios.get(endpoint, { params: Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== '')), withCredentials: true })
-      .then(({ data }) => { if (active) setRows(data.rows); })
+      .then(({ data }) => { if (active) {
+        data.rows.forEach(row => { if (!pendingRef.current.has(rowKey(row))) savedRef.current.set(rowKey(row), row); });
+        setRows(data.rows);
+      } })
       .catch(error => active && setError(failureMessage(error)))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
@@ -68,7 +112,8 @@ export default function LecturerPayments() {
     anchor.element.querySelector('input[data-payment-toggle]')?.focus({ preventScroll: true });
   }, [rows]);
 
-  const applySaved = (changes, preferredKey) => {
+  const applySaved = useCallback((changes, preferredKey) => {
+    changes.forEach(row => savedRef.current.set(rowKey(row), row));
     const updates = new Map(changes.map(row => [rowKey(row), row]));
     const elements = [...(tableRef.current?.querySelectorAll('[data-payment-key]') || [])];
     const leaving = element => {
@@ -83,27 +128,80 @@ export default function LecturerPayments() {
     }
     setRows(current => current.map(row => updates.has(rowKey(row)) ? { ...row, ...updates.get(rowKey(row)) } : row)
       .filter(row => matchesStatus(row, filtersRef.current.paymentStatus)));
-  };
+  }, []);
 
-  const update = async (row, paid) => {
+  const changeDraft = useCallback((key, change) => {
+    const next = change(draftsRef.current[key] || {}), all = { ...draftsRef.current };
+    if (Object.keys(next).length) all[key] = next; else delete all[key];
+    draftsRef.current = all; setDrafts(all);
+  }, []);
+  const edit = useCallback((row, changes) => changeDraft(rowKey(row), current => ({ ...current, ...changes, error: '' })), [changeDraft]);
+  const update = useCallback((row, changes) => {
     const key = rowKey(row);
-    if (pendingRef.current.has(key)) return;
-    pendingRef.current.add(key); setPending(new Set(pendingRef.current)); setError('');
+    if (!canManage) return;
+    const fields = Object.entries(changes);
+    if (fields.every(([field, value]) => submittedRef.current.get(`${key}:${field}`)?.value === value)) return;
+    const token = {};
+    fields.forEach(([field, value]) => submittedRef.current.set(`${key}:${field}`, { value, token }));
+    edit(row, changes);
+    pendingRef.current.add(key); setPending(new Set(pendingRef.current));
     const filterSnapshot = filtersRef.current;
-    try {
-      const { data } = await axios.put(`${endpoint}/${row.courseOfferingId}/${row.lecturerId}`, { paid }, { withCredentials: true });
-      applySaved([{ ...row, ...data }], key);
-      // A filter request may have started before this write finished. Refresh it without clearing rows.
-      if (filtersRef.current !== filterSnapshot) setRevision(value => value + 1);
-    } catch (error) { setError(failureMessage(error)); }
-    finally { pendingRef.current.delete(key); setPending(new Set(pendingRef.current)); }
-  };
+    const previous = queuesRef.current.get(key) || Promise.resolve();
+    const task = previous.then(async () => {
+      try {
+        // Each field saves independently, using the version returned by the preceding save for this pair.
+        const saved = savedRef.current.get(key) || row;
+        if (fields.some(([field, value]) => value !== (saved[field] ?? (field === 'note' ? '' : null)))) {
+          const body = { paid: saved.paid, paymentVersion: saved.paymentVersion ?? null, ...changes };
+          const { data } = await axios.put(`${endpoint}/${row.courseOfferingId}/${row.lecturerId}`, body, { withCredentials: true });
+          applySaved([{ ...saved, ...data }], key);
+        }
+        changeDraft(key, current => {
+          const next = { ...current }; fields.forEach(([field, value]) => {
+            if (submittedRef.current.get(`${key}:${field}`)?.token === token && next[field] === value) delete next[field];
+          });
+          delete next.error; return next;
+        });
+        if (filtersRef.current !== filterSnapshot) setRevision(value => value + 1);
+      } catch (error) {
+        changeDraft(key, current => {
+          const next = { ...current, error: failureMessage(error) };
+          // A failed checkbox request must not look like a saved payment; typed notes/dates stay available for retry.
+          if (Object.hasOwn(changes, 'paid') && next.paid === changes.paid) delete next.paid;
+          return next;
+        });
+      } finally {
+        fields.forEach(([field]) => { if (submittedRef.current.get(`${key}:${field}`)?.token === token) submittedRef.current.delete(`${key}:${field}`); });
+        if (queuesRef.current.get(key) === task) {
+          queuesRef.current.delete(key); pendingRef.current.delete(key); setPending(new Set(pendingRef.current));
+        }
+      }
+    });
+    queuesRef.current.set(key, task);
+    return task;
+  }, [canManage, applySaved, changeDraft, edit]);
+  const commitField = useCallback((row, field, accepted) => {
+    const draft = draftsRef.current[rowKey(row)] || {};
+    if (field === 'paymentDate' && !(draft.paid ?? savedRef.current.get(rowKey(row))?.paid ?? row.paid)) return;
+    if (accepted === undefined && !Object.hasOwn(draft, field)) return;
+    const value = accepted === undefined ? draft[field] : accepted;
+    if (field === 'paymentDate' && !value) {
+      changeDraft(rowKey(row), current => ({ ...current, error: 'Hãy nhập ngày thanh toán hợp lệ.' })); return;
+    }
+    update(row, { [field]: value });
+  }, [update, changeDraft]);
+  const toggle = useCallback((row, paid) => {
+    const key = rowKey(row);
+    if (submittedRef.current.has(`${key}:paid`)) return;
+    if (!paid && (savedRef.current.get(key) || row).paid) { setUnpay(row); return; }
+    update(row, { paid, paymentDate: paid ? (draftsRef.current[key]?.paymentDate || savedRef.current.get(key)?.paymentDate || getBusinessTodayKey()) : null });
+  }, [update]);
   const select = (field, label, items) => <label className="tp-filter tp-select-filter"><span>{label}</span>
     <AppSelect aria-label={label} value={filters[field]} onChange={event => change(field, event.target.value)}>
       <option value="">Tất cả</option>{items.map(item => <option key={item.id} value={item.id}>{field==='lecturerId'?formatLecturerName(item):item.name}</option>)}
     </AppSelect></label>;
 
-  return <FeatureLayout title="Thống kê thanh toán giảng viên" exportConfig={false}>
+  return <FeatureLayout title="Báo cáo tài chính" exportConfig={false}>
     <div className="tp-page lp-page">
       <section className="tp-filters lp-filters" aria-label="Bộ lọc thanh toán">
         <div className="lp-date-filter" role="group" aria-label="Khoảng ngày hoàn thành">
@@ -117,24 +215,23 @@ export default function LecturerPayments() {
             <option value="all">Tất cả</option><option value="paid">Đã thanh toán</option><option value="unpaid">Chưa thanh toán</option>
           </AppSelect></label>
         <label className="tp-filter"><span>Tìm kiếm</span><div className="tp-search"><MagnifyingGlassIcon />
-          <input aria-label="Tìm kiếm" placeholder="Giảng viên, lớp học phần…" value={filters.search} onChange={event => change('search', event.target.value)} /></div></label>
+          <input aria-label="Tìm kiếm" placeholder="Giảng viên, lớp học phần, lớp tham gia…" value={filters.search} onChange={event => change('search', event.target.value)} /></div></label>
       </section>
       {invalidDates && <Alert severity="warning">Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.</Alert>}
       {error && <Alert severity="error">{error}</Alert>}
-      <div className="tp-table-wrap"><div className="tp-table-scroll"><table ref={tableRef} className="tp-table lp-table" aria-label="Thống kê thanh toán giảng viên" aria-busy={loading}>
-        <colgroup>{[4, 19, 45, 7, 13, 12].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup>
+      <div className="tp-table-wrap"><div className="tp-table-scroll"><table ref={tableRef} className="tp-table lp-table" aria-label="Báo cáo tài chính" aria-busy={loading}>
+        <colgroup>{[4, 13, 20, 12, 5, 9, 7, 14, 16].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup>
         <thead><tr>{headers.map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
-        <tbody>{rows.map((row, index) => <tr key={rowKey(row)} data-payment-key={rowKey(row)} aria-busy={pending.has(rowKey(row))}>
-          <td>{index + 1}</td><td><span className="lp-cell-text" title={formatLecturerName({...row,name:row.lecturerName})}>{formatLecturerName({...row,name:row.lecturerName})}</span></td>
-          <td><button className="lp-link" title={row.offeringName} onClick={() => setOffering({ id: row.courseOfferingId, name: row.offeringName })}><span className="lp-cell-text">{row.offeringName}</span></button></td>
-          <td>{row.sessionCount}</td><td>{dateLabel(row.completedAt)}</td>
-          <td><input type="checkbox" data-payment-toggle aria-label={`Đã thanh toán: ${formatLecturerName({...row,name:row.lecturerName})} – ${row.offeringName}`} checked={row.paid}
-            disabled={pending.has(rowKey(row)) || loading || !canManage} onChange={event => update(row, event.target.checked)} /></td>
-        </tr>)}
-          {!rows.length && <tr><td colSpan={6}>{loading ? <CircularProgress size={24} aria-label="Đang tải" /> : 'Không có dữ liệu phù hợp.'}</td></tr>}
+        <tbody>{rows.map((row, index) => <PaymentRow key={rowKey(row)} row={row} index={index} draft={drafts[rowKey(row)]}
+          disabled={loading || !canManage || !Object.hasOwn(row, 'paymentDate')} busy={pending.has(rowKey(row))}
+          edit={edit} commitField={commitField} toggle={toggle} setOffering={setOffering} />)}
+          {!rows.length && <tr><td colSpan={9}>{loading ? <CircularProgress size={24} aria-label="Đang tải" /> : 'Không có dữ liệu phù hợp.'}</td></tr>}
         </tbody></table></div></div>
     </div>
     {offering && <OfferingDetails offering={offering} user={session?.user || {}} readOnly
       readBasePath="/reports/lecturer-payments/offerings" onClose={() => setOffering(null)} />}
+    <ConfirmDialog open={!!unpay} title="Xác nhận bỏ thanh toán" confirmText="Bỏ thanh toán"
+      content="Bạn muốn chuyển dòng này sang chưa thanh toán? Ngày thanh toán sẽ không còn hiệu lực. Ghi chú và lịch sử thao tác được giữ lại."
+      onClose={() => setUnpay(null)} onConfirm={() => { const current = unpay; setUnpay(null); update(current, { paid: false, paymentDate: null }); }} />
   </FeatureLayout>;
 }
