@@ -1,6 +1,5 @@
 .gradebook-history-dialog .MuiBackdrop-root{background:rgba(20,38,58,.48);backdrop-filter:blur(2px)}
-.gradebook-history-dialog{--app-dialog-max-height:720px}
-.gradebook-history-dialog .MuiDialog-paper{width:calc(100% - 96px);max-width:1320px;height:auto;max-height:calc(100dvh - 96px);margin:48px;border:1px solid #c5d2df;border-radius:8px;overflow:hidden;color:#17324d;box-shadow:0 24px 80px #0b223844}
+.gradebook-history-dialog .MuiDialog-paper{width:calc(100% - 96px);max-width:1320px;height:min(680px,calc(100dvh - 96px));max-height:calc(100dvh - 96px);margin:48px;border:1px solid #c5d2df;border-radius:8px;overflow:hidden;color:#17324d;box-shadow:0 24px 80px #0b223844}
 .gradebook-history-dialog .gh-titlebar{display:flex;align-items:center;gap:14px;flex:none;padding:20px 24px;border-bottom:1px solid #000;background:var(--dialog-title-bg,#ffffff);color:var(--dialog-title-text,#123b63);border-bottom:1px solid #e2e8f0;opacity:1}
 .gh-title-copy{flex:1;min-width:0}
 .gradebook-history-dialog .gh-title-copy h2{margin:0;color:#000;font:700 19px/1.4 var(--app-font-family,"Segoe UI",sans-serif)}
@@ -39,10 +38,10 @@ body :is(#root,.MuiDialog-root).gradebook-history-dialog table.gh-results{min-wi
 body :is(#root,.MuiDialog-root).gradebook-history-dialog .gh-results>tbody>tr>td{padding:9px 12px!important;font-size:12px!important}
 .gh-outcome{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11.5px;background:#f0f3f6;color:#64788a;white-space:nowrap}
 .gh-outcome-passed,.gh-outcome-exempt{background:#e8f5ed;color:#247044}.gh-outcome-failed{background:#fceced;color:#a23c43}
-.gh-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;min-height:140px;padding:16px;color:#8293a3;font-size:12.5px}
+.gh-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;min-height:220px;color:#8293a3;font-size:12.5px}
 .gh-empty>svg{width:38px;height:38px;margin-bottom:4px;color:var(--icon-muted)}.gh-empty strong{color:#4a647b;font-size:14px}
 .gradebook-history-dialog .gh-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;flex:none;padding:8px 24px;border-top:1px solid #dce5ed;background:#f8fafc}
 .gh-footer>span{color:#718497;font-size:12px}
 .gradebook-history-dialog .gh-footer>.MuiButton-root{min-width:76px;padding:4px 16px;border-radius:5px;background:#17658b;font-size:12.5px;font-weight:600}
 .gradebook-history-dialog .gh-footer>.MuiButton-root:hover{background:#105472}
-@media(max-width:760px){.gradebook-history-dialog .MuiDialog-paper{width:calc(100% - 24px);height:auto;max-height:calc(100dvh - 32px);margin:16px 12px}.gradebook-history-dialog .gh-titlebar{padding:16px;gap:10px}.gradebook-history-dialog .gh-title-copy h2{font-size:17px}.gh-title-icon{width:36px;height:36px}.gh-summary{padding:10px 16px}.gh-summary>span+span{display:none}.gradebook-history-dialog .gh-footer{padding:8px 16px}.gh-footer>span{max-width:65%;font-size:11.5px}}
+@media(max-width:760px){.gradebook-history-dialog .MuiDialog-paper{width:calc(100% - 24px);height:calc(100dvh - 32px);max-height:calc(100dvh - 32px);margin:16px 12px}.gradebook-history-dialog .gh-titlebar{padding:16px;gap:10px}.gradebook-history-dialog .gh-title-copy h2{font-size:17px}.gh-title-icon{width:36px;height:36px}.gh-summary{padding:10px 16px}.gh-summary>span+span{display:none}.gradebook-history-dialog .gh-footer{padding:8px 16px}.gh-footer>span{max-width:65%;font-size:11.5px}}

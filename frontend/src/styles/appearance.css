@@ -1,7 +1,7 @@
-/* Text size is applied without zooming or transforming the page.
-   Adaptive layout rules let containers grow around their text.
+/* Do not zoom/transform the page or change sticky offsets, grid tracks or
+   column widths. Text buttons grow vertically to contain their labels.
    Important layer rules also cover lazy-loaded page styles and portal content.
-   Toolbar controls share one height at every text size. */
+   At 100% the original typography is used without overrides. */
 @layer app-text-size {
   @media screen {
     html[data-font-size]:not([data-font-size="100"]) body :is(
@@ -158,149 +158,12 @@
       max-width: 100% !important;
     }
 
-    /* Inline actions share the same height as text grows. */
-    html[data-font-size]:not([data-font-size="100"]) :is(.MuiButton-root, .page-export-inline .document-export-trigger):not(:where(
-      .report-preview *, .transcript-print-document *, .report-print-sheet *,
-      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
-      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
-      [data-preserve-font-size], [data-preserve-font-size] *
-    )) {
-      box-sizing: border-box;
-      min-height: calc(1.5em + 14px) !important;
-      padding: 6px 14px !important;
-    }
-
-    html[data-font-size]:not([data-font-size="100"]) .MuiButton-root:not(:where(
-      .report-preview *, .transcript-print-document *, .report-print-sheet *,
-      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
-      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
-      [data-preserve-font-size], [data-preserve-font-size] *
-    )) :is(.MuiButton-startIcon, .MuiButton-endIcon) > svg {
-      font-size: 1.6em !important;
-      width: 1em !important;
-      height: 1em !important;
-      flex-shrink: 0;
-    }
-
-    /* Mode labels grow horizontally with the selected text size. */
-    html[data-font-size]:not([data-font-size="100"]) .exam-mode-switch .MuiButton-root {
-      white-space: nowrap !important;
-      overflow-wrap: normal !important;
-      max-width: none !important;
-    }
-
     /* Scheduling cards have bounded areas; scroll their content rather than
        allowing text to cover adjacent slots or the drag/drop target. */
     html[data-font-size]:not([data-font-size="100"]) :is(.sl-session, .sl-other) {
       min-width: 0;
       max-width: 100%;
       overflow: auto;
-    }
-
-    html[data-font-size] {
-      --app-control-height: calc(21.25px + 18.75px * var(--app-text-scale, 1));
-      --app-control-icon-size: calc(18px * var(--app-text-scale, 1));
-      --app-table-action-size: calc(32px * var(--app-text-scale, 1));
-      --app-table-icon-size: calc(16px * var(--app-text-scale, 1));
-    }
-
-    /* One geometry for single-line fields and actions, including lazy pages.
-       Multiline editors, navigation and printed documents retain their layout. */
-    html[data-font-size] body :is(
-      .MuiButton-root, .document-export-trigger, .sl-btn, .sl-pending, .btn,
-      .sl-create-actions > button, .sl-create-confirm-card footer > button,
-      .MuiOutlinedInput-root:not(.MuiInputBase-multiline),
-      .MuiFilledInput-root:not(.MuiInputBase-multiline),
-      .MuiInput-root:not(.MuiInputBase-multiline),
-      .sl-search, .sl-select, .sl-combo > input, .sl-combo > button,
-      .sl-create-filter, .sl-create-subject-search > input, .sl-create-name input, .sl-lecturer-trigger, .app-time-field,
-      .tp-search, .tp-filter > input:not([type="checkbox"]), .tp-year-trigger,
-      select:not([multiple]):not([size])
-    ):not(:where(
-      .sl-drawer-close, .ribbon-header *, .ribbon-sidebar *,
-      .report-preview *, .transcript-print-document *, .report-print-sheet *,
-      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
-      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
-      [data-preserve-font-size], [data-preserve-font-size] *
-    )) {
-      box-sizing: border-box !important;
-      height: var(--app-control-height) !important;
-      min-height: var(--app-control-height) !important;
-      max-height: none !important;
-      font-size: calc(12.5px * var(--app-text-scale, 1)) !important;
-      line-height: 1.5 !important;
-    }
-
-    html[data-font-size] body :is(.MuiButton-root, .document-export-trigger, .sl-btn, .sl-pending, .btn):not(:where(
-      .sl-drawer-close, .ribbon-header *, .ribbon-sidebar *,
-      .report-preview *, .transcript-print-document *, .report-print-sheet *,
-      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
-      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
-      [data-preserve-font-size], [data-preserve-font-size] *
-    )) {
-      padding: 0 1em !important;
-      white-space: nowrap !important;
-      overflow-wrap: normal !important;
-      flex-shrink: 0;
-      min-width: max-content;
-    }
-
-    html[data-font-size] .tp-search input {
-      box-sizing: border-box;
-      height: 100% !important;
-      min-height: 0 !important;
-      padding-block: 0 !important;
-    }
-
-    html[data-font-size] body .MuiInputBase-root:not(.MuiInputBase-multiline) :is(.MuiInputBase-input, .MuiSelect-select) {
-      min-height: 0 !important;
-      height: auto !important;
-      padding-block: 0 !important;
-      font-size: inherit !important;
-      line-height: 1.5 !important;
-    }
-
-    html[data-font-size] body :is(.MuiInputBase-root, .MuiButton-root) :is(.MuiInputAdornment-root, .MuiButton-startIcon, .MuiButton-endIcon) svg,
-    html[data-font-size] .document-export-trigger :is(.report-export-download, .report-export-chevron) {
-      width: var(--app-control-icon-size) !important;
-      height: var(--app-control-icon-size) !important;
-      font-size: var(--app-control-icon-size) !important;
-      flex-shrink: 0;
-    }
-
-    /* Compact action targets share one geometry in native and MUI tables. */
-    html[data-font-size] body table :is(.MuiIconButton-root.MuiButtonBase-root, .app-icon-action.sl-btn):not(:where(
-      .report-preview *, .transcript-print-document *, .report-print-sheet *,
-      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
-      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
-      [data-preserve-font-size], [data-preserve-font-size] *
-    )) {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      box-sizing: border-box !important;
-      width: var(--app-table-action-size) !important;
-      min-width: var(--app-table-action-size) !important;
-      max-width: var(--app-table-action-size) !important;
-      height: var(--app-table-action-size) !important;
-      min-height: var(--app-table-action-size) !important;
-      padding: 0 !important;
-      line-height: 1 !important;
-      vertical-align: middle !important;
-      flex-shrink: 0;
-    }
-
-    html[data-font-size] body table :is(.MuiIconButton-root.MuiButtonBase-root, .app-icon-action.sl-btn):not(:where(
-      .report-preview *, .transcript-print-document *, .report-print-sheet *,
-      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
-      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
-      [data-preserve-font-size], [data-preserve-font-size] *
-    )) > svg {
-      display: block;
-      width: var(--app-table-icon-size) !important;
-      height: var(--app-table-icon-size) !important;
-      font-size: var(--app-table-icon-size) !important;
-      flex-shrink: 0;
     }
   }
 }
