@@ -185,6 +185,16 @@ const RibbonHeader = () => {
     try { sessionStorage.setItem(SIDEBAR_OPEN_KEY, String(menuOpen)); }
     catch { /* Navigation still works when session storage is unavailable. */ }
   }, [menuOpen]);
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const dismissOutside = event => {
+      if (sidebarRef.current?.contains(event.target) || menuToggleRef.current?.contains(event.target)) return;
+      setMenuOpen(false);
+      setSearchQuery('');
+    };
+    document.addEventListener('click', dismissOutside, true);
+    return () => document.removeEventListener('click', dismissOutside, true);
+  }, [menuOpen]);
   useLayoutEffect(() => {
     if (desktop && role) document.documentElement.dataset.ribbonSidebar = menuOpen ? 'expanded' : 'compact';
     else delete document.documentElement.dataset.ribbonSidebar;

@@ -34,6 +34,20 @@ const render = (...args) => {
 };
 beforeEach(() => sessionStorage.removeItem('sdh.sidebar.open'));
 describe("Ribbon read/navigation permission contracts", () => {
+  it("closes on an outside click without swallowing the page action or stealing focus", () => {
+    const clicked = jest.fn();
+    render(<>{view(session(['scheduling.view']), '/masters/schedule')}<button onClick={clicked}>Nội dung trang</button></>);
+    fireEvent.click(screen.getByRole('searchbox'));
+    expect(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' })).toBeInTheDocument();
+    const outside = screen.getByRole('button', { name: 'Nội dung trang' });
+    outside.focus();
+    fireEvent.click(outside);
+    expect(clicked).toHaveBeenCalledTimes(1);
+    expect(outside).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Mở menu tác vụ' })).toBeInTheDocument();
+    expect(sessionStorage.getItem('sdh.sidebar.open')).toBe('false');
+  });
+
   it("only changes sidebar visibility through explicit controls, not pointer movement or focus", () => {
     const { unmount } = baseRender(view(session(['scheduling.view']), '/masters/schedule'));
     const sidebar = screen.getByRole('complementary', { name: 'Menu chức năng' });
