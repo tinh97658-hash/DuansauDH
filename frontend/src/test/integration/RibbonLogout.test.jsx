@@ -26,7 +26,7 @@ const render = (...args) => {
   return result;
 };
 describe("Ribbon current-session POST logout", () => {
-  beforeEach(() => { jest.clearAllMocks(); });
+  beforeEach(() => { jest.clearAllMocks(); sessionStorage.removeItem('sdh.sidebar.open'); });
   it.each([
     ["Thông tin về đơn vị", "/system/unit-info"], ["Về trang chủ", "/"],
   ])("confirms unsaved grades before navigating with %s", async (label, destination) => {

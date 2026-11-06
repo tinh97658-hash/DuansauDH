@@ -29,6 +29,7 @@ const tabs = [
 const tabIcons = { system: ShieldCheckIcon, plan: CalendarDaysIcon, masters: AcademicCapIcon, doctoral: TrophyIcon, reports: DocumentChartBarIcon };
 const normalizeSearch = (value) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase().trim();
 const breadcrumbLabel = (value) => value.charAt(0) + value.slice(1).toLocaleLowerCase("vi");
+const SIDEBAR_OPEN_KEY = 'sdh.sidebar.open';
 
 export const ribbons = {
   system: [
@@ -151,7 +152,10 @@ const RibbonHeader = () => {
   const session = useAuthSession();
   const sessionRole = session ? session.activeProfile?.code || session.user?.role || "student" : null;
   const [activeTab, setActiveTab] = useState(() => tabForPath(location.pathname));
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(() => {
+    try { return sessionStorage.getItem(SIDEBAR_OPEN_KEY) === 'true'; }
+    catch { return false; }
+  });
   const [desktop, setDesktop] = useState(() => window.matchMedia?.('(min-width: 761px)').matches ?? true);
   const [breadcrumbMenu, setBreadcrumbMenu] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -161,7 +165,6 @@ const RibbonHeader = () => {
   const searchRef = useRef(null);
   const searchRequestedRef = useRef(false);
   const focusRequestedRef = useRef(false);
-  const pointerInsideRef = useRef(false);
   const closeMenu = () => {
     setMenuOpen(false);
     setSearchQuery("");
@@ -174,10 +177,14 @@ const RibbonHeader = () => {
   useEffect(() => {
     const media = window.matchMedia?.('(min-width: 761px)');
     if (!media) return undefined;
-    const update = () => { pointerInsideRef.current = false; setDesktop(media.matches); setMenuOpen(false); };
+    const update = () => setDesktop(media.matches);
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
   }, []);
+  useEffect(() => {
+    try { sessionStorage.setItem(SIDEBAR_OPEN_KEY, String(menuOpen)); }
+    catch { /* Navigation still works when session storage is unavailable. */ }
+  }, [menuOpen]);
   useLayoutEffect(() => {
     if (desktop && role) document.documentElement.dataset.ribbonSidebar = menuOpen ? 'expanded' : 'compact';
     else delete document.documentElement.dataset.ribbonSidebar;
@@ -196,8 +203,6 @@ const RibbonHeader = () => {
   const path = location.pathname;
   useEffect(() => {
     setActiveTab(tabForPath(path));
-    if (sidebarRef.current?.contains(document.activeElement)) menuToggleRef.current?.focus();
-    setMenuOpen(false);
     setSearchQuery("");
     setBreadcrumbMenu(null);
   }, [path, location.search]);
@@ -252,7 +257,6 @@ const RibbonHeader = () => {
     .filter(section => section.actions.length);
   const breadcrumbMenuLabel = breadcrumbMenu?.level === "group" ? currentGroup?.label : currentTab?.[1];
   const openBreadcrumbMenu = (event, level) => {
-    setMenuOpen(false);
     setBreadcrumbMenu({ anchorEl: event.currentTarget, level });
   };
   const userName = session?.user?.name || session?.user?.fullName || roleNames[role] || role;
@@ -270,7 +274,6 @@ const RibbonHeader = () => {
   const runAction = async (item) => {
     if (item.action === "logout" && loggingOut) return;
     if (item.action !== "logout") {
-      if (path === item.route && !location.search) closeMenu();
       return navigate(item.route);
     }
     if (!await confirmLeave()) return;
@@ -339,26 +342,7 @@ const RibbonHeader = () => {
         {menuOpen ? <ChevronLeftIcon /> : desktop ? <img src={BRAND.logoUrl} alt="" /> : <Bars3Icon />}<span>Menu</span>
       </button>
       {menuOpen && !desktop && <div className="ribbon-menu-backdrop" aria-hidden="true" onClick={closeMenu} />}
-      <aside id="ribbon-sidebar" ref={sidebarRef} className={`ribbon-sidebar${menuOpen ? ' is-expanded' : ' is-compact'}`} aria-label="Menu chức năng" hidden={!desktop && !menuOpen}
-        onPointerEnter={event => {
-          if (!desktop || event.pointerType === 'touch') return;
-          pointerInsideRef.current = true;
-          setMenuOpen(true);
-        }}
-        onPointerLeave={() => {
-          pointerInsideRef.current = false;
-          if (!desktop) return;
-          if (sidebarRef.current?.contains(document.activeElement)) menuToggleRef.current?.focus();
-          setMenuOpen(false); setSearchQuery('');
-        }}
-        onFocusCapture={event => {
-          if (desktop && event.target.closest('.ribbon-tab-toggle')) setMenuOpen(true);
-        }}
-        onBlur={event => {
-          if (desktop && !pointerInsideRef.current && !event.currentTarget.contains(event.relatedTarget)) {
-            setMenuOpen(false); setSearchQuery('');
-          }
-        }}>
+      <aside id="ribbon-sidebar" ref={sidebarRef} className={`ribbon-sidebar${menuOpen ? ' is-expanded' : ' is-compact'}`} aria-label="Menu chức năng" hidden={!desktop && !menuOpen}>
         <div className="ribbon-sidebar-brand ribbon-brand-group">
           <div className="ribbon-sidebar-brand-content" hidden={!menuOpen}>
             <button className="ribbon-brand" type="button" onClick={() => navigate("/")} aria-label="Về trang chủ">

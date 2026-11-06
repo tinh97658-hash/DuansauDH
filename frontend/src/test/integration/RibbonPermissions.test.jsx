@@ -32,8 +32,9 @@ const render = (...args) => {
   if (toggle) fireEvent.click(toggle);
   return result;
 };
+beforeEach(() => sessionStorage.removeItem('sdh.sidebar.open'));
 describe("Ribbon read/navigation permission contracts", () => {
-  it("keeps a compact icon rail, expands on hover and restores the compact layout on leaving", () => {
+  it("only changes sidebar visibility through explicit controls, not pointer movement or focus", () => {
     const { unmount } = baseRender(view(session(['scheduling.view']), '/masters/schedule'));
     const sidebar = screen.getByRole('complementary', { name: 'Menu chức năng' });
     expect(sidebar).toBeVisible();
@@ -41,9 +42,14 @@ describe("Ribbon read/navigation permission contracts", () => {
     expect(screen.getByRole('button', { name: 'ĐÀO TẠO THẠC SĨ' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Xếp lịch' })).toBeNull();
     fireEvent.pointerEnter(sidebar);
+    expect(document.documentElement).toHaveAttribute('data-ribbon-sidebar', 'compact');
+    fireEvent.click(screen.getByRole('button', { name: 'Mở menu tác vụ' }));
     expect(document.documentElement).toHaveAttribute('data-ribbon-sidebar', 'expanded');
     expect(screen.getByRole('button', { name: 'Xếp lịch' })).toHaveAttribute('aria-current', 'page');
     fireEvent.pointerLeave(sidebar);
+    fireEvent.blur(sidebar, { relatedTarget: document.body });
+    expect(document.documentElement).toHaveAttribute('data-ribbon-sidebar', 'expanded');
+    fireEvent.click(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' }));
     expect(document.documentElement).toHaveAttribute('data-ribbon-sidebar', 'compact');
     expect(sidebar).toBeVisible();
     expect(screen.queryByRole('searchbox')).toBeNull();
@@ -52,13 +58,26 @@ describe("Ribbon read/navigation permission contracts", () => {
     expect(document.documentElement).not.toHaveAttribute('data-ribbon-sidebar');
   });
 
-  it("opens the rail search and supports opening a category by keyboard focus", () => {
+  it("opens the rail search and requires activation to open a compact category", () => {
     baseRender(view(session(['scheduling.view']), '/masters/schedule'));
     fireEvent.click(screen.getByRole('button', { name: 'Mở tìm kiếm chức năng' }));
     expect(screen.getByRole('searchbox', { name: 'Tìm kiếm chức năng' })).toHaveFocus();
     fireEvent.keyDown(document, { key: 'Escape' });
     fireEvent.focus(screen.getByRole('button', { name: 'ĐÀO TẠO THẠC SĨ' }));
+    expect(screen.queryByRole('button', { name: 'Xếp lịch' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'ĐÀO TẠO THẠC SĨ' }));
     expect(screen.getByRole('button', { name: 'Xếp lịch' })).toBeInTheDocument();
+  });
+
+  it("keeps the sidebar open on navigation and restores that choice when the page remounts", () => {
+    const first = render(view(session(['scheduling.view']), '/masters/schedule'));
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo lớp học phần' }));
+    expect(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' })).toBeInTheDocument();
+    expect(sessionStorage.getItem('sdh.sidebar.open')).toBe('true');
+    first.unmount();
+    baseRender(view(session(['scheduling.view']), '/masters/course-offerings'));
+    expect(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tạo lớp học phần' })).toHaveAttribute('aria-current', 'page');
   });
 
   it("keeps touch navigation behind a toggle and does not reserve a desktop column on mobile", () => {

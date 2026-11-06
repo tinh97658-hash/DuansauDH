@@ -1,6 +1,7 @@
-/* Compact icon rail that expands on hover, like the sidebar reference. */
+/* Sidebar opens and collapses through explicit controls. */
 :root {
   --ribbon-rail-width: 64px;
+  --ribbon-header-height: calc(64px * var(--app-text-scale, 1));
   --ribbon-expanded-width: min(clamp(320px, calc(300px * var(--app-text-scale, 1)), 460px), calc(100vw - 52px));
 }
 html[data-ribbon-sidebar="compact"] { --ribbon-sidebar-width: var(--ribbon-rail-width); }
@@ -15,7 +16,7 @@ html[data-ribbon-sidebar] #root {
   width: 100%;
   color: var(--text-primary, #172B3A);
   background: #FFFFFF;
-  border-bottom: 1px solid var(--border-color, #DFE4E8);
+  border-bottom: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   font-family: var(--app-font-family);
   -webkit-font-smoothing: auto;
@@ -29,10 +30,10 @@ html[data-ribbon-sidebar] #root {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 20px;
-  min-height: 64px;
+  min-height: var(--ribbon-header-height);
   padding: 0 24px;
   background: #FFFFFF;
-  border-bottom: 1px solid #EDF2F7;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .ribbon-topbar-start { display: flex; align-items: center; gap: 18px; min-width: 0; }
@@ -141,7 +142,7 @@ html[data-ribbon-sidebar] #root {
 /* The desktop rail reserves its own column; mobile keeps a dismissible drawer. */
 .ribbon-menu-tab {
   position: fixed;
-  top: 14px;
+  top: calc((var(--ribbon-header-height) - 36px) / 2);
   left: 14px;
   z-index: 1201;
   display: flex;
@@ -195,8 +196,9 @@ html[data-ribbon-sidebar] #root {
   display: flex;
   flex-shrink: 0;
   gap: 10px;
-  min-height: 72px;
-  padding: 14px 48px 14px 14px;
+  height: var(--ribbon-header-height);
+  min-height: var(--ribbon-header-height);
+  padding: 6px 48px 6px 14px;
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-light);
 }
@@ -311,10 +313,6 @@ html[data-ribbon-sidebar] #root {
 .ribbon-footer-logout svg { width: 20px; height: 20px; }
 .ribbon-footer-logout:hover { background: var(--table-hover-bg); color: var(--primary); }
 .ribbon-footer-logout:disabled { opacity: .55; cursor: wait; }
-@layer app-square-corners {
-  .ribbon-sidebar { border-radius: 0 12px 12px 0 !important; }
-  .ribbon-sidebar :is(.ribbon-tab-toggle, .ribbon-action, .ribbon-search, .ribbon-rail-search) { border-radius: 5px !important; }
-}
 @media (prefers-reduced-motion: reduce) {
   html[data-ribbon-sidebar] #root, .ribbon-sidebar, .ribbon-menu-tab { transition: none; }
 }
