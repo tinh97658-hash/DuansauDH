@@ -27,12 +27,15 @@ const render = (...args) => {
 };
 describe("Ribbon current-session POST logout", () => {
   beforeEach(() => { jest.clearAllMocks(); sessionStorage.removeItem('sdh.sidebar.open'); });
-  it('expands the compact footer before allowing logout', () => {
+  it.each(['button', 'svg'])('logs out directly from the compact footer when clicking its %s', async target => {
+    axios.post.mockResolvedValue({ status: 204 });
     renderPage();
     fireEvent.keyDown(document, { key: 'Escape' });
-    fireEvent.click(screen.getByRole('button', { name: 'Đăng xuất' }));
-    expect(document.querySelector('.ribbon-sidebar')).toHaveClass('is-expanded');
-    expect(axios.post).not.toHaveBeenCalled();
+    const button = screen.getByRole('button', { name: 'Đăng xuất' });
+    fireEvent.click(target === 'svg' ? button.querySelector('svg') : button);
+    expect(document.querySelector('.ribbon-sidebar')).toHaveClass('is-compact');
+    await waitFor(() => expect(axios.post).toHaveBeenCalledWith(`${API_BASE_URL}/user/logout`, {}, { withCredentials: true }));
+    expect(await screen.findByRole('heading', { name: 'Login page' })).toBeInTheDocument();
   });
   it.each([
     ["Thông tin về đơn vị", "/system/unit-info"], ["Về trang chủ", "/"],

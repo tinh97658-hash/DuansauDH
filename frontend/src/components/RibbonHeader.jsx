@@ -358,7 +358,7 @@ const RibbonHeader = () => {
       {menuOpen && !desktop && <div className="ribbon-menu-backdrop" aria-hidden="true" onClick={closeMenu} />}
       <aside id="ribbon-sidebar" ref={sidebarRef} className={`ribbon-sidebar${menuOpen ? ' is-expanded' : ' is-compact'}`} aria-label="Menu chức năng" hidden={!desktop && !menuOpen}
         onClickCapture={event => {
-          if (menuOpen) return;
+          if (menuOpen || event.target.closest('.ribbon-footer-logout')) return;
           event.stopPropagation();
           const tab = event.target.closest('.ribbon-tab-toggle');
           if (tab) setActiveTab(tab.dataset.ribbonTab);
