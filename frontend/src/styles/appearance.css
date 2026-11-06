@@ -252,6 +252,14 @@
       padding-block: 0 !important;
     }
 
+    /* The arrow stays inside the input border as the scope controls scale. */
+    html[data-font-size] body .sl-schedule-scope-fields .sl-combo > button {
+      top: 1px;
+      bottom: 1px;
+      height: calc(100% - 2px) !important;
+      min-height: 0 !important;
+    }
+
     html[data-font-size] body .MuiInputBase-root:not(.MuiInputBase-multiline) :is(.MuiInputBase-input, .MuiSelect-select) {
       min-height: 0 !important;
       height: auto !important;

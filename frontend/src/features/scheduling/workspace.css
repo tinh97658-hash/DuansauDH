@@ -192,6 +192,7 @@
 .sl-schedule-view .sl-year-select{margin:0;appearance:none;-webkit-appearance:none;background-color:#fff;background-image:var(--app-chevron);background-repeat:no-repeat;background-position:right 11px center;background-size:12px 8px}
 .sl-schedule-view .sl-combo input:focus,.sl-schedule-view .sl-year-select:focus{outline:0;border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
 .sl-schedule-view .sl-year-select.sl-placeholder{color:var(--text-muted)}
+.sl-schedule-scope-fields .sl-year-select.MuiInputBase-root{display:flex;align-items:center}
 .sl-schedule-view .sl-worklist{min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:6px var(--sl-scope-inline) 12px;background:#fff}
 .sl-schedule-view .sl-search-wrap{flex:none;margin:2px 0 8px;background:#fff}
 .sl-schedule-view .sl-search-wrap span{left:11px;top:7px;color:#8a9aaa;font-size:15px}
