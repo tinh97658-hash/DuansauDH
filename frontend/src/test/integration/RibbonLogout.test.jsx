@@ -27,6 +27,13 @@ const render = (...args) => {
 };
 describe("Ribbon current-session POST logout", () => {
   beforeEach(() => { jest.clearAllMocks(); sessionStorage.removeItem('sdh.sidebar.open'); });
+  it('expands the compact footer before allowing logout', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Đăng xuất' }));
+    expect(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' })).toBeInTheDocument();
+    expect(axios.post).not.toHaveBeenCalled();
+  });
   it.each([
     ["Thông tin về đơn vị", "/system/unit-info"], ["Về trang chủ", "/"],
   ])("confirms unsaved grades before navigating with %s", async (label, destination) => {

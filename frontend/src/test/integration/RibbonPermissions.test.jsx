@@ -34,6 +34,14 @@ const render = (...args) => {
 };
 beforeEach(() => sessionStorage.removeItem('sdh.sidebar.open'));
 describe("Ribbon read/navigation permission contracts", () => {
+  it.each(['.ribbon-sidebar', '.ribbon-sidebar-brand', '.ribbon-command-scroll', '.ribbon-sidebar-footer'])("opens the compact sidebar by clicking its blank area: %s", selector => {
+    const { container } = baseRender(view(session(['scheduling.view']), '/masters/schedule'));
+    expect(screen.getByRole('button', { name: 'Mở menu tác vụ' })).toBeInTheDocument();
+    fireEvent.click(container.querySelector(selector));
+    expect(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Xếp lịch' })).toHaveAttribute('aria-current', 'page');
+  });
+
   it("closes on an outside click without swallowing the page action or stealing focus", () => {
     const clicked = jest.fn();
     render(<>{view(session(['scheduling.view']), '/masters/schedule')}<button onClick={clicked}>Nội dung trang</button></>);

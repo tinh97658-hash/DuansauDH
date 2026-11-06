@@ -190,6 +190,7 @@ html[data-ribbon-sidebar] #root {
   font-size: calc(13px * var(--app-text-scale, 1));
 }
 .ribbon-sidebar.is-expanded { width: var(--ribbon-expanded-width); box-shadow: 5px 0 18px #173e7514; }
+.ribbon-sidebar.is-compact { cursor: pointer; }
 .ribbon-sidebar [data-heroicon] { color: inherit !important; }
 .ribbon-sidebar[hidden] { display: none; }
 .ribbon-sidebar-brand {

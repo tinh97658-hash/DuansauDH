@@ -352,7 +352,15 @@ const RibbonHeader = () => {
         {menuOpen ? <ChevronLeftIcon /> : desktop ? <img src={BRAND.logoUrl} alt="" /> : <Bars3Icon />}<span>Menu</span>
       </button>
       {menuOpen && !desktop && <div className="ribbon-menu-backdrop" aria-hidden="true" onClick={closeMenu} />}
-      <aside id="ribbon-sidebar" ref={sidebarRef} className={`ribbon-sidebar${menuOpen ? ' is-expanded' : ' is-compact'}`} aria-label="Menu chức năng" hidden={!desktop && !menuOpen}>
+      <aside id="ribbon-sidebar" ref={sidebarRef} className={`ribbon-sidebar${menuOpen ? ' is-expanded' : ' is-compact'}`} aria-label="Menu chức năng" hidden={!desktop && !menuOpen}
+        onClickCapture={event => {
+          if (menuOpen) return;
+          event.stopPropagation();
+          const tab = event.target.closest('.ribbon-tab-toggle');
+          if (tab) setActiveTab(tab.dataset.ribbonTab);
+          if (event.target.closest('.ribbon-rail-search')) searchRequestedRef.current = true;
+          setMenuOpen(true);
+        }}>
         <div className="ribbon-sidebar-brand ribbon-brand-group">
           <div className="ribbon-sidebar-brand-content" hidden={!menuOpen}>
             <button className="ribbon-brand" type="button" onClick={() => navigate("/")} aria-label="Về trang chủ">
@@ -374,7 +382,7 @@ const RibbonHeader = () => {
               const expanded = menuOpen && (Boolean(searchTerm) || selectedTab === id);
               const TabIcon = tabIcons[id];
               return <div className="ribbon-tab-section" key={id}>
-                <button type="button" className={`ribbon-tab-toggle${expanded ? " active" : ""}${currentTab?.[0] === id ? ' current' : ''}`} aria-label={label} title={!menuOpen ? breadcrumbLabel(label) : undefined} aria-expanded={expanded} aria-controls={`ribbon-section-${id}`} onClick={() => {
+                <button type="button" data-ribbon-tab={id} className={`ribbon-tab-toggle${expanded ? " active" : ""}${currentTab?.[0] === id ? ' current' : ''}`} aria-label={label} title={!menuOpen ? breadcrumbLabel(label) : undefined} aria-expanded={expanded} aria-controls={`ribbon-section-${id}`} onClick={() => {
                   setSearchQuery("");
                   if (!menuOpen) { setMenuOpen(true); setActiveTab(id); }
                   else setActiveTab(selectedTab === id && !searchTerm ? null : id);
