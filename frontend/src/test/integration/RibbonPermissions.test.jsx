@@ -33,6 +33,16 @@ const render = (...args) => {
   return result;
 };
 describe("Ribbon read/navigation permission contracts", () => {
+  it('shows the dashboard bell and staff identity once while retaining profile switching and logout', () => {
+    const value = { ...session(['scheduling.view']), user: { role: 'admin', name: 'Nguyễn Trang' },
+      activeProfile: { id: 'p1', code: 'admin', name: 'Quản trị hệ thống' }, profiles: [{ id: 'p1' }, { id: 'p2' }], chooseProfile: vi.fn() };
+    render(view(value, '/viewLogged'));
+    expect(screen.getByRole('button', { name: 'Thông báo' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getAllByText('Nguyễn Trang')).toHaveLength(1);
+    expect(screen.getAllByText('Quản trị hệ thống')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Đổi phiên làm việc' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Đăng xuất' })).toBeInTheDocument();
+  });
   it("filters across groups without accents while respecting permissions", () => {
     render(view(session(["scheduling.view", "exams.view"]), "/masters/schedule"));
     const search = screen.getByRole("searchbox", { name: "Tìm kiếm chức năng" });

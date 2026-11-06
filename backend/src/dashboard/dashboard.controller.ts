@@ -7,7 +7,7 @@ import type { DashboardProgram, DashboardSection } from "./dashboard.service.js"
 
 export class OperationalDashboardQuery {
   @Matches(/^\d{4}$/, { message: "Năm phải gồm 4 chữ số." }) year!: string;
-  @IsOptional() @IsIn(["grouping", "teaching", "grades", "approvals", "studyLeaveApproval", "majorTransferApproval"]) section?: DashboardSection;
+  @IsOptional() @IsIn(["grouping", "teaching", "grades", "approvals", "studyLeaveApproval", "majorTransferApproval", "learnersChart", "sessionsChart", "completionChart", "activity"]) section?: DashboardSection;
   @IsOptional() @IsIn(["masters", "doctoral"]) program?: DashboardProgram;
 }
 

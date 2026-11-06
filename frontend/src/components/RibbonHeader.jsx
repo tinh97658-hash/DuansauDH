@@ -9,6 +9,7 @@ import { useAuthSession } from "../context/AuthSession";
 import { routeViewCode } from '../features/accounts/routePermissions';
 import { preloadPage } from "../utils/lazyPage";
 import "../styles/ribbon-header.css";
+import DashboardActivity from '../features/dashboard/DashboardActivity';
 
 const action = (label, route, icon, color, options = {}) => ({ label, route, icon, color, ...options });
 const group = (label, actions) => ({ label, actions });
@@ -172,6 +173,7 @@ const RibbonHeader = () => {
   }, [navigate, sessionRole]);
 
   const path = location.pathname;
+  const dashboardHome = path === '/' || path === '/viewLogged';
   useEffect(() => {
     setActiveTab(tabForPath(path));
     if (sidebarRef.current?.contains(document.activeElement)) menuToggleRef.current?.focus();
@@ -264,7 +266,11 @@ const RibbonHeader = () => {
             {currentAction && <><ChevronRightIcon aria-hidden="true" /><strong aria-current="page">{currentAction.label}</strong></>}
           </div>
         </div>
-        <div className="ribbon-user-avatar" title={`${userName} · ${roleNames[role] || role}`}>{avatar}</div>
+        {dashboardHome ? <div className="od-header-account">
+          <DashboardActivity />
+          <div className="od-header-identity"><strong>{userName}</strong><span>{session?.activeProfile?.name || roleNames[role] || role}</span></div>
+          <div className="ribbon-user-avatar" title={userName}>{avatar}</div>
+        </div> : <div className="ribbon-user-avatar" title={`${userName} · ${roleNames[role] || role}`}>{avatar}</div>}
       </div>
       <button
         ref={menuToggleRef}
@@ -315,8 +321,8 @@ const RibbonHeader = () => {
         </div>
         {logoutError && <div className="ribbon-logout-error" role="alert">{logoutError}</div>}
         <div className="ribbon-sidebar-footer" title={`Hồ sơ: ${session?.activeProfile?.name || roleNames[role] || role}`}>
-          <div className="ribbon-user-avatar">{avatar}</div>
-          <div className="ribbon-user-info"><span className="ribbon-user-name">{userName}</span><span className="ribbon-user-role">{session?.activeProfile?.name || (session?.user?.name || session?.user?.fullName ? roleNames[role] || role : BRAND.institute)}</span>
+          {!dashboardHome && <div className="ribbon-user-avatar">{avatar}</div>}
+          <div className="ribbon-user-info">{!dashboardHome && <><span className="ribbon-user-name">{userName}</span><span className="ribbon-user-role">{session?.activeProfile?.name || (session?.user?.name || session?.user?.fullName ? roleNames[role] || role : BRAND.institute)}</span></>}
           {session?.activeProfile && <span className="ribbon-user-role">{session.activeProfile.scopeLabel}</span>}
           {session?.chooseProfile && (session.profiles || []).length > 1 && <button type="button" className="sl-btn" onClick={async () => { if (await confirmLeave()) session.chooseProfile(); }}>Đổi phiên làm việc</button>}
           </div>

@@ -8,6 +8,9 @@ import { databaseModels } from "../../src/database/database.module.js";
 import { DashboardService, operationalPermissions } from "../../src/dashboard/dashboard.service.js";
 import { OperationalDashboardQuery } from "../../src/dashboard/dashboard.controller.js";
 import { businessCalendarDaysSince } from '../../src/scheduling/scheduling-time.js';
+import { workingProfileStorage } from '../../src/auth/profile-context.js';
+import { routeViewCode, routeActionCode } from '../../src/auth/route-permissions.js';
+import { GroupScopeService } from '../../src/auth/group-scope.service.js';
 
 let db: Sequelize;
 beforeAll(() => { db = new Sequelize({ dialect: "postgres", database: "test", logging: false, models: databaseModels }); });
@@ -61,10 +64,10 @@ describe("operational dashboard permissions", () => {
     expect(f.gradebooks.tracking).toHaveBeenLastCalledWith(expect.any(Array), false);
   });
   it("uses effective permissions without a hidden scheduling assignment requirement", () => {
-    expect(operationalPermissions(user(), new Set(DEFAULT_ROLE_PERMISSIONS[user().role]))).toEqual({ grouping: true, grades: true, approvals: true, studyLeaveApproval: true, majorTransferApproval: true, scheduling: true, progress: true, overview: true });
+    expect(operationalPermissions(user(), new Set(DEFAULT_ROLE_PERMISSIONS[user().role]))).toMatchObject({ grouping: true, grades: true, approvals: true, studyLeaveApproval: true, majorTransferApproval: true, scheduling: true, progress: true, overview: true });
     expect(operationalPermissions(user("admin", false), new Set(DEFAULT_ROLE_PERMISSIONS[user("admin", false).role]))).toMatchObject({ scheduling: true, progress: true, grouping: true });
-    expect(operationalPermissions(user("supervisor", true), new Set(DEFAULT_ROLE_PERMISSIONS[user("supervisor", true).role]))).toEqual({ grouping: false, grades: false, approvals: false, studyLeaveApproval: false, majorTransferApproval: false, scheduling: true, progress: true, overview: true });
-    expect(operationalPermissions(user("examiner", false), new Set(DEFAULT_ROLE_PERMISSIONS[user("examiner", false).role]))).toEqual({ grouping: false, grades: true, approvals: false, studyLeaveApproval: false, majorTransferApproval: false, scheduling: true, progress: true, overview: true });
+    expect(operationalPermissions(user("supervisor", true), new Set(DEFAULT_ROLE_PERMISSIONS[user("supervisor", true).role]))).toMatchObject({ grouping: false, grades: false, approvals: false, studyLeaveApproval: false, majorTransferApproval: false, scheduling: true, progress: true, overview: true });
+    expect(operationalPermissions(user("examiner", false), new Set(DEFAULT_ROLE_PERMISSIONS[user("examiner", false).role]))).toMatchObject({ grouping: false, grades: true, approvals: false, studyLeaveApproval: false, majorTransferApproval: false, scheduling: true, progress: true, overview: true });
     expect(Object.values(operationalPermissions(Student.build({ role: "admin" }), new Set(DEFAULT_ROLE_PERMISSIONS.admin)))).not.toContain(true);
     expect(Object.values(operationalPermissions({ role: "admin", canManageScheduling: true }, new Set(DEFAULT_ROLE_PERMISSIONS.admin)))).not.toContain(true);
   });
@@ -101,7 +104,7 @@ describe("operational dashboard permissions", () => {
     const f = fixture();
     const result = await f.service.operational(user(), '2026', undefined, 'doctoral');
     expect(result.program).toBe('doctoral');
-    expect(Object.keys(result.sources).sort()).toEqual(['grouping', 'teaching', 'grades', 'approvals', 'studyLeaveApproval', 'majorTransferApproval'].sort());
+    expect(Object.keys(result.sources).sort()).toEqual(['teaching', 'grades', 'approvals', 'studyLeaveApproval', 'majorTransferApproval', 'learnersChart', 'sessionsChart', 'completionChart'].sort());
     for (const source of Object.values(result.sources)) {
       expect(source).toMatchObject({ status: 'not_implemented' });
       expect(source).not.toHaveProperty('data');
@@ -124,6 +127,98 @@ describe("operational dashboard permissions", () => {
 });
 
 describe("operational dashboard aggregation", () => {
+  it('uses separate existing scope contexts for scheduling, grades and admissions without changing access rules', async () => {
+    const f = fixture();
+    const scope = new GroupScopeService({ transaction: async work => work({}) } as any);
+    f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(DEFAULT_ROLE_PERMISSIONS.admin), roleCodes: ['admin'],
+      groupScope: { restrictView: true, restrictEdit: true, readOnly: false } } as any);
+    const contexts: any[] = [];
+    f.scheduling.listCourseOfferings.mockImplementation(async () => { contexts.push({ ...scope.current() }); return []; });
+    f.gradebooks.tracking.mockImplementation(async () => { contexts.push({ ...scope.current() }); return new Map(); });
+    f.requests.query.mockImplementation(async () => { contexts.push({ ...scope.current() }); return []; });
+    const service = new DashboardService(f.masters as any, f.scheduling as any, f.system as any, f.rbac as any, f.gradebooks as any, f.requests as any, scope);
+    await service.operational(user(), '2026');
+    expect(contexts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ schedulingAction: 'view', schedulingView: true, restrictView: true }),
+      expect.objectContaining({ academicDomain: 'gradebook', academicPermission: 'gradebook.view', restrictView: true }),
+      expect.objectContaining({ admissionAction: 'view', restrictView: true }),
+    ]));
+    expect(contexts.filter(context => context.schedulingAction === 'view').every(context => !context.academicDomain)).toBe(true);
+    expect(scope.current()).toBeUndefined();
+  });
+  it('keeps all four grade stages separate, deduplicates offerings and does not warn on future exams', async () => {
+    const f = fixture();
+    const ids = ['components', 'exam', 'marks', 'ready', 'done'];
+    const offerings = ids.map(id => offering(id, {}, 'completed'));
+    f.scheduling.listCourseOfferings.mockResolvedValue([...offerings, offerings[1]]);
+    f.gradebooks.tracking.mockResolvedValue(new Map(ids.map((id, index) => [id, {
+      gradebookStage: ['components_missing', 'awaiting_exam', 'exam_missing', 'result_ready', 'completed'][index],
+      completedTeachingAt: null, examCompletedAt: null, eligibilityStatus: 'approved',
+    }])));
+    f.requests.query.mockResolvedValue([{ offeringId: 'exam', scheduledCount: 1, upcomingCount: 1, nextExamAt: '2099-01-01T01:00:00Z' }]);
+    const data = (await f.service.operational(user(), '2026', 'grades')).sources.grades.data;
+    expect(data.stages.map(stage => [stage.stage, stage.count])).toEqual([
+      ['components_missing', 1], ['awaiting_exam', 1], ['exam_missing', 1], ['result_ready', 1],
+    ]);
+    expect(data.stages[1].items[0]).toMatchObject({ upcomingExam: true, elapsedDays: null, detail: 'Đã xếp lịch thi sắp tới' });
+    expect(data.stages[0].items[0].elapsedDays).toBeNull();
+    expect(JSON.stringify(data)).not.toMatch(/quá hạn|khẩn cấp/);
+  });
+  it('does not offer exam scheduling to a grade submitter without exams.write', async () => {
+    const f = fixture();
+    f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['gradebook.view', 'gradebook.submit']), roleCodes: ['entry'] });
+    f.scheduling.listCourseOfferings.mockResolvedValue([offering('exam', {}, 'completed')]);
+    f.gradebooks.tracking.mockResolvedValue(new Map([['exam', { gradebookStage: 'awaiting_exam' }]]));
+    const result = await f.service.operational(user(), '2026', 'grades');
+    expect(result.permissions).toMatchObject({ grades: true, approvals: false, examsWrite: false });
+    expect(result.sources.grades.data.stages[1].items[0]).toMatchObject({ action: 'Mở bảng điểm', href: expect.stringContaining('/masters/exam-lists?') });
+  });
+  it('does not infer page access from a role name or broad capability in an HTTP profile', () => {
+    workingProfileStorage.run({ staffId: 'staff', roleId: 'profile', selectionRequired: false }, () => {
+      expect(operationalPermissions(user(), new Set(['gradebook.view', 'gradebook.submit']))).toMatchObject({ grades: false, gradebookView: false });
+      const granted = new Set(['gradebook.view', 'gradebook.submit', routeViewCode('/masters/exam-lists'), routeActionCode('/masters/exam-lists', 'gradebook.submit')]);
+      expect(operationalPermissions(user(), granted)).toMatchObject({ grades: true, approvals: false });
+    });
+  });
+  it('keeps admission charts hidden from scheduling-only staff and loads only the chosen source on retry', async () => {
+    const f = fixture();
+    f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['scheduling.view']), roleCodes: ['viewer'] });
+    const result = await f.service.operational(user(), '2026');
+    expect(result.permissions).toMatchObject({ learnersOverview: false, overview: true, scheduling: false });
+    expect(result.sources.learnersChart).toBeUndefined();
+    expect(result.sources.sessionsChart.status).toBe('ready');
+    f.requests.query.mockClear();
+    await f.service.operational(user(), '2026', 'completionChart');
+    expect(f.requests.query).toHaveBeenCalledTimes(1);
+    expect(f.requests.query.mock.calls[0][0]).toContain('COUNT(DISTINCT o.id)');
+  });
+  it('isolates a failed chart from work and other charts', async () => {
+    const f = fixture();
+    f.requests.query.mockImplementation(async sql => { if (sql.includes('FROM teaching_sessions ts')) throw Error('private error'); return []; });
+    const result = await f.service.operational(user(), '2026');
+    expect(result.sources.sessionsChart.status).toBe('error');
+    expect(result.sources.completionChart.status).toBe('ready');
+    expect(result.sources.grouping.status).toBe('ready');
+    expect(JSON.stringify(result)).not.toContain('private error');
+  });
+  it('returns actual recorded activity without a fabricated unread state or write statements', async () => {
+    const f = fixture();
+    f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['gradebook.view']), roleCodes: ['viewer'] });
+    f.requests.query.mockResolvedValue([{ id: 'event', action: 'result.approve', at: '2026-11-03T01:00:00Z', offeringId: 'o', groupId: 'g', title: 'Lớp thật' }]);
+    const result = await f.service.operational(user(), '2026', 'activity');
+    expect(result.sources.activity.data).toMatchObject({ readState: 'not_supported', items: [{ detail: 'Bảng điểm đã duyệt / khóa', href: '/masters/exam-lists?year=2026&offeringId=o&groupId=g' }] });
+    expect(f.requests.query).toHaveBeenCalledTimes(1);
+    expect(f.requests.query.mock.calls[0][0]).not.toMatch(/\b(INSERT|UPDATE|DELETE)\b/);
+    expect(f.requests.query.mock.calls[0][1]).toMatchObject({ replacements: { year: '2026' } });
+  });
+  it('retains complete approval counts beyond any preview size', async () => {
+    const f = fixture();
+    const values = Array.from({ length: 31 }, (_, index) => offering(`o${index}`, {}, 'completed'));
+    f.scheduling.listCourseOfferings.mockResolvedValue(values);
+    f.gradebooks.tracking.mockResolvedValue(new Map(values.map(value => [value.id, { resultStatus: 'submitted' }])));
+    expect((await f.service.operational(user(), '2026', 'approvals')).sources.approvals.data.resultApproval)
+      .toMatchObject({ count: 31, itemCount: 31, items: expect.any(Array) });
+  });
   it('loads course offerings once per dashboard request and refreshes them on the next request', async () => {
     const f = fixture();
     const first = await f.service.operational(user(), '2026');
@@ -170,8 +265,8 @@ describe("operational dashboard aggregation", () => {
   it('requires decision and view grants and does not expose learner requests to read-only staff or requesters', async () => {
     const f = fixture();
     f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['plan.view', 'admission.view', 'studyleave.request', 'majortransfer.request']), roleCodes: ['custom'] });
-    expect((await f.service.operational(user(), '2026')).sources).toEqual({});
-    expect(f.requests.query).not.toHaveBeenCalled();
+    expect(Object.keys((await f.service.operational(user(), '2026')).sources)).toEqual(['learnersChart']);
+    expect(f.requests.query).toHaveBeenCalledTimes(1); // Read-only admissions chart, no approval records.
     expect(operationalPermissions(user(), new Set(DEFAULT_ROLE_PERMISSIONS.admin), true)).toMatchObject({ studyLeaveApproval: false, majorTransferApproval: false });
     expect(operationalPermissions(user(), new Set(['studyleave.approve', 'majortransfer.approve']))).toMatchObject({ studyLeaveApproval: false, majorTransferApproval: false });
     f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['plan.view', 'admission.view', 'studyleave.approve']), roleCodes: ['custom'] });
@@ -254,7 +349,7 @@ describe("operational dashboard aggregation", () => {
       expect(items[0].detail).toBe('Hoàn thành môn học 12 ngày trước');
       expect(items[0]).not.toHaveProperty('count');expect(items[0]).not.toHaveProperty('unit');
       expect(warningGroups.map((g:any)=>g.items.map((i:any)=>i.id))).toEqual([['exam'],['exam-grades']]);
-      expect(warningGroups[0].items[0].detail).toBe('Điểm thành phần được duyệt 9 ngày trước');
+      expect(warningGroups[0].items[0].detail).toBe('Chưa có lịch thi đang chờ tổ chức');
       expect(warningGroups[1].items[0].detail).toBe('Thi xong 7 ngày trước');
       expect(warningGroups[0].items[0].href).toContain('/masters/exam-schedule?year=2026&offeringId=exam&groupId=g1&majorId=m1');
       expect(warningGroups[1].items[0].href).toContain('/masters/exam-lists?year=2026&offeringId=exam-grades&groupId=g1&majorId=m1');

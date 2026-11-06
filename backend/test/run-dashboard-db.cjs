@@ -1,0 +1,50 @@
+// Creates a fresh disposable database, applies real migrations, runs the Dashboard read-model SQL tests, then removes it.
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
+const { Sequelize } = require('sequelize');
+const { Umzug, SequelizeStorage } = require('umzug');
+const root = path.resolve(__dirname, '..');
+const config = {};
+for (const file of [path.join(root, '../.env'), path.join(root, 'config.env')]) {
+  if (!fs.existsSync(file)) continue;
+  for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const match = line.match(/^([A-Z_]+)\s*=\s*(.*)$/);
+    if (match) config[match[1]] = match[2].replace(/^['"]|['"]$/g, '');
+  }
+}
+const uri = new URL(process.env.DATABASE_URL || config.DATABASE_URL ||
+  `postgres://${encodeURIComponent(config.POSTGRES_USER)}:${encodeURIComponent(config.POSTGRES_PASSWORD)}@localhost:${config.DB_PORT}/${config.POSTGRES_DB}`);
+const testName = `pgsms_dashboard_test_${Date.now()}`;
+const admin = new Sequelize(uri.toString(), { logging: false });
+uri.pathname = `/${testName}`;
+const db = new Sequelize(uri.toString(), { logging: false });
+let created = false;
+(async () => {
+  try {
+    await admin.query(`CREATE DATABASE "${testName}"`);
+    created = true;
+    const migrator = new Umzug({
+      migrations: { glob: path.join(root, 'dist/database/migrations/*.js').replace(/\\/g, '/') },
+      context: db.getQueryInterface(), storage: new SequelizeStorage({ sequelize: db, tableName: 'sequelize_meta' }), logger: undefined,
+    });
+    await migrator.up({ to: '093-exam-schedule-permissions.js' });
+    // 094 requires a functioning administrator. This fixture exists only in this disposable DB.
+    await db.query(`INSERT INTO staff(id,name,email,role,status,created_at,updated_at)
+      VALUES(gen_random_uuid(),'Dashboard test admin','dashboard-test@example.invalid','admin','active',now(),now());
+      INSERT INTO roles(id,code,name,active,created_at,updated_at)
+      VALUES(gen_random_uuid(),'admin','Dashboard test admin',true,now(),now()) ON CONFLICT(code) DO NOTHING;
+      INSERT INTO role_permissions(role_id,permission_id,created_at,updated_at)
+        SELECT r.id,p.id,now(),now() FROM roles r CROSS JOIN permissions p WHERE r.code='admin' ON CONFLICT DO NOTHING;`);
+    await migrator.up();
+    console.log('All migrations, including 098, passed on a fresh disposable database.');
+    const result = spawnSync(process.execPath, [require.resolve('jest/bin/jest'), '--config', 'test/jest.config.cjs', '--runInBand', 'test/integration/dashboard-v2-postgres.spec.ts'], {
+      cwd: root, stdio: 'inherit', env: { ...process.env, DATABASE_URL: uri.toString(), RUN_DASHBOARD_DB_TESTS: 'true', NODE_ENV: 'test' },
+    });
+    process.exitCode = result.status ?? 1;
+  } finally {
+    await db.close();
+    if (created) await admin.query(`DROP DATABASE "${testName}"`);
+    await admin.close();
+  }
+})().catch(error => { console.error(error.original?.message || error.message); process.exitCode = 1; });
