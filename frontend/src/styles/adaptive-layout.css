@@ -197,6 +197,26 @@
   }
 }
 
+/* Single-line labels override scaled-card wrapping when the workspace narrows. */
+@layer app-text-size {
+  @media screen {
+    html[data-font-size] .sl-create-figma .sl-create-group-list :is(.sl-group-info, .sl-group-tags-row, .sl-major-cohort-pair) {
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden !important;
+    }
+    html[data-font-size] .sl-create-figma .sl-create-group-list .sl-badge {
+      display: block !important;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden !important;
+      text-overflow: ellipsis;
+      white-space: nowrap !important;
+      overflow-wrap: normal !important;
+    }
+  }
+}
+
 @media print {
   .sl-matrix-pivot-table {
     --sl-pivot-subject-width: 240px !important;

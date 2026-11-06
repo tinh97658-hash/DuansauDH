@@ -786,12 +786,14 @@ body .sl-create-year-menu .MuiMenuItem-root{font-size:13.5px}
 
 /* Cards keep their content height when the scrollable lists are full. */
 .sl-create-figma :is(.sl-create-subject-list,.sl-create-group-list)>button{flex-shrink:0;height:auto}
-.sl-create-figma .sl-major-cohort-pair{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;vertical-align:middle}
+.sl-create-figma .sl-major-cohort-pair{display:inline-flex;align-items:center;gap:6px;flex:1 1 0%;min-width:0;vertical-align:middle}
 .sl-create-figma .sl-major-cohort-pair .sl-major-badge{white-space:nowrap}
 .sl-create-figma .sl-major-cohort-pair .sl-cohort-badge{flex-shrink:0;white-space:nowrap}
 .sl-create-figma .sl-create-student-list p{min-width:0;overflow-wrap:anywhere}
 .sl-create-figma .sl-create-group-list>button{position:relative;grid-template-columns:20px minmax(0,1fr)}
 .sl-create-figma .sl-group-title-row{padding-right:110px}
 .sl-create-figma .sl-create-group-count{position:absolute;top:9px;right:14px}
-.sl-create-figma .sl-group-tags-row{flex-wrap:nowrap;overflow-x:auto;max-width:100%;scrollbar-width:thin}
-.sl-create-figma .sl-group-tags-row>.sl-badge{flex-shrink:0}
+.sl-create-figma .sl-group-tags-row{flex-wrap:nowrap;overflow:hidden;max-width:100%}
+.sl-create-figma .sl-group-tags-row>.sl-badge{flex:0 1 auto;max-width:35%}
+.sl-create-figma .sl-major-cohort-pair .sl-major-badge{flex:1 1 0%}
+.sl-create-figma .sl-major-cohort-pair .sl-cohort-badge{flex:0 1 auto;max-width:50%}

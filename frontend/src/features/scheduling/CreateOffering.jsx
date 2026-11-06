@@ -352,11 +352,11 @@ export default function CreateOffering({ user }) {
                           <span className="sl-badge sl-study-first">{group.unstudiedCount ?? group.memberCount} chưa học</span>
                         )}
                         <span className="sl-major-cohort-pair">
-                          <span className={`sl-badge sl-major-badge ${isCrossMajor ? "sl-badge-cross-major" : ""}`}>
+                          <span title={groupMajorName(group)} className={`sl-badge sl-major-badge ${isCrossMajor ? "sl-badge-cross-major" : ""}`}>
                             {groupMajorName(group)}
                           </span>
                           {group.academicYear && (
-                            <span className={`sl-badge sl-cohort-badge ${isCrossCohort ? "sl-cohort-other" : ""}`}>
+                            <span title={`Khóa ${group.academicYear}`} className={`sl-badge sl-cohort-badge ${isCrossCohort ? "sl-cohort-other" : ""}`}>
                               Khóa {group.academicYear}
                             </span>
                           )}
