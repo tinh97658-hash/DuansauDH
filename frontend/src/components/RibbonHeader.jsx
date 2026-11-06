@@ -408,7 +408,6 @@ const RibbonHeader = () => {
         <div className="ribbon-sidebar-footer" title={`Hồ sơ: ${session?.activeProfile?.name || roleNames[role] || role}`}>
           <div className="ribbon-user-avatar" hidden={!menuOpen}>{avatar}</div>
           <div className="ribbon-user-info" hidden={!menuOpen}><span className="ribbon-user-name">{userName}</span><span className="ribbon-user-role">{session?.activeProfile?.name || (session?.user?.name || session?.user?.fullName ? roleNames[role] || role : BRAND.institute)}</span>
-          {session?.activeProfile && <span className="ribbon-user-role">{session.activeProfile.scopeLabel}</span>}
           {session?.chooseProfile && (session.profiles || []).length > 1 && <button type="button" className="sl-btn" onClick={async () => { if (await confirmLeave()) session.chooseProfile(); }}>Đổi phiên làm việc</button>}
           </div>
           <button type="button" className="ribbon-footer-logout" aria-label="Đăng xuất" title="Đăng xuất" disabled={loggingOut} onClick={() => runAction({ action: "logout" })}><ArrowRightStartOnRectangleIcon /></button>
