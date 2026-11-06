@@ -211,7 +211,6 @@ html[data-ribbon-sidebar] #root {
 .ribbon-search > svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-secondary); }
 .ribbon-search input { width: 100%; min-width: 0; border: 0; outline: 0; padding: 0; background: transparent; color: var(--text-primary); font: inherit; }
 .ribbon-search input::placeholder { color: var(--text-secondary); }
-.ribbon-search kbd { padding: 0 5px; border: 1px solid var(--dropdown-border); color: var(--text-secondary); font: inherit; font-size: .85em; }
 .ribbon-rail-search { display: grid; place-items: center; flex-shrink: 0; width: 42px; min-height: 42px; margin: 10px auto; border: 0; background: transparent; color: var(--text-secondary); cursor: pointer; }
 .ribbon-rail-search svg { width: 20px; height: 20px; }
 .ribbon-rail-search:hover { background: var(--table-hover-bg); color: var(--primary); }

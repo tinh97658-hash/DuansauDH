@@ -371,7 +371,6 @@ const RibbonHeader = () => {
         <div className="ribbon-search-wrap" hidden={!menuOpen}>
           <label className="ribbon-search"><MagnifyingGlassIcon />
             <input ref={searchRef} type="search" aria-label="Tìm kiếm chức năng" placeholder="Tìm kiếm chức năng..." value={searchQuery} onChange={event => setSearchQuery(event.target.value)} />
-            <kbd aria-hidden="true">/</kbd>
           </label>
         </div>
         <div className="ribbon-command-scroll">
