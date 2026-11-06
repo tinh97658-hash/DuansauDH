@@ -28,29 +28,33 @@ const PaymentRow = React.memo(function PaymentRow({ row, index, draft, disabled,
   const lecturerName = formatLecturerName({...row, name: row.lecturerName});
   const name = `${lecturerName} – ${row.offeringName}`;
   const groups = row.participatingGroups || [];
-  const groupNames = groups.map(group => group.name || group.code).filter(Boolean).join(', ');
+  const groupNames = groups.map((group, groupIndex) => ({ key: group.id || group.code || groupIndex, name: group.name || group.code })).filter(group => group.name);
+  const participatingGroups = groupNames.length ? groupNames : [{ key: 'empty', name: '—' }];
+  const rowSpan = participatingGroups.length;
   const needsDate = value.paid && !value.paymentDate;
-  return <tr data-payment-key={rowKey(row)} aria-busy={busy}>
-  <td>{index + 1}</td><td><span className="lp-cell-text" title={lecturerName}>{lecturerName}</span></td>
-  <td><button className="lp-link" title={row.offeringName} onClick={() => setOffering({ id: row.courseOfferingId, name: row.offeringName })}><span className="lp-cell-text">{row.offeringName}</span></button></td>
-  <td><span className="lp-group-names" title={groupNames || undefined}>{groupNames || '—'}</span></td>
-  <td>{row.sessionCount}</td><td>{dateLabel(row.completedAt)}</td>
-  <td><input type="checkbox" data-payment-toggle aria-label={`Đã thanh toán: ${name}`} checked={value.paid}
+  return <><tr data-payment-key={rowKey(row)} aria-busy={busy}>
+  <td rowSpan={rowSpan}>{index + 1}</td><td rowSpan={rowSpan}><span className="lp-cell-text" title={lecturerName}>{lecturerName}</span></td>
+  <td rowSpan={rowSpan}><button className="lp-link" title={row.offeringName} onClick={() => setOffering({ id: row.courseOfferingId, name: row.offeringName })}><span className="lp-cell-text">{row.offeringName}</span></button></td>
+  <td><span className="lp-group-names" title={participatingGroups[0].name}>{participatingGroups[0].name}</span></td>
+  <td rowSpan={rowSpan}>{row.sessionCount}</td><td rowSpan={rowSpan}>{dateLabel(row.completedAt)}</td>
+  <td rowSpan={rowSpan}><input type="checkbox" data-payment-toggle aria-label={`Đã thanh toán: ${name}`} checked={value.paid}
     disabled={disabled || (busy && draft?.paid !== undefined)} onChange={event => toggle(row, event.target.checked)} /></td>
-  <td><DateField size="small" value={value.paid ? value.paymentDate || '' : ''} disabled={disabled || !value.paid}
+  <td rowSpan={rowSpan}><DateField size="small" value={value.paid ? value.paymentDate || '' : ''} disabled={disabled || !value.paid}
     className="lp-payment-date" inputProps={{ 'aria-label': `Ngày thanh toán: ${name}` }}
     onChange={event => edit(row, { paymentDate: event.target.value })}
     onAccept={date => commitField(row, 'paymentDate', date)}
     onBlur={() => commitField(row, 'paymentDate')}
     onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); commitField(row, 'paymentDate'); } }} />
     {needsDate && <span className="lp-missing-date">Cần bổ sung ngày</span>}</td>
-  <td><input className="lp-note" aria-label={`Ghi chú: ${name}`} placeholder="Ghi chú (không bắt buộc)" title={value.note || ''}
+  <td rowSpan={rowSpan}><input className="lp-note" aria-label={`Ghi chú: ${name}`} title={value.note || ''}
     maxLength={2000} disabled={disabled} value={value.note || ''} onChange={event => edit(row, { note: event.target.value })}
     onBlur={() => commitField(row, 'note')}
     onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); commitField(row, 'note'); } }} />
     {busy && <span className="lp-saving" role="status">Đang lưu…</span>}
     {draft?.error && <div className="lp-row-error" role="alert">{draft.error}</div>}</td>
-  </tr>;
+  </tr>{participatingGroups.slice(1).map(group => <tr key={group.key} className="lp-group-row" aria-busy={busy}>
+    <td><span className="lp-group-names" title={group.name}>{group.name}</span></td>
+  </tr>)}</>;
 });
 export default function LecturerPayments() {
   const session = useAuthSession();

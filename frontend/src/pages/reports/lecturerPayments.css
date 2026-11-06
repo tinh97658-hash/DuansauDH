@@ -27,9 +27,12 @@
 .lp-payment-date .Mui-disabled svg { color:#98a3ad; }
 .lp-payment-date .Mui-focused .MuiOutlinedInput-notchedOutline { border-color:#0b7fa3; }
 .lp-missing-date { display:block; color:#925c07; font-size:12px; margin-top:4px; }
-.lp-note { width:100%; min-width:0; padding:9px 7px; border:1px solid #b9cbd8; border-radius:4px; font:inherit; background:#fff; color:inherit; text-overflow:ellipsis; }
+.lp-note { width:100%; min-width:0; padding:9px 7px; border:1px solid transparent; border-radius:4px; font:inherit; background:transparent; color:inherit; text-overflow:ellipsis; }
 .lp-note:disabled { background:#f1f4f7; }
-.lp-note:focus { outline:2px solid #0b7fa3; outline-offset:1px; }
+.lp-note:hover:not(:disabled),.lp-note:focus:not(:disabled) { border-color:#b9cbd8; }
+.lp-note:focus { outline:1px solid #b9cbd8; outline-offset:1px; }
 .lp-saving { display:block; color:#667b89; margin-top:4px; font-size:12px; }
 .lp-row-error { color:#b42318; font-size:12px; margin-top:5px; }
 .lp-group-names { line-height:1.5; overflow-wrap:anywhere; }
+.lp-table td[rowspan] { vertical-align:middle; }
+.lp-table .lp-group-row td { padding:9px 12px; text-align:left; border-right:1px solid #d2dee8; }
