@@ -31,6 +31,7 @@
 .sl-create-figma .sl-combo input,.sl-create-figma .sl-create-year{display:block;width:100%;height:var(--sl-scope-control-height);box-sizing:border-box;padding:0 42px 0 13px;border:1px solid #b9cad8;border-radius:7px;background-color:#fff;color:var(--text-primary);font-family:var(--app-font-family);font-size:14.5px;font-weight:500;line-height:normal}
 .sl-create-figma .sl-create-year{appearance:none;-webkit-appearance:none;background-image:var(--app-chevron);background-repeat:no-repeat;background-position:right 11px center;background-size:12px 8px;cursor:pointer}
 .sl-create-figma .sl-create-year.sl-placeholder,.sl-create-figma .sl-create-year:disabled{color:var(--text-muted);opacity:1}
+.sl-create-scope-fields .sl-create-year.MuiInputBase-root{display:flex;align-items:center}
 .sl-create-figma .sl-create-year:disabled{cursor:not-allowed;background-color:#fff}
 .sl-create-figma .sl-create-year .MuiSelect-select{display:flex;align-items:center;box-sizing:border-box;height:100%;min-height:0;padding:0;background:transparent}
 .sl-create-figma .sl-create-year.Mui-focused{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
