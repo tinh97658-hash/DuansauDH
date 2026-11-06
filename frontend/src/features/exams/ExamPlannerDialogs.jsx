@@ -23,10 +23,7 @@ export function ExamPendingCards({sessions,onSelect,canWrite,saving,onHeld,onNot
   <div className="sl-pending-side"><small title={`Phòng ${s.roomCode} · ${s.candidateCount} thí sinh`}>Phòng {s.roomCode} · {s.candidateCount} TS</small><div className="sl-pending-actions"><button className="sl-btn" disabled={!canWrite||saving} onClick={()=>onNotHeld(s)}>Không diễn ra</button><button className="sl-btn sl-btn-primary" disabled={!canWrite||saving} onClick={()=>onHeld(s)}><CheckIcon fontSize="inherit" /> Đã diễn ra</button></div></div>
  </article>);
 }
-export function CandidateList({item}){
- return <details className="ep-candidates"><summary>Danh sách thí sinh ({item.candidateCount})</summary><ol>{(item.candidates||[]).map(c=><li key={c.participantId}>{c.code?`${c.code} · `:''}{c.fullName}</li>)}</ol></details>;
-}
-export function ExamEditor({session,offering,slot,rooms,lecturers=[],units=[],canWrite,saving,error,onClose,onSave,onCompose,embedded=false}){
+export function ExamEditor({session,offering,slot,rooms,lecturers=[],units=[],canWrite,saving,error,onClose,onSave,embedded=false}){
  const wallTime=useExamWallTime();
  const [form,setForm]=useState({examDate:session?.examDate||slot.date,startTime:session?.startTime.slice(0,5)||slot.start,endTime:session?.endTime.slice(0,5)||slot.end,roomId:session?.roomId||'',secondLecturerId:session?.secondLecturerId||'',secondExternalInvigilatorName:session?.secondExternalInvigilatorName||'',secondExternalUnitName:session?.secondExternalUnitName||'',lecturerId:session?.lecturerId||'',note:session?.note||''});
  const [unitId,setUnitId]=useState(()=>{const lecturer=lecturers.find(l=>l.id===session?.lecturerId);return lecturer&&units.some(unit=>unit.id===lecturer.unitId&&isExamUnit(unit))?lecturer.unitId:'';});
@@ -50,8 +47,6 @@ export function ExamEditor({session,offering,slot,rooms,lecturers=[],units=[],ca
   {error&&<div role="alert" className="v20-error">{error}</div>}
   <div className="v20-composer">
    <section className="sl-editor-info"><h4>THÔNG TIN CA THI</h4><strong>{item.name}</strong><p>{item.subjectName}</p>
-    <CandidateList item={item}/>
-    {onCompose&&!periodClosed&&<button className="sl-btn" disabled={saving||!canWrite} onClick={()=>onCompose(form)}>Ghép học phần / thêm đợt thi</button>}
     <div className="ep-period-value">Buổi: <strong>{form.startTime<'13:00'?(form.endTime>'13:00'?'Sáng / Chiều':'Sáng'):'Chiều'}</strong></div>
     <label className="v20-field sl-unit-field">Đơn vị
      <SearchSelect label="Đơn vị" value={unitId} options={visibleUnits}

@@ -135,6 +135,10 @@ const managedRecords = managedStatuses.map((studyStatus, index) => ({
   studyStatus, academicYear: '2024', major: { name: 'Công nghệ thông tin' }, assignedGroup: null,
 }));
 const setupManaged = (total = 7) => axios.get.mockImplementation(async url => {
+  if (url.includes('/system/training-years')) return { data: [
+    { name: '2024', startDate: '2024-01-01', active: true },
+    { name: '2026', startDate: '2026-01-01', active: true },
+  ] };
   if (url.includes('/system/majors')) return { data: [{ id: 'major', name: 'Công nghệ thông tin', program: 'masters', disciplineId: 'discipline', discipline: { name: 'Ngành CNTT' } }] };
   if (url.includes('/plan/admission-records')) return { data: { data: managedRecords, pagination: { total, totalPages: Math.ceil(total / 15) } } };
   return { data: { rows: [row], total: 1 } };

@@ -164,23 +164,26 @@ export function scheduleDocumentMetadata(schedule) {
 }
 
 // Print the same grouped weekly layout in PDF, Word and Excel.
-export function scheduleDocumentColumns() {
-  return [
+export function scheduleDocumentColumns(schedule = {}) {
+  const columns = [
     { key: "number", label: "STT", weight: 8, excelWidth: 6, fields: [0], nowrap: true, center: true },
     { key: "groups", label: "Lớp", weight: 28, excelWidth: 26, fields: [2] },
     { key: "subject", label: "Học phần", weight: 42, excelWidth: 38, fields: [3] },
-    { key: "lecturer", label: "Giảng viên", weight: 30, excelWidth: 28, fields: [4], center: true },
+    { key: "lecturer", label: schedule.kind === "exam" ? "Cán bộ coi thi" : "Giảng viên", weight: 30, excelWidth: 28, fields: [4], center: true, multiline: schedule.kind === "exam" },
     { key: "time", label: "Thời gian", weight: 36, excelWidth: 28, fields: [5], center: true },
     { key: "room", label: "Phòng học", weight: 22, excelWidth: 18, fields: [6], center: true },
     { key: "note", label: "Ghi chú", weight: 26, excelWidth: 28, fields: [7] },
   ];
+  return schedule.kind === "exam"
+    ? [...columns.slice(0, 3), columns[4], columns[5], columns[3], columns[6]]
+    : columns;
 }
 
 export function scheduleDocumentCell(row, column) {
-  const parts = column.fields.filter((index) => row[index] !== "").map((index) => ({
-    text: String(row[index]),
+  const parts = column.fields.filter((index) => row[index] !== "").flatMap((index) => (column.multiline ? String(row[index]).split(/\r?\n/) : [String(row[index])]).map(text => ({
+    text,
     nowrap: !!column.nowrap,
-  }));
+  })));
   return parts.length ? parts : [{ text: "", nowrap: false }];
 }
 

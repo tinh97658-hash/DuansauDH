@@ -517,7 +517,7 @@ const CatalogManager = ({
         <Stack spacing="14px">
           <Box sx={{ p: 1.75, border: "1px solid #d7e1e8", borderRadius: "6px", backgroundColor: "#fbfcfd" }}>
             <Stack spacing="13px">
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: showCode ? "160px 1fr" : "1fr" }, gap: 1.5 }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: showCode ? "minmax(0, calc(160px * var(--app-text-scale, 1))) minmax(0, 1fr)" : "1fr" }, gap: 1.5 }}>
                 {showCode && <CompactField label={codeLabel.toUpperCase()} htmlFor="catalog-code">
                   <TextField id="catalog-code" value={form.code} onChange={setField("code")} inputProps={{ "aria-label": codeLabel }} fullWidth size="small" sx={compactControlSx} />
                 </CompactField>}

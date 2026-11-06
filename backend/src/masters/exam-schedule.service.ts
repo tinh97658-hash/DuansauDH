@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { Staff } from '../database/models/staff.model.js';
 import { RbacService } from '../auth/rbac.service.js';
 import { ExamWorkflowService } from './exam-workflow.service.js';
-import { ConfirmExamDto, ExamScheduleQueryDto, ExamSessionActionDto, RescheduleExamDto, ScheduleExamDto, SaveExamArrangementDto } from './dto/exam-schedule.dto.js';
+import { ConfirmExamDto, ExamCandidateAttendanceDto, ExamScheduleQueryDto, ExamSessionActionDto, RescheduleExamDto, ScheduleExamDto, SaveExamArrangementDto } from './dto/exam-schedule.dto.js';
 import {activeExam, validateExamArrangement,externalInvigilatorKey,examRoomFits} from './exam-arrangement.js';
 import { GradebookAccessService } from './gradebook-access.service.js';
 
@@ -50,7 +50,13 @@ export class ExamScheduleService {
       (SELECT count(*)::int FROM course_exam_session_candidates c WHERE c.session_id=es.id) AS "candidateCount",
       (SELECT jsonb_agg(c.participant_id ORDER BY c.participant_id) FROM course_exam_session_candidates c WHERE c.session_id=es.id) AS "candidateIds",
       p.rows->0->>'classGroupId' AS "classGroupId",
-      (SELECT jsonb_agg(jsonb_build_object('participantId',person->>'participantId','code',person->>'code','fullName',person->>'fullName')) FROM jsonb_array_elements(p.rows) person WHERE EXISTS(SELECT 1 FROM course_exam_session_candidates c WHERE c.session_id=es.id AND c.participant_id=person->>'participantId')) AS candidates,
+      (SELECT jsonb_agg(jsonb_build_object('participantId',person->>'participantId','code',person->>'code','fullName',person->>'fullName',
+        'attendanceStatus',COALESCE(att.status,'present'),'attendanceRecordedAt',att.recorded_at) ORDER BY candidate_order)
+        FROM jsonb_array_elements(p.rows) WITH ORDINALITY AS people(person,candidate_order)
+        JOIN course_exam_session_candidates c ON c.session_id=es.id AND c.participant_id=person->>'participantId'
+        LEFT JOIN course_exam_candidate_attendance att ON att.session_id=c.session_id AND att.participant_id=c.participant_id) AS candidates,
+      (es.status IN ('scheduled','held') AND w.mode='new' AND w.result_status NOT IN ('submitted','approved')
+        AND (es.exam_date+es.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp()) AS "canRecordAttendance",
       (es.status='scheduled' AND (es.exam_date+es.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'>clock_timestamp()) AS "canEdit",
       (es.status='scheduled' AND (es.exam_date+es.end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp()) AS "pendingConfirmation"
       FROM course_exam_sessions es JOIN course_exam_arrangements a ON a.id=es.arrangement_id LEFT JOIN course_exam_workflows w ON w.course_offering_id=es.course_offering_id JOIN course_offerings o ON o.id=es.course_offering_id JOIN subjects s ON s.id=o.subject_id JOIN rooms r ON r.id=es.room_id LEFT JOIN lecturers l ON l.id=es.lecturer_id LEFT JOIN lecturers l2 ON l2.id=es.second_lecturer_id JOIN course_exam_eligibility_snapshots p ON p.id=es.eligibility_snapshot_id
@@ -251,6 +257,38 @@ export class ExamScheduleService {
   }
 
   async cancel(id:string,dto:ExamSessionActionDto,actor:any){return this.finish(id,dto,actor,'cancelled');}
+  async recordAttendance(id:string,dto:ExamCandidateAttendanceDto,actor:any){
+    await this.authorize(actor);
+    return this.db.transaction(async tx=>{
+      const [ref]=await this.query('SELECT course_offering_id,arrangement_id FROM course_exam_sessions WHERE id= :id',{id},tx);
+      if(!ref)throw new NotFoundException('Không tìm thấy ca thi.');
+      if(this.access){
+        const scope=await this.access.assertOffering(actor,ref.course_offering_id,tx);
+        if(scope.readOnly)throw new ForbiddenException('Bạn chỉ có quyền xem danh sách thí sinh.');
+      }
+      const {state}=await this.workflow.lock(ref.course_offering_id,tx);
+      if(['submitted','approved'].includes(state.result_status))throw new ConflictException('Kết quả đã gửi duyệt hoặc đã khóa; không thể sửa trạng thái dự thi.');
+      await this.query('SELECT id FROM course_exam_arrangements WHERE id= :id FOR UPDATE',{id:ref.arrangement_id},tx);
+      const session=await this.session(id,tx);this.checkVersion(session,dto.version);
+      if(!['scheduled','held'].includes(session.status))throw new ConflictException('Ca thi đã hủy hoặc không diễn ra; chỉ được xem trạng thái thí sinh.');
+      const [started]=await this.query(`SELECT (exam_date+start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp() ok FROM course_exam_sessions WHERE id= :id`,{id},tx);
+      if(!started.ok)throw new ConflictException('Chỉ ghi nhận vắng từ khi ca thi bắt đầu.');
+      const [candidate]=await this.query(`SELECT c.participant_id,COALESCE(a.status,'present') AS status
+        FROM course_exam_session_candidates c LEFT JOIN course_exam_candidate_attendance a
+          ON a.session_id=c.session_id AND a.participant_id=c.participant_id
+        WHERE c.session_id=:id AND c.participant_id=:participant`,{id,participant:dto.participantId},tx);
+      if(!candidate)throw new NotFoundException('Thí sinh không thuộc danh sách của ca thi này.');
+      await this.db.query(`INSERT INTO course_exam_candidate_attendance(session_id,participant_id,status,recorded_by,recorded_at)
+        VALUES(:id,:participant,:status,:actor,clock_timestamp()) ON CONFLICT(session_id,participant_id)
+        DO UPDATE SET status=EXCLUDED.status,recorded_by=EXCLUDED.recorded_by,recorded_at=EXCLUDED.recorded_at`,
+        {transaction:tx,replacements:{id,participant:dto.participantId,status:dto.status,actor:actor.id}});
+      const [updated]=await this.query(`UPDATE course_exam_sessions SET version=version+1,updated_by=:actor,updated_at=now() WHERE id=:id RETURNING version`,{id,actor:actor.id},tx);
+      const [arrangement]=await this.query('UPDATE course_exam_arrangements SET version=version+1 WHERE id=:id RETURNING version',{id:session.arrangement_id},tx);
+      await this.workflow.event(session.course_offering_id,'exam.attendance',actor,'Ghi nhận trạng thái dự thi',
+        {sessionId:id,participantId:dto.participantId,status:candidate.status},{sessionId:id,participantId:dto.participantId,status:dto.status},tx);
+      return {id,participantId:dto.participantId,status:dto.status,version:updated.version,arrangementId:session.arrangement_id,arrangementVersion:arrangement.version};
+    });
+  }
   async confirm(id:string,dto:ConfirmExamDto,actor:any){return this.finish(id,dto,actor,dto.status);}
   private async finish(id:string,dto:{version:number;note?:string},actor:any,status:'held'|'not_held'|'cancelled'){
     await this.authorize(actor);if(status!=='held'&&!dto.note?.trim())throw new BadRequestException(status==='cancelled'?'Nhập lý do hủy lịch thi.':'Nhập lý do không diễn ra.');

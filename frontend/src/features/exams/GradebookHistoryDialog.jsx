@@ -14,6 +14,7 @@ const ACTION_LABELS = {
   "final.approve": "Duyệt kết quả", "final.reopen": "Mở lại kết quả",
   "exam.schedule": "Xếp buổi thi", "exam.reschedule": "Đổi lịch thi",
   "exam.held": "Xác nhận đã thi", "exam.cancel": "Hủy lịch thi",
+  "exam.attendance": "Ghi nhận trạng thái dự thi",
 };
 
 const ROLE_LABELS = { admin: "Quản trị viên", supervisor: "Giảng viên hướng dẫn", examiner: "Giám khảo" };

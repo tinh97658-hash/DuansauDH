@@ -1,15 +1,17 @@
 import {examInvigilatorName} from './examInvigilators';
 import React,{useState} from 'react';
 import {Link} from 'react-router-dom';
+import {UsersIcon,TableCellsIcon,CheckCircleIcon,XCircleIcon,TrashIcon} from '../../components/AppIcons';
 import {Modal} from '../scheduling/shared';
 import {formatExamDate} from './examCalendar';
 import {examStatus} from './examPlanner';
 import {activeExamGroup,examGroupsPeak} from './examArrangement';
 import ExamArrangementEditor from './ExamArrangementEditor';
 import ExamLearnerClasses from './ExamLearnerClasses';
+import ExamCandidatesTable from './ExamCandidatesTable';
 import {ExamEditor,ExamReasonDialog} from './ExamPlannerDialogs';
 
-export default function ExamSessionDialog({members,queue,rooms,lecturers,units,canWrite,saving,refreshing,error,onClose,onClearError,onSaveArrangement,onSaveSession,onAction}){
+export default function ExamSessionDialog({members,queue,rooms,lecturers,units,canWrite,saving,refreshing,error,onClose,onClearError,onSaveArrangement,onSaveSession,onAction,onAttendanceChange}){
  const [mode,setMode]=useState(null),[expanded,setExpanded]=useState([]);
  const sorted=[...members].sort((a,b)=>(a.roundNo||1)-(b.roundNo||1)||a.startTime.localeCompare(b.startTime)||(a.name||'').localeCompare(b.name||'','vi'));
  const active=sorted.filter(activeExamGroup),display=active.length?active:sorted,seed=display[0];
@@ -60,17 +62,15 @@ export default function ExamSessionDialog({members,queue,rooms,lecturers,units,c
        <td title={g.note?`Ghi chú: ${g.note}`:undefined}>{g.subjectName||'—'}</td><td>{g.candidateCount}</td><td>{examStatus(g)}</td>
        <td><div className="ep-session-row-actions">
         <div className="ep-session-view-actions">
-        <button className="sl-btn" aria-label={`Danh sách thí sinh ${g.subjectName} · ${g.name}`} aria-expanded={open} aria-controls={detailId} onClick={()=>setExpanded(ids=>open?ids.filter(id=>id!==g.id):[...ids,g.id])}>DS thí sinh</button>
-        <Link className="sl-btn" to={`/masters/exam-lists?offeringId=${g.courseOfferingId}&groupId=${g.classGroupId||g.groups?.[0]?.id||''}`}>Mở bảng điểm</Link>
+        <button className="sl-btn app-icon-action ep-icon-action" title="Danh sách thí sinh" aria-label={`Danh sách thí sinh ${g.subjectName} · ${g.name}`} aria-expanded={open} aria-controls={detailId} onClick={()=>setExpanded(ids=>open?ids.filter(id=>id!==g.id):[...ids,g.id])}><UsersIcon/></button>
+        <Link className="sl-btn app-icon-action ep-icon-action" title="Mở bảng điểm" aria-label="Mở bảng điểm" to={`/masters/exam-lists?offeringId=${g.courseOfferingId}&groupId=${g.classGroupId||g.groups?.[0]?.id||''}`}><TableCellsIcon/></Link>
         </div>
-        {canWrite&&editable(g)&&<button className="sl-btn sl-btn-danger" disabled={busy} aria-label={`Hủy lịch ${g.subjectName} · ${g.name}`} onClick={()=>rowAction('cancel',g)}>Hủy lịch</button>}
-        {canWrite&&g.pendingConfirmation&&<><button className="sl-btn sl-btn-primary" disabled={busy} onClick={()=>rowAction('held',g)}>Đã diễn ra</button><button className="sl-btn" disabled={busy} onClick={()=>rowAction('not_held',g)}>Không diễn ra</button></>}
+        {canWrite&&editable(g)&&<button className="sl-btn sl-btn-danger app-icon-action ep-icon-action ep-icon-action-danger" title="Hủy lịch thi" disabled={busy} aria-label={`Hủy lịch ${g.subjectName} · ${g.name}`} onClick={()=>rowAction('cancel',g)}><TrashIcon/></button>}
+        {canWrite&&g.pendingConfirmation&&<><button className="sl-btn app-icon-action ep-icon-action ep-icon-action-success" title="Xác nhận đã diễn ra" aria-label="Đã diễn ra" disabled={busy} onClick={()=>rowAction('held',g)}><CheckCircleIcon/></button><button className="sl-btn app-icon-action ep-icon-action ep-icon-action-warning" title="Xác nhận không diễn ra" aria-label="Không diễn ra" disabled={busy} onClick={()=>rowAction('not_held',g)}><XCircleIcon/></button></>}
        </div></td>
       </tr>{open&&<tr><td colSpan={7} className="ep-session-candidate-cell"><section id={detailId} aria-label={`Thí sinh ${g.subjectName} · ${g.name}`}>
        <h3>Danh sách thí sinh · {g.subjectName} ({g.candidateCount})</h3>
-       <table className="v20-table" aria-label={`Danh sách thí sinh ${g.subjectName}`}><thead><tr><th>STT</th><th>Mã học viên</th><th>Họ tên</th></tr></thead>
-        <tbody>{(g.candidates||[]).map((c,i)=><tr key={c.participantId}><td>{i+1}</td><td>{c.code||'—'}</td><td>{c.fullName||'—'}</td></tr>)}{!g.candidates?.length&&<tr><td colSpan={3}>Chưa có danh sách thí sinh.</td></tr>}</tbody>
-       </table>
+       <ExamCandidatesTable session={g} canWrite={canWrite} busy={busy} onAttendanceChange={onAttendanceChange}/>
       </section></td></tr>}</React.Fragment>;
      })}</tbody>
     </table></div>

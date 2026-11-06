@@ -35,14 +35,14 @@ it('includes academic titles in teaching and exam export rows',()=>{
  const teaching=scheduleExportRows([{id:'s',sessionDate:snapshot.week,period:'MORNING',lecturer,courseOffering:{id:'offering',subject:{name:'Triết học'}}}]);
  expect(teaching[0]).toContain('PGS.TS Nguyễn An');
  const exam=buildExamScheduleDocument({week:snapshot.week,end:snapshot.end,sessions:[{examDate:snapshot.week,startTime:'08:00',lecturerName:'Nguyễn An',lecturerAcademicRank:'Phó Giáo sư',lecturerAcademicDegree:'Tiến sĩ',secondLecturerName:'Trần Bình',secondLecturerAcademicDegree:'Thạc sĩ'}]});
- expect(exam.rows[0][4]).toBe('PGS.TS Nguyễn An; ThS Trần Bình');
+ expect(exam.rows[0][4]).toBe('PGS.TS Nguyễn An\nThS Trần Bình');
 });
 
 it("exports exam data with the exam heading in PDF, Word and Excel using the shared layout", async () => {
   global.TextEncoder = TextEncoder;
   const exam = buildExamScheduleDocument({ week: snapshot.week, end: snapshot.end, sessions: [{
     examDate: snapshot.week, startTime: "08:00:00", endTime: "10:00:00",
-    groups: [{ code: "CNTT-2026" }], subjectName: "Cơ sở dữ liệu", lecturerName: "Nguyễn An", roomCode: "A101",
+    groups: [{ code: "CNTT-2026" }], subjectName: "Cơ sở dữ liệu", lecturerName: "Nguyễn An", secondExternalInvigilatorName: "Trần Bình", roomCode: "A101",
   }, {
     examDate: snapshot.week, startTime: "07:00", endTime: "08:00", status: "cancelled",
     subjectName: "Môn đã hủy", roomCode: "CANCELLED_ROOM",
@@ -54,6 +54,11 @@ it("exports exam data with the exam heading in PDF, Word and Excel using the sha
   expect(screen.getByRole("table")).toHaveClass("document-report-table");
   expect(screen.getByRole("heading", { name: "LỊCH THI KẾT THÚC HỌC PHẦN" })).toBeInTheDocument();
   expect(screen.getByText("08h00 sáng T2")).toBeInTheDocument();
+  expect(screen.getByRole('columnheader',{name:'Cán bộ coi thi'})).toBeInTheDocument();
+  expect(screen.getAllByRole('columnheader').map(cell=>cell.textContent)).toEqual(['STT','Lớp','Học phần','Thời gian','Phòng học','Cán bộ coi thi','Ghi chú']);
+  expect(screen.queryByRole('columnheader',{name:'Giảng viên'})).not.toBeInTheDocument();
+  const invigilatorCell=screen.getByText('Nguyễn An').closest('td');
+  expect([...invigilatorCell.children].map(line=>line.textContent)).toEqual(['Nguyễn An','Trần Bình']);
   expect(screen.queryByText("Môn đã hủy")).not.toBeInTheDocument();
   expect(buildExamScheduleDocument({ week: snapshot.week, end: snapshot.end, sessions: [{
     examDate: "2026-10-11", startTime: "14:00", endTime: "15:15",
@@ -63,13 +68,20 @@ it("exports exam data with the exam heading in PDF, Word and Excel using the sha
   const book = new ExcelJS.Workbook();
   await book.xlsx.load(await bufferOf(await createScheduleExcel(exam)));
   expect(book.getWorksheet("Lịch thi").getRow(1).values.join(" ")).toContain("LỊCH THI KẾT THÚC HỌC PHẦN");
-  expect(book.getWorksheet("Lịch thi").getCell("E5").value).toBe("08h00 sáng T2");
+  expect(book.getWorksheet("Lịch thi").getCell("D5").value).toBe("08h00 sáng T2");
+  expect(book.getWorksheet('Lịch thi').getCell('F4').value).toBe('Cán bộ coi thi');
+  expect(book.getWorksheet('Lịch thi').getCell('F5').value).toBe('Nguyễn An\nTrần Bình');
+  expect(book.getWorksheet('Lịch thi').getCell('F5').alignment.wrapText).toBe(true);
   expect(JSON.stringify(book.getWorksheet("Lịch thi").getSheetValues())).not.toContain("CANCELLED_ROOM");
   const zip = await JSZip.loadAsync(await bufferOf(await createScheduleWord(exam)));
   const xml = await zip.file("word/document.xml").async("string");
   expect(xml).toContain("LỊCH THI KẾT THÚC HỌC PHẦN");
   expect(xml).toContain("A101");
   expect(xml).toContain("08h00 sáng T2");
+  expect(xml).toContain('Cán bộ coi thi');
+  const invigilatorXml=xml.match(/<w:tc\b[^>]*>(?:(?!<\/w:tc>)[\s\S])*Nguyễn An(?:(?!<\/w:tc>)[\s\S])*<\/w:tc>/)?.[0];
+  expect(invigilatorXml).toContain('Trần Bình');
+  expect(invigilatorXml).toMatch(/Nguyễn An[\s\S]*<\/w:p>[\s\S]*<w:p[\s\S]*Trần Bình/);
   expect(xml).not.toContain("CANCELLED_ROOM");
 });
 let tab;

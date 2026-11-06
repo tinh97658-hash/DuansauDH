@@ -155,8 +155,9 @@ export default function GradeSettingsDialog({ initialMajorId = "", initialYear =
     confirmDisabled={!dirtyCount || sharedLocked || (Object.keys(drafts).length > 0 && locked)} saving={saving}
     closeButtonAriaLabel="Đóng cài đặt điểm số"
     aria-label="Cài đặt điểm số" PaperProps={{ sx: {
-      width: { xs: "calc(100% - 32px)", sm: "calc(100% - 64px)" },
-      height: { xs: "calc(100dvh - 32px)", sm: "calc(100dvh - 64px)" },
+      width: "100%",
+      maxWidth: 1280,
+      height: "min(720px, calc(100dvh - 48px))",
       maxHeight: { xs: "calc(100dvh - 32px)", sm: "calc(100dvh - 64px)" },
       m: { xs: 2, sm: 4 },
     } }}

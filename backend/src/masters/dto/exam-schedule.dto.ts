@@ -34,6 +34,13 @@ export class ConfirmExamDto {
   @IsIn(['held','not_held']) status!:'held'|'not_held';
 }
 
+export class ExamCandidateAttendanceDto {
+  @IsInt() @Min(0) version!:number;
+  @IsString() @Matches(/^(?:student|admission):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+  participantId!:string;
+  @IsIn(['present','absent_excused','absent_unexcused']) status!:'present'|'absent_excused'|'absent_unexcused';
+}
+
 export class ExamArrangementGroupDto {
   @IsOptional() @IsUUID() id?:string;
   @IsOptional() @IsInt() @Min(0) version?:number;

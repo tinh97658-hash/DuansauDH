@@ -10,6 +10,7 @@ import { getBusinessTodayKey } from "../../utils/schedulingCalendar";
 import OfferingDetails from "./OfferingDetails";
 import OfferingDeleteButton from "./OfferingDeleteButton";
 import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
+import { useAppearanceSettings } from "../../context/AppearanceSettings";
 
 const vietnameseNameCollator = new Intl.Collator("vi", { sensitivity: "base", numeric: true });
 const COHORT_WINDOW_SIZE = 4;
@@ -426,6 +427,7 @@ function CrossCohortBadge({ cohorts }) {
 
 // Sub-component: Pivot Matrix View (Subjects x Cohorts)
 function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, canDelete, onChanged, onSelectOffering, onViewDetails }) {
+  const textScale = (useAppearanceSettings()?.fontSize || 100) / 100;
   // Page through real cohorts only; missing years must not become empty columns.
   // Reset only when the source cohorts or explicit year selection change.
   const [windowStart, setWindowStart] = useState(0);
@@ -468,7 +470,12 @@ function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, canDelete,
         </div>
       )}
       <div className="sl-matrix-pivot-wrap">
-        <table className={`sl-matrix-pivot-table ${selectedYear ? "sl-matrix-pivot-table-selected-year" : ""}`} aria-label="Ma trận học phần theo khóa" style={{ minWidth: `${pivotMinWidth}px` }}>
+        <table className={`sl-matrix-pivot-table ${selectedYear ? "sl-matrix-pivot-table-selected-year" : ""}`} aria-label="Ma trận học phần theo khóa" style={{
+          minWidth: `${pivotMinWidth * textScale}px`,
+          "--sl-pivot-subject-width": `${240 * textScale}px`,
+          "--sl-pivot-credits-width": `${48 * textScale}px`,
+          "--sl-pivot-print-width": `${pivotMinWidth}px`,
+        }}>
           <colgroup>
             <col className="sl-pivot-subj-track" />
             <col className="sl-pivot-credits-track" />

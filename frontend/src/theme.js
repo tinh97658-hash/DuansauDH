@@ -433,7 +433,7 @@ export const theme = createTheme({
       },
     },
     MuiDialog: {
-      defaultProps: { fullScreen: true },
+      defaultProps: { fullScreen: false },
       styleOverrides: {
         paper: {
           borderRadius: 0,

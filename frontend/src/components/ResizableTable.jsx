@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Box, Table, TableCell, TableHead, TableRow } from "@mui/material";
+import { useAppearanceSettings } from "../context/AppearanceSettings";
 
 export default function ResizableTable({ columns, storageKey, children, freezeThrough, className, "aria-label": ariaLabel, sx = {} }) {
+  const textScale = (useAppearanceSettings()?.fontSize || 100) / 100;
   const [widths, setWidths] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) || "{}");
@@ -13,16 +15,17 @@ export default function ResizableTable({ columns, storageKey, children, freezeTh
   const tableRef = useRef(null);
   const [availableWidth, setAvailableWidth] = useState(0);
   const [preview, setPreview] = useState(null);
-  const baseWidthOf = (column) => Math.max(column.minWidth || 60, Math.min(1000,
+  const baseWidthOf = (column) => textScale * Math.max(column.minWidth || 60, Math.min(1000,
     Number.isFinite(widths[column.key]) ? widths[column.key] : column.width || column.minWidth || 120));
   const baseWidth = columns.reduce((sum, column) => sum + baseWidthOf(column), 0);
   const stretchableColumns = columns.filter(column => column.stretch !== false);
   const flexibleColumns = stretchableColumns.filter(column => !Number.isFinite(widths[column.key]));
   const stretchKeys = new Set((flexibleColumns.length ? flexibleColumns : stretchableColumns).map(column => column.key));
   const extraWidth = Math.max(0, availableWidth - baseWidth) / (stretchKeys.size || 1);
+  const printExtraWidth = Math.max(0, availableWidth - baseWidth / textScale) / (stretchKeys.size || 1);
   const widthOf = column => baseWidthOf(column) + (stretchKeys.has(column.key) ? extraWidth : 0);
   const setWidth = (column, width) => setWidths((previous) => ({
-    ...previous, [column.key]: Math.max(column.minWidth || 60, Math.min(1000, width)),
+    ...previous, [column.key]: Math.max(column.minWidth || 60, Math.min(1000, width / textScale)),
   }));
   const frozenIndex = columns.findIndex((column) => column.key === freezeThrough);
   const frozenStyles = {};
@@ -82,7 +85,7 @@ export default function ResizableTable({ columns, storageKey, children, freezeTh
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  return <Box ref={wrapperRef} sx={{ position: "relative", width: "100%", minWidth: baseWidth }}><Table ref={tableRef} size="small" stickyHeader className={className} aria-label={ariaLabel} sx={{
+  return <Box ref={wrapperRef} sx={{ position: "relative", width: "100%", minWidth: baseWidth, "@media print": { minWidth: baseWidth / textScale } }}><Table ref={tableRef} size="small" stickyHeader className={className} aria-label={ariaLabel} sx={{
     tableLayout: "fixed", width: columns.reduce((sum, column) => sum + widthOf(column), 0),
     // Collapsed borders leave seams when cells stick at different scroll offsets.
     ...(frozenIndex >= 0 ? { borderCollapse: "separate", borderSpacing: 0 } : {}),
@@ -90,16 +93,23 @@ export default function ResizableTable({ columns, storageKey, children, freezeTh
     "& td .MuiTypography-root": { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
     ...frozenStyles,
     ...sx,
-    "@media print": { "& th, & td": { position: "static", left: "auto", boxShadow: "none" } },
+    "@media print": {
+      width: Math.max(availableWidth, baseWidth / textScale),
+      "& col": { width: "var(--app-column-print-width) !important" },
+      "& th, & td": { position: "static", left: "auto", boxShadow: "none" },
+    },
   }}>
-    <colgroup>{columns.map((column) => <col key={column.key} className={column.className} style={{ width: widthOf(column) }} />)}</colgroup>
+    <colgroup>{columns.map((column) => <col key={column.key} className={column.className} style={{
+      width: widthOf(column),
+      "--app-column-print-width": `${baseWidthOf(column) / textScale + (stretchKeys.has(column.key) ? printExtraWidth : 0)}px`,
+    }} />)}</colgroup>
     <TableHead><TableRow>
       {columns.map((column, index) => <TableCell key={column.key} align={column.align || "left"} padding={column.padding || "normal"}>
         {column.header ?? column.label}
         <Box
           role="slider" aria-orientation="horizontal" tabIndex={0}
           aria-label={`Độ rộng cột ${column.label}`}
-          aria-valuemin={column.minWidth || 60} aria-valuemax={1000} aria-valuenow={widthOf(column)}
+          aria-valuemin={(column.minWidth || 60) * textScale} aria-valuemax={1000 * textScale} aria-valuenow={widthOf(column)}
           title="Kéo mép cột để đổi độ rộng; nháy đúp để vừa nội dung"
           onPointerDown={(event) => {
             if (event.button !== 0) return;
@@ -111,7 +121,7 @@ export default function ResizableTable({ columns, storageKey, children, freezeTh
           }}
           onPointerMove={(event) => {
             if (drag.current?.key === column.key) {
-              const pending = Math.max(column.minWidth || 60, Math.min(1000, drag.current.width + event.clientX - drag.current.x));
+              const pending = Math.max((column.minWidth || 60) * textScale, Math.min(1000 * textScale, drag.current.width + event.clientX - drag.current.x));
               drag.current.pending = pending;
               setPreview({ left: drag.current.left + pending, width: pending });
             }

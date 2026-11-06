@@ -43,8 +43,8 @@ export default function ExamSchedule(){
  const requestState=useRef({inFlight:false,at:0});
  useEffect(()=>{if(!canView)return;
   return listenForBackgroundRefresh(()=>setRevision(n=>n+1),{interval:60000,minInterval:60000,
-   canRefresh:()=>!requestState.current.inFlight&&Date.now()-requestState.current.at>=60000});
- },[canView]);
+   canRefresh:()=>!saving&&!requestState.current.inFlight&&Date.now()-requestState.current.at>=60000});
+ },[canView,saving]);
  useEffect(()=>{if(!canView){setLoading(false);return;}let active=true;setLoading(true);setError('');setLoadError('');
   const controller=new AbortController();requestState.current={inFlight:true,at:Date.now()};
   axios.get(`${API_BASE_URL}/masters/exam-schedule`,{params:{from:week,to:last},withCredentials:true,signal:controller.signal}).then(({data:next})=>{if(active){setData(next);setHasLoaded(true);}}).catch(e=>{if(active){const message=errorText(e);setError(message);setLoadError(message);}}).finally(()=>{if(active){requestState.current.inFlight=false;setLoading(false);}});return()=>{active=false;controller.abort();};
@@ -89,6 +89,18 @@ export default function ExamSchedule(){
   setEditor(null);if(!keepDetail)setDetail(null);clearSelection();setRevision(n=>n+1);notifyGradebookSaved();return true;
  }catch(e){notify.error(errorText(e));refresh?.();return false;}finally{setSaving(false);}};
  const detailMembers=detail?data.sessions.filter(s=>detail.arrangementId?s.arrangementId===detail.arrangementId:s.id===detail.id):[];
+ const saveAttendance=async(session,participantId,status)=>{
+  if(!canWrite||saving||loading)return;
+  setSaving(true);setError('');
+  try{
+   const {data:updated}=await axios.put(`${API_BASE_URL}/masters/exam-sessions/${session.id}/attendance`,{version:session.version,participantId,status},{withCredentials:true});
+   setData(current=>({...current,sessions:current.sessions.map(row=>({...row,
+    ...(row.arrangementId===updated.arrangementId?{arrangementVersion:updated.arrangementVersion}:{}),
+    ...(row.id===session.id?{version:updated.version,candidates:(row.candidates||[]).map(candidate=>candidate.participantId===participantId?{...candidate,attendanceStatus:updated.status}:candidate)}:{})
+   }))}));
+  }catch(failure){const message=errorText(failure);setError(message);notify.error(message);if(failure.response?.status===409)setRevision(n=>n+1);}
+  finally{setSaving(false);}
+ };
  if(!canView)return <FeatureLayout title="Xếp lịch thi"><div role="alert">Bạn không có quyền xem lịch thi.</div></FeatureLayout>;
  return <FeatureLayout title="Xếp lịch thi" maxWidth={1920} hideHeader workspaceMode contentPadding={0}><div className="scheduling-v20 v20-workspace v20-schedule-workspace">
   <section className={`sl-workspace sl-schedule-view exam-planner${sidebarCollapsed?' sl-sidebar-collapsed':''}`} aria-label="Không gian xếp lịch thi">
@@ -135,9 +147,9 @@ export default function ExamSchedule(){
     </div>
    </section>
   </section>
-  {editor&&(editor.mode==='arrangement'?<ExamArrangementEditor initial={editor.initial} members={editor.members} queue={data.queue} rooms={data.rooms} lecturers={data.lecturers} units={data.units} canWrite={canWrite} saving={saving} error={error} onClose={close(setEditor)} onSave={saveArrangement}/>:<ExamEditor session={editor.session} offering={editor.offering} slot={editor.slot} rooms={data.rooms} lecturers={data.lecturers} units={data.units} canWrite={canWrite} saving={saving} error={error} onClose={close(setEditor)} onSave={(form,refresh)=>mutate('save',editor.session,'',form,refresh)} onCompose={form=>compose(editor.session,{...form,offering:editor.offering})}/>)}
+  {editor&&(editor.mode==='arrangement'?<ExamArrangementEditor initial={editor.initial} members={editor.members} queue={data.queue} rooms={data.rooms} lecturers={data.lecturers} units={data.units} canWrite={canWrite} saving={saving} error={error} onClose={close(setEditor)} onSave={saveArrangement}/>:<ExamEditor session={editor.session} offering={editor.offering} slot={editor.slot} rooms={data.rooms} lecturers={data.lecturers} units={data.units} canWrite={canWrite} saving={saving} error={error} onClose={close(setEditor)} onSave={(form,refresh)=>mutate('save',editor.session,'',form,refresh)}/>)}
   {detail&&<ExamSessionDialog key={detail.arrangementId||detail.id} members={detailMembers} queue={data.queue} rooms={data.rooms} lecturers={data.lecturers} units={data.units}
-   canWrite={canWrite} saving={saving} refreshing={loading} error={error} onClose={close(setDetail)} onClearError={()=>setError('')}
+   canWrite={canWrite} saving={saving} refreshing={loading} error={error} onClose={close(setDetail)} onClearError={()=>setError('')} onAttendanceChange={saveAttendance}
    onSaveArrangement={(form,id,retry)=>saveArrangement(form,id,retry,true)}
    onSaveSession={(session,form,retry)=>mutate('save',session,'',form,retry,true)}
    onAction={(action,session,note)=>mutate(action,session,note,undefined,undefined,true)}/>}

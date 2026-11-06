@@ -91,7 +91,7 @@ function createAppIcon(Icon, name) {
       title={titleAccess} role={titleAccess ? "img" : undefined}
       aria-label={titleAccess} aria-hidden={titleAccess ? false : true}
       data-heroicon={name} {...props}
-      sx={[{ fill: "none", verticalAlign: "middle" }, ...(Array.isArray(sx) ? sx : [sx])]} />;
+      sx={[{ fill: "none", verticalAlign: "middle", flexShrink: 0 }, ...(Array.isArray(sx) ? sx : [sx])]} />;
   });
   AppIcon.displayName = name;
   return AppIcon;

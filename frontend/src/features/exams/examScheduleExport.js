@@ -21,7 +21,7 @@ export function buildExamScheduleDocument({ week, end, sessions = [] }) {
     names((session.groups || []).map(group => group.majorName)),
     names((session.groups || []).map(group => group.code || group.name)) || session.name || "",
     session.subjectName || "",
-    [examInvigilatorName(session),examInvigilatorName(session,true)].filter(Boolean).join("; ") || "Chưa phân công",
+    [examInvigilatorName(session) || "Chưa phân công",examInvigilatorName(session,true) || "Chưa phân công"].join("\n"),
     examTimeSummary(session),
     session.roomCode || "Chưa có phòng",
     session.note || "",

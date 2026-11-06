@@ -18,6 +18,24 @@ const date='2026-10-19',offering={id:'offering',name:'Lớp QT 2026',subjectId:'
 const room={id:'room',name:'Phòng giảng đường',code:'301',capacity:2,isActive:true};let data;
 const renderPage=(permissions=['exams.view','exams.write'])=>renderWithPermissions(<MemoryRouter useTransitions={false}><ExamSchedule/></MemoryRouter>,permissions);
 
+it('saves candidate absences immediately, keeps the detail open and uses the latest session version',async()=>{
+ const participantId='admission:11111111-1111-4111-8111-111111111111';
+ data.sessions=[session({status:'held',canEdit:false,canRecordAttendance:true,arrangementId:'arrangement',arrangementVersion:5,
+  candidates:[{participantId,code:'HV001',fullName:'Nguyễn Văn An'}],candidateIds:[participantId],candidateCount:1})];
+ axios.put.mockImplementation(async(_url,payload)=>({data:{id:'session',participantId,status:payload.status,version:payload.version+1,arrangementId:'arrangement',arrangementVersion:payload.version+3}}));
+ renderPage();await waitFor(()=>expect(document.querySelector('.ep-event')).not.toBeNull());
+ fireEvent.click(document.querySelector('.ep-event'));
+ const dialog=await screen.findByRole('dialog');fireEvent.click(within(dialog).getByRole('button',{name:/Danh sách thí sinh/}));
+ const cp=within(dialog).getByRole('checkbox',{name:/Vắng CP/}),kp=within(dialog).getByRole('checkbox',{name:/Vắng KP/});
+ fireEvent.click(cp);await waitFor(()=>expect(cp).toBeChecked());expect(kp).not.toBeChecked();
+ expect(axios.put).toHaveBeenLastCalledWith(expect.stringContaining('/masters/exam-sessions/session/attendance'),{version:3,participantId,status:'absent_excused'},{withCredentials:true});
+ fireEvent.click(kp);await waitFor(()=>expect(kp).toBeChecked());expect(cp).not.toBeChecked();
+ expect(axios.put).toHaveBeenLastCalledWith(expect.any(String),{version:4,participantId,status:'absent_unexcused'},expect.any(Object));
+ fireEvent.click(kp);await waitFor(()=>expect(kp).not.toBeChecked());expect(cp).not.toBeChecked();
+ expect(axios.put).toHaveBeenLastCalledWith(expect.any(String),{version:5,participantId,status:'present'},expect.any(Object));
+ expect(screen.getByRole('dialog')).toBe(dialog);
+});
+
 it('coalesces stale focus events and aborts requests when changing weeks',async()=>{
  renderPage();await screen.findByRole('button',{name:/Lớp QT 2026 2 TS/});
  const initialSignal=axios.get.mock.calls.find(([url])=>url.endsWith('/masters/exam-schedule'))[1].signal;

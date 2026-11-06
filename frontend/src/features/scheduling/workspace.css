@@ -11,7 +11,7 @@
 .scheduling-v20 .sl-scope>.sl-filter>.sl-select{min-width:0}
 .scheduling-v20 input,.scheduling-v20 select,.scheduling-v20 textarea,.scheduling-v20 button{font:inherit}.scheduling-v20 button:disabled{cursor:not-allowed;opacity:.55}.scheduling-v20 button:focus-visible,.scheduling-v20 a:focus-visible{outline:2px solid #075a9c;outline-offset:2px}
 .scheduling-v20 .sl-create-v18-shell{border:0}.scheduling-v20 .sl-create-v18-row{width:100%}.v20-error{padding:10px 12px;background:#fff0f0;border-left:3px solid #b4232b;color:#842027;white-space:pre-line}.v20-hint{padding:8px;color:#627480;font-size:11.5px}.v20-flex{display:flex;align-items:center;gap:8px}.v20-stack{display:grid;gap:10px}.v20-field{display:grid;gap:5px;margin-bottom:12px}.v20-field input,.v20-field select,.v20-field textarea{width:100%;padding:8px;border:1px solid #b5c2cc;background:white;min-height:33px}.v20-scope-step{margin:12px 0 6px;font-weight:700;color:#536b79}.v20-scope-step b{display:inline-grid;place-items:center;width:23px;height:23px;background:#e7f2f8;color:#075a9c;margin-right:7px}.v20-empty-guide{height:100%;display:grid;place-items:center;padding:40px;text-align:center;background:#eef2f5}.v20-empty-guide h2{color:#24465d;font-size:20px}.v20-empty-guide p{color:#637682;line-height:1.6}.v20-empty-guide .sl-guide-icon{width:52px;height:52px;margin:auto;display:grid;place-items:center;border:1px solid #a8bdcb;border-radius:50%;background:#fff;color:var(--icon-blue);font-size:24px}
-.scheduling-v20.v20-dialog{height:auto;margin:20px;width:640px;max-width:calc(100vw - 40px);max-height:calc(100dvh - 40px);overflow:hidden;display:flex;flex-direction:column;border-radius:0;background:#fff}.scheduling-v20.v20-wide{width:1180px}.scheduling-v20.v20-drawer{position:fixed;right:0;top:0;bottom:0;margin:0;max-height:100dvh;width:640px;max-width:100vw}.v20-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid #c7d1d9}.v20-dialog-head h2{font-size:17px;color:#173f58;margin:0}.v20-dialog-body{padding:18px;overflow:auto;min-height:0;flex:1}.v20-dialog-foot{padding:12px 18px;display:flex;justify-content:flex-end;gap:8px;border-top:1px solid #c7d1d9;background:#f8fafb}.v20-table{border-collapse:collapse;width:100%;font-size:12px}.v20-table td,.v20-table th{border-bottom:1px solid #d5dfe6;padding:8px;text-align:left}.v20-table th{background:#eaf1f7;color:#123e60;position:sticky;top:0}.v20-table textarea{width:100%;min-width:170px;min-height:34px;border:1px solid #c7d1d9;padding:6px;resize:vertical}.v20-composer{display:grid;grid-template-columns:40% minmax(0,1fr);gap:24px}.v20-room-floor{margin-bottom:16px}.v20-room-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.v20-room{min-height:68px;border:1px solid #becbd4;background:white;color:#21724c;padding:8px;text-align:left}.v20-room span,.v20-room small{display:block;margin-top:4px}.v20-room.sl-on{background:#eaf5fb;border:2px solid #1f78b2}.v20-room.v20-busy{background:#fff6dd;color:#815a08}.v20-room.v20-unavailable{background:#eef1f3;color:#66727a}.v20-slot-items{height:100%;overflow:auto}.v20-add-slot{display:block;width:100%;padding:9px;border:1px dashed #8cb6d2;background:#eff8fd;color:#075a9c}.scheduling-v20 .sl-card{cursor:pointer}.scheduling-v20 .sl-calendar{--day-count:7}.v20-selected-chip{border:1px solid #a4c6dc;background:#eaf4fa;padding:4px 7px}.v20-days{display:flex;flex-wrap:wrap;gap:8px}.v20-days label{display:flex;align-items:center;gap:3px}.scheduling-v20 .sl-create-v18-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.scheduling-v20 .sl-create-v18-stat strong{overflow-wrap:anywhere}.v20-text-link{color:#075a9c}
+.scheduling-v20.v20-dialog{height:auto;margin:20px;width:560px;max-width:calc(100vw - 40px);max-height:calc(100dvh - 40px);overflow:hidden;display:flex;flex-direction:column;border-radius:0;background:#fff}.scheduling-v20.v20-dialog.v20-wide{width:1120px}.scheduling-v20.v20-drawer{position:fixed;right:0;top:0;bottom:0;margin:0;max-height:100dvh;width:640px;max-width:100vw}.v20-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid #c7d1d9}.v20-dialog-head h2{font-size:17px;color:#173f58;margin:0}.v20-dialog-body{padding:18px;overflow:auto;min-height:0;flex:1}.v20-dialog-foot{padding:12px 18px;display:flex;justify-content:flex-end;gap:8px;border-top:1px solid #c7d1d9;background:#f8fafb}.v20-table{border-collapse:collapse;width:100%;font-size:12px}.v20-table td,.v20-table th{border-bottom:1px solid #d5dfe6;padding:8px;text-align:left}.v20-table th{background:#eaf1f7;color:#123e60;position:sticky;top:0}.v20-table textarea{width:100%;min-width:170px;min-height:34px;border:1px solid #c7d1d9;padding:6px;resize:vertical}.v20-composer{display:grid;grid-template-columns:40% minmax(0,1fr);gap:24px}.v20-room-floor{margin-bottom:16px}.v20-room-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.v20-room{min-height:68px;border:1px solid #becbd4;background:white;color:#21724c;padding:8px;text-align:left}.v20-room span,.v20-room small{display:block;margin-top:4px}.v20-room.sl-on{background:#eaf5fb;border:2px solid #1f78b2}.v20-room.v20-busy{background:#fff6dd;color:#815a08}.v20-room.v20-unavailable{background:#eef1f3;color:#66727a}.v20-slot-items{height:100%;overflow:auto}.v20-add-slot{display:block;width:100%;padding:9px;border:1px dashed #8cb6d2;background:#eff8fd;color:#075a9c}.scheduling-v20 .sl-card{cursor:pointer}.scheduling-v20 .sl-calendar{--day-count:7}.v20-selected-chip{border:1px solid #a4c6dc;background:#eaf4fa;padding:4px 7px}.v20-days{display:flex;flex-wrap:wrap;gap:8px}.v20-days label{display:flex;align-items:center;gap:3px}.scheduling-v20 .sl-create-v18-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.scheduling-v20 .sl-create-v18-stat strong{overflow-wrap:anywhere}.v20-text-link{color:#075a9c}
 @media(max-width:1199px){.scheduling-v20 .sl-workspace{min-width:1040px;min-height:650px}.v20-composer{grid-template-columns:1fr}.v20-room-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 
 /* Figma v2 · create offering flow. The shared application navigation is intentionally untouched. */
@@ -19,7 +19,7 @@
 .sl-create-figma{--sl-scope-inline:18px;--sl-scope-control-height:36px;--sl-create-top-row-height:164px;grid-template-columns:560px minmax(0,1fr);gap:0;padding:0;background:#fff;border:1px solid #d7e1e9;border-radius:4px;overflow:hidden;color:#172b3a}
 .sl-create-figma .sl-left{border:0;border-right:1px solid #d7e1e9;background:#f8fafc;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .sl-create-figma .sl-scope{padding:8px var(--sl-scope-inline) 7px;border:0;background:#f8fafc;flex:none}
-.sl-workspace.sl-create-mode.sl-create-figma .sl-scope{height:var(--sl-create-top-row-height);box-sizing:border-box}
+.sl-workspace.sl-create-mode.sl-create-figma .sl-scope{height:auto;min-height:var(--sl-create-top-row-height);box-sizing:border-box}
 .sl-create-figma .sl-scope>.sl-eyebrow{margin-bottom:3px;color:#607486;font-size:12.5px;font-weight:700}
 .sl-create-scope-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;row-gap:5px}
 .sl-create-scope-field{min-width:0}
@@ -36,7 +36,7 @@
 .sl-create-figma .sl-create-year.Mui-focused{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
 .sl-create-figma .sl-combo>button{top:1px;height:34px;width:38px;border-radius:0 7px 7px 0;color:transparent;font-size:0;background-color:#fff;background-image:var(--app-chevron);background-repeat:no-repeat;background-position:center;background-size:12px 8px}
 .sl-create-figma .sl-combo input:focus,.sl-create-figma .sl-create-year:focus{outline:0;border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
-.sl-create-figma .sl-combo-list{top:38px;right:auto;left:0;width:max-content;min-width:100%;max-width:420px;max-height:260px;border:1px solid #b9cad8;border-radius:7px;box-shadow:0 12px 28px rgba(23,62,117,.18);overflow-x:hidden}
+.sl-create-figma .sl-combo-list{top:calc(100% + 4px);right:auto;left:0;width:max-content;min-width:100%;max-width:420px;max-height:260px;border:1px solid #b9cad8;border-radius:7px;box-shadow:0 12px 28px rgba(23,62,117,.18);overflow-x:hidden}
 .sl-create-figma .sl-combo-list button{min-height:42px;gap:18px;padding:10px 13px;align-items:center;color:#173e75;font-size:14.5px;line-height:1.35}
 .sl-create-figma .sl-combo-list small{flex:none;min-width:52px;text-align:right;color:#607486;font-size:12.5px}
 .sl-workspace.sl-create-mode.sl-create-figma .sl-worklist{padding:6px var(--sl-scope-inline) 12px;border-top:1px solid #d7e1e9;background:#f8fafc;overflow:hidden;flex:1;min-height:0;display:flex;flex-direction:column}
@@ -101,7 +101,7 @@
 .v20-workspace>.sl-create-flow-page{flex:1;min-height:0}
 .sl-create-flow-page{height:100%;min-height:600px;background:#f2f6f9;color:#172b3a}
 .sl-create-confirm-page{padding:0;background:#f3f6f9}
-.sl-create-confirm-card{height:100%;min-width:1000px;display:grid;grid-template-rows:minmax(0,1fr) 56px;background:#f3f6f9;overflow:hidden}
+.sl-create-confirm-card{height:100%;min-width:1000px;display:grid;grid-template-rows:minmax(0,1fr) auto;background:#f3f6f9;overflow:hidden}
 .sl-create-confirm-content{min-height:0;display:grid;grid-template-columns:minmax(360px,32%) minmax(0,1fr);gap:14px;padding:14px 20px}
 .sl-create-confirm-course,.sl-create-confirm-roster{min-width:0;min-height:0;border:1px solid #d7e1e9;border-radius:12px;background:#fff}
 .sl-create-confirm-course{position:relative;display:flex;flex-direction:column;padding:22px 24px;overflow-y:auto;scrollbar-width:none}
@@ -175,7 +175,7 @@
 .sl-schedule-view.sl-sidebar-collapsed>.sl-left{width:0;min-width:0;max-width:0;overflow:visible;border:0;background:transparent}
 .sl-schedule-view.sl-sidebar-collapsed .sl-sidebar-content{display:none}
 .sl-schedule-view.sl-sidebar-collapsed .sl-sidebar-toggle{top:50%;right:-31px;transform:translateY(-50%);border:1px solid #bfcedb;border-left:0;border-radius:0 5px 5px 0}
-.sl-schedule-view .sl-scope{height:calc(var(--sl-schedule-head-height) + var(--sl-schedule-day-head-height) + 1px);padding:4px var(--sl-scope-inline) 0;border-bottom:1px solid #d7e1e9;background:#f8fafc}
+.sl-schedule-view .sl-scope{height:auto;min-height:calc(var(--sl-schedule-head-height) + var(--sl-schedule-day-head-height) + 1px);padding:4px var(--sl-scope-inline) 0;border-bottom:1px solid #d7e1e9;background:#f8fafc}
 .sl-schedule-view .sl-eyebrow{margin-bottom:2px;color:#607486;font-size:11.5px;font-weight:700;letter-spacing:.02em}
 .sl-schedule-scope-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 112px;gap:10px}
 .sl-schedule-scope-field{min-width:0}
@@ -233,7 +233,6 @@
 .sl-schedule-view .sl-week button{flex:none;width:25px;height:28px;border:0;background:transparent;color:#607486;font-size:18px}
 .sl-schedule-view .sl-week strong{min-width:0;white-space:nowrap;color:#173e75;font-size:12px}
 .sl-schedule-view .sl-actions{justify-self:end;gap:8px;flex-wrap:nowrap;min-width:max-content}
-.sl-schedule-view .sl-export-trigger{height:38px;min-height:38px}
 .sl-print-only{display:none}
 @media print{
   @page{size:A4 landscape;margin:8mm}
@@ -251,6 +250,12 @@
 .sl-schedule-view .sl-pending:focus:not(:focus-visible){outline:0;box-shadow:none}
 .sl-schedule-view .sl-pending:focus-visible{outline:2px solid #0b7f9c;outline-offset:2px}
 .sl-schedule-view .sl-today{min-width:77px;border-color:#bfcedb;color:#172b3a}
+/* Teaching and exam toolbars share control geometry at every text scale. */
+.sl-schedule-view .sl-schedule-head{height:auto}
+.sl-schedule-view .sl-actions :is(.sl-btn,.sl-pending){display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;height:auto;min-height:calc(1.5em + 12px);padding:5px 12px;font-size:12.5px;line-height:1.5;white-space:normal}
+.sl-schedule-view .sl-actions .document-export-trigger>span{font-size:inherit;line-height:inherit}
+.sl-schedule-view .sl-actions .report-export-download{width:1.2em!important;height:1.2em!important}
+.sl-schedule-view .sl-actions .report-export-chevron{width:1em!important;height:1em!important}
 .sl-schedule-view .sl-selected-strip{height:38px;min-height:38px;display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:3px 8px 3px 12px;border-bottom:1px solid #c7dce8;background:#eef7fb}
 .sl-schedule-view .sl-selected-tag{padding-right:10px;border-right:1px solid #c1d9e5;color:#176f94;font-size:10.5px;font-weight:800;white-space:nowrap}
 .sl-schedule-view .sl-selected-offering{min-width:0;overflow:hidden;color:#173e75;font-size:12.5px;font-weight:700;text-overflow:ellipsis;white-space:nowrap}
@@ -500,12 +505,14 @@
 .sl-offering-drawer .v20-dialog-foot{min-height:58px;display:flex;flex-wrap:wrap;gap:8px;padding:10px 20px;border-top:1px solid #d9e4ec;background:#fff}
 .sl-offering-drawer .v20-dialog-foot .sl-btn{min-width:128px;height:36px;min-height:36px;border-radius:8px;font-size:12.5px}
 .sl-offering-drawer .v20-dialog-foot .sl-btn-primary{min-width:218px;border-color:#0b7f9c;background:#0b7f9c;color:#fff}
-/* Restore only the vt5 pending-dialog presentation for Teaching and Exams. */
-.scheduling-v20.v20-dialog.sl-pending-drawer{width:min(1400px,calc(100vw - 48px));max-width:calc(100vw - 48px);height:calc(100dvh - 40px);max-height:calc(100dvh - 40px);margin:20px;font-size:16.5px}
+/* Pending lists fit their rows and scroll only when the viewport requires it. */
+.scheduling-v20.v20-dialog.sl-pending-drawer{width:min(1120px,calc(100vw - 48px));max-width:calc(100vw - 48px);height:auto;max-height:min(760px,calc(100dvh - 48px));margin:20px;font-size:15px}
 .sl-pending-drawer .v20-dialog-head{min-height:56px;padding:11px 18px;background:#fff}
 .sl-pending-drawer .v20-dialog-head h2{color:#173e75;font-size:17px;font-weight:700}
 .sl-pending-drawer .v20-dialog-head .sl-btn{width:32px;min-width:32px;height:32px;min-height:32px;padding:0;border:0;background:transparent;color:#607486;font-size:22px}
 .sl-pending-body{min-height:0;padding:12px 14px!important;overflow:auto!important;background:#f6f9fc}
+.scheduling-v20.v20-dialog.sl-pending-drawer{--app-dialog-max-height:760px}
+.scheduling-v20.v20-dialog.sl-pending-drawer:not(:has(.sl-pending-card)){width:600px}
 .sl-pending-card{min-height:80px;display:grid;grid-template-columns:minmax(120px,17%) minmax(0,1fr) minmax(310px,30%);align-items:center;gap:14px;margin-bottom:9px;padding:10px 14px 10px 11px;border:1px solid #d9e4ec;border-left:3px solid #d6ad65;border-radius:9px;background:#fff}
 .sl-pending-date{min-width:0;padding-right:14px;border-right:1px solid #e2e8f0}.sl-pending-date strong,.sl-pending-date span{display:block}.sl-pending-date strong{color:#123b63;font-size:14px;font-weight:700;line-height:1.3}.sl-pending-date span{margin-top:3px;color:#9a570c;font-size:12.5px;font-weight:600;line-height:1.3}
 .sl-pending-copy{min-width:0}.sl-pending-copy h3{margin:0;overflow:hidden;color:#123b63;font-size:14px;font-weight:600;line-height:1.35;text-overflow:ellipsis;text-transform:uppercase;white-space:nowrap}.sl-pending-copy span{display:block;margin-top:4px;overflow:hidden;color:#5f748c;font-size:13px;font-weight:400;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}
@@ -532,7 +539,7 @@
   .sl-editor-info{border-right:0;border-bottom:1px solid #e2e8f0}
   .sl-session-editor-dialog .v20-room-grid{grid-template-columns:repeat(2,minmax(120px,1fr))}
   .sl-pending-card{grid-template-columns:minmax(105px,auto) minmax(0,1fr);align-items:start}
-  .scheduling-v20.v20-dialog.sl-pending-drawer{width:calc(100vw - 24px);max-width:calc(100vw - 24px);height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);margin:12px}
+  .scheduling-v20.v20-dialog.sl-pending-drawer{width:calc(100vw - 24px);max-width:calc(100vw - 24px);height:auto;max-height:calc(100dvh - 24px);margin:12px}
   .sl-pending-side{grid-column:1/-1;padding-top:8px;border-top:1px solid #e2e8f0}
 }
 
@@ -639,19 +646,19 @@
 .sl-matrix-cohort-window button:hover:not(:disabled){border-color:#9ab7c8;background:#edf6f8}
 .sl-matrix-pivot-wrap{flex:1;height:auto;min-height:0;overflow:auto;border:1px solid #d9e4ec;border-radius:0;background:#fff}
 .sl-matrix-pivot-table{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;color:#123b63;font-size:12px}
-.sl-pivot-subj-track{width:240px}
-.sl-pivot-credits-track{width:48px}
+.sl-pivot-subj-track{width:var(--sl-pivot-subject-width,240px)}
+.sl-pivot-credits-track{width:var(--sl-pivot-credits-width,48px)}
 .sl-matrix-pivot-table th{position:sticky;top:0;z-index:3;padding:8px;border-right:1px solid #e7edf2;border-bottom:1px solid #d9e4ec;background:#eef4f8;color:#123b63;font-size:11.5px;font-weight:600;text-align:left;letter-spacing:.02em}
 .sl-matrix-pivot-table td{padding:6px;border-right:1px solid #e7edf2;border-bottom:1px solid #e7edf2;background:#fff;vertical-align:top}
 .sl-matrix-pivot-table tbody tr:hover td{background:#fbfdfe}
 .sl-matrix-pivot-table th:last-child,.sl-matrix-pivot-table td:last-child{border-right:0}
-.sl-pivot-subj-col,.sl-pivot-subj-cell{position:sticky;left:0;width:240px;min-width:240px;max-width:240px}
+.sl-pivot-subj-col,.sl-pivot-subj-cell{position:sticky;left:0;width:var(--sl-pivot-subject-width,240px);min-width:var(--sl-pivot-subject-width,240px);max-width:var(--sl-pivot-subject-width,240px)}
 .sl-matrix-pivot-table th.sl-pivot-subj-col{z-index:4}
 .sl-pivot-subj-cell{z-index:1;background:#fff!important}
 .sl-pivot-subject-code{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-bottom:3px}
 .sl-pivot-subj-cell strong{color:#0b7f9c;font-size:12px;font-weight:600;overflow-wrap:anywhere}
 .sl-pivot-subj-cell>span{display:block;color:#123b63;font-size:13px;font-weight:500;line-height:1.4;overflow-wrap:anywhere}
-.sl-pivot-credits-cell{width:48px;color:#5f748c;font-weight:500;text-align:center}
+.sl-pivot-credits-cell{width:var(--sl-pivot-credits-width,48px);color:#5f748c;font-weight:500;text-align:center}
 .sl-pivot-cell-offerings{display:flex;flex-direction:column;gap:6px}
 .sl-pivot-cell-offerings-single-year{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}
 .sl-pivot-mini-card{position:relative;min-height:104px;display:flex;flex-direction:column;gap:3px;padding:8px;overflow:hidden;border:1px solid #d9e4ec;border-radius:0;background:#fff;transition:border-color .15s ease}

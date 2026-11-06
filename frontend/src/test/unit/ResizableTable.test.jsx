@@ -1,6 +1,7 @@
 import { act, createEvent, fireEvent, render, screen } from "@testing-library/react";
 import { TableBody, TableCell, TableRow } from "@mui/material";
 import ResizableTable from "../../components/ResizableTable";
+import { AppearanceSettingsProvider, useAppearanceSettings } from "../../context/AppearanceSettings";
 
 const columns = [
   { key: "name", label: "Họ đệm", width: 160 },
@@ -18,6 +19,30 @@ const pointer = (element, type, x) => {
 };
 
 beforeEach(() => localStorage.clear());
+
+it("scales columns and frozen offsets without rewriting saved widths when appearance changes", () => {
+  function Example() {
+    const {setFontSize} = useAppearanceSettings();
+    return <><button onClick={() => setFontSize(150)}>Large</button><button onClick={() => setFontSize(100)}>Default</button>{table("email")}</>;
+  }
+  render(<AppearanceSettingsProvider><Example /></AppearanceSettingsProvider>);
+  const name = screen.getByRole("slider", {name: "Độ rộng cột Họ đệm"});
+  const email = screen.getByRole("slider", {name: "Độ rộng cột Email"});
+  fireEvent.click(screen.getByText("Large"));
+  expect(name).toHaveAttribute("aria-valuenow", "240");
+  expect(email).toHaveAttribute("aria-valuenow", "360");
+  expect(screen.getByRole("columnheader", {name: /Email/})).toHaveStyle({left: "240px"});
+  name.setPointerCapture = jest.fn();
+  pointer(name, "pointerDown", 100);
+  pointer(name, "pointerMove", 130);
+  pointer(name, "pointerUp", 130);
+  expect(name).toHaveAttribute("aria-valuenow", "270");
+  expect(JSON.parse(localStorage.getItem("test-column-widths"))).toEqual({name: 180});
+  fireEvent.click(screen.getByText("Default"));
+  expect(name).toHaveAttribute("aria-valuenow", "180");
+  expect(email).toHaveAttribute("aria-valuenow", "240");
+  expect(screen.getByRole("columnheader", {name: /Email/})).toHaveStyle({left: "180px"});
+});
 
 it("shares spare container width evenly, preserves manual resizing, and updates frozen offsets on viewport changes", () => {
   let available = 900;

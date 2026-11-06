@@ -29,11 +29,11 @@
 
   body .app-popup :is(.MuiDialogTitle-root, .v20-dialog-head, .sl-editor-hero, .sl-offering-hero) {
     flex-shrink: 0;
-    padding: 18px 24px;
+    padding: 12px 20px;
     border-bottom: 1px solid #b8c7d6;
     background: var(--popup-title-bg);
     color: #000;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
     line-height: 1.4;
     letter-spacing: 0.3px;
@@ -43,7 +43,7 @@
     margin: 0;
     color: #000;
     font-family: inherit;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
     line-height: 1.4;
     text-transform: uppercase;
@@ -174,9 +174,9 @@
 
   body .app-popup :is(.MuiDialogActions-root, .v20-dialog-foot) {
     flex-shrink: 0;
-    min-height: 70px;
-    padding: 12px 24px;
-    gap: 12px;
+    min-height: 58px;
+    padding: 10px 20px;
+    gap: 8px;
     flex-wrap: wrap;
     border-top: 1px solid #e2e8f0;
     background: #f8fafc;
@@ -255,8 +255,8 @@
 @media screen and (max-width: 600px) {
   body .app-popup .MuiDialog-paper {
     margin: 12px;
-    width: calc(100% - 24px);
-    max-width: calc(100% - 24px);
+    width: 100%;
+    max-width: 100%;
     max-height: calc(100dvh - 24px);
   }
 
@@ -283,35 +283,23 @@
   }
 }
 
-/* All dialog variants nearly fill the viewport, including page-specific sx dimensions,
-   scheduling drawers, nested confirmations, and dialogs without app-popup.
-   Keep this screen-only so document print geometry is unchanged. */
-@layer app-fullscreen-dialogs {
+/* Keep each dialog's functional width and natural content height. Only the
+   viewport bounds and scrolling are shared; printed documents are unchanged. */
+@layer app-dialog-layout {
   @media screen {
-    .MuiDialog-root { --app-dialog-gap: clamp(8px, 1.2vw, 16px); }
+    .MuiDialog-root { --app-dialog-gap: clamp(12px, 2vw, 24px); }
 
     .MuiDialog-container {
       padding: var(--app-dialog-gap) !important;
-      align-items: stretch !important;
+      box-sizing: border-box;
     }
 
-    .MuiDialog-container::after { display: none !important; }
-
-    .MuiDialog-paper {
-      position: relative !important;
-      inset: auto !important;
-      display: flex !important;
-      flex-direction: column !important;
+    .MuiDialog-paper:not(.MuiDialog-paperFullScreen) {
       margin: 0 !important;
-      width: 100% !important;
       min-width: 0 !important;
-      max-width: 100% !important;
-      height: calc(100vh - 2 * var(--app-dialog-gap)) !important;
-      height: calc(100dvh - 2 * var(--app-dialog-gap)) !important;
       min-height: 0 !important;
-      max-height: calc(100vh - 2 * var(--app-dialog-gap)) !important;
-      max-height: calc(100dvh - 2 * var(--app-dialog-gap)) !important;
-      border: 1px solid #b8c7d6 !important;
+      max-height: min(var(--app-dialog-max-height, 100vh), calc(100vh - 2 * var(--app-dialog-gap))) !important;
+      max-height: min(var(--app-dialog-max-height, 100dvh), calc(100dvh - 2 * var(--app-dialog-gap))) !important;
       overflow: hidden !important;
     }
 
@@ -328,12 +316,16 @@
 
     .MuiDialogActions-root, .v20-dialog-foot { flex-wrap: wrap !important; }
 
-    /* The offering table previously stopped at 260px, wasting the remaining
-       content area. Its parent already provides vertical scrolling. */
-    .MuiDialog-paper .sl-offering-sessions-wrap { max-height: none !important; }
+    /* Close controls stay compact when toolbar controls scale with text. */
+    .MuiDialog-paper :is(.v20-dialog-head > .sl-btn, .sl-drawer-close) {
+      width: 32px !important;
+      min-width: 32px !important;
+      height: 32px !important;
+      min-height: 32px !important;
+      padding: 0 !important;
+    }
 
-    /* On narrow screens keep the seven schedule columns readable and scroll
-       horizontally instead of squeezing each heading into individual letters. */
+    /* Preserve readable schedule columns with scrolling on narrow screens. */
     .MuiDialog-paper .sl-offering-sessions-wrap table { min-width: 900px !important; }
   }
 }

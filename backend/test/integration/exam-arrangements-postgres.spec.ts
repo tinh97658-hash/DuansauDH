@@ -9,11 +9,13 @@ import {up as lecturerUp} from '../../src/database/migrations/067-exam-session-l
 import {up as arrangementsUp,down as arrangementsDown} from '../../src/database/migrations/068-exam-arrangements.js';
 import {up as externalInvigilatorsUp} from '../../src/database/migrations/069-external-exam-invigilators.js';
 import {up as twoInvigilatorsUp} from '../../src/database/migrations/098-two-exam-invigilators.js';
+import {up as attendanceUp,down as attendanceDown} from '../../src/database/migrations/099-exam-candidate-attendance.js';
 
 const describeDb=process.env.RUN_POSTGRES_EXAM_ARRANGEMENT_TESTS==='true'?describe:describe.skip;
 describeDb('Grouped exam reservations on PostgreSQL',()=>{
  let db:Sequelize,admin:Sequelize,service:ExamScheduleService,actor:any,room:string,lecturer:string;
  const schema='exam_arrangement_test_'+randomUUID().replace(/-/g,'');
+ let createdAttendanceRole=false;
  const sql=(q:string,r:any={})=>db.query(q,{replacements:r,type:QueryTypes.SELECT}) as Promise<any[]>;
  const date='2099-05-04';
  async function offering(people:string[],name='Triết học'){
@@ -56,6 +58,13 @@ describeDb('Grouped exam reservations on PostgreSQL',()=>{
   await arrangementsUp({context:db.getQueryInterface()});
   await externalInvigilatorsUp({context:db.getQueryInterface()});
   await twoInvigilatorsUp({context:db.getQueryInterface()});
+  const [roles]=await admin.query("SELECT 1 FROM pg_roles WHERE rolname='pgsms_group_scoped'");
+  if(!roles.length){await admin.query('CREATE ROLE pgsms_group_scoped NOLOGIN');createdAttendanceRole=true;}
+  await sql(`CREATE FUNCTION app_gradebook_offering_visible(uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT COALESCE(current_setting('test.attendance_visible',true),'true')='true' $$;
+    CREATE FUNCTION app_offering_allowed(uuid,boolean) RETURNS boolean LANGUAGE sql AS $$ SELECT COALESCE(current_setting('test.attendance_writable',true),'true')='true' $$;
+    GRANT USAGE ON SCHEMA ${schema} TO pgsms_group_scoped;
+    GRANT SELECT ON course_exam_sessions TO pgsms_group_scoped;`);
+  await attendanceUp({context:db.getQueryInterface()});
   expect((await sql('SELECT arrangement_id,round_no FROM course_exam_sessions WHERE id=:id',{id:session}))[0]).toEqual({arrangement_id:session,round_no:1});
   service=new ExamScheduleService(db,new ExamWorkflowService(db,rbac),rbac);
  },30000);
@@ -64,7 +73,36 @@ describeDb('Grouped exam reservations on PostgreSQL',()=>{
   room=randomUUID();lecturer=randomUUID();
   await sql('INSERT INTO rooms VALUES(:room,30,true); INSERT INTO lecturers VALUES(:lecturer,true)',{room,lecturer});
  });
- afterAll(async()=>{await db?.close();if(admin){await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.close();}});
+ afterAll(async()=>{await db?.close();if(admin){await admin.query(`DROP SCHEMA ${schema} CASCADE`);if(createdAttendanceRole)await admin.query('DROP ROLE pgsms_group_scoped');await admin.close();}});
+ it('persists mutually exclusive attendance without changing the frozen candidate list',async()=>{
+  const participant='admission:'+randomUUID(),item=await offering([participant]);
+  const saved=await service.saveArrangement(null,payload([item]),actor),id=saved.sessionIds[0];
+  await sql("UPDATE course_exam_sessions SET exam_date='2000-01-01' WHERE id=:id",{id});
+  let version=0;
+  for(const status of ['absent_excused','absent_unexcused','present'] as const){
+   const updated=await service.recordAttendance(id,{participantId:participant,version,status},actor);version=updated.version;
+   expect((await sql('SELECT status FROM course_exam_candidate_attendance WHERE session_id=:id',{id}))[0].status).toBe(status);
+   expect((await sql('SELECT participant_id FROM course_exam_session_candidates WHERE session_id=:id',{id})).map(r=>r.participant_id)).toEqual([participant]);
+   const list=await service.list({from:'2000-01-01',to:'2000-01-01'});
+   expect(list.sessions.find(s=>s.id===id)?.candidates[0].attendanceStatus).toBe(status);
+  }
+  await expect(service.recordAttendance(id,{participantId:participant,version:0,status:'absent_excused'},actor)).rejects.toThrow('thay đổi');
+  await expect(service.recordAttendance(id,{participantId:'admission:'+randomUUID(),version,status:'absent_unexcused'},actor)).rejects.toThrow('không thuộc');
+  expect((await sql('SELECT action FROM gradebook_events WHERE course_offering_id=:id AND action=\'exam.attendance\'',{id:item.courseOfferingId}))).toHaveLength(3);
+  await db.transaction(async transaction=>{
+   await db.query("SET LOCAL ROLE pgsms_group_scoped; SET LOCAL test.attendance_visible='false'",{transaction});
+   const hidden=await db.query('SELECT * FROM course_exam_candidate_attendance WHERE session_id=:id',{transaction,replacements:{id},type:QueryTypes.SELECT});
+   expect(hidden).toEqual([]);
+  });
+  await db.transaction(async transaction=>{
+   await db.query("SET LOCAL ROLE pgsms_group_scoped; SET LOCAL test.attendance_visible='true'; SET LOCAL test.attendance_writable='false'",{transaction});
+   const changed=await db.query("UPDATE course_exam_candidate_attendance SET status='absent_unexcused' WHERE session_id=:id RETURNING status",{transaction,replacements:{id},type:QueryTypes.SELECT});
+   expect(changed).toEqual([]);
+  });
+  expect((await sql('SELECT status FROM course_exam_candidate_attendance WHERE session_id=:id',{id}))[0].status).toBe('present');
+  await expect(sql("INSERT INTO course_exam_candidate_attendance(session_id,participant_id,status) VALUES(:id,:participant,'absent_excused')",{id,participant:'admission:'+randomUUID()})).rejects.toThrow();
+  await expect(attendanceDown({context:db.getQueryInterface()})).rejects.toThrow('downgrade refused');
+ });
  it('handles all three scenarios, peaks at 30 seats, cancels one group and preserves all other slots',async()=>{
   const a=await offering(['a1','a2']),b=await offering(['b1'],'Xác suất'),c=await offering(['a1','a2'],'Xác suất'),d=await offering(['b1'],'Kinh tế');
   const result=await service.saveArrangement(null,payload([a,b,{...c,roundNo:2,startTime:'09:15',endTime:'10:45'},{...d,roundNo:2,startTime:'09:15',endTime:'10:15'}]),actor);
