@@ -33,6 +33,50 @@ const render = (...args) => {
   return result;
 };
 describe("Ribbon read/navigation permission contracts", () => {
+  it("keeps a compact icon rail, expands on hover and restores the compact layout on leaving", () => {
+    const { unmount } = baseRender(view(session(['scheduling.view']), '/masters/schedule'));
+    const sidebar = screen.getByRole('complementary', { name: 'Menu chức năng' });
+    expect(sidebar).toBeVisible();
+    expect(document.documentElement).toHaveAttribute('data-ribbon-sidebar', 'compact');
+    expect(screen.getByRole('button', { name: 'ĐÀO TẠO THẠC SĨ' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Xếp lịch' })).toBeNull();
+    fireEvent.pointerEnter(sidebar);
+    expect(document.documentElement).toHaveAttribute('data-ribbon-sidebar', 'expanded');
+    expect(screen.getByRole('button', { name: 'Xếp lịch' })).toHaveAttribute('aria-current', 'page');
+    fireEvent.pointerLeave(sidebar);
+    expect(document.documentElement).toHaveAttribute('data-ribbon-sidebar', 'compact');
+    expect(sidebar).toBeVisible();
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Xếp lịch' })).toBeNull();
+    unmount();
+    expect(document.documentElement).not.toHaveAttribute('data-ribbon-sidebar');
+  });
+
+  it("opens the rail search and supports opening a category by keyboard focus", () => {
+    baseRender(view(session(['scheduling.view']), '/masters/schedule'));
+    fireEvent.click(screen.getByRole('button', { name: 'Mở tìm kiếm chức năng' }));
+    expect(screen.getByRole('searchbox', { name: 'Tìm kiếm chức năng' })).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.focus(screen.getByRole('button', { name: 'ĐÀO TẠO THẠC SĨ' }));
+    expect(screen.getByRole('button', { name: 'Xếp lịch' })).toBeInTheDocument();
+  });
+
+  it("keeps touch navigation behind a toggle and does not reserve a desktop column on mobile", () => {
+    const previous = window.matchMedia;
+    window.matchMedia = jest.fn(() => ({ matches: false, addEventListener: jest.fn(), removeEventListener: jest.fn() }));
+    try {
+      baseRender(view(session(['scheduling.view']), '/masters/schedule'));
+      expect(screen.queryByRole('complementary')).toBeNull();
+      expect(document.documentElement).not.toHaveAttribute('data-ribbon-sidebar');
+      fireEvent.click(screen.getByRole('button', { name: 'Mở menu tác vụ' }));
+      const sidebar = screen.getByRole('complementary', { name: 'Menu chức năng' });
+      fireEvent.pointerLeave(sidebar);
+      expect(sidebar).toBeVisible();
+      fireEvent.click(document.querySelector('.ribbon-menu-backdrop'));
+      expect(screen.queryByRole('complementary')).toBeNull();
+    } finally { window.matchMedia = previous; }
+  });
+
   it("collapses subgroup labels independently and reveals matching actions during search", () => {
     render(view(session(["masters.view", "scheduling.view"]), "/masters/schedule"));
     const heading = screen.getByRole("button", { name: "THỦ TỤC ĐẦU VÀO" });
