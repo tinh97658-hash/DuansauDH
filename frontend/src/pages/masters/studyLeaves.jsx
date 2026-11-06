@@ -21,13 +21,13 @@ import { usePermissions } from '../../features/accounts/usePermissions';
 import StudyManagementRecords from '../../features/learners/StudyManagementRecords';
 
 const COLUMNS = [
-  { key: 'learner', label: 'Học viên', width: 280, minWidth: 220 },
-  { key: 'class', label: 'Lớp hành chính', width: 170, minWidth: 140 },
-  { key: 'dates', label: 'Thời gian bảo lưu', width: 220, minWidth: 200 },
-  { key: 'status', label: 'Trạng thái', width: 220, minWidth: 200, align: 'center' },
-  { key: 'overdue', label: 'Quá hạn', width: 100, minWidth: 90, align: 'center' },
-  { key: 'approval', label: 'Phê duyệt', width: 280, minWidth: 240, align: 'center' },
-  { key: 'actions', label: 'Thao tác', width: 280, minWidth: 230, align: 'center' },
+  { key: 'learner', label: 'Học viên', width: 190, minWidth: 180, stretch: false },
+  { key: 'class', label: 'Lớp hành chính', width: 130, minWidth: 130, stretch: false },
+  { key: 'dates', label: 'Thời gian bảo lưu', width: 190, minWidth: 190, stretch: false },
+  { key: 'status', label: 'Trạng thái', width: 170, minWidth: 170, align: 'center' },
+  { key: 'overdue', label: 'Quá hạn', width: 74, minWidth: 74, align: 'center', stretch: false },
+  { key: 'approval', label: 'Phê duyệt', width: 190, minWidth: 180, align: 'center' },
+  { key: 'actions', label: 'Thao tác', width: 190, minWidth: 180, align: 'center' },
 ];
 
 export default function StudyLeaves() {
@@ -114,7 +114,7 @@ function StudyLeaveList() {
     {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
     <Paper variant="outlined" sx={{ borderColor: '#D7E4EE', borderRadius: '6px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(23, 62, 117, 0.04)' }}>
       <TableContainer sx={{ overflow: 'auto' }}>
-      <ResizableTable columns={COLUMNS} storageKey="study-leaves-table-widths" aria-label="Danh sách bảo lưu"><TableBody>{result.rows.map(row => {
+      <ResizableTable columns={COLUMNS} storageKey="study-leaves-table-widths:compact-v2" aria-label="Danh sách bảo lưu" sx={{ '& td:first-of-type .MuiTypography-root': { whiteSpace: 'normal', overflowWrap: 'anywhere' } }}><TableBody>{result.rows.map(row => {
         const active = ['active', 'expiring', 'overdue'].includes(row.status);
         const pendingExtension = row.extensions?.some(item => item.status === 'pending');
         return <TableRow hover key={row.id}>
