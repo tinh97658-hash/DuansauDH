@@ -34,16 +34,28 @@ describe("ClassGroupService remove", () => {
     const classGroups = { findByPk: jest.fn().mockResolvedValue(group) };
     const classGroupMembers = { count: jest.fn().mockResolvedValue(memberCount) };
     const offeringGroups = { count: jest.fn().mockResolvedValue(offeringCount) };
+    const transaction = { LOCK: { UPDATE: "UPDATE" } };
+    const sequelize = { query: jest.fn().mockResolvedValue([{ used: false }]), transaction: jest.fn((callback: any) => callback(transaction)) };
     const service = new ClassGroupService(
       classGroups as never,
       classGroupMembers as never,
       offeringGroups as never,
       {} as never,
       {} as never,
-      {} as never,
+      sequelize as never,
     );
-    return { service, group };
+    return { service, group, classGroups, sequelize, transaction };
   };
+
+  it("locks and checks an empty class in one transaction before deletion", async () => {
+    const { service, group, classGroups, sequelize, transaction } = buildService();
+    await service.remove("group-1");
+    expect(sequelize.transaction).toHaveBeenCalledTimes(1);
+    expect(classGroups.findByPk).toHaveBeenCalledWith("group-1", { transaction, lock: "UPDATE" });
+    expect(group.destroy).toHaveBeenCalledWith({ transaction });
+    expect(String(sequelize.query.mock.calls[0][0])).toContain("21026");
+    expect(String(sequelize.query.mock.calls[1][0])).toContain("714062");
+  });
 
   it("reports how many course offerings still use the group", async () => {
     const { service, group } = buildService(0, 6);

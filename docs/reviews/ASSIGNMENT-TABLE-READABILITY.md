@@ -14,7 +14,7 @@
 |Table / scrollWidth|946 px|
 |Phần phải cần cuộn|209 px|
 
-Chín cột tách riêng: checkbox, mã, họ đệm, tên, ngày sinh, giới tính, chuyên ngành, học phí, nhóm hiện tại. Học phí bắt đầu tại x732, kéo đến852; nhóm hiện tại bắt đầu x852, kéo đến976. Phần lớn học phí và toàn bộ nhóm hiện tại nằm ngoài vùng nhìn ban đầu. Đã chụp trạng thái **10 candidates** trước sửa: [RD-001](../.tmp/qa-focused-20261018/RD-001-before-ten.png).
+Chín cột tách riêng: checkbox, mã, họ đệm, tên, ngày sinh, giới tính, chuyên ngành, học phí, nhóm hiện tại. Học phí bắt đầu tại x732, kéo đến852; nhóm hiện tại bắt đầu x852, kéo đến976. Phần lớn học phí và toàn bộ nhóm hiện tại nằm ngoài vùng nhìn ban đầu. Đã chụp trạng thái **10 candidates** trước sửa: [RD-001](../../.tmp/qa-focused-20261018/RD-001-before-ten.png).
 
 ## Column-value audit và quyết định
 
@@ -106,27 +106,27 @@ Edge thật qua CDP pointer/keyboard, DEV backend/database thực; không mock A
 
 | Check | Actual / evidence |
 |---|---|
-|~10 candidates, default|[RD-002](../.tmp/qa-focused-20261018/RD-002-after-ten-empty-target.png): có mã QA-2026-01 và người thiếu mã; identity/ngày sinh/tuition hiện trọn; không cuộn ngang|
-|10 selected|[RD-003](../.tmp/qa-focused-20261018/RD-003-ten-selected.png): selected10, cap5, vượt5; không silent truncation|
-|Search active|[RD-004](../.tmp/qa-focused-20261018/RD-004-search-ten-selected.png): Đinh hiện3 nhưng tổng selected vẫn10|
-|Narrow split|[RD-005](../.tmp/qa-focused-20261018/RD-005-narrow-sticky.png):39%, scroll66px, checkbox/tên giữ cố định; tuition đọc được|
-|Wide split|[RD-006](../.tmp/qa-focused-20261018/RD-006-wide-split.png):65%; cả hai pane vẫn thao tác được; search/selection giữ nguyên|
-|Full target|[RD-007](../.tmp/qa-focused-20261018/RD-007-full-target.png): nhóm .1 full1/1; Gán không thể vượt chỗ|
-|Partial target +5 selected|[RD-008](../.tmp/qa-focused-20261018/RD-008-partial-target-five-selected.png): nhóm .2=2/5, còn3, selected5/vượt2;8 candidates vẫn không horizontal overflow|
-|Full target +5 candidates|[RD-009](../.tmp/qa-focused-20261018/RD-009-full-target-five-candidates.png): nhóm .2=5/5; bảng trái vẫn đọc được|
-|Empty target +Gán tiếp|[RD-010](../.tmp/qa-focused-20261018/RD-010-five-selected-before-restore.png): nhóm .6 trống, selected5/còn5; sau Gán roster đủ5, selection clear đúng lúc|
+|~10 candidates, default|[RD-002](../../.tmp/qa-focused-20261018/RD-002-after-ten-empty-target.png): có mã QA-2026-01 và người thiếu mã; identity/ngày sinh/tuition hiện trọn; không cuộn ngang|
+|10 selected|[RD-003](../../.tmp/qa-focused-20261018/RD-003-ten-selected.png): selected10, cap5, vượt5; không silent truncation|
+|Search active|[RD-004](../../.tmp/qa-focused-20261018/RD-004-search-ten-selected.png): Đinh hiện3 nhưng tổng selected vẫn10|
+|Narrow split|[RD-005](../../.tmp/qa-focused-20261018/RD-005-narrow-sticky.png):39%, scroll66px, checkbox/tên giữ cố định; tuition đọc được|
+|Wide split|[RD-006](../../.tmp/qa-focused-20261018/RD-006-wide-split.png):65%; cả hai pane vẫn thao tác được; search/selection giữ nguyên|
+|Full target|[RD-007](../../.tmp/qa-focused-20261018/RD-007-full-target.png): nhóm .1 full1/1; Gán không thể vượt chỗ|
+|Partial target +5 selected|[RD-008](../../.tmp/qa-focused-20261018/RD-008-partial-target-five-selected.png): nhóm .2=2/5, còn3, selected5/vượt2;8 candidates vẫn không horizontal overflow|
+|Full target +5 candidates|[RD-009](../../.tmp/qa-focused-20261018/RD-009-full-target-five-candidates.png): nhóm .2=5/5; bảng trái vẫn đọc được|
+|Empty target +Gán tiếp|[RD-010](../../.tmp/qa-focused-20261018/RD-010-five-selected-before-restore.png): nhóm .6 trống, selected5/còn5; sau Gán roster đủ5, selection clear đúng lúc|
 
 Kết luận trên dataset đã thử: **Học phí hiện đủ; trạng thái chưa có nhóm rõ ở tên pane; identity nối được với trạng thái cùng hàng, không phải cuộn qua lại ở default split. Không thấy cắt chữ quan trọng ở default.** Rows có thể cuộn dọc; split/column resizing vẫn giữ.
 
 Tên rất dài được kiểm bằng integration fixture, chưa có tên dài tương đương trong10 candidates DEV thực để chụp browser; không sửa hồ sơ Admissions chỉ để tạo mẫu. Không tuyên bố browser long-name case đã pass. Long arbitrary group code thuộc pane phải không được tạo riêng ở lượt này; pane phải không thay đổi. Chưa kiểm zoom200%, mobile hoặc screen reader.
 
-Artifacts trong [qa-focused-20261018](../.tmp/qa-focused-20261018/), prefix RD; browser-journal.jsonl có action/network metadata. Hai ảnh RD-005/006 cuối là checkpoint đã đo sau pointer resize thực, không phải lần helper click divider chưa có keyboard focus.
+Artifacts trong [qa-focused-20261018](../../.tmp/qa-focused-20261018), prefix RD; browser-journal.jsonl có action/network metadata. Hai ảnh RD-005/006 cuối là checkpoint đã đo sau pointer resize thực, không phải lần helper click divider chưa có keyboard focus.
 
 ### DEV data và khôi phục
 
 Đã bỏ10 members khỏi QTKD .2/.6 qua UI để tạo candidate list, rồi gán lại qua UI theo các checkpoint partial/full. Cuối lượt đã khôi phục đúng learner→group mapping, cap và status như trước task: .2=5/5, .6=5/5, .1=1/1; groups11/members15. Membership IDs mới được sinh do remove/reassign, không giả định row IDs giữ nguyên.
 
-Read-only [db-readability-final.json](../.tmp/qa-focused-20261018/db-readability-final.json) so với snapshot trước: group data bằng nhau, learner/name/code/studyStatus→group mapping bằng nhau; duplicates rỗng. Admission records/evaluations211/21, offerings6, sessions6, gradebook1 giữ nguyên. Không tạo/xóa group, không sửa hồ sơ, không time fixture/reset/reseed trong lượt này.
+Read-only [db-readability-final.json](../../.tmp/qa-focused-20261018/db-readability-final.json) so với snapshot trước: group data bằng nhau, learner/name/code/studyStatus→group mapping bằng nhau; duplicates rỗng. Admission records/evaluations211/21, offerings6, sessions6, gradebook1 giữ nguyên. Không tạo/xóa group, không sửa hồ sơ, không time fixture/reset/reseed trong lượt này.
 
 ## Unchanged
 

@@ -3,7 +3,7 @@
 > **Hệ thống:** Phần mềm Quản lý Đào tạo Sau Đại học (Postgraduate Student Management System)  
 > **Kiến trúc:** NestJS 11 (Express + Sequelize ORM + PostgreSQL) | React 18 (Material-UI + Webpack)  
 > **Thời điểm cập nhật:** Tháng 10/2026 (Hoàn thành Giai đoạn 1 & Giai đoạn 2)  
-> **Tài liệu tham chiếu:** [`BAO-CAO-HIEU-NANG-BAO-MAT.md`](file:///d:/Vi%E1%BB%87n%20%C4%91%C3%A0o%20t%E1%BA%A1o%20SDH/DuanSDH/project/BAO-CAO-HIEU-NANG-BAO-MAT.md)
+> **Tài liệu tham chiếu:** [`BAO-CAO-HIEU-NANG-BAO-MAT.md`](BAO-CAO-HIEU-NANG-BAO-MAT.md)
 
 ---
 

@@ -43,7 +43,7 @@ const buildService = () => {
     {} as never,
     {} as never,
   );
-  return { service, subjects, majors, courseOfferings, sequelize };
+  return { service, subjects, majors, courseOfferings, sequelize, curriculumEntries };
 };
 
 const createDto = (overrides: Record<string, unknown> = {}) => ({
@@ -56,6 +56,14 @@ const createDto = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("PlanService Subject logical identity", () => {
+  it("does not move a catalog subject out of the scope of a curriculum already containing it", async () => {
+    const { service, subjects, curriculumEntries } = buildService();
+    const current = subject();
+    subjects.findByPk.mockResolvedValue(current);
+    curriculumEntries.count.mockResolvedValue(1);
+    await expect(service.updateSubject(current.id, { majorId: "major-3" })).rejects.toThrow();
+    expect(current.update).not.toHaveBeenCalled();
+  });
   it("rejects a duplicate pair before creating a catalog record", async () => {
     const { service, subjects } = buildService();
     subjects.findOne.mockResolvedValue(subject());
@@ -80,7 +88,7 @@ describe("PlanService Subject logical identity", () => {
       .rejects.toMatchObject({ status: 409 });
     expect(subjects.create).not.toHaveBeenCalled();
   });
-  it.each([{ credits: 5 }, { isRequired: false }, { name: "Changed" }, { canonicalSubjectId: "root" }])(
+  it.each([{ credits: 5 }, { name: "Changed" }, { canonicalSubjectId: "root" }])(
     "blocks catalog edits affecting a used curriculum: %j", async patch => {
       const { service, subjects, sequelize } = buildService();
       const used = subject({ credits: 3, isRequired: true });

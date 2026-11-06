@@ -8,7 +8,7 @@
 
 Điểm cần cải thiện nhất là **tạo nhanh chuyển route làm mất selection và search**. Khuyến nghị modal/drawer **“+ Tạo mới” ngay trong Assignment**, tái sử dụng logic tạo nhóm hiện có; **chưa triển khai**.
 
-Chỉ audit Grouping và Dashboard. CourseOffering/Scheduling/Grades được dùng để chuẩn bị hoặc xử lý các trạng thái Dashboard, không đánh giá UX toàn bộ các module đó. Không kiểm lại QA-ADM-001/002, không điều tra DOB/GPA. Quy tắc nhập học đã được thay đổi ngày 25/10/2026: **chỉ đã đóng học phí mới là Đang học**; phân nhóm không tự chuyển trạng thái. Các kết quả QA ngày 18/10 là ghi nhận lịch sử, không xác nhận quy tắc hiện tại. Xem [quy tắc học phí](TUITION-ENROLLMENT-POLICY.md).
+Chỉ audit Grouping và Dashboard. CourseOffering/Scheduling/Grades được dùng để chuẩn bị hoặc xử lý các trạng thái Dashboard, không đánh giá UX toàn bộ các module đó. Không kiểm lại QA-ADM-001/002, không điều tra DOB/GPA. Quy tắc nhập học đã được thay đổi ngày 25/10/2026: **chỉ đã đóng học phí mới là Đang học**; phân nhóm không tự chuyển trạng thái. Các kết quả QA ngày 18/10 là ghi nhận lịch sử, không xác nhận quy tắc hiện tại. Xem [quy tắc học phí](../TUITION-ENROLLMENT-POLICY.md).
 
 ## 1. Môi trường và dữ liệu
 
@@ -20,7 +20,7 @@ Chỉ audit Grouping và Dashboard. CourseOffering/Scheduling/Grades được d�
 - Baseline: groups4/members11/offerings3/sessions2/gradebooks1. KTQT Nhóm2 đã completed, gradebook revision6 và đủ10 kết quả. Home2026: grouping4, unscheduled1, pending0, missing-grade0.
 - Persona: chỉ admin thực tế. Chưa có account operational khác trong fixture để xác nhận UI ẩn/disabled theo quyền. Không dùng admin để suy ra các role khác pass.
 
-Artifacts riêng của lượt này: [qa-focused-20261018](../.tmp/qa-focused-20261018/). Có `source-before.txt`, `source-after.txt`, `db-baseline.json`, `db-final.json`, `browser-journal.jsonl`, `time-fixtures.jsonl` và PNG. `.tmp` là evidence local, có thể bị gitignore; cần giữ thư mục khi review báo cáo.
+Artifacts riêng của lượt này: [qa-focused-20261018](../../.tmp/qa-focused-20261018). Có `source-before.txt`, `source-after.txt`, `db-baseline.json`, `db-final.json`, `browser-journal.jsonl`, `time-fixtures.jsonl` và PNG. `.tmp` là evidence local, có thể bị gitignore; cần giữ thư mục khi review báo cáo.
 
 ### Chuẩn bị trạng thái
 
@@ -35,7 +35,7 @@ Artifacts riêng của lượt này: [qa-focused-20261018](../.tmp/qa-focused-20
 | `2dcad5df-cc0f-4efd-b9f2-b0997974d24d` |20/10→14/10| QA FOCUS — Quản trị chiến lược |
 | `315e96b5-a6d1-4c17-9072-07ce1e3cc5fd` |21/10→15/10| QA FOCUS — Quản trị marketing |
 
-Before/after đầy đủ trong [time-fixtures.jsonl](../.tmp/qa-focused-20261018/time-fixtures.jsonl). Ba session QA FOCUS được tạo qua UI trước khi đổi ngày. Fixture được chia thành các bước để quan sát thực tế warningCount1→3→4.
+Before/after đầy đủ trong [time-fixtures.jsonl](../../.tmp/qa-focused-20261018/time-fixtures.jsonl). Ba session QA FOCUS được tạo qua UI trước khi đổi ngày. Fixture được chia thành các bước để quan sát thực tế warningCount1→3→4.
 
 ## 2. Manual methodology
 
@@ -169,7 +169,7 @@ Các section footer grouping/scheduling dùng cùng href với top aggregate. Đ
 - **Exact browser steps:** (1) KTHH chọn Đặng Ngọc Mai, tìm Đặng; hoặc QTKD chọn5, tìm Đinh còn3 visible. (2) Bấm “+ Tạo nhanh nhóm mới”. (3) Tạo nhóm trong route riêng, hoặc Hủy rồi browser Back. (4) Đọc search/selection khi trở về.
 - **Expected:** tiếp tục công việc với draft đã chọn/tìm, hoặc cảnh báo rõ việc rời context. Cancel của flow tạo nhanh nên có đường trở lại rõ ràng.
 - **Actual:** năm/ngành/major được prefill; tạo thành công chọn đúng nhóm mới. Nhưng search thành rỗng và selected0. Cancel chỉ đóng dialog, vẫn ở create route; Back về Assignment cũng không giữ draft. Tái hiện ở lô1,3 và5.
-- **Evidence:** G-005 trước, [G-006](../.tmp/qa-focused-20261018/G-006-quick-return-lost-selection-search.png), G-012 trước5/G-013 sau tạo; journal có URL và read-back selected/search.
+- **Evidence:** G-005 trước, [G-006](../../.tmp/qa-focused-20261018/G-006-quick-return-lost-selection-search.png), G-012 trước5/G-013 sau tạo; journal có URL và read-back selected/search.
 - **User impact:** phải chọn lại; nhìn danh sách “Chưa chọn học viên” sau đổi màn dễ lo mất các người vừa chọn. Với search chỉ hiện3 nhưng đã chọn5, người dùng còn phải nhớ2 hidden selections.
 - **Business impact:** tăng nguy cơ bỏ sót/chọn sai khi phục hồi selection; **chưa chứng minh đã gán nhầm**.
 - **Frequency:** mọi return đã thử trong các case trên. **Workaround:** ghi nhớ/search lại và reselect; không cần chọn lại year/major.
@@ -183,7 +183,7 @@ Các section footer grouping/scheduling dùng cùng href với top aggregate. Đ
 - **Steps:** (1) Mở Assignment QTKD. (2) Chọn10. (3) Đọc Học phí/Nhóm hiện tại cạnh tên. (4) Cuộn ngang trong pane trái để tìm trạng thái, rồi quay lại định danh.
 - **Expected:** thông tin quyết định nằm trong vùng dễ đối chiếu; scroll không làm mất liên hệ người/trạng thái.
 - **Actual:** tên/ngày sinh/chuyên ngành chiếm pane trái; Học phí bị cắt và Nhóm hiện tại ngoài vùng thấy. Scrollbar thật và resize có sẵn, nhưng người dùng phải dịch ngang. Pane phải trống tạo nhiều khoảng trắng khi target chưa có người.
-- **Evidence:** [G-016](../.tmp/qa-focused-20261018/G-016-ten-selected.png), G-017 sau horizontal wheel, G-018 member list.
+- **Evidence:** [G-016](../../.tmp/qa-focused-20261018/G-016-ten-selected.png), G-017 sau horizontal wheel, G-018 member list.
 - **User impact:** phải cuộn/dò lại hàng; text phụ nhỏ. **Business impact:** tăng rủi ro bỏ sót trạng thái khi rà danh sách, không thay quy tắc học phí.
 - **Frequency:** tái hiện với default layout ở viewport đã thử. **Workaround:** resize split, chỉnh cột hoặc search hẹp.
 - **Effort:** thêm horizontal scroll đi/về đã thực hiện; không gán số giây tiết kiệm.10 hàng cần dịch dọc nhẹ khi global header mở đầy đủ.
@@ -196,7 +196,7 @@ Các section footer grouping/scheduling dùng cùng href với top aggregate. Đ
 - **Steps:** (1) Mở Chuyên ngành trong Summary. (2) Đọc hai options Khai thác hàng hải. (3) Đối chiếu data-value bằng DOM read-only.
 - **Expected:** hiển thị code hoặc mô tả phân biệt khi tên trùng; không cần người dùng nhớ thứ tự option.
 - **Actual:** cùng text “Khai thác hàng hải”, IDs `708c1ed3-3599-4d87-afc5-5958facbdcd3` và `6338999f-8ca0-4199-a42b-23fe8dfe53bd`. Không khẳng định Summary trộn count: chưa có hai pending rows cùng tên để thử điều đó.
-- **Evidence:** [G-019](../.tmp/qa-focused-20261018/G-019-same-major-display-different-ids.png), DOM read-back option text/id.
+- **Evidence:** [G-019](../../.tmp/qa-focused-20261018/G-019-same-major-display-different-ids.png), DOM read-back option text/id.
 - **User impact:** khó chọn đúng phạm vi, có thể phải mở/thử rồi quay lại. **Business impact:** rủi ro xử lý nhầm major; chưa quan sát sai assignment/cross-link.
 - **Frequency:** luôn gặp khi mở selector với catalog này. **Workaround:** kiểm group code/context sau chọn, nhờ danh mục phân biệt; không dùng UUID như nhãn chính.
 - **Effort:** tối thiểu một lựa chọn thử lại nếu chọn sai; chưa đo một người dùng chọn nhầm nên không gán click trung bình.
@@ -209,7 +209,7 @@ Các section footer grouping/scheduling dùng cùng href với top aggregate. Đ
 - **Steps:** (1) Offline bằng network emulation. (2) Gán5. (3) Đọc toast. (4) Bật online rồi Gán5 lại.
 - **Expected:** nói rõ kết nối/request thất bại và có thể thử lại; tránh gợi sửa dữ liệu khi chưa có business validation.
 - **Actual:** “Không thể phân học viên vào nhóm. Vui lòng kiểm tra lại dữ liệu.” Selection5 và target giữ đúng, retry online thành công.
-- **Evidence:** [G-014](../.tmp/qa-focused-20261018/G-014-failed-assign-preserves-selection.png), journal network failure và G-015 retry.
+- **Evidence:** [G-014](../../.tmp/qa-focused-20261018/G-014-failed-assign-preserves-selection.png), journal network failure và G-015 retry.
 - **User impact:** dễ đi sửa scope/dữ liệu đúng thay vì thử lại. **Business impact:** chậm thao tác, chưa thấy data corruption hoặc partial assignment.
 - **Frequency:**1 controlled offline attempt; không suy ra mọi loại lỗi có cùng message.
 - **Workaround:** kiểm kết nối rồi retry, giữ selection hiện có.
@@ -282,7 +282,7 @@ Luồng in-place dự kiến bỏ2 pathname transitions và thao tác phục h�
 
 ## 10. Trạng thái DB cuối và giới hạn còn lại
 
-Snapshot [db-final.json](../.tmp/qa-focused-20261018/db-final.json), read-only sau thao tác:
+Snapshot [db-final.json](../../.tmp/qa-focused-20261018/db-final.json), read-only sau thao tác:
 
 | Entity | Baseline→Final | Thay đổi |
 |---|---:|---|

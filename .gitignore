@@ -1,5 +1,6 @@
 # Dependencies and generated builds (keep package manifests and lockfiles)
 node_modules/
+node_modules-before-*/
 dist/
 build/
 coverage/
@@ -45,6 +46,7 @@ Thumbs.db
 *~
 
 # Local diagnostics, database backups and generated verification reports
+/.local/
 /.tmp/
 /.docker-recovery/
 *.log
@@ -57,6 +59,9 @@ Thumbs.db
 /frontend-*-results.json
 /backend/realistic-test-verification.json
 /docs/data-changes/
+/docs/imports/*-before-*.json
+/backend/.tmp-*
+/route-endpoints.txt
 
 # Runtime user uploads, never source assets
 /backend/public/userDocs/

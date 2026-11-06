@@ -14,11 +14,9 @@ import { ClassGroupMember } from "../database/models/training/class-group-member
 import { Subject } from "../database/models/plan/subject.model.js";
 import { Curriculum } from "../database/models/plan/curriculum.model.js";
 import { CurriculumBlock } from "../database/models/plan/curriculum-block.model.js";
-import { CurriculumElectiveGroup } from "../database/models/plan/curriculum-elective-group.model.js";
 import { CurriculumSubject } from "../database/models/plan/curriculum-subject.model.js";
 import { AdmissionRecord } from "../database/models/plan/admission-record.model.js";
 import { CourseOffering } from "../database/models/training/course-offering.model.js";
-import { ClassGroupElective } from "../database/models/training/class-group-elective.model.js";
 import { CourseOfferingClassGroup } from "../database/models/training/course-offering-class-group.model.js";
 import { CourseOfferingStudent } from "../database/models/training/course-offering-student.model.js";
 import { MajorTransfer } from "../database/models/training/major-transfer.model.js";
@@ -35,8 +33,8 @@ import { SubjectRecognitionService } from "./subject-recognition.service.js";
 @Module({
   imports: [SequelizeModule.forFeature([
     Subject,
-    Curriculum, CurriculumBlock, CurriculumElectiveGroup, CurriculumSubject,
-    ClassGroup, ClassGroupMember, ClassGroupElective, CourseOfferingClassGroup, CourseOfferingStudent,
+    Curriculum, CurriculumBlock, CurriculumSubject,
+    ClassGroup, ClassGroupMember, CourseOfferingClassGroup, CourseOfferingStudent,
     MajorTransfer, SubjectRecognition, LearnerSubjectResult, BridgeKnowledgeSubject,
     Major, AdmissionRecord, CourseOffering, AdmissionRound, AdmissionEvaluation, AdmissionEvaluationHistory,
   ])],

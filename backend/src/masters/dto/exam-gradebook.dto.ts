@@ -38,6 +38,17 @@ export class SaveExamGradebookDto extends ExamGradebookQueryDto {
   @IsArray() @ArrayMinSize(0) @ArrayMaxSize(1000) @ValidateNested({ each: true }) @Type(() => ExamGradeRowDto) rows!: ExamGradeRowDto[];
 }
 
+export class ImportComponentRowDto {
+  @IsString() @MaxLength(80) participantId!: string;
+  @IsOptional() @IsNumber() @Min(0) @Max(10) testScore?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(10) assignmentScore?: number;
+}
+
+export class ImportExamComponentsDto extends ExamGradebookQueryDto {
+  @IsInt() @Min(0) revision!: number;
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(1000) @ValidateNested({ each: true }) @Type(() => ImportComponentRowDto) rows!: ImportComponentRowDto[];
+}
+
 export class GradebookWorkflowDto extends ExamGradebookQueryDto {
   @IsIn(["submit", "approve", "reopen", "request_reopen", "reject_reopen"]) action!: "submit" | "approve" | "reopen" | "request_reopen" | "reject_reopen";
   @IsInt() @Min(0) revision!: number;

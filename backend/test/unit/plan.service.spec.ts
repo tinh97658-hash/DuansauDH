@@ -236,7 +236,7 @@ describe("PlanService subject requirement synchronization", () => {
     expect(sequelize.query).toHaveBeenCalledWith(expect.stringContaining("SUM(s.credits)"), { replacements: { subjectId: subject.id }, transaction });
   });
 
-  it("updates existing curriculum entries when a catalog subject becomes elective", async () => {
+  it("changes the catalog default without overwriting existing curricula, even when used", async () => {
     const subject = {
       id: "subject-1", majorId: "major-1", program: "masters",
       codeNumber: 1, codeText: "ATBM", sharedMajorIds: [], allowCrossMajor: false,
@@ -252,26 +252,18 @@ describe("PlanService subject requirement synchronization", () => {
     const transaction = { LOCK: { UPDATE: "UPDATE" } };
     const sequelize = {
       transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)),
-      query: jest.fn().mockResolvedValue([[], 1]),
+      query: jest.fn().mockResolvedValue([{ used: true }]),
     };
     const service = new PlanService(
       subjects as never, curriculumEntries as never, {} as never, majors as never,
       {} as never, sequelize as never, {} as never, {} as never, {} as never, {} as never,
     );
 
-    await service.updateSubject(subject.id, { isRequired: false, subjectType: "TC" });
+    await service.updateSubject(subject.id, { isRequired: false });
 
-    expect(curriculumEntries.update).toHaveBeenCalledWith(
-      { isRequired: false },
-      { where: { subjectId: subject.id }, transaction },
-    );
-    expect(sequelize.query).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE curriculum_subjects"),
-      expect.objectContaining({
-        replacements: { subjectId: subject.id, blockCode: "TC" },
-        transaction,
-      }),
-    );
+    expect(subject.update).toHaveBeenCalledWith(expect.objectContaining({ isRequired: false }), { transaction });
+    expect(curriculumEntries.update).not.toHaveBeenCalled();
+    expect(sequelize.query).not.toHaveBeenCalledWith(expect.stringContaining("UPDATE curriculum_subjects"), expect.anything());
   });
 });
 

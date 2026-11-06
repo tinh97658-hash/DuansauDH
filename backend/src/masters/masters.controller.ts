@@ -14,7 +14,7 @@ import {
 } from "./dto/masters-class-group.dto.js";
 import { MastersService } from "./masters.service.js";
 import { ExamGradebookService } from "./exam-gradebook.service.js";
-import { ExamGradebookQueryDto, ExamSubjectsQueryDto, SaveExamGradebookDto, GradebookWorkflowDto } from "./dto/exam-gradebook.dto.js";
+import { ExamGradebookQueryDto, ExamSubjectsQueryDto, SaveExamGradebookDto, GradebookWorkflowDto, ImportExamComponentsDto } from "./dto/exam-gradebook.dto.js";
 import { AdmissionEvaluationService } from "../plan/admission-evaluation.service.js";
 
 @Controller("masters")
@@ -82,6 +82,8 @@ export class MastersController {
   examLists(@Query() query: ExamGradebookQueryDto, @CurrentUser() actor: any) { return this.gradebooks.getForActor(query,actor); }
   @Put("exam-lists") @RequirePermissions("gradebook.submit")
   saveExamLists(@Body() dto: SaveExamGradebookDto, @CurrentUser() actor: any) { return this.gradebooks.save(dto, actor); }
+  @Post("exam-lists/import-components") @RequirePermissions("gradebook.submit")
+  importExamComponents(@Body() dto: ImportExamComponentsDto, @CurrentUser() actor: any) { return this.gradebooks.importComponents(dto, actor); }
   @Get("english-exam") englishExam() { return this.masters.englishExam(); }
   @Get("english-scores") englishScores() { return this.masters.englishScores(); }
   @Get("english-certification") englishCertification() { return this.masters.englishCertification(); }

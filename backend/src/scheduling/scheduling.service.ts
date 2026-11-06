@@ -20,7 +20,6 @@ import { Room } from "../database/models/common/room.model.js";
 import { Subject } from "../database/models/plan/subject.model.js";
 import { Curriculum } from "../database/models/plan/curriculum.model.js";
 import { CurriculumSubject } from "../database/models/plan/curriculum-subject.model.js";
-import { ClassGroupElective } from "../database/models/training/class-group-elective.model.js";
 import { Staff } from "../database/models/staff.model.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
 import { ClassGroupMember } from "../database/models/training/class-group-member.model.js";
@@ -68,7 +67,6 @@ export class SchedulingService {
     @InjectModel(CourseOfferingClassGroup) private readonly offeringGroups: typeof CourseOfferingClassGroup,
     @InjectModel(Subject) private readonly subjects: typeof Subject,
     @InjectModel(CurriculumSubject) private readonly curriculumSubjects: typeof CurriculumSubject,
-    @InjectModel(ClassGroupElective) private readonly classGroupElectives: typeof ClassGroupElective,
     @InjectModel(ClassGroup) private readonly classGroups: typeof ClassGroup,
     @InjectModel(ClassGroupMember) private readonly classGroupMembers: typeof ClassGroupMember,
     @InjectModel(Major) private readonly majors: typeof Major,
@@ -88,7 +86,6 @@ export class SchedulingService {
       throw new BadRequestException(`Chức năng tạo lớp học phần cho chương trình "${program}" chưa được kích hoạt.`);
     }
   }
-
   async classGroupOptions(majorId?: string) {
     const groups = await this.classGroups.findAll({
       where: { program: "masters", ...(majorId ? { majorId } : {}) },
@@ -268,10 +265,10 @@ export class SchedulingService {
     const logicalSubjectId = (subject: Subject | any) => subject?.canonicalSubjectId || subject?.id;
 
     const classes = groups.map((group) => {
-      const curriculumEntries = new Map(curriculumRows
-        .filter((row) => row.curriculumId === group.curriculumId)
-        .map((row) => [row.subjectId, row]));
       const groupOfferings = (offeringIdsByGroup.get(group.id) || []).map((id) => offeringById.get(id)).filter(Boolean) as CourseOffering[];
+      const curriculumEntries = new Map(curriculumRows
+        .filter(row => row.curriculumId === group.curriculumId)
+        .map((row) => [row.subjectId, row]));
 
       const subjects = catalogSubjects.map((subject) => {
         const entry = curriculumEntries.get(subject.id);
@@ -999,7 +996,7 @@ export class SchedulingService {
       bucket.push(member);
       membersByGroup.set(member.classGroupId, bucket);
     }
-    // Every class follows the complete subject list of its selected curriculum.
+    // A class follows the complete subject list of its assigned curriculum.
     const curriculumIds = [...new Set(groups.map((group) => group.curriculumId).filter((id): id is string => Boolean(id)))];
     const curriculumSubjectRows = curriculumIds.length === 0 ? [] : await this.curriculumSubjects.findAll({
       where: { curriculumId: { [Op.in]: curriculumIds } },
@@ -1250,7 +1247,7 @@ export class SchedulingService {
           throw new BadRequestException(`Nhóm "${group.code}" chưa được gắn chương trình đào tạo.`);
         }
         const localSubjects = curriculumSubjectRows
-          .filter((row) => row.curriculumId === group.curriculumId)
+          .filter(row => row.curriculumId === group.curriculumId)
           .map((row) => row.subject as Subject)
           .filter(Boolean);
         if (localSubjects.length === 0) {
@@ -1278,7 +1275,7 @@ export class SchedulingService {
           )
         ));
         if (!matchingLocalSubject) {
-          throw new BadRequestException(`Chương trình đào tạo của nhóm "${group.code}" không có môn trùng tên và số tín chỉ.`);
+          throw new BadRequestException(`CTĐT của nhóm "${group.code}" không có môn trùng tên và số tín chỉ.`);
         }
         matchingSubjectIds.add(matchingLocalSubject.id);
       }

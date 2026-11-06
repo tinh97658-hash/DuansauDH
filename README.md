@@ -16,11 +16,14 @@ Migration `098-training-years` tạo danh mục, giữ các năm đang có trong
 
 ## Công nghệ
 
+Cấu trúc repository và quy trình production: xem [hướng dẫn triển khai](docs/deployment.md).
+Các tài liệu nghiệp vụ, kế hoạch và báo cáo được tổng hợp tại [docs/README.md](docs/README.md).
+
 Phân quyền theo hồ sơ làm việc, cây module và quyền xem/ghi: xem [hướng dẫn phân quyền](docs/working-profiles-permission-tree.md).
 
 Dữ liệu demo nhập điểm, lịch sử giảng dạy và tạo lịch thi: xem [hướng dẫn demo thi](docs/exam-demo.md), chạy riêng bằng `npm --prefix backend run db:seed:exam-demo`.
 
-- Frontend: React 18, React Router 6, Material UI, Ant Design, Bootstrap và Axios.
+- Frontend: React 18, React Router 7, Vite, Material UI, Bootstrap và Axios.
 - Backend: Node.js 22, NestJS 11, Passport, class-validator, bcrypt, Multer và Nodemailer.
 - Database: PostgreSQL 16.
 - ORM: Sequelize TypeScript qua `@nestjs/sequelize`, với repository và service được dependency injection quản lý.
@@ -69,18 +72,37 @@ khỏi mọi danh sách lựa chọn chuyên ngành.
 
 `subjects` (danh mục học phần theo ngành + bậc; học phần cùng tên ở các ngành vẫn
 có mã riêng, cờ học chung chỉ phục vụ ghép lớp), `curriculums` (CTĐT của một
-ngành + bậc + khóa), `curriculum_blocks` (khối kiến thức),
-`curriculum_elective_groups` (nhóm tự chọn kèm số tín chỉ tối thiểu/tối đa) và
-`curriculum_subjects` (học phần trong CTĐT: bắt buộc/tự chọn, thuộc khối, nhóm
-tự chọn). **Một ngành + bậc + khóa có thể có nhiều CTĐT**; **mỗi lớp tự chọn CTĐT
+ngành + bậc + khóa), `curriculum_blocks` (khối kiến thức) và
+`curriculum_subjects` (học phần trong CTĐT, loại bắt buộc/tự chọn).
+**Một ngành + bậc + khóa có thể có nhiều CTĐT**; **mỗi lớp chọn CTĐT
 mà lớp theo học** qua `class_groups.curriculum_id` (bắt buộc chọn khi phạm vi có
 nhiều CTĐT, tự gán khi chỉ có một).
+
+Mỗi lớp chọn đúng một CTĐT qua `class_groups.curriculum_id` và học toàn bộ
+danh sách môn trong CTĐT đó. Trong CTĐT, người quản lý tự đặt nhãn **Bắt buộc /
+Tự chọn** cho từng môn bằng cột **Loại học phần**. Nhãn này không tạo nhóm, không
+đặt định mức tín chỉ, không yêu cầu chọn lại môn theo lớp. Cùng một học phần có thể
+có loại khác nhau trong các CTĐT khác nhau; thay đổi chỉ lưu trên dòng của CTĐT đang sửa.
+
+Tổng tín chỉ là tổng của tất cả môn trong CTĐT. Tạo lớp học phần, tiến độ và bảng
+điểm đều dùng toàn bộ danh sách đó, không lọc theo nhóm hoặc danh sách chọn riêng.
+Loại học phần chỉ sửa được khi môn chưa mở lớp học phần và chưa có dữ liệu học tập
+trong CTĐT đó. Môn đã sử dụng được khóa cả trên giao diện lẫn API; các môn chưa dùng
+trong cùng CTĐT vẫn chỉnh được. Các lớp học chung dùng mã môn khác vẫn được đối chiếu
+để giữ lịch sử. Thêm/xóa môn của CTĐT đã có dữ liệu đào tạo vẫn được bảo vệ.
+
+Danh mục học phần không hiển thị cột **Bắt buộc mặc định**. Các giá trị mặc định cũ
+chỉ hỗ trợ khởi tạo môn vào CTĐT; không đồng bộ ngược vào các CTĐT đang dùng.
+Các bảng/cột nhóm tự chọn và quy tắc riêng của lớp đã lưu được giữ để bảo toàn lịch sử,
+nhưng không còn tham gia luồng nghiệp vụ. Migration `100-simple-curriculum-subjects`
+tính lại tổng tín chỉ theo danh sách đầy đủ và bỏ ghi chú chia nhóm tạm trước đây.
 
 ### Bảng riêng — Nhóm học phần & thi (dùng chung thạc sĩ/tiến sĩ)
 
 `class_groups` (lớp/nhóm học viên), `class_group_members`,
-`class_group_electives` (học phần tự chọn mà Viện chỉ định cho cả lớp),
 `exam_sessions`, `exam_eligibilities`, `exam_results`.
+`class_group_electives` và `curriculum_elective_groups` chỉ lưu dữ liệu cũ, không
+còn quyết định môn học hoặc định mức của lớp.
 
 Đào tạo học phần: `course_offerings`, `course_offering_class_groups`,
 `course_offering_students`, `teaching_sessions`, `scheduling_retakes`.
@@ -126,7 +148,7 @@ npm --prefix backend run db:migrate
 
 Khởi động lại backend/frontend sau migration. Migration 061 thêm lịch sử thành viên lớp, trạng thái duyệt điểm, nhật ký thay đổi và bản kết quả học tập đã chốt; đối soát trạng thái học theo phân lớp hiện tại. Điểm cũ giữ trạng thái nháp và phải được gửi/duyệt để tính vào hoàn thành học phần. Migration không hỗ trợ tự động xóa lịch sử bằng `down`; rollback dùng bản sao lưu đã kiểm chứng.
 
-Sau khi hoàn thành giảng dạy: lưu đủ điểm → gửi duyệt → admin duyệt và khóa. Admin muốn sửa phải mở lại với lý do. Bảng điểm cá nhân hiển thị điều kiện học phần còn thiếu và cho admin lưu bản kết quả khi đủ điều kiện; các bản cũ vẫn mở lại được sau điều chỉnh. Hoàn thành học phần được tách riêng với xét tốt nghiệp/GPA. Xem [kế hoạch và báo cáo vòng đời học viên](BAO-CAO-LOGIC-VONG-DOI-HOC-VIEN.md).
+Sau khi hoàn thành giảng dạy: lưu đủ điểm → gửi duyệt → admin duyệt và khóa. Admin muốn sửa phải mở lại với lý do. Bảng điểm cá nhân hiển thị điều kiện học phần còn thiếu và cho admin lưu bản kết quả khi đủ điều kiện; các bản cũ vẫn mở lại được sau điều chỉnh. Hoàn thành học phần được tách riêng với xét tốt nghiệp/GPA. Xem [kế hoạch và báo cáo vòng đời học viên](docs/reviews/BAO-CAO-LOGIC-VONG-DOI-HOC-VIEN.md).
 
 ### Quản lý tài khoản & phân quyền (migration 062)
 
@@ -166,7 +188,7 @@ khẩu (buộc đăng xuất và đổi mật khẩu lần kế tiếp); buộc 
 cách tăng `staff.session_version`. Giao diện nằm trong nhóm **Tài khoản & phân
 quyền** trên thanh điều hướng: `/system/accounts`, `/system/roles`,
 `/system/audit-logs` và `/system/change-password` (bắt buộc đổi mật khẩu khi còn
-mật khẩu khởi tạo). Xem [kế hoạch chi tiết](KE-HOACH-QUAN-LY-TAI-KHOAN-PHAN-QUYEN.md).
+mật khẩu khởi tạo). Xem [kế hoạch chi tiết](docs/plans/KE-HOACH-QUAN-LY-TAI-KHOAN-PHAN-QUYEN.md).
 
 ### Nhật ký thay đổi dữ liệu (migration 063)
 
@@ -216,7 +238,6 @@ Các biến chính:
 | `FRONTEND_URL` | `http://localhost:${WEB_PORT}` | Origin frontend được CORS cho phép |
 | `API_PUBLIC_URL` | `http://localhost:${PORT}` | URL công khai dùng cho OAuth callback |
 | `REACT_APP_API_URL` | `${API_PUBLIC_URL}` | URL API cho frontend; đặt `/api` khi triển khai qua reverse proxy |
-| `GENERATE_SOURCEMAP` | `false` | Cấu hình build frontend |
 | `GOOGLE_CLIENT_ID` | trống | Google OAuth, không bắt buộc khi chạy DB |
 | `GOOGLE_CLIENT_SECRET` | trống | Google OAuth, không bắt buộc khi chạy DB |
 
@@ -287,9 +308,11 @@ nối; cổng này không mở ra mạng LAN.
 
 ## Chạy toàn bộ ứng dụng (thủ công)
 
-Docker Compose chỉ quản lý `db` và `pgadmin`. Các service `migrate`, `api`, `web`
-đã được bỏ khỏi `compose.yaml` — backend và frontend chạy trực tiếp bằng npm để
-dễ phát triển (xem hướng dẫn ba terminal bên dưới).
+`compose.yaml` chỉ quản lý `db` và `pgadmin` cho development; backend và frontend
+chạy trực tiếp bằng npm (xem hướng dẫn ba terminal bên dưới).
+Production dùng riêng `compose.prod.yaml`, gồm `db`, `api`, `web` và công cụ
+`migrate`: xem [quy trình production](docs/deployment.md). Hai cấu hình dùng
+volume database riêng; không tự động chuyển dữ liệu development sang production.
 
 Sau khi khởi động xong:
 
@@ -509,8 +532,7 @@ docker compose down -v
 Đây là cache BuildKit bị lỗi. Rebuild riêng backend không dùng cache:
 
 ```powershell
-docker compose --profile app build --no-cache api migrate
-docker compose --profile app up -d
+docker compose --env-file .env.production -f compose.prod.yaml build --no-cache api
 ```
 
 Không cần xóa PostgreSQL volume.
@@ -520,8 +542,8 @@ Không cần xóa PostgreSQL volume.
 Kiểm tra trạng thái và log:
 
 ```powershell
-docker compose --profile app ps
-docker compose --profile app logs --tail=100 migrate api
+docker compose --env-file .env.production -f compose.prod.yaml ps
+docker compose --env-file .env.production -f compose.prod.yaml logs --tail=100 api
 ```
 
 ### pgAdmin không kết nối được
@@ -557,6 +579,9 @@ npm run test:coverage
 Các lệnh chi tiết cho backend được mô tả trong `backend/Testing.md`.
 
 ## Checklist production
+
+Thực hiện theo [hướng dẫn triển khai và rollback](docs/deployment.md). Không dùng
+`npm run dev` hoặc `vite preview` làm server production.
 
 - Thay toàn bộ password và `SESSION_SECRET` trong `.env`.
 - Bật HTTPS và đặt `SESSION_COOKIE_SECURE=true`.

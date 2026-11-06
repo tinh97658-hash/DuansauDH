@@ -6,7 +6,7 @@
 > Ngày lập: 2026-10-18 (cập nhật 2026-10-19: thống nhất mọi vai trò theo permission).
 > Phạm vi áp dụng: `backend/` (NestJS 11 + Sequelize + Umzug) và `frontend/` (React + MUI).
 
-> Cập nhật 28/10/2026: lịch học có grant scope riêng từ migration 082; xem [hướng dẫn phân công và phạm vi lịch](docs/group-responsibility.md). Quy tắc phải bao phủ đủ mọi nhóm tiếp tục áp dụng cho tổ chức lớp, điểm và lịch thi theo chính sách tương ứng; thao tác lịch chung đã chuyển đổi chỉ cần một nhóm phụ trách. Các vai trò chưa được đối chiếu scope vẫn ở chế độ tương thích.
+> Cập nhật 28/10/2026: lịch học có grant scope riêng từ migration 082; xem [hướng dẫn phân công và phạm vi lịch](../group-responsibility.md). Quy tắc phải bao phủ đủ mọi nhóm tiếp tục áp dụng cho tổ chức lớp, điểm và lịch thi theo chính sách tương ứng; thao tác lịch chung đã chuyển đổi chỉ cần một nhóm phụ trách. Các vai trò chưa được đối chiếu scope vẫn ở chế độ tương thích.
 
 ---
 

@@ -88,7 +88,7 @@ export class ExamWorkflowService {
     return {...row,...emptyResult,eligible:calculateExamEligibility(row,row.eligibilityPolicy),workflowPhase:'components',eligibilityFrozen:false,examScoreEditable:false,
       ...(row.studyLeaveFailure?{result:'failed'}:row.profileForeignLanguageExempt?{result:'passed'}:row.examExempt?{result:'exempt'}:{})};
   }
-  async save(dto:any,actor:any,load:ExamRosterLoader) {
+  async save(dto:any,actor:any,load:ExamRosterLoader,{componentImport=false}={}) {
     await assertGradebookWorkflowAccess(actor,'submit',this.rbac);
     await this.db.transaction(async transaction=>{
       // Retain the existing grade/policy/transcript-publication mutex. Exam
@@ -96,11 +96,29 @@ export class ExamWorkflowService {
       await this.query('SELECT pg_advisory_xact_lock(21026)',{},transaction);
       const {state}=await this.lock(dto.courseOfferingId,transaction);
       if(this.access)await this.access.assertOffering(actor,dto.courseOfferingId,transaction);
+      if(componentImport){
+        // Scheduling takes the same offering row lock. Check inside this
+        // transaction so a concurrently created session cannot slip through.
+        const sessions=await this.query('SELECT id FROM course_exam_sessions WHERE course_offering_id=:id LIMIT 1',{id:dto.courseOfferingId},transaction);
+        if(sessions.length)throw new ConflictException({code:'COMPONENT_IMPORT_CLOSED',message:'Lớp học phần đã tạo lịch thi, không được nhập điểm từ Excel (kể cả lịch thi đã hủy).'});
+        if(!Array.isArray(dto.rows)||!dto.rows.length||dto.rows.length>1000)throw new BadRequestException('File phải có từ 1 đến 1000 học viên cần cập nhật.');
+      }
       this.requireRevision(await this.revision(dto.courseOfferingId,transaction),dto.revision);
       if(['submitted','approved'].includes(state.result_status))throw new ConflictException('Bảng điểm đã gửi duyệt hoặc đã khóa. Cần mở lại kết quả trước khi sửa.');
       const rows:any[]=state.eligibility_status==='approved'?await this.approvedRows(dto.courseOfferingId,state,transaction):await load(transaction);
       const byId=new Map<string,any>(rows.map(row=>[row.participantId,row]));const ids=new Set<string>();const changed:any[]=[];
-      for(const value of dto.rows){
+      for(const input of dto.rows){
+        let value=input;
+        if(componentImport){
+          const current=byId.get(input.participantId);
+          if(!current)throw new BadRequestException('Học viên không thuộc danh sách lớp học phần.');
+          if(input.testScore==null&&input.assignmentScore==null)throw new BadRequestException('Học viên chưa có điểm KT hoặc TL/BTL để nhập.');
+          const policy=current.eligibilityPolicy||LEGACY_GRADING_POLICY;
+          // Only these two fields may cross the import boundary. Empty cells
+          // preserve saved scores; results, exemption and notes stay authoritative.
+          value={...current,testScore:input.testScore??current.testScore,assignmentScore:input.assignmentScore??current.assignmentScore,
+            policyVersion:policy.version,policyRulesVersion:policy.rulesVersion};
+        }
         for(const key of ['testScore','assignmentScore','examScore']){
           const score=value[key];
           if(score!=null&&(typeof score!=='number'||!Number.isFinite(score)||score<0||score>10))throw new BadRequestException('Điểm phải là số từ 0 đến 10.');
@@ -127,7 +145,7 @@ export class ExamWorkflowService {
         const old=byId.get(row.participantId);
         return ['testScore','assignmentScore','examExempt','eligible'].some(key=>row[key]!==old[key]);
       }))await this.refreshEligibility(dto.courseOfferingId,state,roster,actor,transaction);
-      await this.event(dto.courseOfferingId,'save',actor,'Lưu điểm',rows.filter(row=>ids.has(row.participantId)),changed,transaction);
+      await this.event(dto.courseOfferingId,'save',actor,componentImport?'Nhập điểm KT và TL/BTL từ Excel':'Lưu điểm',rows.filter(row=>ids.has(row.participantId)),changed,transaction);
     });
   }
   private async refreshEligibility(id:string,state:any,rows:any[],actor:any,transaction:Transaction) {

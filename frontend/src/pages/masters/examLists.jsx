@@ -11,6 +11,7 @@ import { Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, MenuI
 import { DocumentCheckIcon, CalendarDaysIcon, ClipboardDocumentListIcon, ClockIcon, Cog6ToothIcon } from "../../components/AppIcons";
 import GradeSettingsDialog from "../../features/exams/GradeSettingsDialog";
 import GradebookHistoryDialog from "../../features/exams/GradebookHistoryDialog";
+import GradebookImportDialog from "../../features/exams/GradebookImportDialog";
 import GradebookStageNotice from "../../features/exams/GradebookStageNotice";
 import FeatureLayout from "../../components/FeatureLayout";
 import FilterSelectField from "../../components/FilterSelectField";
@@ -114,6 +115,7 @@ export default function ExamLists() {
   const [total, setTotal] = useState(0), [totalRows, setTotalRows] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
   const [unassessedRows, setUnassessedRows] = useState(null);
@@ -181,7 +183,7 @@ export default function ExamLists() {
     }, signal: controller.signal })
       .then(({ data }) => { if (active) {
         setWorkflow(data.workflow || { status: "draft", version: 0 });
-        if (data.offering) setLoadedOffering({ id: offeringId, status: data.offering.status, examScheduling: data.offering.examScheduling });
+        if (data.offering) setLoadedOffering({ id: offeringId, status: data.offering.status, examScheduling: data.offering.examScheduling, componentImportAllowed: data.componentImportAllowed === true });
         refreshOfferingCompletion(data.offering);
         const refreshedDirty = { ...dirtyRef.current };
         setRows(data.rows.map(row => {
@@ -333,7 +335,7 @@ export default function ExamLists() {
       });
       setRows(data.rows.map(row => { const saved = draftOf(row); savedRows.current.set(row.participantId, saved); return { ...saved, savedEligibility: row.eligible }; })); setRevision(data.revision); setDirty({}); dirtyRef.current = {};
       if (data.workflow) setWorkflow(data.workflow);
-      if (data.offering) setLoadedOffering(data.offering);
+      if (data.offering) setLoadedOffering({ ...data.offering, componentImportAllowed: data.componentImportAllowed === true });
       refreshOfferingCompletion(data.offering);
       setTotal(data.total); setTotalRows(data.totalRows); setPage(data.page);
       setUnassessedRows(data.unassessedRows ?? null);
@@ -518,9 +520,12 @@ export default function ExamLists() {
         {!blank && <Button startIcon={<ClockIcon />} disabled={!offeringId || saving} onClick={loadHistory}>Lịch sử điểm</Button>}
           {blank && <DocumentExportMenu label="Danh sách thi" title="Xuất lịch thi kết thúc học phần" disabled={!groupId || !offeringId || !total || busy || saving || exporting || !examPrintReady}
             onWord={() => exportFile("word")} onExcel={() => exportFile("excel")} onPdf={() => exportFile("pdf")} />}
-          {!blank && <Tooltip title={dirtyCount ? "Lưu các điểm đang chỉnh sửa trước khi xuất phiếu ký" : "Xuất phiếu theo dõi tình hình học tập — BM.02-QT.SDH.03"}><span>
+          {!blank && <Tooltip placement="top" disableFocusListener title={dirtyCount ? "Lưu các điểm đang chỉnh sửa trước khi xuất phiếu ký" : "Xuất phiếu theo dõi tình hình học tập — BM.02-QT.SDH.03"}><span>
             <DocumentExportMenu label="Xuất báo cáo" title="Xuất phiếu theo dõi tình hình học tập — BM.02-QT.SDH.03" disabled={!groupId || !offeringId || !totalRows || busy || saving || exporting || !!dirtyCount}
               onWord={() => exportSigningSheet("word")} onExcel={() => exportSigningSheet("excel")} onPdf={() => exportSigningSheet("pdf")} />
+          </span></Tooltip>}
+          {!blank && canSubmitGrades && <Tooltip title={dirtyCount ? "Lưu các điểm đang sửa trước khi import" : "Chỉ nhập Điểm KT và Điểm TL/BTL sau khi hoàn thành giảng dạy, trước khi tạo lịch thi"}><span>
+            <Button disabled={!offeringId || !teachingCompleted || !componentEditable || loadedOffering?.id !== offeringId || !loadedOffering.componentImportAllowed || !totalRows || busy || saving || exporting || !!dirtyCount} onClick={() => setImportOpen(true)}>Nhập điểm từ Excel</Button>
           </span></Tooltip>}
           {!blank && <Button startIcon={<DocumentCheckIcon />} disabled={!workflowEditable || !canSubmitGrades || !teachingCompleted || (!dirtyCount && !(newWorkflow && workflow.eligibility.status !== 'approved' && totalRows > 0 && unassessedRows === 0)) || saving || exporting || busy} onClick={save}>{saving ? "Đang lưu..." : "Cập nhật cả bảng"}</Button>}
           <Tooltip title="Cài đặt điểm số">
@@ -589,6 +594,10 @@ export default function ExamLists() {
       </details>
       {dirtyCount > 0 && !blank && <Alert severity="warning" sx={{ mt: 1 }} className="exam-no-print">Bạn có điểm chưa lưu.</Alert>}
       {settingsOpen && <GradeSettingsDialog canEdit={canEditPolicy} initialMajorId={majorId} initialYear={year} groups={groups} onClose={() => setSettingsOpen(false)} />}
+      {importOpen && <GradebookImportDialog classGroupId={groupId} offeringId={offeringId} onClose={() => setImportOpen(false)} onSaved={(_data, count) => {
+        setImportOpen(false); setPolicyRevision(value => value + 1); notifyGradebookSaved();
+        notify.success(`Đã nhập điểm KT và TL/BTL cho ${count} học viên.`);
+      }} />}
       <AppDialog
         open={!!workflowAction}
         onClose={() => setWorkflowAction("")}

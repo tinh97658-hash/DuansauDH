@@ -969,7 +969,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
           sx: {
             borderRadius: "6px",
             overflow: "hidden",
-            border: "1px solid #B8C7D6",
+            border: "1px solid #cbd5e1",
             width: "calc(100vw - 32px)",
             maxWidth: "1800px",
             boxShadow: "0 12px 36px rgba(15, 39, 75, 0.22)",
@@ -978,9 +978,9 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
       >
         <DialogTitle
           sx={{
-            background: "var(--dialog-title-bg, #b4cae6)",
-            color: "var(--dialog-title-text, #000000)",
-            borderBottom: "1px solid #B8C7D6",
+            background: "var(--dialog-title-bg, #ffffff)",
+            color: "var(--dialog-title-text, #123b63)",
+            borderBottom: "1px solid #e2e8f0",
             py: 1.25,
             px: 2.5,
             display: "flex",
@@ -1003,7 +1003,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
           {/* Main 3-Column A4 Layout Grid */}
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" }, gap: 1.5 }}>
             {/* COLUMN 1: THÔNG TIN CÁ NHÂN + ẢNH 3x4 */}
-            <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#FFFFFF", borderRadius: "3px", borderColor: "#DFE4E8" }}>
+            <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#FFFFFF", borderRadius: "8px", borderColor: "#cbd5e1", boxShadow: "0 1px 3px rgba(15,23,42,0.05)" }}>
               <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", display: "block", mb: 1, textTransform: "uppercase" }}>
                 Thông tin cá nhân
               </Typography>
@@ -1253,7 +1253,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
             {/* COLUMN 2: THỂ THỨC ĐÀO TẠO & CHỖ Ở & GIẤY TỜ BỔ SUNG */}
             <Stack spacing={1.5}>
               {/* THỂ THỨC ĐÀO TẠO */}
-              <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#FFFFFF", borderRadius: "3px", borderColor: "#DFE4E8" }}>
+              <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#FFFFFF", borderRadius: "8px", borderColor: "#cbd5e1", boxShadow: "0 1px 3px rgba(15,23,42,0.05)" }}>
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
                   <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", textTransform: "uppercase" }}>
                     Thể thức đào tạo
@@ -1420,7 +1420,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
               {/* THÔNG TIN CHỖ Ở & GIẤY TỜ BỔ SUNG */}
               <Box sx={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 1 }}>
                 {/* THÔNG TIN CHỖ Ở */}
-                <Paper variant="outlined" sx={{ p: 1.2, bgcolor: "#FFFFFF", borderRadius: "3px", borderColor: "#DFE4E8" }}>
+                <Paper variant="outlined" sx={{ p: 1.2, bgcolor: "#FFFFFF", borderRadius: "8px", borderColor: "#cbd5e1", boxShadow: "0 1px 3px rgba(15,23,42,0.05)" }}>
                   <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", display: "block", mb: 0.8, textTransform: "uppercase" }}>
                     Thông tin chỗ ở
                   </Typography>
@@ -1453,7 +1453,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                 </Paper>
 
                 {/* GIẤY TỜ BỔ SUNG */}
-                <Paper variant="outlined" sx={{ p: 1.2, bgcolor: "#FFFFFF", borderRadius: "3px", borderColor: "#DFE4E8" }}>
+                <Paper variant="outlined" sx={{ p: 1.2, bgcolor: "#FFFFFF", borderRadius: "8px", borderColor: "#cbd5e1", boxShadow: "0 1px 3px rgba(15,23,42,0.05)" }}>
                   <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", display: "block", mb: 0.8, textTransform: "uppercase" }}>
                     Giấy tờ nộp
                   </Typography>
@@ -1485,7 +1485,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
             </Stack>
 
             {/* COLUMN 3: VĂN BẰNG ĐẠI HỌC (NĂNG LỰC ĐẦU VÀO) */}
-            <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#FFFFFF", borderRadius: "3px", borderColor: "#DFE4E8" }}>
+            <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#FFFFFF", borderRadius: "8px", borderColor: "#cbd5e1", boxShadow: "0 1px 3px rgba(15,23,42,0.05)" }}>
               <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", display: "block", mb: 1, textTransform: "uppercase" }}>
                 Văn bằng đại học (Đầu vào)
               </Typography>
@@ -1581,7 +1581,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
               fontSize: 13,
               fontWeight: 700,
               textTransform: "none",
-              borderRadius: "3px",
+              borderRadius: "6px",
               boxShadow: "none",
               "&:hover": { bgcolor: "#0E5E2D" },
             }}
@@ -1603,7 +1603,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                 fontSize: 13,
                 fontWeight: 600,
                 textTransform: "none",
-                borderRadius: "3px",
+                borderRadius: "6px",
                 borderColor: "#0788B8",
                 color: "#0788B8",
                 bgcolor: "#FFFFFF",
@@ -1625,7 +1625,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
               fontSize: 13,
               fontWeight: 600,
               textTransform: "none",
-              borderRadius: "3px",
+              borderRadius: "6px",
               bgcolor: "#FFFFFF",
             }}
           >

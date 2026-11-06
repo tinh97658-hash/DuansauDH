@@ -29,7 +29,6 @@ const buildService = () => {
     offeringGroups as never,
     subjects as never,
     curriculumSubjects as never,
-    classGroupElectives as never,
     classGroups as never,
     classGroupMembers as never,
     majors as never,
@@ -350,6 +349,32 @@ describe("SchedulingService course-offering candidates", () => {
     expect(result.subjects).toHaveLength(1);
     expect(result.subjects[0].subject.id).toBe(subject.id);
     expect(result.subjects[0].eligibleClassGroups).toEqual([expect.objectContaining({ id: g1.id, memberCount: 2 })]);
+  });
+
+  it("exposes every curriculum subject to each assigned class without a separate selection", async () => {
+    const mocks = buildService();
+    const first = group("first"), second = group("second");
+    second.curriculumId = first.curriculumId;
+    mocks.majors.findOne.mockResolvedValue({ id: "major-1" });
+    mocks.classGroups.findAll.mockResolvedValue([first, second]);
+    mocks.packages.findAll.mockResolvedValue([{ id: "entry-elective", curriculumId: first.curriculumId, subjectId: subject.id, subject, isRequired: false }]);
+    mocks.classGroupElectives.findAll.mockResolvedValue([{ classGroupId: second.id, curriculumSubjectId: "entry-elective" }]);
+    mocks.offeringGroups.findAll.mockResolvedValue([]);
+    const result = await mocks.service.listCourseOfferingCandidates({ program: "masters", majorId: "major-1", academicYear: "2026" });
+    expect(result.subjects).toHaveLength(1);
+    expect(result.subjects[0].eligibleClassGroups.map(g => g.id)).toEqual([first.id, second.id]);
+  });
+
+  it.each([true, false])("ignores retired class overrides and uses the complete assigned curriculum (required: %s)", async required => {
+    const mocks = buildService();
+    const first = { ...group("first"), subjectRequirements: [{ curriculumSubjectId: "entry", isRequired: required }] };
+    const second = { ...group("second"), curriculumId: first.curriculumId, subjectRequirements: [] };
+    mocks.majors.findOne.mockResolvedValue({ id: "major-1" });
+    mocks.classGroups.findAll.mockResolvedValue([first, second]);
+    mocks.packages.findAll.mockResolvedValue([{ id: "entry", curriculumId: first.curriculumId, subjectId: subject.id, subject, isRequired: !required }]);
+    mocks.offeringGroups.findAll.mockResolvedValue([]);
+    const result = await mocks.service.listCourseOfferingCandidates({ program: "masters", majorId: "major-1", academicYear: "2026" });
+    expect(result.subjects[0].eligibleClassGroups.map(g => g.id)).toEqual([first.id, second.id]);
   });
 
   it("does not expose a subject that is outside the official package", async () => {
@@ -686,6 +711,14 @@ describe("SchedulingService.createCourseOffering", () => {
     });
     return g1;
   };
+
+  it("opens a curriculum elective without a separate class selection", async () => {
+    const mocks = buildService();
+    const g1 = arrangeValidCreate(mocks);
+    mocks.packages.findAll.mockResolvedValue([{ ...officialPackage(g1.id), isRequired: false }]);
+    await expect(mocks.service.createCourseOffering({ subjectId: subject.id, classGroupIds: [g1.id] })).resolves.toBeDefined();
+    expect(mocks.courseOfferings.create).toHaveBeenCalled();
+  });
 
   it("creates the offering and group relation atomically after locking groups", async () => {
     const mocks = buildService();
@@ -1104,7 +1137,7 @@ describe("SchedulingService persisted reads", () => {
     }));
   });
 
-  it("returns the class progress summary and every teaching session", async () => {
+  it.each([true, false])("returns class progress and preserves opened elective history (required: %s)", async isRequired => {
     const { service, majors, subjects, packages, classGroupElectives, classGroups, offeringGroups, courseOfferings, teachingSessions } = buildService();
     const selectedGroup = { ...group("group-1", "CNT2027.01"), curriculum: { id: curriculumIdFor("group-1"), code: "CNTT-2027", name: "CTĐT CNTT 2027", totalCredits: 60 } };
     const secondSubject = { ...subject, id: "subject-2", code: "HP02", name: "Học phần chưa học" };
@@ -1119,7 +1152,7 @@ describe("SchedulingService persisted reads", () => {
     classGroups.findAll.mockResolvedValue([selectedGroup]);
     subjects.findAll.mockResolvedValue([subject, secondSubject]);
     packages.findAll.mockResolvedValue([
-      { id: "entry-1", curriculumId: selectedGroup.curriculumId, subjectId: subject.id, subject, isRequired: true, credits: 3, sortOrder: 1, block: { id: "block", code: "CS", name: "Cơ sở", sortOrder: 1 } },
+      { id: "entry-1", curriculumId: selectedGroup.curriculumId, subjectId: subject.id, subject, isRequired, credits: 3, sortOrder: 1, block: { id: "block", code: "CS", name: "Cơ sở", sortOrder: 1 } },
       { id: "entry-2", curriculumId: selectedGroup.curriculumId, subjectId: secondSubject.id, subject: secondSubject, isRequired: true, credits: 2, sortOrder: 2, block: { id: "block", code: "CS", name: "Cơ sở", sortOrder: 1 } },
     ]);
     classGroupElectives.findAll.mockResolvedValue([]);

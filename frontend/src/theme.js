@@ -447,10 +447,10 @@ export const theme = createTheme({
         root: {
           fontSize: "15px",
           fontWeight: 700,
-          color: "var(--dialog-title-text, #000000)",
-          borderBottom: "1px solid #718292",
+          color: "var(--dialog-title-text, #123b63)",
+          borderBottom: "1px solid #e2e8f0",
           padding: "12px 18px",
-          background: "var(--dialog-title-bg, #b4cae6)",
+          background: "var(--dialog-title-bg, #ffffff)",
           "& .MuiTypography-root, & .MuiIconButton-root": { color: "inherit" },
         },
       },

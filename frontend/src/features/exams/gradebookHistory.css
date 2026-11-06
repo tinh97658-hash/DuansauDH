@@ -1,7 +1,7 @@
 .gradebook-history-dialog .MuiBackdrop-root{background:rgba(20,38,58,.48);backdrop-filter:blur(2px)}
 .gradebook-history-dialog{--app-dialog-max-height:720px}
 .gradebook-history-dialog .MuiDialog-paper{width:calc(100% - 96px);max-width:1320px;height:auto;max-height:calc(100dvh - 96px);margin:48px;border:1px solid #c5d2df;border-radius:8px;overflow:hidden;color:#17324d;box-shadow:0 24px 80px #0b223844}
-.gradebook-history-dialog .gh-titlebar{display:flex;align-items:center;gap:14px;flex:none;padding:20px 24px;border-bottom:1px solid #000;background:var(--dialog-title-bg,#b4cae6);color:#000;opacity:1}
+.gradebook-history-dialog .gh-titlebar{display:flex;align-items:center;gap:14px;flex:none;padding:20px 24px;border-bottom:1px solid #000;background:var(--dialog-title-bg,#ffffff);color:var(--dialog-title-text,#123b63);border-bottom:1px solid #e2e8f0;opacity:1}
 .gh-title-copy{flex:1;min-width:0}
 .gradebook-history-dialog .gh-title-copy h2{margin:0;color:#000;font:700 19px/1.4 var(--app-font-family,"Segoe UI",sans-serif)}
 .gradebook-history-dialog .gh-title-copy p{margin:4px 0 0;color:#000;font-size:12.5px;font-weight:400;line-height:1.5;letter-spacing:0;opacity:1}

@@ -9,7 +9,7 @@ import {
   CreateSubjectFromExistingDto,
   DecideMajorTransferDto, DecideRecognitionDto, ProposeRecognitionsDto, RequestMajorTransferDto, UpdateSubjectRecognitionDto,
   UpdateLearningResultDto,
-  SetCurriculumSubjectsDto,
+  SetCurriculumSubjectsDto, UpdateCurriculumSubjectRequirementDto,
   UpdateAdmissionRecordDto, UpdateClassDto, UpdateCurriculumDto, UpdateSubjectDto,
 } from "./dto/plan.dto.js";
 import { CurriculumService } from "./curriculum.service.js";
@@ -58,9 +58,10 @@ export class PlanController {
   @Post("curriculums") @RequirePermissions("plan.manage") createCurriculum(@Body() dto: CreateCurriculumDto) { return this.curriculums.create(dto); }
   @Put("curriculums/:id") @RequirePermissions("plan.manage") updateCurriculum(@Param("id") id: string, @Body() dto: UpdateCurriculumDto) { return this.curriculums.update(id, dto); }
   @Put("curriculums/:id/subjects") @RequirePermissions("plan.manage") setCurriculumSubjects(@Param("id") id: string, @Body() dto: SetCurriculumSubjectsDto) { return this.curriculums.setSubjects(id, dto); }
+  @Put("curriculums/:id/subjects/:entryId/requirement") @RequirePermissions("plan.manage") setSubjectRequirement(@Param("id") id: string, @Param("entryId") entryId: string, @Body() dto: UpdateCurriculumSubjectRequirementDto) { return this.curriculums.setSubjectRequirement(id, entryId, dto.isRequired); }
   @Delete("curriculums/:id") @RequirePermissions("plan.manage") removeCurriculum(@Param("id") id: string) { return this.curriculums.remove(id); }
 
-  // ===== Học phần của lớp: toàn bộ học phần thuộc CTĐT lớp đã chọn =====
+  // ===== Toàn bộ học phần trong CTĐT lớp đã chọn =====
   @Get("classes/:id/subjects") classSubjects(@Param("id") id: string) { return this.curriculums.classSubjects(id); }
   @Post("classes/:id/curriculum") @RequirePermissions("plan.manage") ensureClassCurriculum(@Param("id") id: string) { return this.curriculums.ensureForClass(id); }
 

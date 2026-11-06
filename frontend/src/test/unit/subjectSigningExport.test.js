@@ -2,7 +2,7 @@ import JSZip from "jszip";
 import ExcelJS from "exceljs";
 import fs from "node:fs";
 import path from "node:path";
-import { buildSubjectSigningDocument, createSubjectSigningWord, createSubjectSigningExcel, SUBJECT_SIGNING_FORM } from "../../features/exams/subjectSigningExport";
+import { buildSubjectSigningDocument, createSubjectSigningWord, createSubjectSigningExcel, SUBJECT_SIGNING_FORM, SUBJECT_SIGNING_LAYOUT } from "../../features/exams/subjectSigningExport";
 import { excelWidthToPoints } from "../../utils/documentLayout";
 
 const sample = () => buildSubjectSigningDocument([
@@ -79,6 +79,17 @@ it("round-trips all 31 learners in Excel with the source form's merged cells and
   expect(firstValue(5).richText).toContainEqual(expect.objectContaining({ text: "Chuyên ngành: ", font: expect.objectContaining({ bold: true }) }));
   expect(Array.from({ length: 31 }, (_, i) => first.getCell(10 + i, 1).value)).toEqual(Array.from({ length: 31 }, (_, i) => i + 1));
   expect(first.pageSetup).toMatchObject({ orientation: "landscape", fitToWidth: 1, fitToHeight: 0, printTitlesRow: "8:9", printArea: `A1:${first.getColumn(first.columnCount).letter}48` });
+  const openingZoom = Math.max(50, Math.min(200, Math.floor((window.innerWidth - 80) / (SUBJECT_SIGNING_LAYOUT.width / 20 * 96 / 72) * 100)));
+  expect(first.views[0]).toMatchObject({ style: "normal", showGridLines: false, zoomScale: openingZoom, activeCell: "A1" });
+  // Use Excel's actual OOXML-to-pixel formula, independently of our inverse
+  // helper: a round trip through matching but incorrect helpers hid narrowing.
+  const renderedWidth = first.columns.reduce((sum, column) =>
+    sum + Math.trunc((256 * column.width + Math.trunc(128 / 7)) / 256 * 7) * 72 / 96, 0);
+  const printableWidth = 297 * 72 / 25.4 - (first.pageSetup.margins.left + first.pageSetup.margins.right) * 72;
+  expect(first.pageSetup.paperSize).toBe(9);
+  expect(first.pageSetup.fitToPage).toBe(true);
+  expect(Math.abs(renderedWidth - SUBJECT_SIGNING_LAYOUT.width / 20)).toBeLessThan(3);
+  expect(Math.abs(renderedWidth - printableWidth)).toBeLessThan(3);
 });
 
 it('gives metadata independent widths and equal signature thirds with long fixture content', async () => {

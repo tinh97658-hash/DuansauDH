@@ -37,8 +37,8 @@
   --primary-dark: #004D6B;
   --primary-light: #EBF5FB;
   --secondary: #173E75;
-  --dialog-title-bg: #b4cae6;
-  --dialog-title-text: #000000;
+  --dialog-title-bg: #ffffff;
+  --dialog-title-text: #123b63;
   --dropdown-border: #B9CBD8;
   --dropdown-hover-bg: var(--table-hover-bg);
   --dropdown-selected-bg: var(--table-header-bg);
@@ -334,4 +334,20 @@ a:hover {
   .MuiSwitch-track {
     border-radius: 999px !important;
   }
+}
+
+/* Tooltips must NEVER capture pointer events or block clicks anywhere in the app */
+.MuiTooltip-popper,
+.MuiTooltip-tooltip,
+[role="tooltip"] {
+  pointer-events: none !important;
+}
+
+/* Hide tooltips when export menus or dropdowns are open */
+body:has(.document-export-options) .MuiTooltip-popper,
+body:has([aria-haspopup="menu"][aria-expanded="true"]) .MuiTooltip-popper {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }

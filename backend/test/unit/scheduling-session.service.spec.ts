@@ -52,7 +52,6 @@ const buildService = () => {
     offeringGroups as never,
     subjects as never,
     curriculumSubjects as never,
-    classGroupElectives as never,
     classGroups as never,
     classGroupMembers as never,
     majors as never,

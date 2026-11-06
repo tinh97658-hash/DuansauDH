@@ -689,3 +689,126 @@ describe("Training Plan canonical curriculum display", () => {
     expect(axios.delete).not.toHaveBeenCalled();
   });
 });
+
+describe("Training Plan independent curriculum labels", () => {
+  beforeEach(() => { jest.clearAllMocks(); });
+  const setup = (isRequired, subjectsEditable = true, requirementEditable = true) => {
+    const entry = { id: "entry-required", subjectId: "subject-a", name: "Học phần trong CTĐT", code: "A", credits: 3, isRequired, blockCode: "CS", requirementEditable };
+    let curriculum = { id: "current", code: "CT-A", name: "CTĐT A", majorId: major.id, subjectsEditable,
+      applicableFromYear: String(new Date().getFullYear()), subjects: [entry], classGroups: [{ id: "class-a", code: "L01" }],
+      configurationComplete: false, electiveGroups: [{ id: "old", minCredits: 99, maxCredits: 99 }] };
+    configureReads([]);
+    const defaultGet = axios.get.getMockImplementation();
+    axios.get.mockImplementation(url => url.includes("/plan/curriculums?") ? Promise.resolve({ data: [curriculum] })
+      : url.endsWith("/plan/curriculums/current") ? Promise.resolve({ data: curriculum }) : defaultGet(url));
+    axios.put.mockImplementation(async (url, payload) => {
+      curriculum = { ...curriculum, subjects: [{ ...entry, isRequired: payload.isRequired }] };
+      return { data: curriculum };
+    });
+    return entry;
+  };
+  const open = async () => {
+    await act(async () => { render(<TrainingPlan />); });
+    await clickAndWait(await screen.findByRole("tab", { name: /Chương trình đào tạo theo khóa/ }));
+  };
+  const changeType = async (entry, label) => {
+    fireEvent.mouseDown(screen.getByLabelText(`Loại học phần ${entry.name}`));
+    await clickAndWait(await screen.findByRole("option", { name: label }));
+  };
+
+  it.each([true, false])("updates the label only inside the current curriculum: %s", async isRequired => {
+    const entry = setup(isRequired);
+    await open();
+    expect(screen.queryByText(/Chưa xếp nhóm/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Chưa cấu hình đủ/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cấu hình nhóm/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Chọn môn cho lớp/)).not.toBeInTheDocument();
+    expect(screen.getByText("Tổng: 3 TC")).toBeInTheDocument();
+    await changeType(entry, isRequired ? "Tự chọn" : "Bắt buộc");
+    expect(axios.put).toHaveBeenCalledWith(expect.stringMatching(/\/plan\/curriculums\/current\/subjects\/entry-required\/requirement$/), { isRequired: !isRequired }, { withCredentials: true });
+    expect(axios.put).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(`${isRequired ? "Tự chọn" : "Bắt buộc"}: 3 TC`)).toBeInTheDocument();
+  });
+
+  it("allows editing an unused course while other courses have begun", async () => {
+    const entry = setup(true, false);
+    await open();
+    expect(screen.getByRole("button", { name: "Thêm học phần từ danh mục" })).toBeDisabled();
+    await changeType(entry, "Tự chọn");
+    expect(axios.put).toHaveBeenCalledWith(expect.any(String), { isRequired: false }, { withCredentials: true });
+  });
+
+  it("disables editing a course already used and explains the lock", async () => {
+    const entry = setup(true, false, false);
+    await open();
+    expect(screen.getByLabelText(`Loại học phần ${entry.name}`)).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByText("Đã sử dụng — giữ nguyên")).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByLabelText(`Loại học phần ${entry.name}`));
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+    expect(axios.put).not.toHaveBeenCalled();
+  });
+
+  it("retains the label if a course starts being used after the page was loaded", async () => {
+    const entry = setup(true);
+    axios.put.mockRejectedValue({ response: { data: { message: "Học phần đã mở lớp" } } });
+    await open();
+    await changeType(entry, "Tự chọn");
+    expect(toast.error).toHaveBeenCalledWith("Học phần đã mở lớp");
+    expect(screen.getByText("Bắt buộc: 3 TC")).toBeInTheDocument();
+  });
+
+  it("preserves the previous label when saving fails", async () => {
+    const entry = setup(true);
+    axios.put.mockRejectedValue({ response: { data: { message: "Không thể cập nhật" } } });
+    await open();
+    await changeType(entry, "Tự chọn");
+    expect(toast.error).toHaveBeenCalledWith("Không thể cập nhật");
+    expect(screen.getByText("Bắt buộc: 3 TC")).toBeInTheDocument();
+  });
+});
+
+describe("Training Plan asynchronous curriculum scope", () => {
+  beforeEach(() => { jest.clearAllMocks(); });
+  const curriculum = id => ({ id, code: `CT-${id}`, name: `Chương trình ${id}`, majorId: major.id, program: "masters",
+    applicableFromYear: String(new Date().getFullYear()), classGroups: [], subjectsEditable: true,
+    subjects: [{ id: `entry-${id}`, subjectId: `subject-${id}`, name: `Môn ${id}`, code: id, credits: 3, isRequired: true, requirementEditable: true }] });
+  const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
+  const setup = (firstDetail) => {
+    const a = curriculum("A"), b = curriculum("B");
+    configureReads([]);
+    const defaultGet = axios.get.getMockImplementation();
+    axios.get.mockImplementation(url => url.includes("/plan/curriculums?") ? Promise.resolve({ data: [a, b] })
+      : url.endsWith("/plan/curriculums/A") ? (firstDetail || Promise.resolve({ data: a }))
+      : url.endsWith("/plan/curriculums/B") ? Promise.resolve({ data: b }) : defaultGet(url));
+    return { a, b };
+  };
+  const open = async () => {
+    await act(async () => { render(<TrainingPlan />); });
+    await clickAndWait(await screen.findByRole("tab", { name: /Chương trình đào tạo theo khóa/ }));
+  };
+
+  it("ignores a late response for a curriculum the user has already left", async () => {
+    const pending = deferred();
+    const { a, b } = setup(pending.promise);
+    await open();
+    await clickAndWait(screen.getByText(b.name));
+    expect(await screen.findByText("Môn B")).toBeInTheDocument();
+    await act(async () => { pending.resolve({ data: a }); });
+    expect(screen.getByText("Môn B")).toBeInTheDocument();
+    expect(screen.queryByText("Môn A")).not.toBeInTheDocument();
+  });
+
+  it("does not jump back to a previous curriculum when its pending save finishes", async () => {
+    const pending = deferred();
+    const { a, b } = setup();
+    axios.put.mockReturnValue(pending.promise);
+    await open();
+    fireEvent.mouseDown(await screen.findByLabelText("Loại học phần Môn A"));
+    await clickAndWait(await screen.findByRole("option", { name: "Tự chọn" }));
+    await clickAndWait(screen.getByText(b.name));
+    expect(await screen.findByText("Môn B")).toBeInTheDocument();
+    await act(async () => { pending.resolve({ data: { ...a, subjects: [{ ...a.subjects[0], isRequired: false }] } }); });
+    expect(screen.getByText("Môn B")).toBeInTheDocument();
+    expect(screen.queryByText("Môn A")).not.toBeInTheDocument();
+  });
+});
