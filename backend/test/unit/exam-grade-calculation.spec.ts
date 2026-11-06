@@ -1,6 +1,13 @@
 import { calculateExamEligibility, calculateExamGrade, resolveSavedExamGrade } from "../../src/masters/exam-grade-calculation.js";
 import { LEGACY_GRADING_POLICY } from "../../src/masters/grading-policy.js";
 
+it.each(['absent_excused','absent_unexcused'] as const)('resolves %s without substituting a numeric zero',examAttendanceStatus=>{
+ const row={testScore:8,assignmentScore:8,examScore:9,examExempt:false,examAttendanceStatus};
+ const expected={courseScore:null,grade4:null,letterGrade:'',result:examAttendanceStatus==='absent_unexcused'?'failed':'pending'};
+ expect(calculateExamGrade(row)).toEqual(expected);
+ expect(resolveSavedExamGrade({...row,finalized:true,courseScore:9,result:'passed'})).toEqual(expected);
+});
+
 it.each([false, true])('keeps a frozen disqualification failed in saved reports (finalized: %s)', finalized => {
   expect(resolveSavedExamGrade({ eligibilityFrozen: true, eligible: false, workflowPhase: 'final',
     testScore: 3.9, assignmentScore: 5, result: 'pending', finalized }))

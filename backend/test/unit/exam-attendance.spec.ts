@@ -78,6 +78,23 @@ it('rejects candidates outside the frozen roster',async()=>{
  expect(f.db.query).not.toHaveBeenCalled();
 });
 
+it('does not allow editing confirmed attendance even with the latest version',async()=>{
+ const f=fixture();(f.session as any).attendance_confirmed_at=new Date();
+ await expect(f.service.recordAttendance('session',dto,f.actor)).rejects.toThrow('đã xác nhận và khóa');
+ expect(f.db.query).not.toHaveBeenCalled();
+});
+it('enforces write permission, responsibility and result locks before confirming attendance',async()=>{
+ const f=fixture();f.rbac.effectiveAccess.mockResolvedValue({permissions:new Set(['exams.view'])});
+ await expect(f.service.confirmAttendance('session',{version:4},f.actor)).rejects.toThrow(ForbiddenException);
+ expect(f.db.transaction).not.toHaveBeenCalled();
+ const readonly=fixture();readonly.access.assertOffering.mockResolvedValue({readOnly:true});
+ await expect(readonly.service.confirmAttendance('session',{version:4},readonly.actor)).rejects.toThrow(ForbiddenException);
+ expect(readonly.workflow.lock).not.toHaveBeenCalled();
+ const locked=fixture();locked.workflow.lock.mockResolvedValue({state:{result_status:'approved'}});
+ await expect(locked.service.confirmAttendance('session',{version:4},locked.actor)).rejects.toThrow(ConflictException);
+ expect(locked.db.query).not.toHaveBeenCalled();
+});
+
 it('validates mutually exclusive attendance, participant identity and version',async()=>{
  for(const status of ['present','absent_excused','absent_unexcused'])expect(await validate(plainToInstance(ExamCandidateAttendanceDto,{...dto,status}))).toEqual([]);
  for(const change of [{status:['absent_excused','absent_unexcused']},{status:'absent'},{version:-1},{version:'4'},{participantId:'not-a-candidate'},{participantId:''}])

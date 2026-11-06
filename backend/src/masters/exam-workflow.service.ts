@@ -17,6 +17,7 @@ const emptyResult = { examScore: null, courseScore: null, grade4: null, letterGr
 const fingerprint = (rows: any[]) => [...rows].sort((a,b)=>a.participantId.localeCompare(b.participantId)).map(row=>Object.fromEntries([
   'participantId','classGroupId','code','fullName','testScore','assignmentScore','examScore','eligible','examExempt',
   'gradingPolicy','eligibilityPolicy','studyLeaveFailure','profileForeignLanguageExempt','courseScore','result',
+  'examAttendanceStatus','examSessionId','isMakeup',
 ].map(key=>[key,row[key]??null])));
 
 @Injectable()
@@ -76,7 +77,12 @@ export class ExamWorkflowService {
     const books=await this.query('SELECT grades FROM course_exam_gradebooks WHERE course_offering_id=:id ORDER BY updated_at DESC,class_group_id',{id},transaction);
     const held=(await this.query(`SELECT c.participant_id FROM course_exam_session_candidates c JOIN course_exam_sessions s ON s.id=c.session_id
       WHERE s.course_offering_id=:id AND s.status='held'`,{id,snapshot:snapshot.id},transaction)).map(r=>r.participant_id);
-    return resolveApprovedExamRows(snapshot.rows,books,held,state);
+    const attempts=await this.query(`SELECT DISTINCT ON (c.participant_id) c.participant_id,c.session_id,c.makeup_for_session_id,s.status,
+      COALESCE(a.status,'present') AS attendance FROM course_exam_sessions s JOIN course_exam_session_candidates c ON c.session_id=s.id
+      LEFT JOIN course_exam_candidate_attendance a ON a.session_id=c.session_id AND a.participant_id=c.participant_id
+      WHERE s.course_offering_id=:id AND s.status IN ('scheduled','held')
+      ORDER BY c.participant_id,s.exam_date DESC,s.start_time DESC,s.created_at DESC,s.id DESC`,{id},transaction);
+    return resolveApprovedExamRows(snapshot.rows,books,held,state,attempts);
   }
   componentRow(row:any) {
     return {...row,...emptyResult,eligible:calculateExamEligibility(row,row.eligibilityPolicy),workflowPhase:'components',eligibilityFrozen:false,examScoreEditable:false,

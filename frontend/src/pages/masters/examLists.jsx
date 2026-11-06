@@ -27,7 +27,7 @@ import { buildExamListDocument, createExamListExcel, createExamListWord } from "
 import { buildSubjectSigningDocument, createSubjectSigningExcel, createSubjectSigningWord, openSubjectSigningPreview, subjectSigningFilename } from "../../features/exams/subjectSigningExport";
 import { API_BASE_URL } from "../../config/http";
 import { personNameParts } from "../../utils/personName";
-import { displayGradeDate, draftOf, formatAttemptScores, formatScore, gradebookColumns, gradebookRowValues, gradePayload, isExamCandidate, numericScore, RESULT_LABELS, rowError, SCORE_FIELDS, updateGradeDraft, visibleGradeRows } from "../../features/exams/gradebook";
+import { examAttendanceLabel, displayGradeDate, draftOf, formatAttemptScores, formatScore, gradebookColumns, gradebookRowValues, gradePayload, isExamCandidate, numericScore, RESULT_LABELS, rowError, SCORE_FIELDS, updateGradeDraft, visibleGradeRows } from "../../features/exams/gradebook";
 import "../../features/exams/gradebook.css";
 import { useSubjectCatalogRevision } from "../../utils/subjectCatalog";
 import { notifyGradebookSaved } from "../../utils/gradebookRevision";
@@ -188,7 +188,7 @@ export default function ExamLists() {
           savedRows.current.set(row.participantId, draftOf(row));
           const draft = row.canEditGrade === false || row.profileForeignLanguageExempt || row.studyLeaveFailure || (data.workflow && data.workflow.status !== "draft") ? undefined : dirtyRef.current[row.participantId];
           if (row.canEditGrade === false || row.profileForeignLanguageExempt || row.studyLeaveFailure) delete refreshedDirty[row.participantId];
-          const merged = { ...row, ...draft, canEditGrade: row.canEditGrade, studyStatus: row.studyStatus, studyLeaveFailure: row.studyLeaveFailure, eligibilityPolicy: row.eligibilityPolicy, profileForeignLanguageExempt: row.profileForeignLanguageExempt };
+          const merged = { ...row, ...draft, examAttendanceStatus:row.examAttendanceStatus,examScoreEditable:row.examScoreEditable,examSessionId:row.examSessionId, canEditGrade: row.canEditGrade, studyStatus: row.studyStatus, studyLeaveFailure: row.studyLeaveFailure, eligibilityPolicy: row.eligibilityPolicy, profileForeignLanguageExempt: row.profileForeignLanguageExempt };
           const next = { ...(draft ? updateGradeDraft(merged) : draftOf(row)), savedEligibility: row.eligible };
           if (draft) refreshedDirty[row.participantId] = next;
           return next;
@@ -283,7 +283,7 @@ export default function ExamLists() {
     if (!canSubmitGrades || !teachingCompleted) { if (canSubmitGrades) showCompletionWarning(); return; }
     if (rows.find(row => row.participantId === id)?.canEditGrade === false || rows.find(row => row.participantId === id)?.profileForeignLanguageExempt || rows.find(row => row.participantId === id)?.studyLeaveFailure) return;
     if(('testScore' in patch||'assignmentScore' in patch||'examExempt' in patch)&&!componentEditable)return;
-    if('examScore' in patch&&(!resultEditable||!rows.find(row=>row.participantId===id)?.examScoreEditable))return;
+    if('examScore' in patch&&(!resultEditable||!rows.find(row=>row.participantId===id)?.examScoreEditable||examAttendanceLabel(rows.find(row=>row.participantId===id)||{})))return;
     const apply = row => ["testScore", "assignmentScore", "examScore", "examExempt"].some(key => key in patch) ? updateGradeDraft(row, patch) : { ...row, ...patch };
     setRows((current) => current.map((row) => row.participantId === id ? apply(row) : row));
     const row = dirty[id] || rows.find(item => item.participantId === id);
@@ -555,14 +555,14 @@ export default function ExamLists() {
                 </TableCell>
                 <TableCell align="center" title={row.profileForeignLanguageExempt ? "Miễn thi ngoại ngữ theo hồ sơ học viên" : undefined}><Checkbox size="small" disabled={rowLocked||!componentEditable} checked={row.examExempt} inputProps={{ "aria-label": `Miễn thi ${row.code}` }} onChange={(event) => edit(row.participantId, { examExempt: event.target.checked, result: event.target.checked ? "exempt" : "pending" })} /></TableCell>
                 {!blank && <>{SCORE_FIELDS.map(([key, label, max]) => {
-                  const disabled = rowLocked || (['testScore','assignmentScore'].includes(key)?!componentEditable:key==='examScore'?!resultEditable||!row.examScoreEditable:true);
+                  const disabled = rowLocked || (['testScore','assignmentScore'].includes(key)?!componentEditable:key==='examScore'?!resultEditable||!row.examScoreEditable||!!examAttendanceLabel(row):true);
                   const cellClass = key === 'examScore' ? (disabled ? 'exam-derived-cell exam-score-locked' : 'exam-editable-cell') : calculatedColumns.has(key) ? 'exam-derived-cell' : undefined;
                   return <TableCell key={key} align="center" className={cellClass}>
-                  <TextField fullWidth size="small" autoComplete="off" name={`grade-${offeringId}-${row.participantId}-${key}`} value={blank ? "" : row[key]} disabled={disabled} InputProps={{ readOnly: ["courseScore", "grade4"].includes(key) }} error={!blank && numericScore(row[key]) !== null && (!Number.isFinite(numericScore(row[key])) || numericScore(row[key]) < 0 || numericScore(row[key]) > max)} onChange={["courseScore", "grade4"].includes(key) ? undefined : (event) => { const value = event.target.value; const score = numericScore(value); if (value === "" || (/^\d*(?:[.,]\d*)?$/.test(value) && Number.isFinite(score) && score >= 0 && score <= max)) edit(row.participantId, { [key]: value }); }} onBlur={calculatedColumns.has(key) ? undefined : () => formatInput(row.participantId, key)} inputProps={{ "data-score-column": key, "aria-label": `${label} ${row.code}`, inputMode: "decimal", autoCorrect: "off", autoCapitalize: "off", spellCheck: false }} sx={inputSx} />
+                  <TextField fullWidth size="small" autoComplete="off" name={`grade-${offeringId}-${row.participantId}-${key}`} value={blank ? "" : key === "examScore" && examAttendanceLabel(row) ? examAttendanceLabel(row) : row[key]} disabled={disabled} InputProps={{ readOnly: ["courseScore", "grade4"].includes(key) }} error={!blank && numericScore(row[key]) !== null && (!Number.isFinite(numericScore(row[key])) || numericScore(row[key]) < 0 || numericScore(row[key]) > max)} onChange={["courseScore", "grade4"].includes(key) ? undefined : (event) => { const value = event.target.value; const score = numericScore(value); if (value === "" || (/^\d*(?:[.,]\d*)?$/.test(value) && Number.isFinite(score) && score >= 0 && score <= max)) edit(row.participantId, { [key]: value }); }} onBlur={calculatedColumns.has(key) ? undefined : () => formatInput(row.participantId, key)} inputProps={{ "data-score-column": key, "aria-label": `${label} ${row.code}`, inputMode: "decimal", autoCorrect: "off", autoCapitalize: "off", spellCheck: false }} sx={inputSx} />
                 </TableCell>;
                 })}
                 <TableCell className="exam-derived-cell"><TextField fullWidth size="small" value={blank ? "" : row.letterGrade} disabled={rowLocked || (row.eligible === false && !row.examExempt)} InputProps={{ readOnly: true }} inputProps={{ "aria-label": `Thang điểm chữ ${row.code}`, maxLength: 10 }} sx={inputSx} /></TableCell>
-                <TableCell className="exam-derived-cell"><TextField fullWidth size="small" value={blank ? "" : formatAttemptScores(row.attemptScores)} disabled={rowLocked || (row.eligible === false && !row.examExempt)} InputProps={{ readOnly: true }} inputProps={{ "aria-label": `Điểm các lần thi ${row.code}` }} sx={inputSx} /></TableCell></>}
+                <TableCell className="exam-derived-cell"><TextField fullWidth size="small" value={blank ? "" : examAttendanceLabel(row) || formatAttemptScores(row.attemptScores)} disabled={rowLocked || (row.eligible === false && !row.examExempt)} InputProps={{ readOnly: true }} inputProps={{ "aria-label": `Điểm các lần thi ${row.code}` }} sx={inputSx} /></TableCell></>}
                 {!blank && <TableCell className="exam-derived-cell"><TextField select fullWidth size="small" SelectProps={{ native: true }} value={row.result} disabled inputProps={{ "aria-label": `Kết quả điểm ${row.code}` }} sx={{ ...inputSx, "& select": { py: 0.5, fontSize: 12, color: row.result === "failed" ? "#B52D2D" : row.result === "passed" ? "#137B3B" : "#607486" } }}>
                   {Object.entries(RESULT_LABELS).map(([value, label]) => <option key={value} value={value}>{row.studyLeaveFailure && value === "failed" ? "Không đạt" : label}</option>)}
                 </TextField></TableCell>}

@@ -24,7 +24,7 @@ export function buildExamScheduleDocument({ week, end, sessions = [] }) {
     [examInvigilatorName(session) || "Chưa phân công",examInvigilatorName(session,true) || "Chưa phân công"].join("\n"),
     examTimeSummary(session),
     session.roomCode || "Chưa có phòng",
-    session.note || "",
+    [session.makeupCount?`Thi bù: ${session.makeupCount} học viên`:'',session.note||''].filter(Boolean).join('\n'),
   ]);
   return { kind: "exam", week, end, discipline: "", major: "", year: "", rows, sessionCount: rows.length };
 }

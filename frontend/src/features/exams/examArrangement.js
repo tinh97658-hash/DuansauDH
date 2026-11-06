@@ -29,7 +29,7 @@ export function collectExamArrangements(sessions){
    code:`${new Set(display.map(s=>s.roundNo||1)).size} đợt · ${display.length} nhóm thi`,
    subjectName:[...new Set(display.map(s=>s.subjectName))].join(' · '),
    startTime:display.map(s=>s.startTime).sort()[0],endTime:display.map(s=>s.endTime).sort().at(-1),
-   candidateCount:examGroupsPeak(active),groups:[...new Map(display.flatMap(s=>s.groups||[]).map(g=>[g.id,g])).values()],
+   candidateCount:examGroupsPeak(active),makeupCount:display.reduce((sum,g)=>sum+Number(g.makeupCount||0),0),groups:[...new Map(display.flatMap(s=>s.groups||[]).map(g=>[g.id,g])).values()],
    pendingConfirmation:active.some(s=>s.pendingConfirmation),
    status:active.some(s=>s.status==='scheduled')?'scheduled':active.length?'held':members.some(s=>s.status==='not_held')?'not_held':'cancelled'};
  });

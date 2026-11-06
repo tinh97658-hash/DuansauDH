@@ -6,7 +6,7 @@ import { Alert, Button, Chip, CircularProgress, MenuItem, Paper, TableBody, Tabl
 import FilterSelectField from "../../components/FilterSelectField";
 import ResizableTable from "../../components/ResizableTable";
 import { API_BASE_URL } from "../../config/http";
-import { calculateGrade, RESULT_LABELS, SCORE_FIELDS, formatAttemptScores } from "../exams/gradebook";
+import { examAttendanceLabel, calculateGrade, RESULT_LABELS, SCORE_FIELDS, formatAttemptScores } from "../exams/gradebook";
 import { calculateExamEligibility } from "../exams/gradingPolicy";
 import "./learnerScorecard.css";
 import { useSubjectCatalogRevision } from "../../utils/subjectCatalog";
@@ -116,9 +116,9 @@ export default function LearnerScorecard({ admissionRecordId, classGroupId, onCl
                 <TableCell title={subject.name}>{subject.name}</TableCell>
                 <TableCell align="center">{subject.credits ?? "—"}</TableCell>
                 <TableCell>{subject.isRequired ? "Bắt buộc" : "Tự chọn"}</TableCell>
-                {SCORE_FIELDS.map(([key]) => <TableCell key={key} align="center">{(key === "courseScore" ? grade?.score : details[key]) ?? ""}</TableCell>)}
+                {SCORE_FIELDS.map(([key]) => <TableCell key={key} align="center">{key==='examScore'&&examAttendanceLabel(details)?examAttendanceLabel(details):(key === "courseScore" ? grade?.score : details[key]) ?? ""}</TableCell>)}
                 <TableCell align="center">{details.letterGrade || ""}</TableCell>
-                <TableCell>{formatAttemptScores(details.attemptScores)}</TableCell>
+                <TableCell>{examAttendanceLabel(details)||formatAttemptScores(details.attemptScores)}</TableCell>
                 <TableCell className="lsc-result">{result}</TableCell>
               </TableRow>;
             })}</TableBody>

@@ -76,7 +76,10 @@ export default function ExamSchedule(){
     const offering=editor?.offering||offerings.find(o=>o.id===target?.courseOfferingId),payload={...form,courseOfferingId:offering.id,snapshotId:target?.snapshotId||offering.snapshotId,eligibilityVersion:offering.eligibilityVersion,...(target?{version:target.version}:{})};
     if(target)await axios.put(`${base}/${target.id}`,payload,options);else await axios.post(base,payload,options);
    }else await axios.post(`${base}/${target.id}/${action==='cancel'?'cancel':'confirm'}`,{version:target.version,note,...(action==='cancel'?{}:{status:action})},options);
-   setEditor(null);if(!keepDetail)setDetail(null);setReason(null);clearSelection();setRevision(n=>n+1);notifyGradebookSaved();return true;
+   setEditor(null);
+   if(action==='held'){setPendingOpen(false);setAggregate(null);setDetail({...target,attendanceSessionId:target.id});}
+   else if(!keepDetail)setDetail(null);
+   setReason(null);clearSelection();setRevision(n=>n+1);notifyGradebookSaved();return true;
   }catch(e){notify.error(errorText(e));refreshAvailability?.();return false;}finally{setSaving(false);}
  };
  const close=setter=>()=>{if(!saving){setter(null);setError('');}};
@@ -98,6 +101,20 @@ export default function ExamSchedule(){
     ...(row.arrangementId===updated.arrangementId?{arrangementVersion:updated.arrangementVersion}:{}),
     ...(row.id===session.id?{version:updated.version,candidates:(row.candidates||[]).map(candidate=>candidate.participantId===participantId?{...candidate,attendanceStatus:updated.status}:candidate)}:{})
    }))}));
+   setRevision(n=>n+1);notifyGradebookSaved();
+  }catch(failure){const message=errorText(failure);setError(message);notify.error(message);if(failure.response?.status===409)setRevision(n=>n+1);}
+  finally{setSaving(false);}
+ };
+ const confirmAttendance=async session=>{
+  if(!canWrite||saving||loading||!session.canConfirmAttendance)return;
+  setSaving(true);setError('');
+  try{
+   const {data:updated}=await axios.post(`${API_BASE_URL}/masters/exam-sessions/${session.id}/attendance/confirm`,{version:session.version},{withCredentials:true});
+   setData(current=>({...current,sessions:current.sessions.map(row=>({...row,
+    ...(row.arrangementId===updated.arrangementId?{arrangementVersion:updated.arrangementVersion}:{}),
+    ...(row.id===session.id?{version:updated.version,attendanceConfirmedAt:updated.attendanceConfirmedAt,canRecordAttendance:false,canConfirmAttendance:false}:{})
+   }))}));
+   setRevision(n=>n+1);notifyGradebookSaved();
   }catch(failure){const message=errorText(failure);setError(message);notify.error(message);if(failure.response?.status===409)setRevision(n=>n+1);}
   finally{setSaving(false);}
  };
@@ -116,7 +133,7 @@ export default function ExamSchedule(){
       {canWrite&&<p className="ep-selection-help">{mergeMode?'Tích chọn các lớp cần ghép, rồi chọn ô Sáng / Chiều trên lịch.':'Tích chọn nhiều lớp để ghép thi, hoặc bấm tên lớp để xếp riêng.'}</p>}
       {queue.map(o=><div key={o.id} className={`ep-queue-card${selectedIds.includes(o.id)?' ep-active':''}`}>
        {canWrite&&<input type="checkbox" aria-label={`Chọn lớp ${o.name} · ${o.subjectName}`} checked={selectedIds.includes(o.id)} disabled={loading||saving} onChange={()=>toggleOffering(o.id,true)} />}
-       <button type="button" className="ep-queue-select" disabled={loading||saving} aria-label={`${o.name} ${o.candidateCount} TS ${o.subjectName}`} aria-pressed={selectedIds.includes(o.id)} onClick={()=>toggleOffering(o.id)}><strong title={o.name}>{examOfferingLabel(o)}</strong><b>{o.candidateCount} TS</b><span>{o.subjectName}</span></button>
+       <button type="button" className="ep-queue-select" disabled={loading||saving} aria-label={`${o.name} ${o.candidateCount} TS ${o.subjectName}${o.makeupCount?' · Thi bù':''}`} aria-pressed={selectedIds.includes(o.id)} onClick={()=>toggleOffering(o.id)}><strong title={o.name}>{examOfferingLabel(o)}</strong><b>{o.candidateCount} TS</b><span>{o.subjectName}</span>{o.makeupCount>0&&<small className="ep-makeup-badge">Thi bù · {o.makeupCount} học viên</small>}</button>
       </div>)}
      </aside></div>
     </div>
@@ -137,7 +154,7 @@ export default function ExamSchedule(){
       const showList=()=>setAggregate({date,periodLabel:period.label,sessions:items});
       return <div className="sl-slot ep-period-slot" key={date}>
        <button className="ep-period-target" aria-label={`${selected?'Chọn':'Xem ca thi'} ${formatExamDate(date)} ${period.label==='SÁNG'?'Sáng':'Chiều'}`} disabled={saving||(!selected&&!items.length)||!!selected&&(!canWrite||closed)} onClick={()=>selected?openEditor(null,{date,start:period.start,end:period.end,period:period.id}):showList()}/>
-       <div className="ep-period-items">{items.slice(0,3).map(s=><Tooltip key={s.id} arrow placement="right" title={<div className="ep-exam-preview"><strong>{s.subjectName}</strong><span>{formatExamDate(s.examDate)} · {s.startTime.slice(0,5)}–{s.endTime.slice(0,5)}</span><span>Phòng {s.roomCode} · {s.candidateCount} thí sinh</span><small>{examCardStatus(s)}</small></div>}><button className={`ep-event ep-${s.pendingConfirmation?'pending':s.status}`} aria-label={`${s.name} ${s.subjectName} ${formatExamDate(s.examDate)} ${s.startTime.slice(0,5)} ${examStatus(s)}`} onClick={()=>openDetail(s)}><strong>{examOfferingLabel(s)}</strong><span className="ep-event-location">{s.roomCode} · {s.candidateCount} TS</span>{(s.pendingConfirmation||['held','not_held','cancelled'].includes(s.status))&&<small>{examCardStatus(s)}</small>}</button></Tooltip>)}
+       <div className="ep-period-items">{items.slice(0,3).map(s=><Tooltip key={s.id} arrow placement="right" title={<div className="ep-exam-preview"><strong>{s.subjectName}</strong><span>{formatExamDate(s.examDate)} · {s.startTime.slice(0,5)}–{s.endTime.slice(0,5)}</span><span>Phòng {s.roomCode} · {s.candidateCount} thí sinh</span><small>{examCardStatus(s)}</small></div>}><button className={`ep-event ep-${s.pendingConfirmation?'pending':s.status}`} aria-label={`${s.name} ${s.subjectName} ${formatExamDate(s.examDate)} ${s.startTime.slice(0,5)} ${examStatus(s)}`} onClick={()=>openDetail(s)}><strong>{examOfferingLabel(s)}</strong><span className="ep-event-location">{s.roomCode} · {s.candidateCount} TS</span>{s.makeupCount>0&&<small className="ep-makeup-badge">Thi bù · {s.makeupCount} HV</small>}{(s.pendingConfirmation||['held','not_held','cancelled'].includes(s.status))&&<small>{examCardStatus(s)}</small>}</button></Tooltip>)}
        {items.length>3&&<Tooltip arrow placement="right" title={<div className="ep-overflow-preview"><strong>{items.length-3} CA KHÁC</strong>{items.slice(3).map(s=><p key={s.id}>{examOfferingLabel(s)} · {s.roomCode} · {s.candidateCount} TS</p>)}</div>}><button className="ep-more" onClick={showList}>+{items.length-3} ca khác</button></Tooltip>}
        {selected&&!closed&&<button className="v20-add-slot" onClick={()=>openEditor(null,{date,start:period.start,end:period.end,period:period.id})} disabled={!canWrite||saving}><PlusIcon fontSize="inherit" /> Xếp lịch</button>}
        </div>
@@ -148,8 +165,8 @@ export default function ExamSchedule(){
    </section>
   </section>
   {editor&&(editor.mode==='arrangement'?<ExamArrangementEditor initial={editor.initial} members={editor.members} queue={data.queue} rooms={data.rooms} lecturers={data.lecturers} units={data.units} canWrite={canWrite} saving={saving} error={error} onClose={close(setEditor)} onSave={saveArrangement}/>:<ExamEditor session={editor.session} offering={editor.offering} slot={editor.slot} rooms={data.rooms} lecturers={data.lecturers} units={data.units} canWrite={canWrite} saving={saving} error={error} onClose={close(setEditor)} onSave={(form,refresh)=>mutate('save',editor.session,'',form,refresh)}/>)}
-  {detail&&<ExamSessionDialog key={detail.arrangementId||detail.id} members={detailMembers} queue={data.queue} rooms={data.rooms} lecturers={data.lecturers} units={data.units}
-   canWrite={canWrite} saving={saving} refreshing={loading} error={error} onClose={close(setDetail)} onClearError={()=>setError('')} onAttendanceChange={saveAttendance}
+  {detail&&<ExamSessionDialog key={detail.arrangementId||detail.id} attendanceSessionId={detail.attendanceSessionId} members={detailMembers} queue={data.queue} rooms={data.rooms} lecturers={data.lecturers} units={data.units}
+   canWrite={canWrite} saving={saving} refreshing={loading} error={error} onClose={close(setDetail)} onClearError={()=>setError('')} onAttendanceChange={saveAttendance} onAttendanceConfirm={confirmAttendance}
    onSaveArrangement={(form,id,retry)=>saveArrangement(form,id,retry,true)}
    onSaveSession={(session,form,retry)=>mutate('save',session,'',form,retry,true)}
    onAction={(action,session,note)=>mutate(action,session,note,undefined,undefined,true)}/>}

@@ -79,7 +79,7 @@ it("keeps a previously selected inactive unit available on edit", async () => {
 
 it('displays academic titles while keeping the editable name unchanged',async()=>{
  rows=[legacy];render(<Lecturers/>);
- const family=await screen.findByText('PGS.TS Nguyễn');
+ const family=await screen.findByText('PGS. TS. Nguyễn');
  expect(within(family.closest('tr')).getByText('An')).toBeInTheDocument();
  fireEvent.doubleClick(family.closest('tr'));
  expect(within(screen.getByRole('dialog')).getByLabelText('Họ và tên')).toHaveValue('Nguyễn An');

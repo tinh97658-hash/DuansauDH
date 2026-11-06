@@ -41,6 +41,10 @@ export class ExamCandidateAttendanceDto {
   @IsIn(['present','absent_excused','absent_unexcused']) status!:'present'|'absent_excused'|'absent_unexcused';
 }
 
+export class ConfirmExamAttendanceDto {
+  @IsInt() @Min(0) version!:number;
+}
+
 export class ExamArrangementGroupDto {
   @IsOptional() @IsUUID() id?:string;
   @IsOptional() @IsInt() @Min(0) version?:number;

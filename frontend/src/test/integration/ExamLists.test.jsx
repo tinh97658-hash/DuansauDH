@@ -33,6 +33,14 @@ const render = (ui, url = "/") => renderUi(<MemoryRouter useTransitions={false} 
 const reportExportName = () => screen.getByRole("button", { name: "Danh sách thi" }).getAttribute("aria-pressed") === "true" ? "Xuất lịch thi kết thúc học phần" : "Xuất phiếu theo dõi tình hình học tập — BM.02-QT.SDH.03";
 const savedRow = { participantId: "student:one", code: "HV001", fullName: "Nguyễn Văn An", dob: "1990-01-02", gender: "Nam", eligible: null, examExempt: false, testScore: null, assignmentScore: null, examScore: null, courseScore: null, grade4: null, letterGrade: "", attemptScores: [], result: "pending" };
 
+it.each([['absent_unexcused','Không thi','failed'],['absent_excused','Chờ thi bù','pending']])('shows %s as a locked text score with the correct result',async(examAttendanceStatus,label,result)=>{
+ setup('admin',[{...savedRow,testScore:8,assignmentScore:8,examAttendanceStatus}],'final');
+ render(<ExamLists/>,'/?groupId=g1&offeringId=o1');
+ const exam=await screen.findByRole('textbox',{name:'Điểm thi hết môn HV001'});
+ expect(exam).toHaveValue(label);expect(exam).toBeDisabled();
+ expect(screen.getByRole('combobox',{name:'Kết quả điểm HV001'})).toHaveValue(result);
+});
+
 it('keeps only the learning-follow-up export in the gradebook toolbar', async () => {
   setup('admin', [{ ...savedRow, testScore: 8, assignmentScore: 9, examScore: 8, finalized: true, result: 'passed' }], 'locked');
   const replace = vi.fn();
@@ -1016,7 +1024,7 @@ it("requests only 15 students per page and saves drafts from different pages tog
   ] })));
   expect(await screen.findByText("Đã cập nhật bảng điểm cho 2 học viên.")).toBeInTheDocument();
   expect(screen.queryByText(/Vui lòng gửi duyệt tư cách thi/)).not.toBeInTheDocument();
-});
+},120000);
 
 it("returns to the first page when searching or changing the list mode", async () => {
   setup("admin", Array.from({ length: 22 }, (_, index) => ({

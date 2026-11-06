@@ -1,6 +1,14 @@
 import { gradebookCompletionStatus, resolveApprovedExamRows, unresolvedExamRows } from "../../src/masters/exam-tracking.js";
 import { LEGACY_GRADING_POLICY } from "../../src/masters/grading-policy.js";
 
+it('requires a makeup for CP but treats KP as a resolved failed result without exam marks',()=>{
+ const people=['cp','kp'].map(participantId=>({participantId,eligible:true,testScore:8,assignmentScore:8,examExempt:false}));
+ const attempts=people.map((p,i)=>({participant_id:p.participantId,session_id:'original',status:'held',attendance:i?'absent_unexcused':'absent_excused'}));
+ const rows=resolveApprovedExamRows(people,[],['cp','kp'],{result_status:'draft'},attempts);
+ expect(rows.map(r=>[r.result,r.examScore,r.courseScore,r.examScoreEditable])).toEqual([['pending',null,null,false],['failed',null,null,false]]);
+ expect(unresolvedExamRows(rows).map(r=>r.participantId)).toEqual(['cp']);
+});
+
 it.each(['not_available', 'draft', 'submitted', 'approved'])('resolves a frozen ineligible learner as failed without exam marks in %s', result_status => {
   const frozen = { participantId: 'student:ineligible', eligible: false, examExempt: false, testScore: 3.9, assignmentScore: 5 };
   const old = { ...frozen, result: 'pending', finalized: result_status === 'approved' };

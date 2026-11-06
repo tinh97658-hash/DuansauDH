@@ -33,3 +33,18 @@ it('shows a status column and an empty row spanning all four columns',()=>{
  expect(screen.getByRole('columnheader',{name:'Trạng thái'})).toBeInTheDocument();
  expect(screen.getByText('Chưa có danh sách thí sinh.')).toHaveAttribute('colspan','4');
 });
+
+it('confirms attendance below the roster and disables every choice once confirmed',()=>{
+ const confirm=vi.fn(),session={...initial,status:'held',canConfirmAttendance:true};
+ const view=render(<ExamCandidatesTable session={session} canWrite onAttendanceChange={vi.fn()} onAttendanceConfirm={confirm}/>);
+ fireEvent.click(screen.getByRole('button',{name:'Xác nhận trạng thái dự thi'}));
+ expect(confirm).toHaveBeenCalledWith(session);
+ view.rerender(<ExamCandidatesTable session={{...session,attendanceConfirmedAt:'2026-11-06T08:00:00Z'}} canWrite onAttendanceChange={vi.fn()} onAttendanceConfirm={confirm}/>);
+ expect(screen.getByRole('status')).toHaveTextContent('Đã xác nhận trạng thái dự thi');
+ expect(screen.queryByRole('button',{name:'Xác nhận trạng thái dự thi'})).not.toBeInTheDocument();
+ for(const checkbox of screen.getAllByRole('checkbox'))expect(checkbox).toBeDisabled();
+});
+it('prevents confirmation while an attendance save is running',()=>{
+ render(<ExamCandidatesTable session={{...initial,canConfirmAttendance:true}} canWrite busy onAttendanceConfirm={vi.fn()}/>);
+ expect(screen.getByRole('button',{name:'Xác nhận trạng thái dự thi'})).toBeDisabled();
+});

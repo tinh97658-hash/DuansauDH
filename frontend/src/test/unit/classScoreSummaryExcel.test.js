@@ -19,6 +19,14 @@ const loadSheet = async (report) => {
   await book.xlsx.load(buffer);
   return book.getWorksheet("Tổng hợp điểm");
 };
+
+it('exports unexcused absence as Không thi and excused absence as Chờ thi bù',async()=>{
+ const report=sampleReport(2,1);
+ report.rows[0].scores={hp0:{score:null,result:'failed',examAttendanceStatus:'absent_unexcused'},hp1:{score:null,result:'pending',examAttendanceStatus:'absent_excused'}};
+ const sheet=await loadSheet(report);
+ expect(sheet.getCell('G11').value).toBe('Không thi');
+ expect(sheet.getCell('H11').value).toBe('Chờ thi bù');
+});
 const textOf = (cell) => cell.value?.richText ? cell.value.richText.map(run => run.text).join("") : cell.value;
 
 it.each([{ studyLeaveFailure: true }, { eligibilityFrozen: true }])("exports a failed attempt without a numerical score as Không đạt: %j", async flags => {

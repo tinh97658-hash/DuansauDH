@@ -10,10 +10,14 @@ import {up as arrangementsUp,down as arrangementsDown} from '../../src/database/
 import {up as externalInvigilatorsUp} from '../../src/database/migrations/069-external-exam-invigilators.js';
 import {up as twoInvigilatorsUp} from '../../src/database/migrations/098-two-exam-invigilators.js';
 import {up as attendanceUp,down as attendanceDown} from '../../src/database/migrations/099-exam-candidate-attendance.js';
+import {up as makeupUp} from '../../src/database/migrations/100-exam-makeup-candidates.js';
+import {up as projectionUp} from '../../src/database/migrations/101-exam-attendance-grade-projection.js';
+import {up as attendanceConfirmationUp} from '../../src/database/migrations/102-confirm-exam-attendance.js';
+import {LEGACY_GRADING_POLICY} from '../../src/masters/grading-policy.js';
 
 const describeDb=process.env.RUN_POSTGRES_EXAM_ARRANGEMENT_TESTS==='true'?describe:describe.skip;
 describeDb('Grouped exam reservations on PostgreSQL',()=>{
- let db:Sequelize,admin:Sequelize,service:ExamScheduleService,actor:any,room:string,lecturer:string;
+ let db:Sequelize,admin:Sequelize,service:ExamScheduleService,workflow:ExamWorkflowService,actor:any,room:string,lecturer:string;
  const schema='exam_arrangement_test_'+randomUUID().replace(/-/g,'');
  let createdAttendanceRole=false;
  const sql=(q:string,r:any={})=>db.query(q,{replacements:r,type:QueryTypes.SELECT}) as Promise<any[]>;
@@ -23,8 +27,9 @@ describeDb('Grouped exam reservations on PostgreSQL',()=>{
   await sql(`INSERT INTO subjects(id,name,program) VALUES(:subject,:name,'masters');
     INSERT INTO course_offerings(id,subject_id,name,status) VALUES(:id,:subject,:name,'completed');
     INSERT INTO course_exam_eligibility_snapshots(id,course_offering_id,version,rows,actor) VALUES(:snapshot,:id,1,CAST(:rows AS jsonb),'{}');
-    INSERT INTO course_exam_workflows(course_offering_id,eligibility_status,eligibility_version,eligibility_snapshot_id) VALUES(:id,'approved',1,:snapshot)`,
-    {id,subject,snapshot,name,rows:JSON.stringify(people.map(participantId=>({participantId,fullName:participantId,eligible:true,examExempt:false})))});
+    INSERT INTO course_exam_workflows(course_offering_id,eligibility_status,eligibility_version,eligibility_snapshot_id) VALUES(:id,'approved',1,:snapshot);
+    INSERT INTO course_exam_gradebooks(id,class_group_id,course_offering_id,grades) VALUES(:snapshot,:id,:id,CAST(:rows AS jsonb))`,
+    {id,subject,snapshot,name,rows:JSON.stringify(people.map(participantId=>({participantId,classGroupId:id,fullName:participantId,eligible:true,examExempt:false,testScore:8,assignmentScore:8,gradingPolicy:LEGACY_GRADING_POLICY,eligibilityPolicy:LEGACY_GRADING_POLICY})))});
   return {courseOfferingId:id,snapshotId:snapshot,eligibilityVersion:1,roundNo:1,startTime:'08:00',endTime:'09:00'};
  }
  const payload=(groups:any[],extra:any={})=>({examDate:date,period:'MORNING' as const,roomId:room,lecturerId:lecturer,groups,...extra});
@@ -35,7 +40,7 @@ describeDb('Grouped exam reservations on PostgreSQL',()=>{
   await sql(`CREATE TABLE staff(id uuid PRIMARY KEY);
     CREATE TABLE subjects(id uuid PRIMARY KEY,name text,code text,program text);
     CREATE TABLE course_offerings(id uuid PRIMARY KEY,subject_id uuid,name text,status text,gradebook_status text DEFAULT 'draft',gradebook_snapshot jsonb,gradebook_version int DEFAULT 0);
-    CREATE TABLE course_exam_gradebooks(course_offering_id uuid,grades jsonb);
+    CREATE TABLE course_exam_gradebooks(id uuid PRIMARY KEY,class_group_id uuid,course_offering_id uuid,revision int DEFAULT 0,grades jsonb,created_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now(),UNIQUE(class_group_id,course_offering_id));
     CREATE TABLE rooms(id uuid PRIMARY KEY,capacity int,is_active boolean,code text,name text);
     CREATE TABLE lecturers(id uuid PRIMARY KEY,active boolean,code text,name text,unit_id uuid,academic_rank text,academic_degree text);
     CREATE TABLE units(id uuid,code text,name text,active boolean,sort_order int);
@@ -50,7 +55,7 @@ describeDb('Grouped exam reservations on PostgreSQL',()=>{
   const actorId=randomUUID();room=randomUUID();lecturer=randomUUID();
   actor=Object.create(Staff.prototype);Object.defineProperties(actor,{id:{value:actorId},name:{value:'Scheduler'},role:{value:'admin'}});
   await sql('INSERT INTO staff VALUES(:id); INSERT INTO rooms VALUES(:room,30,true); INSERT INTO lecturers VALUES(:lecturer,true)',{id:actorId,room,lecturer});
-  const rbac:any={effectiveAccess:async()=>({permissions:new Set(['exams.write'])})};
+  const rbac:any={effectiveAccess:async()=>({permissions:new Set(['exams.write','gradebook.submit','gradebook.approve'])})};
   // Verify backfill against a real pre-migration session and roster.
   const legacy=await offering(['legacy']);const session=randomUUID();
   await sql(`INSERT INTO course_exam_sessions(id,course_offering_id,eligibility_snapshot_id,exam_date,start_time,end_time,room_id,lecturer_id,created_by,updated_by)
@@ -63,10 +68,13 @@ describeDb('Grouped exam reservations on PostgreSQL',()=>{
   await sql(`CREATE FUNCTION app_gradebook_offering_visible(uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT COALESCE(current_setting('test.attendance_visible',true),'true')='true' $$;
     CREATE FUNCTION app_offering_allowed(uuid,boolean) RETURNS boolean LANGUAGE sql AS $$ SELECT COALESCE(current_setting('test.attendance_writable',true),'true')='true' $$;
     GRANT USAGE ON SCHEMA ${schema} TO pgsms_group_scoped;
-    GRANT SELECT ON course_exam_sessions TO pgsms_group_scoped;`);
+    GRANT SELECT,UPDATE ON course_exam_sessions TO pgsms_group_scoped;`);
   await attendanceUp({context:db.getQueryInterface()});
+  await makeupUp({context:db.getQueryInterface()});
+  await projectionUp({context:db.getQueryInterface()});
+  await attendanceConfirmationUp({context:db.getQueryInterface()});
   expect((await sql('SELECT arrangement_id,round_no FROM course_exam_sessions WHERE id=:id',{id:session}))[0]).toEqual({arrangement_id:session,round_no:1});
-  service=new ExamScheduleService(db,new ExamWorkflowService(db,rbac),rbac);
+  workflow=new ExamWorkflowService(db,rbac);service=new ExamScheduleService(db,workflow,rbac);
  },30000);
  beforeEach(async()=>{
   // Unique resources isolate scenarios without deleting immutable exam history.
@@ -74,6 +82,110 @@ describeDb('Grouped exam reservations on PostgreSQL',()=>{
   await sql('INSERT INTO rooms VALUES(:room,30,true); INSERT INTO lecturers VALUES(:lecturer,true)',{room,lecturer});
  });
  afterAll(async()=>{await db?.close();if(admin){await admin.query(`DROP SCHEMA ${schema} CASCADE`);if(createdAttendanceRole)await admin.query('DROP ROLE pgsms_group_scoped');await admin.close();}});
+ it('confirms and permanently locks attendance while preserving CP makeup and KP results',async()=>{
+  const cp='admission:'+randomUUID(),kp='admission:'+randomUUID(),item=await offering([cp,kp]);
+  const saved=await service.saveArrangement(null,payload([item]),actor),id=saved.sessionIds[0];
+  await expect(service.confirmAttendance(id,{version:0},actor)).rejects.toThrow('Đã diễn ra');
+  await sql("UPDATE course_exam_sessions SET exam_date='2000-01-01' WHERE id=:id",{id});
+  await service.confirm(id,{version:0,status:'held'},actor);
+  await service.recordAttendance(id,{version:1,participantId:cp,status:'absent_excused'},actor);
+  await service.recordAttendance(id,{version:2,participantId:kp,status:'absent_unexcused'},actor);
+  await expect(service.confirmAttendance(id,{version:1},actor)).rejects.toThrow('thay đổi');
+  const locked=await service.confirmAttendance(id,{version:3},actor);
+  expect(locked).toMatchObject({id,version:4});expect(locked.attendanceConfirmedAt).toBeTruthy();
+  await expect(service.recordAttendance(id,{version:4,participantId:cp,status:'present'},actor)).rejects.toThrow('khóa');
+  await expect(service.recordAttendance(id,{version:4,participantId:kp,status:'present'},actor)).rejects.toThrow('khóa');
+  await expect(sql("UPDATE course_exam_candidate_attendance SET status='present' WHERE session_id=:id",{id})).rejects.toThrow('đã xác nhận và khóa');
+  const list=await service.list({from:'2000-01-01',to:'2000-01-01'});
+  expect(list.sessions.find(s=>s.id===id)).toMatchObject({canRecordAttendance:false,canConfirmAttendance:false});
+  expect(list.queue.find(o=>o.id===item.courseOfferingId)).toMatchObject({candidateIds:[cp],makeupCount:1});
+  const [book]=await sql('SELECT grades FROM course_exam_gradebooks WHERE course_offering_id=:id',{id:item.courseOfferingId});
+  expect(book.grades.find((r:any)=>r.participantId===kp)).toMatchObject({result:'failed',examScore:null});
+ });
+ it('projects scoped exam attendance without granting direct mark-entry access',async()=>{
+  const participant='admission:'+randomUUID(),item=await offering([participant]);
+  const saved=await service.saveArrangement(null,payload([item]),actor),id=saved.sessionIds[0];
+  await sql(`GRANT SELECT ON course_exam_gradebooks TO pgsms_group_scoped`);
+  await db.transaction(async transaction=>{
+   await db.query("SET LOCAL ROLE pgsms_group_scoped; SET LOCAL test.attendance_visible='true'; SET LOCAL test.attendance_writable='true'",{transaction});
+   await db.query(`INSERT INTO course_exam_candidate_attendance(session_id,participant_id,status,recorded_by)
+    VALUES(:id,:participant,'absent_unexcused',:actor)`,{transaction,replacements:{id,participant,actor:actor.id}});
+   const [book]:any=await db.query('SELECT grades FROM course_exam_gradebooks WHERE course_offering_id=:offering',{transaction,replacements:{offering:item.courseOfferingId},type:QueryTypes.SELECT});
+   expect(book.grades[0]).toMatchObject({examAttendanceStatus:'absent_unexcused',examScore:null,courseScore:null,result:'failed',testScore:8,assignmentScore:8});
+  });
+  await expect(db.transaction(async transaction=>{
+   await db.query('SET LOCAL ROLE pgsms_group_scoped',{transaction});
+   await db.query(`UPDATE course_exam_gradebooks SET grades='[]' WHERE course_offering_id=:id`,{transaction,replacements:{id:item.courseOfferingId}});
+  })).rejects.toThrow('permission denied');
+  await expect(db.transaction(async transaction=>{
+   await db.query('SET LOCAL ROLE pgsms_group_scoped',{transaction});
+   await db.query('SELECT app_project_exam_attendance(:id)',{transaction,replacements:{id:item.courseOfferingId}});
+  })).rejects.toThrow('permission denied');
+ });
+ it('preserves existing held-exam marks that predate attendance metadata',async()=>{
+  const present='admission:'+randomUUID(),absent='admission:'+randomUUID(),item=await offering([present,absent]);
+  const saved=await service.saveArrangement(null,payload([item]),actor),id=saved.sessionIds[0];
+  await sql("UPDATE course_exam_sessions SET exam_date='2000-01-01' WHERE id=:id",{id});
+  await service.confirm(id,{version:0,status:'held'},actor);
+  await sql(`UPDATE course_exam_gradebooks SET grades=(SELECT jsonb_agg(CASE WHEN mark->>'participantId'=:present
+    THEN (mark-'examSessionId'-'examAttendanceStatus')||'{"examScore":7,"courseScore":7.5,"result":"passed"}'::jsonb ELSE mark END)
+    FROM jsonb_array_elements(grades) mark) WHERE course_offering_id=:offering`,{present,offering:item.courseOfferingId});
+  await service.recordAttendance(id,{version:1,participantId:absent,status:'absent_unexcused'},actor);
+  const [book]=await sql('SELECT grades FROM course_exam_gradebooks WHERE course_offering_id=:offering',{offering:item.courseOfferingId});
+  expect(book.grades.find((r:any)=>r.participantId===present)).toMatchObject({examScore:7,courseScore:7.5,result:'passed'});
+  expect(book.grades.find((r:any)=>r.participantId===absent)).toMatchObject({examScore:null,courseScore:null,result:'failed'});
+ });
+ it('queues only CP absences, groups makeup with other subjects, preserves history and completes a later attempt',async()=>{
+  const cp='admission:'+randomUUID(),kp='admission:'+randomUUID(),present='admission:'+randomUUID();
+  let item=await offering([cp,kp,present]);const peer=await offering(['admission:'+randomUUID()],'Môn ghép');
+  const original=await service.saveArrangement(null,payload([item]),actor),id=original.sessionIds[0];
+  await sql("UPDATE course_exam_sessions SET exam_date='2000-01-01' WHERE id=:id",{id});
+  await service.confirm(id,{version:0,status:'held'},actor);
+  await service.recordAttendance(id,{version:1,participantId:cp,status:'absent_excused'},actor);
+  await service.recordAttendance(id,{version:2,participantId:kp,status:'absent_unexcused'},actor);
+  // Updating component marks creates a new eligibility snapshot without losing
+  // the original absence or forcing the makeup attempt to inherit it.
+  await workflow.save({courseOfferingId:item.courseOfferingId,revision:await workflow.revision(item.courseOfferingId),rows:[{
+    participantId:cp,testScore:9,assignmentScore:8,examScore:null,examExempt:false,policyVersion:0,policyRulesVersion:0
+  }]},actor,async()=>[]);
+  const refreshed=await workflow.state(item.courseOfferingId);
+  item={...item,snapshotId:refreshed.eligibility_snapshot_id,eligibilityVersion:refreshed.eligibility_version};
+  const listed=await service.list({from:date,to:date});
+  expect(listed.queue.find(o=>o.id===item.courseOfferingId)).toMatchObject({candidateIds:[cp],candidateCount:1,makeupCount:1});
+  const current=async()=>workflow.approvedRows(item.courseOfferingId,await workflow.state(item.courseOfferingId));
+  expect((await current()).find(r=>r.participantId===kp)).toMatchObject({examAttendanceStatus:'absent_unexcused',result:'failed',examScore:null,courseScore:null,examScoreEditable:false});
+  expect((await current()).find(r=>r.participantId===cp)).toMatchObject({examAttendanceStatus:'absent_excused',result:'pending',examScore:null});
+  const makeup=await service.saveArrangement(null,payload([item,peer],{examDate:'2099-05-06'}),actor);
+  const mid=makeup.sessionIds[0];
+  expect(await sql('SELECT participant_id,makeup_for_session_id FROM course_exam_session_candidates WHERE session_id=:id',{id:mid})).toEqual([{participant_id:cp,makeup_for_session_id:id}]);
+  expect((await service.list({from:date,to:'2099-05-07'})).queue.some(o=>o.id===item.courseOfferingId)).toBe(false);
+  await expect(service.saveArrangement(null,payload([item],{examDate:'2099-05-07'}),actor)).rejects.toThrow('Không có thí sinh');
+  await expect(service.recordAttendance(id,{version:3,participantId:cp,status:'present'},actor)).rejects.toThrow('đã được xếp thi bù');
+  await sql("UPDATE course_exam_sessions SET exam_date='2001-01-01' WHERE id IN (:ids)",{ids:makeup.sessionIds});
+  await service.confirm(mid,{version:0,status:'held'},actor);
+  let roster=await current();
+  expect(roster.find(r=>r.participantId===cp)).toMatchObject({isMakeup:true,examAttendanceStatus:'present',examScoreEditable:true,examScore:null});
+  await workflow.save({courseOfferingId:item.courseOfferingId,revision:await workflow.revision(item.courseOfferingId),rows:roster.filter(r=>r.participantId!==kp).map(r=>({participantId:r.participantId,testScore:8,assignmentScore:8,examExempt:false,examScore:7}))},actor,async()=>[]);
+  roster=await current();expect(roster.find(r=>r.participantId===cp)).toMatchObject({result:'passed',examScore:7});
+  expect(roster.find(r=>r.participantId===kp)).toMatchObject({result:'failed',examScore:null});
+  await workflow.transition({courseOfferingId:item.courseOfferingId,version:0,revision:await workflow.revision(item.courseOfferingId),action:'submit'},actor,'final',async()=>[]);
+  expect((await workflow.state(item.courseOfferingId)).result_status).toBe('submitted');
+  expect((await sql('SELECT status FROM course_exam_candidate_attendance WHERE session_id=:id AND participant_id=:cp',{id,cp}))[0].status).toBe('absent_excused');
+ });
+ it('restores a cancelled makeup to the queue and handles repeated excused absence without duplicating candidates',async()=>{
+  const cp='admission:'+randomUUID(),item=await offering([cp]);
+  const root=await service.saveArrangement(null,payload([item]),actor),id=root.sessionIds[0];
+  await sql("UPDATE course_exam_sessions SET exam_date='2000-01-01' WHERE id=:id",{id});
+  await service.recordAttendance(id,{version:0,participantId:cp,status:'absent_excused'},actor);
+  const makeup=await service.saveArrangement(null,payload([item],{examDate:'2099-05-06'}),actor);
+  await service.cancel(makeup.sessionIds[0],{version:0,note:'Đổi buổi thi bù'},actor);
+  expect((await service.list({from:date,to:date})).queue.find(o=>o.id===item.courseOfferingId)).toMatchObject({candidateIds:[cp],makeupCount:1});
+  const next=await service.saveArrangement(null,payload([item],{examDate:'2099-05-07'}),actor),nid=next.sessionIds[0];
+  await sql("UPDATE course_exam_sessions SET exam_date='2001-01-01' WHERE id=:id",{id:nid});
+  await service.recordAttendance(nid,{version:0,participantId:cp,status:'absent_excused'},actor);
+  const again=await service.saveArrangement(null,payload([item],{examDate:'2099-05-08'}),actor);
+  expect((await sql('SELECT makeup_for_session_id FROM course_exam_session_candidates WHERE session_id=:id',{id:again.sessionIds[0]}))[0].makeup_for_session_id).toBe(nid);
+ });
  it('persists mutually exclusive attendance without changing the frozen candidate list',async()=>{
   const participant='admission:'+randomUUID(),item=await offering([participant]);
   const saved=await service.saveArrangement(null,payload([item]),actor),id=saved.sessionIds[0];

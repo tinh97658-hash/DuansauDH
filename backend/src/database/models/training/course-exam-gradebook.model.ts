@@ -15,6 +15,10 @@ export interface CourseExamGrade {
   profileForeignLanguageExempt?: boolean;
   /** Server-derived result of an interrupted attempt; never accepted as an editable mark. */
   studyLeaveFailure?: boolean;
+  /** Server-derived attendance of the current exam attempt. */
+  examAttendanceStatus?: 'present' | 'absent_excused' | 'absent_unexcused';
+  examSessionId?: string | null;
+  isMakeup?: boolean;
   testScore: number | null;
   assignmentScore: number | null;
   examScore: number | null;

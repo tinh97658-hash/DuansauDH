@@ -46,7 +46,7 @@ export function ExamEditor({session,offering,slot,rooms,lecturers=[],units=[],ca
  return <ExamDialogLayout embedded={embedded} wide className="sl-session-editor-dialog ep-editor" bodyClassName="sl-session-editor-body" title={session?'SỬA LỊCH THI':'XẾP LỊCH THI'} busy={saving} onClose={onClose} actions={<><button className="sl-btn" disabled={saving} onClick={onClose}>{embedded?'Hủy chỉnh sửa':'Hủy'}</button><button className="sl-btn sl-btn-primary" disabled={!valid||saving} onClick={()=>onSave({...form,lecturerId:form.lecturerId||undefined,...secondInvigilatorPayload(form)},()=>setRetry(n=>n+1))}>{embedded?'Lưu thay đổi':session?'Lưu lịch':'Xếp lịch'}</button></>}>
   {error&&<div role="alert" className="v20-error">{error}</div>}
   <div className="v20-composer">
-   <section className="sl-editor-info"><h4>THÔNG TIN CA THI</h4><strong>{item.name}</strong><p>{item.subjectName}</p>
+   <section className="sl-editor-info"><h4>THÔNG TIN CA THI</h4><strong>{item.name}</strong><p>{item.subjectName}</p>{item.makeupCount>0&&<p className="ep-makeup-badge">Thi bù · {item.makeupCount} học viên</p>}
     <div className="ep-period-value">Buổi: <strong>{form.startTime<'13:00'?(form.endTime>'13:00'?'Sáng / Chiều':'Sáng'):'Chiều'}</strong></div>
     <label className="v20-field sl-unit-field">Đơn vị
      <SearchSelect label="Đơn vị" value={unitId} options={visibleUnits}

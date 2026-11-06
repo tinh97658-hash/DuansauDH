@@ -11,6 +11,15 @@ it("formats exam attempts as comma-separated scores with one decimal place", () 
 
 const row = (overrides = {}) => draftOf({ participantId: "student:one", code: "HV001", fullName: "Nguyễn Văn An", eligible: null, examExempt: false, result: "pending", ...overrides });
 
+it.each([['absent_unexcused','Không thi','failed'],['absent_excused','Chờ thi bù','pending']])('exports %s as text without manufacturing marks',(examAttendanceStatus,label,result)=>{
+ const draft=row({workflowPhase:'final',eligible:true,testScore:8,assignmentScore:8,examScore:9,examAttendanceStatus});
+ expect(draft).toMatchObject({result,examScore:'',courseScore:'',grade4:'',attemptScores:''});
+ expect(rowError(draft)).toBe('');
+ expect(gradePayload(draft)).toMatchObject({examScore:null,courseScore:null,result,attemptScores:[]});
+ expect(gradebookRowValues(draft,0).slice(-6)).toEqual([label,'','','',label,result==='failed'?'Không đạt':'Chưa có kết quả']);
+ expect(gradebookCsv([draft])).toContain(label);
+});
+
 it.each([false, true])('displays and exports confirmed ineligibility as failed without inventing marks (finalized: %s)', finalized => {
   const draft = row({ testScore: 3.9, assignmentScore: 5, eligible: false, eligibilityFrozen: true, workflowPhase: 'final', finalized });
   expect(draft).toMatchObject({ result: 'failed', examScore: '', courseScore: '', grade4: '', letterGrade: '', attemptScores: '' });

@@ -15,5 +15,6 @@ export function formatLecturerName(lecturer){
  }
  const rank=clean(person.academicRank),degree=clean(person.academicDegree);
  const titles=rank||degree?[ranks[key(rank)]||rank,degrees[key(degree)]||degree].filter(Boolean):legacy;
- return [...new Set(titles)].join('.')+(titles.length&&name?' ':'')+name;
+ const prefix=[...new Set(titles.map(title=>title.replace(/[.\s]+$/g,'')))].filter(Boolean).map(title=>`${title}.`).join(' ');
+ return prefix+(prefix&&name?' ':'')+name;
 }

@@ -189,7 +189,8 @@ export class ExamGradebookService {
       const approved = state.mode !== 'legacy_preserved' && state.eligibility_status === 'approved' && Array.isArray(state.approvedRows);
       const candidates = approved ? state.approvedRows.filter((row: any) => row.eligible === true && !row.examExempt) : [];
       const held = new Set(state.heldIds);
-      const examCompleted = candidates.length > 0 && candidates.every((row: any) => held.has(row.participantId));
+      const currentGrades=approved?resolveApprovedExamRows(state.approvedRows,state.books,state.heldIds,state):[];
+      const examCompleted = candidates.length > 0 && candidates.every((row: any) => held.has(row.participantId)&&currentGrades.find((r:any)=>r.participantId===row.participantId)?.examAttendanceStatus!=='absent_excused');
       const examGradesComplete = state.mode === 'legacy_preserved'
         ? legacyExamGradesComplete(state.legacyGradebookStatus, state.legacyGradebookSnapshot)
         : approved && state.approvedRows.length > 0 && !unresolvedExamRows(resolveApprovedExamRows(state.approvedRows, state.books, state.heldIds, state)).length;
@@ -266,7 +267,7 @@ export class ExamGradebookService {
         {id:offering.id,snapshot:state.eligibility_snapshot_id},transaction);
       const assignedIds = new Set(assigned.map(row=>row.participant_id));
       const candidates = all.filter((row:any)=>row.eligible===true&&!row.examExempt);
-      const examScheduling = {candidateCount:candidates.length,remainingCount:candidates.filter((row:any)=>!assignedIds.has(row.participantId)).length};
+      const examScheduling = {candidateCount:candidates.length,remainingCount:candidates.filter((row:any)=>!assignedIds.has(row.participantId)||(row.examAttendanceStatus==='absent_excused'&&!row.makeupScheduled)).length};
       const examGradesComplete = all.length > 0 && !unresolvedExamRows(all).length;
       const stage = gradebookStage(offering, { ...state, approvedRows: all, books: [{ grades: all }], heldIds: assigned.filter(row => row.status === 'held').map(row => row.participant_id) });
       const scoped=query.rosterScope==='offering'?all:all.filter((r:any)=>r.classGroupId===group.id);

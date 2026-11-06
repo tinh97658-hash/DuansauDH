@@ -9,6 +9,7 @@ export const SCORE_FIELDS = [
   ["examScore", "Điểm thi hết môn", 10], ["courseScore", "Điểm học phần", 10], ["grade4", "Thang điểm 4", 4],
 ];
 export const RESULT_LABELS = { pending: "Chưa có kết quả", passed: "Đạt", failed: "Không đạt", exempt: "Miễn thi" };
+export const examAttendanceLabel = row => row.examAttendanceStatus === 'absent_unexcused' ? 'Không thi' : row.examAttendanceStatus === 'absent_excused' ? 'Chờ thi bù' : '';
 export const numericScore = (value) => String(value ?? "").trim() === "" ? null : Number(String(value).trim().replace(",", "."));
 const roundScore = (value) => Math.round((value + Number.EPSILON * 10) * 10) / 10;
 export const formatScore = (value, max = 10) => {
@@ -27,6 +28,7 @@ export const formatAttemptScores = value => {
   return scores.map(score => formatScore(score)).filter(Boolean).join(", ");
 };
 export const calculateGrade = (row) => {
+  if(examAttendanceLabel(row))return {courseScore:null,grade4:null,letterGrade:'',result:row.examAttendanceStatus==='absent_unexcused'?'failed':'pending'};
   const ineligible = (row.eligibilityFrozen || row.workflowPhase === 'final') && row.eligible === false && !row.examExempt && !row.profileForeignLanguageExempt;
   if (row.finalized) return { courseScore: numericScore(row.courseScore), grade4: numericScore(row.grade4),
     letterGrade: row.letterGrade || "", result: ineligible && (!row.result || row.result === 'pending') ? 'failed' : row.result || "pending" };
@@ -37,6 +39,7 @@ export const updateGradeDraft = (row, patch = {}) => {
   const rawScores = rawComponentScores(row);
   for (const key of COMPONENT_KEYS) if (Object.prototype.hasOwnProperty.call(patch, key)) rawScores[key] = numericScore(patch[key]);
   const draft = { ...row, ...patch, rawScores };
+  if(examAttendanceLabel(draft)){draft.examScore='';draft.rawScores.examScore=null;}
   if (draft.workflowPhase && !draft.eligibilityFrozen) draft.eligible = calculateExamEligibility(draft);
   const grade = calculateGrade(draft);
   const eligible = draft.eligibilityFrozen?draft.eligible:calculateExamEligibility(draft);
@@ -55,7 +58,7 @@ export const draftOf = (row) => {
   return !row.examExempt && eligible === false ? updateGradeDraft(draft) : draft;
 };
 export const rowError = (row) => {
-  if (row.studyLeaveFailure || row.profileForeignLanguageExempt) return "";
+  if (row.studyLeaveFailure || row.profileForeignLanguageExempt || examAttendanceLabel(row)) return "";
   for (const [key, label, max] of SCORE_FIELDS) {
     const value = numericScore(row[key]);
     if (value !== null && (!Number.isFinite(value) || value < 0 || value > max)) return `${label} phải từ 0 đến ${max}.`;
@@ -105,7 +108,7 @@ export const gradebookRowValues = (row, index, blank = false) => {
   const name = personNameParts(row);
   return [index + 1, row.code || "—", name.familyAndMiddle, name.givenName, displayGradeDate(row.dob), row.gender || "—",
     row.eligible == null ? "Chưa xét" : row.eligible ? "Đủ tư cách" : "Không đủ tư cách", row.examExempt ? "Có" : "Không",
-    ...(!blank ? [...SCORE_FIELDS.map(([key, , max]) => key === "examScore" && ineligible ? "0.0" : formatFieldScore(row, key, max)), row.letterGrade, ineligible ? "0.0" : formatScore(row.examScore)] : []),
+    ...(!blank ? [...SCORE_FIELDS.map(([key, , max]) => key === "examScore" ? examAttendanceLabel(row)||(ineligible?"0.0":formatFieldScore(row,key,max)) : formatFieldScore(row, key, max)), row.letterGrade, examAttendanceLabel(row)||(ineligible ? "0.0" : formatScore(row.examScore))] : []),
     ...(!blank ? [row.studyLeaveFailure ? "Không đạt" : RESULT_LABELS[row.result] || RESULT_LABELS.pending] : [row.notes || ""])];
 };
 export const gradebookCsv = (rows, blank = false) => {

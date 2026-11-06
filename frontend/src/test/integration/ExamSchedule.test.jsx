@@ -18,19 +18,43 @@ const date='2026-10-19',offering={id:'offering',name:'Lớp QT 2026',subjectId:'
 const room={id:'room',name:'Phòng giảng đường',code:'301',capacity:2,isActive:true};let data;
 const renderPage=(permissions=['exams.view','exams.write'])=>renderWithPermissions(<MemoryRouter useTransitions={false}><ExamSchedule/></MemoryRouter>,permissions);
 
+it('confirms attendance from the footer and keeps the reloaded roster locked',async()=>{
+ data.sessions=[session({status:'held',canEdit:false,canRecordAttendance:true,canConfirmAttendance:true,arrangementId:'arrangement',
+  candidates:[{participantId:'student:a',code:'HV001',fullName:'Nguyễn Văn An',attendanceStatus:'absent_excused'}]})];
+ axios.post.mockImplementation(async()=>{data.sessions=data.sessions.map(s=>({...s,version:4,attendanceConfirmedAt:'2026-11-06T08:00:00Z',canRecordAttendance:false,canConfirmAttendance:false}));return {data:{id:'session',version:4,attendanceConfirmedAt:'2026-11-06T08:00:00Z',arrangementId:'arrangement',arrangementVersion:2}};});
+ renderPage();await waitFor(()=>expect(document.querySelector('.ep-event')).not.toBeNull());fireEvent.click(document.querySelector('.ep-event'));
+ const dialog=screen.getByRole('dialog');fireEvent.click(within(dialog).getByRole('button',{name:/Danh sách thí sinh/}));
+ fireEvent.click(within(dialog).getByRole('button',{name:'Xác nhận trạng thái dự thi'}));
+ await within(dialog).findByText('Đã xác nhận trạng thái dự thi');
+ await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/session/attendance/confirm'),{version:3},{withCredentials:true}));
+ expect(within(dialog).getByRole('checkbox',{name:/Vắng CP/})).toBeChecked();
+ expect(within(dialog).getByRole('checkbox',{name:/Vắng CP/})).toBeDisabled();
+ expect(within(dialog).queryByRole('button',{name:'Xác nhận trạng thái dự thi'})).not.toBeInTheDocument();
+});
+
+it('labels makeup candidates in the queue and schedules them through the normal exam editor',async()=>{
+ data.queue=[{...offering,makeupCount:2}];data.approvedOfferings=data.queue;
+ renderPage();await screen.findByText('Thi bù · 2 học viên');
+ await open();expect(within(screen.getByRole('dialog')).getByText('Thi bù · 2 học viên')).toBeInTheDocument();
+ selectRoom();fireEvent.click(screen.getByRole('button',{name:'Xếp lịch'}));
+ await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/masters/exam-sessions'),expect.objectContaining({courseOfferingId:offering.id,snapshotId:offering.snapshotId}),expect.any(Object)));
+});
+
 it('saves candidate absences immediately, keeps the detail open and uses the latest session version',async()=>{
  const participantId='admission:11111111-1111-4111-8111-111111111111';
  data.sessions=[session({status:'held',canEdit:false,canRecordAttendance:true,arrangementId:'arrangement',arrangementVersion:5,
   candidates:[{participantId,code:'HV001',fullName:'Nguyễn Văn An'}],candidateIds:[participantId],candidateCount:1})];
- axios.put.mockImplementation(async(_url,payload)=>({data:{id:'session',participantId,status:payload.status,version:payload.version+1,arrangementId:'arrangement',arrangementVersion:payload.version+3}}));
+ axios.put.mockImplementation(async(_url,payload)=>{data.sessions=data.sessions.map(s=>({...s,version:payload.version+1,candidates:s.candidates.map(c=>({...c,attendanceStatus:payload.status}))}));return {data:{id:'session',participantId,status:payload.status,version:payload.version+1,arrangementId:'arrangement',arrangementVersion:payload.version+3}};});
  renderPage();await waitFor(()=>expect(document.querySelector('.ep-event')).not.toBeNull());
  fireEvent.click(document.querySelector('.ep-event'));
  const dialog=await screen.findByRole('dialog');fireEvent.click(within(dialog).getByRole('button',{name:/Danh sách thí sinh/}));
  const cp=within(dialog).getByRole('checkbox',{name:/Vắng CP/}),kp=within(dialog).getByRole('checkbox',{name:/Vắng KP/});
  fireEvent.click(cp);await waitFor(()=>expect(cp).toBeChecked());expect(kp).not.toBeChecked();
  expect(axios.put).toHaveBeenLastCalledWith(expect.stringContaining('/masters/exam-sessions/session/attendance'),{version:3,participantId,status:'absent_excused'},{withCredentials:true});
+ await waitFor(()=>expect(kp).toBeEnabled());
  fireEvent.click(kp);await waitFor(()=>expect(kp).toBeChecked());expect(cp).not.toBeChecked();
  expect(axios.put).toHaveBeenLastCalledWith(expect.any(String),{version:4,participantId,status:'absent_unexcused'},expect.any(Object));
+ await waitFor(()=>expect(kp).toBeEnabled());
  fireEvent.click(kp);await waitFor(()=>expect(kp).not.toBeChecked());expect(cp).not.toBeChecked();
  expect(axios.put).toHaveBeenLastCalledWith(expect.any(String),{version:5,participantId,status:'present'},expect.any(Object));
  expect(screen.getByRole('dialog')).toBe(dialog);
@@ -177,6 +201,32 @@ it('requires a cancellation reason inside the same detail dialog',async()=>{
 });
 it('confirms Held directly without any reason field',async()=>{
  data.sessions=[session({pendingConfirmation:true,canEdit:false})];renderPage();fireEvent.click(await screen.findByRole('button',{name:'Chờ xác nhận (1)'}));const dialog=screen.getByRole('dialog');expect(within(dialog).queryByRole('textbox')).toBeNull();fireEvent.click(within(dialog).getByRole('button',{name:'Đã diễn ra'}));await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/session/confirm'),{version:3,note:'',status:'held'},{withCredentials:true}));
+});
+it.each(['pending','detail'])('opens the candidate attendance list after Held from %s',async entry=>{
+ const participantId='admission:11111111-1111-4111-8111-111111111111';
+ data.sessions=[session({pendingConfirmation:true,canEdit:false,arrangementId:'arrangement',canRecordAttendance:true,
+  candidates:[{participantId,code:'HV001',fullName:'Nguyễn Văn An'}]})];
+ axios.post.mockImplementation(async()=>{data.sessions=data.sessions.map(s=>({...s,status:'held',pendingConfirmation:false,version:4}));return {data:{id:'session',status:'held'}};});
+ axios.put.mockImplementation(async(_url,payload)=>{data.sessions=data.sessions.map(s=>({...s,version:5,candidates:s.candidates.map(c=>({...c,attendanceStatus:payload.status}))}));return {data:{id:'session',participantId,status:payload.status,version:5,arrangementId:'arrangement',arrangementVersion:2}};});
+ renderPage();
+ if(entry==='pending')fireEvent.click(await screen.findByRole('button',{name:'Chờ xác nhận (1)'}));
+ else {await waitFor(()=>expect(document.querySelector('.ep-event')).not.toBeNull());fireEvent.click(document.querySelector('.ep-event'));}
+ fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Đã diễn ra'}));
+ const dialog=await screen.findByRole('dialog',{name:'CHI TIẾT BUỔI THI'});
+ const cp=await within(dialog).findByRole('checkbox',{name:/Vắng CP/});
+ await waitFor(()=>expect(cp).toBeEnabled());
+ expect(screen.queryByRole('dialog',{name:/CA THI CHỜ XÁC NHẬN/})).not.toBeInTheDocument();
+ expect(within(dialog).getByRole('button',{name:/Danh sách thí sinh/})).toHaveAttribute('aria-expanded','true');
+ fireEvent.click(cp);await waitFor(()=>expect(cp).toBeChecked());
+ expect(axios.put).toHaveBeenCalledWith(expect.stringContaining('/session/attendance'),{version:4,participantId,status:'absent_excused'},expect.any(Object));
+});
+it('keeps the pending list open when Held fails instead of opening attendance',async()=>{
+ data.sessions=[session({pendingConfirmation:true,canEdit:false})];axios.post.mockRejectedValue({response:{data:{message:'Ca thi đã thay đổi'}}});
+ renderPage();fireEvent.click(await screen.findByRole('button',{name:'Chờ xác nhận (1)'}));
+ fireEvent.click(screen.getByRole('button',{name:'Đã diễn ra'}));
+ await waitFor(()=>expect(axios.post).toHaveBeenCalled());
+ expect(screen.getByRole('dialog',{name:/CA THI CHỜ XÁC NHẬN/})).toBeInTheDocument();
+ expect(screen.queryByRole('dialog',{name:'CHI TIẾT BUỔI THI'})).not.toBeInTheDocument();
 });
 it.each([0,1,3])('uses the vt5 pending card layout with %i sessions',async(count)=>{
  data.sessions=Array.from({length:count},(_,i)=>session({id:'pending'+i,pendingConfirmation:true,canEdit:false,name:'Lớp học phần có tên dài '+i,subjectName:'Quản trị nguồn nhân lực và phát triển tổ chức'}));

@@ -21,7 +21,8 @@ export function gradebookStage(offering: any, state: any = {}) {
     const held = new Set(state.heldIds || []);
     // A partly held offering still needs exams for its remaining candidates.
     // Sets prevent duplicate assignments across sessions inflating completion.
-    if (candidates.some((row: any) => !held.has(row.participantId))) return 'awaiting_exam';
+    const savedGrades=(state.books||[]).flatMap((book:any)=>book.grades||[]);
+    if (candidates.some((row: any) => !held.has(row.participantId)||savedGrades.find((g:any)=>g.participantId===row.participantId)?.examAttendanceStatus==='absent_excused')) return 'awaiting_exam';
     const rows = resolveApprovedExamRows(state.approvedRows, state.books || [], state.heldIds || [], state);
     return unresolvedExamRows(rows).length ? 'exam_missing' : 'result_ready';
   }
@@ -37,27 +38,36 @@ export function gradebookCompletionStatus(state: any, examGradesComplete: boolea
 }
 
 // The gradebook and tracking summaries resolve the same frozen roster and held exams.
-export function resolveApprovedExamRows(frozenRows: any[], books: any[], heldIds: string[], state: any) {
+export function resolveApprovedExamRows(frozenRows: any[], books: any[], heldIds: string[], state: any, attempts?: any[]) {
   const saved = new Map<string, any>();
   for (const book of books) for (const row of book.grades) if (!saved.has(row.participantId)) saved.set(row.participantId, row);
   const held = new Set(heldIds);
   return frozenRows.map(frozen => {
     const previous = saved.get(frozen.participantId);
-    const examScore = held.has(frozen.participantId) ? previous?.examScore ?? null : null;
+    const attempt=attempts?.find(a=>a.participant_id===frozen.participantId);
+    const examAttendanceStatus=attempts ? (attempt?.makeup_for_session_id&&attempt.status!=='held'&&attempt.attendance==='present'?'absent_excused':attempt?.attendance||'present') : previous?.examAttendanceStatus||'present';
+    const absent=examAttendanceStatus!=='present';
+    const currentHeld=attempts ? attempt?.status==='held' : held.has(frozen.participantId);
+    const sameAttempt=!attempt||previous?.examSessionId===attempt.session_id||(!previous?.examSessionId&&!attempt.makeup_for_session_id);
+    const examScore = !absent&&currentHeld&&sameAttempt ? previous?.examScore ?? null : null;
     const calculated = state.result_status === 'approved' && previous?.finalized
       ? resolveSavedExamGrade({ ...previous, eligibilityFrozen: true, eligible: frozen.eligible,
         examExempt: frozen.examExempt, profileForeignLanguageExempt: frozen.profileForeignLanguageExempt })
-      : frozen.eligible === true && held.has(frozen.participantId)
-      ? calculateExamGrade({ ...frozen, examScore }, frozen.gradingPolicy, frozen.eligibilityPolicy)
+      : absent ? calculateExamGrade({...frozen,examScore:null,examAttendanceStatus},frozen.gradingPolicy,frozen.eligibilityPolicy)
+      : frozen.eligible === true && currentHeld
+      ? calculateExamGrade({ ...frozen, examScore, examAttendanceStatus }, frozen.gradingPolicy, frozen.eligibilityPolicy)
       : { ...emptyResult, ...(frozen.studyLeaveFailure ? { result: 'failed' } : frozen.profileForeignLanguageExempt ? { result: 'passed' } : frozen.examExempt ? { result: 'exempt' } : frozen.eligible === false ? { result: 'failed' } : {}) };
     return { ...frozen, ...calculated, examScore: frozen.eligible === true ? examScore : null, attemptScores: examScore == null ? [] : [examScore],
+      examAttendanceStatus,examSessionId:attempts?attempt?.session_id||null:previous?.examSessionId,isMakeup:attempts?!!attempt?.makeup_for_session_id:!!previous?.isMakeup,
+      makeupScheduled:!!(attempt?.makeup_for_session_id&&attempt.status==='scheduled'&&attempt.attendance==='present'),
       notes: previous?.notes ?? frozen.notes, eligibilityFrozen: ['submitted','approved'].includes(state.result_status),
-      examScoreEditable: frozen.eligible === true && held.has(frozen.participantId) && state.result_status === 'draft',
+      examScoreEditable: !absent&&frozen.eligible === true && currentHeld && state.result_status === 'draft',
       workflowPhase: 'final', finalized: state.result_status === 'approved' };
   });
 }
 
 export const unresolvedExamRows = (rows: any[]) => rows.filter(row => !row.examExempt && !row.profileForeignLanguageExempt && !row.studyLeaveFailure
+  && row.examAttendanceStatus!=='absent_unexcused'
   && (row.eligible == null || (row.eligible === true && (row.examScore == null || row.result === 'pending'))));
 
 // An approved historical gradebook can prove finished marks, but cannot supply a missing exam date.

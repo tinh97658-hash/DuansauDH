@@ -2,7 +2,7 @@ import { BRAND } from "../../config/branding";
 import { formatDateTime } from "../../utils/dateFormat";
 import { openDocumentPreview } from "../../utils/documentFiles";
 import { mmToPoints, pointsToExcelWidth, excelRowHeight } from "../../utils/documentLayout";
-import { draftOf, gradebookColumns, gradebookRowValues, visibleGradeRows } from "./gradebook";
+import { examAttendanceLabel, draftOf, gradebookColumns, gradebookRowValues, visibleGradeRows } from "./gradebook";
 import { gradebookDocumentColumns } from "./gradebookLayout";
 
 export const GRADEBOOK_HEADER_ROW = 9;
@@ -25,7 +25,7 @@ export async function fetchAllGradebookRows(fetchPage, params, getDirty = () => 
     revision = data.revision;
     total = data.total;
     if (data.page !== page) throw new Error("Danh sách đã thay đổi trong lúc xuất. Vui lòng xuất lại.");
-    exported.push(...data.rows.map(row => row.finalized || (data.workflow && data.workflow.status !== "draft") || row.profileForeignLanguageExempt || row.studyLeaveFailure ? draftOf(row) : getDirty()[row.participantId] || draftOf(row)));
+    exported.push(...data.rows.map(row => row.finalized || (data.workflow && data.workflow.status !== "draft") || row.profileForeignLanguageExempt || row.studyLeaveFailure || examAttendanceLabel(row) ? draftOf(row) : getDirty()[row.participantId] || draftOf(row)));
     page++;
   } while ((page - 1) * 15 < total);
   return visibleGradeRows(exported, params.mode, params.search);

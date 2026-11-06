@@ -242,7 +242,7 @@ export class ClassScoreSummaryService {
           entry.score = calculated.courseScore;
           entry.result = calculated.result;
           entry.details = { ...grade, ...calculated, eligibilityPolicy: policy };
-          if (!grade.workflowPhase && !grade.finalized && !grade.studyLeaveFailure && !grade.examExempt && calculateExamEligibility(grade, policy) === false) {
+          if (!grade.examAttendanceStatus && !grade.workflowPhase && !grade.finalized && !grade.studyLeaveFailure && !grade.examExempt && calculateExamEligibility(grade, policy) === false) {
             entry.score = 0;
             entry.result = "failed";
             entry.details = { ...entry.details, examScore: 0, attemptScores: [0] };
@@ -258,6 +258,7 @@ export class ClassScoreSummaryService {
         }
         const person = people.get(entry.participantId);
         if (person) person.scores[entry.subjectId] = { score: entry.score == null ? null : Number(entry.score), result: entry.result,
+          ...(entry.details?.examAttendanceStatus ? {examAttendanceStatus:entry.details.examAttendanceStatus} : {}),
           ...(entry.details?.finalized ? { finalized: true } : {}),
           ...(entry.details?.eligibilityFrozen ? { eligibilityFrozen: true } : {}),
           ...(entry.details?.studyLeaveFailure ? { studyLeaveFailure: true } : {}),

@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Put, Query, UseGuards } from "@nestjs/common";
 import { ExamScheduleService } from './exam-schedule.service.js';
-import { ConfirmExamDto, ExamCandidateAttendanceDto, ExamScheduleQueryDto, ExamSessionActionDto, RescheduleExamDto, ScheduleExamDto, SaveExamArrangementDto } from './dto/exam-schedule.dto.js';
+import { ConfirmExamAttendanceDto, ConfirmExamDto, ExamCandidateAttendanceDto, ExamScheduleQueryDto, ExamSessionActionDto, RescheduleExamDto, ScheduleExamDto, SaveExamArrangementDto } from './dto/exam-schedule.dto.js';
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
 import { GroupResponsibilityService } from "../auth/group-responsibility.service.js";
 import { CurrentUser } from "../common/auth-user.js";
@@ -60,6 +60,8 @@ export class MastersController {
   confirmExam(@Param('id',ParseUUIDPipe) id:string,@Body() dto:ConfirmExamDto,@CurrentUser() actor:any){return this.examSchedule.confirm(id,dto,actor);}
   @Put('exam-sessions/:id/attendance') @RequirePermissions('exams.write')
   recordExamAttendance(@Param('id',ParseUUIDPipe) id:string,@Body() dto:ExamCandidateAttendanceDto,@CurrentUser() actor:any){return this.examSchedule.recordAttendance(id,dto,actor);}
+  @Post('exam-sessions/:id/attendance/confirm') @RequirePermissions('exams.write')
+  confirmExamAttendance(@Param('id',ParseUUIDPipe) id:string,@Body() dto:ConfirmExamAttendanceDto,@CurrentUser() actor:any){return this.examSchedule.confirmAttendance(id,dto,actor);}
 
   @Get("bridge-course") bridgeCourse() { return this.masters.bridgeCourse(); }
   @Get("grading-policies")

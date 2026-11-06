@@ -1,5 +1,5 @@
 import {examInvigilatorName} from './examInvigilators';
-import React,{useState} from 'react';
+import React,{useEffect,useState} from 'react';
 import {Link} from 'react-router-dom';
 import {UsersIcon,TableCellsIcon,CheckCircleIcon,XCircleIcon,TrashIcon} from '../../components/AppIcons';
 import {Modal} from '../scheduling/shared';
@@ -11,8 +11,14 @@ import ExamLearnerClasses from './ExamLearnerClasses';
 import ExamCandidatesTable from './ExamCandidatesTable';
 import {ExamEditor,ExamReasonDialog} from './ExamPlannerDialogs';
 
-export default function ExamSessionDialog({members,queue,rooms,lecturers,units,canWrite,saving,refreshing,error,onClose,onClearError,onSaveArrangement,onSaveSession,onAction,onAttendanceChange}){
- const [mode,setMode]=useState(null),[expanded,setExpanded]=useState([]);
+export default function ExamSessionDialog({members,queue,rooms,lecturers,units,canWrite,saving,refreshing,error,attendanceSessionId,onClose,onClearError,onSaveArrangement,onSaveSession,onAction,onAttendanceChange,onAttendanceConfirm}){
+ const [mode,setMode]=useState(null),[expanded,setExpanded]=useState(()=>attendanceSessionId?[attendanceSessionId]:[]);
+ useEffect(()=>{
+  if(!attendanceSessionId)return;
+  setExpanded(ids=>ids.includes(attendanceSessionId)?ids:[...ids,attendanceSessionId]);
+  const timer=setTimeout(()=>document.getElementById(`exam-candidates-${attendanceSessionId}`)?.scrollIntoView?.({block:'nearest'}),0);
+  return()=>clearTimeout(timer);
+ },[attendanceSessionId]);
  const sorted=[...members].sort((a,b)=>(a.roundNo||1)-(b.roundNo||1)||a.startTime.localeCompare(b.startTime)||(a.name||'').localeCompare(b.name||'','vi'));
  const active=sorted.filter(activeExamGroup),display=active.length?active:sorted,seed=display[0];
  if(!seed)return null;
@@ -59,7 +65,7 @@ export default function ExamSessionDialog({members,queue,rooms,lecturers,units,c
       return <React.Fragment key={g.id}><tr className={activeExamGroup(g)?'':'ep-session-history'}>
        <td>{g.roundNo||1}</td><td>{g.startTime.slice(0,5)}–{g.endTime.slice(0,5)}</td>
        <td><ExamLearnerClasses groups={g.groups}/></td>
-       <td title={g.note?`Ghi chú: ${g.note}`:undefined}>{g.subjectName||'—'}</td><td>{g.candidateCount}</td><td>{examStatus(g)}</td>
+       <td title={g.note?`Ghi chú: ${g.note}`:undefined}>{g.subjectName||'—'}{g.makeupCount>0&&<span className="ep-makeup-badge">{g.makeupCount} thi bù</span>}</td><td>{g.candidateCount}</td><td>{examStatus(g)}</td>
        <td><div className="ep-session-row-actions">
         <div className="ep-session-view-actions">
         <button className="sl-btn app-icon-action ep-icon-action" title="Danh sách thí sinh" aria-label={`Danh sách thí sinh ${g.subjectName} · ${g.name}`} aria-expanded={open} aria-controls={detailId} onClick={()=>setExpanded(ids=>open?ids.filter(id=>id!==g.id):[...ids,g.id])}><UsersIcon/></button>
@@ -70,7 +76,7 @@ export default function ExamSessionDialog({members,queue,rooms,lecturers,units,c
        </div></td>
       </tr>{open&&<tr><td colSpan={7} className="ep-session-candidate-cell"><section id={detailId} aria-label={`Thí sinh ${g.subjectName} · ${g.name}`}>
        <h3>Danh sách thí sinh · {g.subjectName} ({g.candidateCount})</h3>
-       <ExamCandidatesTable session={g} canWrite={canWrite} busy={busy} onAttendanceChange={onAttendanceChange}/>
+       <ExamCandidatesTable session={g} canWrite={canWrite} busy={busy} onAttendanceChange={onAttendanceChange} onAttendanceConfirm={onAttendanceConfirm}/>
       </section></td></tr>}</React.Fragment>;
      })}</tbody>
     </table></div>

@@ -11,6 +11,7 @@ function fixture(permissions=['exams.view','exams.write'],readOnly=false){
   const sessions=[{id:'one',courseOfferingId:'shared',arrangementId:'mixed',canEdit:true,candidateIds:[]},
     {id:'two',courseOfferingId:'hidden',arrangementId:'mixed',canEdit:true,candidateIds:[]}];
   const query=jest.fn(async(sql:string)=>sql.includes('BETWEEN 0 AND 62')?[{ok:true}]
+    :sql.includes('latest.attendance')?[{course_offering_id:'shared',person:{participantId:'visible'}},{course_offering_id:'hidden',person:{participantId:'hidden'}}]
     :sql.includes('FROM course_exam_workflows w')?[{id:'shared',remainingCount:2,candidateIds:[]},{id:'hidden',remainingCount:1,candidateIds:[]}]
     :sql.includes('FROM course_exam_sessions es JOIN course_exam_arrangements')?sessions:[]);
   const workflow:any={query,lock:jest.fn().mockResolvedValue({state:{}})};

@@ -6,6 +6,8 @@ export const roundExamScore = (score?: number | null): number | null => score ==
 // Read projections must resolve component scores exactly as the entry screen does.
 // Older imported rows can contain only a final score and must retain that evidence.
 export function resolveSavedExamGrade(grade: Partial<CourseExamGrade>, eligibilityPolicy?: GradingPolicy | null) {
+  if (grade.examAttendanceStatus === 'absent_unexcused') return {courseScore:null,grade4:null,letterGrade:'',result:'failed' as const};
+  if (grade.examAttendanceStatus === 'absent_excused') return {courseScore:null,grade4:null,letterGrade:'',result:'pending' as const};
   const ineligible = grade.eligibilityFrozen && grade.eligible === false && !grade.examExempt && !grade.profileForeignLanguageExempt;
   if (grade.finalized) return { courseScore: grade.courseScore ?? null, grade4: grade.grade4 ?? null,
     letterGrade: grade.letterGrade || "", result: ineligible && (!grade.result || grade.result === 'pending') ? 'failed' as const : grade.result || "pending" };
@@ -20,7 +22,9 @@ export function resolveSavedExamGrade(grade: Partial<CourseExamGrade>, eligibili
     grade.gradingPolicy || LEGACY_GRADING_POLICY, (grade.eligibilityFrozen?grade.eligibilityPolicy:eligibilityPolicy) || LEGACY_GRADING_POLICY);
 }
 
-export function calculateExamGrade(row: Pick<CourseExamGrade, "testScore" | "assignmentScore" | "examScore" | "examExempt" | "profileForeignLanguageExempt" | "studyLeaveFailure">, policy: GradingPolicy = LEGACY_GRADING_POLICY, eligibilityPolicy: GradingPolicy = policy): Pick<CourseExamGrade, "courseScore" | "grade4" | "letterGrade" | "result"> {
+export function calculateExamGrade(row: Pick<CourseExamGrade, "testScore" | "assignmentScore" | "examScore" | "examExempt" | "profileForeignLanguageExempt" | "studyLeaveFailure" | "examAttendanceStatus">, policy: GradingPolicy = LEGACY_GRADING_POLICY, eligibilityPolicy: GradingPolicy = policy): Pick<CourseExamGrade, "courseScore" | "grade4" | "letterGrade" | "result"> {
+  if (row.examAttendanceStatus === 'absent_unexcused') return {courseScore:null,grade4:null,letterGrade:'',result:'failed'};
+  if (row.examAttendanceStatus === 'absent_excused') return {courseScore:null,grade4:null,letterGrade:'',result:'pending'};
   if (row.studyLeaveFailure) return { courseScore: null, grade4: null, letterGrade: "", result: "failed" };
   if (row.profileForeignLanguageExempt) return { courseScore: null, grade4: null, letterGrade: "", result: "passed" };
   const ineligible = !row.examExempt && calculateExamEligibility(row, eligibilityPolicy) === false;

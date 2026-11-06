@@ -6,9 +6,10 @@ import { randomUUID } from 'node:crypto';
 import { Staff } from '../database/models/staff.model.js';
 import { RbacService } from '../auth/rbac.service.js';
 import { ExamWorkflowService } from './exam-workflow.service.js';
-import { ConfirmExamDto, ExamCandidateAttendanceDto, ExamScheduleQueryDto, ExamSessionActionDto, RescheduleExamDto, ScheduleExamDto, SaveExamArrangementDto } from './dto/exam-schedule.dto.js';
+import { ConfirmExamAttendanceDto, ConfirmExamDto, ExamCandidateAttendanceDto, ExamScheduleQueryDto, ExamSessionActionDto, RescheduleExamDto, ScheduleExamDto, SaveExamArrangementDto } from './dto/exam-schedule.dto.js';
 import {activeExam, validateExamArrangement,externalInvigilatorKey,examRoomFits} from './exam-arrangement.js';
 import { GradebookAccessService } from './gradebook-access.service.js';
+import {pendingExamCandidatesSql} from './exam-makeup.js';
 
 @Injectable()
 export class ExamScheduleService {
@@ -37,6 +38,11 @@ export class ExamScheduleService {
       FROM course_exam_workflows w JOIN course_offerings o ON o.id=w.course_offering_id JOIN subjects s ON s.id=o.subject_id
       JOIN course_exam_eligibility_snapshots p ON p.id=w.eligibility_snapshot_id
       WHERE w.mode='new' AND w.eligibility_status='approved' AND o.status='completed' ORDER BY o.name,o.id`);
+    if(queue.length){
+      const available=await this.query(pendingExamCandidatesSql,{offerings:queue.map(o=>o.id)});
+      queue=queue.map(o=>{const candidates=available.filter(c=>c.course_offering_id===o.id).map(c=>({...c.person,isMakeup:!!c.makeup_for_session_id,makeupForSessionId:c.makeup_for_session_id}));
+        return {...o,candidates,candidateIds:candidates.map(c=>c.participantId),candidateCount:candidates.length,remainingCount:candidates.length,makeupCount:candidates.filter(c=>c.isMakeup).length};});
+    }
     let sessions=await this.query(`SELECT es.*,es.exam_date::text AS "examDate",es.start_time::text AS "startTime",es.end_time::text AS "endTime",
       es.course_offering_id AS "courseOfferingId",es.eligibility_snapshot_id AS "snapshotId",es.room_id AS "roomId",es.lecturer_id AS "lecturerId",COALESCE(l.name,es.external_invigilator_name) AS "lecturerName",
       l.academic_rank AS "lecturerAcademicRank",l.academic_degree AS "lecturerAcademicDegree",l2.academic_rank AS "secondLecturerAcademicRank",l2.academic_degree AS "secondLecturerAcademicDegree",
@@ -48,14 +54,17 @@ export class ExamScheduleService {
       (SELECT jsonb_agg(jsonb_build_object('id',g.id,'name',g.name,'code',g.code,'academicYear',g.academic_year,'majorId',g.major_id,'majorName',m.name,'disciplineId',m.discipline_id,'disciplineName',d.name))
         FROM course_offering_class_groups l JOIN class_groups g ON g.id=l.class_group_id LEFT JOIN majors m ON m.id=g.major_id LEFT JOIN disciplines d ON d.id=m.discipline_id WHERE l.course_offering_id=o.id) AS groups,
       (SELECT count(*)::int FROM course_exam_session_candidates c WHERE c.session_id=es.id) AS "candidateCount",
+      (SELECT count(*)::int FROM course_exam_session_candidates c WHERE c.session_id=es.id AND c.makeup_for_session_id IS NOT NULL) AS "makeupCount",
       (SELECT jsonb_agg(c.participant_id ORDER BY c.participant_id) FROM course_exam_session_candidates c WHERE c.session_id=es.id) AS "candidateIds",
       p.rows->0->>'classGroupId' AS "classGroupId",
       (SELECT jsonb_agg(jsonb_build_object('participantId',person->>'participantId','code',person->>'code','fullName',person->>'fullName',
-        'attendanceStatus',COALESCE(att.status,'present'),'attendanceRecordedAt',att.recorded_at) ORDER BY candidate_order)
+        'attendanceStatus',COALESCE(att.status,'present'),'attendanceRecordedAt',att.recorded_at,'isMakeup',c.makeup_for_session_id IS NOT NULL) ORDER BY candidate_order)
         FROM jsonb_array_elements(p.rows) WITH ORDINALITY AS people(person,candidate_order)
         JOIN course_exam_session_candidates c ON c.session_id=es.id AND c.participant_id=person->>'participantId'
         LEFT JOIN course_exam_candidate_attendance att ON att.session_id=c.session_id AND att.participant_id=c.participant_id) AS candidates,
-      (es.status IN ('scheduled','held') AND w.mode='new' AND w.result_status NOT IN ('submitted','approved')
+      es.attendance_confirmed_at AS "attendanceConfirmedAt",
+      (es.status='held' AND es.attendance_confirmed_at IS NULL AND w.mode='new' AND w.result_status NOT IN ('submitted','approved')) AS "canConfirmAttendance",
+      (es.status IN ('scheduled','held') AND es.attendance_confirmed_at IS NULL AND w.mode='new' AND w.result_status NOT IN ('submitted','approved')
         AND (es.exam_date+es.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp()) AS "canRecordAttendance",
       (es.status='scheduled' AND (es.exam_date+es.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'>clock_timestamp()) AS "canEdit",
       (es.status='scheduled' AND (es.exam_date+es.end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp()) AS "pendingConfirmation"
@@ -177,11 +186,12 @@ export class ExamScheduleService {
           WHERE p.id= :id AND p.course_offering_id= :offering`,{id:g.snapshotId,offering:g.courseOfferingId},tx);
         if(!snapshot)throw new ConflictException('Danh sách thi không thuộc lớp học phần.');
         const rows=snapshot.rows.filter((r:any)=>r.eligible===true&&!r.examExempt);
-        const assigned=old?[]:await this.query(`SELECT c.participant_id FROM course_exam_sessions es JOIN course_exam_session_candidates c ON c.session_id=es.id WHERE es.course_offering_id=:offering AND es.status IN ('scheduled','held')`,{offering:g.courseOfferingId},tx);
-        const candidates=old?(await this.query('SELECT participant_id FROM course_exam_session_candidates WHERE session_id= :id',{id:old.id},tx)).map(r=>r.participant_id):rows.map((r:any)=>r.participantId).filter((id:string)=>!assigned.some(c=>c.participant_id===id));
+        const pending=old?await this.query('SELECT participant_id,makeup_for_session_id FROM course_exam_session_candidates WHERE session_id= :id',{id:old.id},tx)
+          :await this.query(pendingExamCandidatesSql,{offerings:[g.courseOfferingId]},tx);
+        const candidates=pending.map(r=>r.participant_id);
         if(!candidates.length)throw new ConflictException('Không có thí sinh cần thi.');
         const aliasNames:Record<string,string>={};
-        prepared.push({...g,old,locked,rows,candidates,aliases:await this.aliases(candidates,tx,rows,aliasNames),aliasNames,label:`${snapshot.name} / ${snapshot.subject}`});
+        prepared.push({...g,old,locked,rows,candidates,pending,aliases:await this.aliases(candidates,tx,rows,aliasNames),aliasNames,label:`${snapshot.name} / ${snapshot.subject}`});
       }
       const span=validateExamArrangement(prepared,dto.period);
       await this.resources([
@@ -233,7 +243,7 @@ export class ExamScheduleService {
         else{
           await this.db.query(`INSERT INTO course_exam_sessions(id,arrangement_id,round_no,course_offering_id,eligibility_snapshot_id,exam_date,start_time,end_time,room_id,lecturer_id,external_invigilator_name,external_unit_name,external_invigilator_key,second_lecturer_id,second_external_invigilator_name,second_external_unit_name,second_external_invigilator_key,created_by,updated_by,note)
             VALUES(:id,:arrangement,:round,:offering,:snapshot,:date,:start,:end,:room,:lecturer,:externalName,:externalUnit,:externalKey,:secondLecturer,:secondName,:secondUnit,:secondKey,:actor,:actor,:note)`,{transaction:tx,replacements});
-          for(const participant of g.candidates)await this.db.query('INSERT INTO course_exam_session_candidates(session_id,participant_id) VALUES(:id,:participant)',{transaction:tx,replacements:{id:sessionId,participant}});
+          for(const candidate of g.pending)await this.db.query('INSERT INTO course_exam_session_candidates(session_id,participant_id,makeup_for_session_id) VALUES(:id,:participant,:source)',{transaction:tx,replacements:{id:sessionId,participant:candidate.participant_id,source:candidate.makeup_for_session_id||null}});
         }
         await this.workflow.event(g.courseOfferingId,g.old?'exam.reschedule':'exam.schedule',actor,dto.note||'Xếp buổi thi',g.old,{id:sessionId,arrangementId:id,roundNo:g.roundNo,...replacements,candidateCount:g.candidates.length},tx);
       }
@@ -270,6 +280,7 @@ export class ExamScheduleService {
       if(['submitted','approved'].includes(state.result_status))throw new ConflictException('Kết quả đã gửi duyệt hoặc đã khóa; không thể sửa trạng thái dự thi.');
       await this.query('SELECT id FROM course_exam_arrangements WHERE id= :id FOR UPDATE',{id:ref.arrangement_id},tx);
       const session=await this.session(id,tx);this.checkVersion(session,dto.version);
+      if(session.attendance_confirmed_at)throw new ConflictException('Trạng thái dự thi đã xác nhận và khóa, không thể chỉnh sửa.');
       if(!['scheduled','held'].includes(session.status))throw new ConflictException('Ca thi đã hủy hoặc không diễn ra; chỉ được xem trạng thái thí sinh.');
       const [started]=await this.query(`SELECT (exam_date+start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp() ok FROM course_exam_sessions WHERE id= :id`,{id},tx);
       if(!started.ok)throw new ConflictException('Chỉ ghi nhận vắng từ khi ca thi bắt đầu.');
@@ -278,6 +289,9 @@ export class ExamScheduleService {
           ON a.session_id=c.session_id AND a.participant_id=c.participant_id
         WHERE c.session_id=:id AND c.participant_id=:participant`,{id,participant:dto.participantId},tx);
       if(!candidate)throw new NotFoundException('Thí sinh không thuộc danh sách của ca thi này.');
+      const children=await this.query(`SELECT c.session_id FROM course_exam_session_candidates c JOIN course_exam_sessions s ON s.id=c.session_id
+        WHERE c.makeup_for_session_id=:id AND c.participant_id=:participant AND s.status IN ('scheduled','held')`,{id,participant:dto.participantId},tx);
+      if(children.length&&candidate.status!==dto.status)throw new ConflictException('Thí sinh đã được xếp thi bù. Hãy hủy lịch thi bù trước khi đổi trạng thái buổi thi gốc.');
       await this.db.query(`INSERT INTO course_exam_candidate_attendance(session_id,participant_id,status,recorded_by,recorded_at)
         VALUES(:id,:participant,:status,:actor,clock_timestamp()) ON CONFLICT(session_id,participant_id)
         DO UPDATE SET status=EXCLUDED.status,recorded_by=EXCLUDED.recorded_by,recorded_at=EXCLUDED.recorded_at`,
@@ -290,6 +304,26 @@ export class ExamScheduleService {
     });
   }
   async confirm(id:string,dto:ConfirmExamDto,actor:any){return this.finish(id,dto,actor,dto.status);}
+  async confirmAttendance(id:string,dto:ConfirmExamAttendanceDto,actor:any){
+    await this.authorize(actor);
+    return this.db.transaction(async tx=>{
+      const [ref]=await this.query('SELECT course_offering_id,arrangement_id FROM course_exam_sessions WHERE id= :id',{id},tx);
+      if(!ref)throw new NotFoundException('Không tìm thấy ca thi.');
+      if(this.access){const scope=await this.access.assertOffering(actor,ref.course_offering_id,tx);if(scope.readOnly)throw new ForbiddenException('Bạn chỉ có quyền xem danh sách thí sinh.');}
+      const {state}=await this.workflow.lock(ref.course_offering_id,tx);
+      if(['submitted','approved'].includes(state.result_status))throw new ConflictException('Kết quả đã gửi duyệt hoặc đã khóa.');
+      await this.query('SELECT id FROM course_exam_arrangements WHERE id= :id FOR UPDATE',{id:ref.arrangement_id},tx);
+      const session=await this.session(id,tx);this.checkVersion(session,dto.version);
+      if(session.attendance_confirmed_at)throw new ConflictException('Trạng thái dự thi đã xác nhận và khóa.');
+      if(session.status!=='held')throw new ConflictException('Chỉ xác nhận trạng thái dự thi sau khi ca thi được xác nhận Đã diễn ra.');
+      const [updated]=await this.query(`UPDATE course_exam_sessions SET attendance_confirmed_at=clock_timestamp(),attendance_confirmed_by=:actor,
+        version=version+1,updated_by=:actor,updated_at=now() WHERE id=:id RETURNING version,attendance_confirmed_at AS "attendanceConfirmedAt"`,{id,actor:actor.id},tx);
+      const [arrangement]=await this.query('UPDATE course_exam_arrangements SET version=version+1 WHERE id=:id RETURNING version',{id:session.arrangement_id},tx);
+      await this.workflow.event(session.course_offering_id,'exam.attendance.confirm',actor,'Xác nhận và khóa trạng thái dự thi',
+        {sessionId:id},{sessionId:id,confirmedAt:updated.attendanceConfirmedAt},tx);
+      return {id,version:updated.version,attendanceConfirmedAt:updated.attendanceConfirmedAt,arrangementId:session.arrangement_id,arrangementVersion:arrangement.version};
+    });
+  }
   private async finish(id:string,dto:{version:number;note?:string},actor:any,status:'held'|'not_held'|'cancelled'){
     await this.authorize(actor);if(status!=='held'&&!dto.note?.trim())throw new BadRequestException(status==='cancelled'?'Nhập lý do hủy lịch thi.':'Nhập lý do không diễn ra.');
     const note=dto.note?.trim()||'';

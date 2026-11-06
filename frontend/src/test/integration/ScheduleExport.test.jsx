@@ -33,9 +33,9 @@ const bufferOf = (blob) => new Promise((resolve, reject) => {
 it('includes academic titles in teaching and exam export rows',()=>{
  const lecturer={name:'Nguyễn An',academicRank:'Phó Giáo sư',academicDegree:'Tiến sĩ'};
  const teaching=scheduleExportRows([{id:'s',sessionDate:snapshot.week,period:'MORNING',lecturer,courseOffering:{id:'offering',subject:{name:'Triết học'}}}]);
- expect(teaching[0]).toContain('PGS.TS Nguyễn An');
+ expect(teaching[0]).toContain('PGS. TS. Nguyễn An');
  const exam=buildExamScheduleDocument({week:snapshot.week,end:snapshot.end,sessions:[{examDate:snapshot.week,startTime:'08:00',lecturerName:'Nguyễn An',lecturerAcademicRank:'Phó Giáo sư',lecturerAcademicDegree:'Tiến sĩ',secondLecturerName:'Trần Bình',secondLecturerAcademicDegree:'Thạc sĩ'}]});
- expect(exam.rows[0][4]).toBe('PGS.TS Nguyễn An\nThS Trần Bình');
+ expect(exam.rows[0][4]).toBe('PGS. TS. Nguyễn An\nThS. Trần Bình');
 });
 
 it("exports exam data with the exam heading in PDF, Word and Excel using the shared layout", async () => {

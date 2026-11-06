@@ -160,3 +160,10 @@ body .app-popup .ep-arrangement-dialog .ep-resource-hint{margin:0;padding:10px 1
 .ep-session-row-actions .ep-icon-action-warning{background:#fff8e9;border-color:#dfba80;color:#a65d13}
 .ep-session-row-actions .ep-icon-action-warning:hover:not(:disabled){background:#fff0cf;border-color:#a65d13}
 .ep-session-row-actions .ep-icon-action-danger{background:#fff4f4;border-color:#dfb1b4;color:#b52d2d}
+.ep-makeup-badge{display:inline-block;width:max-content;max-width:100%;margin:.2em 0 .2em .5em;padding:.1em .45em;border:1px solid #c4b1e0;background:#f4effb;color:#674397;font-size:.85em;font-weight:600;line-height:1.5;white-space:nowrap;vertical-align:middle}
+.ep-queue-select>.ep-makeup-badge{grid-column:1/-1;margin-left:0}
+.ep-attendance-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid #c9d8e5}
+.ep-attendance-footer p{margin:0;color:#354959;line-height:1.5}
+.ep-attendance-footer small{display:block;margin-top:4px;color:#607486}
+.ep-attendance-confirmed{display:inline-flex;align-items:center;gap:.45em;color:#137b3b;font-weight:600}
+.ep-attendance-footer :is(.sl-btn,.ep-attendance-confirmed)>svg{width:1.25em;height:1.25em;font-size:inherit;flex-shrink:0}
