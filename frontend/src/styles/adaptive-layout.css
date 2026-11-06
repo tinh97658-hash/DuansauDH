@@ -161,6 +161,11 @@
       grid-template-rows: auto repeat(2, minmax(calc(190px * var(--app-text-scale)), max-content)) !important;
     }
 
+    /* Empty exam periods must not stretch the automatic day-header row. */
+    html[data-font-size]:not([data-font-size="100"]) .sl-schedule-view .ep-period-calendar {
+      grid-template-rows: calc(30px * var(--app-text-scale)) repeat(2, minmax(calc(190px * var(--app-text-scale)), 1fr)) !important;
+    }
+
     html[data-font-size]:not([data-font-size="100"]) .sl-schedule-view .sl-day {
       display: flex !important;
       justify-content: center !important;

@@ -21,6 +21,7 @@
 .ep-stacked .ep-event{padding:1px 3px;gap:0}.ep-stacked .ep-event>strong,.ep-stacked .ep-event>.ep-event-location{line-height:1.3}
 /* Period cells reuse the Teaching timetable grid; exact exam times remain in the editor. */
 .sl-schedule-view .ep-period-calendar{min-width:760px}
+.exam-planner .ep-period-calendar>:is(.sl-corner,.sl-day){position:sticky;top:0;z-index:3}
 .sl-schedule-view .ep-period-slot{padding:6px;overflow:auto}
 .ep-period-target{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent}
 .exam-planner .ep-period-target:disabled{opacity:1;cursor:default}
