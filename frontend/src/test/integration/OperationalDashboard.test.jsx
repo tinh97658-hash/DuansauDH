@@ -39,45 +39,191 @@ const approvals = () => screen.getByRole('region', { name: 'Chờ phê duyệt' 
 const tab = label => fireEvent.click(screen.getByRole('tab', { name: label }));
 beforeEach(() => { vi.clearAllMocks(); axios.get.mockResolvedValue({ data: fixture() }); });
 
-it('greets the active working profile and keeps the existing navigation, footer and filters in the header', async () => {
+
+let previewHeight = 224;
+const resizeCallbacks = new Set();
+beforeAll(() => {
+  vi.stubGlobal('ResizeObserver', class {
+    constructor(callback) { this.callback = callback; resizeCallbacks.add(callback); }
+    observe() {}
+    disconnect() { resizeCallbacks.delete(this.callback); }
+  });
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function () {
+    return this.classList.contains('od-task-viewport') ? previewHeight : 900;
+  });
+  const original = HTMLElement.prototype.getBoundingClientRect;
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+    return this.classList.contains('od-task-row') ? new DOMRect(0, 0, 600, 56) : original.call(this);
+  });
+});
+afterAll(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+beforeEach(() => { previewHeight = 224; });
+const taskList = () => within(work()).getByRole('list', { name: 'Danh sách công việc' });
+
+it('keeps the greeting, shared navigation, notification and header filters', async () => {
   await open();
-  expect(screen.getByRole('heading', { name: 'Xin chào, Hồ sơ a' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Xin chào, Tên nhân sự' })).toBeInTheDocument();
   expect(screen.getByRole('navigation', { name: 'Ribbon hiện có' })).toBeInTheDocument();
   expect(screen.getByText('Footer hiện có')).toBeInTheDocument();
   expect(document.querySelector('.od-header')).toContainElement(screen.getByRole('group', { name: 'Bộ lọc dashboard' }));
 });
-it('separates group details, inline preview and navigation without adding incompatible units', async () => {
+it('replaces the aggregate view with four direct record tabs', async () => {
   await open();
-  const group = within(work()).getByRole('region', { name: 'Học viên chưa phân nhóm' });
-  expect(group).toHaveTextContent('7 học viên');
-  expect(screen.queryByText('Công nghệ thông tin')).not.toBeInTheDocument();
-  fireEvent.click(within(group).getByRole('button', { name: /Xem trước/ }));
-  expect(within(group).getByText('Công nghệ thông tin')).toBeInTheDocument();
-  expect(screen.getByTestId('location')).toHaveTextContent('/viewLogged');
-  fireEvent.click(within(group).getByRole('button', { name: 'Chi tiết' }));
+  expect(screen.getAllByRole('tab').map(element => element.textContent)).toEqual(['Phân nhóm', 'Xếp lịch', 'Xác nhận', 'Điểm']);
+  expect(screen.queryByRole('tab', { name: 'Tất cả' })).not.toBeInTheDocument();
+  expect(within(taskList()).getByText('Công nghệ thông tin')).toBeInTheDocument();
+  expect(within(taskList()).getByText('7 học viên')).toBeInTheDocument();
+  expect(within(work()).queryByRole('button', { expanded: false })).not.toBeInTheDocument();
+});
+it.each([
+  ['Chờ phân nhóm', '/masters/assign-class-groups?year=2026'],
+  ['Chưa xếp lịch', '/masters/schedule?year=2026&queue=unscheduled'],
+  ['Chờ xác nhận buổi học', '/masters/schedule?year=2026&queue=pending-confirmation'],
+  ['Theo dõi điểm', '/masters/exam-lists?year=2026'],
+])('keeps the %s KPI as a shortcut to the original feature', async (label, href) => {
+  await open();
+  const link = screen.getByRole('link', { name: `Xem công việc: ${label}` });
+  expect(link).toHaveAttribute('href', href);
+  fireEvent.click(link);
+  expect(screen.getByTestId('location')).toHaveTextContent(href);
   expect(screen.getByRole('tab', { name: 'Phân nhóm' })).toHaveAttribute('aria-selected', 'true');
-  fireEvent.click(screen.getByRole('link', { name: 'Mở chức năng: Công nghệ thông tin' }));
-  expect(screen.getByTestId('location')).toHaveTextContent('/masters/assign-class-groups?year=2026&majorId=m1&disciplineId=d1');
 });
-it('shows different counts and deep links for unscheduled offerings and pending sessions', async () => {
-  await open(); tab('Lịch học');
-  expect(within(work()).getByRole('region', { name: 'Lớp học phần chưa xếp lịch' })).toHaveTextContent('1 lớp học phần');
-  expect(within(work()).getByRole('region', { name: 'Buổi học chờ xác nhận' })).toHaveTextContent('3 buổi');
-  expect(screen.getByRole('link', { name: 'Mở chức năng: Lớp chờ xác nhận' })).toHaveAttribute('href', '/masters/schedule?year=2026&offeringId=o2&queue=pending-confirmation');
+it('lists positive grouping queues in descending learner count and preserves their major deep links', async () => {
+  const data = fixture();
+  data.sources.grouping.data.items = [
+    { id: 'low', title: 'Ít học viên', count: 2, href: '/masters/assign-class-groups?year=2026&majorId=low' },
+    { id: 'zero', title: 'Đã phân nhóm', count: 0 },
+    { id: 'high', title: 'Nhiều học viên', count: 12, href: '/masters/assign-class-groups?year=2026&majorId=high' },
+  ];
+  axios.get.mockResolvedValue({ data }); await open();
+  const rows = within(taskList()).getAllByRole('listitem');
+  expect(rows.map(row => row.querySelector('strong').textContent)).toEqual(['Nhiều học viên', 'Ít học viên']);
+  fireEvent.click(within(rows[0]).getByRole('link'));
+  expect(screen.getByTestId('location')).toHaveTextContent('/masters/assign-class-groups?year=2026&majorId=high');
 });
-it('renders four ordered expandable grade stages without a mixed urgency list', async () => {
+it('shows unscheduled offerings immediately without an accordion or aggregate zero row', async () => {
+  await open(); tab('Xếp lịch');
+  expect(within(taskList()).getByText('Lớp chưa có lịch')).toBeInTheDocument();
+  expect(within(taskList()).getByText('Chưa xếp lịch')).toBeInTheDocument();
+  expect(within(taskList()).getByRole('link')).toHaveAttribute('href', '/masters/schedule?year=2026&offeringId=o1');
+  expect(within(work()).queryByRole('button', { expanded: false })).not.toBeInTheDocument();
+});
+it('keeps confirmations grouped by offering with accurate session counts and stable priority', async () => {
+  const data = fixture();
+  data.sources.teaching.data.progress.items.push({ id: 'older', title: 'Lớp nhiều buổi', count: 9, unit: 'buổi', href: '/masters/schedule?year=2026&offeringId=older&queue=pending-confirmation' });
+  data.sources.teaching.data.progress.itemCount = 2;
+  data.sources.teaching.data.progress.count = 12;
+  axios.get.mockResolvedValue({ data }); await open(); tab('Xác nhận');
+  const rows = within(taskList()).getAllByRole('listitem');
+  expect(rows).toHaveLength(2);
+  expect(rows[0]).toHaveTextContent('Lớp nhiều buổi');
+  expect(rows[0]).toHaveTextContent('9 buổi');
+  expect(rows[1]).toHaveTextContent('3 buổi');
+  expect(within(rows[0]).getByRole('link')).toHaveAttribute('href', expect.stringContaining('queue=pending-confirmation'));
+  expect(work()).not.toHaveTextContent('quá hạn');
+});
+it('uses a compact stage selector and shows only the chosen grade stage', async () => {
   await open(); tab('Điểm');
-  const titles = ['Chưa hoàn thiện điểm thành phần', 'Chờ tổ chức thi', 'Thi xong, chờ nhập điểm thi', 'Đủ kết quả, chờ gửi duyệt'];
-  for (const [index, title] of titles.entries()) {
-    const group = within(work()).getByRole('region', { name: title });
-    expect(within(group).getByRole('button')).toHaveAttribute('aria-expanded', 'false');
-    fireEvent.click(within(group).getByRole('button'));
-    expect(within(group).getByText(`Lớp giai đoạn ${index + 1}`)).toBeInTheDocument();
-  }
-  expect(work()).toHaveTextContent('Đã xếp lịch thi sắp tới');
-  expect(work()).not.toHaveTextContent(/quá hạn|khẩn cấp|CẢNH BÁO/);
-  expect(within(work()).getByRole('link', { name: 'Mở để gửi duyệt: Lớp giai đoạn 4' })).toHaveAttribute('href', expect.stringContaining('offeringId=result_ready'));
+  const picker = within(work()).getByRole('group', { name: 'Giai đoạn điểm' });
+  expect(within(picker).getAllByRole('button')).toHaveLength(4);
+  expect(within(taskList()).getByText('Lớp giai đoạn 1')).toBeInTheDocument();
+  fireEvent.click(within(picker).getByRole('button', { name: /Tổ chức thi/ }));
+  expect(within(taskList()).getByText('Lớp giai đoạn 2')).toBeInTheDocument();
+  expect(within(taskList()).queryByText('Lớp giai đoạn 1')).not.toBeInTheDocument();
+  expect(within(taskList()).getByText('Đã xếp lịch thi sắp tới')).toBeInTheDocument();
+  expect(document.querySelector('.od-stage-toggle,.od-grade-stages,[aria-controls^="od-stage-"]')).toBeNull();
 });
+it('uses each grade record URL without upgrading exam permissions', async () => {
+  const data = fixture();
+  data.sources.grades.data.stages[1].items[0] = { id: 'exam', title: 'Lớp được xếp thi', action: 'Xếp lịch thi', href: '/masters/exam-schedule?year=2026&offeringId=exam' };
+  axios.get.mockResolvedValue({ data }); await open(); tab('Điểm');
+  fireEvent.click(within(work()).getByRole('button', { name: /Tổ chức thi/ }));
+  expect(within(taskList()).getByRole('link', { name: /Xếp lịch thi/ })).toHaveAttribute('href', '/masters/exam-schedule?year=2026&offeringId=exam');
+});
+it('removes zero grade stages and renders a single remaining stage directly', async () => {
+  const data = fixture();
+  data.sources.grades.data.stages.forEach((stage, index) => { if (index !== 2) { stage.count = 0; stage.items = []; } });
+  axios.get.mockResolvedValue({ data }); await open(); tab('Điểm');
+  expect(within(work()).queryByRole('group', { name: 'Giai đoạn điểm' })).not.toBeInTheDocument();
+  expect(within(work()).getByText('Điểm thi')).toBeInTheDocument();
+  expect(within(taskList()).getByText('Lớp giai đoạn 3')).toBeInTheDocument();
+});
+it.each(['Phân nhóm', 'Xếp lịch', 'Xác nhận', 'Điểm'])('shows a compact empty state for %s without a view-all link', async label => {
+  const data = fixture();
+  data.sources.grouping.data = metric();
+  data.sources.teaching.data = { scheduling: metric(), progress: metric() };
+  data.sources.grades.data.stages.forEach(stage => { stage.count = 0; stage.items = []; });
+  axios.get.mockResolvedValue({ data }); await open(); tab(label);
+  expect(within(work()).getByText(/^Không có/)).toBeInTheDocument();
+  expect(within(work()).queryByRole('link', { name: 'Xem tất cả' })).not.toBeInTheDocument();
+  expect(within(work()).queryByRole('list')).not.toBeInTheDocument();
+});
+it('adapts the preview to measured space and only offers view-all for hidden records', async () => {
+  const data = fixture();
+  data.sources.grouping.data.items = Array.from({ length: 8 }, (_, i) => ({ id: `m-${i}`, title: `Chuyên ngành ${i}`, count: 8 - i, href: `/masters/assign-class-groups?year=2026&majorId=m${i}` }));
+  data.sources.grouping.data.itemCount = 8;
+  axios.get.mockResolvedValue({ data }); await open();
+  expect(within(taskList()).getAllByRole('listitem')).toHaveLength(4);
+  expect(within(work()).getByRole('link', { name: 'Xem tất cả' })).toHaveAttribute('href', '/masters/assign-class-groups?year=2026');
+  previewHeight = 112;
+  await act(async () => { resizeCallbacks.forEach(callback => callback()); await new Promise(resolve => requestAnimationFrame(resolve)); });
+  expect(within(taskList()).getAllByRole('listitem')).toHaveLength(2);
+  expect(work()).toHaveTextContent('Hiển thị 2/8 mục');
+  previewHeight = 560;
+  await act(async () => { resizeCallbacks.forEach(callback => callback()); await new Promise(resolve => requestAnimationFrame(resolve)); });
+  expect(within(taskList()).getAllByRole('listitem')).toHaveLength(8);
+  expect(within(work()).queryByRole('link', { name: 'Xem tất cả' })).not.toBeInTheDocument();
+});
+it('uses itemCount for partial previews instead of learner totals or preview length', async () => {
+  const data = fixture(); data.sources.grouping.data.itemCount = 25;
+  axios.get.mockResolvedValue({ data }); await open();
+  expect(work()).toHaveTextContent('Hiển thị 1/25 mục');
+  expect(within(work()).getByRole('link', { name: 'Xem tất cả' })).toBeInTheDocument();
+});
+it('does not invent the number of specialties from the learner count when itemCount is absent', async () => {
+  const data = fixture(); delete data.sources.grouping.data.itemCount;
+  data.sources.grouping.data.count = 200;
+  axios.get.mockResolvedValue({ data }); await open();
+  expect(within(taskList()).getAllByRole('listitem')).toHaveLength(1);
+  expect(within(work()).queryByRole('link', { name: 'Xem tất cả' })).not.toBeInTheDocument();
+  expect(work()).not.toHaveTextContent('/200');
+});
+it('isolates source errors, hides failed KPI links and retries only the failed source', async () => {
+  const data = fixture(); data.sources.grouping = { status: 'error' };
+  axios.get.mockResolvedValue({ data }); await open();
+  expect(within(work()).getByRole('alert')).toHaveTextContent('Chưa tải được dữ liệu');
+  expect(screen.queryByRole('link', { name: 'Xem công việc: Chờ phân nhóm' })).not.toBeInTheDocument();
+  expect(screen.getByRole('figure')).toBeInTheDocument();
+  axios.get.mockResolvedValue({ data: { permissions, sources: { grouping: fixture().sources.grouping } } });
+  await act(async () => fireEvent.click(within(work()).getByRole('button', { name: 'Thử lại' })));
+  expect(axios.get).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ params: { year: '2026', program: 'masters', section: 'grouping' } }));
+  expect(within(taskList()).getByText('Công nghệ thông tin')).toBeInTheDocument();
+});
+it('switches overview topics in one chart and preserves real monthly zero values', async () => {
+  const data = fixture();
+  data.sources.completionChart.data.values = ['06/2026', '07/2026', '08/2026', '09/2026', '10/2026', '11/2026'].map((label, index) => ({ label, count: index === 5 ? 3 : 0 }));
+  axios.get.mockResolvedValue({ data }); await open();
+  fireEvent.change(screen.getByRole('combobox', { name: 'Chủ đề tổng quan' }), { target: { value: 'completionChart' } });
+  const figure = screen.getByRole('figure', { name: 'Hoàn thành giảng dạy' });
+  expect(screen.getAllByRole('figure')).toHaveLength(1);
+  expect([...figure.querySelectorAll('.od-column-track>i')].map(bar => bar.style.height)).toEqual(['0%', '0%', '0%', '0%', '0%', '100%']);
+  expect(figure).not.toHaveTextContent('Tổng:');
+});
+it('keeps a zero-valued chart empty and does not fabricate donut segments', async () => {
+  const data = fixture(); data.sources.learnersChart.data.values = [];
+  axios.get.mockResolvedValue({ data }); await open();
+  expect(screen.getByText('Chưa có dữ liệu trong phạm vi này.')).toBeInTheDocument();
+  expect(document.querySelector('.od-donut')).toBeNull();
+});
+it('supports roving keyboard focus across the four work tabs', async () => {
+  await open(); const first = screen.getByRole('tab', { name: 'Phân nhóm' }); first.focus();
+  await userEvent.keyboard('{ArrowRight}');
+  expect(screen.getByRole('tab', { name: 'Xếp lịch' })).toHaveFocus();
+  expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Xếp lịch');
+  await userEvent.keyboard('{End}');
+  expect(screen.getByRole('tab', { name: 'Điểm' })).toHaveFocus();
+});
+
 it.each(['entry', 'approval', 'both'])('shows entry and approval independently for %s access', async kind => {
   const data = fixture(); data.permissions = { grades: kind !== 'approval', approvals: kind !== 'entry' };
   axios.get.mockResolvedValue({ data }); await open();
@@ -101,7 +247,8 @@ it('keeps zero-count approval groups accessible inside the compact empty state',
   data.sources.approvals.data.resultApproval = metric();
   data.sources.studyLeaveApproval.data = metric(); data.sources.majorTransferApproval.data = metric();
   axios.get.mockResolvedValue({ data }); await open();
-  expect(within(approvals()).getByText('Không có yêu cầu chờ phê duyệt')).toBeInTheDocument();
+  expect(within(approvals()).queryByText('Không có yêu cầu chờ phê duyệt')).not.toBeInTheDocument();
+  expect(within(approvals()).getAllByText('0')).toHaveLength(3);
   fireEvent.click(within(approvals()).getByRole('button', { name: /Kết quả điểm chờ duyệt/ }));
   expect(within(approvals()).getByText('Không có mục chờ xử lý.')).toBeInTheDocument();
   fireEvent.click(within(approvals()).getByRole('button', { name: 'Tổng quan phê duyệt' }));
@@ -121,52 +268,14 @@ it.each([['Bảo lưu', '/masters/study-leaves/record1?tab=leave'], ['Chuyển c
   fireEvent.click(within(approvals()).getByRole('link'));
   expect(screen.getByTestId('location')).toHaveTextContent(href);
 });
-it('displays one chart at a time and excludes admissions topics for scheduling-only viewers', async () => {
-  const data = fixture(); data.permissions = { overview: true };
-  axios.get.mockResolvedValue({ data }); await open();
-  expect(screen.queryByRole('region', { name: 'Công việc cần xử lý' })).not.toBeInTheDocument();
-  const select = screen.getByRole('combobox', { name: 'Chủ đề tổng quan' });
-  expect(within(select).queryByText('Hồ sơ / học viên trong khóa')).not.toBeInTheDocument();
-  expect(screen.getAllByRole('figure')).toHaveLength(1);
-  fireEvent.change(select, { target: { value: 'completionChart' } });
-  expect(screen.getByRole('figure', { name: 'Hoàn thành giảng dạy' })).toHaveTextContent('11/2026');
-});
-it('uses real zero data as an empty state, not fabricated chart values', async () => {
-  const data = fixture(); data.sources.learnersChart.data.values = [];
-  axios.get.mockResolvedValue({ data }); await open();
-  expect(screen.getByText('Chưa có dữ liệu trong phạm vi này.')).toBeInTheDocument();
-  expect(document.querySelector('.od-donut')).toBeNull();
-});
-it('renders every returned month as a vertical column, preserving zero heights and the total', async () => {
-  const data = fixture();
-  data.sources.completionChart.data.values = ['06/2026', '07/2026', '08/2026', '09/2026', '10/2026', '11/2026'].map((label, index) => ({ label, count: index === 5 ? 3 : 0 }));
-  axios.get.mockResolvedValue({ data }); await open();
-  fireEvent.change(screen.getByRole('combobox', { name: 'Chủ đề tổng quan' }), { target: { value: 'completionChart' } });
-  const figure = screen.getByRole('figure', { name: 'Hoàn thành giảng dạy' });
-  expect(figure.querySelectorAll('.od-month')).toHaveLength(6);
-  expect(figure).toHaveTextContent('Tổng: 3 lớp học phần');
-  const bars = [...figure.querySelectorAll('.od-column-track>i')];
-  expect(bars.map(bar => bar.style.height)).toEqual(['0%', '0%', '0%', '0%', '0%', '100%']);
-});
-it('isolates a failed source and retries just that source while other panels remain usable', async () => {
-  const data = fixture(); data.sources.grouping = { status: 'error' };
-  axios.get.mockResolvedValue({ data }); await open();
-  const grouping = within(work()).getByRole('region', { name: 'Học viên chưa phân nhóm' });
-  expect(within(grouping).getByRole('alert')).toBeInTheDocument();
-  expect(screen.getByRole('figure')).toBeInTheDocument();
-  axios.get.mockResolvedValue({ data: { permissions, sources: { grouping: fixture().sources.grouping } } });
-  await act(async () => fireEvent.click(within(grouping).getByRole('button', { name: 'Thử lại' })));
-  expect(axios.get).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ params: { year: '2026', program: 'masters', section: 'grouping' } }));
-  expect(grouping).toHaveTextContent('7 học viên');
-  expect(screen.getByRole('region', { name: 'Chờ phê duyệt' })).toBeInTheDocument();
-});
+
 it('ignores a late response for the previously selected year', async () => {
   let resolve;
   axios.get.mockImplementation((_url, options) => options.params.year === '2026' ? new Promise(done => { resolve = done; }) : Promise.resolve({ data: fixture('2025') }));
   await open(); fireEvent.change(screen.getByRole('combobox', { name: 'Năm tuyển sinh' }), { target: { value: '2025' } });
-  await waitFor(() => expect(screen.getByRole('link', { name: 'Mở chức năng: Học viên chưa phân nhóm' })).toHaveAttribute('href', '/masters/assign-class-groups?year=2025'));
+  await waitFor(() => expect(screen.getByRole('link', { name: 'Xem công việc: Chờ phân nhóm' })).toHaveAttribute('href', '/masters/assign-class-groups?year=2025'));
   await act(async () => resolve({ data: fixture('2026') }));
-  expect(screen.getByRole('link', { name: 'Mở chức năng: Học viên chưa phân nhóm' })).toHaveAttribute('href', '/masters/assign-class-groups?year=2025');
+  expect(screen.getByRole('link', { name: 'Xem công việc: Chờ phân nhóm' })).toHaveAttribute('href', '/masters/assign-class-groups?year=2025');
 });
 it('clears old profile content immediately and ignores its late response', async () => {
   const result = await open();
@@ -185,7 +294,7 @@ it('rejects an unresolved response from the previous working profile', async () 
     .mockImplementationOnce(() => new Promise(resolve => { finishNew = resolve; }));
   const result = await open();
   result.rerender(view('b'));
-  const current = fixture(); current.permissions = { grouping: true }; current.sources.grouping.data.count = 2;
+  const current = fixture(); current.permissions = { grouping: true }; current.sources.grouping.data.count = 2; current.sources.grouping.data.items[0].count = 2;
   await act(async () => finishNew({ data: current }));
   await act(async () => finishOld({ data: fixture() }));
   expect(screen.queryByRole('region', { name: 'Chờ phê duyệt' })).not.toBeInTheDocument();
@@ -200,14 +309,6 @@ it('does not use masters content or charts when doctoral sources are unimplement
   await waitFor(() => expect(screen.getAllByText('Nghiệp vụ Tiến sĩ chưa triển khai.').length).toBeGreaterThan(0));
   expect(screen.queryByRole('figure')).not.toBeInTheDocument();
   expect(screen.queryByText('7 học viên')).not.toBeInTheDocument();
-});
-it('keeps keyboard tabs and inline expanders accessible', async () => {
-  await open(); const all = screen.getByRole('tab', { name: 'Tất cả' }); all.focus();
-  await userEvent.keyboard('{ArrowRight}');
-  expect(screen.getByRole('tab', { name: 'Phân nhóm' })).toHaveFocus();
-  expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Phân nhóm');
-  await userEvent.keyboard('{End}');
-  expect(screen.getByRole('tab', { name: 'Điểm' })).toHaveFocus();
 });
 it.each([{}, { grouping: true }, { approvals: true }, { overview: true }, { grouping: true, approvals: true }, { grouping: true, overview: true }])('adapts to permission combination %j without empty columns', async allowed => {
   const data = fixture(); data.permissions = allowed;
