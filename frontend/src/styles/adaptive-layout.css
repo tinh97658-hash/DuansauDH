@@ -1,0 +1,212 @@
+/* Content, not fixed pixel heights, determines scaled UI layout. */
+@layer app-text-size {
+  @media screen {
+    html[data-font-size] body .sl-combo > button {
+      top: 1px !important;
+      height: calc(var(--app-control-height) - 2px) !important;
+      min-height: calc(var(--app-control-height) - 2px) !important;
+    }
+
+    html[data-font-size] .sl-combo-list { top: calc(100% + 4px) !important; }
+
+    html[data-font-size]:not([data-font-size="100"]) :is(.sl-create-scope-fields, .sl-schedule-scope-fields) {
+      display: flex !important;
+      flex-wrap: wrap !important;
+      gap: 10px 14px !important;
+      align-items: flex-end !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) :is(.sl-create-scope-field, .sl-schedule-scope-field) {
+      flex: 1 1 calc(140px * var(--app-text-scale)) !important;
+      min-width: 0 !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .sl-create-scope-discipline { flex-basis: 100% !important; }
+
+    html[data-font-size]:not([data-font-size="100"]) .sl-create-figma .sl-right { overflow: auto !important; }
+    html[data-font-size]:not([data-font-size="100"]) .sl-create-main { grid-template-rows: auto minmax(0, 1fr) auto !important; }
+    html[data-font-size]:not([data-font-size="100"]) .sl-create-footer {
+      position: static !important;
+      width: auto !important;
+    }
+    html[data-font-size]:not([data-font-size="100"]) .sl-create-students { padding-bottom: 16px !important; }
+
+    html[data-font-size]:not([data-font-size="100"]) .sl-matrix-filters {
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(160px * var(--app-text-scale))), 1fr)) !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .sl-matrix-board {
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(320px * var(--app-text-scale))), 1fr)) !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) :is(.sl-matrix-col-cards-four, .sl-pivot-cell-offerings-single-year) {
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(220px * var(--app-text-scale))), 1fr)) !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) :is(.sl-matrix-card, .sl-pivot-mini-card, .sl-create-student-list > div) {
+      font-size: calc(12.5px * var(--app-text-scale)) !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .od-summary-row {
+      grid-template-columns: minmax(calc(180px * var(--app-text-scale)), max-content) minmax(0, 1fr) !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .od-filters {
+      height: auto !important;
+      grid-template-rows: auto auto !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .od-cards {
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(200px * var(--app-text-scale))), 1fr)) !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .od-card {
+      height: auto !important;
+      min-height: calc(124px * var(--app-text-scale)) !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .od-card-value strong { font-size: calc(26px * var(--app-text-scale)) !important; }
+
+    html[data-font-size]:not([data-font-size="100"]) .od-overview dl {
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(140px * var(--app-text-scale))), 1fr)) !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) :is(.v20-scope-step, .sl-eyebrow) {
+      height: auto !important;
+      min-height: 0 !important;
+      line-height: 1.4 !important;
+      white-space: normal !important;
+      overflow-wrap: anywhere !important;
+      font-size: calc(12.5px * var(--app-text-scale)) !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .v20-scope-step b {
+      height: auto !important;
+      min-height: 1.4em !important;
+      flex-shrink: 0 !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) :is(
+      .sl-create-subject-title, .sl-create-section-title, .sl-create-confirm-title,
+      .sl-create-confirm-badges, .sl-create-footer, .sl-create-actions,
+      .sl-schedule-head, .sl-actions, .sl-selected-strip,
+      .sl-offering-tabs, .sl-matrix-toolbar-head, .sl-matrix-toolbar-actions,
+      .exam-main-toolbar, .exam-tool-actions, .tp-filters, .css-filters
+    ) {
+      height: auto !important;
+      min-width: 0 !important;
+      flex-wrap: wrap !important;
+      row-gap: 8px !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .sl-schedule-head {
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px 12px !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .sl-schedule-head h1 { margin-right: auto !important; }
+
+    html[data-font-size]:not([data-font-size="100"]) :is(
+      .sl-section h2, .sl-create-subject-title > span, .sl-create-section-title b,
+      .sl-create-confirm-badges span, .sl-create-student-list > div > span,
+      .sl-filter-chip, .sl-offering-tab, .transcript-format-option, .MuiTab-root, .MuiChip-root
+    ) {
+      box-sizing: border-box !important;
+      height: auto !important;
+      min-height: 1.6em !important;
+      max-height: none !important;
+      line-height: 1.4 !important;
+      white-space: normal !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .MuiChip-label {
+      white-space: normal !important;
+      overflow-wrap: anywhere !important;
+      padding-block: 3px !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) :is(.MuiGrid-item, .MuiStack-root, .MuiFormControl-root) { min-width: 0 !important; }
+    html[data-font-size]:not([data-font-size="100"]) .MuiFormControlLabel-root { max-width: 100% !important; }
+
+    html[data-font-size] body .MuiInputBase-root:not(.MuiInputBase-multiline):is(.MuiAutocomplete-inputRoot, :has(.MuiSelect-multiple)) {
+      height: auto !important;
+      min-height: var(--app-control-height) !important;
+      max-height: none !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .v20-field textarea {
+      height: auto !important;
+      min-height: calc(96px * var(--app-text-scale)) !important;
+    }
+
+    /* All regular table rows can grow; sticky positions and print tables are retained. */
+    html[data-font-size]:not([data-font-size="100"]) :is(tr, td, th):not(:where(
+      .report-preview *, .transcript-print-document *, .report-print-sheet *,
+      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
+      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
+      [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      height: auto !important;
+      max-height: none !important;
+      line-height: 1.5 !important;
+    }
+
+    /* Timetable columns and rows grow together; the calendar owns scrolling. */
+    html[data-font-size]:not([data-font-size="100"]) .sl-schedule-view .sl-calendar {
+      min-width: calc(1040px * var(--app-text-scale)) !important;
+      height: auto !important;
+      min-height: 100% !important;
+      grid-template-columns: max-content repeat(7, minmax(calc(140px * var(--app-text-scale)), 1fr)) !important;
+      grid-template-rows: auto repeat(2, minmax(calc(190px * var(--app-text-scale)), max-content)) !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .sl-schedule-view .sl-day {
+      display: flex !important;
+      justify-content: center !important;
+      align-items: center !important;
+      height: auto !important;
+      min-height: calc(30px * var(--app-text-scale)) !important;
+      white-space: nowrap !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .sl-day :is(strong, span) {
+      font-size: inherit !important;
+      white-space: nowrap !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .sl-slot > .v20-slot-items {
+      height: auto !important;
+      overflow: visible !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) :is(.sl-session, .ep-event, .v20-room) {
+      height: auto !important;
+      max-height: none !important;
+      flex-shrink: 0 !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) :is(.sl-card, .sl-matrix-card, .sl-pivot-mini-card, .sl-create-subject-list > button, .sl-create-group-list > button, .sl-create-student-list > div, .sl-session, .ep-event, .v20-room) :is(strong, span, small, em) {
+      font-size: inherit !important;
+      line-height: 1.4 !important;
+      white-space: normal !important;
+      overflow-wrap: anywhere !important;
+      overflow: visible !important;
+      -webkit-line-clamp: unset !important;
+    }
+  }
+}
+
+@media print {
+  .sl-matrix-pivot-table {
+    --sl-pivot-subject-width: 240px !important;
+    --sl-pivot-credits-width: 48px !important;
+    min-width: var(--sl-pivot-print-width) !important;
+  }
+}
+
+@layer app-text-size {
+  @media screen and (max-width: 700px) {
+    html[data-font-size]:not([data-font-size="100"]) .od-summary-row { grid-template-columns: minmax(0, 1fr) !important; }
+  }
+}

@@ -175,9 +175,9 @@
 
   body .app-popup :is(.MuiDialogActions-root, .v20-dialog-foot) {
     flex-shrink: 0;
-    min-height: 70px;
-    padding: 12px 24px;
-    gap: 12px;
+    min-height: 58px;
+    padding: 10px 20px;
+    gap: 8px;
     flex-wrap: wrap;
     border-top: 1px solid #e2e8f0;
     background: #f8fafc;
@@ -256,8 +256,8 @@
 @media screen and (max-width: 600px) {
   body .app-popup .MuiDialog-paper {
     margin: 12px;
-    width: calc(100% - 24px);
-    max-width: calc(100% - 24px);
+    width: 100%;
+    max-width: 100%;
     max-height: calc(100dvh - 24px);
   }
 

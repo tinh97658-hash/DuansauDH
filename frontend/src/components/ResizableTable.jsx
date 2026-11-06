@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Box, Table, TableCell, TableHead, TableRow } from "@mui/material";
 import { useAppearanceSettings } from "../context/AppearanceSettings";
+import FloatingTableScrollbar from './FloatingTableScrollbar';
 
 export default function ResizableTable({ columns, storageKey, children, freezeThrough, className, "aria-label": ariaLabel, sx = {} }) {
   const textScale = (useAppearanceSettings()?.fontSize || 100) / 100;
@@ -158,5 +159,6 @@ export default function ResizableTable({ columns, storageKey, children, freezeTh
       position: "absolute", top: 2, right: 5, px: 0.75, py: 0.25,
       bgcolor: "#173E75", color: "white", borderRadius: "3px", fontSize: 11, whiteSpace: "nowrap",
     }}>{Math.round(preview.width)} px</Box></Box>}
+    <FloatingTableScrollbar wrapperRef={wrapperRef} tableRef={tableRef} label={ariaLabel}/>
   </Box>;
 }

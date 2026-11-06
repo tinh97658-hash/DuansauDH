@@ -46,6 +46,16 @@
     line-height: 1.5;
   }
 
+  /* Align text with row actions, including rows that wrap onto several lines. */
+  body :is(#root, .MuiDialog-root, .scheduling-v20) table > tbody > tr > :is(td, th):not(:where(
+    .report-preview *, .transcript-print-document *, .report-print-sheet *,
+    .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
+    .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
+    [data-preserve-font-size], [data-preserve-font-size] *
+  )) {
+    vertical-align: middle !important;
+  }
+
   /* Outlined status labels retain their meaning without faint default borders. */
   body :is(#root, .MuiDialog-root) table:not(.document-report-table) .MuiChip-outlined {
     border-color: currentColor;
