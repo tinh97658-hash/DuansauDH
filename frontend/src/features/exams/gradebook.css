@@ -17,9 +17,9 @@
 .exam-gradebook .exam-tool-actions .MuiButton-root{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:5px 10px;border:1px solid #b4c6d5;border-radius:0;background:#fff;color:#354959;font-size:12px;font-weight:500;line-height:1.5;white-space:nowrap;box-shadow:none}
 .exam-gradebook .exam-tool-actions .MuiButton-root:hover{border-color:#86a9c1;background:#f0f6fa}
 .exam-gradebook .exam-tool-actions .MuiButton-root.Mui-disabled,.exam-gradebook .exam-tool-actions .document-export-trigger:disabled{border-color:#dce4eb;background:#f8fafc;color:#8b99a7}
-.exam-gradebook .exam-tool-actions .MuiIconButton-root{width:32px;height:32px;border:1px solid #b4c6d5;border-radius:0;background:#fff;color:#354959}
+.exam-gradebook .exam-tool-actions .MuiIconButton-root{width:32px;height:32px;border:1px solid #b4c6d5;border-radius:0;background:#fff;color:var(--icon-muted)}
 .exam-gradebook .exam-tool-actions .MuiIconButton-root:hover{border-color:#86a9c1;background:#f0f6fa}
-.exam-gradebook .exam-tool-actions .MuiIconButton-root.Mui-disabled{border-color:#dce4eb;color:#8b99a7}
+.exam-gradebook .exam-tool-actions .MuiIconButton-root.Mui-disabled{border-color:#dce4eb;color:var(--icon-disabled)}
 .exam-mode-switch .MuiButton-root:focus-visible,.exam-tool-actions .MuiButton-root:focus-visible,.exam-tool-actions .MuiIconButton-root:focus-visible{outline:2px solid #173e75;outline-offset:2px}
 .exam-workspace-controls .MuiChip-root{border-radius:0;font-size:12px}
 @media(max-width:760px){.exam-toolbar-status{flex:1 1 180px}.exam-tool-actions{flex-basis:100%;justify-content:flex-start;margin-left:0}.exam-main-toolbar{gap:8px}}

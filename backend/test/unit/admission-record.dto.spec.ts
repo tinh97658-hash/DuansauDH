@@ -11,6 +11,9 @@ const validRecord = {
 };
 
 describe.each([CreateAdmissionRecordDto, UpdateAdmissionRecordDto])("%p contact validation", (Dto) => {
+  it.each(["Nộp hồ sơ đầu vào", "Đang học", "Thôi học", "Bảo lưu", "Đã tốt nghiệp", "Xoá tên"])("accepts study status %s", async (studyStatus) => {
+    expect(await validate(plainToInstance(Dto, { ...validRecord, studyStatus }))).toHaveLength(0);
+  });
   it('normalizes manual learner codes and rejects codes longer than storage allows', async () => {
     const dto = plainToInstance(Dto, { ...validRecord, code: ' hv26001 ' });
     expect(await validate(dto)).toHaveLength(0);

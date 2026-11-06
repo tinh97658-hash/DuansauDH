@@ -33,8 +33,8 @@ export class LecturerPaymentService {
       throw new BadRequestException('Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.');
     }
     const data = await this.db.query<any>(`WITH teaching AS (
-      SELECT o.id AS "courseOfferingId", l.id AS "lecturerId", l.name AS "lecturerName",
-        l.unit_id AS "unitId", o.name AS "offeringName",
+      SELECT o.id AS "courseOfferingId", l.id AS "lecturerId", l.name AS "lecturerName",l.academic_rank AS "academicRank",l.academic_degree AS "academicDegree",
+        l.unit_id AS "unitId", COALESCE(NULLIF(o.name,''),subject.name) AS "offeringName",
         o.completed_at AS "completedAt", COUNT(s.id)::integer AS "sessionCount"
       ${PAYMENT_SESSIONS_SQL}
       GROUP BY o.id,l.id,subject.name
@@ -59,7 +59,7 @@ export class LecturerPaymentService {
   }
 
   async options() {
-    const lecturers = await this.db.query(`SELECT DISTINCT l.id,l.name,l.unit_id AS "unitId"
+    const lecturers = await this.db.query(`SELECT DISTINCT l.id,l.name,l.academic_rank AS "academicRank",l.academic_degree AS "academicDegree",l.unit_id AS "unitId"
       ${PAYMENT_SESSIONS_SQL} ORDER BY l.name,l.id`, { type: QueryTypes.SELECT });
     const units = await this.db.query(`SELECT id,name FROM units ORDER BY name,id`, { type: QueryTypes.SELECT });
     return { lecturers, units };

@@ -23,15 +23,15 @@ export default function SessionEditor({ session, offering, date, period, user, o
   const [deleting, setDeleting] = useState(false);
   const [unitFilter, setUnitFilter] = useState(null);
   const [roomManuallySelected, setRoomManuallySelected] = useState(false);
-  const catalog = useLoad(async () => {
-    const [lecturers, units, rooms, detail, offeringSessions] = await Promise.all([api.get("/system/lecturers"), api.get("/system/units"), api.get("/system/rooms"), api.get(`/scheduling/course-offerings/${offering.id}`), api.get(`/scheduling/course-offerings/${offering.id}/teaching-sessions`)]);
+  const catalog = useLoad(async signal => {
+    const [lecturers, units, rooms, detail, offeringSessions] = await Promise.all([api.get("/system/lecturers", { signal }), api.get("/system/units", { signal }), api.get("/system/rooms", { signal }), api.get(`/scheduling/course-offerings/${offering.id}`, { signal }), api.get(`/scheduling/course-offerings/${offering.id}/teaching-sessions`, { signal })]);
     const availableRooms = rows(rooms);
     // A historical room stays visible without requiring catalog administration access.
     const historicalRoom = session?.room;
     return { lecturers: rows(lecturers), units: rows(units), rooms: historicalRoom && !availableRooms.some(room => room.id === historicalRoom.id)
       ? [...availableRooms, { ...historicalRoom, isActive: false }] : availableRooms, offering: detail, offeringSessions: Array.isArray(offeringSessions) ? offeringSessions : [] };
   }, [offering.id, session?.id, session?.room]);
-  const availability = useLoad(async () => rows(await api.get(`/scheduling/teaching-sessions?${new URLSearchParams({ from: form.sessionDate, to: form.sessionDate, conflictForOfferingId: offering.id })}`)), [form.sessionDate, offering.id]);
+  const availability = useLoad(async signal => rows(await api.get(`/scheduling/teaching-sessions?${new URLSearchParams({ from: form.sessionDate, to: form.sessionDate, conflictForOfferingId: offering.id })}`, { signal })), [form.sessionDate, offering.id]);
 
   const currentOffering = catalog.data?.offering || offering;
   const sessionForPeriod = session ? { ...session, endTime: periodTimes(session.period).endTime } : null;

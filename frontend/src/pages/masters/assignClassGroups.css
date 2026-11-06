@@ -24,14 +24,14 @@
 .assignment-summary-name{flex:1;min-width:0;overflow-wrap:anywhere}
 .assignment-summary-action{display:inline-flex;align-items:center;gap:6px;flex:none;white-space:nowrap}
 .assignment-summary-count{color:var(--assignment-brand);font-weight:700;transition:color .16s ease}
-.assignment-summary-action>svg{flex-shrink:0;color:var(--text-muted,#8a9aaa);font-size:17px;transition:transform .16s ease,color .16s ease}
+.assignment-summary-action>svg{flex-shrink:0;color:var(--icon-muted);font-size:17px;transition:transform .16s ease,color .16s ease}
 .assignment-summary-major:hover{background:var(--table-hover-bg,#f5fafe)}
 .assignment-summary-major:hover .assignment-summary-count,.assignment-summary-major:focus-visible .assignment-summary-count{color:var(--assignment-teal)}
 .assignment-summary-major:hover .assignment-summary-action>svg{color:var(--assignment-brand);transform:translateX(2px)}
 .assignment-summary-major:focus-visible .assignment-summary-action>svg{color:var(--assignment-brand)}
 .assignment-summary-major:focus-visible{background:var(--primary-light,#ebf5fb);outline:2px solid var(--primary,#0788b8);outline-offset:-2px}
 .assignment-summary-empty{padding:20px 16px;text-align:center;background:#fff;border:1px solid var(--assignment-border)}
-.assignment-summary-empty>svg{width:24px;height:24px;color:var(--success,#137b3b);margin-bottom:6px}
+.assignment-summary-empty>svg{width:24px;height:24px;color:var(--icon-success);margin-bottom:6px}
 .assignment-summary-empty .MuiTypography-caption{display:block;margin:4px auto 0;font-size:12px}
 .assignment-page .assignment-panel{min-height:440px;border-color:var(--assignment-border);box-shadow:0 1px 3px rgba(23,50,77,.04)}
 .assignment-selection-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px;min-height:32px}
@@ -40,7 +40,7 @@
 .assignment-overflow{display:inline-flex;align-items:center;gap:4px;color:var(--warning,#b86216);font-weight:600;margin-left:6px}
 .assignment-overflow svg{width:15px;height:15px}
 .assignment-page .assignment-operational-alert{margin-bottom:12px;background:var(--warning-light,#fef7e0);border:1px solid #e8d4ac;padding:8px 12px;color:var(--assignment-slate)}
-.assignment-operational-alert .MuiAlert-icon{color:var(--warning,#b86216);padding-top:2px}
+.assignment-operational-alert .MuiAlert-icon{color:var(--icon-warning);padding-top:2px}
 .assignment-operational-alert .MuiAlert-message{padding:0;min-width:0}
 .assignment-operational-alert .MuiTypography-root{font-size:12px;line-height:1.6}
 .assignment-operational-alert .assignment-alert-title{font-weight:700;color:var(--assignment-navy);font-size:13px}

@@ -13,7 +13,6 @@ import { Sequelize } from "sequelize-typescript";
 import { learnerStudyStatusSql } from '../plan/learner-study-status.js';
 import { getBusinessWallTime } from '../scheduling/scheduling-time.js';
 import { routeViewCode, routeActionCode } from '../auth/route-permissions.js';
-import { workingProfileStorage } from '../auth/profile-context.js';
 
 export type DashboardProgram = "masters" | "doctoral";
 
@@ -21,19 +20,17 @@ export const operationalPermissions = (user: unknown, permissions: Set<string>, 
   const can = (...required: string[]) => user instanceof Staff
     && (program !== "doctoral" || permissions.has("doctoral.view"))
     && required.every((permission) => permissions.has(permission));
-  // Internal callers may have legacy grants; HTTP profiles also require the page grant.
-  const hasRoutes = !!workingProfileStorage.getStore() || [...permissions].some(permission => permission.startsWith('route.'));
-  const page = (path: string, action?: string) => !hasRoutes || (permissions.has(routeViewCode(path))
-    && (!action || permissions.has(routeActionCode(path, action))));
+  const page = (path: string, action?: string) => can(routeViewCode(path), ...(action ? [routeActionCode(path, action)] : []));
+  const schedule = page('/masters/schedule', 'scheduling.write') || page('/masters/course-matrix', 'scheduling.write');
   return {
-    grouping: !readOnly && can(`${program}.view`, `${program}.manage`) && page(`/${program}/assign-class-groups`, `${program}.manage`),
+    grouping: !readOnly && can(`${program}.view`, `${program}.manage`) && page(`/${program}/assign-class-groups`, program === 'masters' ? 'masters.manage' : undefined),
     grades: !readOnly && can("gradebook.view", "gradebook.submit") && page('/masters/exam-lists', 'gradebook.submit'),
     approvals: !readOnly && can("gradebook.view", "gradebook.approve") && page('/masters/exam-lists', 'gradebook.approve'),
     studyLeaveApproval: !readOnly && can("plan.view", "admission.view", "studyleave.approve") && page('/masters/study-leaves', 'studyleave.approve'),
-    majorTransferApproval: !readOnly && can("plan.view", "admission.view", "majortransfer.approve") && page('/plan/admission-records', 'majortransfer.approve'),
-    scheduling: !readOnly && can("scheduling.view", "scheduling.write") && canWriteScheduling(user, permissions) && page('/masters/schedule', 'scheduling.write'),
-    progress: !readOnly && can("scheduling.view", "scheduling.write") && canWriteScheduling(user, permissions) && page('/masters/schedule', 'scheduling.write'),
-    overview: can("scheduling.view") && page('/masters/schedule'),
+    majorTransferApproval: !readOnly && can("plan.view", "admission.view", "majortransfer.approve") && ['/plan/admission-records','/masters/admitted-records','/masters/admission-scores'].some(path => page(path, 'majortransfer.approve')),
+    scheduling: !readOnly && can("scheduling.view", "scheduling.write") && schedule && canWriteScheduling(user, permissions),
+    progress: !readOnly && can("scheduling.view", "scheduling.write") && schedule && canWriteScheduling(user, permissions),
+    overview: can("scheduling.view") && ['/masters/course-offerings','/masters/schedule','/masters/course-matrix'].some(path => page(path)),
     learnersOverview: can('admission.view') && page('/plan/admission-records'),
     examsWrite: !readOnly && can('exams.view', 'exams.write') && page('/masters/exam-schedule', 'exams.write'),
     gradebookView: can('gradebook.view') && page('/masters/exam-lists'),

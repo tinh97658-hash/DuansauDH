@@ -1,6 +1,6 @@
 export const STUDY_STATUS_VALUES = ["Nộp hồ sơ đầu vào", "Đủ điều kiện dự tuyển", "Đã trúng tuyển", "Không trúng tuyển",
   "Đang học", "Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Đã thôi học", "Tạm hoãn", "Từ chối",
-  "Tạm dừng", "Hoàn thành", "Tốt nghiệp", "Đã tốt nghiệp"];
+  "Tạm dừng", "Hoàn thành", "Tốt nghiệp", "Đã tốt nghiệp", "Xoá tên"];
 
 export const STUDY_MANAGEMENT_STATUSES = [
   "Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Đã thôi học", "Tạm hoãn", "Từ chối",

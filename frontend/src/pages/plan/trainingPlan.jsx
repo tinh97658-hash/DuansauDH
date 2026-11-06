@@ -1,5 +1,6 @@
 import { DocumentCheckIcon, BookOpenIcon, CheckCircleIcon, CheckIcon, LightBulbIcon, PencilSquareIcon, PlusIcon, QueueListIcon, RectangleStackIcon, StopIcon, TrashIcon, XMarkIcon } from "../../components/AppIcons";
 import { usePermissions } from "../../features/accounts/usePermissions";
+import useTrainingYears from "../../hooks/useTrainingYears";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
@@ -40,7 +41,6 @@ const SUBJECT_TYPES = [
 const currentYear = new Date().getFullYear();
 const subjectNameCollator = new Intl.Collator('vi', { sensitivity: 'base', numeric: true });
 // Used by the curriculum creation dialog; the top-level year filter is intentionally hidden.
-const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
 const LEVELS = [
   { value: "masters", label: "Thạc sĩ" },
   { value: "doctoral", label: "Tiến sĩ" },
@@ -95,6 +95,7 @@ const cellInputSx = {
 };
 
 const TrainingPlan = () => {
+  const years = useTrainingYears(String(currentYear));
   const catalogRevision = useSubjectCatalogRevision(false);
   // Global Filters
   const [majors, setMajors] = useState([]);
@@ -1455,9 +1456,9 @@ const TrainingPlan = () => {
                               sx={{ p: 0.5 }}
                             >
                               {row.majorAssignment ? (
-                                <CheckCircleIcon fontSize="small" sx={{ color: "#0788B8" }} />
+                                <CheckCircleIcon fontSize="small" sx={{ color: "var(--icon-primary)" }} />
                               ) : (
-                                <StopIcon fontSize="small" sx={{ color: "#DFE4E8" }} />
+                                <StopIcon fontSize="small" sx={{ color: "var(--icon-muted)" }} />
                               )}
                             </IconButton>
                           </Tooltip>
@@ -1471,7 +1472,7 @@ const TrainingPlan = () => {
                               sx={{ p: 0.5 }}
                             >
                               {row.isRequired ? (
-                                <CheckIcon fontSize="small" sx={{ color: "#137B3B", fontWeight: 900 }} />
+                                <CheckIcon fontSize="small" sx={{ color: "var(--icon-success)", fontWeight: 900 }} />
                               ) : (
                                 <Typography variant="caption" sx={{ color: "#8A9AAA" }}>—</Typography>
                               )}
@@ -2164,7 +2165,7 @@ const TrainingPlan = () => {
               color: "#425466",
               fontSize: 13,
               lineHeight: 1.55,
-              "& .MuiAlert-icon": { color: "#0788B8", py: 0.25 },
+              "& .MuiAlert-icon": { color: "var(--icon-primary)", py: 0.25 },
               "& .MuiAlert-message": { py: 0.25 },
             }}
           >
@@ -2543,7 +2544,7 @@ const TrainingPlan = () => {
                   }}
                   sx={{ height: 36, fontSize: 13 }}
                 >
-                  {YEARS.map((y) => (
+                  {years.map((y) => (
                     <MenuItem key={y} value={y} sx={{ fontSize: 13 }}>
                       Khóa {y}
                     </MenuItem>

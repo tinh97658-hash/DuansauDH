@@ -128,9 +128,11 @@ it.each(["Nguyễn", "Không khớp"])("exports the whole selected class indepen
       total: config.params.search ? matching.length : full.total, page: config.params.page, pageSize: 15 } }));
   mount();
   await screen.findByText("HV001");
+  const table = screen.getByRole("table");
   fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: search } });
+  expect(screen.getByRole("table")).toBe(table);
   await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/class-score-summary$/),
-    { params: { classGroupId: "g1", search, page: 1, pageSize: 15 } }));
+    { params: { classGroupId: "g1", search, page: 1, pageSize: 15 }, signal: expect.any(AbortSignal) }));
   if (matching.length) await screen.findByText("HV001");
   else await screen.findByText("Không có học viên phù hợp với tìm kiếm.");
   await waitFor(() => expect(screen.getByRole("button", { name: "Xuất báo cáo" })).toBeEnabled());
@@ -152,7 +154,7 @@ it("filters classes by intake year and loads the selected class", async () => {
   chooseFilter("Ngành", "Kinh tế");
   await screen.findByText("HV002");
   chooseFilter("Năm vào trường", "2025");
-  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/class-score-summary$/), { params: { classGroupId: "g3", search: "", page: 1, pageSize: 15 } }));
+  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/class-score-summary$/), { params: { classGroupId: "g3", search: "", page: 1, pageSize: 15 }, signal: expect.any(AbortSignal) }));
   await screen.findByText("HV003");
   expect(screen.getByLabelText("Chọn lớp")).toHaveTextContent("CNTT2025.1.1");
   expect(screen.getByLabelText("Chọn lớp")).not.toHaveTextContent("QTKD2026");
@@ -167,14 +169,14 @@ it("loads only a page, requests the next page, and resets search to page one", a
   mount();
   await screen.findByText("HV001");
   expect(axios.get.mock.calls.some(([url]) => url.endsWith("/export"))).toBe(false);
-  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/class-score-summary$/), { params: { classGroupId: "g1", search: "", page: 1, pageSize: 15 } });
+  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/class-score-summary$/), { params: { classGroupId: "g1", search: "", page: 1, pageSize: 15 }, signal: expect.any(AbortSignal) });
   fireEvent.click(screen.getByRole("button", { name: /^Trang 2$/ }));
   const row = (await screen.findByText("HV016")).closest("tr");
   expect(within(row).getAllByRole("cell")[0]).toHaveTextContent("16");
-  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/class-score-summary$/), { params: { classGroupId: "g1", search: "", page: 2, pageSize: 15 } });
+  expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/class-score-summary$/), { params: { classGroupId: "g1", search: "", page: 2, pageSize: 15 }, signal: expect.any(AbortSignal) });
   fireEvent.change(screen.getByLabelText("T\u00ecm ki\u1ebfm"), { target: { value: "HV040" } });
   await screen.findByText("HV040");
-  expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/class-score-summary$/), { params: { classGroupId: "g1", search: "HV040", page: 1, pageSize: 15 } });
+  expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/class-score-summary$/), { params: { classGroupId: "g1", search: "HV040", page: 1, pageSize: 15 }, signal: expect.any(AbortSignal) });
   expect(axios.get.mock.calls.some(([url]) => url.endsWith("/export"))).toBe(false);
 });
 

@@ -20,6 +20,14 @@ it('uses effective roles and current responsibility instead of the actor role st
   expect(f.access.canEdit(access)).toBe(true);
 });
 
+it('keeps permission and responsibility reads on the grade-save transaction holding the mutex',async()=>{
+  const f=fixture();
+  const transaction={} as any;
+  await f.access.assertOffering(f.actor,'merged',transaction);
+  expect(f.rbac.effectiveAccess).toHaveBeenCalledWith(f.actor,true,transaction);
+  for(const [,options] of f.db.query.mock.calls) expect(options.transaction).toBe(transaction);
+});
+
 it('keeps admin access and enforces readonly even for admins',async()=>{
   const f=fixture(['admin']);expect((await f.access.forActor(f.actor)).groupIds).toBeNull();
   const readonly=fixture(['admin'],true);

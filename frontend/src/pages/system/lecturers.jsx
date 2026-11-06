@@ -1,5 +1,9 @@
 import React from "react";
 import CatalogManager from "../../components/CatalogManager";
+import {formatLecturerName} from "../../utils/lecturerName";
+import {personNameParts} from "../../utils/personName";
+
+const lecturerNameParts=row=>personNameParts(formatLecturerName(row));
 
 const Lecturers = () => (
   <CatalogManager
@@ -11,6 +15,7 @@ const Lecturers = () => (
     codeLabel="Mã giảng viên"
     nameLabel="Họ và tên"
     splitPersonName
+    getNameParts={lecturerNameParts}
     sortable={false}
     editOnDoubleClick
     showEditAction

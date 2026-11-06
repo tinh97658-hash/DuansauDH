@@ -1,7 +1,7 @@
 import { renderToastHost } from "../renderToastHost";
 beforeEach(renderToastHost);
 import React from 'react';
-import {fireEvent,screen,waitFor,within} from '@testing-library/react';
+import {act,fireEvent,screen,waitFor,within} from '@testing-library/react';
 import {MemoryRouter} from 'react-router-dom';
 import axios from 'axios';
 import {renderWithPermissions} from '../renderWithPermissions';
@@ -18,6 +18,42 @@ const date='2026-10-19',offering={id:'offering',name:'Lớp QT 2026',subjectId:'
 const room={id:'room',name:'Phòng giảng đường',code:'301',capacity:2,isActive:true};let data;
 const renderPage=(permissions=['exams.view','exams.write'])=>renderWithPermissions(<MemoryRouter useTransitions={false}><ExamSchedule/></MemoryRouter>,permissions);
 
+it('coalesces stale focus events and aborts requests when changing weeks',async()=>{
+ renderPage();await screen.findByRole('button',{name:/Lớp QT 2026 2 TS/});
+ const initialSignal=axios.get.mock.calls.find(([url])=>url.endsWith('/masters/exam-schedule'))[1].signal;
+ let resolve;
+ axios.get.mockImplementation(()=>new Promise(done=>{resolve=done;}));
+ const now=Date.now(),clock=vi.spyOn(Date,'now').mockReturnValue(now+61000);
+ try{
+  await act(async()=>{fireEvent.focus(window);fireEvent(document,new Event('visibilitychange'));});
+  expect(axios.get.mock.calls.filter(([url])=>url.endsWith('/masters/exam-schedule'))).toHaveLength(2);
+  expect(initialSignal.aborted).toBe(true);
+  const pendingSignal=axios.get.mock.calls.at(-1)[1].signal;
+  clock.mockReturnValue(now+122000);
+  await act(async()=>{fireEvent.focus(window);});
+  expect(axios.get.mock.calls.filter(([url])=>url.endsWith('/masters/exam-schedule'))).toHaveLength(2);
+  fireEvent.click(screen.getByRole('button',{name:'Tuần sau'}));
+  expect(pendingSignal.aborted).toBe(true);
+  await act(async()=>{resolve({data});});
+ }finally{clock.mockRestore();}
+});
+
+it('saves an exam without selecting either invigilator',async()=>{
+ renderPage();await open();fireEvent.click(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/}));
+ fireEvent.click(screen.getByRole('button',{name:'Xếp lịch'}));
+ await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/masters/exam-sessions'),expect.objectContaining({lecturerId:undefined,secondLecturerId:undefined}),expect.any(Object)));
+});
+it('saves two staff from independent units and can clear the second staff',async()=>{
+ renderPage();await open();selectRoom();
+ chooseScope('Đơn vị cán bộ 2','Viện Đào tạo Sau đại học');
+ chooseScope('Cán bộ coi thi 2','Trần Bình');
+ fireEvent.change(screen.getByRole('combobox',{name:'Cán bộ coi thi 2'}),{target:{value:''}});
+ expect(screen.getByRole('button',{name:'Xếp lịch'})).toBeEnabled();
+ chooseScope('Cán bộ coi thi 2','Trần Bình');
+ fireEvent.click(screen.getByRole('button',{name:'Xếp lịch'}));
+ await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({lecturerId:'lecturer',secondLecturerId:'lecturer-2'}),expect.any(Object)));
+});
+
 it('does not use teaching or gradebook permissions to open the exam calendar',()=>{
   renderPage(['scheduling.view','scheduling.write','gradebook.view']);
   expect(screen.getByRole('alert')).toHaveTextContent('Bạn không có quyền xem lịch thi.');
@@ -26,10 +62,10 @@ const queueButton=()=>within(screen.getByRole('complementary',{name:'Chưa xếp
 const open=async()=>{fireEvent.click(await within(screen.getByRole('complementary',{name:'Chưa xếp lịch'})).findByRole('button',{name:/Lớp QT/}));fireEvent.click(screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'}));await screen.findByRole('dialog',{name:'XẾP LỊCH THI'});await waitFor(()=>expect(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/})).toBeEnabled());};
 const chooseScope=(label,name)=>{fireEvent.focus(screen.getByRole('combobox',{name:label}));fireEvent.click(screen.getByRole('option',{name}));};
 const chooseUnit=id=>chooseScope('Đơn vị',data.units.find(unit=>unit.id===id).name);
-const lecturerButton=()=>screen.getByRole('button',{name:'Giảng viên',exact:true});
+const lecturerButton=()=>screen.getByRole('button',{name:'Cán bộ coi thi 1',exact:true});
 const openLecturers=()=>{if(lecturerButton().getAttribute('aria-expanded')!=='true')fireEvent.click(lecturerButton());};
 const chooseLecturer=id=>{openLecturers();fireEvent.click(screen.getByRole('option',{name:data.lecturers.find(l=>l.id===id).name,exact:true}));};
-const selectRoom=()=>{fireEvent.click(screen.getByRole('button',{name:/301 2 chỗ/}));if(lecturerButton().textContent.includes('Chọn giảng viên')){chooseUnit('unit-1');chooseLecturer('lecturer');}};
+const selectRoom=()=>{fireEvent.click(screen.getByRole('button',{name:/301 2 chỗ/}));if(lecturerButton().textContent.includes('Chọn cán bộ coi thi 1')){chooseUnit('unit-1');chooseLecturer('lecturer');}};
 function session(extra={}){return {id:'session',courseOfferingId:offering.id,snapshotId:'snapshot',version:3,name:offering.name,subjectId:offering.subjectId,subjectName:offering.subjectName,groups:offering.groups,candidateCount:2,candidateIds:offering.candidateIds,examDate:date,startTime:'08:00',endTime:'10:00',roomId:room.id,roomCode:room.code,lecturerId:'lecturer-2',lecturerName:'Trần Bình',status:'scheduled',canEdit:true,...extra};}
 beforeEach(()=>{vi.clearAllMocks();data={queue:[offering],approvedOfferings:[offering],sessions:[],rooms:[room,{...room,id:'small',code:'201',capacity:1}],units:[{id:'unit-1',name:'Viện Đào tạo SĐH',active:true},{id:'unit-2',name:'Viện Đào tạo Sau đại học',active:true},{id:'other-unit',name:'Khoa Công nghệ thông tin',active:true}],lecturers:[{id:'lecturer',code:'GV01',name:'Nguyễn An',unitId:'unit-1',active:true},{id:'lecturer-2',code:'GV02',name:'Trần Bình',unitId:'unit-2',active:true},{id:'inactive',name:'Giảng viên cũ',unitId:'unit-1',active:false}]};axios.get.mockImplementation(async()=>({data}));axios.post.mockResolvedValue({data:{id:'new'}});axios.put.mockResolvedValue({data:{}});});
 it('fails closed without view permission',()=>{renderPage([]);expect(screen.getByRole('alert')).toHaveTextContent('không có quyền');expect(axios.get).not.toHaveBeenCalled();});
@@ -76,6 +112,21 @@ it('clears dependent specialization/year and selected queue when hierarchy chang
 it('reuses the Teaching scope collapse/expand interaction',async()=>{renderPage();await screen.findByRole('button',{name:/Lớp QT/});fireEvent.click(screen.getByRole('button',{name:'Thu gọn phạm vi làm việc'}));expect(document.querySelector('.sl-workspace')).toHaveClass('sl-sidebar-collapsed');fireEvent.click(screen.getByRole('button',{name:'Mở phạm vi làm việc'}));expect(document.querySelector('.sl-workspace')).not.toHaveClass('sl-sidebar-collapsed');});
 it('searches course/subject context from the scope panel without extra dropdowns',async()=>{renderPage();await screen.findByRole('button',{name:/Lớp QT/});fireEvent.change(screen.getByLabelText('Tìm kiếm'),{target:{value:'QT'}});expect(queueButton()).toBeInTheDocument();fireEvent.change(screen.getByLabelText('Tìm kiếm'),{target:{value:'Không tìm thấy'}});expect(screen.queryByRole('button',{name:/Lớp QT/})).toBeNull();});
 it('navigates weeks, displays daytime and Vietnamese dates',async()=>{renderPage();await screen.findByRole('button',{name:/Lớp QT/});expect(screen.getByText('SÁNG')).toBeInTheDocument();expect(screen.getByText('CHIỀU')).toBeInTheDocument();expect(screen.queryByText('07:00')).toBeNull();expect(screen.queryByText('19:00')).toBeNull();expect(document.querySelectorAll('.ep-period-slot')).toHaveLength(14);expect(screen.queryByText('06:00')).toBeNull();expect(screen.queryByText(/UTC/)).toBeNull();fireEvent.click(screen.getByRole('button',{name:'Tuần sau'}));await waitFor(()=>expect(axios.get).toHaveBeenLastCalledWith(expect.any(String),expect.objectContaining({params:{from:'2026-10-26',to:'2026-11-01'}})));});
+it('keeps the pending count stable during week navigation and updates it when the new week arrives',async()=>{
+ data.sessions=[session({pendingConfirmation:true})];
+ renderPage();
+ expect(screen.getByRole('button',{name:'Chờ xác nhận (Đang tải)'})).toHaveAttribute('aria-busy','true');
+ const pendingButton=await screen.findByRole('button',{name:'Chờ xác nhận (1)'});
+ let finishWeek;
+ axios.get.mockImplementationOnce(()=>new Promise(resolve=>{finishWeek=resolve;}));
+ fireEvent.click(screen.getByRole('button',{name:'Tuần sau'}));
+ expect(pendingButton).toHaveTextContent('Chờ xác nhận (1)');
+ expect(pendingButton).toHaveAttribute('aria-busy','true');
+ expect(screen.getByRole('button',{name:'Tuần trước'})).toBeEnabled();
+ expect(screen.getByRole('button',{name:'Tuần sau'})).toBeEnabled();
+ await act(async()=>{finishWeek({data:{...data,sessions:[]}});});
+ expect(await screen.findByRole('button',{name:'Chờ xác nhận (0)'})).toHaveAttribute('aria-busy','false');
+});
 it('creates from a slot using immutable approved snapshot and shared floor-grouped room cards',async()=>{
  renderPage();await open();expect(screen.queryByLabelText('Phòng thi')).toBeNull();expect(screen.getByText('TẦNG 2')).toBeInTheDocument();expect(screen.getByText('TẦNG 3')).toBeInTheDocument();expect(screen.queryByLabelText('Bắt đầu')).toBeNull();expect(screen.queryByLabelText('Kết thúc')).toBeNull();expect(screen.getByRole('button',{name:/201 1 chỗ TRỐNG/})).toBeEnabled();
  selectRoom();expect(screen.getByRole('button',{name:/301 2 chỗ ĐANG CHỌN/})).toHaveAttribute('aria-pressed','true');fireEvent.click(screen.getByRole('button',{name:'Xếp lịch'}));await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/masters/exam-sessions'),expect.objectContaining({courseOfferingId:'offering',snapshotId:'snapshot',eligibilityVersion:2,roomId:'room',lecturerId:'lecturer',examDate:date,startTime:'08:00',endTime:'09:00'}),{withCredentials:true}));
@@ -96,7 +147,7 @@ it('opens edit with same room grid and saves session version',async()=>{
  data.sessions=[session()];data.queue=[];renderPage();fireEvent.click(await screen.findByRole('button',{name:/19\/10\/2026 08:00 Đã xếp lịch/}));
  const dialog=screen.getByRole('dialog',{name:'CHI TIẾT BUỔI THI'});expect(dialog).toHaveTextContent('Trần Bình');
  fireEvent.click(screen.getByRole('button',{name:'Chỉnh sửa buổi thi'}));expect(screen.getAllByRole('dialog')).toHaveLength(1);expect(dialog).toBeInTheDocument();
- await waitFor(()=>expect(screen.getByRole('button',{name:'Lưu thay đổi'})).toBeEnabled());expect(screen.getByRole('combobox',{name:'Đơn vị'})).toHaveValue('Viện Đào tạo Sau đại học');expect(lecturerButton()).toHaveTextContent('Trần Bình');chooseUnit('unit-1');expect(lecturerButton()).toHaveTextContent('Chọn giảng viên');chooseLecturer('lecturer');fireEvent.click(screen.getByRole('button',{name:'Lưu thay đổi'}));
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Lưu thay đổi'})).toBeEnabled());expect(screen.getByRole('combobox',{name:'Đơn vị'})).toHaveValue('Viện Đào tạo Sau đại học');expect(lecturerButton()).toHaveTextContent('Trần Bình');chooseUnit('unit-1');expect(lecturerButton()).toHaveTextContent('Chọn cán bộ coi thi 1');chooseLecturer('lecturer');fireEvent.click(screen.getByRole('button',{name:'Lưu thay đổi'}));
  await waitFor(()=>expect(axios.put).toHaveBeenCalledWith(expect.stringContaining('/session'),expect.objectContaining({version:3,lecturerId:'lecturer',startTime:'08:00',endTime:'10:00'}),{withCredentials:true}));
  await waitFor(()=>expect(within(dialog).getByRole('table',{name:'Các học phần trong buổi thi'})).toBeInTheDocument());
 });
@@ -141,14 +192,14 @@ it('keeps long academic names out of queue identifiers, calendar cards and activ
  const item={...offering,name:'QTKD 2026 — Quản trị nguồn nhân lực — Nhóm 11',subjectName:'Quản trị nguồn nhân lực',groups:[{...offering.groups[0],code:'QTKD 2026.1.11'}]};
  data.queue=[item];data.approvedOfferings=[item];data.sessions=[session({name:item.name,subjectName:item.subjectName,groups:item.groups,pendingConfirmation:true})];renderPage();
  const queue=await within(screen.getByRole('complementary',{name:'Chưa xếp lịch'})).findByRole('button',{name:/Nhóm 11/});expect(queue).toHaveTextContent('QTKD 2026.1.11');expect(queue.textContent).not.toContain('Nhóm 11');expect(queue).toHaveTextContent('Quản trị nguồn nhân lực');
- fireEvent.click(queue);const strip=document.querySelector('.sl-selected-strip');expect(strip).toHaveTextContent('ĐANG XẾP');expect(strip).toHaveTextContent('QTKD 2026.1.11');expect(strip).toHaveTextContent('2 TS');expect(strip).not.toHaveTextContent(item.subjectName);
+ fireEvent.click(queue);const strip=document.querySelector('.sl-selected-strip');expect(strip).toHaveTextContent('ĐANG XẾP');expect(strip).toHaveTextContent('QTKD 2026.1.11');expect(strip).toHaveTextContent('2 th\u00ed sinh');expect(strip).not.toHaveTextContent(item.subjectName);
  const card=document.querySelector('.ep-event');expect(card).toHaveTextContent('QTKD 2026.1.11');expect(card).toHaveTextContent('301 · 2 TS');expect(card).toHaveTextContent('CHỜ XÁC NHẬN');expect(card.textContent).not.toContain(item.subjectName);expect(card.textContent).not.toContain('08:00');
  fireEvent.mouseOver(card);const tooltip=await screen.findByRole('tooltip');expect(tooltip).toHaveTextContent(item.subjectName);expect(tooltip).toHaveTextContent('19/10/2026 · 08:00–10:00');expect(tooltip).toHaveTextContent('Phòng 301 · 2 thí sinh');
 });
-it('uses the clicked afternoon without editable start/end times and requires an active lecturer',async()=>{
+it('uses the clicked afternoon without editable start/end times and permits an unassigned invigilator',async()=>{
  renderPage();fireEvent.click(await within(screen.getByRole('complementary',{name:'Chưa xếp lịch'})).findByRole('button',{name:/Lớp QT/}));fireEvent.click(screen.getByRole('button',{name:'Chọn 19/10/2026 Chiều'}));
  expect(screen.queryByLabelText('Ngày thi')).toBeNull();expect(screen.getByText('Chiều')).toBeInTheDocument();expect(screen.queryByLabelText('Bắt đầu')).toBeNull();expect(screen.queryByLabelText('Kết thúc')).toBeNull();await waitFor(()=>expect(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/})).toBeEnabled());
- fireEvent.click(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/}));expect(screen.getByRole('button',{name:'Xếp lịch'})).toBeDisabled();expect(screen.queryByRole('option',{name:'Giảng viên cũ'})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:/301 2 chỗ TRỐNG/}));expect(screen.getByRole('button',{name:'Xếp lịch'})).toBeEnabled();expect(screen.queryByRole('option',{name:'Giảng viên cũ'})).toBeNull();
  chooseUnit('unit-1');chooseLecturer('lecturer');fireEvent.click(screen.getByRole('button',{name:'Xếp lịch'}));await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({examDate:date,startTime:'14:00',endTime:'15:00',lecturerId:'lecturer'}),expect.any(Object)));
 });
 it('disables lecturers already assigned to an overlapping exam even when the room is free',async()=>{
@@ -164,7 +215,7 @@ it('requires a unit first, filters its lecturers and clears the lecturer when th
  expect(screen.getByRole('option',{name:/Nguyễn An/})).toBeInTheDocument();expect(screen.queryByRole('option',{name:/Trần Bình/})).toBeNull();
  selectRoom();expect(screen.getByRole('button',{name:'Xếp lịch'})).toBeEnabled();
  chooseUnit('unit-2');openLecturers();
- expect(lecturerButton()).toHaveTextContent('Chọn giảng viên');expect(screen.getByRole('button',{name:'Xếp lịch'})).toBeDisabled();
+ expect(lecturerButton()).toHaveTextContent('Chọn cán bộ coi thi 1');expect(screen.getByRole('button',{name:'Xếp lịch'})).toBeEnabled();
  expect(screen.queryByRole('option',{name:/Nguyễn An/})).toBeNull();expect(screen.getByRole('option',{name:/Trần Bình/})).toBeInTheDocument();
 });
 it('only offers the two postgraduate institutes and excludes other or unassigned units from search',async()=>{

@@ -1,3 +1,4 @@
+import {formatLecturerName} from '../../utils/lecturerName';
 import { BRAND } from "../../config/branding";
 import { createExcelForm, excelRowHeight } from "../../utils/documentLayout";
 import { openDocumentPreview, sanitizeDocumentFilenamePart } from "../../utils/documentFiles";
@@ -22,7 +23,7 @@ export function buildSubjectSigningDocument(groups, offering, rows) {
     title: SUBJECT_SIGNING_FORM.title, subject: offering?.subject?.name || "", credits: offering?.subject?.credits ?? "",
     group: unique(groups.map(group => group?.code || group?.name)), cohort: unique(groups.map(group => group?.academicYear)),
     major: unique(groups.map(group => group?.major?.name)), year: offering?.academicYear || "",
-    lecturer: offering?.lecturer?.name || "", lecturerUnit: offering?.lecturer?.unit?.name || "",
+    lecturer: formatLecturerName(offering?.lecturer) || "", lecturerUnit: offering?.lecturer?.unit?.name || "",
     location: `${BRAND.institute}, ${BRAND.university}`,
     // Attendance, absences and separate practical marks are not present in the gradebook.
     // Leave them blank for the instructor instead of inferring them from other scores.

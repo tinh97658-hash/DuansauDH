@@ -1,0 +1,16 @@
+export const RELIGIONS = [
+  "Phật giáo",
+  "Công giáo",
+  "Phật giáo Hoà Hảo",
+  "Hồi giáo",
+  "Cao Đài",
+  "Minh sư đạo",
+  "Minh Lý đạo",
+  "Tin Lành",
+  "Tịnh độ cư sĩ Phật hội Việt Nam",
+  "Đạo Tứ ân hiếu nghĩa",
+  "Bửu sơn Kỳ hương",
+  "Ba Ha'i",
+  "Tôn giáo khác",
+  "Không",
+];

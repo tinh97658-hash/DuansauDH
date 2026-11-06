@@ -5,6 +5,7 @@ import { Staff } from "../database/models/staff.model.js";
 import { PERMISSIONS_KEY, ANY_PERMISSIONS_KEY, ACTION_PERMISSIONS_KEY } from "./permissions.decorator.js";
 import { workingProfileStorage } from '../auth/profile-context.js';
 import { routePermissionAllowed,permissionRoutesForRequest } from '../auth/route-authorization.js';
+import { authorizationPath } from '../auth/request-path.js';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -20,7 +21,10 @@ export class PermissionsGuard implements CanActivate {
     const actionPermission = actions && Object.hasOwn(actions, request.body?.action) ? actions[request.body.action] : undefined;
     if (actions && !actionPermission) throw new ForbiddenException("Thao tác không được phép.");
     const profile=workingProfileStorage.getStore();
-    if (!required.length && !any.length && !actions && (!profile||!permissionRoutesForRequest(request.originalUrl||request.url||'',request.method).length)) return true;
+    // This self-service endpoint must remain available to read-only profiles.
+    if (!required.length && !any.length && !actions && request.method==='PATCH'
+      && authorizationPath(request.originalUrl||request.url||'')==='/accounts/me/password') return true;
+    if (!required.length && !any.length && !actions && (!profile||(['GET','HEAD','OPTIONS'].includes(request.method)&&!permissionRoutesForRequest(request.originalUrl||request.url||'',request.method).length))) return true;
 
     const user = request.user;
     if (!(user instanceof Staff)) throw new ForbiddenException("Bạn không có quyền thực hiện thao tác này");

@@ -27,7 +27,7 @@
 .vmu-login-input::placeholder { color: #17212e; opacity: 1; }
 .vmu-login-input:hover { border-color: #a9bdd6; }
 .vmu-login-input:focus { border-color: #1872bd; box-shadow: 0 0 0 3px #1872bd20; }
-.vmu-login-input-icon { position: absolute; left: 22px; color: #607287; pointer-events: none; }
+.vmu-login-input-icon { position: absolute; left: 22px; color: var(--icon-muted); pointer-events: none; }
 .vmu-login-input-toggle { position: absolute; right: 14px; display: grid; place-items: center; width: 34px; height: 34px; border: 0; background: transparent; color: #607287; cursor: pointer; }
 .vmu-login-input-toggle:hover { background: #dbe5f5; }
 .vmu-login-submit { position: relative; display: flex; align-items: center; justify-content: center; gap: 38px; width: 100%; height: 55px; margin-top: -3px; border: 1px solid #0e66b2; background: linear-gradient(105deg, #116cb5, #095cba); color: white; font-size: 22px; font-weight: 700; cursor: pointer; transition: filter .2s; }
@@ -48,14 +48,14 @@
 .vmu-login-right { position: absolute; inset: 0 0 0 auto; width: 56%; pointer-events: none; }
 .vmu-login-right-top { position: absolute; top: 4.2vh; right: 2.6vw; display: flex; justify-content: flex-end; gap: 12px; }
 .vmu-pill { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; white-space: nowrap; color: #314960; background: #ffffffdf; font-size: clamp(9px, .72vw, 12px); font-weight: 600; box-shadow: 0 2px 9px #3169950d; }
-.vmu-pill svg { font-size: 17px; color: #32678c; }
+.vmu-pill svg { font-size: 17px; color: var(--icon-blue); }
 .vmu-pill-location { pointer-events: auto; cursor: pointer; text-decoration: none; }
 .vmu-pill-location:hover { color: #314960; background: #fff; text-decoration: none; }
 .vmu-pill-divider { color: #94a3b0; }
 .vmu-pill-clock { font-variant-numeric: tabular-nums; }
 .vmu-login-right-bottom { position: absolute; right: 2.6vw; bottom: 7.5vh; }
 .vmu-contact-card { display: flex; align-items: center; gap: 13px; padding: 12px 18px; background: #fffffff0; box-shadow: 0 2px 14px #245d7a13; pointer-events: auto; }
-.vmu-contact-card > svg { font-size: 25px; color: #25597f; }
+.vmu-contact-card > svg { font-size: 25px; color: var(--icon-blue); }
 .vmu-contact-label { color: #56616c; font-size: 10px; margin-bottom: 1px; }
 .vmu-contact-email { color: #163650; font-size: 14px; font-weight: 750; text-decoration: none; }
 .vmu-contact-email:hover { color: #0965b6; }

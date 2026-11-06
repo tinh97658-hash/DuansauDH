@@ -378,8 +378,10 @@ it("locks unfinished classes, shows the yellow warning at the right, and unlocks
   expect(input).toHaveValue("");
   expect(axios.put).not.toHaveBeenCalled();
   status = "completed";
+  const clock = jest.spyOn(Date, "now").mockReturnValue(Date.now() + 31000);
   fireEvent(window, new Event("focus"));
   await waitFor(() => expect(screen.getByLabelText("Điểm kiểm tra HV001")).toBeEnabled());
+  clock.mockRestore();
   fireEvent.mouseDown(screen.getByLabelText("Tên lớp học phần"));
   expect(screen.getByText("CẦN RÀ SOÁT")).toBeInTheDocument();
   expect(screen.queryByText("ĐANG GIẢNG DẠY")).not.toBeInTheDocument();

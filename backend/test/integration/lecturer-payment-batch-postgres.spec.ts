@@ -22,7 +22,7 @@ describeDb('Payment batch atomicity, conflicts and RLS on disposable PostgreSQL'
       CREATE TABLE ${schema}.units(id uuid PRIMARY KEY,name text);
       CREATE TABLE ${schema}.class_groups(id uuid PRIMARY KEY,code text,name text);
       CREATE TABLE ${schema}.course_offering_class_groups(course_offering_id uuid,class_group_id uuid);
-      CREATE TABLE ${schema}.lecturers(id uuid PRIMARY KEY,name text,unit_id uuid);
+      CREATE TABLE ${schema}.lecturers(id uuid PRIMARY KEY,name text,unit_id uuid,academic_rank text,academic_degree text);
       CREATE TABLE ${schema}.course_offerings(id uuid PRIMARY KEY,subject_id uuid,name text,status text,completed_at timestamptz);
       CREATE TABLE ${schema}.teaching_sessions(id uuid PRIMARY KEY,course_offering_id uuid,lecturer_id uuid,status text,confirmed_at timestamptz,created_at timestamptz,session_date date,end_time time);
       CREATE TABLE ${schema}.lecturer_payments(course_offering_id uuid,lecturer_id uuid,paid boolean NOT NULL,payment_date date,note text DEFAULT '',updated_by_staff_id uuid,created_at timestamptz,updated_at timestamptz NOT NULL,PRIMARY KEY(course_offering_id,lecturer_id));
@@ -41,12 +41,19 @@ describeDb('Payment batch atomicity, conflicts and RLS on disposable PostgreSQL'
     await db.query(`TRUNCATE ${schema}.lecturer_payments,${schema}.teaching_sessions,${schema}.course_offerings,${schema}.lecturers,${schema}.subjects,${schema}.units;
       INSERT INTO subjects VALUES('${id(10)}','Subject');
       INSERT INTO units VALUES('${id(20)}','Unit A'),('${id(21)}','Unit B');
-      INSERT INTO lecturers VALUES('${id(1)}','Teacher A','${id(20)}'),('${id(2)}','Teacher B','${id(20)}'),('${id(3)}','Outside filter','${id(21)}');
+      INSERT INTO lecturers(id,name,unit_id) VALUES('${id(1)}','Teacher A','${id(20)}'),('${id(2)}','Teacher B','${id(20)}'),('${id(3)}','Outside filter','${id(21)}');
       INSERT INTO course_offerings VALUES('${id(30)}','${id(10)}','Completed class','completed','2026-11-02T18:00Z'),('${id(31)}','${id(10)}','Active class','active',NULL);
       INSERT INTO teaching_sessions VALUES
         ('${id(40)}','${id(30)}','${id(1)}','held','2026-11-02T10:00Z','2026-10-01','2026-11-02','12:00'),
         ('${id(41)}','${id(30)}','${id(2)}','held','2026-11-02T10:00Z','2026-10-01','2026-11-02','12:00'),
         ('${id(42)}','${id(30)}','${id(3)}','held','2026-11-02T10:00Z','2026-10-01','2026-11-02','12:00');`);
+  });
+  it('returns academic rank and degree for payment rows and lecturer options',async()=>{
+    await db.query(`UPDATE lecturers SET academic_rank='PGS',academic_degree='TS' WHERE id='${id(1)}'`);
+    const listed=await service.list();
+    expect(listed.rows.find((row:any)=>row.lecturerId===id(1))).toMatchObject({academicRank:'PGS',academicDegree:'TS'});
+    const options=await service.options();
+    expect(options.lecturers.find((row:any)=>row.id===id(1))).toMatchObject({academicRank:'PGS',academicDegree:'TS'});
   });
   afterAll(async () => { await db?.close(); }); // The runner drops this entire disposable database.
 

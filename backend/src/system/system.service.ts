@@ -16,12 +16,14 @@ import { Major } from "../database/models/common/major.model.js";
 import { Room } from "../database/models/common/room.model.js";
 import { Nationality } from "../database/models/common/nationality.model.js";
 import { StudyStatus } from "../database/models/common/study-status.model.js";
+import { TrainingYear } from "../database/models/common/training-year.model.js";
 import { TrainingLevel } from "../database/models/common/training-level.model.js";
 import { TrainingMode } from "../database/models/common/training-mode.model.js";
 import { TrainingModeGroup } from "../database/models/common/training-mode-group.model.js";
 import { Ward } from "../database/models/common/ward.model.js";
 import { Subject } from "../database/models/plan/subject.model.js";
 import { Staff } from "../database/models/staff.model.js";
+import { TrainingYearDto, UpdateTrainingYearDto } from "./dto/training-year.dto.js";
 import { CreateCatalogDto, CreateRoomDto, UpdateCatalogDto, UpdateRoomDto } from "./dto/catalog.dto.js";
 
 // Các model danh mục dùng chung; dùng any để tránh lỗi union ModelStatic với method this của Sequelize.
@@ -51,9 +53,23 @@ export class SystemService {
     @InjectModel(ClassGroup) private readonly classGroups: typeof ClassGroup = ClassGroup,
     @InjectConnection() private readonly sequelize: Sequelize = null as any,
     @InjectModel(Unit) private readonly units: typeof Unit = Unit,
+    @InjectModel(TrainingYear) private readonly trainingYears: typeof TrainingYear = TrainingYear,
   ) {}
 
   // ===== Các chức năng chưa triển khai =====
+  async listTrainingYears() { return this.trainingYears.findAll({ order: [["name", "ASC"]] }); }
+  async saveTrainingYear(dto: TrainingYearDto | UpdateTrainingYearDto, id?: string) {
+    const row = id ? await this.trainingYears.findByPk(id) : null;
+    if (id && !row) throw new NotFoundException("Không tìm thấy năm đào tạo.");
+    const values = { name: dto.name ?? row?.name, startDate: dto.startDate ?? row?.startDate, active: dto.active ?? row?.active ?? true };
+    try {
+      return row ? await row.update(values) : await this.trainingYears.create(values);
+    } catch (error: any) {
+      if (error.name === "SequelizeUniqueConstraintError") throw new ConflictException("Năm đào tạo đã tồn tại.");
+      throw error;
+    }
+  }
+
   private stub(feature: string, label: string) {
     return { feature, label, status: "not_implemented", message: `Chức năng "${label}" chưa được triển khai.` };
   }

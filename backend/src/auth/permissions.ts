@@ -47,8 +47,8 @@ export const PERMISSIONS: PermissionDefinition[] = [
     code:`module.${module.id}`,group:module.name,name:`Mở module ${module.name}`,description:'Cổng truy cập module. Quyền xem và ghi từng tab được cấp riêng.'})),
   // ===== Tài khoản & phân quyền =====
   { code: "account.view", group: "Tài khoản & phân quyền", name: "Xem tài khoản nhân sự", description: "Xem danh sách và thông tin tài khoản nhân sự; không tự cho phép tạo, sửa hoặc khóa tài khoản." },
-  { code: "account.manage", group: "Tài khoản & phân quyền", name: "Quản lý tài khoản nhân sự", description: "Tạo, sửa, khóa hoặc mở tài khoản và gán vai trò. Cấp thêm quyền xem tài khoản để sử dụng màn hình quản lý." },
-  { code: "account.password.reset", group: "Tài khoản & phân quyền", name: "Đặt lại mật khẩu nhân sự", description: "Đặt lại mật khẩu cho nhân sự. Quyền này được cấp riêng với quyền sửa tài khoản." },
+  { code: "account.manage", group: "Tài khoản & phân quyền", name: "Quản lý tài khoản nhân sự", description: "Đặc quyền tương đương quản trị viên: tạo, sửa, khóa hoặc mở tài khoản và gán mọi vai trò, bao gồm Quản trị hệ thống, cho bản thân hoặc người khác. Chỉ cấp cho người được tin cậy như quản trị viên. Cần quyền xem tài khoản." },
+  { code: "account.password.reset", group: "Tài khoản & phân quyền", name: "Đặt lại mật khẩu nhân sự", description: "Cho phép đặt lại mật khẩu mọi tài khoản nhân sự, bao gồm tài khoản Quản trị hệ thống. Chỉ cấp cho người được tin cậy như quản trị viên. Quyền này được cấp riêng với quyền sửa tài khoản." },
   { code: "role.view", group: "Tài khoản & phân quyền", name: "Xem vai trò", description: "Xem danh sách vai trò và các quyền đã được cấp cho từng vai trò." },
   { code: "role.manage", group: "Tài khoản & phân quyền", name: "Quản lý vai trò và ma trận quyền", description: "Tạo, sửa vai trò và thay đổi ma trận quyền. Thay đổi áp dụng cho tất cả nhân sự mang vai trò đó; cần thêm quyền xem vai trò để mở màn hình." },
   { code: "audit.view", group: "Tài khoản & phân quyền", name: "Xem nhật ký thao tác", description: "Xem lịch sử thao tác và thay đổi dữ liệu. Nhật ký toàn hệ thống bị chặn khi vai trò giới hạn xem theo nhóm." },

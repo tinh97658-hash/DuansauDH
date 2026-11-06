@@ -2,6 +2,7 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable, NestMidd
 import { Staff } from '../database/models/staff.model.js';
 import { RbacService } from './rbac.service.js';
 import { workingProfileStorage } from './profile-context.js';
+import { authorizationPath } from './request-path.js';
 
 @Injectable()
 export class WorkingProfileMiddleware implements NestMiddleware {
@@ -26,7 +27,7 @@ export class WorkingProfileGuard implements CanActivate {
   canActivate(context:ExecutionContext){
     const request=context.switchToHttp().getRequest();
     if(!(request.user instanceof Staff))return true;
-    const path=(request.originalUrl||request.url||'').split('?')[0];
+    const path=authorizationPath(request.originalUrl||request.url||'');
     if(/^\/auth\/(session|profiles(?:\/select)?|capabilities|loginSuccess|login\/success)$/.test(path)
       ||path==='/user/logout'||path==='/accounts/me/password')return true;
     const profile=workingProfileStorage.getStore();

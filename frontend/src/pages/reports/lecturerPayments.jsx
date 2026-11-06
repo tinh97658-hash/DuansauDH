@@ -1,3 +1,4 @@
+import {formatLecturerName} from '../../utils/lecturerName';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { Alert, CircularProgress } from '@mui/material';
@@ -24,12 +25,13 @@ const matchesStatus = (row, status) => status === 'all' || row.paid === (status 
 // Keep unrelated rows and date fields stable while another pair is being edited.
 const PaymentRow = React.memo(function PaymentRow({ row, index, draft, disabled, busy, edit, commitField, toggle, setOffering }) {
   const value = { ...row, ...draft };
-  const name = `${row.lecturerName} – ${row.offeringName}`;
+  const lecturerName = formatLecturerName({...row, name: row.lecturerName});
+  const name = `${lecturerName} – ${row.offeringName}`;
   const groups = row.participatingGroups || [];
   const groupNames = groups.map(group => group.name || group.code).filter(Boolean).join(', ');
   const needsDate = value.paid && !value.paymentDate;
   return <tr data-payment-key={rowKey(row)} aria-busy={busy}>
-  <td>{index + 1}</td><td><span className="lp-cell-text" title={row.lecturerName}>{row.lecturerName}</span></td>
+  <td>{index + 1}</td><td><span className="lp-cell-text" title={lecturerName}>{lecturerName}</span></td>
   <td><button className="lp-link" title={row.offeringName} onClick={() => setOffering({ id: row.courseOfferingId, name: row.offeringName })}><span className="lp-cell-text">{row.offeringName}</span></button></td>
   <td><span className="lp-group-names" title={groupNames || undefined}>{groupNames || '—'}</span></td>
   <td>{row.sessionCount}</td><td>{dateLabel(row.completedAt)}</td>
@@ -192,7 +194,7 @@ export default function LecturerPayments() {
   }, [update]);
   const select = (field, label, items) => <label className="tp-filter tp-select-filter"><span>{label}</span>
     <AppSelect aria-label={label} value={filters[field]} onChange={event => change(field, event.target.value)}>
-      <option value="">Tất cả</option>{items.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+      <option value="">Tất cả</option>{items.map(item => <option key={item.id} value={item.id}>{field==='lecturerId'?formatLecturerName(item):item.name}</option>)}
     </AppSelect></label>;
 
   return <FeatureLayout title="Báo cáo tài chính" exportConfig={false}>

@@ -462,7 +462,7 @@ const AssignClassGroups = () => {
           }}>
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 0.75, color: "#111827" }}>
-                <UserIcon sx={{ color: "#1685B5", fontSize: 19 }} />
+                <UserIcon sx={{ color: "var(--icon-primary)", fontSize: 19 }} />
                 Học viên chưa phân nhóm
                 <Chip size="small" label={`${filteredStudents.length} HV`} sx={{ ml: 0.25, height: 22, bgcolor: "#EAF6FC", color: "#0788B8", fontWeight: 700 }} />
               </Typography>
@@ -587,7 +587,7 @@ const AssignClassGroups = () => {
           }}>
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 0.75, color: "#111827" }}>
-                <UserGroupIcon sx={{ color: "#168B7C", fontSize: 19 }} />
+                <UserGroupIcon sx={{ color: "var(--icon-teal)", fontSize: 19 }} />
                 Nhóm mục tiêu
               </Typography>
             </Box>

@@ -103,6 +103,7 @@ it("keeps the confirmation and entered note mounted when the tab becomes visible
   axios.get.mockImplementation(url => url.endsWith("/auth/session")
     ? new Promise(resolve => { resolveSession = resolve; }) : originalGet(url));
   const visibility = jest.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+  const clock = jest.spyOn(Date, "now").mockReturnValue(Date.now() + 31000);
   try {
     fireEvent(document, new Event("visibilitychange"));
     await waitFor(() => expect(resolveSession).toBeDefined());
@@ -112,6 +113,7 @@ it("keeps the confirmation and entered note mounted when the tab becomes visible
     expect(screen.getByRole("textbox", { name: "Ghi chú HV001" })).toBe(note);
   } finally {
     visibility.mockRestore();
+    clock.mockRestore();
   }
 });
 
@@ -417,7 +419,7 @@ it("renders course matrix across cohorts, displays KPIs and switches between vie
   expect(within(offeringCard).queryByText("Xem chi tiết")).not.toBeInTheDocument();
   fireEvent.click(within(offeringCard).getByRole("button", { name: /Xem chi tiết.*2026/ }));
   expect(await screen.findByRole("dialog")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Đóng" }));
+  fireEvent.click(within(screen.getByRole("dialog")).getAllByRole("button", { name: "Đóng" })[0]);
 
   // Selecting one cohort lays its ordered offerings out in four columns.
   fireEvent.change(screen.getByLabelText("Khóa / năm học"), { target: { value: "2026" } });

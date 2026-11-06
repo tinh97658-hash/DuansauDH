@@ -1,3 +1,4 @@
+import {formatLecturerName} from '../../utils/lecturerName';
 import { formatDate } from "../../utils/dateFormat";
 import { groupsOf } from "./shared";
 import { downloadDocumentFile, openDocumentPreview } from "../../utils/documentFiles";
@@ -60,7 +61,7 @@ export function scheduleExportRows(sessions, majorCatalog = []) {
         names(groupMajors.map((major) => major.name)),
         names(groups.map((group) => group.code || group.name)),
         offering.subject?.name || "",
-        session.lecturer?.name || "Chưa có giảng viên",
+        formatLecturerName(session.lecturer) || "Chưa có giảng viên",
         session.room?.code || session.room?.name || "Chưa có phòng",
         session.note || "",
       ];

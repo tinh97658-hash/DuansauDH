@@ -7,6 +7,8 @@ import { Passport } from "passport";
 import request from "supertest";
 import { AuthController } from "../../src/auth/auth.controller.js";
 import { AuthService } from "../../src/auth/auth.service.js";
+import { RbacService } from "../../src/auth/rbac.service.js";
+import { AuditService } from "../../src/audit/audit.service.js";
 import { UserController } from "../../src/auth/user.controller.js";
 import { LogoutOriginGuard } from "../../src/auth/logout-origin.guard.js";
 import { AuthenticatedGuard } from "../../src/common/authenticated.guard.js";
@@ -42,6 +44,7 @@ describe("POST logout with real Passport/session lifecycle and origin boundary",
     const module = await Test.createTestingModule({
       controllers: [UserController, AuthController, TestSessionController],
       providers: [LogoutOriginGuard, { provide: ConfigService, useValue: config },
+        { provide: RbacService, useValue: {} }, { provide: AuditService, useValue: { record: jest.fn().mockResolvedValue(undefined) } },
         { provide: AuthService, useValue: audit }, { provide: StaffService, useValue: {} }, { provide: StudentsService, useValue: {} }],
     }).compile();
     app = module.createNestApplication();

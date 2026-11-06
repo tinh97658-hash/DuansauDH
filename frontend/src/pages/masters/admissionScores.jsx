@@ -270,7 +270,7 @@ export default function AdmissionScores() {
             </Stack>
           </Box>
           <Box sx={{ p: 1.25, bgcolor: "#EFF6FB", border: "1px solid #CDE0F0", borderRadius: "4px", display: "flex", gap: 1.25, alignItems: "flex-start" }}>
-            <InformationCircleIcon sx={{ fontSize: 18, color: "#0788B8", mt: "1px", flexShrink: 0 }} />
+            <InformationCircleIcon sx={{ fontSize: 18, color: "var(--icon-primary)", mt: "1px", flexShrink: 0 }} />
             <Typography sx={{ fontSize: "12px", color: "#244360", lineHeight: "17px" }}>
               Đợt áp dụng cho tất cả ngành thạc sĩ trong năm. Nhập điểm ngưỡng từng ngành ở bảng sau khi tạo đợt.
             </Typography>

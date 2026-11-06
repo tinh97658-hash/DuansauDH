@@ -39,7 +39,10 @@ export class ExamScheduleService {
       WHERE w.mode='new' AND w.eligibility_status='approved' AND o.status='completed' ORDER BY o.name,o.id`);
     let sessions=await this.query(`SELECT es.*,es.exam_date::text AS "examDate",es.start_time::text AS "startTime",es.end_time::text AS "endTime",
       es.course_offering_id AS "courseOfferingId",es.eligibility_snapshot_id AS "snapshotId",es.room_id AS "roomId",es.lecturer_id AS "lecturerId",COALESCE(l.name,es.external_invigilator_name) AS "lecturerName",
+      l.academic_rank AS "lecturerAcademicRank",l.academic_degree AS "lecturerAcademicDegree",l2.academic_rank AS "secondLecturerAcademicRank",l2.academic_degree AS "secondLecturerAcademicDegree",
       es.external_invigilator_name AS "externalInvigilatorName",es.external_unit_name AS "externalUnitName",
+      es.second_lecturer_id AS "secondLecturerId",COALESCE(l2.name,es.second_external_invigilator_name) AS "secondLecturerName",
+      es.second_external_invigilator_name AS "secondExternalInvigilatorName",es.second_external_unit_name AS "secondExternalUnitName",
       es.arrangement_id AS "arrangementId",es.round_no AS "roundNo",a.version AS "arrangementVersion",a.note AS "arrangementNote",w.eligibility_version AS "eligibilityVersion",
       o.name,s.name AS "subjectName",s.id AS "subjectId",s.code AS "subjectCode",r.code AS "roomCode",r.name AS "roomName",
       (SELECT jsonb_agg(jsonb_build_object('id',g.id,'name',g.name,'code',g.code,'academicYear',g.academic_year,'majorId',g.major_id,'majorName',m.name,'disciplineId',m.discipline_id,'disciplineName',d.name))
@@ -50,7 +53,7 @@ export class ExamScheduleService {
       (SELECT jsonb_agg(jsonb_build_object('participantId',person->>'participantId','code',person->>'code','fullName',person->>'fullName')) FROM jsonb_array_elements(p.rows) person WHERE EXISTS(SELECT 1 FROM course_exam_session_candidates c WHERE c.session_id=es.id AND c.participant_id=person->>'participantId')) AS candidates,
       (es.status='scheduled' AND (es.exam_date+es.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'>clock_timestamp()) AS "canEdit",
       (es.status='scheduled' AND (es.exam_date+es.end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp()) AS "pendingConfirmation"
-      FROM course_exam_sessions es JOIN course_exam_arrangements a ON a.id=es.arrangement_id LEFT JOIN course_exam_workflows w ON w.course_offering_id=es.course_offering_id JOIN course_offerings o ON o.id=es.course_offering_id JOIN subjects s ON s.id=o.subject_id JOIN rooms r ON r.id=es.room_id LEFT JOIN lecturers l ON l.id=es.lecturer_id JOIN course_exam_eligibility_snapshots p ON p.id=es.eligibility_snapshot_id
+      FROM course_exam_sessions es JOIN course_exam_arrangements a ON a.id=es.arrangement_id LEFT JOIN course_exam_workflows w ON w.course_offering_id=es.course_offering_id JOIN course_offerings o ON o.id=es.course_offering_id JOIN subjects s ON s.id=o.subject_id JOIN rooms r ON r.id=es.room_id LEFT JOIN lecturers l ON l.id=es.lecturer_id LEFT JOIN lecturers l2 ON l2.id=es.second_lecturer_id JOIN course_exam_eligibility_snapshots p ON p.id=es.eligibility_snapshot_id
       WHERE es.arrangement_id IN (SELECT x.arrangement_id FROM course_exam_sessions x WHERE x.exam_date BETWEEN :from::date AND :to::date OR (x.status='scheduled' AND (x.exam_date+x.end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp()))
       ORDER BY es.exam_date,es.start_time,es.id`,query);
     if(allowed!==null){
@@ -61,7 +64,7 @@ export class ExamScheduleService {
         canEdit:session.canEdit&&!mixed.has(session.arrangementId)}));
     }
     const rooms=await this.query('SELECT id,code,name,capacity,is_active AS "isActive" FROM rooms ORDER BY code,id');
-    const lecturers=await this.query('SELECT id,code,name,active,unit_id AS "unitId" FROM lecturers ORDER BY name,id');
+    const lecturers=await this.query('SELECT id,code,name,active,academic_rank AS "academicRank",academic_degree AS "academicDegree",unit_id AS "unitId" FROM lecturers ORDER BY name,id');
     const units=await this.query('SELECT id,code,name,active FROM units ORDER BY sort_order,name,id');
     const candidateIds=[...new Set([...queue,...sessions].flatMap(s=>s.candidateIds||[]))];
     if(candidateIds.length){
@@ -108,8 +111,14 @@ export class ExamScheduleService {
     await this.authorize(actor);
     const lecturerId=dto.lecturerId||null,externalName=dto.externalInvigilatorName?.trim()||null,externalUnit=dto.externalUnitName?.trim()||null;
     if(lecturerId&&(externalName||externalUnit))throw new BadRequestException('Chỉ chọn giảng viên hoặc nhập giám thị bên ngoài.');
-    if(!lecturerId&&(!externalName||!externalUnit))throw new BadRequestException('Vui lòng chọn giảng viên hoặc nhập đầy đủ tên giám thị và đơn vị bên ngoài.');
-    const externalKey=!lecturerId?externalInvigilatorKey(externalUnit!,externalName!):null;
+    if(!!externalName!==!!externalUnit)throw new BadRequestException('Nhập đầy đủ tên cán bộ coi thi và đơn vị bên ngoài, hoặc để trống cả hai.');
+    const externalKey=externalName?externalInvigilatorKey(externalUnit!,externalName):null;
+    const secondLecturer=dto.secondLecturerId||null,secondName=dto.secondExternalInvigilatorName?.trim()||null,secondUnit=dto.secondExternalUnitName?.trim()||null;
+    if(secondLecturer&&(secondName||secondUnit))throw new BadRequestException('Cán bộ coi thi 2: chỉ chọn giảng viên hoặc nhập thông tin bên ngoài.');
+    if(!!secondName!==!!secondUnit)throw new BadRequestException('Nhập đầy đủ tên và đơn vị cán bộ coi thi 2, hoặc để trống cả hai.');
+    const secondKey=secondName?externalInvigilatorKey(secondUnit!,secondName):null;
+    if((lecturerId&&lecturerId===secondLecturer)||(externalKey&&externalKey===secondKey))throw new BadRequestException('Hai cán bộ coi thi phải là hai người khác nhau.');
+    const lecturerIds=[lecturerId,secondLecturer].filter((id):id is string=>!!id),externalKeys=[externalKey,secondKey].filter((key):key is string=>!!key);
     const id=arrangementId||randomUUID(),sessionIds:string[]=[];
     await this.db.transaction(async tx=>{
       const offeringIds=dto.groups.map(g=>g.courseOfferingId);
@@ -147,7 +156,7 @@ export class ExamScheduleService {
         if(old)this.checkVersion(old,g.version!);
         const locked=old&&(!old.future||old.status!=='scheduled');
         if(locked){
-          if(old.examDate!==dto.examDate||old.room_id!==dto.roomId||old.lecturer_id!==lecturerId||(old.external_invigilator_name||null)!==externalName||(old.external_unit_name||null)!==externalUnit||old.round_no!==g.roundNo||old.startTime.slice(0,5)!==g.startTime||old.endTime.slice(0,5)!==g.endTime)
+          if(old.examDate!==dto.examDate||old.room_id!==dto.roomId||old.lecturer_id!==lecturerId||(old.external_invigilator_name||null)!==externalName||(old.external_unit_name||null)!==externalUnit||(old.second_lecturer_id||null)!==secondLecturer||(old.second_external_invigilator_name||null)!==secondName||(old.second_external_unit_name||null)!==secondUnit||old.round_no!==g.roundNo||old.startTime.slice(0,5)!==g.startTime||old.endTime.slice(0,5)!==g.endTime)
             throw new ConflictException('Nhóm đã bắt đầu hoặc đã xác nhận phải giữ nguyên lịch và phòng, giám thị.');
         }else{
           await this.periodOpen(dto.examDate,dto.period,tx);
@@ -170,8 +179,8 @@ export class ExamScheduleService {
       }
       const span=validateExamArrangement(prepared,dto.period);
       await this.resources([
-        'room:'+dto.roomId,lecturerId?'lecturer:'+lecturerId:'external-invigilator:'+externalKey,
-        ...existing.flatMap(s=>['room:'+s.room_id,...(s.lecturer_id?['lecturer:'+s.lecturer_id]:[]),...(s.external_invigilator_key?['external-invigilator:'+s.external_invigilator_key]:[])]),
+        'room:'+dto.roomId,...lecturerIds.map(id=>'lecturer:'+id),...externalKeys.map(key=>'external-invigilator:'+key),
+        ...existing.flatMap(s=>['room:'+s.room_id,...(s.second_lecturer_id?['lecturer:'+s.second_lecturer_id]:[]),...(s.second_external_invigilator_key?['external-invigilator:'+s.second_external_invigilator_key]:[]),...(s.lecturer_id?['lecturer:'+s.lecturer_id]:[]),...(s.external_invigilator_key?['external-invigilator:'+s.external_invigilator_key]:[])]),
         ...prepared.flatMap(g=>g.aliases.map((p:string)=>'candidate:'+p))
       ],tx);
       // Resource contention may have waited past a group's original/new start.
@@ -183,17 +192,18 @@ export class ExamScheduleService {
       const [room]=await this.query('SELECT * FROM rooms WHERE id= :id FOR SHARE',{id:dto.roomId},tx);
       if(!room?.is_active||!examRoomFits(room.capacity,span.peak))
         throw new ConflictException({code:'EXAM_ROOM_CAPACITY',message:`Phòng phải hoạt động, có sức chứa rõ ràng và chỉ được vượt tối đa 2 thí sinh so với số chỗ (thi đồng thời: ${span.peak} thí sinh).`});
-      if(lecturerId){
+      for(const lecturerId of lecturerIds){
         const [lecturer]=await this.query('SELECT active FROM lecturers WHERE id= :id FOR SHARE',{id:lecturerId},tx);
         if(!lecturer?.active)throw new BadRequestException('Vui lòng chọn giảng viên đang hoạt động để coi thi.');
       }
       // Reserve the entire envelope, including gaps between rounds.
       const [busy]=await this.query(`SELECT arrangement_id,room_id= :room AS room FROM course_exam_sessions
         WHERE status IN ('scheduled','held') AND arrangement_id<> :id AND exam_date= :date::date
-          AND (room_id= :room OR lecturer_id= :lecturer OR external_invigilator_key= :externalKey)
-        GROUP BY arrangement_id,room_id,lecturer_id,external_invigilator_key
+          AND (room_id= :room OR lecturer_id IN (:lecturers) OR second_lecturer_id IN (:lecturers)
+            OR external_invigilator_key IN (:externalKeys) OR second_external_invigilator_key IN (:externalKeys))
+        GROUP BY arrangement_id,room_id,lecturer_id,external_invigilator_key,second_lecturer_id,second_external_invigilator_key
         HAVING min(start_time)< :end::time AND max(end_time)> :start::time ORDER BY room DESC LIMIT 1`,
-        {id,date:dto.examDate,room:dto.roomId,lecturer:lecturerId,externalKey,...span},tx);
+        {id,date:dto.examDate,room:dto.roomId,lecturers:lecturerIds.length?lecturerIds:[null],externalKeys:externalKeys.length?externalKeys:[null],...span},tx);
       if(busy?.room)throw new ConflictException({code:'EXAM_ROOM_CONFLICT',message:'Phòng đã có buổi thi trùng giờ (bao gồm khoảng nghỉ giữa các đợt).'});
       for(const g of prepared){
         const clashes=await this.query(`SELECT DISTINCT c.participant_id,o.name,su.name AS subject FROM course_exam_sessions s
@@ -209,13 +219,14 @@ export class ExamScheduleService {
       for(const g of prepared){
         const sessionId=g.id||randomUUID();sessionIds.push(sessionId);
         if(g.locked)continue;
-        const replacements={id:sessionId,arrangement:id,round:g.roundNo,offering:g.courseOfferingId,snapshot:g.snapshotId,date:dto.examDate,start:g.startTime,end:g.endTime,room:dto.roomId,lecturer:lecturerId,externalName,externalUnit,externalKey,actor:actor.id,note:dto.note||''};
+        const replacements={id:sessionId,arrangement:id,round:g.roundNo,offering:g.courseOfferingId,snapshot:g.snapshotId,date:dto.examDate,start:g.startTime,end:g.endTime,room:dto.roomId,lecturer:lecturerId,externalName,externalUnit,externalKey,secondLecturer,secondName,secondUnit,secondKey,actor:actor.id,note:dto.note||''};
         if(g.old)await this.db.query(`UPDATE course_exam_sessions SET exam_date= :date,start_time= :start,end_time= :end,room_id= :room,lecturer_id= :lecturer,round_no= :round,
           external_invigilator_name= :externalName,external_unit_name= :externalUnit,external_invigilator_key= :externalKey,
+          second_lecturer_id= :secondLecturer,second_external_invigilator_name= :secondName,second_external_unit_name= :secondUnit,second_external_invigilator_key= :secondKey,
           version=version+1,updated_by= :actor,updated_at=now() WHERE id= :id`,{transaction:tx,replacements});
         else{
-          await this.db.query(`INSERT INTO course_exam_sessions(id,arrangement_id,round_no,course_offering_id,eligibility_snapshot_id,exam_date,start_time,end_time,room_id,lecturer_id,external_invigilator_name,external_unit_name,external_invigilator_key,created_by,updated_by,note)
-            VALUES(:id,:arrangement,:round,:offering,:snapshot,:date,:start,:end,:room,:lecturer,:externalName,:externalUnit,:externalKey,:actor,:actor,:note)`,{transaction:tx,replacements});
+          await this.db.query(`INSERT INTO course_exam_sessions(id,arrangement_id,round_no,course_offering_id,eligibility_snapshot_id,exam_date,start_time,end_time,room_id,lecturer_id,external_invigilator_name,external_unit_name,external_invigilator_key,second_lecturer_id,second_external_invigilator_name,second_external_unit_name,second_external_invigilator_key,created_by,updated_by,note)
+            VALUES(:id,:arrangement,:round,:offering,:snapshot,:date,:start,:end,:room,:lecturer,:externalName,:externalUnit,:externalKey,:secondLecturer,:secondName,:secondUnit,:secondKey,:actor,:actor,:note)`,{transaction:tx,replacements});
           for(const participant of g.candidates)await this.db.query('INSERT INTO course_exam_session_candidates(session_id,participant_id) VALUES(:id,:participant)',{transaction:tx,replacements:{id:sessionId,participant}});
         }
         await this.workflow.event(g.courseOfferingId,g.old?'exam.reschedule':'exam.schedule',actor,dto.note||'Xếp buổi thi',g.old,{id:sessionId,arrangementId:id,roundNo:g.roundNo,...replacements,candidateCount:g.candidates.length},tx);
@@ -255,7 +266,7 @@ export class ExamScheduleService {
       if(s.status!=='scheduled')throw new ConflictException('Ca thi đã được xử lý. Lịch sử được bảo toàn.');
       const candidates=(await this.query('SELECT participant_id FROM course_exam_session_candidates WHERE session_id= :id',{id},tx)).map(r=>r.participant_id);
       const aliases=await this.aliases(candidates,tx);
-      await this.resources(['room:'+s.room_id,...(s.lecturer_id?['lecturer:'+s.lecturer_id]:[]),...(s.external_invigilator_key?['external-invigilator:'+s.external_invigilator_key]:[]),...aliases.map(p=>'candidate:'+p)],tx);
+      await this.resources(['room:'+s.room_id,...(s.second_lecturer_id?['lecturer:'+s.second_lecturer_id]:[]),...(s.second_external_invigilator_key?['external-invigilator:'+s.second_external_invigilator_key]:[]),...(s.lecturer_id?['lecturer:'+s.lecturer_id]:[]),...(s.external_invigilator_key?['external-invigilator:'+s.external_invigilator_key]:[]),...aliases.map(p=>'candidate:'+p)],tx);
       if(status==='cancelled')await this.future(s.exam_date,s.start_time,tx);
       else{
         const [ended]=await this.query(`SELECT (exam_date+end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp() ok FROM course_exam_sessions WHERE id= :id`,{id},tx);

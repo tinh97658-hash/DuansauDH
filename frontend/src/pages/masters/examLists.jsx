@@ -1,4 +1,5 @@
 import { notify } from "../../utils/notify";
+import { listenForBackgroundRefresh } from "../../utils/backgroundRefresh";
 import { usePermissions } from "../../features/accounts/usePermissions";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
@@ -77,16 +78,16 @@ export default function ExamLists() {
     const refresh = () => setPolicyRevision(value => value + 1);
     const profileRefresh = event => { if (event.detail?.source === "profile") refresh(); };
     const storage = event => { if (["grading-policy-revision", "exam-gradebook-revision"].includes(event.key)) refresh(); };
-    const visible = () => { if (document.visibilityState === "visible") refresh(); };
+    const stopBackgroundRefresh = listenForBackgroundRefresh(refresh, {
+      canRefresh: () => !gradeRequest.current.inFlight && Date.now() - gradeRequest.current.at >= 30000,
+    });
     window.addEventListener("grading-policy-changed", refresh);
     window.addEventListener("exam-gradebook-saved", profileRefresh);
     window.addEventListener("storage", storage);
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", visible);
     return () => {
       window.removeEventListener("grading-policy-changed", refresh); window.removeEventListener("storage", storage);
       window.removeEventListener("exam-gradebook-saved", profileRefresh);
-      window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", visible);
+      stopBackgroundRefresh();
     };
   }, []);
   const [workflow, setWorkflow] = useState({ status: "draft", version: 0 });
@@ -107,6 +108,7 @@ export default function ExamLists() {
   const [groupId, setGroupId] = useState(""), [offeringId, setOfferingId] = useState("");
   const [rows, setRows] = useState([]), [revision, setRevision] = useState(0), [dirty, setDirty] = useState({});
   const savedRows = useRef(new Map());
+  const gradeRequest = useRef({ inFlight: false, at: 0 });
   const [mode, setMode] = useState("all"), [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0), [totalRows, setTotalRows] = useState(0);
@@ -170,7 +172,8 @@ export default function ExamLists() {
     const controller = new AbortController();
     setRows([]);
     setUnassessedRows(null);
-    if (!groupId || !offeringId) { setLoading(false); return () => { active = false; }; }
+    if (!groupId || !offeringId) { gradeRequest.current.inFlight = false; setLoading(false); return () => { active = false; }; }
+    gradeRequest.current = { inFlight: true, at: Date.now() };
     setLoading(true); setError("");
     axios.get(`${API_BASE_URL}/masters/exam-lists`, { params: {
       classGroupId: groupId, courseOfferingId: offeringId, rosterScope: "offering", page, pageSize: PAGE_SIZE, mode, search,
@@ -198,7 +201,7 @@ export default function ExamLists() {
         if (data.page !== page) setPage(data.page);
       } })
       .catch((failure) => active && setError(errorMessage(failure, "Không thể tải bảng điểm.")))
-      .finally(() => active && setLoading(false));
+      .finally(() => { if (active) { gradeRequest.current.inFlight = false; setLoading(false); } });
     return () => { active = false; controller.abort(); };
   }, [groupId, offeringId, page, mode, search, examIncludeIds, examExcludeIds, policyRevision]);
 

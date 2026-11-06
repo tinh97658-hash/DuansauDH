@@ -1,8 +1,21 @@
-import { dropdownMenuGeometry } from '../../utils/dropdownGeometry';
+import { dropdownMenuGeometry, dropdownMenuStyles } from '../../utils/dropdownGeometry';
 
 const anchor = (top, left = 70, width = 150) => ({
   ownerDocument: { defaultView: { innerWidth: 900, innerHeight: 600 } },
   getBoundingClientRect: () => ({ top, bottom: top + 38, left, right: left + width, width }),
+});
+it('anchors short upward lists by their bottom edge instead of an estimated 360px height', () => {
+  expect(dropdownMenuStyles(anchor(540))).toMatchObject({
+    top: 'auto !important', bottom: '64px !important',
+    transformOrigin: 'bottom left !important',
+  });
+});
+it('keeps a bottom-only receipt menu below its field with scrolling space', () => {
+  const trigger = anchor(400);
+  trigger.getAttribute = name => name === 'data-dropdown-placement' ? 'bottom' : null;
+  expect(dropdownMenuStyles(trigger)).toMatchObject({
+    top: '442px !important', bottom: 'auto !important', maxHeight: '150px !important',
+  });
 });
 it('retains NT left alignment and exact control width', () => {
   expect(dropdownMenuGeometry(anchor(50))).toEqual({ width: 150, left: 70, top: 92, maxHeight: 360 });

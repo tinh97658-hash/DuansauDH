@@ -47,7 +47,7 @@ const FilterSearchField = ({
         ...InputProps,
         startAdornment: InputProps?.startAdornment ?? (
           <InputAdornment position="start">
-            <MagnifyingGlassIcon sx={{ width: 16, height: 16, color: "#5B6F87" }} />
+            <MagnifyingGlassIcon sx={{ width: 16, height: 16, color: "var(--icon-muted)" }} />
           </InputAdornment>
         ),
       }}

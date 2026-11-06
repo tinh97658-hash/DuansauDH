@@ -77,7 +77,7 @@ describe("Learner data access over HTTP", () => {
         } },
         { provide: StudyLeaveService, useValue: { list: read, detail: read } },
         { provide: MastersService, useValue: { listClassGroups: read, getClassGroup: read, listEligibleStudents: read } },
-        { provide: ExamGradebookService, useValue: { history: read, transition: write } },
+        { provide: ExamGradebookService, useValue: { historyForActor: read, transition: write } },
         { provide: ReportsService, useValue: {} },
         { provide: LecturerPaymentService, useValue: {} },
         { provide: SchedulingService, useValue: {} },

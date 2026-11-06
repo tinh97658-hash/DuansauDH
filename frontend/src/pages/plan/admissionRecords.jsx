@@ -1,11 +1,13 @@
 import { usePermissions } from "../../features/accounts/usePermissions";
 import DateField from "../../components/DateField";
+import useTrainingYears from "../../hooks/useTrainingYears";
 import { formatDate } from "../../utils/dateFormat";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { PROFILE_CATEGORIES, profileCategoryLabel } from "../../features/admission/profileCategories";
-import { isStudyManagementStatus, studyManagementStatuses, studyManagementStatusLabel } from "../../features/admission/studyManagement";
+import { RELIGIONS } from "../../features/admission/religions";
+import { STUDY_STATUS_OPTIONS, isStudyManagementStatus, studyManagementStatuses, studyManagementStatusLabel } from "../../features/admission/studyManagement";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
@@ -36,7 +38,6 @@ import {
 
 const currentYear = new Date().getFullYear();
 const PAGE_SIZE = 15;
-const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
 
 const TRAINING_LEVELS = [
   { value: "Thạc sĩ", label: "Thạc sĩ" },
@@ -45,22 +46,20 @@ const TRAINING_LEVELS = [
 
 const TRAINING_MODE_GROUPS = [
   "Chính quy",
-  "Vừa làm vừa học",
-  "Vừa học vừa làm",
   "Đào tạo từ xa",
+  "Vừa làm - Vừa học",
 ];
 
 const TRAINING_MODES = [
+  "Cử tuyển",
+  "Đào tạo liên thông",
   "Đào tạo thông thường",
-  "Định hướng nghiên cứu",
-  "Định hướng ứng dụng",
+  "Đào tạo văn bằng 2",
 ];
 
 const RECEIPT_TYPES = [
   "Trực tiếp",
-  "Qua bưu điện",
-  "Trực tuyến",
-  "Đại diện nộp",
+  "Online",
 ];
 
 
@@ -75,6 +74,8 @@ const STUDY_STATUSES = [
   "Bảo lưu quá hạn",
   "Thôi học",
   "Đã thôi học",
+  "Đã tốt nghiệp",
+  "Xoá tên",
   "Tạm hoãn",
   "Từ chối",
 ];
@@ -107,11 +108,8 @@ const CITIES = [
 
 const DEGREE_TYPES = [
   "Chính quy",
-  "Vừa làm vừa học",
-  "Tại chức",
-  "Liên thông",
-  "Văn bằng 2",
-  "Du học / Nước ngoài",
+  "Vừa làm - Vừa học",
+  "Đào tạo từ xa",
 ];
 
 const GRAD_CLASSIFICATIONS = [
@@ -211,6 +209,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
   const recordDetailUrl = id => `${recordDetailBase}/${id}${isStudyManagement ? "?returnView=records" : ""}`;
   // Global Filter State
   const [year, setYear] = useState(isStudyManagement ? "" : String(currentYear));
+  const years = useTrainingYears(year, setYear);
   const [levelFilter, setLevelFilter] = useState(isMastersList ? "Thạc sĩ" : "ALL");
   const [disciplineFilter, setDisciplineFilter] = useState("");
   const [majorFilter, setMajorFilter] = useState("ALL");
@@ -457,13 +456,15 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
       phone: rec.phone || "",
       email: rec.email || "",
       pob: rec.pob || "Hải Phòng",
-      receiptType: rec.receiptType || "Trực tiếp",
+      receiptType: rec.receiptType === "Trực tuyến" ? "Online" : rec.receiptType || "Trực tiếp",
       profileCategory: profileCategoryLabel(rec.profileCategory),
       admissionDate: rec.admissionDate || new Date().toISOString().split("T")[0],
       photo: rec.photo || "",
 
       isExemptForeignLanguage: Boolean(rec.isExemptForeignLanguage),
-      trainingModeGroup: rec.trainingModeGroup || "Chính quy",
+      trainingModeGroup: ["Vừa làm vừa học", "Vừa học vừa làm"].includes(rec.trainingModeGroup)
+        ? "Vừa làm - Vừa học"
+        : rec.trainingModeGroup || "Chính quy",
       trainingLevel,
       trainingModeName: rec.trainingModeName || "Đào tạo thông thường",
       majorId: selectedMajor?.id || "",
@@ -494,7 +495,9 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
       job: rec.job || "",
       supplementSubjectsCount: rec.supplementSubjectsCount ?? 0,
       gradSchool: rec.gradSchool || "Trường Đại học Hàng hải Việt Nam",
-      gradDegreeType: rec.gradDegreeType || "Chính quy",
+      gradDegreeType: ["Vừa làm vừa học", "Vừa học vừa làm"].includes(rec.gradDegreeType)
+        ? "Vừa làm - Vừa học"
+        : rec.gradDegreeType || "Chính quy",
       gradYear: rec.gradYear || "2022",
       gpa: rec.gpa || "3.20",
       gradMajor: rec.gradMajor || "",
@@ -622,7 +625,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="flex-end" sx={{ width: { xs: "100%", md: "auto" }, minWidth: 0, flex: "1 1 0%", flexWrap: { xs: "wrap", md: "nowrap" } }}>
             <FilterSelectField disabled={saving} label="Năm" value={year} onChange={(e) => { setYear(e.target.value); setClassGroupFilter(""); }} sx={{ flex: "1 1 108px", minWidth: 108 }}>
                 {isStudyManagement && <MenuItem value="">Tất cả năm</MenuItem>}
-                {YEARS.map((y) => (
+                {years.map((y) => (
                   <MenuItem key={y} value={y} sx={{ fontSize: 12 }}>
                     {y}
                   </MenuItem>
@@ -934,7 +937,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                         {isAdmin && (
                           <Tooltip title="Sửa hồ sơ">
                             <IconButton size="small" color="inherit" aria-label={`Sửa hồ sơ ${r.code || r.fullName}`} onClick={() => handleOpenEdit(r)}>
-                              <PencilSquareIcon sx={{ fontSize: 17, color: "#607486" }} />
+                              <PencilSquareIcon sx={{ fontSize: 17, color: "var(--icon-muted)" }} />
                             </IconButton>
                           </Tooltip>
                         )}
@@ -1191,6 +1194,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                     <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Hình thức nhận hồ sơ</Typography>
                     <Select
                       size="small"
+                      data-dropdown-placement="bottom"
                       value={formData.receiptType}
                       onChange={(e) => setFormData((p) => ({ ...p, receiptType: e.target.value }))}
                       fullWidth
@@ -1206,6 +1210,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                     <Select
                       labelId="admission-profile-category-label"
                       size="small"
+                      data-dropdown-placement="bottom"
                       value={formData.profileCategory}
                       onChange={(e) => setFormData((p) => ({ ...p, profileCategory: e.target.value }))}
                       fullWidth
@@ -1393,12 +1398,14 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                       <Typography variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Trạng thái học</Typography>
                       <Select
                         size="small"
+                        data-dropdown-placement="bottom"
                         value={formData.studyStatus}
                         onChange={(e) => setFormData((p) => ({ ...p, studyStatus: e.target.value }))}
                         fullWidth
                         sx={{ height: 30, fontSize: 12, bgcolor: "#fff" }}
                       >
-                        {STUDY_STATUSES.map((s) => (
+                        {!STUDY_STATUS_OPTIONS.includes(formData.studyStatus) && <MenuItem value={formData.studyStatus} sx={{ display: "none" }}>{formData.studyStatus}</MenuItem>}
+                        {STUDY_STATUS_OPTIONS.map((s) => (
                           <MenuItem key={s} value={s} disabled={(["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học"].includes(s)
                             || ["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học"].includes(records.find(record => record.id === formData.id)?.studyStatus)
                             || (formData.trainingLevel === "Thạc sĩ" && ["Đã trúng tuyển", "Không trúng tuyển"].includes(s)))
@@ -1427,8 +1434,10 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                       <TextField size="small" value={formData.ethnicity} onChange={(e) => setFormData((p) => ({ ...p, ethnicity: e.target.value }))} fullWidth sx={cellInputSx} />
                     </Box>
                     <Box>
-                      <Typography variant="caption" sx={{ color: "#607486", fontSize: 10.5 }}>Tôn giáo</Typography>
-                      <TextField size="small" value={formData.religion} onChange={(e) => setFormData((p) => ({ ...p, religion: e.target.value }))} fullWidth sx={cellInputSx} />
+                      <Typography component="label" id="admission-religion-label" variant="caption" sx={{ color: "#607486", fontSize: 10.5 }}>Tôn giáo</Typography>
+                      <Select labelId="admission-religion-label" size="small" data-dropdown-placement="bottom" value={formData.religion} onChange={(e) => setFormData((p) => ({ ...p, religion: e.target.value }))} fullWidth sx={cellInputSx}>
+                        {RELIGIONS.map((religion) => <MenuItem key={religion} value={religion}>{religion}</MenuItem>)}
+                      </Select>
                     </Box>
                     <Box>
                       <Typography variant="caption" sx={{ color: "#607486", fontSize: 10.5 }}>Thành phố</Typography>

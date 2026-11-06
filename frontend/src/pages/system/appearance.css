@@ -1,0 +1,10 @@
+.appearance-settings { width: 680px; max-width: 100%; padding: 20px; align-self: center; }
+.appearance-settings h1 { margin: 0 0 8px; font-size: 20px; }
+.appearance-settings h2 { margin: 0 0 10px; font-size: 15px; }
+.appearance-settings > p { line-height: 1.6; }
+.appearance-preview { margin: 16px 0; min-width: 0; }
+.appearance-preview-scroll { width: 100%; overflow: auto; border: 1px solid var(--table-border-color); }
+.appearance-preview table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.appearance-preview :is(td, th) { overflow-wrap: anywhere; white-space: normal; vertical-align: top; }
+.appearance-note { margin: 16px 0 0; color: var(--text-secondary); }
+@media (max-width: 600px) { .appearance-settings { padding: 14px; } }

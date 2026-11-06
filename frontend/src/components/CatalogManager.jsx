@@ -13,6 +13,7 @@ import { PencilSquareIcon, PlusIcon, TrashIcon } from "./AppIcons";
 import { API_BASE_URL } from "../config/http";
 import FeatureLayout from "./FeatureLayout";
 import AppDialog from "./AppDialog";
+import DateField from "./DateField";
 import ConfirmDialog from "./ConfirmDialog";
 import { personNameParts } from "../utils/personName";
 import FilterSearchField from "./FilterSearchField";
@@ -94,6 +95,7 @@ const CatalogManager = ({
   sortable = true, parent = null, parentBeforeName = false, fields = EMPTY_FIELDS, editOnDoubleClick = false,
   showEditAction = true, showDeleteAction = false, showSortColumn = sortable,
   showCode = true, showIndex = true, splitPersonName = false,
+  getNameParts = personNameParts,
   inlineEdit = false,
   activeField = "active",
   baseEndpoint = null,
@@ -240,12 +242,12 @@ const CatalogManager = ({
     const keyword = search.trim().toLowerCase();
     if (!keyword) return rows;
     const haystacks = (row) => [
-      showCode ? row.code : "", row.name,
+      showCode ? row.code : "", row.name, splitPersonName ? Object.values(getNameParts(row)).join(' ') : '',
       ...tableFields.map((f) => f.searchValue ? f.searchValue(row, fieldOptions[f.key]) : row[f.key]),
       parent ? (parent.display ? parent.display(row) : row[parent.field]) : "",
     ];
     return rows.filter((row) => haystacks(row).some((v) => String(v ?? "").toLowerCase().includes(keyword)));
-  }, [rows, search, parent, tableFields, showCode, fieldOptions]);
+  }, [rows, search, parent, tableFields, showCode, fieldOptions, splitPersonName, getNameParts]);
   const currentPage = Math.min(page, Math.max(0, Math.ceil(filtered.length / pageSize) - 1));
   const visibleRows = filtered.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
@@ -393,8 +395,8 @@ const CatalogManager = ({
   return (
     <FeatureLayout title={title} group={group} desc={desc} exportConfig={{ disabled: loading || !!error,
       getReport: () => tableReport(title, columns, filtered, (row, column) => {
-        if (column.key === "lastName") return personNameParts(row).familyAndMiddle;
-        if (column.key === "firstName") return personNameParts(row).givenName;
+        if (column.key === "lastName") return getNameParts(row).familyAndMiddle;
+        if (column.key === "firstName") return getNameParts(row).givenName;
         if (column.key === "status") return row[activeField] ? activeStatusLabel || "Đang sử dụng" : "Ngừng sử dụng";
         if (column.key.startsWith("parent:")) return parent.display ? parent.display(row) : row[parent.field];
         if (column.key.startsWith("field:")) {
@@ -461,7 +463,7 @@ const CatalogManager = ({
                 {showIndex && <TableCell>{currentPage * pageSize + index + 1}</TableCell>}
                 {showCode && <TableCell>{renderEditableCell(row, "code", codeLabel, <Typography variant="body2" sx={{ fontFamily: "inherit" }}>{row.code}</Typography>)}</TableCell>}
                 {parent && parentBeforeName && <TableCell>{parent.display ? parent.display(row) : row[parent.field]}</TableCell>}
-                {splitPersonName ? <><TableCell>{personNameParts(row).familyAndMiddle}</TableCell><TableCell>{personNameParts(row).givenName}</TableCell></> : <TableCell>{renderEditableCell(row, "name", nameLabel, row.name)}</TableCell>}
+                {splitPersonName ? <><TableCell>{getNameParts(row).familyAndMiddle}</TableCell><TableCell>{getNameParts(row).givenName}</TableCell></> : <TableCell>{renderEditableCell(row, "name", nameLabel, row.name)}</TableCell>}
                 {parent && !parentBeforeName && <TableCell>{parent.display ? parent.display(row) : row[parent.field]}</TableCell>}
                 {tableFields.map((f) => <TableCell key={f.key} align={f.align || "left"}>{renderFieldValue(row, f)}</TableCell>)}
                 {showSortColumn && <TableCell align="center">{row.sortOrder}</TableCell>}
@@ -550,6 +552,9 @@ const CatalogManager = ({
                     />
                   );
                 }
+                if (f.type === "date") return <CompactField key={f.key} label={f.label} htmlFor={`catalog-${f.key}`}>
+                  <DateField id={`catalog-${f.key}`} value={form[f.key]} onChange={setField(f.key)} fullWidth size="small" inputProps={{ "aria-label": f.label }} sx={compactControlSx} />
+                </CompactField>;
                 if (f.type === "number") {
                   return (
                     <CompactField key={f.key} label={f.label.toUpperCase()} htmlFor={`catalog-${f.key}`}>

@@ -76,7 +76,7 @@ export default function CreateOffering({ user }) {
     };
   }, [roster]);
 
-  const majors = useLoad(async () => rows(await api.get("/system/majors?program=masters")).filter((item) => item.active !== false && !isCommonMajor(item)), []);
+  const majors = useLoad(async signal => rows(await api.get("/system/majors?program=masters", { signal })).filter((item) => item.active !== false && !isCommonMajor(item)), []);
   const disciplines = disciplinesFromMajors(majors.data || []);
   const visibleMajors = majorsForDiscipline(majors.data || [], disciplineId);
   const groups = useLoad(async signal => majorId ? rows(await api.get(`/scheduling/class-groups/options?${new URLSearchParams({ majorId })}`, { signal })) : [], [majorId]);
@@ -158,7 +158,7 @@ export default function CreateOffering({ user }) {
   if (created) {
     return <section className="sl-create-flow-page sl-create-success-page">
       <div className="sl-create-success-card">
-        <div className="sl-create-success-icon"><CheckCircleIcon style={{ width: 54, height: 54, color: "#137B3B" }} /></div>
+        <div className="sl-create-success-icon"><CheckCircleIcon style={{ width: 54, height: 54, color: "var(--icon-success)" }} /></div>
         <div className="sl-create-success-kicker">ĐÃ TẠO LỚP HỌC PHẦN</div>
         <h1>{created.name || effectiveOfferingName}</h1>
         <p>{participatingMajors} · Năm {participatingYears || year}</p>
@@ -246,7 +246,7 @@ export default function CreateOffering({ user }) {
           </div>
           <div className="sl-create-scope-field sl-create-scope-year">
             <div className="v20-scope-step"><b>3</b>KHÓA / NĂM HỌC</div>
-            <YearSelect className={`sl-create-year${year ? "" : " sl-placeholder"}`} label="Khóa / Năm học" role="button"
+            <YearSelect className={`sl-create-year${year ? "" : " sl-placeholder"}`} menuClassName="sl-create-year-menu" label="Khóa / Năm học" role="button"
               value={year} years={years} placeholder="Chọn khóa / năm" disabled={!majorId || groups.loading}
               onChange={value => changeScope(() => setYear(value))} />
             {groups.error && <Notice error={groups.error} />}
@@ -351,14 +351,16 @@ export default function CreateOffering({ user }) {
                         {(group.unstudiedCount ?? (group.isRetake ? 0 : group.memberCount)) > 0 && (
                           <span className="sl-badge sl-study-first">{group.unstudiedCount ?? group.memberCount} chưa học</span>
                         )}
-                        <span className={`sl-badge sl-major-badge ${isCrossMajor ? "sl-badge-cross-major" : ""}`}>
-                          {groupMajorName(group)}
-                        </span>
-                        {group.academicYear && (
-                          <span className={`sl-badge sl-cohort-badge ${isCrossCohort ? "sl-cohort-other" : ""}`}>
-                            Khóa {group.academicYear}
+                        <span className="sl-major-cohort-pair">
+                          <span className={`sl-badge sl-major-badge ${isCrossMajor ? "sl-badge-cross-major" : ""}`}>
+                            {groupMajorName(group)}
                           </span>
-                        )}
+                          {group.academicYear && (
+                            <span className={`sl-badge sl-cohort-badge ${isCrossCohort ? "sl-cohort-other" : ""}`}>
+                              Khóa {group.academicYear}
+                            </span>
+                          )}
+                        </span>
                       </span>
                     </span>
                     <span className="sl-create-group-count">

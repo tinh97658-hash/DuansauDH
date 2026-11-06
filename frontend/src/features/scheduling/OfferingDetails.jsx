@@ -1,3 +1,4 @@
+import {formatLecturerName} from '../../utils/lecturerName';
 import { CalendarDaysIcon, EyeIcon, XMarkIcon } from "../../components/AppIcons";
 import { notify } from "../../utils/notify";
 import { usePermissions } from "../accounts/usePermissions";
@@ -9,10 +10,10 @@ import OfferingDeleteButton from "./OfferingDeleteButton";
 
 export default function OfferingDetails({ offering, user, onClose, onSaved, onOpenSession, onSelect, readBasePath = "/scheduling/course-offerings", readOnly = false }) {
   const { can } = usePermissions();
-  const detail = useLoad(() => api.get(`${readBasePath}/${offering.id}`), [offering.id, readBasePath]);
-  const roster = useLoad(() => api.get(`${readBasePath}/${offering.id}/roster`), [offering.id, readBasePath]);
-  const sessions = useLoad(async () => rows(await api.get(`${readBasePath}/${offering.id}/teaching-sessions`)), [offering.id, readBasePath]);
-  const unresolved = useLoad(async () => rows(await api.get(`${readBasePath}/${offering.id}/unresolved-teaching-sessions`)), [offering.id, readBasePath]);
+  const detail = useLoad(signal => api.get(`${readBasePath}/${offering.id}`, { signal }), [offering.id, readBasePath]);
+  const roster = useLoad(signal => api.get(`${readBasePath}/${offering.id}/roster`, { signal }), [offering.id, readBasePath]);
+  const sessions = useLoad(async signal => rows(await api.get(`${readBasePath}/${offering.id}/teaching-sessions`, { signal })), [offering.id, readBasePath]);
+  const unresolved = useLoad(async signal => rows(await api.get(`${readBasePath}/${offering.id}/unresolved-teaching-sessions`, { signal })), [offering.id, readBasePath]);
   const [activeTab, setActiveTab] = useState("schedule");
   const [sessionFilter, setSessionFilter] = useState("all");
   const [notes, setNotes] = useState({});
@@ -61,6 +62,7 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
     {(canNotes || canManage) && <OfferingDeleteButton offering={value} disabled={saving || detail.loading || sessions.loading || !!detail.error || !!sessions.error}
       onDeleted={() => { onSaved?.(); onClose(); }} onScheduleDeleted={() => { detail.reload(); sessions.reload(); unresolved.reload(); onSaved?.(); }} />}
     {canManage && value.status === "active" && <>{onSelect && <button className="sl-btn" onClick={() => onSelect(value)}>Xếp lịch / Xếp thêm</button>}<button className="sl-btn sl-btn-primary" disabled={saving || detail.loading || !!detail.error || unresolved.loading || !!unresolved.error || !summary.heldCount} onClick={() => { setError(""); unresolved.reload(); setCompleting(true); }}>Xác nhận hoàn thành giảng dạy</button></>}
+    <button type="button" className="sl-btn" disabled={saving} onClick={onClose}>Đóng</button>
   </>}>
     <header className="sl-offering-hero"><div><div className="sl-eyebrow">LỚP HỌC PHẦN</div><h2>{offeringTitle(value)}</h2><strong>{subjectLabel(value)}</strong><p>{groupsOf(value).length} lớp/nhóm · {value.participantCount ?? 0} học viên</p></div><div className="sl-offering-hero-actions"><button className="sl-drawer-close" aria-label="Đóng" disabled={saving} onClick={onClose}><XMarkIcon fontSize="small" /></button><span className={`sl-state ${value.status === "completed" ? "sl-complete" : "sl-progress"}`}>{value.status === "completed" ? "HOÀN THÀNH" : "ĐANG DẠY"}</span></div></header>
     <div className={`sl-offering-content ${activeTab === "people" ? "sl-offering-content-people" : ""}`}>{detail.error && <Notice error={detail.error} />}{error && <Notice error={error} />}
@@ -191,7 +193,7 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
                       <strong>{session.room?.code || "Chưa xếp"}</strong>
                     </td>
                     <td className="sl-session-centered">
-                      <strong>{session.lecturer?.name || "Chưa phân công"}</strong>
+                      <strong>{formatLecturerName(session.lecturer) || "Chưa phân công"}</strong>
                     </td>
                     <td style={{ textAlign: "center" }}>
                       <span style={{

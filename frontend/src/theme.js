@@ -12,6 +12,18 @@ export const TABLE_BORDER_RADIUS = 0;
 export const TABLE_HOVER_BACKGROUND = "#EAF2F8";
 export const CONTROL_BORDER_RADIUS = 0;
 
+const iconForegrounds = {
+  default: "var(--icon-neutral, #243746)",
+  primary: "var(--icon-primary, #00445E)",
+  secondary: "var(--icon-blue, #173E75)",
+  action: "var(--icon-neutral, #243746)",
+  disabled: "var(--icon-disabled, #526576)",
+  info: "var(--icon-primary, #00445E)",
+  success: "var(--icon-success, #0B5128)",
+  warning: "var(--icon-warning, #703800)",
+  error: "var(--icon-danger, #8C2222)",
+};
+
 /**
  * Institutional Theme for University Postgraduate Operations System
  * Strictly following .rulesforai and operational workspace reference design
@@ -85,14 +97,36 @@ export const theme = createTheme({
     button: { textTransform: "none", fontWeight: 600, fontSize: "12.5px" },
   },
   components: {
+    MuiSvgIcon: {
+      styleOverrides: {
+        root: ({ ownerState }) => ({
+          // Inherited icons keep the foreground of solid buttons and selected items.
+          ...(ownerState.color && ownerState.color !== "inherit" && {
+            color: iconForegrounds[ownerState.color],
+          }),
+        }),
+      },
+    },
+    MuiListItemIcon: {
+      styleOverrides: { root: { color: "var(--icon-neutral, #243746)" } },
+    },
     MuiCheckbox: {
       defaultProps: {
         icon: React.createElement(StopIcon),
-        checkedIcon: React.createElement(CheckCircleIcon),
         indeterminateIcon: React.createElement(MinusIcon),
       },
+      styleOverrides: {
+        root: ({ ownerState }) => ({
+          color: iconForegrounds.default,
+          "&.Mui-checked, &.MuiCheckbox-indeterminate": { color: iconForegrounds[ownerState.color] },
+          "&.Mui-disabled": { color: iconForegrounds.disabled },
+        }),
+      },
     },
-    MuiNativeSelect: { defaultProps: { IconComponent: ChevronDownIcon } },
+    MuiNativeSelect: {
+      defaultProps: { IconComponent: ChevronDownIcon },
+      styleOverrides: { icon: { color: "var(--icon-muted, #354959)", "&.Mui-disabled": { color: iconForegrounds.disabled } } },
+    },
     MuiTableSortLabel: { defaultProps: { IconComponent: ArrowDownIcon } },
     MuiPaginationItem: { defaultProps: { components: { previous: ChevronLeftIcon, next: ChevronRightIcon } } },
     MuiCssBaseline: {
@@ -176,12 +210,14 @@ export const theme = createTheme({
     },
     MuiIconButton: {
       styleOverrides: {
-        root: {
+        root: ({ ownerState }) => ({
           borderRadius: 0,
+          color: iconForegrounds[ownerState.color || "default"],
+          "&.Mui-disabled": { color: "var(--icon-disabled, #526576)" },
           "&:hover": {
             backgroundColor: "#F0F4F8",
           },
-        },
+        }),
       },
     },
     MuiPaper: {
@@ -250,7 +286,7 @@ export const theme = createTheme({
     MuiSelect: {
       defaultProps: { IconComponent: ChevronDownIcon },
       styleOverrides: {
-        icon: { color: '#526576' },
+        icon: { color: "var(--icon-muted, #354959)", "&.Mui-disabled": { color: iconForegrounds.disabled } },
         select: {
           paddingTop: 6,
           paddingBottom: 6,
@@ -397,6 +433,7 @@ export const theme = createTheme({
       },
     },
     MuiDialog: {
+      defaultProps: { fullScreen: true },
       styleOverrides: {
         paper: {
           borderRadius: 0,
@@ -477,9 +514,9 @@ export const theme = createTheme({
           borderRadius: 0,
           fontSize: "12.5px",
           "& .MuiAlert-icon": {
-            color: theme.palette[ownerState.color || ownerState.severity || "info"][
-              ownerState.variant === "filled" ? "contrastText" : "main"
-            ],
+            color: ownerState.variant === "filled"
+              ? theme.palette[ownerState.color || ownerState.severity || "info"].contrastText
+              : iconForegrounds[ownerState.color || ownerState.severity || "info"],
             opacity: 1,
           },
         }),
