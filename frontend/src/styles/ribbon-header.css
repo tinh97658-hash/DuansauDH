@@ -246,16 +246,16 @@ html[data-ribbon-sidebar] #root {
 .ribbon-tab-toggle > svg[hidden] { display: none; }
 .ribbon-tab-toggle .ribbon-section-chevron { width: 16px; height: 16px; transform: rotate(-90deg); }
 .ribbon-tab-toggle .ribbon-section-chevron.expanded { transform: rotate(0); }
-.ribbon-tab-toggle:hover { background: var(--table-hover-bg); color: var(--primary); }
-.ribbon-tab-toggle.active { color: var(--primary); background: var(--primary-light); }
-.ribbon-tab-toggle.active:hover { color: var(--primary); background: var(--table-hover-bg); }
+.ribbon-tab-toggle:hover { background: var(--dropdown-hover-bg); color: var(--text-primary); }
+.ribbon-tab-toggle.active { color: var(--primary-dark); background: var(--dropdown-selected-bg); }
+.ribbon-tab-toggle.active:hover { color: var(--primary-dark); background: var(--dropdown-hover-bg); }
 .ribbon-tab-toggle.current { box-shadow: inset 3px 0 var(--primary); }
 .ribbon-sidebar.is-compact .ribbon-tab-toggle { justify-content: center; padding-inline: 0; }
 .ribbon-command-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 6px 10px 20px; scrollbar-width: thin; scrollbar-color: #b4c0cb transparent; }
 .ribbon-commands { padding: 0 0 0 10px; }
 .ribbon-group { padding: 14px 0; border-bottom: 1px solid var(--border-light); }
 .ribbon-group:last-child { border-bottom: 0; }
-.ribbon-group-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 0 7px 9px; border: 0; background: transparent; color: var(--text-secondary); font-family: inherit; font-size: .8em; line-height: 1.4; font-weight: 600; letter-spacing: .3px; text-align: left; cursor: pointer; }
+.ribbon-group-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 7px; border: 0; background: var(--muted-surface); color: var(--text-secondary); font-family: inherit; font-size: .8em; line-height: 1.4; font-weight: 700; letter-spacing: .3px; text-align: left; cursor: pointer; }
 .ribbon-group-label:hover { color: var(--primary); }
 .ribbon-group-label:focus-visible { outline: 2px solid var(--icon-primary); outline-offset: 2px; border-radius: 3px; }
 .ribbon-group-label:disabled { cursor: default; }
@@ -280,21 +280,20 @@ html[data-ribbon-sidebar] #root {
   cursor: pointer;
 }
 .ribbon-action > span { min-width: 0; overflow-wrap: anywhere; }
-.ribbon-action:hover { background: var(--table-hover-bg); color: var(--primary); }
-.ribbon-action.active { background: var(--primary-light); color: var(--primary); border-color: var(--dropdown-border); }
+.ribbon-action:hover { background: var(--dropdown-hover-bg); color: var(--text-primary); }
+.ribbon-action.active { background: var(--dropdown-selected-bg); color: var(--primary-dark); border-color: transparent; }
 .ribbon-action.active { font-weight: 600; }
 .ribbon-action:disabled { opacity: .55; cursor: wait; }
-.ribbon-action .ribbon-action-icon {
+.ribbon-sidebar .ribbon-action .ribbon-action-icon {
   flex-shrink: 0;
   width: 18px;
   height: 18px;
   padding: 0;
   box-sizing: border-box;
   border-radius: 7px;
-  color: var(--text-secondary);
+  color: var(--ribbon-icon-color, var(--icon-primary)) !important;
   background: transparent;
 }
-.ribbon-action:hover .ribbon-action-icon, .ribbon-action.active .ribbon-action-icon { color: var(--text-primary); }
 .ribbon-menu-tab:focus-visible,
 .ribbon-tab-toggle:focus-visible,
 .ribbon-footer-logout:focus-visible,
