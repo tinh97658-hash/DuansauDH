@@ -16,6 +16,7 @@ import { API_BASE_URL } from '../../config/http';
 import { leaveDate, leaveStatusLabels } from '../../features/learners/StudyLeavePanel';
 import StudyLeaveRequestDialog from '../../features/learners/StudyLeaveRequestDialog';
 import StudyLeaveDecisionDialog from '../../features/learners/StudyLeaveDecisionDialog';
+import StudyLeaveExtensionDialog from '../../features/learners/StudyLeaveExtensionDialog';
 import { usePermissions } from '../../features/accounts/usePermissions';
 import StudyManagementRecords from '../../features/learners/StudyManagementRecords';
 
@@ -25,8 +26,8 @@ const COLUMNS = [
   { key: 'dates', label: 'Thời gian bảo lưu', width: 220, minWidth: 200 },
   { key: 'status', label: 'Trạng thái', width: 220, minWidth: 200, align: 'center' },
   { key: 'overdue', label: 'Quá hạn', width: 100, minWidth: 90, align: 'center' },
-  { key: 'approval', label: 'Phê duyệt', width: 220, minWidth: 210, align: 'center' },
-  { key: 'actions', label: 'Thao tác', width: 140, minWidth: 120, align: 'center' },
+  { key: 'approval', label: 'Phê duyệt', width: 280, minWidth: 240, align: 'center' },
+  { key: 'actions', label: 'Thao tác', width: 280, minWidth: 230, align: 'center' },
 ];
 
 export default function StudyLeaves() {
@@ -48,6 +49,7 @@ function StudyLeaveList() {
   const { can } = usePermissions();
   const [creating, setCreating] = useState(false);
   const [decision, setDecision] = useState(null);
+  const [extension, setExtension] = useState(null);
   const [revision, setRevision] = useState(0);
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
@@ -102,22 +104,37 @@ function StudyLeaveList() {
         notify.success(`Đã ${decision.action === 'approve' ? 'duyệt' : 'từ chối'} bảo lưu cho ${decision.leave.fullName}.`);
         setDecision(null); setRevision(value => value + 1);
       }} />}
+    {extension && <StudyLeaveExtensionDialog key={`${extension.leave.id}-${extension.action}`} {...extension}
+      onClose={() => setExtension(null)} onCompleted={() => {
+        const messages = { request_extension: 'Đã gửi đề nghị gia hạn', approve_extension: 'Đã duyệt gia hạn', reject_extension: 'Đã từ chối gia hạn' };
+        notify.success(`${messages[extension.action]} cho ${extension.leave.fullName}.`);
+        setExtension(null); setRevision(value => value + 1);
+      }} />}
     <Alert severity="info" sx={{ mb: 1.5, fontSize: 12 }}>Sắp hết hạn: còn tối đa 30 ngày. Quá hạn vẫn chờ xử lý, chưa tự động thôi học.</Alert>
     {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
     <Paper variant="outlined" sx={{ borderColor: '#D7E4EE', borderRadius: '6px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(23, 62, 117, 0.04)' }}>
       <TableContainer sx={{ overflow: 'auto' }}>
-      <ResizableTable columns={COLUMNS} storageKey="study-leaves-table-widths" aria-label="Danh sách bảo lưu"><TableBody>{result.rows.map(row => <TableRow hover key={row.id}>
+      <ResizableTable columns={COLUMNS} storageKey="study-leaves-table-widths" aria-label="Danh sách bảo lưu"><TableBody>{result.rows.map(row => {
+        const active = ['active', 'expiring', 'overdue'].includes(row.status);
+        const pendingExtension = row.extensions?.some(item => item.status === 'pending');
+        return <TableRow hover key={row.id}>
         <TableCell><Typography variant="body2" fontWeight={600}>{row.fullName}</Typography><Typography variant="caption" color="text.secondary">{row.code} · {row.trainingLevel}</Typography></TableCell>
         <TableCell>{row.classCode || '—'}</TableCell><TableCell>{leaveDate(row.startDate)} – {leaveDate(row.endDate)}</TableCell>
         <TableCell align="center"><Chip size="small" color={row.status === 'overdue' ? 'error' : row.status === 'expiring' ? 'warning' : 'default'} label={leaveStatusLabels[row.status] || row.status} />
           {row.extensions?.some(extension => extension.status === 'pending') && <Typography variant="caption" display="block">Có gia hạn chờ duyệt</Typography>}</TableCell>
         <TableCell align="center">{row.status === 'overdue' ? `${row.overdueDays} ngày` : '—'}</TableCell>
-        <TableCell align="center">{row.status === 'pending' && can('studyleave.approve') ? <Stack direction="row" spacing={1} justifyContent="center">
+        <TableCell align="center">{row.status === 'pending' && can('studyleave.approve') ? <Stack direction="row" justifyContent="center" sx={{ gap: 1, flexWrap: 'wrap' }}>
           <Button size="small" variant="contained" disabled={loading} sx={{ whiteSpace: 'nowrap' }} onClick={() => {  setDecision({ leave: row, action: 'approve' }); }}>Duyệt bảo lưu</Button>
           <Button size="small" color="error" disabled={loading} sx={{ whiteSpace: 'nowrap' }} onClick={() => {  setDecision({ leave: row, action: 'reject' }); }}>Từ chối</Button>
+        </Stack> : active && pendingExtension && can('studyleave.approve') ? <Stack direction="row" justifyContent="center" sx={{ gap: 1, flexWrap: 'wrap' }}>
+          <Button size="small" variant="contained" disabled={loading} onClick={() => setExtension({ leave: row, action: 'approve_extension' })}>Duyệt gia hạn</Button>
+          <Button size="small" color="error" disabled={loading} onClick={() => setExtension({ leave: row, action: 'reject_extension' })}>Từ chối gia hạn</Button>
         </Stack> : '—'}</TableCell>
-        <TableCell align="center"><Button size="small" component={Link} to={`/masters/study-leaves/${row.admissionRecordId}?tab=leave`} onPointerEnter={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)} onFocus={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)}>Mở hồ sơ</Button></TableCell>
-      </TableRow>)}{!result.rows.length && <TableRow><TableCell colSpan={7} align="center" sx={{ py: 5, color: 'text.secondary' }}>{loading ? 'Đang tải…' : 'Không có hồ sơ bảo lưu phù hợp.'}</TableCell></TableRow>}</TableBody></ResizableTable>
+        <TableCell align="center"><Stack direction="row" justifyContent="center" sx={{ gap: 1, flexWrap: 'wrap' }}>
+          {active && !pendingExtension && can('studyleave.request') && <Button size="small" variant="outlined" disabled={loading} onClick={() => setExtension({ leave: row, action: 'request_extension' })}>Đề nghị gia hạn</Button>}
+          <Button size="small" component={Link} to={`/masters/study-leaves/${row.admissionRecordId}?tab=leave`} onPointerEnter={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)} onFocus={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)}>Mở hồ sơ</Button>
+        </Stack></TableCell>
+      </TableRow>})}{!result.rows.length && <TableRow><TableCell colSpan={7} align="center" sx={{ py: 5, color: 'text.secondary' }}>{loading ? 'Đang tải…' : 'Không có hồ sơ bảo lưu phù hợp.'}</TableCell></TableRow>}</TableBody></ResizableTable>
       </TableContainer>
       <ListPagination count={result.total} page={page} pageSize={20} onPageChange={setPage} recordLabel="học viên" />
     </Paper>

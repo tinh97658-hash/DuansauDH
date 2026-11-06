@@ -93,7 +93,8 @@ it('shows an overdue extension separately from the unchanged current deadline an
   expect(screen.getByText(/Hạn hiện tại vẫn là 30\/06\/2026/)).toBeInTheDocument();
   expect(screen.getByText(/Kiểm tra: 0 · Bài tập: 7/)).toBeInTheDocument();
   expect(screen.getByText('Không đạt do bảo lưu; học lại từ đầu khi trở lại')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Duyệt gia hạn' })).toBeEnabled();
+  expect(screen.queryByRole('button', { name: 'Duyệt gia hạn' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Từ chối gia hạn' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Đề nghị gia hạn' })).not.toBeInTheDocument();
 });
 

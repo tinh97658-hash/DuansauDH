@@ -995,7 +995,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
             </Tabs>
             {detailTab === "admission" && <AdmissionEvaluationPanel record={record} isAdmin={isAdmin} disabled={isDirty || saving} onBusyChange={setSaving} onDecided={fetchData} />}
             {detailTab === "grades" && <LearnerScorecard admissionRecordId={id} classGroupId={searchParams.get("classGroupId")} onClassChange={value => changeDetailScope("classGroupId", value)} />}
-            {detailTab === "leave" && <StudyLeavePanel record={record} isAdmin={fromStudyManagement && can("studyleave.approve")} canRequest={fromStudyManagement && can("studyleave.request")} disabled={isDirty || saving} onChanged={fetchData} />}
+            {detailTab === "leave" && <StudyLeavePanel record={record} isAdmin={fromStudyManagement && can("studyleave.approve")} disabled={isDirty || saving} onChanged={fetchData} />}
           <Box sx={{ display: detailTab === "profile" ? "block" : "none" }}>
           <Paper variant="outlined" sx={{ ...sectionCardSx, mb: 2 }}>
             <Typography sx={sectionTitleSx}>

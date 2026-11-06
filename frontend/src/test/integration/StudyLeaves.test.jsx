@@ -115,6 +115,116 @@ it('shows overdue days, a pending extension and a direct link to the learner lea
   expect(screen.getByRole('link', { name: 'Mở hồ sơ' })).toHaveAttribute('href', '/masters/study-leaves/record?tab=leave');
 });
 
+const proposal = { id: 'extension', status: 'pending', endDate: '2099-12-31', reason: 'Tiếp tục điều trị' };
+const setupExtension = (extensions = [], detailOverrides = {}, listStatus = 'active') => {
+  const current = { ...row, startDate: '2020-01-01', endDate: '2099-06-30', status: 'approved', effectiveStatus: 'active', extensions, ...detailOverrides };
+  axios.get.mockImplementation(async url => url.includes('/admission-records/')
+    ? { data: { leaves: [current] } }
+    : { data: { rows: [{ ...current, status: listStatus }], total: 1 } });
+  axios.post.mockResolvedValue({ data: {} });
+};
+
+it.each(['active', 'expiring', 'overdue'])('offers extension requests for %s leaves in the actions column', async status => {
+  setupExtension([], {}, status);
+  mountWithDecisions();
+  const button = await screen.findByRole('button', { name: 'Đề nghị gia hạn' });
+  expect(within(button.closest('tr')).getAllByRole('cell')[6]).toContainElement(button);
+  expect(screen.getByRole('link', { name: 'Mở hồ sơ' })).toBeInTheDocument();
+});
+
+it.each(['pending', 'scheduled', 'rejected', 'resumed', 'withdrawn'])('hides extension actions for %s leaves', async status => {
+  setupExtension([], {}, status);
+  mountWithDecisions();
+  await screen.findByText(row.fullName);
+  expect(screen.queryByRole('button', { name: 'Đề nghị gia hạn' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Duyệt gia hạn' })).toBeNull();
+});
+
+it('requests an extension from the list, validates the date and reason, and refreshes after saving', async () => {
+  setupExtension();
+  mountWithDecisions();
+  fireEvent.click(await screen.findByRole('button', { name: 'Đề nghị gia hạn' }));
+  const dialog = within(screen.getByRole('dialog'));
+  await dialog.findByText('Hạn hiện tại: 30/06/2099');
+  expect(dialog.getByRole('button', { name: 'Xác nhận' })).toBeDisabled();
+  fireEvent.change(dialog.getByLabelText('Lý do đề nghị gia hạn *'), { target: { value: '  Tiếp tục điều trị  ' } });
+  fireEvent.change(dialog.getByLabelText('Ngày kết thúc mới'), { target: { value: '30/06/2099' } });
+  expect(dialog.getByRole('button', { name: 'Xác nhận' })).toBeDisabled();
+  fireEvent.change(dialog.getByLabelText('Ngày kết thúc mới'), { target: { value: '31/12/2099' } });
+  fireEvent.click(dialog.getByRole('button', { name: 'Xác nhận' }));
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/study-leaves/leave/actions'),
+    { action: 'request_extension', note: 'Tiếp tục điều trị', endDate: '2099-12-31' }, { withCredentials: true }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  await waitFor(() => expect(axios.get.mock.calls.filter(([url]) => url.endsWith('/plan/study-leaves')).length).toBeGreaterThan(1));
+});
+
+it.each(['approve_extension', 'reject_extension'])('handles %s on the list and shows the current and proposed deadlines', async action => {
+  setupExtension([proposal]);
+  mountWithDecisions();
+  const trigger = await screen.findByRole('button', { name: action === 'approve_extension' ? 'Duyệt gia hạn' : 'Từ chối gia hạn' });
+  expect(within(trigger.closest('tr')).getAllByRole('cell')[5]).toContainElement(trigger);
+  expect(screen.queryByRole('button', { name: 'Đề nghị gia hạn' })).toBeNull();
+  fireEvent.click(trigger);
+  const dialog = within(screen.getByRole('dialog'));
+  await dialog.findByText('Hạn đề nghị: 31/12/2099');
+  expect(dialog.getByText('Hạn hiện tại: 30/06/2099')).toBeInTheDocument();
+  expect(dialog.getByText('Lý do đề nghị: Tiếp tục điều trị')).toBeInTheDocument();
+  expect(axios.post).not.toHaveBeenCalled();
+  const rejecting = action === 'reject_extension';
+  if (rejecting) {
+    expect(dialog.getByRole('button', { name: 'Xác nhận' })).toBeDisabled();
+    fireEvent.change(dialog.getByLabelText('Lý do từ chối gia hạn *'), { target: { value: 'Thiếu giấy tờ' } });
+  }
+  fireEvent.click(dialog.getByRole('button', { name: 'Xác nhận' }));
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/study-leaves/leave/actions'),
+    { action, note: rejecting ? 'Thiếu giấy tờ' : '' }, { withCredentials: true }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+});
+
+it('respects separate extension request and approval permissions', async () => {
+  setupExtension([proposal]);
+  const requestOnly = renderWithPermissions(<MemoryRouter><StudyLeaves /></MemoryRouter>, ['plan.view', 'studyleave.request']);
+  await screen.findByText(row.fullName);
+  expect(screen.queryByRole('button', { name: 'Duyệt gia hạn' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Từ chối gia hạn' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Đề nghị gia hạn' })).toBeNull();
+  requestOnly.unmount();
+  setupExtension();
+  renderWithPermissions(<MemoryRouter><StudyLeaves /></MemoryRouter>, ['plan.view', 'studyleave.approve']);
+  await screen.findByText(row.fullName);
+  expect(screen.queryByRole('button', { name: 'Đề nghị gia hạn' })).toBeNull();
+});
+
+it('blocks a decision if the extension was already processed after the list loaded', async () => {
+  setupExtension([{ ...proposal, status: 'approved' }]);
+  axios.get.mockImplementation(async url => url.includes('/admission-records/')
+    ? { data: { leaves: [{ ...row, startDate: '2020-01-01', status: 'approved', extensions: [] }] } }
+    : { data: { rows: [{ ...row, status: 'active', extensions: [proposal] }], total: 1 } });
+  mountWithDecisions();
+  fireEvent.click(await screen.findByRole('button', { name: 'Duyệt gia hạn' }));
+  const dialog = within(screen.getByRole('dialog'));
+  await dialog.findByText(/Đợt bảo lưu hoặc yêu cầu gia hạn đã thay đổi/);
+  expect(dialog.getByRole('button', { name: 'Xác nhận' })).toBeDisabled();
+  expect(axios.post).not.toHaveBeenCalled();
+});
+
+it('keeps the extension dialog open with the server explanation and blocks duplicate submissions', async () => {
+  setupExtension([proposal]);
+  let reject;
+  axios.post.mockImplementation(() => new Promise((resolve, rejectPromise) => { reject = rejectPromise; }));
+  mountWithDecisions();
+  fireEvent.click(await screen.findByRole('button', { name: 'Duyệt gia hạn' }));
+  const dialog = within(screen.getByRole('dialog'));
+  await dialog.findByText('Hạn đề nghị: 31/12/2099');
+  fireEvent.click(dialog.getByRole('button', { name: 'Xác nhận' }));
+  fireEvent.click(dialog.getByRole('button', { name: 'Xác nhận' }));
+  expect(axios.post).toHaveBeenCalledTimes(1);
+  expect(dialog.getByRole('button', { name: 'Hủy' })).toBeDisabled();
+  reject({ response: { data: { message: 'Yêu cầu đã thay đổi. Hãy tải lại.' } } });
+  expect(await dialog.findByText('Yêu cầu đã thay đổi. Hãy tải lại.')).toBeInTheDocument();
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+});
+
 it('passes search and an overdue filter to the API and keeps the list empty when nothing matches', async () => {
   render(<MemoryRouter useTransitions={false}><StudyLeaves /></MemoryRouter>);
   await screen.findByText('Nguyễn Văn A');
