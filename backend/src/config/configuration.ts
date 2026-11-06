@@ -34,4 +34,5 @@ export const environmentSchema = Joi.object({
   GOOGLE_CLIENT_ID: Joi.string().allow("").default(""),
   GOOGLE_CLIENT_SECRET: Joi.string().allow("").default(""),
   LOG_LEVEL: Joi.string().default("info"),
+  NOTIFICATION_V2_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
 }).unknown(true);

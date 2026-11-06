@@ -10,7 +10,7 @@ import { useAuthSession } from "../context/AuthSession";
 import { routeViewCode } from '../features/accounts/routePermissions';
 import { preloadPage } from "../utils/lazyPage";
 import "../styles/ribbon-header.css";
-import DashboardActivity from '../features/dashboard/DashboardActivity';
+import NotificationBell from '../features/notifications/NotificationBell';
 
 const action = (label, route, icon, color, options = {}) => ({ label, route, icon, color, ...options });
 const group = (label, actions) => ({ label, actions });
@@ -288,11 +288,11 @@ const RibbonHeader = () => {
             {currentAction && <><ChevronRightIcon aria-hidden="true" /><strong aria-current="page">{currentAction.label}</strong></>}
           </nav>
         </div>
-        {dashboardHome ? <div className="od-header-account">
-          <DashboardActivity />
-          <div className="od-header-identity"><strong>{userName}</strong><span>{session?.activeProfile?.name || roleNames[role] || role}</span></div>
-          <div className="ribbon-user-avatar" title={userName}>{avatar}</div>
-        </div> : <div className="ribbon-user-avatar" title={`${userName} · ${roleNames[role] || role}`}>{avatar}</div>}
+        <div className={`notification-header-slot${dashboardHome ? ' od-header-account' : ''}`}>
+          <NotificationBell />
+          {dashboardHome && <div className="od-header-identity"><strong>{userName}</strong><span>{session?.activeProfile?.name || roleNames[role] || role}</span></div>}
+          <div className="ribbon-user-avatar" title={dashboardHome ? userName : `${userName} · ${roleNames[role] || role}`}>{avatar}</div>
+        </div>
       </div>
       {breadcrumbMenu && <Menu id="ribbon-breadcrumb-menu" anchorEl={breadcrumbMenu.anchorEl} open={Boolean(breadcrumbGroups.length)}
         onClose={() => setBreadcrumbMenu(null)} anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
