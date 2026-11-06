@@ -22,6 +22,28 @@ const buildService = () => {
 };
 
 describe("PlanService admission major synchronization", () => {
+  it("checks the major on the save transaction so scoped profile updates cannot wait on their own lock", async () => {
+    const transaction = { LOCK: { UPDATE: 'UPDATE' } };
+    const major = { id: 'major-1', name: 'Công nghệ thông tin', program: 'masters', active: true };
+    const record = { id: 'record-1', majorId: major.id, trainingLevel: 'Thạc sĩ', status: 'pending', studyStatus: 'Nộp hồ sơ đầu vào', update: jest.fn().mockResolvedValue(undefined) };
+    const majors = { findByPk: jest.fn(async (_id: string, options: any) => {
+      // A separate scoped transaction would wait for the lock already held by save.
+      if (options?.transaction !== transaction) throw new Error('Major lookup escaped the save transaction');
+      return major;
+    }) };
+    const records = { findByPk: jest.fn().mockResolvedValue(record) };
+    const db = { query: jest.fn().mockResolvedValue([]), transaction: jest.fn(async (work: any) => work(transaction)) };
+    const evaluation = { guardRecordUpdate: jest.fn().mockResolvedValue(undefined) };
+    const service = new PlanService({} as never, {} as never, {} as never, majors as never, records as never,
+      db as never, {} as never, {} as never, {} as never, {} as never, evaluation as never);
+    await service.updateAdmissionRecord(record.id, { majorId: major.id, trainingLevel: 'Thạc sĩ', firstName: 'An' });
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(majors.findByPk).toHaveBeenCalledWith(major.id, { transaction });
+    expect(evaluation.guardRecordUpdate).toHaveBeenCalledWith(record, expect.anything(), transaction);
+    expect(record.update).toHaveBeenCalledWith(expect.objectContaining({ majorName: major.name }), { transaction });
+    expect(records.findByPk).toHaveBeenLastCalledWith(record.id, expect.objectContaining({ transaction }));
+  });
+
   it("stores the canonical catalog name instead of trusting the client", async () => {
     const { service, majors, admissionRecords } = buildService();
     majors.findByPk.mockResolvedValue({

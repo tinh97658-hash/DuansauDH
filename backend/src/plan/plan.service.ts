@@ -73,9 +73,11 @@ export class PlanService {
     return undefined;
   }
 
-  private async requireAdmissionMajor(majorId: string | null | undefined, trainingLevel?: string | null) {
+  private async requireAdmissionMajor(majorId: string | null | undefined, trainingLevel?: string | null, transaction?: Transaction) {
     if (!majorId) throw new BadRequestException("Vui lòng chọn chuyên ngành đăng ký tuyển sinh");
-    const major = await this.majors.findByPk(majorId);
+    // Scoped reads also acquire the learner lock. Reuse the save transaction
+    // instead of opening a second connection that waits on our own lock.
+    const major = await this.majors.findByPk(majorId, { transaction });
     if (!major || major.active === false || major.isCommon) {
       throw new BadRequestException("Chuyên ngành đã chọn không tồn tại hoặc đã ngừng sử dụng");
     }
@@ -806,7 +808,7 @@ export class PlanService {
       const payload: Record<string, unknown> = { ...dto };
       delete payload.majorName;
       if (dto.majorId !== undefined || dto.trainingLevel !== undefined) {
-        const major = await this.requireAdmissionMajor(dto.majorId ?? record.majorId, dto.trainingLevel ?? record.trainingLevel);
+        const major = await this.requireAdmissionMajor(dto.majorId ?? record.majorId, dto.trainingLevel ?? record.trainingLevel, transaction);
         payload.majorId = major.id;
         payload.majorName = major.name;
       }
