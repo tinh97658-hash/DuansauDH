@@ -1,9 +1,9 @@
 .exam-gradebook { width: 100%; min-width: 0; }
-.exam-workspace-controls{margin-bottom:6px;border:1px solid #d7e4ee;background:#fff}
+.exam-workspace-controls{margin-bottom:8px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(15,23,42,.05)}
 .exam-main-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:7px 10px;min-height:46px}
 .exam-mode-switch{display:inline-flex;flex:0 0 auto}
-.exam-gradebook .exam-mode-switch .MuiButton-root{width:132px;min-height:32px;border:1px solid #b4c6d5;border-radius:0;padding:5px 10px;font-size:12px;font-weight:500;white-space:nowrap;box-shadow:none}
-.exam-gradebook .exam-mode-switch .MuiButton-root+.MuiButton-root{margin-left:-1px}
+.exam-gradebook .exam-mode-switch .MuiButton-root{width:132px;min-height:32px;border:1px solid #cbd5e1;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:none}
+.exam-gradebook .exam-mode-switch .MuiButton-root:first-child{border-radius:6px 0 0 6px}.exam-gradebook .exam-mode-switch .MuiButton-root:last-child{border-radius:0 6px 6px 0}.exam-gradebook .exam-mode-switch .MuiButton-root+.MuiButton-root{margin-left:-1px}
 .exam-gradebook .exam-mode-switch .MuiButton-root[aria-pressed="true"]{position:relative;z-index:1;border-color:#173e75;background:#173e75;color:#fff}
 .exam-gradebook .exam-mode-switch .MuiButton-root[aria-pressed="false"]{background:#fff;color:#173e75}
 .exam-gradebook .exam-mode-switch .MuiButton-root[aria-pressed="false"]:hover{background:#f0f6fa}
@@ -14,14 +14,14 @@
 .exam-toolbar-status .exam-status-warning{color:#946412}
 .exam-tool-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px;margin-left:auto;max-width:100%;min-width:0}
 .exam-gradebook .exam-tool-actions .document-export-trigger{min-height:32px;padding-block:5px;font-size:12px;line-height:20px}
-.exam-gradebook .exam-tool-actions .MuiButton-root{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:5px 10px;border:1px solid #b4c6d5;border-radius:0;background:#fff;color:#354959;font-size:12px;font-weight:500;line-height:1.5;white-space:nowrap;box-shadow:none}
-.exam-gradebook .exam-tool-actions .MuiButton-root:hover{border-color:#86a9c1;background:#f0f6fa}
+.exam-gradebook .exam-tool-actions .MuiButton-root{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:5px 12px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#334155;font-size:12px;font-weight:600;line-height:1.5;white-space:nowrap;box-shadow:0 1px 2px rgba(15,23,42,.04);transition:all .15s ease}
+.exam-gradebook .exam-tool-actions .MuiButton-root:hover{border-color:#94a3b8;background:#f1f5f9;color:#0f172a}
 .exam-gradebook .exam-tool-actions .MuiButton-root.Mui-disabled,.exam-gradebook .exam-tool-actions .document-export-trigger:disabled{border-color:#dce4eb;background:#f8fafc;color:#8b99a7}
-.exam-gradebook .exam-tool-actions .MuiIconButton-root{width:32px;height:32px;border:1px solid #b4c6d5;border-radius:0;background:#fff;color:var(--icon-muted)}
+.exam-gradebook .exam-tool-actions .MuiIconButton-root{width:32px;height:32px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:var(--icon-muted);transition:all .15s ease}
 .exam-gradebook .exam-tool-actions .MuiIconButton-root:hover{border-color:#86a9c1;background:#f0f6fa}
 .exam-gradebook .exam-tool-actions .MuiIconButton-root.Mui-disabled{border-color:#dce4eb;color:var(--icon-disabled)}
 .exam-mode-switch .MuiButton-root:focus-visible,.exam-tool-actions .MuiButton-root:focus-visible,.exam-tool-actions .MuiIconButton-root:focus-visible{outline:2px solid #173e75;outline-offset:2px}
-.exam-workspace-controls .MuiChip-root{border-radius:0;font-size:12px}
+.exam-workspace-controls .MuiChip-root{border-radius:6px;font-size:12px}
 @media(max-width:760px){.exam-toolbar-status{flex:1 1 180px}.exam-tool-actions{flex-basis:100%;justify-content:flex-start;margin-left:0}.exam-main-toolbar{gap:8px}}
 .exam-empty-scope{padding:28px 20px;color:#607486;text-align:center}
 .exam-empty-scope h1{margin:0 0 5px;color:#173e75;font-size:15px;font-weight:700}
@@ -36,7 +36,7 @@
   .exam-gradebook .exam-table-container td{vertical-align:middle}
   .exam-gradebook .exam-table-container td:nth-child(14),.exam-gradebook .exam-table-container td:nth-child(15),.exam-gradebook .exam-table-container td:nth-child(16){text-align:center}
   body #root .exam-gradebook table > thead > tr > th:has(.exam-calculated-label) {
-    background: #e2ebf3 !important;
+    background: #e0f2fe !important;
   }
   .exam-gradebook .exam-derived-cell {
     background: #edf2f6 !important;

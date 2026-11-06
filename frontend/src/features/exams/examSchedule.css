@@ -53,16 +53,20 @@
 .ep-heading-actions>.sl-btn{white-space:nowrap}
 .scheduling-v20.v20-dialog.ep-arrangement-dialog{width:min(1280px,94vw);max-width:calc(100vw - 24px)}
 .ep-session-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;color:#173e75}
-.ep-session-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin:0;padding:14px;border:1px solid #d7e1e9;background:#f8fafc}
+.ep-session-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin:0 0 12px;padding:14px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc}
 .ep-session-summary dt{color:#607486;font-size:12px;margin-bottom:5px}.ep-session-summary dd{margin:0;font-weight:600;overflow-wrap:anywhere}
 .ep-session-summary small,.ep-session-detail-table td>small{display:block;margin-top:5px;color:#607486;font-size:12px;font-weight:400}
-.ep-session-counts{color:#526a7e;font-size:13px}
-.ep-round-table .ep-session-detail-table{min-width:1120px;table-layout:auto}.ep-session-detail-table th,.ep-session-detail-table td{vertical-align:top}
-.ep-session-round-column{width:52px}.ep-session-time-column{width:104px}.ep-session-classes-column{width:1%}
-.ep-session-detail-table>:is(thead,tbody)>tr>:is(th,td):nth-child(3){width:1%}
-.ep-session-count-column,.ep-session-status-column{width:1%}.ep-session-actions-column{width:calc(316px - 2cm)}
-body :is(#root,.MuiDialog-root,.scheduling-v20) table.ep-session-detail-table>:is(thead,tbody)>tr>:is(th,td):is(:nth-child(5),:nth-child(6)){width:1%;padding-left:4px!important;padding-right:calc(4px + 4mm)!important;white-space:nowrap}
-.ep-session-row-actions{display:flex;flex-wrap:wrap;gap:4px;width:calc(300px - 2cm);min-width:0}.ep-session-row-actions .sl-btn{display:inline-flex;align-items:center;justify-content:center;font-family:inherit;font-size:12px;font-weight:650;line-height:1.2;white-space:nowrap;text-decoration:none}
+.ep-session-counts{color:#526a7e;font-size:13px;margin:8px 0 12px}
+.ep-round-table{overflow-x:auto;max-width:100%;border:1px solid #cbd5e1;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(15,23,42,.05);margin-bottom:12px}
+.ep-round-table .ep-session-detail-table{min-width:1120px;table-layout:auto;width:100%}
+.ep-session-detail-table th{white-space:nowrap!important;word-break:keep-all!important;overflow-wrap:normal!important;padding:9px 12px!important;font-size:12px!important;font-weight:700!important;background:#f1f5f9!important;color:#0f2b48!important;border-bottom:1px solid #cbd5e1}
+.ep-session-detail-table td{vertical-align:top;padding:8px 12px}
+.ep-session-round-column{width:64px;min-width:64px}.ep-session-time-column{width:120px;min-width:120px}.ep-session-classes-column{width:140px;min-width:140px}
+.ep-session-detail-table>:is(thead,tbody)>tr>:is(th,td):nth-child(3){width:140px;min-width:140px}
+.ep-session-count-column{width:90px;min-width:90px}.ep-session-status-column{width:115px;min-width:115px}.ep-session-actions-column{width:280px;min-width:260px}
+body :is(#root,.MuiDialog-root,.scheduling-v20) table.ep-session-detail-table>:is(thead,tbody)>tr>:is(th,td):is(:nth-child(1),:nth-child(2),:nth-child(5),:nth-child(6)){white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important}
+body :is(#root,.MuiDialog-root,.scheduling-v20) table.ep-session-detail-table>:is(thead,tbody)>tr>:is(th,td):is(:nth-child(5),:nth-child(6)){padding-left:6px!important;padding-right:calc(4px + 2mm)!important;text-align:center}
+.ep-session-row-actions{display:flex;flex-wrap:wrap;gap:6px;width:auto;min-width:260px}.ep-session-row-actions .sl-btn{display:inline-flex;align-items:center;justify-content:center;font-family:inherit;font-size:12px;font-weight:600;line-height:1.2;white-space:nowrap;text-decoration:none;border-radius:6px;padding:4px 10px;border:1px solid #cbd5e1;background:#fff;transition:all .15s ease}.ep-session-row-actions .sl-btn:hover{background:#f1f5f9;border-color:#94a3b8}.ep-session-row-actions .sl-btn-primary{background:#0284c7;border-color:#0284c7;color:#fff}.ep-session-row-actions .sl-btn-primary:hover{background:#0369a1;border-color:#0369a1}.ep-session-row-actions .sl-btn-danger{background:#fef2f2;border-color:#fecaca;color:#dc2626}.ep-session-row-actions .sl-btn-danger:hover{background:#fee2e2;border-color:#ef4444;color:#b91c1c}
 body .app-popup .ep-session-row-actions .sl-btn{font-size:12px!important;padding-inline:4px}
 .ep-session-row-actions a.sl-btn,.ep-session-row-actions a.sl-btn:visited{color:#344f60;text-decoration:none}
 .ep-session-view-actions{display:inline-flex;flex-wrap:nowrap;flex:none;gap:4px}

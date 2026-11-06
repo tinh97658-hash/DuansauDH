@@ -66,7 +66,7 @@ const paged = (gradeRows, params = {}) => {
   const page = Math.min(params.page || 1, Math.max(1, Math.ceil(found.length / 15)));
   const visible=params.mode==='exam'&&phaseFixture==='components'?[]:found;
   const candidateCount = assessed.filter(isExamCandidate).length;
-  return { offering:{id:'o1',status:'completed',examScheduling:{candidateCount,remainingCount:phaseFixture==='waiting'?candidateCount:0}},workflow:workflowFor(phaseFixture),revision: 0, rows: visible.slice((page - 1) * 15, page * 15), total: visible.length, totalRows: gradeRows.length, unassessedRows: assessed.filter(row => row.eligible === null).length, page, pageSize: 15 };
+  return { componentImportAllowed: ['components','waiting'].includes(phaseFixture), offering:{id:'o1',status:'completed',examScheduling:{candidateCount,remainingCount:phaseFixture==='waiting'?candidateCount:0}},workflow:workflowFor(phaseFixture),revision: 0, rows: visible.slice((page - 1) * 15, page * 15), total: visible.length, totalRows: gradeRows.length, unassessedRows: assessed.filter(row => row.eligible === null).length, page, pageSize: 15 };
 };
 const setup = (role = "admin", gradeRows = data.rows,phase) => {
   phaseFixture=phase||(gradeRows.some(row=>row.examScore!=null)?'final':'components');
@@ -87,6 +87,14 @@ const setup = (role = "admin", gradeRows = data.rows,phase) => {
 beforeEach(async () => {
   await new Promise(resolve => setTimeout(resolve, 0));
   jest.clearAllMocks(); localStorage.clear(); setup();
+});
+
+it.each([['components',true],['waiting',true],['final',false],['locked',false]])('offers Excel import only before scheduling in %s',async(phase,allowed)=>{
+  setup('admin',[{...savedRow,testScore:8,assignmentScore:8}],phase);
+  render(<ExamLists/>);
+  await screen.findByLabelText('Điểm kiểm tra HV001');
+  const button=screen.getByRole('button',{name:'Nhập điểm từ Excel'});
+  if(allowed)expect(button).toBeEnabled();else expect(button).toBeDisabled();
 });
 
 it.each(['waiting','final'])('edits components without eligibility approval in %s',async phase=>{

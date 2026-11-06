@@ -1,4 +1,4 @@
-import { DocumentCheckIcon, BookOpenIcon, CheckCircleIcon, CheckIcon, LightBulbIcon, PencilSquareIcon, PlusIcon, QueueListIcon, RectangleStackIcon, StopIcon, TrashIcon, XMarkIcon } from "../../components/AppIcons";
+import { DocumentCheckIcon, BookOpenIcon, CheckCircleIcon, LightBulbIcon, PencilSquareIcon, PlusIcon, QueueListIcon, RectangleStackIcon, StopIcon, TrashIcon, XMarkIcon } from "../../components/AppIcons";
 import { usePermissions } from "../../features/accounts/usePermissions";
 import useTrainingYears from "../../hooks/useTrainingYears";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -115,7 +115,9 @@ const TrainingPlan = () => {
   const [curriculumId, setCurriculumId] = useState("");
   // CTĐT của khóa đang chọn
   const [curriculum, setCurriculum] = useState(null);
-  const curriculumInUse = (curriculum?.classGroups || []).length > 0;
+  const curriculumInUse = curriculum?.subjectsEditable === undefined
+    ? (curriculum?.classGroups || []).length > 0
+    : !curriculum.subjectsEditable;
   const [curriculumSubjects, setCurriculumSubjects] = useState([]);
   const [curriculumSubjectSearch, setCurriculumSubjectSearch] = useState("");
 
@@ -182,12 +184,21 @@ const TrainingPlan = () => {
   const [selectedCatalogSubjectIds, setSelectedCatalogSubjectIds] = useState([]);
   const [catalogSubjects, setCatalogSubjects] = useState([]);
 
+  const activeScope = useRef({ majorId, level, curriculumId });
+  activeScope.current = { majorId, level, curriculumId };
+  const requestVersions = useRef({ majors: 0, data: 0, detail: 0 });
+  const isCurrentScope = (scope) => activeScope.current.majorId === scope.majorId
+    && activeScope.current.level === scope.level;
+
   // Load Majors
   const selectedMajorId = useRef(majorId);
   selectedMajorId.current = majorId;
   const loadMajors = useCallback(async () => {
+    const version = ++requestVersions.current.majors;
+    const isCurrent = () => version === requestVersions.current.majors && activeScope.current.level === level;
     try {
       const { data } = await axios.get(`${API_BASE_URL}/plan/training-plan?program=${level}`, { withCredentials: true });
+      if (!isCurrent()) return;
       const list = Array.isArray(data) ? data : data.data || [];
       setMajors(list);
       if (list.length > 0) {
@@ -204,6 +215,7 @@ const TrainingPlan = () => {
         setCurriculumSubjects([]);
       }
     } catch (err) {
+      if (!isCurrent()) return;
       toast.error(err.response?.data?.message || "Không thể tải danh sách chuyên ngành");
     }
   }, [level]);
@@ -215,10 +227,23 @@ const TrainingPlan = () => {
   // Auth Check
 
 
+  useEffect(() => {
+    setSubjects([]);
+    setProgramSubjects([]);
+    setCatalogSubjects([]);
+    setCurriculums([]);
+    setCurriculumId("");
+    setCurriculum(null);
+    setCurriculumSubjects([]);
+  }, [majorId, level]);
+
   // Load each resource independently. A missing curriculum endpoint must not hide
   // a valid subject catalog (the scheduling module consumes that catalog too).
   const loadData = useCallback(async () => {
-    if (!majorId) return;
+    const version = ++requestVersions.current.data;
+    const scope = { majorId, level };
+    const isCurrent = () => version === requestVersions.current.data && isCurrentScope(scope);
+    if (!majorId) { setLoading(false); return; }
     setLoading(true);
     try {
       const [subjectsResult, programSubjectsResult, curriculumsResult] = await Promise.allSettled([
@@ -227,6 +252,7 @@ const TrainingPlan = () => {
         axios.get(`${API_BASE_URL}/plan/curriculums?majorId=${majorId}&program=${level}`, { withCredentials: true }),
       ]);
 
+      if (!isCurrent()) return;
       const fetchedSubjects = subjectsResult.status === "fulfilled" && Array.isArray(subjectsResult.value.data)
         ? subjectsResult.value.data
         : [];
@@ -264,9 +290,10 @@ const TrainingPlan = () => {
         setCurriculumSubjects([]);
       }
     } catch (err) {
+      if (!isCurrent()) return;
       toast.error(err.response?.data?.message || "Không thể tải dữ liệu kế hoạch đào tạo");
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [majorId, level, year]);
 
@@ -277,6 +304,10 @@ const TrainingPlan = () => {
   // Load detailed curriculum
   const loadCurriculumDetail = useCallback(async (targetCurriculumId) => {
     const cId = targetCurriculumId || curriculumId;
+    const scope = { majorId, level };
+    const version = ++requestVersions.current.detail;
+    const isCurrent = () => version === requestVersions.current.detail && isCurrentScope(scope)
+      && activeScope.current.curriculumId === cId;
     if (!cId) {
       setCurriculum(null);
       setCurriculumSubjects([]);
@@ -284,23 +315,26 @@ const TrainingPlan = () => {
     }
     try {
       const { data } = await axios.get(`${API_BASE_URL}/plan/curriculums/${cId}`, { withCredentials: true });
+      if (!isCurrent()) return;
       setCurriculum(data || null);
       setCurriculumSubjects(Array.isArray(data?.subjects) ? data.subjects : []);
     } catch (err) {
+      if (!isCurrent()) return;
       toast.error(err.response?.data?.message || "Không thể tải chương trình đào tạo của khóa");
     }
-  }, [curriculumId]);
+  }, [curriculumId, majorId, level]);
 
   useEffect(() => {
     loadCurriculumDetail(curriculumId);
   }, [curriculumId, loadCurriculumDetail, catalogRevision]);
 
   const publishSubjectCatalogChange = () => {
+    const scope = { majorId, level };
     notifySubjectCatalogChanged();
     if (!curriculumId) return;
     loadCurriculumDetail(curriculumId);
     axios.get(`${API_BASE_URL}/plan/curriculums?majorId=${majorId}&program=${level}`, { withCredentials: true })
-      .then(({ data }) => setCurriculums(Array.isArray(data) ? data : []))
+      .then(({ data }) => { if (isCurrentScope(scope)) setCurriculums(Array.isArray(data) ? data : []); })
       .catch(() => toast.error("Không thể làm mới tổng tín chỉ chương trình đào tạo."));
   };
 
@@ -461,10 +495,7 @@ const TrainingPlan = () => {
   const subjectStats = useMemo(() => {
     const total = subjects.length;
     const totalCredits = subjects.reduce((sum, s) => sum + (Number(s.credits) || 0), 0);
-    const required = subjects.filter((s) => s.isRequired).length;
-    const optional = total - required;
-    const active = subjects.filter((s) => s.active).length;
-    return { total, totalCredits, required, optional, active };
+    return { total, totalCredits };
   }, [subjects]);
 
   // ==========================================
@@ -667,7 +698,7 @@ const TrainingPlan = () => {
       setProgramSubjects((prev) => prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)));
       setCurriculumSubjects((prev) => prev.map((entry) => (
         entry.subjectId === updated.id
-          ? { ...entry, code: updated.codeText || updated.code, name: updated.name, credits: updated.credits, active: updated.active, majorAssignment: updated.majorAssignment, isRequired: updated.isRequired, blockCode: updated.subjectType }
+          ? { ...entry, code: updated.codeText || updated.code, name: updated.name, credits: updated.credits, active: updated.active, majorAssignment: updated.majorAssignment, blockCode: updated.subjectType }
           : entry
       )));
       setEditingSubjectId(null);
@@ -690,11 +721,6 @@ const TrainingPlan = () => {
       );
       setSubjects((prev) => prev.map((s) => (s.id === subject.id ? { ...s, ...updated } : s)));
       setCatalogSubjects((prev) => prev.map((s) => (s.id === subject.id ? { ...s, ...updated } : s)));
-      if (field === "isRequired") {
-        setCurriculumSubjects((prev) => prev.map((entry) => (
-          entry.subjectId === subject.id ? { ...entry, isRequired: newValue } : entry
-        )));
-      }
       publishSubjectCatalogChange();
     } catch (err) {
       toast.error(err.response?.data?.message || "Không thể cập nhật trạng thái");
@@ -907,6 +933,25 @@ const TrainingPlan = () => {
     });
   };
 
+  const handleCurriculumRequirementChange = async (entry, isRequired) => {
+    if (!isAdmin || matrixSaving || !curriculum || entry.requirementEditable === false || entry.isRequired === isRequired) return;
+    const scope = { ...activeScope.current };
+    try {
+      setMatrixSaving(true);
+      const { data: updated } = await axios.put(
+        `${API_BASE_URL}/plan/curriculums/${curriculum.id}/subjects/${entry.id}/requirement`,
+        { isRequired }, { withCredentials: true }
+      );
+      if (!isCurrentScope(scope) || activeScope.current.curriculumId !== scope.curriculumId) return;
+      ++requestVersions.current.detail;
+      setCurriculum(updated);
+      setCurriculumSubjects(updated.subjects || []);
+      toast.success("Đã cập nhật loại học phần trong CTĐT này");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Không thể cập nhật loại học phần");
+    } finally { setMatrixSaving(false); }
+  };
+
   // Loại bỏ 1 học phần khỏi CTĐT của khóa
   const executeRemoveSubjectFromCurriculum = async (entry) => {
     const nextEntries = curriculumSubjects
@@ -969,7 +1014,7 @@ const TrainingPlan = () => {
     if (!isAdmin || matrixSaving || !curriculum || curriculumInUse) return;
     requestConfirm({
       title: "Làm sạch toàn bộ học phần trong CTĐT",
-      content: `Bạn có chắc muốn làm sạch toàn bộ học phần trong CTĐT (${curriculum.code}) của khóa này để tự chọn lại từ đầu từ danh mục không?`,
+      content: `Bạn có chắc muốn xóa toàn bộ học phần trong CTĐT (${curriculum.code}) của khóa này để lập lại từ đầu không?`,
       confirmLabel: "Làm sạch",
       confirmColor: "error",
       onConfirm: executeClearAllSubjectsFromCurriculum,
@@ -1185,9 +1230,7 @@ const TrainingPlan = () => {
             <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end">
               <Typography variant="caption" sx={{ color: "#607486", fontWeight: 600, mr: 1 }}>
                 Tổng: <strong style={{ color: "#172B3A" }}>{subjectStats.total}</strong> HP (
-                <strong style={{ color: "#0788B8" }}>{subjectStats.totalCredits}</strong> TC) · Bắt buộc:{" "}
-                <strong style={{ color: "#137B3B" }}>{subjectStats.required}</strong> · Tự chọn:{" "}
-                <strong style={{ color: "#B86216" }}>{subjectStats.optional}</strong>
+                <strong style={{ color: "#0788B8" }}>{subjectStats.totalCredits}</strong> TC)
               </Typography>
 
               {isAdmin && !isAddingSubject && (
@@ -1223,7 +1266,7 @@ const TrainingPlan = () => {
               overflow: "visible !important",
             }}
           >
-            <Table size="small" aria-label="Danh mục học phần" sx={{ minWidth: 1250, tableLayout: "fixed" }}>
+            <Table size="small" aria-label="Danh mục học phần" sx={{ minWidth: 1140, tableLayout: "fixed" }}>
               <TableHead>
                 <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", color: "#172B3A", fontWeight: 700, fontSize: 12, py: "8px", borderBottom: "2px solid #DFE4E8" } }}>
                   <TableCell sx={{ width: 44, textAlign: "center" }}>STT</TableCell>
@@ -1234,7 +1277,6 @@ const TrainingPlan = () => {
                   <TableCell sx={{ width: 270, textAlign: "center", whiteSpace: "nowrap" }}>Nhóm kiến thức</TableCell>
                   <TableCell sx={{ width: 120, textAlign: "center" }}>Học chung</TableCell>
                   <TableCell sx={{ width: 95, textAlign: "center" }}>Bài tập lớn</TableCell>
-                  <TableCell sx={{ width: 90, textAlign: "center" }}>Bắt buộc</TableCell>
                   <TableCell sx={{ width: 90, textAlign: "center" }}>Trạng thái</TableCell>
                   {isAdmin && <TableCell sx={{ width: 110, textAlign: "center" }}>Thao tác</TableCell>}
                 </TableRow>
@@ -1243,7 +1285,7 @@ const TrainingPlan = () => {
               <TableBody>
                 {filteredSubjects.length === 0 && !isAddingSubject ? (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 11 : 10} align="center" sx={{ py: 5, color: "#607486" }}>
+                    <TableCell colSpan={isAdmin ? 10 : 9} align="center" sx={{ py: 5, color: "#607486" }}>
                       Chưa có học phần nào cho chuyên ngành <strong>{selectedMajor?.name}</strong>.
                       {isAdmin && (
                         <Box sx={{ mt: 1 }}>
@@ -1342,14 +1384,6 @@ const TrainingPlan = () => {
                               size="small"
                               checked={editingSubjectForm.majorAssignment}
                               onChange={(e) => setEditingSubjectForm((p) => ({ ...p, majorAssignment: e.target.checked }))}
-                              sx={{ p: 0.5 }}
-                            />
-                          </TableCell>
-                          <TableCell align="center">
-                            <Checkbox
-                              size="small"
-                              checked={editingSubjectForm.isRequired}
-                              onChange={(e) => setEditingSubjectForm((p) => ({ ...p, isRequired: e.target.checked }))}
                               sx={{ p: 0.5 }}
                             />
                           </TableCell>
@@ -1459,22 +1493,6 @@ const TrainingPlan = () => {
                                 <CheckCircleIcon fontSize="small" sx={{ color: "var(--icon-primary)" }} />
                               ) : (
                                 <StopIcon fontSize="small" sx={{ color: "var(--icon-muted)" }} />
-                              )}
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Tooltip title={isAdmin ? "Bấm để chuyển Bắt buộc / Tự chọn" : ""}>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => { e.stopPropagation(); handleQuickToggleSubject(row, "isRequired"); }}
-                              disabled={!isAdmin}
-                              sx={{ p: 0.5 }}
-                            >
-                              {row.isRequired ? (
-                                <CheckIcon fontSize="small" sx={{ color: "var(--icon-success)", fontWeight: 900 }} />
-                              ) : (
-                                <Typography variant="caption" sx={{ color: "#8A9AAA" }}>—</Typography>
                               )}
                             </IconButton>
                           </Tooltip>
@@ -1609,14 +1627,6 @@ const TrainingPlan = () => {
                         size="small"
                         checked={subjectDraft.majorAssignment}
                         onChange={(e) => setSubjectDraft((p) => ({ ...p, majorAssignment: e.target.checked }))}
-                        sx={{ p: 0.5 }}
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      <Checkbox
-                        size="small"
-                        checked={subjectDraft.isRequired}
-                        onChange={(e) => setSubjectDraft((p) => ({ ...p, isRequired: e.target.checked }))}
                         sx={{ p: 0.5 }}
                       />
                     </TableCell>
@@ -1768,7 +1778,7 @@ const TrainingPlan = () => {
                                   key={c.id}
                                   hover
                                   selected={isSelected}
-                                  onClick={() => setCurriculumId(c.id)}
+                                  onClick={() => { setCurriculum(null); setCurriculumSubjects([]); setCurriculumId(c.id); }}
                                   sx={{
                                     cursor: "pointer",
                                     bgcolor: isSelected ? "#EBF5FB !important" : "inherit",
@@ -1786,7 +1796,7 @@ const TrainingPlan = () => {
                                   </TableCell>
                                   <TableCell align="center">
                                     <Typography variant="body2" sx={{ fontWeight: 700, color: "#137B3B", fontSize: 12 }}>
-                                      {c.totalCredits || 0} TC
+                                      {`${c.totalCredits || 0} TC`}
                                     </Typography>
                                   </TableCell>
                                   <TableCell>
@@ -1969,11 +1979,10 @@ const TrainingPlan = () => {
 
                   </Stack>
 
-                  {curriculumInUse && (
-                    <Alert severity="info" sx={{ mb: 1.5 }}>
-                      CTĐT này đã được gắn cho lớp học. Danh sách học phần được giữ nguyên để bảo toàn kết quả học tập; hãy lập CTĐT mới khi cần thay đổi.
-                    </Alert>
-                  )}
+                  {curriculumInUse && <Typography variant="body2" sx={{ mb: 1.5, color: "#607486" }}>
+                    CTĐT đã có dữ liệu đào tạo nên giữ nguyên danh sách môn. Chỉ môn chưa được sử dụng mới được đổi Bắt buộc / Tự chọn.
+                  </Typography>}
+                  {curriculum.note && <Typography variant="body2" sx={{ mb: 1.5, color: "#607486", whiteSpace: "pre-line" }}>Ghi chú CTĐT: {curriculum.note}</Typography>}
 
                   <Stack
                     direction={{ xs: "column", lg: "row" }}
@@ -1995,7 +2004,7 @@ const TrainingPlan = () => {
                       />
                       <Chip
                       size="small"
-                      label={`Tổng: ${requiredCredits + electiveCredits} TC / Chuẩn 60 TC`}
+                      label={`Tổng: ${requiredCredits + electiveCredits} TC`}
                       sx={{ height: 24, bgcolor: "#EAF4FB", color: "#0788B8", fontSize: 11, fontWeight: 700 }}
                       />
                       <Chip
@@ -2026,7 +2035,7 @@ const TrainingPlan = () => {
                           <TableCell sx={{ width: "42%" }}>Tên học phần</TableCell>
                           <TableCell sx={{ width: 48, px: 0, textAlign: "center" }}>TC</TableCell>
                           <TableCell sx={{ width: 230, whiteSpace: "nowrap" }}>Nhóm kiến thức</TableCell>
-                          <TableCell sx={{ width: 95, textAlign: "center" }}>Loại</TableCell>
+                          <TableCell sx={{ width: 190, textAlign: "center" }}>Loại học phần</TableCell>
                           {isAdmin && <TableCell sx={{ width: 45, textAlign: "center" }}>Xóa</TableCell>}
                         </TableRow>
                       </TableHead>
@@ -2058,19 +2067,14 @@ const TrainingPlan = () => {
                                   || "—"}
                               </TableCell>
                               <TableCell align="center">
-                                <Chip
-                                  size="small"
-                                  variant="outlined"
-                                  label={entry.isRequired ? "Bắt buộc" : "Tự chọn"}
-                                  sx={{
-                                    height: 24,
-                                    fontSize: 11,
-                                    fontWeight: 700,
-                                    cursor: "default",
-                                    borderColor: entry.isRequired ? "#137B3B" : "#B86216",
-                                    color: entry.isRequired ? "#137B3B" : "#B86216",
-                                  }}
-                                />
+                                {isAdmin ? <Select size="small" fullWidth value={entry.isRequired ? "required" : "elective"}
+                                  inputProps={{ "aria-label": `Loại học phần ${entry.name}` }} disabled={matrixSaving || entry.requirementEditable === false}
+                                  onChange={event => handleCurriculumRequirementChange(entry, event.target.value === "required")}
+                                  sx={{ fontSize: 12, height: 32 }}>
+                                  <MenuItem value="required">Bắt buộc</MenuItem>
+                                  <MenuItem value="elective">Tự chọn</MenuItem>
+                                </Select> : <Chip size="small" variant="outlined" label={entry.isRequired ? "Bắt buộc" : "Tự chọn"} />}
+                                {entry.requirementEditable === false && <Typography variant="caption" sx={{ display: "block", color: "#607486", mt: 0.25 }}>Đã sử dụng — giữ nguyên</Typography>}
                               </TableCell>
                               {isAdmin && (
                                 <TableCell align="center">
@@ -2097,29 +2101,14 @@ const TrainingPlan = () => {
                     </Table>
                   </TableContainer>
 
-                  {(curriculum.electiveGroups || []).length > 0 && (
-                    <Box sx={{ mt: 1.5 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 700, color: "#173E75", display: "block", mb: 0.5 }}>
-                        Nhóm tự chọn và số tín chỉ phải chọn
-                      </Typography>
-                      <Stack direction="row" spacing={1} flexWrap="wrap">
-                        {(curriculum.electiveGroups || []).map((group) => (
-                          <Chip
-                            key={group.id}
-                            size="small"
-                            label={`${group.name}: tối thiểu ${group.minCredits} TC${group.maxCredits > 0 ? `, tối đa ${group.maxCredits} TC` : ""}`}
-                            sx={{ height: 22, fontSize: 10, bgcolor: "#F7F9FA", color: "#172B3A", border: "1px solid #DFE4E8" }}
-                          />
-                        ))}
-                      </Stack>
-                    </Box>
-                  )}
+
                 </Box>
               )}
             </Paper>
           </Box>
         </Stack>
       )}
+
 
       <AppDialog
         open={sharingPromptOpen}
@@ -2384,7 +2373,7 @@ const TrainingPlan = () => {
                     <TableCell>Tên học phần</TableCell>
                     <TableCell sx={{ width: 50, textAlign: "center" }}>TC</TableCell>
                     <TableCell sx={{ width: 190, whiteSpace: "nowrap" }}>Nhóm kiến thức</TableCell>
-                    <TableCell sx={{ width: 110, textAlign: "center" }}>Phân loại</TableCell>
+                    <TableCell sx={{ width: 110, textAlign: "center" }}>Mặc định từ danh mục</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -2440,7 +2429,7 @@ const TrainingPlan = () => {
                             {s.isRequired !== false ? (
                               <Chip
                                 size="small"
-                                label="Bắt buộc"
+                                label="Học bắt buộc"
                                 sx={{
                                   height: 22,
                                   fontSize: 11,

@@ -210,12 +210,16 @@ export class PlanService {
       // An explicit sharing scope controls future grouping, not the subject's
       // academic identity. Keep structural and legacy identity edits protected.
       const protectedFields = ["codeNumber", "codeText", "name", "majorId", "program", "credits",
-        "subjectType", "isRequired", "canonicalSubjectId"];
+        "subjectType", "canonicalSubjectId"];
       const legacySharingChanged = dto.sharedMajorIds === undefined && payload.allowCrossMajor !== undefined
         && payload.allowCrossMajor !== subject.allowCrossMajor;
       if (legacySharingChanged || protectedFields.some(key => payload[key] !== undefined
         && !isDeepStrictEqual(payload[key], subject[key]))) {
         await assertSubjectStructureEditable(this.sequelize, id, transaction);
+      }
+      if ((majorId !== subject.majorId || program !== subject.program)
+        && await this.curriculumEntries.count({ where: { subjectId: id }, transaction }) > 0) {
+        throw new ConflictException("Học phần đang nằm trong CTĐT nên không thể đổi ngành hoặc bậc đào tạo. Hãy tạo học phần trong phạm vi mới.");
       }
       await this.validateSubjectIdentityUpdate(subject, dto, program, transaction);
       if (dto.sharedMajorIds !== undefined && (!isDeepStrictEqual(
@@ -254,18 +258,8 @@ export class PlanService {
         );
       }
 
-      // Curriculum entries store a snapshot of the required/elective flag.
-      // Keep that snapshot aligned with the catalog, which is the UI's source
-      // of truth for this property.
-      if (dto.isRequired !== undefined) {
-        await this.curriculumEntries.update(
-          {
-            isRequired: dto.isRequired,
-            ...(dto.isRequired ? { electiveGroupId: null } : {}),
-          },
-          { where: { subjectId: id }, transaction },
-        );
-      }
+      // isRequired is only a default for newly added curriculum subjects.
+      // Existing curricula keep their own required/elective status.
 
       // A curriculum entry also snapshots the catalog's knowledge-block type.
       // Move existing entries to the matching block in their own curriculum

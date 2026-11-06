@@ -36,31 +36,97 @@
       overflow-wrap: anywhere;
     }
 
-    /* Text may wrap inside ordinary cells. Keep all position/width rules,
-       especially sticky columns and multi-row sticky headers, on their pages. */
-    html[data-font-size]:not([data-font-size="100"]) :is(td, th):not(:where(
+    /* Proportional heading and badge overrides for compact dashboard and widget elements */
+    html[data-font-size]:not([data-font-size="100"]) .od-card h2 {
+      font-size: calc(13px * var(--app-text-scale)) !important;
+      line-height: 1.35 !important;
+    }
+    html[data-font-size]:not([data-font-size="100"]) .od-panel-heading h2 {
+      font-size: calc(14px * var(--app-text-scale)) !important;
+      line-height: 1.35 !important;
+    }
+    html[data-font-size]:not([data-font-size="100"]) .od-category-heading h3 {
+      font-size: calc(13px * var(--app-text-scale)) !important;
+      line-height: 1.35 !important;
+    }
+    html[data-font-size]:not([data-font-size="100"]) .od-warning-group h3 {
+      font-size: calc(11px * var(--app-text-scale)) !important;
+      line-height: 1.35 !important;
+    }
+    html[data-font-size]:not([data-font-size="100"]) .od-card-state {
+      font-size: calc(9.5px * var(--app-text-scale)) !important;
+    }
+    html[data-font-size]:not([data-font-size="100"]) .od-card-value strong {
+      font-size: calc(22px + 4px * var(--app-text-scale)) !important;
+      line-height: 1.1 !important;
+    }
+    html[data-font-size]:not([data-font-size="100"]) .od-card-value > span {
+      font-size: calc(11px * var(--app-text-scale)) !important;
+    }
+
+    /* Table headers keep their titles intact on one line, never breaking letter-by-letter */
+    html[data-font-size]:not([data-font-size="100"]) th:not(:where(
       .report-preview *, .transcript-print-document *, .report-print-sheet *,
       .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
       .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
       [data-preserve-font-size], [data-preserve-font-size] *
     )) {
-      white-space: normal !important;
-      overflow-wrap: anywhere !important;
+      white-space: nowrap !important;
+      overflow-wrap: normal !important;
+      word-break: normal !important;
     }
 
-    /* Typography renders captions as inline spans. Their own nowrap rule can
-       otherwise exceed the cell even when the cell itself allows wrapping. */
+    /* Long text in ordinary data cells may wrap cleanly at word boundaries.
+       Never break words letter-by-letter, and preserve cells that need single-line display. */
+    html[data-font-size]:not([data-font-size="100"]) td:not(:where(
+      .report-preview *, .transcript-print-document *, .report-print-sheet *,
+      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
+      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
+      [data-preserve-font-size], [data-preserve-font-size] *,
+      .nowrap, .assignment-nowrap, .report-short-cell, .report-serial-cell,
+      [class*="nowrap"], [class*="action"], [class*="status"], [class*="count"],
+      [class*="round"], [class*="badge"], [class*="date"], [class*="time"], [class*="code"],
+      [class*="metric"], [class*="state"]
+    )) {
+      white-space: normal !important;
+      overflow-wrap: break-word !important;
+      word-break: normal !important;
+    }
+
+    /* Keep short metadata cells and explicit nowrap cells on a single line */
+    html[data-font-size]:not([data-font-size="100"]) :is(td, th):is(
+      .nowrap, .assignment-nowrap, .report-short-cell, .report-serial-cell,
+      [class*="nowrap"], [class*="action"], [class*="status"], [class*="count"],
+      [class*="round"], [class*="badge"], [class*="date"], [class*="time"], [class*="code"],
+      [class*="metric"], [class*="state"], .ep-session-round-column, .ep-session-time-column,
+      .ep-session-count-column, .ep-session-status-column
+    ) {
+      white-space: nowrap !important;
+      overflow-wrap: normal !important;
+      word-break: normal !important;
+    }
+
+    /* Typography inside table cells wraps with break-word, never anywhere */
     html[data-font-size]:not([data-font-size="100"]) :is(td, th) .MuiTypography-root:not(:where(
       .report-preview *, .transcript-print-document *, .report-print-sheet *,
       .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
       .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
-      [data-preserve-font-size], [data-preserve-font-size] *
+      [data-preserve-font-size], [data-preserve-font-size] *,
+      [class*="nowrap"], [class*="action"], [class*="status"], [class*="count"],
+      [class*="badge"], [class*="date"], [class*="time"], [class*="code"]
     )) {
       display: block;
       min-width: 0;
       max-width: 100%;
       white-space: normal !important;
-      overflow-wrap: anywhere !important;
+      overflow-wrap: break-word !important;
+      word-break: normal !important;
+    }
+
+    /* Action buttons inside table rows must keep their labels on one line */
+    html[data-font-size]:not([data-font-size="100"]) :is(td, .ep-session-row-actions, [class*="actions"]) :is(.sl-btn, .MuiButton-root, .btn) {
+      white-space: nowrap !important;
+      overflow-wrap: normal !important;
     }
 
     /* Single-line controls retain their bounds and their dropdown arrow inset.
@@ -78,7 +144,8 @@
       .report-preview *, .transcript-print-document *, .report-print-sheet *,
       .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
       .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
-      [data-preserve-font-size], [data-preserve-font-size] *
+      [data-preserve-font-size], [data-preserve-font-size] *,
+      td .sl-btn, td .btn, td .MuiButton-root, .ep-session-row-actions .sl-btn
     )) {
       /* A fixed height clips wrapped labels when the font grows. A minimum
          preserves a usable target while allowing every line to fit. */

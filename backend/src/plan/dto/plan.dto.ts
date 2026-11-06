@@ -114,12 +114,14 @@ export class UpdateCurriculumDto {
 }
 
 export class SetCurriculumSubjectsDto {
+  @IsOptional() @IsArray() @ArrayUnique((group: CurriculumElectiveGroupDto) => group.code)
+  @ValidateNested({ each: true }) @Type(() => CurriculumElectiveGroupDto) electiveGroups?: CurriculumElectiveGroupDto[];
   @IsArray() @ArrayUnique((entry: CurriculumSubjectEntryDto) => entry.subjectId)
   @ValidateNested({ each: true }) @Type(() => CurriculumSubjectEntryDto) subjects!: CurriculumSubjectEntryDto[];
 }
 
-export class SetClassElectivesDto {
-  @IsArray() @IsUUID("4", { each: true }) @ArrayUnique() curriculumSubjectIds!: string[];
+export class UpdateCurriculumSubjectRequirementDto {
+  @IsBoolean() isRequired!: boolean;
 }
 
 // ===== Lớp học (class group) =====

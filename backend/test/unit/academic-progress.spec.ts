@@ -22,25 +22,18 @@ it("accepts approved recognition, without inventing GPA or graduation eligibilit
   expect(academicProgress(card([subject({ grade: { result: "passed", score: 8, details: { source: "recognition" } } })])))
     .toMatchObject({ completed: true, earnedCredits: 3, graduationEligible: null, gpa: null });
 });
-it("requires credits within each elective group rather than just a total", () => {
-  const curriculum = { electiveGroups: [{ id: "a", name: "A", minCredits: 3 }, { id: "b", name: "B", minCredits: 3 }] };
-  const result = academicProgress(card([subject(), subject({ id: "a1", isRequired: false, electiveGroupId: "a", credits: 6 })], curriculum));
+it("ignores legacy group quotas when every course in the assigned curriculum is complete", () => {
+  const result = academicProgress(card([subject({ isRequired: false, electiveGroupId: "old" })], {
+    electiveGroups: [{ id: "old", minCredits: 99, maxCredits: 1 }], blocks: [{ id: "old", minCredits: 99 }],
+  }));
+  expect(result).toMatchObject({ completed: true, earnedCredits: 3, electiveGroups: [] });
+});
+it.each([true, false])("tracks every listed course independently of its required/elective label: %s", isRequired => {
+  const result = academicProgress(card([subject({ isRequired, classOverride: true, grade: null })]));
   expect(result.completed).toBe(false);
-  expect(result.blockers).toContainEqual(expect.objectContaining({ code: "ELECTIVE_MINIMUM", groupId: "b" }));
+  expect(result.blockers).toContainEqual(expect.objectContaining({ subjectId: "s1" }));
 });
-it("allows unselected electives once the configured group minimum is fulfilled", () => {
-  const curriculum = { electiveGroups: [{ id: "a", minCredits: 3 }] };
-  expect(academicProgress(card([subject({ isRequired: false, electiveGroupId: "a" }), subject({ id: "s2", isRequired: false, electiveGroupId: "a", grade: null })], curriculum)).completed).toBe(true);
-});
-it("keeps ungrouped electives mandatory for the complete curriculum selected by the class", () => {
-  expect(academicProgress(card([subject({ isRequired: false, grade: null })])).completed).toBe(false);
-});
-it("treats the default zero elective maximum as uncapped, while rejecting a positive maximum below the minimum", () => {
-  const subjects = [subject({ isRequired: false, electiveGroupId: "a" })];
-  expect(academicProgress(card(subjects, { electiveGroups: [{ id: "a", minCredits: 3, maxCredits: 0 }] })).completed).toBe(true);
-  expect(academicProgress(card(subjects, { electiveGroups: [{ id: "a", minCredits: 3, maxCredits: 2 }] })).completed).toBe(false);
-});
-it("checks block minima and does not count an aliased course twice", () => {
-  const result = academicProgress(card([subject({ canonicalSubjectId: "root", blockId: "b" }), subject({ id: "alias", canonicalSubjectId: "root", blockId: "b" })], { blocks: [{ id: "b", name: "B", minCredits: 6 }] }));
-  expect(result).toMatchObject({ earnedCredits: 3, completed: false });
+it("does not count an aliased course twice", () => {
+  const result = academicProgress(card([subject({ canonicalSubjectId: "root" }), subject({ id: "alias", canonicalSubjectId: "root" })]));
+  expect(result).toMatchObject({ earnedCredits: 3, completed: true });
 });

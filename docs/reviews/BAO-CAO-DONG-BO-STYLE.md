@@ -1,7 +1,7 @@
 # Báo cáo rà soát và kế hoạch đồng bộ style giao diện (UI/UX Audit)
 
 > **Hệ thống Quản lý Đào tạo Sau đại học – Trường Đại học Hàng hải Việt Nam**  
-> **Tài liệu tham chiếu chuẩn:** [`.rulesforai`](../rules/.rulesforai) và [`theme.js`](../frontend/src/theme.js)  
+> **Tài liệu tham chiếu chuẩn:** [`.rulesforai`](../../rules/.rulesforai) và [`theme.js`](../../frontend/src/theme.js)  
 > **Thời điểm rà soát:** Tháng 10/2026  
 
 ---
@@ -11,7 +11,7 @@
 Giao diện hệ thống frontend (`frontend/src`) hiện đang tồn tại sự giao thoa giữa nhiều giai đoạn phát triển:
 1. **Giai đoạn ban đầu (Legacy):** Dùng Bootstrap 5 (`container`, `row`, `table-striped`, `alert-danger`, `btn-primary`), tiêu đề tiếng Anh, căn lề inline thủ công.
 2. **Giai đoạn chuyển giao:** Dùng Material UI (MUI v5) mặc định, bảng tĩnh, popup đơn giản không tùy biến header/footer.
-3. **Giai đoạn tối ưu nghiệp vụ chuyên sâu:** Dùng `FeatureLayout`, `RibbonHeader`, `ResizableTable`, `FilterSelectField`, `FilterSearchField`, CSS tùy biến bảng và phân chia bố cục fluid compact theo tiêu chuẩn tại [`.rulesforai`](../rules/.rulesforai).
+3. **Giai đoạn tối ưu nghiệp vụ chuyên sâu:** Dùng `FeatureLayout`, `RibbonHeader`, `ResizableTable`, `FilterSelectField`, `FilterSearchField`, CSS tùy biến bảng và phân chia bố cục fluid compact theo tiêu chuẩn tại [`.rulesforai`](../../rules/.rulesforai).
 4. **Module Xếp lịch (Scheduling Workspace):** Dùng hệ thống CSS thuần độc lập (`reference.css`, `workspace.css`) với cấu trúc DOM riêng (`.sl-modal`, `.sl-calendar`, `.sl-btn`).
 
 Sự không đồng nhất này dẫn đến trải nghiệm người dùng chưa liền mạch, màu sắc nhận diện bị phân mảnh và khó bảo trì mã nguồn.

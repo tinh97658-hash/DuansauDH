@@ -25,6 +25,10 @@ export function buildSubjectSigningDocument(groups, offering, rows) {
     major: unique(groups.map(group => group?.major?.name)), year: offering?.academicYear || "",
     lecturer: formatLecturerName(offering?.lecturer) || "", lecturerUnit: offering?.lecturer?.unit?.name || "",
     location: `${BRAND.institute}, ${BRAND.university}`,
+    ...(offering?.id && rows.every(row => row.participantId) ? { importContext: {
+      offeringId: offering.id, participants: rows.map(row => ({ participantId: row.participantId,
+        fullName: row.fullName || [row.lastName, row.firstName].filter(Boolean).join(" "), code: row.code || "" })),
+    } } : {}),
     // Attendance, absences and separate practical marks are not present in the gradebook.
     // Leave them blank for the instructor instead of inferring them from other scores.
     rows: rows.map((row, index) => [index + 1, row.fullName || [row.lastName, row.firstName].filter(Boolean).join(" "),
@@ -130,6 +134,25 @@ export async function createSubjectSigningExcel(document) {
   const finalRow = signatureRow + 2;
   sheet.getRow(finalRow).height = 45;
   form.finish(finalRow, headerRow, subheaderRow);
+  if (document.importContext) {
+    // Keep identifiers outside the print area. They travel with Excel rows and
+    // let import distinguish learners with identical names without using STT.
+    const idColumn = sheet.columnCount + 1;
+    sheet.getColumn(idColumn).hidden = true;
+    sheet.getCell(subheaderRow, idColumn).value = "SDH_PARTICIPANT_ID";
+    document.importContext.participants.forEach((person, i) => { sheet.getCell(dataRow + i, idColumn).value = person.participantId; });
+    const metadata = book.addWorksheet("_SDH_IMPORT", { state: "veryHidden" });
+    metadata.addRow(["SDH_COMPONENT_IMPORT", 1]);
+    metadata.addRow([document.importContext.offeringId]);
+    metadata.addRow([columnAt(edges[11]), columnAt(edges[13]), idColumn, columnAt(edges[1]), dataRow, document.rows.length]);
+    metadata.addRow(["Mã định danh", "Họ tên", "Mã học viên"]);
+    document.importContext.participants.forEach(person => metadata.addRow([person.participantId, person.fullName, person.code]));
+  }
+  // XLSX stores a fixed opening zoom. Approximate Excel's available viewport
+  // using the export window, allowing room for row headings and the scrollbar.
+  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : width * 96 / 72 + 80;
+  const zoomScale = Math.max(50, Math.min(200, Math.floor((viewportWidth - 80) / (width * 96 / 72) * 100)));
+  sheet.views = [{ state: "normal", style: "normal", showGridLines: false, zoomScale, activeCell: "A1" }];
   sheet.headerFooter.oddFooter = '&L&"Times New Roman,Bold"&9&K808080NBH: ' + SUBJECT_SIGNING_FORM.publishedOn + '-REV:' + SUBJECT_SIGNING_FORM.revision + '&R&"Times New Roman,Bold"&9&K808080' + SUBJECT_SIGNING_FORM.code;
   return new Blob([await book.xlsx.writeBuffer()], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 }

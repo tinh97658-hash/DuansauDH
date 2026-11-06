@@ -56,7 +56,7 @@ Evidence và action journal: `.tmp/qa-20261018/`. Click vào menu/form, nhập/c
 - Steps: (1) Mở Xếp lịch, tuần 12–18/10. (2) Chọn Xếp lịch cho `QA-2026 KTQL Nhóm 2`. (3) Bấm ô Chiều 18/10 đang có affordance “+ Xếp buổi”. (4) Chọn Đỗ Hải Đăng và phòng BTDEMO26P1 còn trống. (5) Lưu lịch.
 - Expected: lịch tuần và form thống nhất điều kiện ca đã qua; không mời nhập một ca chắc chắn không thể lưu.
 - Actual: form mở và cho chọn đủ thông tin, sau đó báo **“Không thể xếp lịch vào buổi học đã kết thúc.”** Không tạo session; không phải lỗi mất dữ liệu đã lưu.
-- Evidence: [QA-SCHED-003-afternoon-cutoff-mismatch.png](../.tmp/qa-20261018/QA-SCHED-003-afternoon-cutoff-mismatch.png), journal khoảng 10:46 UTC. Tái hiện hai lần trong lượt audit.
+- Evidence: [QA-SCHED-003-afternoon-cutoff-mismatch.png](../../.tmp/qa-20261018/QA-SCHED-003-afternoon-cutoff-mismatch.png), journal khoảng 10:46 UTC. Tái hiện hai lần trong lượt audit.
 - Diagnosis, sau khi quan sát UI: `Schedule.jsx` tính slot chiều đến `23:59`; `SessionEditor.jsx` dùng giờ ca chiều `13:00–17:00`. Thông báo từ kiểm tra trong form; không khẳng định backend gây ra lỗi này.
 - Business impact: không lưu sai lịch, nhưng tốn thao tác điều phối vào ca không còn hợp lệ.
 - User impact: khoảng 5–6 thao tác vô ích, phải hủy và chọn ngày khác.
@@ -67,7 +67,7 @@ Evidence và action journal: `.tmp/qa-20261018/`. Click vào menu/form, nhập/c
 
 ### RISK-TUI-001 — Đã thay thế bằng quy tắc học phí ngày 25/10/2026
 
-Đã bỏ mô tả/quy tắc cũ về việc phân nhóm tự chuyển người chưa đóng tiền sang Đang học. Quy tắc hiện tại: **đã đóng tiền → Đang học → được bảo lưu**; **chưa đóng tiền và xin nghỉ → rút lớp → Nộp hồ sơ đầu vào**. Xem [quy tắc học phí](TUITION-ENROLLMENT-POLICY.md). Các ảnh QA ngày 18/10 chỉ là bằng chứng của phiên bản cũ.
+Đã bỏ mô tả/quy tắc cũ về việc phân nhóm tự chuyển người chưa đóng tiền sang Đang học. Quy tắc hiện tại: **đã đóng tiền → Đang học → được bảo lưu**; **chưa đóng tiền và xin nghỉ → rút lớp → Nộp hồ sơ đầu vào**. Xem [quy tắc học phí](../TUITION-ENROLLMENT-POLICY.md). Các ảnh QA ngày 18/10 chỉ là bằng chứng của phiên bản cũ.
 
 ### RISK-ADM-002 — Giá trị mẫu ngày sinh/điểm TB trở thành dữ liệu thật khi thêm hồ sơ
 
@@ -76,7 +76,7 @@ Evidence và action journal: `.tmp/qa-20261018/`. Click vào menu/form, nhập/c
 - Steps: (1) Quan sát form mặc định. (2) Chỉ nhập code `QA-2024-TEMP`, họ/tên và email audit. (3) Lưu. (4) Đổi Trình độ về tất cả để tìm hồ sơ. (5) Mở sửa lại, đọc Ngày sinh/Điểm TB ĐH.
 - Expected: dữ liệu cá nhân/thành tích chưa được cung cấp cần trống hoặc được xác nhận chủ động; default tổ chức nên phân biệt với dữ liệu cá nhân. Cần chủ nghiệp vụ xác nhận có chủ ý dùng giá trị mẫu hay không.
 - Actual: **2000-01-01** và **3.20** đã điền sẵn và được lưu, giữ nguyên khi mở lại. Form mặc định Thạc sĩ/CNTT dù danh sách đang lọc Tiến sĩ; lưu xong hồ sơ mới bị ẩn bởi chính bộ lọc đó.
-- Evidence: ADM-007-created-temporary-record.png; [UX-ADM-006-prefilled-personal-data.png](../.tmp/qa-20261018/UX-ADM-006-prefilled-personal-data.png). Read-back từ form edit: dob `2000-01-01`, gpa `3.20`.
+- Evidence: ADM-007-created-temporary-record.png; [UX-ADM-006-prefilled-personal-data.png](../../.tmp/qa-20261018/UX-ADM-006-prefilled-personal-data.png). Read-back từ form edit: dob `2000-01-01`, gpa `3.20`.
 - Business impact: ngày sinh/điểm đầu vào không được người nhập xác thực có thể đi vào nghiệp vụ sau.
 - User impact: phải rà soát và thay các giá trị có vẻ hợp lệ; sau lưu còn phải đổi bộ lọc mới thấy hồ sơ.
 - Frequency: quan sát một lượt thêm và một lượt mở lại; không khẳng định mọi cấu hình đều giống nhau.
@@ -150,7 +150,7 @@ Các effort dưới đây tính thao tác thực ở đường đi đã thử; k
 - Steps: (1) Mở KTQT Nhóm 2. (2) Đọc toast yêu cầu hoàn thành giảng dạy. (3) Bấm DS thi rồi Cả bảng điểm. (4) Quan sát trạng thái nhập.
 - Expected: lý do khóa luôn gắn với vùng điểm, có đường đi về đúng lớp để hoàn thành precondition.
 - Actual: ô điểm và Cập nhật cả bảng vẫn disabled, thông báo “Vui lòng xác nhận hoàn thành…” không còn trong body. Tab DS thi lại báo “Hãy nhập đủ điểm thành phần…” dù hiện không thể nhập. Không có CTA sang đúng offering trong lý do khóa đã quan sát.
-- Evidence: [GRADES-001-ten-roster-locked.png](../.tmp/qa-20261018/GRADES-001-ten-roster-locked.png), [UX-GRADE-005-locked-without-persistent-reason.png](../.tmp/qa-20261018/UX-GRADE-005-locked-without-persistent-reason.png); DOM `notice=false`, điểm QA-2026-01 `disabled=true` sau chuyển tab.
+- Evidence: [GRADES-001-ten-roster-locked.png](../../.tmp/qa-20261018/GRADES-001-ten-roster-locked.png), [UX-GRADE-005-locked-without-persistent-reason.png](../../.tmp/qa-20261018/UX-GRADE-005-locked-without-persistent-reason.png); DOM `notice=false`, điểm QA-2026-01 `disabled=true` sau chuyển tab.
 - Approximate effort: thêm 2 click tab là mất lý do; muốn xử lý phải quay lại scheduling và tìm lớp.
 - Business impact: không vượt được guard trái phép; có nguy cơ bỏ dở nhập điểm vì không hiểu khóa.
 - User impact: hai hướng dẫn không giúp hoàn tất việc đang làm; memory load cao khi toast biến mất.
@@ -276,7 +276,7 @@ QL Người dùng/Login chỉ dùng để baseline/persona và phục hồi kế
 
 **B-GRADE-001 — Đã gỡ bằng chấp thuận follow-up của người dùng.** Đầu lượt không có teaching_sessions quá khứ và UI ngăn backdate. Người dùng đã trả lời “Cho phép chuẩn bị một lịch DEV đã qua”; không phải đồng ý suy diễn từ thời gian chờ.
 
-- Lúc11:01:22UTC, transaction local `127.0.0.1:55432/pgsms` khóa/check đúng session `682435b4-9408-4654-9105-d97dd19f01a5`, offering KTQT .2, ngày19/10, status planned. UPDATE đúng1 row: `session_date='2026-10-17'`, `updated_at=NOW()`. **Không đổi status, confirmed/completed, grade hoặc policy bằng DB.** Evidence: [authorized-past-fixture.json](../.tmp/qa-20261018/authorized-past-fixture.json).
+- Lúc11:01:22UTC, transaction local `127.0.0.1:55432/pgsms` khóa/check đúng session `682435b4-9408-4654-9105-d97dd19f01a5`, offering KTQT .2, ngày19/10, status planned. UPDATE đúng1 row: `session_date='2026-10-17'`, `updated_at=NOW()`. **Không đổi status, confirmed/completed, grade hoặc policy bằng DB.** Evidence: [authorized-past-fixture.json](../../.tmp/qa-20261018/authorized-past-fixture.json).
 - Sau đó chỉ dùng UI: pending→held; complete cancel/confirm; nhập/lưu/sửa/xóa/re-enter điểm; report. Blocker thời gian không còn chặn coverage đã nêu.
 - **Refresh khi điểm chưa lưu: chưa kết luận.** Sau đổi local exam QA từ9 thành9.5 chưa save rồi refresh, CDP không hoàn tất action. Runtime/ảnh không trả về, thử handle browser dialog báo không có dialog; có Edge sync target. Không suy diễn đây là mất dữ liệu hay ứng dụng treo. Source có beforeunload handler, nhưng đọc source không thay được kiểm thử thành công. DB read-only cuối vẫn exam9/course8.5, chứng minh9.5 chưa lưu; không chứng minh UX cảnh báo đã đúng. Cần thử lại trên browser sạch với một CDP observer.
 - Còn phải thử: nhánh not_held, unresolved nhiều session, reopen nếu hỗ trợ, miễn thi, retake/nhiều attempt, conflict hai phiên, keyboard đầy đủ xuyên hàng. Không gán pass cho các nhánh đó.
@@ -298,7 +298,7 @@ Giới hạn khác:
 
 ## DB sau audit và các thay đổi đã thực hiện
 
-Read-only snapshot cuối: [db-after.json](../.tmp/qa-20261018/db-after.json), 18/10/2026 18:09:06 GMT+7, transaction `BEGIN READ ONLY` rồi rollback, có grades/revision để kiểm chứng sau sự cố CDP. **Ngoại lệ DB write duy nhất** là ngày session/updated_at được người dùng duyệt ở phần fixture. Không có write API ngoài request từ UI.
+Read-only snapshot cuối: [db-after.json](../../.tmp/qa-20261018/db-after.json), 18/10/2026 18:09:06 GMT+7, transaction `BEGIN READ ONLY` rồi rollback, có grades/revision để kiểm chứng sau sự cố CDP. **Ngoại lệ DB write duy nhất** là ngày session/updated_at được người dùng duyệt ở phần fixture. Không có write API ngoài request từ UI.
 
 | Entity | Trước | Sau | Ý nghĩa |
 |---|---:|---:|---|
@@ -354,11 +354,11 @@ Read-only snapshot cuối: [db-after.json](../.tmp/qa-20261018/db-after.json), 1
 - Tab từ KT QA chuyển đúng BTL QA, nhập qua keyboard được; không phải dùng mouse sau mọi giá trị. Chưa đo keyboard xuyên toàn hàng/10–20 người.
 - Bảng tổng hợp đúng group .2, cột KTQT và10 người; các môn khác trống. Đã refresh report, chọn lại scope và đọc đủ10 giá trị một lần nữa. Single attempt QA cuối là `[9]`; không phát sinh attempt thứ hai khi sửa cùng ô. Chưa thử nghiệp vụ học lại/thi lại.
 
-Ảnh bổ sung: PROGRESS-004-completion-confirm; DASH-004/005/006/007; GRADES-002/003/004/005/006; [RESULT-002-ten-grades-synced.png](../.tmp/qa-20261018/RESULT-002-ten-grades-synced.png). Phép thử unsaved refresh không tạo ảnh hoàn tất; không dùng tên UX-GRADE-006 như ảnh có thật.
+Ảnh bổ sung: PROGRESS-004-completion-confirm; DASH-004/005/006/007; GRADES-002/003/004/005/006; [RESULT-002-ten-grades-synced.png](../../.tmp/qa-20261018/RESULT-002-ten-grades-synced.png). Phép thử unsaved refresh không tạo ảnh hoàn tất; không dùng tên UX-GRADE-006 như ảnh có thật.
 
 ## Evidence và đề nghị ưu tiên
 
-Evidence nằm local tại [.tmp/qa-20261018](../.tmp/qa-20261018/), journal `browser-journal.jsonl`; baseline `.tmp/qa-baseline-20261018.json`, working-tree snapshot `.tmp/qa-source-status-before.txt`. Đây là artifact local, có thể không nằm trong git do `.tmp` ignored; cần giữ thư mục này nếu muốn review ảnh sau lượt làm việc.
+Evidence nằm local tại [.tmp/qa-20261018](../../.tmp/qa-20261018), journal `browser-journal.jsonl`; baseline `.tmp/qa-baseline-20261018.json`, working-tree snapshot `.tmp/qa-source-status-before.txt`. Đây là artifact local, có thể không nằm trong git do `.tmp` ignored; cần giữ thư mục này nếu muốn review ảnh sau lượt làm việc.
 
 Các ảnh chính: BASE-001; ADM-001/002/003/004/005/006/007; QA-ADM-001/002; GROUP-001/002/003/004; OFFER-001/002; SCHED-001/002/003; QA-SCHED-003; PROGRESS-002/003; GRADES-001; RESULT-001; DASH-002/003; RISK-001; UX-ADM-006; UX-GRADE-005. Tên đầy đủ là các file PNG trong thư mục evidence. Không dùng ảnh không tạo thành công hoặc chỉ phục vụ debug dụng cụ làm finding.
 

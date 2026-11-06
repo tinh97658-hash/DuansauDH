@@ -70,17 +70,17 @@ Edge thật, frontend3100/backend3001 và PostgreSQL DEV. Dùng UI bỏ members 
 
 | Case | Evidence / actual |
 |---|---|
-|Default55:45,10 candidates|[CV2-001](../.tmp/qa-focused-20261018/CV2-001-default-ten.png): đủ5 cột, không horizontal scroll, chữ quan trọng không bị cắt|
-|10 selected|[CV2-002](../.tmp/qa-focused-20261018/CV2-002-ten-selected.png): selected10, cap5, vượt5; không truncation|
-|Search tên Đinh|[CV2-003](../.tmp/qa-focused-20261018/CV2-003-search-ten-selected.png): hiện3 rows nhưng selected vẫn10|
-|Narrow39% +scroll108px|[CV2-004](../.tmp/qa-focused-20261018/CV2-004-narrow-sticky.png): checkbox/mã/tên cố định, tuition tới được|
-|Wide65%|[CV2-005](../.tmp/qa-focused-20261018/CV2-005-wide-split.png): no horizontal overflow, split vẫn hoạt động|
-|Có mã, search theo mã|[CV2-006](../.tmp/qa-focused-20261018/CV2-006-with-code.png): QA-2026-01 nằm cột riêng cạnh Hồ Phương Thảo; selected10 vẫn giữ|
-|Thiếu mã, search theo họ tên|[CV2-007](../.tmp/qa-focused-20261018/CV2-007-without-code.png): Hoàng Đức Anh có Chưa có ở cột mã, không dùng internal ID|
+|Default55:45,10 candidates|[CV2-001](../../.tmp/qa-focused-20261018/CV2-001-default-ten.png): đủ5 cột, không horizontal scroll, chữ quan trọng không bị cắt|
+|10 selected|[CV2-002](../../.tmp/qa-focused-20261018/CV2-002-ten-selected.png): selected10, cap5, vượt5; không truncation|
+|Search tên Đinh|[CV2-003](../../.tmp/qa-focused-20261018/CV2-003-search-ten-selected.png): hiện3 rows nhưng selected vẫn10|
+|Narrow39% +scroll108px|[CV2-004](../../.tmp/qa-focused-20261018/CV2-004-narrow-sticky.png): checkbox/mã/tên cố định, tuition tới được|
+|Wide65%|[CV2-005](../../.tmp/qa-focused-20261018/CV2-005-wide-split.png): no horizontal overflow, split vẫn hoạt động|
+|Có mã, search theo mã|[CV2-006](../../.tmp/qa-focused-20261018/CV2-006-with-code.png): QA-2026-01 nằm cột riêng cạnh Hồ Phương Thảo; selected10 vẫn giữ|
+|Thiếu mã, search theo họ tên|[CV2-007](../../.tmp/qa-focused-20261018/CV2-007-without-code.png): Hoàng Đức Anh có Chưa có ở cột mã, không dùng internal ID|
 
 Screenshot full-page giữ viewport layout1440×900, mở rộng capture dọc khi cần. Journal nằm cùng thư mục evidence; prefix CV2 thuộc task này. Tên dài khác thường chỉ có trong integration fixture, không tạo/sửa Admissions để chụp browser. Không chạy mobile/zoom200% hoặc screen reader ở lượt này.
 
-Đã gán lại đúng5 người về QTKD .2 và5 người về .6. Read-only [db-columns-v2-final.json](../.tmp/qa-focused-20261018/db-columns-v2-final.json) xác nhận group data và learner→group/studyStatus mapping bằng snapshot trước task, duplicates rỗng; groups11/members15. Remove/reassign sinh membership row IDs mới, không giả định ID membership được giữ. Không đổi cap/status, không tạo group hoặc chỉnh hồ sơ. Candidate cuối quay về empty wording hiện có.
+Đã gán lại đúng5 người về QTKD .2 và5 người về .6. Read-only [db-columns-v2-final.json](../../.tmp/qa-focused-20261018/db-columns-v2-final.json) xác nhận group data và learner→group/studyStatus mapping bằng snapshot trước task, duplicates rỗng; groups11/members15. Remove/reassign sinh membership row IDs mới, không giả định ID membership được giữ. Không đổi cap/status, không tạo group hoặc chỉnh hồ sơ. Candidate cuối quay về empty wording hiện có.
 
 ## Unchanged
 

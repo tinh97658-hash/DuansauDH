@@ -1,7 +1,8 @@
 /* Shared dialog appearance, including dialogs mounted in MUI portals. */
 @media screen {
   .app-popup {
-    --popup-title-bg: #b4cae6;
+    --popup-title-bg: #ffffff;
+    --popup-title-text: #123b63;
     --popup-text: #172b3a;
     --popup-label: #4b5e68;
     --popup-muted: #607486;
@@ -30,9 +31,9 @@
   body .app-popup :is(.MuiDialogTitle-root, .v20-dialog-head, .sl-editor-hero, .sl-offering-hero) {
     flex-shrink: 0;
     padding: 18px 24px;
-    border-bottom: 1px solid #b8c7d6;
-    background: var(--popup-title-bg);
-    color: #000;
+    border-bottom: 1px solid #e2e8f0;
+    background: var(--popup-title-bg, #ffffff);
+    color: var(--popup-title-text, #123b63);
     font-size: 20px;
     font-weight: 700;
     line-height: 1.4;
@@ -41,7 +42,7 @@
 
   body .app-popup :is(.MuiDialogTitle-root > span, .v20-dialog-head h2, .sl-editor-hero h2, .sl-offering-hero h2) {
     margin: 0;
-    color: #000;
+    color: var(--popup-title-text, #123b63);
     font-family: inherit;
     font-size: 20px;
     font-weight: 700;
@@ -59,7 +60,7 @@
     border: 0;
     border-radius: 4px;
     background: transparent;
-    color: #000;
+    color: #607486;
     font-size: 24px;
     line-height: 1;
   }

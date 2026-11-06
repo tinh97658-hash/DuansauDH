@@ -70,5 +70,13 @@ it('blocks direct reads, history and saves before loading unrelated data',async(
   await expect(f.service.getForActor(query,f.actor)).rejects.toThrow(ForbiddenException);
   await expect(f.service.historyForActor(query,f.actor)).rejects.toThrow(ForbiddenException);
   await expect(f.service.save({...query,revision:0,rows:[]},f.actor)).rejects.toThrow(ForbiddenException);
+  await expect(f.service.importComponents({...query,revision:0,rows:[]},f.actor)).rejects.toThrow(ForbiddenException);
   expect(get).not.toHaveBeenCalled();expect(history).not.toHaveBeenCalled();
+});
+
+it.each([false,true])('exposes Excel import availability using session existence: %s',async scheduled=>{
+  const f=fixture(['admin']);
+  jest.spyOn(f.service,'get').mockResolvedValue({offering:{status:'completed'},workflow:{mode:'new',status:'draft'},rows:[]} as any);
+  f.db.query.mockResolvedValue([{exists:scheduled}]);
+  expect((await f.service.getForActor({classGroupId:'g1',courseOfferingId:'o1'},f.actor)).componentImportAllowed).toBe(!scheduled);
 });

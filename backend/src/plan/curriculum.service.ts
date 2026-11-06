@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
 import { Op } from "sequelize";
-import { assertClassScopeEditable, assertCurriculumEditable, lockTrainingStructure } from "./training-structure-integrity.js";
+import { assertClassScopeEditable, assertCurriculumEditable, assertCurriculumSubjectsEditable, curriculumSubjectsInUse, lockTrainingStructure, usedCurriculumSubjectIds } from "./training-structure-integrity.js";
 import { sortCurriculumSubjectsByVietnameseName } from "./curriculum-subject-order.js";
 import { SUBJECT_KNOWLEDGE_GROUPS } from './subject-knowledge-groups.js';
 import type { Transaction } from "sequelize";
@@ -10,10 +10,8 @@ import { Major } from "../database/models/common/major.model.js";
 import { Subject } from "../database/models/plan/subject.model.js";
 import { Curriculum } from "../database/models/plan/curriculum.model.js";
 import { CurriculumBlock } from "../database/models/plan/curriculum-block.model.js";
-import { CurriculumElectiveGroup } from "../database/models/plan/curriculum-elective-group.model.js";
 import { CurriculumSubject } from "../database/models/plan/curriculum-subject.model.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
-import { ClassGroupElective } from "../database/models/training/class-group-elective.model.js";
 import {
   CreateCurriculumDto,
   CurriculumSubjectEntryDto,
@@ -30,9 +28,8 @@ const SUBJECT_INCLUDE = { model: Subject, as: "subject" } as const;
  * Nghiệp vụ chương trình đào tạo (CTĐT).
  *
  * - Mỗi **ngành + bậc + khóa** có thể có nhiều CTĐT hoàn chỉnh (`curriculums`).
- * - CTĐT gồm các **khối kiến thức** (`curriculum_blocks`), các **nhóm tự chọn**
- *   (`curriculum_elective_groups`) và danh mục **học phần** (`curriculum_subjects`).
- * - Mỗi lớp/nhóm học viên chọn đúng một CTĐT; toàn bộ học phần trong CTĐT đó áp dụng cho lớp.
+ * - CTĐT gồm khối kiến thức và danh sách học phần, mỗi môn có nhãn bắt buộc/tự chọn.
+ * - Mỗi lớp chọn đúng một CTĐT và học toàn bộ danh sách môn của CTĐT đó.
  *   Nếu phạm vi ngành + bậc + khóa có nhiều CTĐT thì lớp **buộc** phải chọn (`curriculumId`).
  * - `findForClassGroup` (chỉ đọc) và `assignToClassGroup` (ghi, tự tạo khi chưa có) là hai
  *   đường vào CTĐT của lớp; cả hai đều đối chiếu ngành + bậc + khóa của lớp.
@@ -42,10 +39,8 @@ export class CurriculumService {
   constructor(
     @InjectModel(Curriculum) private readonly curriculums: typeof Curriculum,
     @InjectModel(CurriculumBlock) private readonly blocks: typeof CurriculumBlock,
-    @InjectModel(CurriculumElectiveGroup) private readonly electiveGroups: typeof CurriculumElectiveGroup,
     @InjectModel(CurriculumSubject) private readonly entries: typeof CurriculumSubject,
     @InjectModel(ClassGroup) private readonly classGroups: typeof ClassGroup,
-    @InjectModel(ClassGroupElective) private readonly classElectives: typeof ClassGroupElective,
     @InjectModel(Subject) private readonly subjects: typeof Subject,
     @InjectModel(Major) private readonly majors: typeof Major,
     private readonly sequelize: Sequelize,
@@ -53,7 +48,6 @@ export class CurriculumService {
 
   private static readonly DETAIL_INCLUDE = [
     { model: CurriculumBlock, as: "blocks" },
-    { model: CurriculumElectiveGroup, as: "electiveGroups" },
     { model: CurriculumSubject, as: "subjectEntries", include: [SUBJECT_INCLUDE] },
   ];
 
@@ -67,7 +61,7 @@ export class CurriculumService {
       where,
       include: [
         { model: Major, as: "major", attributes: ["id", "name"] },
-        { model: CurriculumSubject, as: "subjectEntries", attributes: ["id", "isRequired", "credits"], include: [SUBJECT_INCLUDE] },
+        { model: CurriculumSubject, as: "subjectEntries", attributes: ["id", "isRequired", "credits", "electiveGroupId"], include: [SUBJECT_INCLUDE] },
       ],
       order: [["applicableFromYear", "DESC"], ["code", "ASC"]],
     });
@@ -101,7 +95,6 @@ export class CurriculumService {
       include: CurriculumService.DETAIL_INCLUDE as never,
       order: [
         [{ model: CurriculumBlock, as: "blocks" }, "sortOrder", "ASC"],
-        [{ model: CurriculumElectiveGroup, as: "electiveGroups" }, "sortOrder", "ASC"],
         [{ model: CurriculumSubject, as: "subjectEntries" }, "sortOrder", "ASC"],
       ],
       transaction,
@@ -113,115 +106,44 @@ export class CurriculumService {
       transaction,
     });
     const result = this.withTotals(curriculum);
+    const usedIds = await usedCurriculumSubjectIds(this.sequelize, id, transaction);
     return {
       ...result,
+      subjects: result.subjects.map(entry => ({ ...entry, requirementEditable: !usedIds.has(entry.id) })),
+      subjectsEditable: !(await curriculumSubjectsInUse(this.sequelize, id, transaction)),
       classGroups: classGroups.map((c) => ({ id: c.id, code: c.code, name: c.name, academicYear: c.academicYear })),
     };
   }
 
-  /**
-   * Danh mục học phần hiệu lực của một lớp là toàn bộ học phần trong CTĐT lớp đã chọn.
-   *
-   * Đây là thao tác **chỉ đọc**: nếu lớp chưa có CTĐT thì trả về `curriculum: null`
-   * để giao diện mời người dùng tạo CTĐT (`ensureForClass`).
-   */
+  /** Mỗi lớp học toàn bộ danh sách môn của CTĐT đã gắn; loại môn là thông tin của CTĐT. */
   async classSubjects(classGroupId: string) {
-    return this.sequelize.transaction(async (transaction) => {
-      // Legacy reads may bind an unlinked class, so serialize that path too.
+    return this.sequelize.transaction(async transaction => {
       await lockTrainingStructure(this.sequelize, transaction);
       const classGroup = await this.requireClassGroup(classGroupId, transaction);
       const curriculum = await this.findForClassGroup(classGroup, transaction);
-      if (!curriculum) {
-        return {
-          classGroup: { id: classGroup.id, code: classGroup.code, name: classGroup.name, academicYear: classGroup.academicYear },
-          curriculum: null,
-          blocks: [],
-          electiveGroups: [],
-          subjects: [],
-          selectedElectiveIds: [],
-          totals: { requiredCredits: 0, selectedElectiveCredits: 0, totalCredits: 0 },
-        };
-      }
-      const curriculumId = curriculum.id;
-
-      const [blocks, electiveGroups, rows] = await Promise.all([
-        this.blocks.findAll({ where: { curriculumId }, order: [["sortOrder", "ASC"]], transaction }),
-        this.electiveGroups.findAll({ where: { curriculumId }, order: [["sortOrder", "ASC"]], transaction }),
-        this.entries.findAll({
-          where: { curriculumId },
-          include: [
-            SUBJECT_INCLUDE,
-            { model: CurriculumBlock, as: "block" },
-            { model: CurriculumElectiveGroup, as: "electiveGroup" },
-          ] as never,
-          order: [["sortOrder", "ASC"]],
-          transaction,
-        }),
-      ]);
-
-      const blockById = new Map(blocks.map((block) => [block.id, block]));
-      const groupById = new Map(electiveGroups.map((group) => [group.id, group]));
-
-      const subjectRows = sortCurriculumSubjectsByVietnameseName(rows,
-        (row: any) => row.subject || { id: row.subjectId }).map((row: any) => {
+      const classInfo = { id: classGroup.id, code: classGroup.code, name: classGroup.name, academicYear: classGroup.academicYear };
+      if (!curriculum) return { classGroup: classInfo, curriculum: null, blocks: [], electiveGroups: [], subjects: [], selectedElectiveIds: [],
+        totals: { requiredCredits: 0, selectedElectiveCredits: 0, totalCredits: 0 } };
+      const blocks = await this.blocks.findAll({ where: { curriculumId: curriculum.id }, order: [["sortOrder", "ASC"]], transaction });
+      const rows = await this.entries.findAll({ where: { curriculumId: curriculum.id }, include: [SUBJECT_INCLUDE], transaction });
+      const subjectRows = sortCurriculumSubjectsByVietnameseName(rows, (row: any) => row.subject || { id: row.subjectId }).map((row: any) => {
         const plain = typeof row.get === "function" ? row.get({ plain: true }) : row;
-        // The catalog is the source of truth for required/elective status.
-        // Falling back to the entry keeps older/incomplete relations readable,
-        // while also repairing the display of entries saved before sync existed.
-        const isRequired = Boolean(plain.subject?.isRequired ?? plain.isRequired);
-        const block = plain.blockId ? blockById.get(plain.blockId) : undefined;
-        const group = plain.electiveGroupId ? groupById.get(plain.electiveGroupId) : undefined;
-        return {
-          id: plain.id,
-          subjectId: plain.subjectId,
-          code: plain.subject?.codeText || plain.subject?.code || "",
-          codeNumber: plain.subject?.codeNumber ?? 0,
-          name: plain.subject?.name || "",
-          credits: Number(plain.subject?.credits ?? plain.credits) || 0,
-          isRequired,
-          active: plain.subject?.active !== false,
-          blockId: plain.blockId,
-          // Catalog type is authoritative; the stored block is retained as a
-          // fallback for legacy/incomplete subject relations.
-          blockCode: plain.subject?.subjectType || plain.block?.code || blockById.get(plain.blockId)?.code || "",
-          blockName: block?.name || "",
-          electiveGroupId: plain.electiveGroupId,
-          electiveGroupCode: group?.code || "",
-          electiveGroupName: group?.name || "",
-          selected: true,
-        };
+        const block = blocks.find(item => item.id === plain.blockId);
+        return { id: plain.id, subjectId: plain.subjectId, code: plain.subject?.codeText || plain.subject?.code || "",
+          codeNumber: plain.subject?.codeNumber ?? 0, name: plain.subject?.name || "",
+          credits: Number(plain.subject?.credits ?? plain.credits) || 0, isRequired: plain.isRequired !== false,
+          active: plain.subject?.active !== false, blockId: plain.blockId,
+          blockCode: plain.subject?.subjectType || block?.code || "", blockName: block?.name || "",
+          electiveGroupId: null, electiveGroupCode: "", electiveGroupName: "", selected: true };
       });
-
-      const requiredCredits = subjectRows
-        .filter((row) => row.isRequired)
-        .reduce((total, row) => total + row.credits, 0);
-      const selectedElectiveCredits = subjectRows
-        .filter((row) => !row.isRequired)
-        .reduce((total, row) => total + row.credits, 0);
-
-      return {
-        classGroup: { id: classGroup.id, code: classGroup.code, name: classGroup.name, academicYear: classGroup.academicYear },
-        curriculum: { id: curriculum.id, code: curriculum.code, name: curriculum.name, totalCredits: requiredCredits + selectedElectiveCredits },
-        blocks: blocks.map((block) => ({
-          id: block.id,
-          code: block.code,
-          name: block.name,
-          minCredits: block.minCredits,
-          requiredCredits: subjectRows.filter((row) => row.blockId === block.id && row.isRequired).reduce((total, row) => total + row.credits, 0),
-          electiveCredits: subjectRows.filter((row) => row.blockId === block.id && !row.isRequired).reduce((total, row) => total + row.credits, 0),
-        })),
-        electiveGroups: electiveGroups.map((group) => ({
-          id: group.id,
-          code: group.code,
-          name: group.name,
-          minCredits: group.minCredits,
-          maxCredits: group.maxCredits,
-          selectedCredits: subjectRows.filter((row) => row.electiveGroupId === group.id).reduce((total, row) => total + row.credits, 0),
-        })),
-        subjects: subjectRows,
-        selectedElectiveIds: subjectRows.filter((row) => !row.isRequired).map((row) => row.id),
-        totals: { requiredCredits, selectedElectiveCredits, totalCredits: requiredCredits + selectedElectiveCredits },
-      };
+      const requiredCredits = subjectRows.filter(row => row.isRequired).reduce((sum, row) => sum + row.credits, 0);
+      const selectedElectiveCredits = subjectRows.filter(row => !row.isRequired).reduce((sum, row) => sum + row.credits, 0);
+      return { classGroup: classInfo, curriculum: { id: curriculum.id, code: curriculum.code, name: curriculum.name, totalCredits: requiredCredits + selectedElectiveCredits },
+        blocks: blocks.map(block => ({ id: block.id, code: block.code, name: block.name, minCredits: 0,
+          requiredCredits: subjectRows.filter(row => row.blockId === block.id && row.isRequired).reduce((sum, row) => sum + row.credits, 0),
+          electiveCredits: subjectRows.filter(row => row.blockId === block.id && !row.isRequired).reduce((sum, row) => sum + row.credits, 0) })),
+        electiveGroups: [], subjects: subjectRows, selectedElectiveIds: subjectRows.filter(row => !row.isRequired).map(row => row.id),
+        totals: { requiredCredits, selectedElectiveCredits, totalCredits: requiredCredits + selectedElectiveCredits } };
     });
   }
 
@@ -247,11 +169,10 @@ export class CurriculumService {
       } as never, { transaction });
 
       const blocks = await this.syncBlocks(curriculum.id, dto.blocks || DEFAULT_BLOCKS.map((block) => ({ ...block, minCredits: 0 })), transaction);
-      const groups = await this.syncElectiveGroups(curriculum.id, dto.electiveGroups || [], transaction);
       const entries = Array.isArray(dto.subjects)
         ? dto.subjects
         : await this.catalogEntries(dto.majorId, program, transaction);
-      await this.replaceSubjects(curriculum.id, entries, blocks, groups, transaction);
+      await this.replaceSubjects(curriculum.id, entries, blocks, transaction);
 
       return this.detail(curriculum.id, transaction);
     });
@@ -268,6 +189,18 @@ export class CurriculumService {
       const program = dto.program || curriculum.program;
       const majorId = dto.majorId || curriculum.majorId;
       await this.requireMajor(majorId, program, transaction);
+
+      const scopeChanged = majorId !== curriculum.majorId || program !== curriculum.program;
+      if (scopeChanged || dto.totalCredits !== undefined) {
+        const entries = await this.entries.findAll({ where: { curriculumId: id }, include: [SUBJECT_INCLUDE], transaction });
+        if (scopeChanged && entries.some(entry => !entry.subject || entry.subject.majorId !== majorId || entry.subject.program !== program)) {
+          throw new BadRequestException("Không thể đổi ngành hoặc bậc đào tạo khi danh sách học phần không thuộc phạm vi mới. Hãy lập CTĐT khác hoặc làm trống CTĐT chưa sử dụng trước.");
+        }
+        const actualCredits = entries.reduce((total, entry) => total + (Number(entry.subject?.credits ?? entry.credits) || 0), 0);
+        if (dto.totalCredits !== undefined && dto.totalCredits !== actualCredits) {
+          throw new BadRequestException(`Tổng tín chỉ được tính từ danh sách học phần (${actualCredits} TC), không thể đặt thành ${dto.totalCredits} TC.`);
+        }
+      }
 
       if (dto.code !== undefined && dto.code !== curriculum.code) {
         const duplicate = await this.curriculums.findOne({ where: { code: dto.code, id: { [Op.ne]: id } }, transaction });
@@ -302,77 +235,34 @@ export class CurriculumService {
 
   async setSubjects(id: string, dto: SetCurriculumSubjectsDto) {
     return this.sequelize.transaction(async (transaction) => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
       await lockTrainingStructure(this.sequelize, transaction);
       const curriculum = await this.requireCurriculum(id, transaction);
-      await assertCurriculumEditable(this.sequelize, id, transaction);
-      const [blocks, groups] = await Promise.all([
-        this.blocks.findAll({ where: { curriculumId: id }, transaction }),
-        this.electiveGroups.findAll({ where: { curriculumId: id }, transaction }),
-      ]);
-      if (blocks.length === 0) throw new BadRequestException("Chương trình đào tạo chưa có khối kiến thức.");
-      await this.replaceSubjects(
-        id,
-        dto.subjects,
-        new Map(blocks.map((block) => [block.code, block])),
-        new Map(groups.map((group) => [group.code, group])),
-        transaction,
-      );
+      await assertCurriculumSubjectsEditable(this.sequelize, id, transaction);
+      const blocks = await this.blocks.findAll({ where: { curriculumId: id }, transaction });
+      if (!blocks.length) throw new BadRequestException("Chương trình đào tạo chưa có khối kiến thức.");
+      await this.replaceSubjects(id, dto.subjects, new Map(blocks.map(block => [block.code, block])), transaction);
       return this.detail(id, transaction);
     });
   }
 
-  /** Đặt danh sách học phần tự chọn mà Viện chỉ định cho một lớp. */
-  async setClassElectives(classGroupId: string, curriculumSubjectIds: string[]) {
-    await this.sequelize.transaction(async (transaction) => {
+  /** Only unused subjects can change type, preserving the applied curriculum's history. */
+  async setSubjectRequirement(curriculumId: string, entryId: string, isRequired: boolean) {
+    return this.sequelize.transaction(async transaction => {
+      await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
       await lockTrainingStructure(this.sequelize, transaction);
-      const classGroup = await this.requireClassGroup(classGroupId, transaction);
-      const curriculum = await this.findForClassGroup(classGroup, transaction);
-      if (!curriculum) {
-        throw new BadRequestException("Lớp chưa có chương trình đào tạo. Hãy tạo chương trình đào tạo cho lớp trước.");
+      await this.requireCurriculum(curriculumId, transaction);
+      const rows = await this.entries.findAll({ where: { curriculumId }, transaction });
+      const entry = rows.find(row => row.id === entryId);
+      if (!entry) throw new NotFoundException("Học phần không thuộc CTĐT này.");
+      if (entry.isRequired !== isRequired) {
+        const usedIds = await usedCurriculumSubjectIds(this.sequelize, curriculumId, transaction);
+        if (usedIds.has(entry.id)) throw new ConflictException({ code: "CURRICULUM_SUBJECT_IN_USE",
+          message: "Học phần đã mở lớp hoặc có dữ liệu học tập nên không thể đổi Bắt buộc / Tự chọn. Hãy cấu hình khác trong CTĐT mới." });
+        await entry.update({ isRequired }, { transaction });
       }
-
-      const rows = await this.entries.findAll({
-        where: { curriculumId: curriculum.id },
-        include: [{ model: CurriculumElectiveGroup, as: "electiveGroup" }] as never,
-        transaction,
-      });
-      const byId = new Map(rows.map((row: any) => [row.id, row]));
-      const unknown = curriculumSubjectIds.filter((entryId) => !byId.has(entryId));
-      if (unknown.length > 0) {
-        throw new BadRequestException("Có học phần không thuộc chương trình đào tạo của lớp.");
-      }
-      const notElective = curriculumSubjectIds.filter((entryId) => byId.get(entryId)!.isRequired);
-      if (notElective.length > 0) {
-        throw new BadRequestException("Học phần bắt buộc luôn thuộc chương trình, không cần chọn.");
-      }
-
-      const creditsByGroup = new Map<string, number>();
-      for (const entryId of curriculumSubjectIds) {
-        const row: any = byId.get(entryId)!;
-        const key = row.electiveGroupId || "";
-        creditsByGroup.set(key, (creditsByGroup.get(key) || 0) + (Number(row.credits) || 0));
-      }
-      for (const [groupId, credits] of creditsByGroup) {
-        if (!groupId) continue;
-        const group: any = rows.find((row: any) => row.electiveGroupId === groupId)?.electiveGroup;
-        if (!group) continue;
-        if (group.minCredits > 0 && credits < group.minCredits) {
-          throw new BadRequestException(`Nhóm tự chọn "${group.name}" cần tối thiểu ${group.minCredits} tín chỉ, đang chọn ${credits}.`);
-        }
-        if (group.maxCredits > 0 && credits > group.maxCredits) {
-          throw new BadRequestException(`Nhóm tự chọn "${group.name}" tối đa ${group.maxCredits} tín chỉ, đang chọn ${credits}.`);
-        }
-      }
-
-      await this.classElectives.destroy({ where: { classGroupId }, transaction });
-      if (curriculumSubjectIds.length > 0) {
-        await this.classElectives.bulkCreate(
-          curriculumSubjectIds.map((entryId) => ({ classGroupId, curriculumSubjectId: entryId })) as never,
-          { transaction },
-        );
-      }
+      return this.detail(curriculumId, transaction);
     });
-    return this.classSubjects(classGroupId);
   }
 
   /**
@@ -477,7 +367,7 @@ export class CurriculumService {
 
     const blocks = await this.syncBlocks(curriculum.id, DEFAULT_BLOCKS.map((block) => ({ ...block, minCredits: 0 })), transaction);
     const entries = await this.catalogEntries(majorId, program, transaction);
-    await this.replaceSubjects(curriculum.id, entries, blocks, new Map<string, CurriculumElectiveGroup>(), transaction);
+    await this.replaceSubjects(curriculum.id, entries, blocks, transaction);
     return curriculum;
   }
 
@@ -527,39 +417,10 @@ export class CurriculumService {
     return new Map(rows.map((row) => [row.code, row]));
   }
 
-  private async syncElectiveGroups(curriculumId: string, definitions: Array<{ code: string; name: string; minCredits?: number; maxCredits?: number; sortOrder?: number }>, transaction: Transaction) {
-    const definitionsByCode = new Map<string, { code: string; name: string; minCredits?: number; maxCredits?: number; sortOrder?: number }>();
-    for (const definition of definitions) {
-      const code = String(definition.code || "").trim().toUpperCase();
-      if (!code || definitionsByCode.has(code)) continue;
-      definitionsByCode.set(code, { ...definition, code });
-    }
-    const existing = await this.electiveGroups.findAll({ where: { curriculumId }, transaction });
-    const existingByCode = new Map(existing.map((row) => [row.code, row]));
-    let index = 0;
-    for (const definition of definitionsByCode.values()) {
-      index += 1;
-      const payload = {
-        curriculumId,
-        code: definition.code,
-        name: definition.name || definition.code,
-        minCredits: definition.minCredits ?? 0,
-        maxCredits: definition.maxCredits ?? 0,
-        sortOrder: definition.sortOrder ?? index,
-      };
-      const current = existingByCode.get(definition.code);
-      if (current) await current.update(payload as never, { transaction });
-      else await this.electiveGroups.create(payload as never, { transaction });
-    }
-    const rows = await this.electiveGroups.findAll({ where: { curriculumId }, transaction });
-    return new Map(rows.map((row) => [row.code, row]));
-  }
-
   private async replaceSubjects(
     curriculumId: string,
     entries: CurriculumSubjectEntryDto[],
     blocks: Map<string, CurriculumBlock>,
-    groups: Map<string, CurriculumElectiveGroup>,
     transaction: Transaction,
   ) {
     const subjectIds = [...new Set(entries.map((entry) => entry.subjectId))];
@@ -599,15 +460,11 @@ export class CurriculumService {
       const blockCode = String(subject.subjectType || entry.blockCode || "").trim().toUpperCase();
       const block = (blockCode ? blocks.get(blockCode) : undefined) || fallbackBlock;
       if (!block) throw new BadRequestException("Chương trình đào tạo chưa có khối kiến thức phù hợp.");
-      const groupCode = String(entry.electiveGroupCode || "").trim().toUpperCase();
-      const group = groupCode ? groups.get(groupCode) : undefined;
-      if (groupCode && !group) throw new BadRequestException(`Nhóm tự chọn "${groupCode}" không tồn tại trong chương trình đào tạo.`);
-      const isRequired = subject.isRequired ?? entry.isRequired ?? true;
-      if (isRequired && group) throw new BadRequestException("Học phần bắt buộc không được xếp vào nhóm tự chọn.");
+      const isRequired = entry.isRequired ?? currentBySubjectId.get(entry.subjectId)?.isRequired ?? subject.isRequired ?? true;
       return {
         curriculumId,
         blockId: block.id,
-        electiveGroupId: isRequired ? null : group?.id ?? null,
+        electiveGroupId: null,
         subjectId: entry.subjectId,
         isRequired,
         credits: Number(subject.credits) || 0,
@@ -615,8 +472,7 @@ export class CurriculumService {
       };
     });
 
-    // Đồng bộ theo hiệu số để **giữ nguyên id** của các dòng không đổi; nhờ vậy lựa chọn
-    // học phần tự chọn của lớp không bị mất mỗi lần cập nhật CTĐT.
+    // Keep stable entry ids so grades and history remain attached to the same course.
     const incomingSubjectIds = new Set(payload.map((row) => row.subjectId));
 
     const removed = current.filter((row) => !incomingSubjectIds.has(row.subjectId));
@@ -625,14 +481,12 @@ export class CurriculumService {
       await this.entries.destroy({ where: { id: { [Op.in]: removed.map((row) => row.id) } }, transaction });
     }
 
-    const becameRequired: string[] = [];
     for (const row of payload) {
       const existing = currentBySubjectId.get(row.subjectId);
       if (!existing) {
         await this.entries.create(row as never, { transaction });
         continue;
       }
-      if (row.isRequired && !existing.isRequired) becameRequired.push(existing.id);
       await existing.update(row as never, { transaction });
     }
 
@@ -656,19 +510,20 @@ export class CurriculumService {
         code: subject.codeText || subject.code || "",
         name: subject.name || "",
         credits: Number(subject.credits ?? entry.credits) || 0,
-        isRequired: Boolean(subject.isRequired ?? entry.isRequired),
+        isRequired: Boolean(entry.isRequired ?? subject.isRequired ?? true),
         active: subject.active !== false,
         majorAssignment: Boolean(subject.majorAssignment),
         blockId: entry.blockId,
         blockCode: subject.subjectType || (value.blocks || []).find((block: any) => block.id === entry.blockId)?.code || "",
-        electiveGroupId: entry.electiveGroupId ?? null,
-        electiveGroupCode: (value.electiveGroups || []).find((group: any) => group.id === entry.electiveGroupId)?.code || "",
+        electiveGroupId: null,
+        electiveGroupCode: "",
         sortOrder: entry.sortOrder,
       };
     });
     const requiredCredits = entries.filter((entry: any) => entry.isRequired).reduce((total: number, entry: any) => total + entry.credits, 0);
-    const selectedElectiveCredits = (value.electiveGroups || []).reduce((total: number, group: any) => total + (Number(group.minCredits) || 0), 0);
-    const totalCredits = entries.reduce((total: number, entry: any) => total + entry.credits, 0);
+    const selectedElectiveCredits = entries.filter((entry: any) => !entry.isRequired).reduce((total: number, entry: any) => total + entry.credits, 0);
+    const totalCredits = requiredCredits + selectedElectiveCredits;
+    const availableCredits = entries.reduce((total: number, entry: any) => total + entry.credits, 0);
     return {
       id: value.id,
       code: value.code,
@@ -680,8 +535,9 @@ export class CurriculumService {
       active: value.active,
       note: value.note,
       totalCredits,
+      availableCredits,
       blocks: value.blocks || [],
-      electiveGroups: value.electiveGroups || [],
+      electiveGroups: [],
       classGroups: value.classGroups || [],
       subjects: entries,
       totals: { requiredCredits, selectedElectiveCredits, totalCredits },

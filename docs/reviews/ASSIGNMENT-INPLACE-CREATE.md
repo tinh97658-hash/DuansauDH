@@ -98,14 +98,14 @@ Edge thật, viewport 1440×900; frontend `localhost:3100`, backend `localhost:3
 
 **Contextual create: 0 pathname transitions** khi open/cancel/failure/retry/success. Success chỉ đổi query `groupId` để giữ target qua refresh. Navigation sang management trong bảng trên là bước chuẩn bị/kiểm route riêng, không phải một phần contextual create.
 
-Evidence local trong [qa-focused-20261018](../.tmp/qa-focused-20261018/):
+Evidence local trong [qa-focused-20261018](../../.tmp/qa-focused-20261018):
 
-- [IP-001](../.tmp/qa-focused-20261018/IP-001-dialog-draft.png): dialog và draft bên dưới.
-- [IP-002](../.tmp/qa-focused-20261018/IP-002-failure-preserved.png): create failure giữ form.
-- [IP-003](../.tmp/qa-focused-20261018/IP-003-created-cap3-selection5.png): cap 3/selected 5.
-- [IP-004](../.tmp/qa-focused-20261018/IP-004-created-cap5-preserved.png): cap 5 và hidden selection giữ nguyên.
-- [IP-005](../.tmp/qa-focused-20261018/IP-005-assigned-five.png): Gán 5 thành công.
-- [IP-006](../.tmp/qa-focused-20261018/IP-006-management-batch-created.png): route quản lý tạo batch.
+- [IP-001](../../.tmp/qa-focused-20261018/IP-001-dialog-draft.png): dialog và draft bên dưới.
+- [IP-002](../../.tmp/qa-focused-20261018/IP-002-failure-preserved.png): create failure giữ form.
+- [IP-003](../../.tmp/qa-focused-20261018/IP-003-created-cap3-selection5.png): cap 3/selected 5.
+- [IP-004](../../.tmp/qa-focused-20261018/IP-004-created-cap5-preserved.png): cap 5 và hidden selection giữ nguyên.
+- [IP-005](../../.tmp/qa-focused-20261018/IP-005-assigned-five.png): Gán 5 thành công.
+- [IP-006](../../.tmp/qa-focused-20261018/IP-006-management-batch-created.png): route quản lý tạo batch.
 
 Journal của browser ở cùng thư mục (`browser-journal.jsonl`, các action IP thuộc lượt triển khai này). Nhiều nhóm/ID unusable, late response và reload failure được kiểm tự động có điều khiển; không tuyên bố đã dựng từng case đó bằng dữ liệu browser thật. Chưa chạy screen reader/toàn keyboard form hoặc hai staff gán đồng thời.
 
@@ -113,7 +113,7 @@ Journal của browser ở cùng thư mục (`browser-journal.jsonl`, các action
 
 Tất cả mutation qua UI, không dùng time fixture trong task này. Tạo thêm 4 groups: QTKD .5 cap3 (sau đó closed), .6 cap5 (open, 5 members); CNTT .2/.3 closed cap2. QTKD .2 đổi cap10→5 và còn5 members; .4 closed; .3 giữ closed như baseline. Năm học viên từ .2 được gán sang .6. Không reset/cleanup dữ liệu review.
 
-Read-only snapshot [db-inplace-final.json](../.tmp/qa-focused-20261018/db-inplace-final.json): groups **7→11**, memberships **15→15**, admission records/evaluations **211/21** giữ nguyên; offerings6/sessions6/gradebook1 giữ nguyên. Báo cáo QA trước vẫn là snapshot lịch sử, không sửa lại để phản ánh dataset mới.
+Read-only snapshot [db-inplace-final.json](../../.tmp/qa-focused-20261018/db-inplace-final.json): groups **7→11**, memberships **15→15**, admission records/evaluations **211/21** giữ nguyên; offerings6/sessions6/gradebook1 giữ nguyên. Báo cáo QA trước vẫn là snapshot lịch sử, không sửa lại để phản ánh dataset mới.
 
 ## Unchanged
 

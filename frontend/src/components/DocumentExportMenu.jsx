@@ -79,7 +79,7 @@ export default function DocumentExportMenu({ onWord, onExcel, onPdf, onError, fo
     onBlur={(event) => { if (!root.current?.contains(event.relatedTarget) && !menu.current?.contains(event.relatedTarget)) setOpen(false); }}>
     <button ref={trigger} type="button" className={`document-export-trigger ${className}`} aria-label={title || label}
       aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined}
-      title={title} aria-busy={busy} disabled={disabled || busy} onClick={() => setOpen(!open)}>
+      title={open ? undefined : title} aria-busy={busy} disabled={disabled || busy} onClick={() => setOpen(!open)}>
       <ExportDownloadIcon /><span>{busy ? "Đang xuất…" : label}</span><ExportChevronIcon />
     </button>
     {open && !disabled && createPortal(<div ref={menu} id={menuId} role="menu" aria-label={label} className="document-export-options" style={position}>

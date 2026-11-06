@@ -4,7 +4,6 @@ import { serializeSnapshot, snapshotDigest } from "./transcript-snapshot.js";
 import { academicProgress } from "./academic-progress.js";
 import { auditActor } from "../plan/membership-history.js";
 import { CurriculumBlock } from "../database/models/plan/curriculum-block.model.js";
-import { CurriculumElectiveGroup } from "../database/models/plan/curriculum-elective-group.model.js";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import { QueryTypes } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
@@ -153,13 +152,15 @@ export class ClassScoreSummaryService {
       include: [
         { model: Major, attributes: ["id", "name"] },
         { model: Curriculum, attributes: ["id", "code", "name", "totalCredits"], include: [
-          { model: CurriculumBlock, as: "blocks" }, { model: CurriculumElectiveGroup, as: "electiveGroups" },
+          { model: CurriculumBlock, as: "blocks" },
         ] },
       ],
     });
     if (!group) throw new NotFoundException("Không tìm thấy lớp học viên.");
     const subjects = sortCurriculumSubjectsByVietnameseName(group.curriculumId ? await this.sequelize.query<any>(`
-      SELECT s.id, s.canonical_subject_id AS "canonicalSubjectId", COALESCE(NULLIF(s.code_text, ''), s.code) AS code, s.name, s.credits, s.is_required AS "isRequired", cs.block_id AS "blockId", cs.elective_group_id AS "electiveGroupId", COALESCE(catalog_block.name, b.name) AS "blockName",
+      SELECT s.id, s.canonical_subject_id AS "canonicalSubjectId", COALESCE(NULLIF(s.code_text, ''), s.code) AS code, s.name, s.credits,
+        cs.is_required AS "isRequired", cs.block_id AS "blockId", NULL::text AS "electiveGroupId",
+        COALESCE(catalog_block.name, b.name) AS "blockName",
         ${foreignLanguageSubjectSql('s.id')} AS "isForeignLanguage"
       FROM curriculum_subjects cs
       JOIN subjects s ON s.id = cs.subject_id
@@ -167,7 +168,8 @@ export class ClassScoreSummaryService {
       LEFT JOIN curriculum_blocks catalog_block ON catalog_block.curriculum_id = cs.curriculum_id AND catalog_block.code = s.subject_type
       WHERE cs.curriculum_id = :curriculumId
       ORDER BY b.sort_order, cs.sort_order, s.sort_order, s.code, s.id
-    `, { type: QueryTypes.SELECT, replacements: { curriculumId: group.curriculumId } }) : []);
+    `, { type: QueryTypes.SELECT, replacements: { curriculumId: group.curriculumId, classGroupId: group.id,
+    } }) : []);
     const pageSize = Math.min(100, Math.max(1, query.pageSize || 50));
     const [roster] = await this.sequelize.query<any>(`
       ${CLASS_ROSTER_CTE}, filtered AS (
@@ -276,7 +278,7 @@ export class ClassScoreSummaryService {
       }
     }
     const storedCurriculum = typeof group.curriculum?.toJSON === "function" ? group.curriculum.toJSON() : group.curriculum;
-    const curriculum = storedCurriculum ? { ...storedCurriculum, totalCredits: subjects.reduce((total: number, subject: any) => total + Number(subject.credits || 0), 0) } : null;
+    const curriculum = storedCurriculum ? { ...storedCurriculum, electiveGroups: [], totalCredits: subjects.reduce((total: number, subject: any) => total + Number(subject.credits || 0), 0) } : null;
     const plainGroup = typeof group.toJSON === "function" ? group.toJSON() : group;
     return { group: { ...plainGroup, curriculum }, curriculum, subjects, rows, total: roster.total, page: roster.page, pageSize,
       scorePolicy: "Điểm lấy từ kết quả học phần đã được công nhận hoặc kết quả đã lưu của lần học mới nhất, xác định theo thời điểm mở lớp học phần. Sửa bảng điểm lớp cũ không thay thế kết quả lần học mới hơn. Ô trống: chưa có điểm; MT: miễn thi. Không đạt do bảo lưu: học phần đã có lịch buổi đầu hoặc đã có điểm khi duyệt bảo lưu." };

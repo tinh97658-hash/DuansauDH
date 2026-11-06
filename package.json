@@ -36,8 +36,5 @@
     "test:backend": "npm --prefix backend run test:ci",
     "test:frontend": "npm --prefix frontend run test:ci",
     "test:coverage": "npm --prefix backend run test:coverage && npm --prefix frontend run test:coverage"
-  },
-  "dependencies": {
-    "react-router-dom": "^7.18.4"
   }
 }

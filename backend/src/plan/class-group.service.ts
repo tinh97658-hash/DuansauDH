@@ -194,7 +194,10 @@ export class ClassGroupService {
   }
 
   async remove(id: string, transaction?: Transaction) {
-    const group = await this.classGroups.findByPk(id, { transaction });
+    if (!transaction) return this.sequelize.transaction(tx => this.remove(id, tx));
+    await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
+    await lockTrainingStructure(this.sequelize, transaction);
+    const group = await this.classGroups.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
     if (!group) throw new NotFoundException("Không tìm thấy nhóm học phần.");
     if (group.canEdit === false) throw new ForbiddenException("Bạn không được xóa nhóm này theo cấu hình vai trò.");
     const memberCount = await this.classGroupMembers.count({ where: { classGroupId: id }, transaction });

@@ -11,7 +11,6 @@ import { Room } from "../database/models/common/room.model.js";
 import { Subject } from "../database/models/plan/subject.model.js";
 import { CurriculumSubject } from "../database/models/plan/curriculum-subject.model.js";
 import { Curriculum } from "../database/models/plan/curriculum.model.js";
-import { ClassGroupElective } from "../database/models/training/class-group-elective.model.js";
 import { Staff } from "../database/models/staff.model.js";
 import { ClassGroup } from "../database/models/training/class-group.model.js";
 import { ClassGroupMember } from "../database/models/training/class-group-member.model.js";
@@ -31,7 +30,6 @@ import { ClassScoreSummaryService } from "../reports/class-score-summary.service
     Subject,
     Curriculum,
     CurriculumSubject,
-    ClassGroupElective,
     ClassGroup,
     ClassGroupMember,
     Major,

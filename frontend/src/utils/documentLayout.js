@@ -1,8 +1,12 @@
 // Physical units shared by print, DOCX (twips) and XLSX (points/inches).
 export const mmToPoints = mm => mm * 72 / 25.4;
 export const pointsToTwips = points => Math.round(points * 20);
-export const pointsToExcelWidth = points => points * 4 / 3 < 12 ? points / 9 : (points * 4 / 3 - 5) / 7;
-export const excelWidthToPoints = width => width < 1 ? width * 9 : (width * 7 + 5) * 3 / 4;
+// ExcelJS writes OOXML column widths directly. These already include padding;
+// subtracting the UI's 5px padding here narrows every column, especially forms
+// split into many small columns to support independently merged fields.
+// The workbook's Normal font is Calibri 11 (maximum digit width: 7px at 96dpi).
+export const pointsToExcelWidth = points => points * 4 / 3 / 7;
+export const excelWidthToPoints = width => width * 7 * 3 / 4;
 export const REPORT_LAYOUT = Object.freeze({ margin: 12, heading: 10, title: 15, body: 11, table: 10, line: 1.35, padding: 3.75 });
 export const reportPageWidth = landscape => mmToPoints((landscape ? 297 : 210) - 2 * REPORT_LAYOUT.margin);
 export const sameDocumentTitle = (left, right) => String(left || "").trim().toLocaleLowerCase("vi-VN") === String(right || "").trim().toLocaleLowerCase("vi-VN");

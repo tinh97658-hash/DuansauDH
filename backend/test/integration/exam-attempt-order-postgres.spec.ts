@@ -44,7 +44,8 @@ describeDb("Learning attempt ordering across reports, credits and retakes", () =
         canonical_subject_id uuid, is_required boolean DEFAULT true, subject_type text DEFAULT 'KC', program text DEFAULT 'masters',
         allow_cross_major boolean DEFAULT false, shared_major_ids uuid[] DEFAULT '{}') ON COMMIT DROP;
       CREATE TEMP TABLE curriculum_blocks (id uuid, name text, sort_order int, curriculum_id uuid, code text) ON COMMIT DROP;
-      CREATE TEMP TABLE curriculum_subjects (curriculum_id uuid, subject_id uuid, block_id uuid, elective_group_id uuid, sort_order int DEFAULT 0) ON COMMIT DROP;
+      CREATE TEMP TABLE curriculum_subjects (curriculum_id uuid, subject_id uuid, block_id uuid, elective_group_id uuid,
+        is_required boolean DEFAULT true, sort_order int DEFAULT 0) ON COMMIT DROP;
       CREATE TEMP TABLE course_offerings (id uuid, subject_id uuid, created_at timestamptz, status text DEFAULT 'completed') ON COMMIT DROP;
       CREATE TEMP TABLE course_offering_class_groups (course_offering_id uuid, class_group_id uuid, participant_ids text[]) ON COMMIT DROP;
       CREATE TEMP TABLE course_exam_gradebooks (id uuid, class_group_id uuid, course_offering_id uuid, updated_at timestamptz, grades jsonb) ON COMMIT DROP;

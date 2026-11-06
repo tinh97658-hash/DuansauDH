@@ -23,14 +23,14 @@ const upsertMajors = async (model: any, rows: Row[]) => {
       where: { name: row.name, disciplineId: row.disciplineId, program: row.program },
       defaults: row,
     });
-    if (!wasCreated) { await record.update(row); updated++; } else { created++; }
+    // Existing installations may use their own major codes; only default new rows.
+    const { code: _code, ...updates } = row;
+    if (!wasCreated) { await record.update(updates); updated++; } else { created++; }
   }
   return { created, updated };
 };
 
-async function run() {
-  const app = await NestFactory.createApplicationContext(AppModule, { logger: false });
-  const sequelize = app.get<Sequelize>(getConnectionToken());
+async function seedCommon(sequelize: Sequelize) {
   const results: Record<string, { created: number; updated: number }> = {};
 
   results.ethnicities = await upsertByCode(sequelize.models.Ethnicity, [
@@ -96,12 +96,12 @@ async function run() {
     (await sequelize.models.Discipline.findOne({ where: { code } }))?.get("id") as string | undefined;
 
   results.majors = await upsertMajors(sequelize.models.Major, [
-    { name: "Khai thác hàng hải", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7840101") },
-    { name: "Điều khiển tàu biển", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7840101") },
-    { name: "Kỹ thuật cơ khí", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7580201") },
-    { name: "Kỹ thuật điện - Điện tử", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7520216") },
-    { name: "Kinh tế vận tải biển", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7840104") },
-    { name: "Xây dựng công trình thủy", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7580213") },
+    { code: "KTHH", name: "Khai thác hàng hải", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7840101") },
+    { code: "DKTB", name: "Điều khiển tàu biển", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7840101") },
+    { code: "CKTB", name: "Kỹ thuật cơ khí", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7580201") },
+    { code: "DTDD", name: "Kỹ thuật điện - Điện tử", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7520216") },
+    { code: "KTVB", name: "Kinh tế vận tải biển", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7840104") },
+    { code: "XDCT", name: "Xây dựng công trình thủy", program: "masters", trainingLevelId: masterLevelId || null, disciplineId: await disciplineId("7580213") },
   ]);
 
   results.studyStatuses = await upsertByCode(sequelize.models.StudyStatus, [
@@ -120,7 +120,15 @@ async function run() {
   for (const [key, value] of Object.entries(results)) {
     console.log(`Seeded ${key}: created=${value.created}, updated=${value.updated}`);
   }
-  await app.close();
+}
+
+async function run() {
+  const app = await NestFactory.createApplicationContext(AppModule, { logger: false });
+  try {
+    await seedCommon(app.get<Sequelize>(getConnectionToken()));
+  } finally {
+    await app.close();
+  }
 }
 
 run().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -8,7 +8,7 @@ button.document-export-trigger:disabled{opacity:.5;cursor:default;box-shadow:non
 .report-export-chevron{margin-left:2px;transition:transform .15s}
 [aria-expanded="true"] .report-export-chevron{transform:rotate(180deg)}
 .document-export-trigger:focus-visible,.document-export-options button:focus-visible{outline:2px solid #168ab6;outline-offset:2px}
-.document-export-options{--dropdown-highlight-bg:#f1f5f9;--dropdown-highlight-text:#1e293b;position:fixed;min-width:0;padding:6px;border:1px solid #e0e5eb;border-radius:10px;background:#fff;box-shadow:0 8px 28px #172b3a1c,0 2px 6px #172b3a0a;z-index:1500;box-sizing:border-box;overflow-x:hidden;overflow-y:auto}
+.document-export-options{--dropdown-highlight-bg:#f1f5f9;--dropdown-highlight-text:#1e293b;position:fixed;min-width:0;padding:6px;border:1px solid #e0e5eb;border-radius:10px;background:#fff;box-shadow:0 8px 28px #172b3a1c,0 2px 6px #172b3a0a;z-index:3000;box-sizing:border-box;overflow-x:hidden;overflow-y:auto;pointer-events:auto}
 .document-export-options button{display:flex;align-items:center;gap:11px;width:100%;min-width:0;min-height:42px;padding:10px 12px;border:0;border-radius:6px;background:#fff;color:#283442;font:inherit;font-size:13px;font-weight:500;line-height:20px;text-align:left;white-space:normal;overflow-wrap:anywhere;cursor:pointer}
 .document-export-options button>span{min-width:0;flex:1;white-space:normal;overflow-wrap:anywhere}
 .document-export-icon{width:20px;height:20px;flex:none;fill:none;stroke:currentColor}

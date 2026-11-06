@@ -10,7 +10,7 @@ import { ClassGroupMember } from "../database/models/training/class-group-member
 import { CourseOffering } from "../database/models/training/course-offering.model.js";
 import { CourseOfferingClassGroup } from "../database/models/training/course-offering-class-group.model.js";
 import { CourseExamGrade, CourseExamGradebook } from "../database/models/training/course-exam-gradebook.model.js";
-import { ExamGradebookQueryDto, ExamGradeRowDto, SaveExamGradebookDto } from "./dto/exam-gradebook.dto.js";
+import { ExamGradebookQueryDto, ExamGradeRowDto, SaveExamGradebookDto, ImportExamComponentsDto } from "./dto/exam-gradebook.dto.js";
 import { calculateExamEligibility, calculateExamGrade } from "./exam-grade-calculation.js";
 import { GradingPolicyService } from "./grading-policy.service.js";
 import { excludeRecognizedExamParticipant } from "./recognized-exam-participant.js";
@@ -72,7 +72,12 @@ export class ExamGradebookService {
     if (!this.access) return this.get(query);
     const access=await this.access.assertOffering(actor,query.courseOfferingId);
     const result=await this.get(query);
-    return {...result,rows:result.rows.map(row=>({...row,canEditGrade:this.access!.canEdit(access)}))};
+    const [schedule] = await this.sequelize.query<{ exists: boolean }>(
+      'SELECT EXISTS(SELECT 1 FROM course_exam_sessions WHERE course_offering_id=:id) AS exists',
+      { type: QueryTypes.SELECT, replacements: { id: query.courseOfferingId } });
+    return {...result, componentImportAllowed: result.offering?.status === 'completed' && 'mode' in result.workflow && result.workflow.mode === 'new'
+      && !['submitted','approved'].includes(result.workflow.status) && schedule?.exists === false && this.access.canEdit(access),
+      rows:result.rows.map(row=>({...row,canEditGrade:this.access!.canEdit(access)}))};
   }
 
   async historyForActor(query: ExamGradebookQueryDto, actor: unknown) {
@@ -313,6 +318,14 @@ export class ExamGradebookService {
         return state?.mode==='new'?this.workflow!.componentRow(resolved):resolved;
       }),
     };
+  }
+
+  async importComponents(dto: ImportExamComponentsDto, actor: any) {
+    if(this.access)await this.access.assertOffering(actor,dto.courseOfferingId);
+    if(!this.workflow)throw new ConflictException('Cần dùng quy trình bảng điểm mới để nhập điểm từ Excel.');
+    await this.scope(dto);
+    await this.workflow.save(dto,actor,tx=>this.allWorkflowRows(dto,tx),{componentImport:true});
+    return this.getForActor({...dto,rosterScope:'offering'},actor);
   }
 
   async save(dto: SaveExamGradebookDto, actor?: any) {
