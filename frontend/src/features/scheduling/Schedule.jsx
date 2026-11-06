@@ -426,7 +426,7 @@ export default function Schedule({ user }) {
     const suggestClosing = shouldSuggestClosing(offering);
     const closingMessage = `Đã học được ${summary.heldCount || 0} buổi, bạn có muốn đóng lớp không?`;
     return <article key={offering.id} id={`offering-${offering.id}`} className={`sl-card ${selectedId === offering.id ? "sl-selected" : ""}`}>
-      <div className="sl-card-heading"><button className="sl-btn sl-btn-link sl-card-detail" onClick={() => setDetails(offering)}><strong>{offeringTitle(offering)}</strong><span>{subjectLabel(offering)}</span><small>{groupsOf(offering).length} lớp/nhóm · {offering.participantCount ?? 0} HV</small></button>
+      <div className="sl-card-heading"><button type="button" className="sl-card-detail" onClick={() => setDetails(offering)}><strong>{offeringTitle(offering)}</strong><span>{subjectLabel(offering)}</span><small>{groupsOf(offering).length} lớp/nhóm · {offering.participantCount ?? 0} HV</small></button>
         {suggestClosing && <Tooltip title={closingMessage} arrow placement="top" enterDelay={0} enterNextDelay={0}>
           <button type="button" className="sl-close-suggestion" aria-label={closingMessage} onClick={() => setDetails(offering)}><ExclamationTriangleIcon aria-hidden="true" /></button>
         </Tooltip>}
