@@ -259,7 +259,7 @@ describe("operational dashboard aggregation", () => {
     f.requests.query.mockResolvedValueOnce([{ id: 'leave', recordId: 'learner', fullName: 'Nguyễn Văn An', code: 'HV01', reason: 'Việc gia đình' }]);
     const leave = await f.service.operational(user(), '2026', 'studyLeaveApproval');
     expect(leave.sources.studyLeaveApproval.data).toMatchObject({ count: 1, items: [{
-      title: 'Nguyễn Văn An · HV01', detail: 'Bảo lưu chờ duyệt · Việc gia đình', href: '/masters/study-leaves/learner?tab=leave',
+      title: 'Nguyễn Văn An · HV01', detail: 'Bảo lưu chờ duyệt · Việc gia đình', href: '/masters/study-leaves',
     }] });
     expect(f.requests.query).toHaveBeenCalledWith(expect.stringContaining("request.status = 'pending'"), expect.objectContaining({ replacements: { year: '2026' } }));
     expect(f.requests.query.mock.calls[0][0]).toContain("record.academic_year = :year");

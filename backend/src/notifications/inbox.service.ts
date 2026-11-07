@@ -26,7 +26,7 @@ export class InboxService {
     for (;;) {
       const rows = await this.db.query<Delivery>(`SELECT d.id,d.read_at,d.audience,e.kind,e.entity_id,e.occurred_at
         FROM notification_deliveries d JOIN notification_events e ON e.id=d.event_id
-        WHERE d.staff_id=:staff AND d.profile_id=:profile
+        WHERE d.staff_id=:staff AND d.profile_id=:profile AND e.actor_staff_id IS DISTINCT FROM d.staff_id
         ORDER BY e.occurred_at DESC,d.id DESC LIMIT 500 OFFSET :offset`,
       { type: QueryTypes.SELECT, replacements: { staff: user.id, profile, offset } });
       for (const row of rows) {

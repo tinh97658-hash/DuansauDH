@@ -79,8 +79,7 @@ export class DashboardService {
       id: row.id, title: [row.fullName, row.code].filter(Boolean).join(" · "),
       detail: [leave ? (row.extensionPending ? "Gia hạn bảo lưu chờ duyệt" : "Bảo lưu chờ duyệt")
         : `${row.fromMajor} → ${row.toMajor}`, row.reason].filter(Boolean).join(" · "),
-      href: href(leave ? `/masters/study-leaves/${row.recordId}` : `/plan/admission-records/${row.recordId}`,
-        { tab: leave ? "leave" : "profile" }),
+      href: leave ? '/masters/study-leaves' : href(`/plan/admission-records/${row.recordId}`, { tab: 'profile' }),
     }));
     return { count: items.length, itemCount: items.length, items,
       href: items[0]?.href || (leave ? "/masters/study-leaves" : "/plan/admission-records") };
@@ -285,7 +284,7 @@ export class DashboardService {
       : { pending: 'Yêu cầu chuyển chuyên ngành', approved: 'Chuyển chuyên ngành đã duyệt', rejected: 'Chuyển chuyên ngành bị từ chối' };
     return rows.map(row => ({ id: `${leave ? 'leave' : 'transfer'}:${row.id}:${row.action}:${row.at}`, title: row.title,
       detail: labels[row.action] || 'Yêu cầu đã được cập nhật', at: row.at,
-      href: href(leave ? `/masters/study-leaves/${row.recordId}` : `/plan/admission-records/${row.recordId}`, { tab: leave ? 'leave' : 'profile' }) }));
+      href: leave ? '/masters/study-leaves' : href(`/plan/admission-records/${row.recordId}`, { tab: 'profile' }) }));
   }
 
   async operational(user: unknown, year: string, section?: DashboardSection, program: DashboardProgram = "masters") {

@@ -62,8 +62,8 @@ export class InboxSyncService implements OnModuleInit, OnModuleDestroy {
           const [stored] = await this.select<{ id: string }>('SELECT id FROM notification_events WHERE source_key=:key', { key: event.sourceKey }, transaction);
           const sender = event.kind.endsWith('.requested') || event.kind === 'grade.submitted' ? null : await this.sender(event, transaction);
           for (const actor of staff) for (const profile of profiles.get(actor.id) || []) {
+            if (actor.id === event.actorStaffId) continue;
             const relatedSender = sender?.staffId === actor.id && sender?.profileId === profile.id;
-            // A sender who can also approve remains eligible, including self approval.
             const audience = relatedSender && await this.access.target(actor, profile.id, event, 'sender') ? 'sender'
               : needsApprover(event.kind) && await this.access.target(actor, profile.id, event, 'approver') ? 'approver' : null;
             if (!audience) continue;

@@ -148,14 +148,19 @@ describeDb('Notification V2 — isolated PostgreSQL, actual audit capture and bu
     if (errors.length) throw new AggregateError(errors, 'Notification fixture cleanup failed');
   });
 
-  it('delivers submitted grades only to permitted profiles in scope; supports self notification', async () => {
+  it('delivers submitted grades to other permitted profiles, never the actor', async () => {
     await grade('submit'); await sync.sync().catch(error => { throw new Error(error.original?.message || error.message); });
     const b = await list(); expect(b.items).toHaveLength(1); expect(b.unreadCount).toBe(1); expect(b.items[0].href).toContain(`offeringId=${ids.offering}`);
     expect((await list('a','submit')).total).toBe(0);
     expect((await list('b','submit')).total).toBe(0);
     expect((await list('c','outside')).total).toBe(0);
     await grade('submit','b','approve'); await sync.sync().catch(error => { throw new Error(error.original?.message || error.message); });
-    expect((await list()).unreadCount).toBe(2);
+    expect((await list()).unreadCount).toBe(1);
+    expect((await list('d','approve')).unreadCount).toBe(2);
+    await q(`INSERT INTO notification_deliveries(id,event_id,staff_id,profile_id,audience)
+      SELECT gen_random_uuid(),id,:staff,:profile,'approver' FROM notification_events WHERE actor_staff_id=:staff RETURNING id`,
+    { staff: ids.b, profile: ids.approve });
+    expect((await list()).unreadCount).toBe(1); // Existing self-deliveries are hidden too.
   });
   it('keeps post-activation facts when the audit clock moves behind the activation timestamp', async () => {
     // Notification metadata alone simulates a clock correction; source audit is untouched.
@@ -191,7 +196,7 @@ describeDb('Notification V2 — isolated PostgreSQL, actual audit capture and bu
     await appendLeave('approve_extension','b','approve'); await appendLeave('request_extension','a','submit'); await appendLeave('reject_extension','b','approve'); await sync.sync().catch(error => { throw new Error(error.original?.message || error.message); });
     const a = await as('a','submit', () => inbox.list(actors.a, 1, 50));
     expect(a.items.map(x => x.type)).toEqual(expect.arrayContaining(['leave.approved','extension.approved','extension.rejected']));
-    expect(a.items.find(x => x.type === 'extension.approved').href).toBe(`/masters/study-leaves/${ids.record}?tab=leave`);
+    expect(a.items.find(x => x.type === 'extension.approved').href).toBe('/masters/study-leaves');
   });
   it('does not lose a source transaction committed after a later audit ID was processed', async () => {
     const transaction = await raw.transaction();
@@ -215,7 +220,7 @@ describeDb('Notification V2 — isolated PostgreSQL, actual audit capture and bu
     beforeEach(async () => {
       const start = performance.now();
       await submittedGrades();
-      expect((await list()).total).toBe(2);
+      expect((await list()).total).toBe(1);
       expect((await list('d','approve')).total).toBe(2);
       metrics.fixtureMs += performance.now() - start;
       testStart = performance.now();
@@ -242,7 +247,7 @@ describeDb('Notification V2 — isolated PostgreSQL, actual audit capture and bu
     });
     it('sends approval and reopen to the original sender profile', async () => {
       await grade('approve','b','approve'); await sync.sync().catch(error => { throw new Error(error.original?.message || error.message); });
-      expect((await list()).items.some(x => x.type === 'grade.approved')).toBe(true); // Most recent submitter was B.
+      expect((await list()).items.some(x => x.type === 'grade.approved')).toBe(false); // B approved their own submission.
       await grade('submit'); await grade('approve','b','approve'); await grade('reopen','b','approve'); await sync.sync().catch(error => { throw new Error(error.original?.message || error.message); });
       const a = await list('a','submit');
       expect(a.items.map(x => x.type)).toEqual(expect.arrayContaining(['grade.approved','grade.reopened']));
@@ -258,7 +263,7 @@ describeDb('Notification V2 — isolated PostgreSQL, actual audit capture and bu
         testStart = performance.now();
       });
       it('paginates and marks all read only for the current recipient', async () => {
-        const page = await as('b','approve', () => inbox.list(actors.b, 2, 2)); expect(page.items).toHaveLength(2);
+        const page = await as('b','approve', () => inbox.list(actors.b, 2, 2)); expect(page.items).toHaveLength(1);
         const bBefore = (await list()).unreadCount;
         expect((await list('a','submit')).unreadCount).toBeGreaterThan(0);
         await as('a','submit', () => inbox.readAll(actors.a)); expect((await list('a','submit')).unreadCount).toBe(0);
