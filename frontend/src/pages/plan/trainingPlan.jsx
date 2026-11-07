@@ -502,6 +502,14 @@ const TrainingPlan = () => {
   // SUBJECT ACTIONS (EXCEL-LIKE INLINE WORKFLOW)
   // ==========================================
   const handleStartAddSubject = () => {
+    if (!isAdmin) return;
+    if (isAddingSubject) {
+      const row = draftRowRef.current;
+      const input = row?.contains(lastDraftInputRef.current) ? lastDraftInputRef.current : firstDraftInputRef.current;
+      input?.focus({ preventScroll: true });
+      row?.scrollIntoView?.({ block: "center", inline: "nearest", behavior: "instant" });
+      return;
+    }
     const nextOrder = subjects.length > 0 ? Math.max(...subjects.map((s) => Number(s.sortOrder) || 0)) + 1 : 1;
     setSubjectDraft(initialSubjectDraft(nextOrder));
     setIsAddingSubject(true);
@@ -1206,7 +1214,7 @@ const TrainingPlan = () => {
             justifyContent="space-between"
             sx={{ mb: 1.5 }}
           >
-            <Stack direction="row" spacing={1} alignItems="flex-end" flexWrap="wrap">
+            <Stack className="app-filter-toolbar" direction="row" spacing={1} alignItems="flex-end" flexWrap="nowrap">
               <FilterSearchField
                 placeholder="Tìm kiếm mã HP, tên học phần..."
                 value={subjectSearch}
@@ -1233,7 +1241,7 @@ const TrainingPlan = () => {
                 <strong style={{ color: "#0788B8" }}>{subjectStats.totalCredits}</strong> TC)
               </Typography>
 
-              {isAdmin && !isAddingSubject && (
+              {isAdmin && (
                 <Button
                   variant="contained"
                   size="small"
@@ -1245,12 +1253,14 @@ const TrainingPlan = () => {
                     fontSize: 12,
                     fontWeight: 700,
                     textTransform: "none",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
                     borderRadius: "8px",
                     boxShadow: "none",
                     "&:hover": { bgcolor: "#056A8F", boxShadow: "none" },
                   }}
                 >
-                  Thêm dòng mới
+                  {isAddingSubject ? "Tiếp tục thêm học phần" : "Thêm dòng mới"}
                 </Button>
               )}
             </Stack>

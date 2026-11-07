@@ -119,6 +119,7 @@ export function readGradebookPreview(id) {
   try {
     const data = JSON.parse(window.sessionStorage.getItem(`${PREVIEW_PREFIX}${id}`));
     return data?.version === 1 && ["university", "institute", "title", "group", "subject", "signingDate"].every(key => typeof data[key] === "string") &&
+      (data.responsibleStaffName == null || typeof data.responsibleStaffName === "string") &&
       Array.isArray(data.headers) && data.headers.length === gradebookColumns(data.kind === "exam-list").length && data.headers.every(value => typeof value === "string") &&
       Array.isArray(data.rows) && data.rows.every(row => Array.isArray(row) && row.length === data.headers.length && row.every(value => value == null || ["string", "number"].includes(typeof value))) ? data : null;
   } catch { return null; }

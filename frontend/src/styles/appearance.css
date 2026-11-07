@@ -245,6 +245,14 @@
       min-width: max-content;
     }
 
+    /* Keep the inline deselect action compact as the surrounding text scales. */
+    html[data-font-size] body .sl-schedule-view .sl-selected-strip > .sl-selected-clear {
+      height: calc(1em + 3mm + 2px) !important;
+      min-height: 0 !important;
+      padding: 1.5mm !important;
+      line-height: 1 !important;
+    }
+
     html[data-font-size] .tp-search input {
       box-sizing: border-box;
       height: 100% !important;

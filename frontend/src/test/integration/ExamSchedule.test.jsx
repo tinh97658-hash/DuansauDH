@@ -18,18 +18,48 @@ const date='2026-10-19',offering={id:'offering',name:'Lớp QT 2026',subjectId:'
 const room={id:'room',name:'Phòng giảng đường',code:'301',capacity:2,isActive:true};let data;
 const renderPage=(permissions=['exams.view','exams.write'])=>renderWithPermissions(<MemoryRouter useTransitions={false}><ExamSchedule/></MemoryRouter>,permissions);
 
-it('confirms attendance from the footer and keeps the reloaded roster locked',async()=>{
+it('closes the roster after attendance confirmation and keeps it locked when reopened',async()=>{
  data.sessions=[session({status:'held',canEdit:false,canRecordAttendance:true,canConfirmAttendance:true,arrangementId:'arrangement',
   candidates:[{participantId:'student:a',code:'HV001',fullName:'Nguyễn Văn An',attendanceStatus:'absent_excused'}]})];
  axios.post.mockImplementation(async()=>{data.sessions=data.sessions.map(s=>({...s,version:4,attendanceConfirmedAt:'2026-11-06T08:00:00Z',canRecordAttendance:false,canConfirmAttendance:false}));return {data:{id:'session',version:4,attendanceConfirmedAt:'2026-11-06T08:00:00Z',arrangementId:'arrangement',arrangementVersion:2}};});
  renderPage();await waitFor(()=>expect(document.querySelector('.ep-event')).not.toBeNull());fireEvent.click(document.querySelector('.ep-event'));
  const dialog=screen.getByRole('dialog');fireEvent.click(within(dialog).getByRole('button',{name:/Danh sách thí sinh/}));
  fireEvent.click(within(dialog).getByRole('button',{name:'Xác nhận trạng thái dự thi'}));
- await within(dialog).findByText('Đã xác nhận trạng thái dự thi');
  await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/session/attendance/confirm'),{version:3},{withCredentials:true}));
+ await waitFor(()=>expect(within(dialog).queryByRole('table',{name:'Danh sách thí sinh Quản trị'})).not.toBeInTheDocument());
+ expect(within(dialog).getByRole('button',{name:/Danh sách thí sinh/})).toHaveAttribute('aria-expanded','false');
+ expect(screen.getByRole('dialog')).toBe(dialog);
+ fireEvent.click(within(dialog).getByRole('button',{name:/Danh sách thí sinh/}));
+ await within(dialog).findByText('Đã xác nhận trạng thái dự thi');
  expect(within(dialog).getByRole('checkbox',{name:/Vắng CP/})).toBeChecked();
  expect(within(dialog).getByRole('checkbox',{name:/Vắng CP/})).toBeDisabled();
  expect(within(dialog).queryByRole('button',{name:'Xác nhận trạng thái dự thi'})).not.toBeInTheDocument();
+});
+
+it('shows only the candidate roster before Held, without absence choices or attendance confirmation',async()=>{
+ data.sessions=[session({pendingConfirmation:true,canEdit:false,canRecordAttendance:true,canConfirmAttendance:true,
+  candidates:[{participantId:'student:a',code:'HV001',fullName:'Nguyễn Văn An'}]})];
+ renderPage();await waitFor(()=>expect(document.querySelector('.ep-event')).not.toBeNull());fireEvent.click(document.querySelector('.ep-event'));
+ const dialog=screen.getByRole('dialog');
+ expect(within(dialog).queryByRole('table',{name:'Danh sách thí sinh Quản trị'})).not.toBeInTheDocument();
+ fireEvent.click(within(dialog).getByRole('button',{name:/Danh sách thí sinh/}));
+ expect(within(dialog).getByRole('table',{name:'Danh sách thí sinh Quản trị'})).toHaveTextContent('Nguyễn Văn An');
+ expect(within(dialog).queryByRole('checkbox',{name:/Vắng (CP|KP)/})).not.toBeInTheDocument();
+ expect(within(dialog).queryByRole('button',{name:'Xác nhận trạng thái dự thi'})).not.toBeInTheDocument();
+ expect(axios.post).not.toHaveBeenCalled();expect(axios.put).not.toHaveBeenCalled();
+});
+
+it('keeps the absence choices open when attendance confirmation fails',async()=>{
+ data.sessions=[session({status:'held',canEdit:false,canRecordAttendance:true,canConfirmAttendance:true,
+  candidates:[{participantId:'student:a',code:'HV001',fullName:'Nguyễn Văn An',attendanceStatus:'absent_unexcused'}]})];
+ axios.post.mockRejectedValue({response:{status:500,data:{message:'Chưa lưu được xác nhận'}}});
+ renderPage();await waitFor(()=>expect(document.querySelector('.ep-event')).not.toBeNull());fireEvent.click(document.querySelector('.ep-event'));
+ const dialog=screen.getByRole('dialog');fireEvent.click(within(dialog).getByRole('button',{name:/Danh sách thí sinh/}));
+ fireEvent.click(within(dialog).getByRole('button',{name:'Xác nhận trạng thái dự thi'}));
+ await within(dialog).findByText('Chưa lưu được xác nhận');
+ expect(within(dialog).getByRole('checkbox',{name:/Vắng KP/})).toBeChecked();
+ await waitFor(()=>expect(within(dialog).getByRole('button',{name:'Xác nhận trạng thái dự thi'})).toBeEnabled());
+ expect(within(dialog).getByRole('button',{name:/Danh sách thí sinh/})).toHaveAttribute('aria-expanded','true');
 });
 
 it('labels makeup candidates in the queue and schedules them through the normal exam editor',async()=>{

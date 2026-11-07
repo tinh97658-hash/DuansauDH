@@ -19,6 +19,8 @@ import StudyLeaveDecisionDialog from '../../features/learners/StudyLeaveDecision
 import StudyLeaveExtensionDialog from '../../features/learners/StudyLeaveExtensionDialog';
 import { usePermissions } from '../../features/accounts/usePermissions';
 import StudyManagementRecords from '../../features/learners/StudyManagementRecords';
+import { CalendarDaysIcon, ArrowRightIcon } from '../../components/AppIcons';
+import './studyLeaves.css';
 
 const COLUMNS = [
   { key: 'learner', label: 'Học viên', width: 190, minWidth: 180, stretch: false },
@@ -27,7 +29,7 @@ const COLUMNS = [
   { key: 'status', label: 'Trạng thái', width: 170, minWidth: 170, align: 'center' },
   { key: 'overdue', label: 'Quá hạn', width: 74, minWidth: 74, align: 'center', stretch: false },
   { key: 'approval', label: 'Phê duyệt', width: 190, minWidth: 180, align: 'center' },
-  { key: 'actions', label: 'Thao tác', width: 190, minWidth: 180, align: 'center' },
+  { key: 'actions', label: 'Thao tác', width: 250, minWidth: 240, align: 'center' },
 ];
 
 export default function StudyLeaves() {
@@ -130,10 +132,10 @@ function StudyLeaveList() {
           <Button size="small" variant="contained" disabled={loading} onClick={() => setExtension({ leave: row, action: 'approve_extension' })}>Duyệt gia hạn</Button>
           <Button size="small" color="error" disabled={loading} onClick={() => setExtension({ leave: row, action: 'reject_extension' })}>Từ chối gia hạn</Button>
         </Stack> : '—'}</TableCell>
-        <TableCell align="center"><Stack direction="row" justifyContent="center" sx={{ gap: 1, flexWrap: 'wrap' }}>
-          {active && !pendingExtension && can('studyleave.request') && <Button size="small" variant="outlined" disabled={loading} onClick={() => setExtension({ leave: row, action: 'request_extension' })}>Đề nghị gia hạn</Button>}
-          <Button size="small" component={Link} to={`/masters/study-leaves/${row.admissionRecordId}?tab=leave`} onPointerEnter={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)} onFocus={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)}>Mở hồ sơ</Button>
-        </Stack></TableCell>
+        <TableCell align="center"><div className="study-leave-row-actions">
+          <Link className="study-leave-action study-leave-action-primary" to={`/masters/study-leaves/${row.admissionRecordId}?tab=leave`} onPointerEnter={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)} onFocus={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)}>Mở hồ sơ<ArrowRightIcon aria-hidden="true" /></Link>
+          {active && !pendingExtension && can('studyleave.request') && <button type="button" className="study-leave-action study-leave-action-secondary" aria-label="Đề nghị gia hạn" title="Đề nghị gia hạn bảo lưu" disabled={loading} onClick={() => setExtension({ leave: row, action: 'request_extension' })}><CalendarDaysIcon aria-hidden="true" />Gia hạn</button>}
+        </div></TableCell>
       </TableRow>})}{!result.rows.length && <TableRow><TableCell colSpan={7} align="center" sx={{ py: 5, color: 'text.secondary' }}>{loading ? 'Đang tải…' : 'Không có hồ sơ bảo lưu phù hợp.'}</TableCell></TableRow>}</TableBody></ResizableTable>
       </TableContainer>
       <ListPagination count={result.total} page={page} pageSize={20} onPageChange={setPage} recordLabel="học viên" />

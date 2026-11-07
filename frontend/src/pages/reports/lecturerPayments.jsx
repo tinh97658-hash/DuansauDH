@@ -35,7 +35,7 @@ const PaymentRow = React.memo(function PaymentRow({ row, index, draft, disabled,
   return <><tr data-payment-key={rowKey(row)} aria-busy={busy}>
   <td rowSpan={rowSpan}>{index + 1}</td><td rowSpan={rowSpan}><span className="lp-cell-text" title={lecturerName}>{lecturerName}</span></td>
   <td rowSpan={rowSpan}><button className="lp-link" title={row.offeringName} onClick={() => setOffering({ id: row.courseOfferingId, name: row.offeringName })}><span className="lp-cell-text">{row.offeringName}</span></button></td>
-  <td><span className="lp-group-names" title={participatingGroups[0].name}>{participatingGroups[0].name}</span></td>
+  <td className="lp-participating-cell"><span className="lp-group-names" title={participatingGroups[0].name}>{participatingGroups[0].name}</span></td>
   <td rowSpan={rowSpan}>{row.sessionCount}</td><td rowSpan={rowSpan}>{dateLabel(row.completedAt)}</td>
   <td rowSpan={rowSpan}><input type="checkbox" data-payment-toggle aria-label={`Đã thanh toán: ${name}`} checked={value.paid}
     disabled={disabled || (busy && draft?.paid !== undefined)} onChange={event => toggle(row, event.target.checked)} /></td>
@@ -53,7 +53,7 @@ const PaymentRow = React.memo(function PaymentRow({ row, index, draft, disabled,
     {busy && <span className="lp-saving" role="status">Đang lưu…</span>}
     {draft?.error && <div className="lp-row-error" role="alert">{draft.error}</div>}</td>
   </tr>{participatingGroups.slice(1).map(group => <tr key={group.key} className="lp-group-row" aria-busy={busy}>
-    <td><span className="lp-group-names" title={group.name}>{group.name}</span></td>
+    <td className="lp-participating-cell"><span className="lp-group-names" title={group.name}>{group.name}</span></td>
   </tr>)}</>;
 });
 export default function LecturerPayments() {
@@ -203,7 +203,7 @@ export default function LecturerPayments() {
 
   return <FeatureLayout title="Báo cáo tài chính" exportConfig={false}>
     <div className="tp-page lp-page">
-      <section className="tp-filters lp-filters" aria-label="Bộ lọc thanh toán">
+      <section className="tp-filters lp-filters app-filter-toolbar" aria-label="Bộ lọc thanh toán">
         <div className="lp-date-filter" role="group" aria-label="Khoảng ngày hoàn thành">
           <label className="tp-filter"><span>Từ ngày</span><input aria-label="Từ ngày" type="date" value={filters.from} onChange={event => change('from', event.target.value)} /></label>
           <label className="tp-filter"><span>Đến ngày</span><input aria-label="Đến ngày" type="date" value={filters.to} onChange={event => change('to', event.target.value)} /></label>

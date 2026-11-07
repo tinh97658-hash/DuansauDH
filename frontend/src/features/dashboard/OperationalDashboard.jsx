@@ -9,8 +9,12 @@ import { useDashboardData } from './useDashboardData';
 import './operationalDashboard.css';
 
 const programs = { masters: 'Thạc sĩ', doctoral: 'Tiến sĩ' };
+const doctoralEmptyMessage = 'Chưa được phân công hoặc chưa có dữ liệu cho hệ Tiến sĩ.';
+const doctoralEmptySources = Object.fromEntries(['grouping', 'teaching', 'grades', 'approvals', 'studyLeaveApproval',
+  'majorTransferApproval', 'learnersChart', 'sessionsChart', 'completionChart'].map(key => [key, { status: 'empty', message: doctoralEmptyMessage }]));
 const currentYear = new Date().getFullYear();
-export const dashboardFilters = params => ({ year: /^\d{4}$/.test(params.get('year') || '') ? params.get('year') : String(currentYear),
+export const dashboardFilters = params => ({ year: /^\d{4}$/.test(params.get('year') || '')
+  && Number(params.get('year')) >= currentYear - 2 && Number(params.get('year')) <= currentYear + 2 ? params.get('year') : String(currentYear),
   program: params.get('program') === 'doctoral' ? 'doctoral' : 'masters' });
 const stages = ['components_missing', 'awaiting_exam', 'exam_missing', 'result_ready'];
 const stageTitles = ['Chưa hoàn thiện điểm thành phần', 'Chờ tổ chức thi', 'Thi xong, chờ nhập điểm thi', 'Đủ kết quả, chờ gửi duyệt'];
@@ -45,7 +49,7 @@ function SummaryCards({ permissions, sources, year }) {
       const count = metricCount(metric, definition.key);
       const href = ready ? workDestination(definition, metric, year) : null;
       const Card = href ? Link : 'div';
-      const status = ready ? count === 0 ? 'Đã xử lý hết' : 'Cần xử lý' : source?.status === 'error' ? 'Chưa tải được' : source?.status === 'not_implemented' ? 'Chưa triển khai' : 'Đang tải';
+      const status = ready ? count === 0 ? 'Đã xử lý hết' : 'Cần xử lý' : source?.status === 'empty' ? 'Chưa có dữ liệu' : source?.status === 'error' ? 'Chưa tải được' : source?.status === 'not_implemented' ? 'Chưa triển khai' : 'Đang tải';
       return <article className="od-stat" key={definition.key} data-kind={definition.key}>
         <Card className="od-stat-link" {...(href ? { to: href, 'aria-label': `Xem công việc: ${summaryLabels[definition.key]}` } : { 'aria-disabled': true })}>
         <div className="od-stat-body"><h2>{summaryLabels[definition.key]}</h2>
@@ -64,6 +68,7 @@ function SummaryCards({ permissions, sources, year }) {
 }
 
 export function SourceState({ source, onRetry }) {
+  if (source?.status === 'empty') return <p className="od-empty" role="status">{source.message}</p>;
   if (source?.status === 'not_implemented') return <p className="od-muted">{source.message || 'Nghiệp vụ này chưa được triển khai.'}</p>;
   if (source?.status === 'error') return <div className="od-source-error" role="alert">Chưa tải được dữ liệu.<button type="button" onClick={onRetry}>Thử lại</button></div>;
   return <p className="od-muted" role="status">Đang tải dữ liệu…</p>;
@@ -247,12 +252,17 @@ export default function OperationalDashboard() {
   const tab = selection.scope === scope ? selection.tab : 'grouping';
   const selectTab = value => setSelection({ scope, tab: value });
   const { state, retry } = useDashboardData(year, program);
-  const permissions = state.permissions || {};
+  const emptyDoctoral = program === 'doctoral' && !state.loading && !state.error
+    && Object.values(state.sources || {}).every(source => source.status === 'not_implemented');
+  // These flags only render non-actionable placeholders; API permissions remain unchanged.
+  const permissions = emptyDoctoral ? { ...state.permissions, grouping: true, scheduling: true, progress: true,
+    grades: true, overview: true, learnersOverview: true } : state.permissions || {};
+  const sources = emptyDoctoral ? doctoralEmptySources : state.sources;
   const hasWork = workDefinitions.some(definition => permissions[definition.key]);
   const hasApprovals = permissions.approvals || permissions.studyLeaveApproval || permissions.majorTransferApproval;
   const hasCharts = (permissions.overview || permissions.learnersOverview) && ['learnersChart', 'sessionsChart', 'completionChart']
-    .some(key => state.sources[key] && state.sources[key].status !== 'not_implemented');
-  const years = [...new Set([year, ...Array.from({ length: 7 }, (_, index) => String(currentYear - 4 + index))])].sort().reverse();
+    .some(key => sources[key] && sources[key].status !== 'not_implemented');
+  const years = Array.from({ length: 5 }, (_, index) => String(currentYear + 2 - index));
   const setFilter = (key, value) => { const next = new URLSearchParams(params); next.set(key, value); setParams(next); };
   return <div className="operational-dashboard">
     <header className="od-header"><div>
@@ -268,12 +278,12 @@ export default function OperationalDashboard() {
       : <div className="od-content" key={scope}>
         <DashboardColumns className={`od-layout${hasWork && (hasApprovals || hasCharts) ? '' : ' od-layout-single'}`}>
         {hasWork && <div className="od-work-column">
-          <SummaryCards permissions={permissions} sources={state.sources} year={year} />
-          <WorkPanel permissions={permissions} sources={state.sources} retry={retry} tab={tab} setTab={selectTab} year={year} />
+          <SummaryCards permissions={permissions} sources={sources} year={year} />
+          <WorkPanel permissions={permissions} sources={sources} retry={retry} tab={tab} setTab={selectTab} year={year} />
         </div>}
         {(hasApprovals || hasCharts) && <aside className="od-sidebar" aria-label="Phê duyệt và tổng quan">
-          {hasApprovals && <ApprovalPanel permissions={permissions} sources={state.sources} retry={retry} />}
-          {hasCharts && <OverviewCharts permissions={permissions} sources={state.sources} retry={retry} />}
+          {hasApprovals && <ApprovalPanel permissions={permissions} sources={sources} retry={retry} />}
+          {hasCharts && <OverviewCharts permissions={permissions} sources={sources} retry={retry} />}
         </aside>}
         {!hasWork && !hasApprovals && !hasCharts && <section className="od-panel od-no-access">
           {Object.values(state.sources).some(source => source.status === 'not_implemented')

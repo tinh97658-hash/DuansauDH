@@ -4,6 +4,7 @@ import { ClickAwayListener, MenuItem, MenuList, Paper, Popper } from '@mui/mater
 // Dashboard-only: avoid the global MuiMenu geometry override, which assumes a 360px menu.
 export default function DashboardSelect({ children, onChange, ...props }) {
   const control = useRef(null);
+  const popper = useRef(null);
   const id = useId();
   const [open, setOpen] = useState(false);
   const [width, setWidth] = useState(0);
@@ -24,11 +25,19 @@ export default function DashboardSelect({ children, onChange, ...props }) {
   };
   useEffect(() => {
     if (!open) return undefined;
-    const measure = () => setWidth(control.current?.getBoundingClientRect().width || 0);
+    let frame;
+    const measure = () => {
+      setWidth(control.current?.getBoundingClientRect().width || 0);
+      // Font changes can move the anchor without changing its width. Recheck
+      // placement even when React skips an identical width state update.
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => { void popper.current?.update(); });
+    };
+    measure();
     const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
     if (control.current) observer?.observe(control.current);
     window.addEventListener('resize', measure);
-    return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
+    return () => { cancelAnimationFrame(frame); observer?.disconnect(); window.removeEventListener('resize', measure); };
   }, [open]);
   useEffect(() => { if (props.disabled) setOpen(false); }, [props.disabled]);
   return <>
@@ -39,7 +48,8 @@ export default function DashboardSelect({ children, onChange, ...props }) {
       onKeyDown={event => { if (['ArrowDown', 'ArrowUp', ' ', 'Enter', 'Home', 'End', 'F4'].includes(event.key)) show(event); }}>
       {children}
     </select>
-    <Popper open={open && !props.disabled} anchorEl={control.current} placement="bottom-start"
+    {/* Popper defaults to role="tooltip", whose global styles intentionally disable pointer events. */}
+    <Popper role="presentation" open={open && !props.disabled} anchorEl={control.current} popperRef={popper} placement="bottom-start"
       popperOptions={{ strategy: 'fixed' }} modifiers={[
         { name: 'offset', options: { offset: [0, 6] } },
         { name: 'flip', options: { fallbackPlacements: ['top-start'] } },

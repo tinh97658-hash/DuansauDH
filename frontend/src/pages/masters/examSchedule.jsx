@@ -6,6 +6,7 @@ import axios from 'axios';
 import { notify } from '../../utils/notify';
 import {Tooltip} from '@mui/material';
 import YearSelect from '../../features/scheduling/YearSelect';
+import ScheduleHeader from '../../features/scheduling/ScheduleHeader';
 import FeatureLayout from '../../components/FeatureLayout';
 import PendingConfirmationButton from '../../features/scheduling/PendingConfirmationButton';
 import DocumentExportMenu from '../../components/DocumentExportMenu';
@@ -106,7 +107,7 @@ export default function ExamSchedule(){
   finally{setSaving(false);}
  };
  const confirmAttendance=async session=>{
-  if(!canWrite||saving||loading||!session.canConfirmAttendance)return;
+  if(!canWrite||saving||loading||session.status!=='held'||!session.canConfirmAttendance)return false;
   setSaving(true);setError('');
   try{
    const {data:updated}=await axios.post(`${API_BASE_URL}/masters/exam-sessions/${session.id}/attendance/confirm`,{version:session.version},{withCredentials:true});
@@ -114,8 +115,9 @@ export default function ExamSchedule(){
     ...(row.arrangementId===updated.arrangementId?{arrangementVersion:updated.arrangementVersion}:{}),
     ...(row.id===session.id?{version:updated.version,attendanceConfirmedAt:updated.attendanceConfirmedAt,canRecordAttendance:false,canConfirmAttendance:false}:{})
    }))}));
-   setRevision(n=>n+1);notifyGradebookSaved();
-  }catch(failure){const message=errorText(failure);setError(message);notify.error(message);if(failure.response?.status===409)setRevision(n=>n+1);}
+   setDetail(current=>current?.attendanceSessionId===session.id?{...current,attendanceSessionId:null}:current);
+   setRevision(n=>n+1);notifyGradebookSaved();return true;
+  }catch(failure){const message=errorText(failure);setError(message);notify.error(message);if(failure.response?.status===409)setRevision(n=>n+1);return false;}
   finally{setSaving(false);}
  };
  if(!canView)return <FeatureLayout title="Xếp lịch thi"><div role="alert">Bạn không có quyền xem lịch thi.</div></FeatureLayout>;
@@ -139,7 +141,8 @@ export default function ExamSchedule(){
     </div>
    </div></aside>
    <section className="sl-right ep-calendar" aria-label="Lịch thi tuần">
-    <div className="sl-schedule-head"><div className="ep-heading-actions"><h1>XẾP LỊCH THI</h1></div><div className="sl-week"><button aria-label="Tuần trước" onClick={()=>setWeek(formatDateKey(addDays(week,-7)))}><ChevronLeftIcon fontSize="inherit" /></button><strong>{formatExamDate(week)} – {formatExamDate(last)}</strong><button aria-label="Tuần sau" onClick={()=>setWeek(formatDateKey(addDays(week,7)))}><ChevronRightIcon fontSize="inherit" /></button></div><div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" disabled={loading||saving||!!error} onWord={()=>downloadExport('docx')} onExcel={()=>downloadExport('xlsx')} onPdf={()=>exportSchedule(printSchedule())} onError={e=>setError(e.message||'Không thể xuất lịch thi.')}/><button className="sl-btn sl-today" onClick={()=>setWeek(formatDateKey(mondayOf(getBusinessTodayKey())))}>Tuần này</button><PendingConfirmationButton showIcon={false} count={hasLoaded?pending.length:undefined} loading={loading} error={loadError} open={pendingOpen} controls="exam-pending-dialog" onClick={()=>setPendingOpen(true)} /></div></div>
+    <ScheduleHeader><div className="ep-heading-actions"><h1>XẾP LỊCH THI</h1><div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" disabled={loading||saving||!!error} onWord={()=>downloadExport('docx')} onExcel={()=>downloadExport('xlsx')} onPdf={()=>exportSchedule(printSchedule())} onError={e=>setError(e.message||'Không thể xuất lịch thi.')}/></div></div><nav className="sl-week ep-week-navigation" aria-label="Chuyển tuần lịch thi"><button aria-label="Tuần trước" onClick={()=>setWeek(formatDateKey(addDays(week,-7)))}><ChevronLeftIcon fontSize="inherit" /></button><strong>{formatExamDate(week)} – {formatExamDate(last)}</strong><button aria-label="Tuần sau" onClick={()=>setWeek(formatDateKey(addDays(week,7)))}><ChevronRightIcon fontSize="inherit" /></button></nav><div className="sl-actions"><button className="sl-btn sl-today" onClick={()=>setWeek(formatDateKey(mondayOf(getBusinessTodayKey())))}>Tuần này</button><PendingConfirmationButton showIcon={false} count={hasLoaded?pending.length:undefined} loading={loading} error={loadError} open={pendingOpen} controls="exam-pending-dialog" onClick={()=>setPendingOpen(true)} /></div></ScheduleHeader>
+
     {!!selectedOfferings.length&&<div className="sl-selected-strip ep-selection-strip" aria-label="Các lớp đang chọn">
      <span className="sl-selected-tag">{mergeMode||selectedOfferings.length>1?'ĐANG GHÉP':'ĐANG XẾP'}</span>
      <div className="ep-selected-classes">{selectedOfferings.map(o=><span className="ep-selected-class" key={o.id}><span title={o.subjectName}>{examOfferingLabel(o)}</span><button type="button" aria-label={`Bỏ chọn lớp ${o.name} · ${o.subjectName}`} disabled={saving} onClick={()=>toggleOffering(o.id)}>Bỏ</button></span>)}</div>

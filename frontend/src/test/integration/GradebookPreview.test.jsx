@@ -9,7 +9,7 @@ import { buildExamListDocument } from "../../features/exams/examListExport";
 beforeEach(() => sessionStorage.clear());
 it("previews only qualified non-exempt students with exam-list columns", () => {
   const row = { code: "HV001", fullName: "Nguyễn Văn An", testScore: 4, assignmentScore: 4, examScore: null, result: "pending" };
-  const document = buildExamListDocument({ name: "Lớp CNTT" }, { subject: { name: "Triết học" } }, [row, { ...row, code: "HV002", examExempt: true }, { ...row, code: "HV003", testScore: 3 }]);
+  const document = buildExamListDocument({ name: "Lớp CNTT" }, { subject: { name: "Triết học" } }, [row, { ...row, code: "HV002", examExempt: true }, { ...row, code: "HV003", testScore: 3 }], { name: "Trần Thị Mai" });
   const replace = jest.fn();
   const open = jest.spyOn(window, "open").mockReturnValue({ sessionStorage, location: { replace }, close: jest.fn() });
   try {
@@ -20,6 +20,9 @@ it("previews only qualified non-exempt students with exam-list columns", () => {
     expect(screen.getByRole("heading", { name: "LỊCH THI KẾT THÚC HỌC PHẦN" })).toBeInTheDocument();
     expect(screen.getByText("Viện trưởng Viện ĐTSĐH")).toBeInTheDocument();
     expect(screen.getByText("Cán bộ phụ trách")).toBeInTheDocument();
+    const responsible = screen.getByText("Cán bộ phụ trách").parentElement;
+    expect(within(responsible).getByText("Trần Thị Mai")).toBeInTheDocument();
+    expect(responsible.lastElementChild).toHaveTextContent("Trần Thị Mai");
     expect(screen.getByText("BM.04-QT.SĐH.03")).toBeInTheDocument();
     expect(screen.getByText("Tổng số: 1 học viên")).toBeInTheDocument();
     expect(screen.getByRole("table").closest(".sl-print-sheet")).toBeInTheDocument();

@@ -65,6 +65,22 @@
     line-height: 1;
   }
 
+  /* Keep close icons crisp and centered at every interface text size. */
+  body .app-popup :is(.MuiDialogTitle-root .MuiIconButton-root, .v20-dialog-head > .sl-btn, .sl-drawer-close) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  body .app-popup :is(.MuiDialogTitle-root .MuiIconButton-root, .v20-dialog-head > .sl-btn, .sl-drawer-close) [data-heroicon="XMarkIcon"] {
+    display: block;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    color: var(--text-primary, #102333);
+    stroke-width: 2.25;
+  }
+
   body .app-popup :is(.MuiDialogTitle-root .MuiIconButton-root, .v20-dialog-head > .sl-btn, .sl-drawer-close):hover {
     background: rgba(0, 0, 0, 0.06);
   }

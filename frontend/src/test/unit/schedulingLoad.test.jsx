@@ -32,6 +32,10 @@ it('does not issue duplicate visibility refreshes while a request is still runni
   await act(async () => { requests[0]('initial'); });
   await waitFor(() => expect(result.current.loading).toBe(false));
   fireEvent(document, new Event('visibilitychange'));
+  expect(loader).toHaveBeenCalledTimes(1);
+  const refreshTime = Date.now() + 30001;
+  vi.spyOn(Date, 'now').mockReturnValue(refreshTime);
+  fireEvent(document, new Event('visibilitychange'));
   await waitFor(() => expect(loader).toHaveBeenCalledTimes(2));
   expect(result.current.data).toBe('initial');
   expect(result.current.loading).toBe(false);

@@ -3,6 +3,7 @@ import { Box, Card, Chip, Typography } from "@mui/material";
 import ResponsiveAppBar from "./navbarNew";
 import Footer from "./footer";
 import PageExportBoundary from "./PageExportBoundary";
+import "../styles/toolbars.css";
 
 /**
  * Layout dùng chung cho mọi trang chức năng.

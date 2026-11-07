@@ -300,15 +300,28 @@ it('rejects an unresolved response from the previous working profile', async () 
   expect(screen.queryByRole('region', { name: 'Chờ phê duyệt' })).not.toBeInTheDocument();
   expect(work()).toHaveTextContent('2 học viên');
 });
-it('does not use masters content or charts when doctoral sources are unimplemented', async () => {
+it.each([true, false])('keeps the doctoral dashboard layout without masters data when unconfigured (permissions: %s)', async withPermissions => {
   await open();
   const data = fixture(); data.program = 'doctoral';
   data.sources = Object.fromEntries(Object.keys(data.sources).map(key => [key, { status: 'not_implemented', message: 'Nghiệp vụ Tiến sĩ chưa triển khai.' }]));
+  if (!withPermissions) { data.permissions = {}; data.sources = {}; }
   axios.get.mockResolvedValue({ data });
-  fireEvent.change(screen.getByRole('combobox', { name: 'Hệ đào tạo' }), { target: { value: 'doctoral' } });
-  await waitFor(() => expect(screen.getAllByText('Nghiệp vụ Tiến sĩ chưa triển khai.').length).toBeGreaterThan(0));
+  await userEvent.click(screen.getByRole('combobox', { name: 'Hệ đào tạo' }));
+  await userEvent.click(within(await screen.findByRole('listbox', { name: 'Hệ đào tạo' })).getByRole('option', { name: 'Tiến sĩ' }));
+  await waitFor(() => expect(screen.getByRole('combobox', { name: 'Hệ đào tạo' })).toHaveValue('doctoral'));
+  await waitFor(() => expect(screen.getAllByText('Chưa được phân công hoặc chưa có dữ liệu cho hệ Tiến sĩ.').length).toBeGreaterThan(0));
+  expect(within(screen.getByRole('region', { name: 'Chỉ số công việc' })).getAllByRole('article')).toHaveLength(4);
+  expect(within(work()).getAllByRole('tab')).toHaveLength(4);
+  for (const label of ['Xếp lịch', 'Xác nhận', 'Điểm', 'Phân nhóm']) {
+    fireEvent.click(within(work()).getByRole('tab', { name: label }));
+    expect(within(work()).getByRole('tabpanel')).toHaveTextContent('Chưa được phân công hoặc chưa có dữ liệu cho hệ Tiến sĩ.');
+  }
+  expect(screen.getByRole('heading', { name: 'Tổng quan đào tạo' })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /^Xem công việc:/ })).not.toBeInTheDocument();
   expect(screen.queryByRole('figure')).not.toBeInTheDocument();
   expect(screen.queryByText('7 học viên')).not.toBeInTheDocument();
+  expect(screen.getByTestId('location')).toHaveTextContent('program=doctoral');
+  expect(axios.get).toHaveBeenLastCalledWith(expect.stringContaining('/dashboard/operational'), expect.objectContaining({ params: { year: '2026', program: 'doctoral' } }));
 });
 it.each([{}, { grouping: true }, { approvals: true }, { overview: true }, { grouping: true, approvals: true }, { grouping: true, overview: true }])('adapts to permission combination %j without empty columns', async allowed => {
   const data = fixture(); data.permissions = allowed;

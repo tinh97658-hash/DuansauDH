@@ -8,6 +8,12 @@ import RibbonHeader, { isRibbonRouteActive, ribbons } from "../../components/Rib
 const authorizedSession = { user: { role: "custom" }, access: { permissions: [...new Set(Object.values(ribbons).flatMap(sections => sections.flatMap(section => section.actions.flatMap(item => item.permissions || []))))] } };
 const AuthorizedRibbon = () => <AuthSessionContext.Provider value={authorizedSession}><RibbonHeader /></AuthSessionContext.Provider>;
 
+beforeEach(() => {
+  sessionStorage.removeItem('sdh.sidebar.open');
+  vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
+});
+afterEach(() => vi.unstubAllGlobals());
+
 const render = (...args) => {
   const result = baseRender(...args);
   const toggle = screen.queryByRole("button", { name: "Mở menu tác vụ" });
@@ -15,7 +21,7 @@ const render = (...args) => {
   return result;
 };
 describe("Masters scheduling ribbon", () => {
-  it("nests actions directly below their expanded section and supports action focus", async () => {
+  it("keeps the category rail and function panel separate and supports action focus", async () => {
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ message: "admin" }) });
     try {
@@ -24,7 +30,8 @@ describe("Masters scheduling ribbon", () => {
       const actionRail = screen.getByRole("region", { name: "Tác vụ chức năng" });
       const action = within(actionRail).getByRole("button", { name: "Thống kê tiến độ" });
 
-      expect(sectionNavigation).toContainElement(actionRail);
+      expect(sectionNavigation.closest('aside')).toContainElement(actionRail);
+      expect(sectionNavigation).not.toContainElement(actionRail);
       expect(actionRail).toContainElement(action);
       action.focus();
       expect(action).toHaveFocus();
@@ -33,33 +40,35 @@ describe("Masters scheduling ribbon", () => {
     }
   });
 
-  it("starts collapsed and opens an overlay that closes with the tab, Escape or backdrop", async () => {
+  it("starts collapsed, closes with the control, Escape or backdrop, and retains the menu during navigation", async () => {
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ message: "admin" }) });
     try {
       const { container } = baseRender(<MemoryRouter useTransitions={false} initialEntries={["/system/majors"]}><AuthorizedRibbon /></MemoryRouter>);
-      const toggle = screen.getByRole("button", { name: "Mở menu tác vụ" });
+      const toggle = () => screen.getByRole("button", { name: "Mở menu tác vụ" });
       const sidebar = container.querySelector("#ribbon-sidebar");
-      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(toggle()).toHaveAttribute("aria-expanded", "false");
       expect(sidebar).not.toBeVisible();
       expect(screen.queryByRole("button", { name: "Chuyên ngành" })).not.toBeInTheDocument();
-      fireEvent.click(toggle);
+      fireEvent.click(toggle());
       expect(sidebar).toBeVisible();
-      expect(toggle).toHaveAttribute("aria-expanded", "true");
-      expect(screen.getByRole("button", { name: "HỆ THỐNG" })).toHaveFocus();
-      fireEvent.click(toggle);
+      expect(screen.queryByRole("button", { name: "Mở menu tác vụ" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Chuyên ngành" })).toHaveFocus();
+      fireEvent.click(screen.getByRole("button", { name: "Thu gọn menu tác vụ" }));
       expect(sidebar).not.toBeVisible();
-      fireEvent.click(toggle);
+      fireEvent.click(toggle());
       fireEvent.keyDown(document, { key: "Escape" });
       expect(sidebar).not.toBeVisible();
-      expect(toggle).toHaveFocus();
-      fireEvent.click(toggle);
+      expect(toggle()).toHaveFocus();
+      fireEvent.click(toggle());
       fireEvent.click(container.querySelector(".ribbon-menu-backdrop"));
       expect(sidebar).not.toBeVisible();
-      fireEvent.click(toggle);
+      fireEvent.click(toggle());
       fireEvent.click(screen.getByRole("button", { name: "Chuyên ngành" }));
+      expect(sidebar).toBeVisible();
+      fireEvent.click(screen.getByRole("button", { name: "Thu gọn menu tác vụ" }));
       expect(sidebar).not.toBeVisible();
-      expect(toggle).toHaveFocus();
+      expect(toggle()).toHaveFocus();
     } finally {
       global.fetch = originalFetch;
     }
@@ -116,7 +125,7 @@ describe("Masters scheduling ribbon", () => {
       const active = await screen.findByRole("button", { name: activeLabel });
       const other = screen.getByRole("button", { name: otherLabel });
       const breadcrumb = screen.getByLabelText("Vị trí hiện tại");
-      expect([...breadcrumb.querySelectorAll("span, strong")].map(item => item.textContent)).toEqual(["Đào tạo thạc sĩ", groupLabel, activeLabel]);
+      expect([...breadcrumb.querySelectorAll("button, strong")].map(item => item.textContent)).toEqual(["Đào tạo thạc sĩ", groupLabel, activeLabel]);
       expect(document.querySelector(".ribbon-titlebar img")).toBeNull();
       expect(active).toHaveAttribute("aria-current", "page");
       expect(active).toHaveClass("active");
@@ -124,13 +133,15 @@ describe("Masters scheduling ribbon", () => {
       expect(other).not.toHaveClass("active");
       fireEvent.click(other);
       expect(breadcrumb.querySelector("strong")).toHaveTextContent(otherLabel);
+      fireEvent.click(screen.getByRole("button", { name: "Thu gọn menu tác vụ" }));
       expect(screen.getByRole("button", { name: "Mở menu tác vụ" })).toHaveAttribute("aria-expanded", "false");
       fireEvent.click(screen.getByRole("button", { name: "Mở menu tác vụ" }));
       expect(other).toHaveAttribute("aria-current", "page");
       expect(other).toHaveClass("active");
       expect(active).not.toHaveAttribute("aria-current");
       fireEvent.click(screen.getByRole("button", { name: "Tạo nhóm học viên" }));
-      expect([...breadcrumb.querySelectorAll("span, strong")].map(item => item.textContent)).toEqual(["Đào tạo thạc sĩ", "Thủ tục đầu vào", "Tạo nhóm học viên"]);
+      expect([...breadcrumb.querySelectorAll("button, strong")].map(item => item.textContent)).toEqual(["Đào tạo thạc sĩ", "Thủ tục đầu vào", "Tạo nhóm học viên"]);
+      fireEvent.click(screen.getByRole("button", { name: "Thu gọn menu tác vụ" }));
       fireEvent.click(screen.getByRole("button", { name: "Mở menu tác vụ" }));
       expect(active).not.toHaveAttribute("aria-current");
       expect(other).not.toHaveAttribute("aria-current");

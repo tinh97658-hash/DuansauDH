@@ -1,7 +1,8 @@
 import { fireEvent, render as baseRender, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import RibbonHeader, { ribbons } from "../../components/RibbonHeader";
 import { AuthSessionContext } from "../../context/AuthSession";
+import * as lazyPages from '../../utils/lazyPage';
 
 // Independent navigation contract. Optional page dialogs do not add page gates.
 const routesByPermission = {
@@ -34,6 +35,170 @@ const render = (...args) => {
 };
 beforeEach(() => sessionStorage.removeItem('sdh.sidebar.open'));
 describe("Ribbon read/navigation permission contracts", () => {
+  it('navigates directly to the dashboard from the compact logo without opening the menu', () => {
+    const CurrentPath = () => <output data-testid="current-path">{useLocation().pathname}</output>;
+    baseRender(<MemoryRouter initialEntries={['/masters/schedule']}><AuthSessionContext.Provider value={session(['scheduling.view'])}>
+      <RibbonHeader /><CurrentPath />
+    </AuthSessionContext.Provider></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Về trang chủ' }).querySelector('img'));
+    expect(screen.getByTestId('current-path')).toHaveTextContent(/^\/$/);
+    expect(document.querySelector('.ribbon-sidebar')).toHaveClass('is-compact');
+    expect(sessionStorage.getItem('sdh.sidebar.open')).toBe('false');
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Mở menu tác vụ' }));
+    expect(document.querySelector('.ribbon-sidebar')).toHaveClass('is-expanded');
+  });
+
+  it('does not preload pages when the pointer only passes across menu items', () => {
+    vi.useFakeTimers();
+    const preload = vi.spyOn(lazyPages, 'preloadPage').mockImplementation(() => {});
+    try {
+      render(view(session(['scheduling.view']), '/masters/schedule'));
+      preload.mockClear();
+      const target = screen.getByRole('button', { name: 'Tạo lớp học phần' });
+      fireEvent.pointerEnter(target);
+      fireEvent.pointerLeave(target);
+      vi.advanceTimersByTime(700);
+      expect(preload).not.toHaveBeenCalled();
+      fireEvent.pointerEnter(target);
+      vi.advanceTimersByTime(160);
+      expect(preload).toHaveBeenCalledWith('/masters/course-offerings');
+      preload.mockClear();
+      fireEvent.pointerDown(target);
+      expect(preload).toHaveBeenCalledWith('/masters/course-offerings');
+    } finally { preload.mockRestore(); vi.useRealTimers(); }
+  });
+
+  it('does not recenter a manually scrolled menu when an unrelated subgroup opens or closes', () => {
+    render(view(session(['masters.view', 'scheduling.view']), '/masters/schedule'));
+    const scroller = document.querySelector('.ribbon-command-scroll');
+    scroller.scrollTop = 120;
+    const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      if (this.classList.contains('ribbon-command-scroll')) return { top: 100, bottom: 500 };
+      if (this.classList.contains('ribbon-action')) return { top: 600, bottom: 640 };
+      return { top: 0, bottom: 0 };
+    });
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'THỦ TỤC ĐẦU VÀO' }));
+      expect(scroller.scrollTop).toBe(120);
+      fireEvent(document.querySelector('.ribbon-group-body'), Object.assign(new Event('transitionend', { bubbles: true }), { propertyName: 'grid-template-rows' }));
+      expect(scroller.scrollTop).toBe(120);
+    } finally { bounds.mockRestore(); }
+  });
+
+  it('switches categories in a separate icon rail while preserving the brand and account blocks', () => {
+    render(view(session(['catalog.view', 'scheduling.view']), '/system/majors'));
+    const brand = document.querySelector('.ribbon-sidebar-brand');
+    const footer = document.querySelector('.ribbon-sidebar-footer');
+    const brandMarkup = brand.innerHTML, footerMarkup = footer.innerHTML;
+    const rail = within(screen.getByRole('navigation', { name: 'Nhóm chức năng' }));
+    expect(rail.getByRole('button', { name: 'HỆ THỐNG' })).toHaveClass('active');
+    expect(screen.getByRole('button', { name: 'Chuyên ngành' }).closest('.ribbon-navigation-rail')).toBeNull();
+    fireEvent.click(rail.getByRole('button', { name: 'ĐÀO TẠO THẠC SĨ' }));
+    expect(screen.getByRole('button', { name: 'Xếp lịch' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Chuyên ngành' })).toBeNull();
+    expect(brand.innerHTML).toBe(brandMarkup);
+    expect(footer.innerHTML).toBe(footerMarkup);
+    fireEvent.click(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' }));
+    expect(document.querySelector('.ribbon-sidebar')).toHaveClass('is-compact');
+    fireEvent.click(screen.getByRole('button', { name: 'Mở menu tác vụ' }));
+    expect(screen.getByRole('button', { name: 'Chuyên ngành' })).toHaveAttribute('aria-current', 'page');
+    expect(brand.innerHTML).toBe(brandMarkup);
+    expect(footer.innerHTML).toBe(footerMarkup);
+  });
+
+  it('searches across categories and clears the results without losing the active category', () => {
+    render(view(session(['catalog.view', 'scheduling.view']), '/masters/schedule'));
+    const search = screen.getByRole('searchbox');
+    fireEvent.change(search, { target: { value: 'chuyen nganh' } });
+    expect(screen.getByRole('button', { name: 'Chuyên ngành' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Xếp lịch' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa tìm kiếm chức năng' }));
+    expect(search).toHaveFocus();
+    expect(search).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Xếp lịch' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('reveals scheduling again after the reopening width transition changes wrapped label heights', () => {
+    let actionTop = 2200;
+    const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      if (this.classList.contains('ribbon-command-scroll')) return { top: 100, bottom: 500 };
+      if (this.classList.contains('ribbon-action')) {
+        const top = actionTop - this.closest('.ribbon-command-scroll').scrollTop;
+        return { top, bottom: top + 40 };
+      }
+      return { top: 0, bottom: 0 };
+    });
+    try {
+      render(view(session(['masters.view', 'scheduling.view']), '/masters/schedule'));
+      fireEvent.keyDown(document, { key: 'Escape' });
+      fireEvent.click(screen.getByRole('button', { name: 'Mở menu tác vụ' }));
+      const sidebar = screen.getByRole('complementary', { name: 'Menu chức năng' });
+      const current = screen.getByRole('button', { name: 'Xếp lịch' });
+      const scroller = document.querySelector('.ribbon-command-scroll');
+      expect(current).toHaveAttribute('aria-current', 'page');
+      expect(scroller.scrollTop).toBe(1920);
+      // At the final expanded width, labels stop wrapping and the action moves up.
+      actionTop = 700;
+      expect(current.getBoundingClientRect().top).toBeLessThan(100);
+      fireEvent(sidebar, Object.assign(new Event('transitionend', { bubbles: true }), { propertyName: 'width' }));
+      expect(current.getBoundingClientRect().top).toBeGreaterThanOrEqual(100);
+      expect(current.getBoundingClientRect().bottom).toBeLessThanOrEqual(500);
+      expect(scroller.scrollTop).toBe(420);
+      expect((current.getBoundingClientRect().top + current.getBoundingClientRect().bottom) / 2).toBe(300);
+    } finally { bounds.mockRestore(); }
+  });
+
+  it('centers the current action on opening, navigation and remount even if already visible', () => {
+    const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      if (this.classList.contains('ribbon-command-scroll')) return { top: 100, bottom: 500 };
+      if (this.classList.contains('ribbon-action')) {
+        const scroller = this.closest('.ribbon-command-scroll');
+        return { top: 700 - scroller.scrollTop, bottom: 740 - scroller.scrollTop };
+      }
+      return { top: 0, bottom: 0 };
+    });
+    try {
+      const first = render(view(session(['catalog.view']), '/system/majors'));
+      const scroller = document.querySelector('.ribbon-command-scroll');
+      expect(scroller.scrollTop).toBe(420);
+      expect(screen.getByRole('button', { name: 'Chuyên ngành' })).toHaveFocus();
+      scroller.scrollTop = 300;
+      fireEvent.click(screen.getByRole('button', { name: 'Ngành đào tạo' }));
+      expect(scroller.scrollTop).toBe(420);
+      first.unmount();
+      render(view(session(['catalog.view']), '/system/majors'));
+      expect(document.querySelector('.ribbon-command-scroll').scrollTop).toBe(420);
+    } finally { bounds.mockRestore(); }
+  });
+
+  it('keeps actions near the beginning at the top instead of adding empty space to center them', () => {
+    const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      if (this.classList.contains('ribbon-command-scroll')) return { top: 100, bottom: 500 };
+      if (this.classList.contains('ribbon-action')) return { top: 120, bottom: 160 };
+      return { top: 0, bottom: 0 };
+    });
+    try {
+      render(view(session([]), '/system/appearance'));
+      const scroller = document.querySelector('.ribbon-command-scroll');
+      expect(scroller.scrollTop).toBe(0);
+      fireEvent.keyDown(document, { key: 'Escape' });
+      fireEvent.click(screen.getByRole('button', { name: 'Mở menu tác vụ' }));
+      expect(scroller.scrollTop).toBe(0);
+    } finally { bounds.mockRestore(); }
+  });
+
+  it('reopens the current category and subgroup after browsing and collapsing other menu sections', () => {
+    render(view(session(['catalog.view', 'scheduling.view']), '/system/majors'));
+    fireEvent.click(screen.getByRole('button', { name: 'DANH MỤC ĐÀO TẠO' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ĐÀO TẠO THẠC SĨ' }));
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: 'Mở menu tác vụ' }));
+    expect(screen.getByRole('button', { name: 'Chuyên ngành' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'Chuyên ngành' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'DANH MỤC ĐÀO TẠO' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
   it.each(['.ribbon-sidebar', '.ribbon-sidebar-brand', '.ribbon-command-scroll', '.ribbon-sidebar-footer'])("opens the compact sidebar by clicking its blank area: %s", selector => {
     const { container } = baseRender(view(session(['scheduling.view']), '/masters/schedule'));
     expect(screen.getByRole('button', { name: 'Mở menu tác vụ' })).toBeInTheDocument();
@@ -119,15 +284,23 @@ describe("Ribbon read/navigation permission contracts", () => {
     } finally { window.matchMedia = previous; }
   });
 
-  it('shows the dashboard bell and staff identity once while retaining profile switching and logout', () => {
+  it('omits notifications while retaining staff identity, profile switching and logout', () => {
     const value = { ...session(['scheduling.view']), user: { role: 'admin', name: 'Nguyễn Trang' },
       activeProfile: { id: 'p1', code: 'admin', name: 'Quản trị hệ thống' }, profiles: [{ id: 'p1' }, { id: 'p2' }], chooseProfile: vi.fn() };
     render(view(value, '/viewLogged'));
-    expect(screen.getByRole('button', { name: 'Thông báo' })).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getAllByText('Nguyễn Trang')).toHaveLength(1);
-    expect(screen.getAllByText('Quản trị hệ thống')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Thông báo' })).not.toBeInTheDocument();
+    const identity = document.querySelector('.od-header-identity');
+    expect(identity).toHaveAttribute('aria-hidden', 'true');
+    expect(identity).toHaveStyle({ visibility: 'hidden' });
+    const footer = within(document.querySelector('.ribbon-sidebar-footer'));
+    expect(footer.getByText('Nguyễn Trang')).toBeVisible();
+    expect(footer.getByText('Quản trị hệ thống')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Đổi phiên làm việc' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Đăng xuất' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' }));
+    expect(document.querySelector('.od-header-identity')).toBe(identity);
+    expect(identity).toBeVisible();
+    expect(identity).toHaveAttribute('aria-hidden', 'false');
   });
   it("collapses subgroup labels independently and reveals matching actions during search", () => {
     render(view(session(["masters.view", "scheduling.view"]), "/masters/schedule"));
@@ -190,15 +363,17 @@ describe("Ribbon read/navigation permission contracts", () => {
     expect(tileMarkup()).toEqual(admin);
     expect(screen.getByRole('button', { name: 'Phân nhóm học viên' })).toHaveAttribute('aria-current', 'page');
   });
-  it('keeps distinct high contrast tones for teaching and exam scheduling',()=>{
+  it('keeps category icons while showing plain text actions below the search and category heading',()=>{
     render(view(session(['scheduling.view','gradebook.view','exams.view']),'/masters/exam-lists'));
-    const teaching=screen.getByRole('button',{name:'Xếp lịch'}),exam=screen.getByRole('button',{name:'Xếp lịch thi'});
-    expect(teaching.style.getPropertyValue('--ribbon-icon-color')).toBe('var(--icon-purple)');
-    expect(exam.style.getPropertyValue('--ribbon-icon-color')).toBe('var(--icon-rose)');
-    expect(screen.getByRole('button',{name:'Danh sách thi, điểm thi'}).style.getPropertyValue('--ribbon-icon-color')).toBe('var(--icon-rose)');
-    expect(exam.querySelector('[data-heroicon="CalendarDaysIcon"]')).toBeInTheDocument();exam.focus();expect(exam).toHaveFocus();
+    const panel = document.querySelector('.ribbon-navigation-panel');
+    expect(panel.children[0]).toHaveClass('ribbon-search-wrap');
+    expect(panel.children[1]).toHaveClass('ribbon-panel-heading');
+    for (const action of panel.querySelectorAll('.ribbon-action')) expect(action.querySelector('svg')).toBeNull();
+    for (const category of document.querySelectorAll('.ribbon-tab-toggle')) expect(category.querySelector('svg')).not.toBeNull();
+    const exam=screen.getByRole('button',{name:'Xếp lịch thi'});
+    exam.focus();expect(exam).toHaveFocus();
   });
-  it("reflows the Masters grade group with a distinct calendar icon and unchanged gradebook icon", () => {
+  it("keeps the Masters grade actions in order and highlights the current page", () => {
     render(view(session(["masters.view", "gradebook.view", "exams.view", "reports.view"]), "/masters/exam-schedule"));
     const calendar = screen.getByRole("button", { name: "Xếp lịch thi" });
     const group = calendar.closest(".ribbon-group");
@@ -206,8 +381,6 @@ describe("Ribbon read/navigation permission contracts", () => {
       "Danh sách thi, điểm thi", "Xếp lịch thi", "Tổng hợp điểm của lớp",
     ]);
     expect(screen.queryByRole("button", { name: "Xét tư cách thi hết môn" })).not.toBeInTheDocument();
-    expect(calendar.querySelector('[data-heroicon="CalendarDaysIcon"]')).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Danh sách thi, điểm thi" }).querySelector('[data-heroicon="ClipboardDocumentListIcon"]')).toBeInTheDocument();
     expect(calendar).toHaveAttribute("aria-current", "page");
     expect(group.querySelectorAll(".ribbon-action")).toHaveLength(3);
   });

@@ -3,12 +3,15 @@ import { gradebookColumns, gradebookRowValues, isExamCandidate } from "./gradebo
 import { gradebookDocumentColumns } from "./gradebookLayout";
 import { createScheduleWord, scheduleDocumentMetadata } from "../scheduling/scheduleExport";
 import { mmToPoints, pointsToExcelWidth, excelRowHeight } from "../../utils/documentLayout";
+import { personNameParts } from "../../utils/personName";
 
 export const EXAM_LIST_HEADER_ROW = 4;
 
-export function buildExamListDocument(group, offering, rows) {
+export function buildExamListDocument(group, offering, rows, printedBy) {
+  const { familyAndMiddle, givenName } = personNameParts(printedBy);
   return {
     kind: "exam-list", signingDate: "",
+    responsibleStaffName: [familyAndMiddle, givenName].filter(part => part && part !== "—").join(" "),
     university: BRAND.university.toLocaleUpperCase("vi"), institute: BRAND.institute.toLocaleUpperCase("vi"),
     title: "LỊCH THI KẾT THÚC HỌC PHẦN", group: group?.name || group?.code || "", subject: offering?.subject?.name || "",
     headers: gradebookColumns(true).map(column => column.label),
@@ -24,6 +27,7 @@ export function examListDocumentMetadata(document) {
     range: `Lớp: ${document.group}`,
     notice: `Học phần: ${document.subject}`,
     total: `Tổng số: ${document.rows.length} học viên`,
+    signatureNames: ["", document.responsibleStaffName || ""],
   };
 }
 
@@ -101,6 +105,9 @@ export async function createExamListExcel(document) {
   });
   sheet.getRow(signatureRow + 2).height = 30;
   sheet.getRow(signatureRow + 3).height = 30;
+  metadata.signatureNames.forEach((name, index) => {
+    if (name) heading(signatureRow + 3, index === 0 ? 1 : leftEnd + 1, index === 0 ? leftEnd : columns.length, name, { bold: true, size: 11 });
+  });
   sheet.views = [{ state: "frozen", ySplit: EXAM_LIST_HEADER_ROW, showGridLines: true }];
   sheet.autoFilter = { from: { row: EXAM_LIST_HEADER_ROW, column: 1 }, to: { row: lastRow, column: columns.length } };
   sheet.pageSetup = {

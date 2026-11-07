@@ -1,0 +1,51 @@
+/* Page-level controls keep one row; overflow belongs to the bar, not the page. */
+@media screen {
+    .app-filter-toolbar,
+    .app-action-toolbar {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      min-width: 0 !important;
+      max-width: 100%;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scrollbar-width: thin;
+    }
+    .app-filter-toolbar { align-items: flex-end; padding-bottom: 4px; }
+    .app-filter-toolbar > * { flex-shrink: 1; }
+    .app-filter-toolbar > label > span { white-space: nowrap !important; }
+    .app-filter-toolbar > .MuiStack-root { flex-wrap: nowrap !important; flex-shrink: 0; }
+    :is(.tp-filters,.css-filters).app-filter-toolbar > :is(label,.tp-filter) { flex: 1 1 170px; min-width: 170px; }
+    .app-filter-toolbar > .lp-date-filter { flex: none; }
+    .app-filter-toolbar .MuiSelect-select { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis; }
+    .app-action-toolbar { align-items: center; }
+    .app-action-toolbar > * { flex-shrink: 0 !important; max-width: none !important; }
+    .app-action-toolbar :is(.exam-mode-switch,.exam-tool-actions) { flex: 0 0 auto !important; flex-wrap: nowrap !important; max-width: none !important; }
+    .app-action-toolbar .exam-mode-switch { overflow: visible; }
+    .app-action-toolbar .exam-toolbar-status { flex: 1 0 max-content; flex-wrap: nowrap; }
+    .app-action-toolbar .exam-tool-actions > span { display: inline-flex; flex: none; }
+    .app-action-toolbar :is(button,a,.MuiTypography-root) { white-space: nowrap !important; }
+
+    /* Match the table grid's contrast across native and MUI filter controls. */
+    #root :is(.app-filter-toolbar,.app-action-toolbar,.tp-filters,.css-filters),
+    #root .MuiPaper-root:has(> .app-filter-toolbar) {
+      border-color: var(--table-border-color,#000) !important;
+    }
+    #root :is(.app-filter-toolbar,.app-action-toolbar,.tp-filters,.css-filters) :is(
+      select, input:not(.MuiInputBase-input):not([type="checkbox"]):not([type="radio"]),
+      .MuiOutlinedInput-notchedOutline, .tp-search, .tp-year-trigger, .sl-combo > button,
+      .document-export-trigger, .MuiButton-outlined, .sl-btn
+    ) {
+      border-color: var(--table-border-color,#000) !important;
+    }
+    #root :is(.app-filter-toolbar,.tp-filters,.css-filters) label > span:not(.MuiInputBase-root) {
+      color: var(--text-primary,#102333);
+    }
+}
+@layer app-text-size {
+  @media screen {
+    html[data-font-size] body [data-feature-main] :is(.app-filter-toolbar,.app-action-toolbar),
+    html[data-font-size] body [data-feature-main] .app-action-toolbar .exam-tool-actions { flex-wrap: nowrap !important; }
+    html[data-font-size] body [data-feature-main] .app-action-toolbar :is(button,a,.MuiTypography-root) { white-space: nowrap !important; }
+  }
+}

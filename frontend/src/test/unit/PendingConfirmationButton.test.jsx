@@ -8,7 +8,9 @@ it('distinguishes zero, loading, error and open states while retaining a usable 
   expect(button).toBeEnabled(); fireEvent.click(button); expect(click).toHaveBeenCalledOnce();
   view.rerender(<PendingConfirmationButton count={7} loading open controls="queue" onClick={click} />);
   expect(button).toHaveAttribute('aria-busy', 'true'); expect(button).toHaveAttribute('aria-controls', 'queue');
-  expect(button).toHaveAttribute('aria-expanded', 'true'); expect(button).toHaveTextContent('Đang tải');
+  expect(button).toHaveAttribute('aria-expanded', 'true'); expect(button).toHaveTextContent('Chờ xác nhận (7)');
+  view.rerender(<PendingConfirmationButton loading open controls="queue" onClick={click} />);
+  expect(button).toHaveTextContent('Đang tải');
   view.rerender(<PendingConfirmationButton error="Network error" open={false} onClick={click} />);
   expect(button).toHaveTextContent('Lỗi tải danh sách');
 });

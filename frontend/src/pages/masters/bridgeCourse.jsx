@@ -1,5 +1,5 @@
 import DateField from "../../components/DateField";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -87,6 +87,7 @@ export default function BridgeCourse() {
   const [summary, setSummary] = useState({}), [year, setYear] = useState(String(now)), [status, setStatus] = useState("ALL"), [major, setMajor] = useState("ALL"), [search, setSearch] = useState("");
   const [disciplineId, setDisciplineId] = useState("");
   const [loading, setLoading] = useState(true), [error, setError] = useState("");
+  const listRequestVersion = useRef(0);
   const [open, setOpen] = useState(false), [editing, setEditing] = useState(null), [form, setForm] = useState(blank(String(now))), [saving, setSaving] = useState(false), [deleting, setDeleting] = useState(null);
 
   useEffect(() => {
@@ -99,16 +100,18 @@ export default function BridgeCourse() {
   }, []);
 
   const load = useCallback(async () => {
+    const requestVersion = ++listRequestVersion.current;
     setLoading(true);
     try {
       const p = new URLSearchParams({ academicYear: year });
       if (status !== "ALL") p.set("status", status); if (major !== "ALL") p.set("majorId", major);
       const { data } = await axios.get(`${API_BASE_URL}/masters/bridge-course?${p}`);
+      if (requestVersion !== listRequestVersion.current) return;
       setRows(data.items || []); setSummary(data.summary || {}); setError("");
-    } catch (e) { setError(e.response?.data?.message || "Không thể tải danh sách học bổ sung kiến thức."); }
-    finally { setLoading(false); }
+    } catch (e) { if (requestVersion === listRequestVersion.current) setError(e.response?.data?.message || "Không thể tải danh sách học bổ sung kiến thức."); }
+    finally { if (requestVersion === listRequestVersion.current) setLoading(false); }
   }, [year, status, major]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); return () => { listRequestVersion.current += 1; }; }, [load]);
   const disciplines = useMemo(() => disciplinesFromMajors(majors), [majors]);
   const visibleMajors = useMemo(() => majorsForDiscipline(majors, disciplineId), [majors, disciplineId]);
 
@@ -182,7 +185,7 @@ export default function BridgeCourse() {
     <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mb: 1.25 }}>
       {[["Tổng đăng ký", summary.total, "#087da5"], ["Đã phân công", summary.assigned, "#667085"], ["Đang học", summary.studying, "#168bc2"], ["Đạt / miễn", summary.passed, "#168b63"], ["Không đạt", summary.failed, "#c0392b"]].map(([label, value, color]) => <Paper key={label} variant="outlined" sx={{ px: 1.5, py: .75, minHeight: 48, flex: 1, borderRadius: "6px" }}><Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: 11.5, lineHeight: 1.35 }}>{label}</Typography><Typography variant="h5" fontWeight={700} sx={{ color, fontSize: 18, lineHeight: 1.2 }}>{value || 0}</Typography></Paper>)}
     </Stack>
-    <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderColor: "#C6D5E1", borderRadius: "6px", boxShadow: "none" }}><Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap" alignItems="flex-end">
+    <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderColor: "#C6D5E1", borderRadius: "6px", boxShadow: "none" }}><Stack className="app-filter-toolbar" direction="row" spacing={1.5} useFlexGap flexWrap="nowrap" alignItems="flex-end">
       <FilterSelectField label="Năm học" value={year} onChange={(e) => setYear(e.target.value)} sx={{ flex: "1 1 140px", minWidth: 140 }}>{YEARS.map((v) => <MenuItem key={v} value={v}>{v}</MenuItem>)}</FilterSelectField>
       <FilterSelectField label="Ngành" value={disciplineId} onChange={(e) => { setDisciplineId(e.target.value); setMajor("ALL"); }} sx={{ flex: "1 1 210px", minWidth: 210 }}><MenuItem value="">Tất cả ngành</MenuItem>{disciplines.map((item) => <MenuItem key={item.id} value={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}</FilterSelectField>
       <FilterSelectField label="Chuyên ngành" value={major} onChange={(e) => setMajor(e.target.value)} sx={{ flex: "1 1 210px", minWidth: 210 }}><MenuItem value="ALL">Tất cả chuyên ngành</MenuItem>{visibleMajors.map((m) => <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>)}</FilterSelectField>

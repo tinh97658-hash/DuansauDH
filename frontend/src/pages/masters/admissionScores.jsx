@@ -155,7 +155,7 @@ export default function AdmissionScores() {
     <Stack spacing={2}>
       {error && <Alert severity="error">{error}</Alert>}
       <Paper variant="outlined" sx={{ p: "12px", borderRadius: "6px", borderColor: "#C6D5E1", bgcolor: "#FFF", boxShadow: "none" }}>
-        <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="flex-end">
+        <Stack className="app-filter-toolbar" direction="row" gap={1.5} flexWrap="nowrap" alignItems="flex-end">
           <FilterSelectField label="Đợt xét tuyển toàn viện" value={roundId} disabled={saving || workflowBusy || loading}
             onChange={(event) => selectRound(event.target.value)} sx={{ width: { xs: "100%", sm: 360 }, maxWidth: "100%" }}>
             <MenuItem value="">Chọn đợt xét tuyển</MenuItem>{rounds.map((round) => <MenuItem key={round.id} value={round.id}>{round.name} · {round.academicYear}</MenuItem>)}

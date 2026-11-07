@@ -20,6 +20,7 @@ it('opens the real options and selects their unchanged values with the product t
   const { control, onChange } = setup();
   fireEvent.mouseDown(control, { button: 0 });
   const list = await screen.findByRole('listbox', { name: 'Chủ đề' });
+  expect(list.closest('.od-select-popper')).toHaveAttribute('role', 'presentation');
   expect(control).toHaveAttribute('aria-expanded', 'true');
   expect(within(list).getByRole('option', { name: 'Hồ sơ' })).toHaveAttribute('aria-selected', 'true');
   fireEvent.click(within(list).getByRole('option', { name: 'Theo tháng' }));

@@ -290,7 +290,7 @@ body .od-select-popper [role=option]:is(:hover,:focus-visible,.Mui-focusVisible)
 .od-task-viewport { position: relative; flex: 1; min-height: 0; }
 .od-task-list { list-style: none; margin: 0; padding: 0; }
 .od-task-measure { position: absolute; inset: 0 0 auto; visibility: hidden; pointer-events: none; }
-.od-task-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 32px; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--od-divider); }
+.od-task-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto 32px; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--od-divider); }
 .od-task-copy { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; column-gap: 8px; min-width: 0; }
 .od-task-copy .od-task-attention { grid-column: 1; grid-row: 1; width: 18px; height: 18px; color: #a7780c; stroke-width: 1.8; }
 .od-task-copy strong, .od-task-copy small { grid-column: 2; }
@@ -299,6 +299,8 @@ body .od-select-popper [role=option]:is(:hover,:focus-visible,.Mui-focusVisible)
 .od-task-row>.od-count { grid-column: 2; white-space: nowrap; font-size: 12px; }
 .od-task-action { display: grid; place-items: center; grid-column: 3; width: 32px; height: 34px; border: 1px solid var(--od-border); color: var(--od-blue); background: var(--od-tint); }
 .od-task-action svg { width: 15px; height: 15px; }
+.od-task-action[href]::after { content: ""; position: absolute; inset: 0; cursor: pointer; }
+.od-task-row:has(.od-task-action:focus-visible) { outline: 2px solid var(--od-blue); outline-offset: -2px; }
 .od-task-action:hover { background: #dff3fa; color: #005c77; }
 .od-task-footer { display: flex; align-items: center; justify-content: space-between; flex: none; gap: 8px; min-height: 48px; padding: 6px 0; color: var(--od-muted); font-size: 11px; }
 .od-task-footer>span { min-width: 0; }
@@ -316,6 +318,10 @@ body .od-select-popper [role=option]:is(:hover,:focus-visible,.Mui-focusVisible)
   .od-chart { min-height: 264px; }
 }
 @container dashboard (max-width:700px) {
+  .od-header { align-items: stretch; flex-direction: column; gap: 16px; }
+  .od-header > div:first-child { min-width: 0; }
+  .od-filters { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); width: 100%; min-width: 0; }
+  .od-filters select { min-width: 0; }
   .od-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media(pointer:coarse) {

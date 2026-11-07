@@ -499,7 +499,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
         ? "Vừa làm - Vừa học"
         : rec.gradDegreeType || "Chính quy",
       gradYear: rec.gradYear || "2022",
-      gpa: rec.gpa || "3.20",
+      gpa: String(rec.gpa ?? ""),
       gradMajor: rec.gradMajor || "",
       gradClassification: rec.gradClassification || "Khá",
       diplomaNumber: rec.diplomaNumber || "",

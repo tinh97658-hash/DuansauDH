@@ -90,6 +90,33 @@ describe('Subject independent-code duplicate validation', () => {
 describe('Training Plan draft scope', () => {
   beforeEach(() => { jest.clearAllMocks(); });
 
+  it('hides the add action without an explanation for a view-only profile', async () => {
+    configureReads([]);
+    await act(async () => { renderWithPermissions(<TrainingPlan />, ['plan.view']); });
+    expect(screen.queryByRole('button', { name: 'Thêm dòng mới' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Hồ sơ hiện tại chưa có quyền quản lý kế hoạch/)).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Nhập tên học phần...')).not.toBeInTheDocument();
+    expect(axios.post).not.toHaveBeenCalled();
+  });
+
+  it('keeps the add action available to return to a draft without discarding entered fields', async () => {
+    configureReads([]);
+    await act(async () => { render(<TrainingPlan />); });
+    await clickAndWait(screen.getByRole('button', { name: 'Thêm dòng mới' }));
+    const input = screen.getByPlaceholderText('Nhập tên học phần...');
+    fireEvent.change(input, { target: { value: 'Học phần đang nhập' } });
+    input.focus();
+    const row = input.closest('tr');
+    row.scrollIntoView = vi.fn();
+    input.blur();
+    await clickAndWait(screen.getByRole('button', { name: 'Tiếp tục thêm học phần' }));
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue('Học phần đang nhập');
+    expect(row.scrollIntoView).toHaveBeenCalledWith({ block: 'center', inline: 'nearest', behavior: 'instant' });
+    expect(screen.getAllByPlaceholderText('Nhập tên học phần...')).toHaveLength(1);
+    expect(axios.post).not.toHaveBeenCalled();
+  });
+
   it('returns to the last draft field when the browser tab becomes active', async () => {
     configureReads([]);
     await act(async () => { render(<TrainingPlan />); });

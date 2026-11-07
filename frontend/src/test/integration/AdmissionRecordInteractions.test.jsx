@@ -26,6 +26,7 @@ beforeEach(() => {
   localStorage.clear();
   axios.get.mockImplementation(async url => {
     if (url.includes("/auth/isStaff")) return { data: { message: "admin" } };
+    if (url.includes("/system/training-years")) return { data: [0, 1].map(offset => ({ name: String(new Date().getFullYear() - offset), active: true, startDate: "2000-01-01" })) };
     if (url.includes("/system/majors")) return { data: [{ id: "m1", name: "Công nghệ thông tin", program: "masters" }] };
     if (url.includes("/admission-records?")) return { data: { data: [record], pagination: { total: 1, totalPages: 1 }, stats: { total: 1 } } };
     return { data: [] };
@@ -75,6 +76,24 @@ it.each([
   expect(toast.error).not.toHaveBeenCalled();
   expect(dialog.getByRole("textbox", { name: label, exact: true })).toHaveAttribute("aria-invalid", "true");
   expect(dialog.getByRole("textbox", { name: label, exact: true })).toHaveAccessibleDescription();
+});
+
+it.each([0, "0", null])("does not invent a GPA when saving an unrelated profile field (stored GPA: %s)", async storedGpa => {
+  const reads = axios.get.getMockImplementation();
+  axios.get.mockImplementation(url => url.includes("/admission-records?")
+    ? Promise.resolve({ data: { data: [{ ...record, gpa: storedGpa }], pagination: { total: 1, totalPages: 1 }, stats: { total: 1 } } })
+    : reads(url));
+  axios.put.mockResolvedValue({ data: {} });
+  mount("admitted-masters");
+  fireEvent.click(await screen.findByRole("button", { name: "Sửa hồ sơ HV001" }));
+  const dialog = within(screen.getByRole("dialog"));
+  fireEvent.change(dialog.getByRole("textbox", { name: "Số điện thoại", exact: true }), { target: { value: "0987654321" } });
+  fireEvent.click(dialog.getByRole("button", { name: "Chấp nhận (Enter)" }));
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(
+    expect.stringContaining("/plan/admission-records/record-1"),
+    expect.objectContaining({ gpa: String(storedGpa ?? ""), phone: "0987654321" }),
+    { withCredentials: true },
+  ));
 });
 
 it("saves complete Latin names with Vietnamese accents and normalized spacing", async () => {

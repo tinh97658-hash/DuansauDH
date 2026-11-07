@@ -12,6 +12,7 @@
 .sl-print-signatures{display:grid;grid-template-columns:1fr 1fr;gap:6mm;margin:1mm 0 5mm;text-align:center}
 .sl-print-signatures b,.sl-print-signatures i{display:block}
 .sl-print-signatures i{margin-top:6mm;min-height:18mm;font-style:normal}
+.sl-print-signer-name{display:block;overflow-wrap:anywhere}
 .sl-print-sheet .sl-print-form-footer{display:flex!important;justify-content:space-between;gap:5mm;margin-top:auto;padding-top:1mm;border-top:1px solid #000;font-size:8pt;font-weight:bold}
 
 /* The application forces its UI font on headings/tables; scope this override to the document. */

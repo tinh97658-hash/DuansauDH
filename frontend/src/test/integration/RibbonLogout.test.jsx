@@ -27,6 +27,18 @@ const render = (...args) => {
 };
 describe("Ribbon current-session POST logout", () => {
   beforeEach(() => { jest.clearAllMocks(); sessionStorage.removeItem('sdh.sidebar.open'); });
+  it('keeps the compact menu closed while the home logo respects unsaved changes', async () => {
+    renderPage(false, true);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: 'Về trang chủ' }));
+    fireEvent.click(await screen.findByText('Ở lại'));
+    expect(screen.getByTestId('route')).toHaveTextContent('/system/change-password');
+    expect(document.querySelector('.ribbon-sidebar')).toHaveClass('is-compact');
+    fireEvent.click(await screen.findByRole('button', { name: 'Về trang chủ' }));
+    fireEvent.click(await screen.findByText('Bỏ thay đổi và tiếp tục'));
+    await waitFor(() => expect(screen.getByTestId('route').textContent).toBe('/'));
+    expect(document.querySelector('.ribbon-sidebar')).toHaveClass('is-compact');
+  });
   it.each(['button', 'svg'])('logs out directly from the compact footer when clicking its %s', async target => {
     axios.post.mockResolvedValue({ status: 204 });
     renderPage();

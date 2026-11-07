@@ -2,11 +2,42 @@ import ExcelJS from "exceljs";
 import { buildGradebookDocument, createGradebookExcel, fetchAllGradebookRows, gradebookFilename, GRADEBOOK_HEADER_ROW } from "../../features/exams/gradebookExport";
 import { draftOf, gradebookColumns } from "../../features/exams/gradebook";
 import { autoFitColumnByContent, gradebookDocumentColumns } from "../../features/exams/gradebookLayout";
-import { buildExamListDocument, createExamListExcel, EXAM_LIST_HEADER_ROW } from "../../features/exams/examListExport";
+import { buildExamListDocument, createExamListExcel, createExamListWord, examListDocumentMetadata, EXAM_LIST_HEADER_ROW } from "../../features/exams/examListExport";
+import JSZip from "jszip";
+import { TextEncoder } from "util";
 import { createScheduleExcel } from "../../features/scheduling/scheduleExport";
 
 const group = { code: "CNTT/2026", name: "Công nghệ thông tin 2026" };
 const offering = { subject: { code: "HP:01", name: "Phương pháp nghiên cứu khoa học" } };
+it.each([
+  [{ lastName: ' Nguyễn  Văn ', firstName: ' Bình ' }, 'Nguyễn Văn Bình'],
+  [{ name: ' Trần Thị   Mai ' }, 'Trần Thị Mai'],
+  [{ fullName: 'Lê Quốc An' }, 'Lê Quốc An'],
+  [undefined, ''],
+])('takes the exam-list signer from the printing account without assigning an institute director', (user, name) => {
+  const document = buildExamListDocument(group, { ...offering, lecturerName: 'Giảng viên khác' }, [], user);
+  expect(document.responsibleStaffName).toBe(name);
+  expect(examListDocumentMetadata(document).signatureNames).toEqual(['', name]);
+});
+it('places the printer name in the responsible-officer block in real Excel and Word files', async () => {
+  const document = buildExamListDocument(group, offering, [{ code: 'HV001', fullName: 'Học viên', testScore: 6, assignmentScore: 6 }], { name: 'Nguyễn Văn Bình' });
+  const sheet = (await load(document, createExamListExcel)).worksheets[0];
+  let signatureRow;
+  sheet.eachRow(row => { if (row.values.includes('Cán bộ phụ trách')) signatureRow = row.number; });
+  expect(sheet.getRow(signatureRow + 3).values).toContain('Nguyễn Văn Bình');
+  expect(sheet.getRow(signatureRow + 3).getCell(1).value).toBeNull();
+  const previousEncoder = global.TextEncoder;
+  global.TextEncoder = TextEncoder;
+  try {
+    const blob = await createExamListWord(document);
+    const buffer = await new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsArrayBuffer(blob); });
+    const zip = await JSZip.loadAsync(buffer);
+    const xml = new DOMParser().parseFromString(await zip.file('word/document.xml').async('string'), 'application/xml');
+    const cell = Array.from(xml.getElementsByTagName('w:tc')).find(node => node.textContent.includes('Cán bộ phụ trách'));
+    expect(cell.textContent).toContain('Nguyễn Văn Bình');
+    expect(cell.lastElementChild.textContent).toBe('Nguyễn Văn Bình');
+  } finally { global.TextEncoder = previousEncoder; }
+});
 const roster = count => Array.from({ length: count }, (_, index) => ({
   participantId: `student:${index}`, code: `HV${index + 1}`, fullName: "Nguyễn Văn An", dob: "1990-01-02", gender: "Nam",
   eligible: index === 0 ? null : true, examExempt: index === 1, testScore: 0, assignmentScore: null, examScore: 8,

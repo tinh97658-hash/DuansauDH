@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { Tooltip } from "@mui/material";
 import YearSelect from "./YearSelect";
+import ScheduleHeader from "./ScheduleHeader";
 import { api, groupsOf, intersectDays, labelOf, message, Modal, normalize, Notice, offeringTitle, rows, SearchSelect, unique, useLoad } from "./shared";
 
 import { addDays, formatDateKey, getBusinessTodayKey, getBusinessWallTime, isSessionPast, isSessionStartedInBusinessTimezone, periodTimes, mondayOf, vietnameseDate, vietnameseDayMonth, vietnameseWeekdayShort, weekDaysFrom } from "../../utils/schedulingCalendar";
@@ -35,106 +36,6 @@ const DAY_FOCUS_STATUS_LANES = [
   { key: "held", label: "ĐÃ DIỄN RA", Icon: CheckIcon },
   { key: "not", label: "KHÔNG DIỄN RA", Icon: MinusIcon },
 ];
-
-function SessionMagnifier({ session, stateClass, className, onClick, children }) {
-  const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState({ top: -9999, left: -9999 });
-  const triggerRef = useRef(null);
-  const previewRef = useRef(null);
-  const openTimer = useRef(null);
-  const previewId = `session-magnifier-${session.id}`;
-  const title = offeringTitle(session.courseOffering);
-  const subject = subjectLabel(session.courseOffering);
-  const lecturer = formatLecturerName(session.lecturer) || "Chưa có giảng viên";
-  const room = session.room?.code || "Chưa có phòng";
-
-  const close = () => {
-    window.clearTimeout(openTimer.current);
-    setOpen(false);
-  };
-  const openSoon = () => {
-    window.clearTimeout(openTimer.current);
-    openTimer.current = window.setTimeout(() => setOpen(true), 500);
-  };
-  const openNow = () => {
-    window.clearTimeout(openTimer.current);
-    setOpen(true);
-  };
-
-  useEffect(() => () => window.clearTimeout(openTimer.current), []);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKeyDown = (event) => {
-      if (event.key === "Escape") close();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open]);
-
-  useLayoutEffect(() => {
-    if (!open) return undefined;
-    const updatePosition = () => {
-      const trigger = triggerRef.current;
-      const preview = previewRef.current;
-      if (!trigger || !preview) return;
-      const triggerRect = trigger.getBoundingClientRect();
-      const previewRect = preview.getBoundingClientRect();
-      const edge = 12;
-      const gap = 12;
-      const fitsRight = triggerRect.right + gap + previewRect.width <= window.innerWidth - edge;
-      const fitsLeft = triggerRect.left - gap - previewRect.width >= edge;
-      let left = fitsRight
-        ? triggerRect.right + gap
-        : fitsLeft
-          ? triggerRect.left - gap - previewRect.width
-          : triggerRect.left + (triggerRect.width - previewRect.width) / 2;
-      left = Math.min(Math.max(edge, left), window.innerWidth - edge - previewRect.width);
-      let top = triggerRect.top + (triggerRect.height - previewRect.height) / 2;
-      top = Math.min(Math.max(edge, top), window.innerHeight - edge - previewRect.height);
-      setPosition({ top, left });
-    };
-    updatePosition();
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
-    return () => {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-    };
-  }, [open]);
-
-  const preview = open && createPortal(
-    <aside
-      id={previewId}
-      ref={previewRef}
-      className={`sl-session-magnifier ${stateClass}`}
-      role="tooltip"
-      style={position}
-    >
-      <strong className="sl-magnifier-title">{subject}</strong>
-      <span className="sl-magnifier-subject">{title}</span>
-      <small><span>Phòng học · {room}</span><span>Giảng viên · {lecturer}</span></small>
-    </aside>,
-    document.body
-  );
-
-  return <>
-    <button
-      ref={triggerRef}
-      type="button"
-      className={className}
-      aria-describedby={open ? previewId : undefined}
-      onMouseEnter={openSoon}
-      onMouseLeave={close}
-      onFocus={openNow}
-      onBlur={close}
-      onClick={onClick}
-    >
-      {children}
-    </button>
-    {preview}
-  </>;
-}
 
 function WeekOverflowPreview({ date, dayLabel, period, hiddenSessions, onOpenDay }) {
   const [open, setOpen] = useState(false);
@@ -338,14 +239,14 @@ export default function Schedule({ user }) {
   const sessionState = (session) => ({ held: ["sl-held", "ĐÃ DIỄN RA", CheckIcon], not: ["sl-not", "KHÔNG DIỄN RA", MinusIcon], wait: ["sl-wait", "CHỜ XÁC NHẬN", ClockIcon], planned: ["", "ĐÃ XẾP", CalendarDaysIcon] }[sessionStatusKey(session)]);
   const sessionCard = (session, compact = false) => {
     const [style, state, StateIcon] = sessionState(session);
-    return <SessionMagnifier key={session.id} session={session} stateClass={style} className={`sl-session ${compact ? "sl-session-compact" : ""} ${style}`} onClick={() => openSession(session)}><strong>{offeringTitle(session.courseOffering)}</strong><span>{subjectLabel(session.courseOffering)}</span><small>{formatLecturerName(session.lecturer) || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><em><StateIcon fontSize="inherit" /> {state}</em></SessionMagnifier>;
+    return <button type="button" key={session.id} className={`sl-session ${compact ? "sl-session-compact" : ""} ${style}`} onClick={() => openSession(session)}><strong>{offeringTitle(session.courseOffering)}</strong><span>{subjectLabel(session.courseOffering)}</span><small>{formatLecturerName(session.lecturer) || "Chưa có giảng viên"} · {session.room?.code || "Chưa có phòng"}</small><em><StateIcon fontSize="inherit" /> {state}</em></button>;
   };
   const dayFocusSessionCard = (session) => {
     const style = { held: "sl-held", not: "sl-not", planned: "" }[dayFocusStatusKey(session)];
     const title = offeringTitle(session.courseOffering);
     const subject = subjectLabel(session.courseOffering);
     const room = session.room?.code || "Chưa có phòng";
-    return <SessionMagnifier key={session.id} session={session} stateClass={style} className={`sl-session sl-focus-session ${style}`} onClick={() => openSession(session)}><strong title={title}>{title}</strong><span className="sl-focus-meta" title={`${subject} · ${room}`}><span>{subject}</span><span>· {room}</span></span></SessionMagnifier>;
+    return <button type="button" key={session.id} className={`sl-session sl-focus-session ${style}`} onClick={() => openSession(session)}><strong title={title}>{title}</strong><span className="sl-focus-meta" title={`${subject} · ${room}`}><span>{subject}</span><span>· {room}</span></span></button>;
   };
   const changeWeek = (nextWeek) => {
     const focusedWeekdayIndex = focusedDate
@@ -434,9 +335,11 @@ export default function Schedule({ user }) {
       <div className="sl-card-foot"><div className="sl-card-copy"><strong>Đã diễn ra {summary.heldCount || 0} buổi</strong><span className={!summary.futurePlannedCount ? "sl-no-week" : ""}>{summary.futurePlannedCount ? `Có ${summary.futurePlannedCount} lịch sắp tới` : "Chưa có lịch tuần này"}</span></div>{canEdit && (offering.canWriteSchedule ?? offering.scopeWritable) !== false && offering.status === "active" && <button className="sl-btn sl-btn-primary sl-btn-sm" onClick={() => select(offering)}>Xếp lịch</button>}</div>
     </article>;
   })}{!listed.length && <Notice>Không có lớp học phần trong phạm vi đã chọn.</Notice>}</section>}</div></div></div></aside>
-  <section className="sl-right"><div className="sl-schedule-head"><h1>XẾP LỊCH</h1><div className="sl-week"><button aria-label="Tuần trước" onClick={() => changeWeek(formatDateKey(addDays(week, -7)))}><ChevronLeftIcon fontSize="inherit" /></button><strong>{vietnameseDate(week)} — {vietnameseDate(end)}</strong><button aria-label="Tuần sau" onClick={() => changeWeek(formatDateKey(addDays(week, 7)))}><ChevronRightIcon fontSize="inherit" /></button></div>
-    <div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" label="Xuất báo cáo" disabled={sessions.loading || !!sessions.error || majors.loading || !!majors.error || offerings.loading || !!offerings.error} showFileIcons onWord={downloadWord} onExcel={downloadExcel} onPdf={openPdfPreview} onError={(failure) => notify.error(message(failure))} /><button className="sl-btn sl-today" disabled={week === currentWeek && !focusedDate} onClick={() => changeWeek(currentWeek)}>Tuần này</button>{canEdit && <PendingConfirmationButton showIcon={false} count={pending.data?.length} loading={pending.loading} error={pending.error} open={pendingOpen} controls="schedule-pending-dialog" onClick={() => setPendingOpen(true)} />}</div>
-  </div>{selecting && <div className="sl-selected-strip"><span className="sl-selected-tag">ĐANG XẾP</span><strong className="sl-selected-offering" title={offeringTitle(selected)}>{offeringTitle(selected)}</strong><span className="sl-selected-meta">{selected.subject?.code ? `${selected.subject.code} · ` : ""}{groupsOf(selected).length} lớp/nhóm · {selected.participantCount ?? 0} HV</span><button type="button" className="sl-btn sl-selected-clear" onClick={() => setSelected("")}>Bỏ chọn</button></div>}
+  <section className="sl-right"><ScheduleHeader>
+    <div className="sl-heading-actions"><h1>XẾP LỊCH</h1><div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" label="Xuất báo cáo" disabled={sessions.loading || !!sessions.error || majors.loading || !!majors.error || offerings.loading || !!offerings.error} showFileIcons onWord={downloadWord} onExcel={downloadExcel} onPdf={openPdfPreview} onError={(failure) => notify.error(message(failure))} /></div></div>
+    <div className="sl-week"><button aria-label="Tuần trước" onClick={() => changeWeek(formatDateKey(addDays(week, -7)))}><ChevronLeftIcon fontSize="inherit" /></button><strong>{vietnameseDate(week)} — {vietnameseDate(end)}</strong><button aria-label="Tuần sau" onClick={() => changeWeek(formatDateKey(addDays(week, 7)))}><ChevronRightIcon fontSize="inherit" /></button></div>
+    <div className="sl-actions"><button className="sl-btn sl-today" disabled={week === currentWeek && !focusedDate} onClick={() => changeWeek(currentWeek)}>Tuần này</button>{canEdit && <PendingConfirmationButton showIcon={false} count={pending.data?.length} loading={pending.loading} error={pending.error} open={pendingOpen} controls="schedule-pending-dialog" onClick={() => setPendingOpen(true)} />}</div>
+  </ScheduleHeader>{selecting && <div className="sl-selected-strip"><span className="sl-selected-tag">ĐANG XẾP</span><strong className="sl-selected-offering" title={offeringTitle(selected)}>{offeringTitle(selected)}</strong><span className="sl-selected-meta">{selected.subject?.code ? `${selected.subject.code} · ` : ""}{groupsOf(selected).length} lớp/nhóm · {selected.participantCount ?? 0} HV</span><button type="button" className="sl-btn sl-selected-clear" onClick={() => setSelected("")}>Bỏ chọn</button></div>}
     {sessions.error && <Notice error={sessions.error} />}{error && <Notice error={error} />}
     <div className={`sl-calendar-wrap ${selecting ? "sl-selecting" : ""}`} aria-busy={sessions.loading}>{focusedDay ? <section className="sl-day-focus" aria-label={`Lịch ngày ${vietnameseDate(focusedDate)}`}>
       <header className="sl-day-focus-head"><button type="button" className="sl-focus-back" onClick={() => setFocusedDate("")}><ArrowLeftIcon fontSize="inherit" /> Tuần</button><strong>{vietnameseWeekdayShort(focusedDay)} · {vietnameseDate(focusedDate)} · {sessionsOn(focusedDate).length} lớp</strong></header>

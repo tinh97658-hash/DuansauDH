@@ -64,6 +64,22 @@ async function chooseScope({ expectTable = true } = {}) {
 
 beforeEach(() => { jest.clearAllMocks(); downloadReport.mockResolvedValue(); downloadClassProgressBatch.mockResolvedValue(); mockData(); });
 
+it('keeps the year popup outside the scrolling toolbar and allows selection without closing it', async () => {
+  mount();
+  const trigger = await screen.findByRole('button', { name: 'Khóa / năm học' });
+  await waitFor(() => expect(trigger).toBeEnabled());
+  fireEvent.click(trigger);
+  const menu = screen.getByRole('group', { name: 'Chọn khóa / năm học' });
+  expect(menu.closest('.app-filter-toolbar')).toBeNull();
+  const checkbox = within(menu).getByRole('checkbox');
+  fireEvent.mouseDown(checkbox);
+  fireEvent.click(checkbox);
+  expect(menu).toBeInTheDocument();
+  fireEvent.keyDown(menu, { key: 'Escape' });
+  expect(screen.queryByRole('group', { name: 'Chọn khóa / năm học' })).toBeNull();
+  expect(trigger).toHaveFocus();
+});
+
 it("exports the selected classes through the progress form with the current subject filter", async () => {
   mount(); await chooseScope();
   fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: "Hệ phân tán" } });

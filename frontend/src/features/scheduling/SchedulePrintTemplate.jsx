@@ -21,7 +21,7 @@ export default function SchedulePrintTemplate({ schedule, metadata: customMetada
     <p className="sl-print-total">{metadata.total}</p>
     <section className="sl-print-signoff" aria-label="Lịch trực và ký xác nhận">
       <div className="sl-print-duty">{metadata.duty.map((text) => <p key={text}>{text}</p>)}</div>
-      <div className="sl-print-signatures">{metadata.signatures.map((title) => <div key={title}><b>{title}</b><i>{metadata.signaturePrompt}</i></div>)}</div>
+      <div className="sl-print-signatures">{metadata.signatures.map((title, index) => <div key={title}><b>{title}</b><i>{metadata.signaturePrompt}</i>{metadata.signatureNames?.[index] && <strong className="sl-print-signer-name">{metadata.signatureNames[index]}</strong>}</div>)}</div>
     </section>
     <footer className="sl-print-form-footer">{metadata.footer.map((text) => <span key={text}>{text}</span>)}</footer>
   </div>;

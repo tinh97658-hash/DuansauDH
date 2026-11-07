@@ -16,6 +16,7 @@ beforeEach(() => {
   rows = Array.from({ length: 16 }, (_, index) => ({ id: `record-${index + 1}`, code: `HV${String(index + 1).padStart(3, "0")}`, fullName: `Học viên ${index + 1}`, trainingLevel: "Thạc sĩ", studyStatus: index === 2 ? "Tạm hoãn" : "Đã trúng tuyển", updatedAt: "2026-10-07T01:00:00Z", extraData: index === 1 ? { tuitionPayment: { paid: true } } : {} }));
   axios.get.mockImplementation(async (url) => {
     if (url.endsWith('/auth/isStaff')) return { data: { message: 'admin' } };
+    if (url.includes('/system/training-years')) return { data: [{ name: String(new Date().getFullYear()), active: true, startDate: '2000-01-01' }] };
     if (url.includes('/admission-records?')) {
       const page = Number(new URL(url, 'http://localhost').searchParams.get('page') || 1);
       return { data: { data: rows.slice((page - 1) * 15, page * 15), pagination: { total: 16, totalPages: 2 }, stats: {} } };

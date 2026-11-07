@@ -1,7 +1,7 @@
 import { renderWithPermissions } from "../renderWithPermissions";
 import { vi } from "vitest";
 import React from "react";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import axios from "axios";
 import CreateClassGroups from "../../pages/masters/createClassGroups";
@@ -43,6 +43,50 @@ const openCreateDialog = async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   mockRequests();
+});
+
+test("paginates groups in fixed pages of 15 and resets to the first page when searching", async () => {
+  const defaultGet = axios.get.getMockImplementation();
+  const groups = Array.from({ length: 32 }, (_, index) => ({
+    id: `group-${index}`, code: `NHOM-${String(index + 1).padStart(2, "0")}`, major, majorId: major.id,
+    academicYear: year, status: "open", memberCount: 0, maxStudents: 20,
+  }));
+  axios.get.mockImplementation(async url => url.includes("/masters/class-groups") ? { data: groups } : defaultGet(url));
+  renderPage();
+  await screen.findByText("NHOM-01");
+  const table = screen.getByRole("table", { name: "Danh sách nhóm học phần" });
+  expect(within(table).getAllByRole("row")).toHaveLength(16);
+  expect(screen.getByText("Hiển thị 1–15 trên 32 nhóm học viên")).toBeVisible();
+  expect(screen.queryByText("NHOM-16")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Trang sau" }));
+  expect(screen.getByText("NHOM-16")).toBeVisible();
+  expect(within(table).getAllByRole("row")[1].firstElementChild).toHaveTextContent("16");
+  expect(screen.getByText("Hiển thị 16–30 trên 32 nhóm học viên")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Trang cuối" }));
+  expect(within(table).getAllByRole("row")).toHaveLength(3);
+  expect(screen.getByText("NHOM-32")).toBeVisible();
+  fireEvent.change(screen.getByPlaceholderText("Tìm theo mã nhóm, ngành học..."), { target: { value: "NHOM-01" } });
+  await waitFor(() => expect(within(table).getAllByRole("row")).toHaveLength(2));
+  expect(screen.getByText("NHOM-01")).toBeVisible();
+  expect(screen.getByText("Hiển thị 1–1 trên 1 nhóm học viên")).toBeVisible();
+});
+
+test("ignores a late group response after the year filter has changed", async () => {
+  const defaultGet=axios.get.getMockImplementation();
+  const pending=[];
+  axios.get.mockImplementation(url=>url.includes('/masters/class-groups?')
+    ? new Promise(resolve=>pending.push({url,resolve})) : defaultGet(url));
+  renderPage();
+  await waitFor(()=>expect(pending).toHaveLength(1));
+  fireEvent.mouseDown(screen.getByLabelText('Năm học'));
+  fireEvent.click(await screen.findByRole('option',{name:String(Number(year)-1),exact:true}));
+  await waitFor(()=>expect(pending).toHaveLength(2));
+  const group=(code,academicYear)=>({id:code,code,academicYear,major,majorId:major.id,status:'open',maxStudents:20});
+  await act(async()=>pending[1].resolve({data:[group('NHOM-BO-LOC-MOI',String(Number(year)-1))]}));
+  expect(await screen.findByText('NHOM-BO-LOC-MOI')).toBeVisible();
+  await act(async()=>pending[0].resolve({data:[group('NHOM-PHAN-HOI-CU',year)]}));
+  expect(screen.getByText('NHOM-BO-LOC-MOI')).toBeVisible();
+  expect(screen.queryByText('NHOM-PHAN-HOI-CU')).not.toBeInTheDocument();
 });
 
 test("does not expose automatic student assignment while creating groups", async () => {

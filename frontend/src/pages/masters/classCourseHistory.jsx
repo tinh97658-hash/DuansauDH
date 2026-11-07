@@ -1,6 +1,8 @@
 import {formatLecturerName} from '../../utils/lecturerName';
 import AppSelect from "../../components/AppSelect";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { dropdownMenuGeometry } from "../../utils/dropdownGeometry";
 import axios from "axios";
 import { useSearchParams } from "react-router-dom";
 import { Alert, Box, CircularProgress, Tooltip } from "@mui/material";
@@ -42,9 +44,28 @@ function SelectFilter({ label, value, onChange, children, disabled }) {
 function YearMultiSelect({ years, value, onChange, disabled }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+  const [position, setPosition] = useState(null);
+  useLayoutEffect(() => {
+    if (!open || disabled) return undefined;
+    let frame;
+    const measure = () => {
+      const next = dropdownMenuGeometry(triggerRef.current, { menuHeight: menuRef.current?.scrollHeight || 360 });
+      if (next) setPosition(previous => previous && Object.keys(next).every(key => previous[key] === next[key]) ? previous : next);
+    };
+    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure); };
+    measure();
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null;
+    if (triggerRef.current) observer?.observe(triggerRef.current);
+    if (menuRef.current) observer?.observe(menuRef.current);
+    window.addEventListener('resize', schedule);
+    document.addEventListener('scroll', schedule, true);
+    return () => { cancelAnimationFrame(frame); observer?.disconnect(); window.removeEventListener('resize', schedule); document.removeEventListener('scroll', schedule, true); };
+  }, [open, disabled]);
   useEffect(() => {
     const close = (event) => {
-      if (!rootRef.current?.contains(event.target)) setOpen(false);
+      if (!rootRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) setOpen(false);
     };
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
@@ -55,10 +76,12 @@ function YearMultiSelect({ years, value, onChange, disabled }) {
   };
   return <div className="tp-filter tp-year-filter" ref={rootRef}>
     <span>Khóa / năm học</span>
-    <button type="button" className="tp-year-trigger" aria-label="Khóa / năm học" aria-expanded={open} disabled={disabled} onClick={() => setOpen((current) => !current)}>
+    <button ref={triggerRef} type="button" className="tp-year-trigger" aria-label="Khóa / năm học" aria-expanded={open} disabled={disabled} onClick={() => setOpen((current) => !current)}>
       <span>{value.length ? value.join(", ") : "Chọn khóa / năm học"}</span>
     </button>
-    {open && !disabled && <div className="tp-year-menu" role="group" aria-label="Chọn khóa / năm học">
+    {open && !disabled && createPortal(<div ref={menuRef} className="tp-year-menu" role="group" aria-label="Chọn khóa / năm học"
+      style={{ ...position, position: 'fixed', zIndex: 1500, overflowY: 'auto' }}
+      onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setOpen(false); triggerRef.current?.focus({ preventScroll: true }); } }}>
       {years.map((year) => {
         const checked = value.includes(year);
         return <label className="tp-year-option" key={year}>
@@ -67,7 +90,7 @@ function YearMultiSelect({ years, value, onChange, disabled }) {
         </label>;
       })}
       <small>Có thể chọn nhiều khóa</small>
-    </div>}
+    </div>, document.body)}
   </div>;
 }
 
@@ -297,7 +320,7 @@ export default function ClassCourseHistory() {
 
   return <FeatureLayout title="Theo dõi tiến độ" exportConfig={false}>
     <div className="tp-page">
-      <section className="tp-filters" aria-label="Bộ lọc tiến độ">
+      <section className="tp-filters app-filter-toolbar" aria-label="Bộ lọc tiến độ">
         <SelectFilter label="Ngành" value={disciplineId} onChange={(value) => {
           const candidates = majorsForDiscipline(eligibleMajors, value);
           const nextMajorId = candidates.find((item) => item.id === majorId)?.id || candidates[0]?.id || "";

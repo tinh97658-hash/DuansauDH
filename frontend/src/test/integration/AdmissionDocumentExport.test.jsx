@@ -59,6 +59,7 @@ beforeEach(() => {
   axios.get.mockImplementation(async (url) => {
     if (url.endsWith("/auth/isStaff")) return { data: { message: "admin" } };
     if (url.includes("/system/majors")) return { data: [major] };
+    if (url.includes("/system/training-years")) return { data: [{ name: String(new Date().getFullYear()), active: true, startDate: "2000-01-01" }] };
     if (url.includes("/admission-records?")) return { data: { data: [record, { ...record, id: "other", code: "HV002", fullName: "Hồ sơ khác" }], pagination: { total: 2, totalPages: 1 }, stats: {} } };
     if (url.endsWith("/admission-records/record")) return { data: record };
     if (url.endsWith("/recognized-credits")) return { data: { credits: 0 } };
@@ -95,6 +96,35 @@ it.each(["detail", "list"])("%s keeps every A4 field, checklist, headings and si
   }
   const page = xml.getElementsByTagName("w:pgSz")[0];
   expect(Number(page.getAttribute("w:w"))).toBeLessThan(Number(page.getAttribute("w:h")));
+  const margins = xml.getElementsByTagName("w:pgMar")[0];
+  expect(["top", "bottom", "left", "right"].map(side => Number(margins.getAttribute(`w:${side}`)))).toEqual([1134, 1134, 1701, 850]);
+  const sectionHeading = [...xml.getElementsByTagName("w:p")].find(p => p.textContent === data.sections[2].title);
+  expect([...sectionHeading.getElementsByTagName("w:pageBreakBefore")].every(node=>node.getAttribute("w:val")==="false")).toBe(true);
+  const mainField = [...xml.getElementsByTagName("w:p")].find(p => p.textContent === `${data.sections[1].fields[0].label} ${data.sections[1].fields[0].value}`);
+  expect([...mainField.getElementsByTagName("w:sz")].map(size => size.getAttribute("w:val"))).toEqual(["21", "21"]);
+  for (const paragraph of [...xml.getElementsByTagName("w:p")].filter(p=>p.textContent.trim())) {
+    const spacing=paragraph.getElementsByTagName("w:spacing")[0];
+    expect(Number(spacing.getAttribute("w:after"))).toBeGreaterThanOrEqual(60);
+  }
+  const header=xml.getElementsByTagName("w:tbl")[0];
+  const rules=[...header.getElementsByTagName("w:p")].filter(p=>p.getElementsByTagName("w:pBdr").length);
+  expect(rules).toHaveLength(2);
+  rules.forEach((rule,index)=>{
+    const indent=rule.getElementsByTagName("w:ind")[0];
+    expect([4620,4734][index]-Number(indent.getAttribute("w:left"))-Number(indent.getAttribute("w:right"))).toBe(1814);
+  });
+  expect([...header.getElementsByTagName("w:gridCol")].map(col=>col.getAttribute("w:w"))).toEqual(["4620","4734"]);
+  const school=[...header.getElementsByTagName("w:p")].find(p=>p.textContent===data.masthead[1]);
+  expect(school.getElementsByTagName("w:sz")[0].getAttribute("w:val")).toBe("24");
+  for (const [index,text] of data.nationalHeading.entries()) {
+    const paragraph=[...header.getElementsByTagName("w:p")].find(p=>p.textContent===text);
+    expect(paragraph.getElementsByTagName("w:sz")[0].getAttribute("w:val")).toBe(index===0?"24":"26");
+  }
+  for (const [text,size] of [[data.masthead[2],"24"],[data.title,"28"]]) {
+    const paragraph=[...xml.getElementsByTagName("w:p")].find(p=>p.textContent===text);
+    expect(paragraph.getElementsByTagName("w:sz")[0].getAttribute("w:val")).toBe(size);
+    expect(paragraph.getElementsByTagName("w:b")).toHaveLength(1);
+  }
 });
 
 it("embeds the existing profile photo in a genuine DOCX", async () => {
@@ -104,6 +134,16 @@ it("embeds the existing profile photo in a genuine DOCX", async () => {
   expect(Object.keys(zip.files).some((name) => /^word\/media\/.*\.png$/.test(name))).toBe(true);
   render(<AdmissionPrintTemplate document={data} />);
   expect(screen.getByAltText("Ảnh 3x4")).toHaveAttribute("src", photo);
+  const personal = document.querySelector(".admission-sheet-personal");
+  expect(personal.firstElementChild).toHaveTextContent(data.sections[0].title);
+  expect(personal.lastElementChild).toContainElement(screen.getByAltText("Ảnh 3x4"));
+  const xml = await docxXml(await createAdmissionWord(data));
+  const photoCell = Array.from(xml.getElementsByTagName("w:tc")).find(cell => cell.getElementsByTagName("w:drawing").length);
+  expect(photoCell.parentNode.lastElementChild).toBe(photoCell);
+  const rightMargin=photoCell.getElementsByTagName("w:tcMar")[0].getElementsByTagName("w:right")[0];
+  expect(rightMargin.getAttribute("w:w")).toBe("0");
+  expect(photoCell.parentNode.getElementsByTagName("w:tc")[0].textContent).toContain(data.sections[0].title);
+  expect(Array.from(xml.getElementsByTagName("w:color")).every(color => color.getAttribute("w:val") === "000000")).toBe(true);
 });
 
 it("preserves snapshots and their dates across previews and reloads, printing only on request", () => {
@@ -142,7 +182,7 @@ it.each(["applications", "admitted-masters"])("%s list keeps the relevant row ac
   expect(axios.put).not.toHaveBeenCalled(); expect(axios.post).not.toHaveBeenCalled();
 });
 
-it("both detail dropdowns only export Excel and preserve the current unsaved form", async () => {
+it("both detail dropdowns export the CV in Word or PDF and preserve the current unsaved form", async () => {
   render(<MemoryRouter useTransitions={false} initialEntries={["/plan/admission-records/record"]}><Routes><Route path="/plan/admission-records/:id" element={<AdmissionRecordDetail />} /></Routes></MemoryRouter>);
   await screen.findByDisplayValue(record.fullName);
   const input = screen.getByDisplayValue(record.fullName);
@@ -151,18 +191,20 @@ it("both detail dropdowns only export Excel and preserve the current unsaved for
   expect(triggers).toHaveLength(2);
   for (const [index, trigger] of triggers.entries()) {
     fireEvent.click(trigger);
-    expect(screen.getAllByRole("menuitem")).toHaveLength(1);
-    expect(screen.queryByRole("menuitem", { name: "Word (.docx)" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "PDF (.pdf)" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("menuitem", { name: "Excel (.xlsx)" }));
+    expect(screen.getAllByRole("menuitem")).toHaveLength(2);
+    expect(screen.queryByRole("menuitem", { name: "Excel (.xlsx)" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "PDF (.pdf)" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Word (.docx)" }));
     await waitFor(() => expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledTimes(index + 1), { timeout: 10000 });
-    const workbook = await JSZip.loadAsync(await bufferOf(URL.createObjectURL.mock.calls[index][0]));
-    expect(workbook.file("xl/workbook.xml")).not.toBeNull();
-    const strings = await workbook.file("xl/sharedStrings.xml").async("string");
-    expect(strings).toContain("TÊN ĐANG CHỈNH SỬA");
+    const xml = await docxXml(URL.createObjectURL.mock.calls[index][0]);
+    expect(xml.documentElement.textContent).toContain("TÊN ĐANG CHỈNH SỬA");
     await waitFor(() => expect(trigger).toBeEnabled());
   }
   expect(window.open).not.toHaveBeenCalled(); expect(sessionStorage.length).toBe(0);
+  fireEvent.click(triggers[0]);
+  fireEvent.click(screen.getByRole("menuitem", { name: "PDF (.pdf)" }));
+  await waitFor(() => expect(window.open).toHaveBeenCalledTimes(1));
+  expect(readAdmissionPreview(previewId()).fullName).toBe("Tên đang chỉnh sửa");
   expect(input).toHaveValue("Tên đang chỉnh sửa"); expect(window.print).not.toHaveBeenCalled();
   expect(axios.put).not.toHaveBeenCalled(); expect(axios.post).not.toHaveBeenCalled();
 });
@@ -183,6 +225,7 @@ it.each(["applications", "admitted-masters"])("exports %s only as Excel with eve
   });
   render(<MemoryRouter useTransitions={false}><AdmissionRecords mode={mode} embedded /></MemoryRouter>);
   await screen.findAllByText(record.email);
+  await waitFor(() => expect(screen.queryByRole("progressbar")).not.toBeInTheDocument());
   const trigger = screen.getByRole("button", { name: "Xuất báo cáo", exact: true });
   await waitFor(() => expect(trigger).toBeEnabled());
   fireEvent.click(trigger);

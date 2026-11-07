@@ -9,11 +9,18 @@
 
     html[data-font-size] .sl-combo-list { top: calc(100% + 4px) !important; }
 
-    html[data-font-size]:not([data-font-size="100"]) :is(.sl-create-scope-fields, .sl-schedule-scope-fields) {
+    html[data-font-size]:not([data-font-size="100"]) .sl-schedule-scope-fields {
       display: flex !important;
       flex-wrap: wrap !important;
       gap: 10px 14px !important;
       align-items: flex-end !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .sl-create-scope-fields {
+      display: grid !important;
+      grid-template-columns: minmax(0, 1fr) max-content !important;
+      gap: 10px 14px !important;
+      align-items: end !important;
     }
 
     html[data-font-size]:not([data-font-size="100"]) :is(.sl-create-scope-field, .sl-schedule-scope-field) {
@@ -21,7 +28,10 @@
       min-width: 0 !important;
     }
 
-    html[data-font-size]:not([data-font-size="100"]) .sl-create-scope-discipline { flex-basis: 100% !important; }
+    html[data-font-size]:not([data-font-size="100"]) .sl-create-scope-fields .v20-scope-step {
+      white-space: nowrap !important;
+      overflow-wrap: normal !important;
+    }
 
     html[data-font-size]:not([data-font-size="100"]) .sl-create-figma .sl-right { overflow: auto !important; }
     html[data-font-size]:not([data-font-size="100"]) .sl-create-main { grid-template-rows: auto minmax(0, 1fr) auto !important; }
@@ -100,12 +110,13 @@
     }
 
     html[data-font-size]:not([data-font-size="100"]) .sl-schedule-head {
-      display: flex !important;
+      display: grid !important;
       align-items: center !important;
       gap: 8px 12px !important;
     }
 
-    html[data-font-size]:not([data-font-size="100"]) .sl-schedule-head h1 { margin-right: auto !important; }
+    html[data-font-size]:not([data-font-size="100"]) .sl-schedule-head h1 { margin-right: 0 !important; }
+    html[data-font-size]:not([data-font-size="100"]) .sl-schedule-head .sl-actions { flex-wrap: nowrap !important; }
 
     html[data-font-size]:not([data-font-size="100"]) :is(
       .sl-section h2, .sl-create-subject-title > span, .sl-create-section-title b,

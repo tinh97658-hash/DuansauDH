@@ -30,8 +30,13 @@ import {
 import FeatureLayout from "../../components/FeatureLayout";
 import DocumentExportMenu from "../../components/DocumentExportMenu";
 import { downloadDocumentFile } from "../../utils/documentFiles";
-import { createAdmissionExcel } from "../../features/admission/admissionDocumentExport";
+import { createAdmissionWord, openAdmissionPreview } from "../../features/admission/admissionDocumentExport";
 import { buildAdmissionDocument } from "../../features/admission/admissionDocument";
+import { learnerTranscriptFilename, normalizeLearnerTranscript } from "../../features/learners/learnerTranscript";
+import { createLearnerTranscriptWord } from "../../features/learners/learnerTranscriptWord";
+import { createLearnerTranscriptExcel } from "../../features/learners/learnerTranscriptExcel";
+import { openLearnerTranscriptPdfPreview } from "../../features/learners/learnerTranscriptPdfPreview";
+import { reserveReportPreview } from "../../utils/reportPreview";
 import AppDialog from "../../components/AppDialog";
 import PopupFormField from "../../components/PopupFormField";
 import ConfirmDialog from "../../components/ConfirmDialog";
@@ -244,7 +249,7 @@ const mapRecordToFormState = (data, majorList = []) => {
       ? "Vừa làm - Vừa học"
       : data.gradDegreeType || "Chính quy",
     gradYear: data.gradYear || "",
-    gpa: data.gpa || "",
+    gpa: String(data.gpa ?? ""),
     gradClassification: data.gradClassification || "Khá",
     diplomaNumber: data.diplomaNumber || "",
     registryBookNumber: data.registryBookNumber || "",
@@ -289,6 +294,16 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
   const showStudyTabs = returnPath === "/masters/admitted-records" || fromStudyManagement;
   const requestedTab = searchParams.get("tab");
   const detailTab = (showStudyTabs && ["learning", "grades", "leave"].includes(requestedTab)) || (requestedTab === "admission" && record?.trainingLevel === "Thạc sĩ") ? requestedTab : "profile";
+  const transcriptClassGroupId = searchParams.get("classGroupId") || undefined;
+  const [exportingDocument, setExportingDocument] = useState(false);
+  const documentExportRequest = useRef(null);
+  useEffect(() => {
+    setExportingDocument(false);
+    return () => {
+      const request = documentExportRequest.current;
+      if (request) { request.active = false; request.controller.abort(); request.tab?.close(); documentExportRequest.current = null; }
+    };
+  }, [id, detailTab, transcriptClassGroupId]);
   const changeDetailScope = (key, value) => {
     const params = new URLSearchParams(searchParams);
     params.set(key, value);
@@ -563,14 +578,55 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
     }
   };
 
+  const exportingTranscript = detailTab === "learning" || detailTab === "grades";
+  const exportDocument = async format => {
+    if (documentExportRequest.current || loading || saving || !formData) return;
+    const request = { active: true, controller: new AbortController() };
+    documentExportRequest.current = request;
+    setExportingDocument(true);
+    try {
+      if (!exportingTranscript) {
+        const document = buildAdmissionDocument(formData);
+        if (format === "pdf") openAdmissionPreview(document);
+        else {
+          const blob = await createAdmissionWord(document);
+          if (request.active) downloadDocumentFile(blob, document.filename);
+        }
+        return;
+      }
+      if (format === "pdf") request.tab = reserveReportPreview();
+      // Use the same fresh scorecard and document templates as class-summary exports.
+      const { data } = await axios.get(`${API_BASE_URL}/reports/learner-scorecard/${id}`, {
+        params: transcriptClassGroupId ? { classGroupId: transcriptClassGroupId } : {},
+        withCredentials: true, signal: request.controller.signal,
+      });
+      if (!request.active) return;
+      if (!data.group?.id) throw new Error("Học viên chưa được phân lớp để xuất bảng điểm cá nhân.");
+      const transcript = normalizeLearnerTranscript(data);
+      if (format === "pdf") {
+        await openLearnerTranscriptPdfPreview(transcript, request.tab, { isCancelled: () => !request.active });
+        return;
+      }
+      const create = format === "excel" ? createLearnerTranscriptExcel : createLearnerTranscriptWord;
+      const blob = await create(transcript);
+      if (request.active) downloadDocumentFile(blob, learnerTranscriptFilename(transcript, format));
+    } catch (error) {
+      request.tab?.close();
+      if (request.active) throw error;
+    } finally {
+      if (documentExportRequest.current === request) {
+        documentExportRequest.current = null;
+        setExportingDocument(false);
+      }
+    }
+  };
   const documentActions = {
-    formats: ["excel"],
-    disabled: loading || saving || !formData,
-    onExcel: async () => {
-      const document = buildAdmissionDocument(formData);
-      downloadDocumentFile(await createAdmissionExcel(document), document.filename.replace(/\.docx$/i, ".xlsx"));
-    },
-    onError: (error) => toast.error(error.message || "Không thể xuất hồ sơ. Vui lòng thử lại."),
+    formats: exportingTranscript ? ["excel", "word", "pdf"] : ["word", "pdf"],
+    disabled: loading || saving || exportingDocument || !formData,
+    onExcel: exportingTranscript ? () => exportDocument("excel") : undefined,
+    onWord: () => exportDocument("word"),
+    onPdf: () => exportDocument("pdf"),
+    onError: error => toast.error(error.response?.data?.message || error.message || "Không thể xuất báo cáo. Vui lòng thử lại."),
   };
 
   const submitTransfer = async () => {

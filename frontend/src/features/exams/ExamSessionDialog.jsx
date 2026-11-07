@@ -27,6 +27,9 @@ export default function ExamSessionDialog({members,queue,rooms,lecturers,units,c
  const canEdit=canWrite&&active.some(editable);
  const changeMode=next=>{onClearError();setMode(next);};
  const saved=async save=>{if(await save())setMode(null);};
+ const confirmCandidates=async session=>{
+  if(await onAttendanceConfirm?.(session))setExpanded(ids=>ids.filter(id=>id!==session.id));
+ };
  const rowAction=(action,target)=>{if(action==='held')onAction(action,target);else changeMode({action,target});};
  const beginEdit=()=>changeMode({action:'edit',members});
  // Preserve the versions the user started editing, even if the calendar refreshes in the background.
@@ -76,7 +79,7 @@ export default function ExamSessionDialog({members,queue,rooms,lecturers,units,c
        </div></td>
       </tr>{open&&<tr><td colSpan={7} className="ep-session-candidate-cell"><section id={detailId} aria-label={`Thí sinh ${g.subjectName} · ${g.name}`}>
        <h3>Danh sách thí sinh · {g.subjectName} ({g.candidateCount})</h3>
-       <ExamCandidatesTable session={g} canWrite={canWrite} busy={busy} onAttendanceChange={onAttendanceChange} onAttendanceConfirm={onAttendanceConfirm}/>
+       <ExamCandidatesTable session={g} canWrite={canWrite} busy={busy} showAttendance={g.status==='held'} onAttendanceChange={onAttendanceChange} onAttendanceConfirm={confirmCandidates}/>
       </section></td></tr>}</React.Fragment>;
      })}</tbody>
     </table></div>

@@ -1,4 +1,4 @@
-.tp-page { --tp-muted:#5b6f87; --tp-line:#c5d4e0; flex:1; min-height:0; display:flex; flex-direction:column; color:#12263f; background:#edf3f8; margin:-10px -16px -20px; padding:10px 24px 22px; font-size:12px; }
+.tp-page { --tp-muted:#5b6f87; --tp-line:#c5d4e0; flex:1; min-height:0; display:flex; flex-direction:column; color:#12263f; background:var(--surface-bg,#fff); margin:-10px -16px -20px; padding:10px 24px 22px; font-size:12px; }
 .tp-page * { box-sizing:border-box; }
 .tp-status-cell { display:inline-flex; align-items:center; justify-content:center; gap:5px; }
 .tp-warning { display:inline-flex; align-items:center; justify-content:center; cursor:help; border-radius:3px; }

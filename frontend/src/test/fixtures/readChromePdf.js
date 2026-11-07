@@ -30,7 +30,9 @@ export function readChromePdf(buffer) {
     const fonts = new Map([...resources.matchAll(/\/(F\d+) (\d+) 0 R/g)].map(match => [match[1], maps.get(match[2])]));
     const contents = page.match(/\/Contents\s*(\[[^\]]+\]|\d+ 0 R)/)[1];
     return [...contents.matchAll(/(\d+) 0 R/g)].map(ref => stream(objects.get(ref[1]))).join("\n").match(/BT[\s\S]*?ET/g).map(block => {
-      const font = fonts.get(block.match(/\/(F\d+) [\d.]+ Tf/)[1]);
+      const fontRef = block.match(/\/(F\d+) [\d.]+ Tf/);
+      if (!fontRef) return ""; // Chrome may emit empty text objects on page breaks.
+      const font = fonts.get(fontRef[1]);
       return [...block.matchAll(/<([\da-f]+)>/gi)].map(match => match[1].match(/.{4}/g).map(code => font?.get(parseInt(code, 16)) || "").join("")).join("");
     }).join("");
   });

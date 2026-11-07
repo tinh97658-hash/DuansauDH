@@ -32,11 +32,12 @@
 .ep-period-items .ep-event>strong{font-size:13.5px;line-height:1.25}
 .ep-period-items .ep-event>span{font-size:12.5px;line-height:1.25}.ep-period-items .ep-event>small{font-size:11.5px;line-height:1.25}
 .ep-period-value{margin-top:12px;color:#607486;font-size:12px}
-.ep-heading-actions{display:flex;align-items:center;gap:16px;min-width:0;flex-wrap:wrap}
-.exam-planner .sl-schedule-head{height:auto;min-height:52px;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding-inline:12px}
+.ep-heading-actions{display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:nowrap}
+.exam-planner .sl-schedule-head{height:auto;min-height:52px;display:grid;grid-template-columns:minmax(var(--sl-toolbar-side-width,max-content),1fr) max-content minmax(var(--sl-toolbar-side-width,max-content),1fr);align-items:center;gap:8px;padding-inline:12px;overflow-x:auto}
 .exam-planner .ep-heading-actions{flex:1 1 auto}
-.exam-planner .sl-week{flex:none}
-.exam-planner .sl-actions{margin-left:auto;flex-wrap:wrap;min-width:0}
+.exam-planner .ep-week-navigation{justify-content:center;box-sizing:border-box;min-width:max-content}
+.exam-planner .sl-actions{margin-left:auto;flex-wrap:nowrap;gap:6px;min-width:0}
+.exam-planner .ep-heading-actions .sl-actions{margin-left:0}
 .ep-selection-help{margin:0 0 10px;padding:8px 10px;background:var(--primary-light);color:var(--text-secondary);font-size:12px;line-height:1.5}
 .ep-queue-card{display:flex;align-items:flex-start;gap:4px;margin-bottom:7px;border:1px solid #d7e1e9;border-left:3px solid transparent;background:#fff}
 .ep-queue-card.ep-active{border-color:#72aed0;border-left-color:var(--primary);background:#eaf4fa}
@@ -89,6 +90,8 @@ body .app-popup .ep-arrangement-dialog .ep-candidate-warning p{margin:6px 0 0}
 body .app-popup .ep-arrangement-fields>.v20-field{margin-top:0;min-width:0}
 body .app-popup .ep-arrangement-fields .sl-combo{margin-top:0}
 body .app-popup .ep-arrangement-fields :is(.v20-field>input,.v20-field>select,.sl-combo>input,.sl-lecturer-trigger){box-sizing:border-box;width:100%;height:48px;min-height:48px;margin:0;padding:11px 12px;font:400 15px/1.5 var(--app-font-family)}
+/* Give selected values a solid stroke without enlarging or scaling the control. */
+body .app-popup .ep-arrangement-fields .v20-field>select:not(:disabled){color:var(--text-primary);font-weight:600;letter-spacing:normal;-webkit-font-smoothing:auto}
 body .app-popup .ep-arrangement-fields .sl-combo>input{padding-right:32px}
 body .app-popup .ep-arrangement-fields .sl-combo>button{height:46px}
 body .app-popup .ep-arrangement-fields .sl-combo-list{top:calc(100% + 4px)}
@@ -118,7 +121,7 @@ body .app-popup .ep-arrangement-dialog .ep-resource-hint{margin:0;padding:10px 1
 .ep-arrangement-detail-table :is(th,td):nth-child(5){width:100px;white-space:nowrap;overflow-wrap:normal}
 .ep-arrangement-detail-table :is(th,td):nth-child(6){width:128px;white-space:nowrap;overflow-wrap:normal}
 .ep-arrangement-detail-table :is(th,td):nth-child(7){width:100px;white-space:nowrap;overflow-wrap:normal}
-@media(max-width:800px){.ep-arrangement-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.exam-planner .sl-week{order:3;flex-basis:100%;justify-content:center}}
+@media(max-width:800px){.ep-arrangement-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.ep-arrangement-fields{grid-template-columns:1fr}}
 .ep-detail-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .ep-detail-actions .sl-btn{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;font-family:inherit;font-size:inherit;font-weight:650;line-height:1.2;text-decoration:none;color:#344f60}
@@ -148,6 +151,8 @@ body .app-popup .ep-arrangement-dialog .ep-resource-hint{margin:0;padding:10px 1
 .ep-attendance-option input:disabled:not(:checked)+.ep-attendance-chip{opacity:.6}
 @layer app-text-size{
  @media screen{
+  html[data-font-size]:not([data-font-size="100"]) .exam-planner .sl-schedule-head{display:grid!important;grid-template-columns:minmax(var(--sl-toolbar-side-width,max-content),1fr) max-content minmax(var(--sl-toolbar-side-width,max-content),1fr);gap:8px!important;flex-wrap:nowrap!important}
+  html[data-font-size]:not([data-font-size="100"]) .exam-planner .sl-schedule-head .sl-actions{flex-wrap:nowrap!important}
   .ep-round-table .ep-session-detail-table{table-layout:fixed!important;min-width:calc(1040px * var(--app-text-scale,1))!important}
   .ep-session-round-column{width:calc(50px * var(--app-text-scale,1))!important}
   .ep-session-time-column{width:calc(110px * var(--app-text-scale,1))!important}

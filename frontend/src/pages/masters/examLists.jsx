@@ -27,6 +27,7 @@ import { downloadReport } from "../../utils/reportExport";
 import { buildExamListDocument, createExamListExcel, createExamListWord } from "../../features/exams/examListExport";
 import { buildSubjectSigningDocument, createSubjectSigningExcel, createSubjectSigningWord, openSubjectSigningPreview, subjectSigningFilename } from "../../features/exams/subjectSigningExport";
 import { API_BASE_URL } from "../../config/http";
+import { useAuthSession } from "../../context/AuthSession";
 import { personNameParts } from "../../utils/personName";
 import { examAttendanceLabel, displayGradeDate, draftOf, formatAttemptScores, formatScore, gradebookColumns, gradebookRowValues, gradePayload, isExamCandidate, numericScore, RESULT_LABELS, rowError, SCORE_FIELDS, updateGradeDraft, visibleGradeRows } from "../../features/exams/gradebook";
 import "../../features/exams/gradebook.css";
@@ -70,6 +71,7 @@ const errorMessage = (error, fallback) => {
 };
 
 export default function ExamLists() {
+  const session = useAuthSession();
   const offeringMenu = useOfferingMenu();
   const [entryParams] = useSearchParams();
   const { can } = usePermissions();
@@ -366,7 +368,7 @@ export default function ExamLists() {
         classGroupId: groupId, courseOfferingId: offeringId, rosterScope: "offering", mode, search,
         ...(isExamList ? { includeIds, excludeIds } : {}),
       }, () => workflow.status === "draft" ? dirtyRef.current : {});
-      const document = isExamList ? buildExamListDocument(selectedGroup, selectedOffering, exported)
+      const document = isExamList ? buildExamListDocument(selectedGroup, selectedOffering, exported, session?.user)
         : buildGradebookDocument(selectedGroup, selectedOffering, exported);
       if (!document.rows.length) throw new Error(isExamList ? "Không có học viên đủ tư cách và không miễn thi để in." : "Không có dữ liệu bảng điểm để xuất.");
       if (format === "excel") downloadDocumentFile(await (isExamList ? createExamListExcel(document) : createGradebookExcel(document)), gradebookFilename(selectedGroup, selectedOffering, isExamList ? "DS-thi" : undefined));
@@ -453,7 +455,7 @@ export default function ExamLists() {
         newestOnTop limit={1} className="exam-warning-toast-container exam-no-print" toastClassName="app-toast exam-warning-toast"
          />
       <Paper variant="outlined" sx={{ ...panelSx, p: 1, mb: 1 }} className="exam-no-print">
-        <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="flex-end">
+        <Stack className="app-filter-toolbar" role="group" aria-label="Bộ lọc bảng điểm" direction="row" gap={1.5} flexWrap="nowrap" alignItems="flex-end">
           <FilterSelectField label="Chuyên ngành" value={majorId} disabled={optionsLoading || saving || exporting} sx={{ flex: "0 1 240px", minWidth: 180 }} onChange={(event) => {
             const next = event.target.value;
             requestChange(() => {
@@ -495,7 +497,7 @@ export default function ExamLists() {
       </Paper>
 
       <div className="exam-workspace-controls exam-no-print">
-      <div className="exam-main-toolbar">
+      <div className="exam-main-toolbar app-action-toolbar" role="region" aria-label="Thao tác bảng điểm" tabIndex={0}>
         <div className="exam-mode-switch" role="group" aria-label="Chế độ bảng điểm">
           {Object.entries(modes).map(([key, label]) => <Button key={key} startIcon={<ClipboardDocumentListIcon />} disabled={saving || exporting} variant={mode === key ? "contained" : "outlined"} aria-pressed={mode === key} onClick={() => selectMode(key)}>{label}</Button>)}
         </div>

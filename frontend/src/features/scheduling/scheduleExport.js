@@ -320,10 +320,11 @@ export async function createScheduleWord(schedule, { metadata: customMetadata, c
     columnWidths: [contentWidth / 2, contentWidth / 2],
     layout: TableLayoutType.FIXED,
     borders: Object.fromEntries(["top", "bottom", "left", "right", "insideHorizontal", "insideVertical"].map((side) => [side, { style: BorderStyle.NIL }])),
-    rows: [new TableRow({ cantSplit: true, children: metadata.signatures.map((title) => new TableCell({
+    rows: [new TableRow({ cantSplit: true, children: metadata.signatures.map((title, index) => new TableCell({
       width: { size: 50, type: WidthType.PERCENTAGE },
       children: [paragraph(title, { center: true, bold: true, size: 22, keepNext: true }),
-        paragraph(metadata.signaturePrompt, { center: true, italic: false, size: 22, after: 900 })],
+        paragraph(metadata.signaturePrompt, { center: true, italic: false, size: 22, after: 900 }),
+        ...(metadata.signatureNames?.[index] ? [paragraph(metadata.signatureNames[index], { center: true, bold: true, size: 22 })] : [])],
     })) })],
   });
   const formFooter = new Table({

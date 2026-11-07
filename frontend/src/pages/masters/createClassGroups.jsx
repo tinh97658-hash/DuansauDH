@@ -20,6 +20,7 @@ import FilterSelectField from "../../components/FilterSelectField";
 import ClassGroupCreateDialog, { initialClassGroupForm as initialForm } from "./ClassGroupCreateDialog";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import ResizableTable from "../../components/ResizableTable";
+import ListPagination from "../../components/ListPagination";
 import { disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline } from "../../utils/disciplineScope";
 
 const CLASS_GROUP_COLUMNS = [
@@ -35,6 +36,7 @@ const CLASS_GROUP_COLUMNS = [
 ];
 
 const currentYear = new Date().getFullYear();
+const PAGE_SIZE = 15;
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 3 + i));
 const CreateClassGroups = () => {
   const { can, access } = usePermissions();
@@ -55,9 +57,12 @@ const CreateClassGroups = () => {
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("ALL");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  useEffect(() => { setPage(0); }, [selectedYear, selectedMajor, selectedDiscipline, selectedStatus, search]);
 
   // Data & loading
   const [groups, setGroups] = useState([]);
+  const groupRequestVersion = useRef(0);
   const [loading, setLoading] = useState(true);
   const isAdmin = can("masters.manage") && !access?.groupScope?.readOnly;
   const [error, setError] = useState("");
@@ -100,6 +105,7 @@ const CreateClassGroups = () => {
 
   // Load groups
   const loadGroups = useCallback(async () => {
+    const requestVersion = ++groupRequestVersion.current;
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -110,17 +116,20 @@ const CreateClassGroups = () => {
       const { data } = await axios.get(`${API_BASE_URL}/masters/class-groups?${params.toString()}`, {
         withCredentials: true,
       });
+      if (requestVersion !== groupRequestVersion.current) return;
       setGroups(Array.isArray(data) ? data : data.data || []);
       setError("");
     } catch (err) {
+      if (requestVersion !== groupRequestVersion.current) return;
       setError(err.response?.data?.message || "Không thể tải danh sách nhóm học phần.");
     } finally {
-      setLoading(false);
+      if (requestVersion === groupRequestVersion.current) setLoading(false);
     }
   }, [selectedYear, selectedMajor, selectedStatus]);
 
   useEffect(() => {
     loadGroups();
+    return () => { groupRequestVersion.current += 1; };
   }, [loadGroups]);
 
   // Filtered rows
@@ -136,6 +145,9 @@ const CreateClassGroups = () => {
         || (g.note || "").toLowerCase().includes(kw);
     });
   }, [groups, majors, search, selectedDiscipline]);
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(filtered.length / PAGE_SIZE) - 1));
+  const pageRows = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+  useEffect(() => { if (page !== currentPage) setPage(currentPage); }, [page, currentPage]);
   const disciplines = useMemo(() => disciplinesFromMajors(majors), [majors]);
   const visibleMajors = useMemo(() => majorsForDiscipline(majors, selectedDiscipline), [majors, selectedDiscipline]);
   // Actions
@@ -235,7 +247,7 @@ const CreateClassGroups = () => {
           boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
         }}
       >
-        <Stack direction="row" flexWrap="wrap" alignItems="flex-end" sx={{ gap: 1.5 }}>
+        <Stack className="app-filter-toolbar" direction="row" flexWrap="nowrap" alignItems="flex-end" sx={{ gap: 1.5 }}>
           <FilterSelectField label="Năm học" sx={{ flex: "1 1 190px", minWidth: 190 }}
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
@@ -325,7 +337,7 @@ const CreateClassGroups = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((row, index) => {
+              pageRows.map((row, index) => {
                 const count = row.memberCount || 0;
                 const max = row.maxStudents || 40;
                 const pct = Math.min(100, Math.round((count / max) * 100));
@@ -342,7 +354,7 @@ const CreateClassGroups = () => {
                       "& td": { color: "#111111", py: 1.05, borderColor: "#E2EBF2" },
                     }}
                   >
-                    <TableCell align="center">{index + 1}</TableCell>
+                    <TableCell align="center">{currentPage * PAGE_SIZE + index + 1}</TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontFamily: "inherit", fontWeight: 700, color: "#0788B8" }}>
                         {row.code}
@@ -412,6 +424,8 @@ const CreateClassGroups = () => {
           </TableBody>
         </ResizableTable>
       </TableContainer>
+      {!loading && <ListPagination count={filtered.length} page={currentPage} pageSize={PAGE_SIZE}
+        onPageChange={setPage} recordLabel="nhóm học viên" showSinglePageSummary />}
 
       {/* Add / Edit Dialog */}
       {dialogOpen && <ClassGroupCreateDialog

@@ -379,7 +379,7 @@ const AssignClassGroups = () => {
         borderRadius: 0,
         boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
       }}>
-        <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="flex-end">
+        <Stack className="app-filter-toolbar" direction="row" spacing={1.5} flexWrap="nowrap" alignItems="flex-end">
           <FilterSelectField label="Năm tuyển sinh" sx={{ flex: "1 1 150px", minWidth: 150 }}
               value={selectedYear}
               disabled={actionLoading}

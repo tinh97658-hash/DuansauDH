@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import axios from "axios";
-import { ListItemIcon, ListItemText, ListSubheader, Menu, MenuItem } from "@mui/material";
+import { ListItemText, ListSubheader, Menu, MenuItem } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useConfirmGradeLeave, useDiscardUnsavedGrades } from "./UnsavedChangesGuard";
 import { AcademicCapIcon, AdjustmentsHorizontalIcon, ArrowDownOnSquareIcon, ArrowRightStartOnRectangleIcon, ArrowUpTrayIcon, BanknotesIcon, Bars3Icon, BookOpenIcon, BuildingLibraryIcon, BuildingOffice2Icon, BuildingOfficeIcon, CalendarDaysIcon, CalendarIcon, ChartBarIcon, CheckBadgeIcon, CheckCircleIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon, ClipboardDocumentListIcon, ClockIcon, DocumentChartBarIcon, DocumentCheckIcon, DocumentPlusIcon, DocumentTextIcon, FlagIcon, FolderOpenIcon, HomeModernIcon, InformationCircleIcon, LanguageIcon, LockClosedIcon, MagnifyingGlassIcon, PaperAirplaneIcon, ScaleIcon, ShieldCheckIcon, Squares2X2Icon, TableCellsIcon, TrophyIcon, UserCircleIcon, UserGroupIcon, UserPlusIcon, UsersIcon } from "./AppIcons";
@@ -10,7 +10,6 @@ import { useAuthSession } from "../context/AuthSession";
 import { routeViewCode } from '../features/accounts/routePermissions';
 import { preloadPage } from "../utils/lazyPage";
 import "../styles/ribbon-header.css";
-import NotificationBell from '../features/notifications/NotificationBell';
 
 const action = (label, route, icon, color, options = {}) => ({ label, route, icon, color, ...options });
 const group = (label, actions) => ({ label, actions });
@@ -144,6 +143,11 @@ export const ribbons = {
 const roleNames = { admin: "Quản trị viên", supervisor: "Giảng viên hướng dẫn", examiner: "Giám khảo", student: "Học viên" };
 const tabForPath = (path) => (tabs.find(([id]) => ribbons[id].some(section => section.actions.some(item => isRibbonRouteActive(path, item.route))))
   || tabs.find(([id]) => path === `/${id}` || path.startsWith(`/${id}/`)))?.[0] || "system";
+const groupForPath = (path) => {
+  const tab = tabForPath(path);
+  const index = ribbons[tab].findIndex(section => section.actions.some(item => isRibbonRouteActive(path, item.route)));
+  return index < 0 ? null : `ribbon-group-${tab}-${index}`;
+};
 
 const RibbonHeader = () => {
   const confirmLeave = useConfirmGradeLeave();
@@ -167,6 +171,36 @@ const RibbonHeader = () => {
   const searchRequestedRef = useRef(false);
   const focusRequestedRef = useRef(false);
   const restoreToggleFocusRef = useRef(false);
+  const centerRequestedRef = useRef(false);
+  const preloadTimerRef = useRef(null);
+  const preloadIdleRef = useRef(null);
+  const cancelPreload = () => {
+    window.clearTimeout(preloadTimerRef.current);
+    if (preloadIdleRef.current !== null) window.cancelIdleCallback?.(preloadIdleRef.current);
+    preloadTimerRef.current = null;
+    preloadIdleRef.current = null;
+  };
+  const queuePreload = route => {
+    cancelPreload();
+    if (!route || isRibbonRouteActive(location.pathname, route)) return;
+    preloadTimerRef.current = window.setTimeout(() => {
+      preloadTimerRef.current = null;
+      if (window.requestIdleCallback) {
+        preloadIdleRef.current = window.requestIdleCallback(() => {
+          preloadIdleRef.current = null;
+          preloadPage(route);
+        }, { timeout: 500 });
+      } else preloadPage(route);
+    }, 160);
+  };
+  useEffect(() => cancelPreload, []);
+  useEffect(() => { cancelPreload(); }, [menuOpen, location.pathname]);
+  const openMenu = (tab = tabForPath(location.pathname)) => {
+    setActiveTab(tab);
+    const groupId = groupForPath(location.pathname);
+    if (groupId) setCollapsedGroups(previous => previous[groupId] ? { ...previous, [groupId]: false } : previous);
+    setMenuOpen(true);
+  };
   const closeMenu = () => {
     setMenuOpen(false);
     setSearchQuery("");
@@ -200,8 +234,8 @@ const RibbonHeader = () => {
   useLayoutEffect(() => {
     if (desktop && role) document.documentElement.dataset.ribbonSidebar = menuOpen ? 'expanded' : 'compact';
     else delete document.documentElement.dataset.ribbonSidebar;
-    return () => { delete document.documentElement.dataset.ribbonSidebar; };
   }, [desktop, menuOpen, role]);
+  useLayoutEffect(() => () => { delete document.documentElement.dataset.ribbonSidebar; }, []);
   useEffect(() => {
     if (sessionRole) return;
     let mounted = true;
@@ -216,6 +250,8 @@ const RibbonHeader = () => {
   const dashboardHome = path === '/' || path === '/viewLogged';
   useEffect(() => {
     setActiveTab(tabForPath(path));
+    const groupId = groupForPath(path);
+    if (groupId) setCollapsedGroups(previous => previous[groupId] ? { ...previous, [groupId]: false } : previous);
     setSearchQuery("");
     setBreadcrumbMenu(null);
   }, [path, location.search]);
@@ -226,8 +262,12 @@ const RibbonHeader = () => {
       restoreToggleFocusRef.current = false;
     }
     if (menuOpen) {
-      if (searchRequestedRef.current) searchRef.current?.focus();
-      else if (focusRequestedRef.current) sidebarRef.current?.querySelector(".ribbon-tab-toggle.active")?.focus();
+      if (searchRequestedRef.current) searchRef.current?.focus({ preventScroll: true });
+      else if (focusRequestedRef.current) {
+        const target = sidebarRef.current?.querySelector('.ribbon-action[aria-current="page"]:not([hidden])')
+          || sidebarRef.current?.querySelector(".ribbon-tab-toggle.active");
+        target?.focus({ preventScroll: true });
+      }
       searchRequestedRef.current = false;
       focusRequestedRef.current = false;
     }
@@ -238,7 +278,7 @@ const RibbonHeader = () => {
         if (menuOpen) searchRef.current?.focus();
         else {
           searchRequestedRef.current = true;
-          setMenuOpen(true);
+          openMenu();
         }
       }
       if (menuOpen && event.key === "Escape") {
@@ -249,6 +289,39 @@ const RibbonHeader = () => {
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [menuOpen]);
+
+  useLayoutEffect(() => {
+    centerRequestedRef.current = menuOpen && !searchQuery && activeTab === tabForPath(path);
+  }, [menuOpen, path, activeTab, role, session?.access, searchQuery, desktop]);
+
+  useLayoutEffect(() => {
+    if (!menuOpen || !centerRequestedRef.current) return;
+    const sidebar = sidebarRef.current;
+    if (!sidebar) return;
+    const revealCurrentAction = () => {
+      const scroller = sidebar.querySelector('.ribbon-command-scroll');
+      const current = scroller?.querySelector('.ribbon-action[aria-current="page"]');
+      if (!current || current.closest('[hidden], [aria-hidden="true"]')) return;
+      // Center the active action in the menu; the browser clamps at the end
+      // of the list, while items near the beginning remain at scrollTop 0.
+      const viewport = scroller.getBoundingClientRect();
+      const item = current.getBoundingClientRect();
+      const delta = (item.top + item.bottom - viewport.top - viewport.bottom) / 2;
+      if (Math.abs(delta) > 1) scroller.scrollTop = Math.max(0, scroller.scrollTop + delta);
+      centerRequestedRef.current = false;
+    };
+    const onTransitionEnd = event => {
+      if ((event.target === sidebar && event.propertyName === 'width')
+        || (event.target.classList?.contains('ribbon-group-body') && event.propertyName === 'grid-template-rows')) revealCurrentAction();
+    };
+    revealCurrentAction();
+    const frame = window.requestAnimationFrame(revealCurrentAction);
+    sidebar.addEventListener('transitionend', onTransitionEnd);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      sidebar.removeEventListener('transitionend', onTransitionEnd);
+    };
+  }, [menuOpen, path, activeTab, collapsedGroups, role, session?.access, searchQuery, desktop]);
 
   if (!role) return null;
   // Keep permission-gated navigation hidden until effective access is loaded.
@@ -279,13 +352,14 @@ const RibbonHeader = () => {
   const userName = session?.user?.name || session?.user?.fullName || roleNames[role] || role;
   const avatar = role === "admin" ? "AD" : "NV";
   const renderAction = (item) => {
-    const Icon = item.icon;
     const isActive = isRibbonRouteActive(path, item.route);
     return <button type="button" className={`ribbon-action${isActive ? " active" : ""}`} key={item.label} onClick={() => runAction(item)}
       disabled={item.action === "logout" && loggingOut}
-      onPointerEnter={() => preloadPage(item.route)} onFocus={() => preloadPage(item.route)} onPointerDown={() => preloadPage(item.route)}
-      style={{ "--ribbon-icon-color": item.color }} aria-current={isActive ? "page" : undefined}>
-      <Icon className="ribbon-action-icon" /><span>{item.label}</span>
+      onPointerEnter={() => queuePreload(item.route)} onFocus={() => queuePreload(item.route)}
+      onPointerLeave={cancelPreload} onBlur={cancelPreload}
+      onPointerDown={() => { cancelPreload(); preloadPage(item.route); }}
+      aria-current={isActive ? "page" : undefined}>
+      <span>{item.label}</span>
     </button>;
   };
   const runAction = async (item) => {
@@ -323,9 +397,8 @@ const RibbonHeader = () => {
             {currentAction && <><ChevronRightIcon aria-hidden="true" /><strong aria-current="page">{currentAction.label}</strong></>}
           </nav>
         </div>
-        <div className={`notification-header-slot${dashboardHome ? ' od-header-account' : ''}`}>
-          <NotificationBell />
-          {dashboardHome && !menuOpen && <div className="od-header-identity"><strong>{userName}</strong><span>{session?.activeProfile?.name || roleNames[role] || role}</span></div>}
+        <div className={`ribbon-header-account${dashboardHome ? ' od-header-account' : ''}`}>
+          {dashboardHome && <div className="od-header-identity" aria-hidden={menuOpen} style={{ visibility: menuOpen ? 'hidden' : undefined }}><strong>{userName}</strong><span>{session?.activeProfile?.name || roleNames[role] || role}</span></div>}
           <div className="ribbon-user-avatar" title={dashboardHome ? userName : `${userName} · ${roleNames[role] || role}`}>{avatar}</div>
         </div>
       </div>
@@ -337,18 +410,19 @@ const RibbonHeader = () => {
         {breadcrumbGroups.flatMap(section => [
           ...(breadcrumbMenu?.level === "tab" ? [<ListSubheader key={`group-${section.label}`}>{breadcrumbLabel(section.label)}</ListSubheader>] : []),
           ...section.actions.map(item => {
-            const Icon = item.icon;
             return <MenuItem key={item.route} selected={isRibbonRouteActive(path, item.route)}
               aria-current={isRibbonRouteActive(path, item.route) ? "page" : undefined}
               onPointerEnter={() => preloadPage(item.route)} onFocus={() => preloadPage(item.route)}
               onClick={() => { setBreadcrumbMenu(null); runAction(item); }}>
-              <ListItemIcon><Icon style={{ width: 20, height: 20, color: item.color }} /></ListItemIcon>
               <ListItemText primary={item.label} />
             </MenuItem>;
           }),
         ])}
       </Menu>}
-      {!menuOpen && <button
+      {!menuOpen && desktop && <button type="button" className="ribbon-home-tab" aria-label="Về trang chủ" title="Về dashboard" onClick={() => navigate('/')}>
+        <img src={BRAND.logoUrl} alt="" />
+      </button>}
+      {!menuOpen && !desktop && <button
         ref={menuToggleRef}
         type="button"
         className="ribbon-menu-tab"
@@ -356,20 +430,19 @@ const RibbonHeader = () => {
         aria-expanded={false}
         aria-controls="ribbon-sidebar"
         onClick={() => {
-          focusRequestedRef.current = true; setMenuOpen(true);
+          focusRequestedRef.current = true; openMenu();
         }}
       >
-        {desktop ? <img src={BRAND.logoUrl} alt="" /> : <Bars3Icon />}<span>Menu</span>
+        <Bars3Icon /><span>Menu</span>
       </button>}
       {menuOpen && !desktop && <div className="ribbon-menu-backdrop" aria-hidden="true" onClick={closeMenu} />}
       <aside id="ribbon-sidebar" ref={sidebarRef} className={`ribbon-sidebar${menuOpen ? ' is-expanded' : ' is-compact'}`} aria-label="Menu chức năng" hidden={!desktop && !menuOpen}
         onClickCapture={event => {
-          if (menuOpen || event.target.closest('.ribbon-footer-logout')) return;
+          if (menuOpen || event.target.closest('.ribbon-footer-logout, .ribbon-menu-tab')) return;
           event.stopPropagation();
           const tab = event.target.closest('.ribbon-tab-toggle');
-          if (tab) setActiveTab(tab.dataset.ribbonTab);
           if (event.target.closest('.ribbon-rail-search')) searchRequestedRef.current = true;
-          setMenuOpen(true);
+          openMenu(tab ? tab.dataset.ribbonTab : undefined);
         }}>
         <div className="ribbon-sidebar-brand ribbon-brand-group">
           <div className="ribbon-sidebar-brand-content" hidden={!menuOpen}>
@@ -379,25 +452,49 @@ const RibbonHeader = () => {
             <div className="ribbon-title"><strong>{BRAND.university}</strong><span>{BRAND.institute}</span></div>
           </div>
         </div>
-        {!menuOpen && desktop && <button type="button" className="ribbon-rail-search" aria-label="Mở tìm kiếm chức năng" title="Tìm kiếm chức năng" onClick={() => { searchRequestedRef.current = true; setMenuOpen(true); }}><MagnifyingGlassIcon /></button>}
-        <div className="ribbon-search-wrap" hidden={!menuOpen}>
-          <label className="ribbon-search"><MagnifyingGlassIcon />
-            <input ref={searchRef} type="search" aria-label="Tìm kiếm chức năng" placeholder="Tìm kiếm chức năng..." value={searchQuery} onChange={event => setSearchQuery(event.target.value)} />
-          </label>
-        </div>
-        <div className="ribbon-command-scroll">
-          <div className="ribbon-navigation-label" hidden={!menuOpen}>Danh mục chức năng</div>
-          <nav className="ribbon-tabs" aria-label="Nhóm chức năng">
+        <div className="ribbon-navigation-body">
+          <div className="ribbon-navigation-rail">
+            <button type="button" className="ribbon-rail-search" aria-label="Mở tìm kiếm chức năng" title="Tìm kiếm chức năng" onClick={() => {
+              if (menuOpen) searchRef.current?.focus({ preventScroll: true });
+              else { searchRequestedRef.current = true; openMenu(); }
+            }}><MagnifyingGlassIcon /></button>
+            <nav className="ribbon-tabs" aria-label="Nhóm chức năng">
+              {visibleTabs.map(([id, label]) => {
+                const TabIcon = tabIcons[id];
+                const expanded = menuOpen && (Boolean(searchTerm) || selectedTab === id);
+                return <button type="button" key={id} data-ribbon-tab={id}
+                  className={`ribbon-tab-toggle${menuOpen && selectedTab === id ? " active" : ""}${currentTab?.[0] === id ? ' current' : ''}`}
+                  aria-label={label} title={breadcrumbLabel(label)} aria-expanded={expanded} aria-controls={`ribbon-section-${id}`}
+                  onClick={() => {
+                    setSearchQuery("");
+                    if (!menuOpen) openMenu(id);
+                    else setActiveTab(selectedTab === id && !searchTerm ? null : id);
+                  }}><TabIcon /></button>;
+              })}
+            </nav>
+            {!menuOpen && desktop && <button ref={menuToggleRef} type="button" className="ribbon-menu-tab ribbon-rail-toggle"
+              aria-label="Mở menu tác vụ" title="Mở menu tác vụ" aria-expanded={false} aria-controls="ribbon-sidebar"
+              onClick={() => { focusRequestedRef.current = true; openMenu(); }}><Bars3Icon /><span>Menu</span></button>}
+          </div>
+          <div className="ribbon-navigation-panel" aria-hidden={!menuOpen} {...(!menuOpen ? { inert: '' } : {})}>
+            <div className="ribbon-search-wrap">
+              <label className="ribbon-search"><MagnifyingGlassIcon />
+                <input ref={searchRef} type="search" aria-label="Tìm kiếm chức năng" placeholder="Tìm chức năng..." value={searchQuery} onChange={event => setSearchQuery(event.target.value)} />
+              </label>
+              {searchQuery && <button type="button" className="ribbon-search-clear" aria-label="Xóa tìm kiếm chức năng" onClick={() => {
+                setSearchQuery(''); searchRef.current?.focus({ preventScroll: true });
+              }}>×</button>}
+            </div>
+            <div className="ribbon-panel-heading">
+              <span>{searchTerm ? 'Tìm chức năng' : breadcrumbLabel(visibleTabs.find(([id]) => id === selectedTab)?.[1] || 'Danh mục chức năng')}</span>
+              <button type="button" className="ribbon-panel-close" aria-label="Thu gọn menu tác vụ" title="Thu gọn menu" onClick={closeMenu}><ChevronRightIcon /></button>
+            </div>
+            <div className="ribbon-command-scroll">
             {filteredTabs.map(({ id, label, groups }) => {
-              const expanded = menuOpen && (Boolean(searchTerm) || selectedTab === id);
-              const TabIcon = tabIcons[id];
+              const expanded = Boolean(searchTerm) || selectedTab === id;
               return <div className="ribbon-tab-section" key={id}>
-                <button type="button" data-ribbon-tab={id} className={`ribbon-tab-toggle${expanded ? " active" : ""}${currentTab?.[0] === id ? ' current' : ''}`} aria-label={label} title={!menuOpen ? breadcrumbLabel(label) : undefined} aria-expanded={expanded} aria-controls={`ribbon-section-${id}`} onClick={() => {
-                  setSearchQuery("");
-                  if (!menuOpen) { setMenuOpen(true); setActiveTab(id); }
-                  else setActiveTab(selectedTab === id && !searchTerm ? null : id);
-                }}><TabIcon /><span hidden={!menuOpen}>{label}</span><ChevronDownIcon hidden={!menuOpen} className={`ribbon-section-chevron${expanded ? " expanded" : ""}`} /></button>
                 <div id={`ribbon-section-${id}`} className="ribbon-commands" role="region" aria-label="Tác vụ chức năng" hidden={!expanded}>
+                  {searchTerm && <div className="ribbon-search-category">{breadcrumbLabel(label)}</div>}
                   {expanded && groups.map(itemGroup => {
                     const groupId = `ribbon-group-${id}-${ribbons[id].findIndex(section => section.label === itemGroup.label)}`;
                     const groupExpanded = Boolean(searchTerm) || !collapsedGroups[groupId];
@@ -406,14 +503,18 @@ const RibbonHeader = () => {
                         disabled={Boolean(searchTerm)} onClick={() => setCollapsedGroups(previous => ({ ...previous, [groupId]: !previous[groupId] }))}>
                         <span>{itemGroup.label}</span><ChevronDownIcon className={`ribbon-group-chevron${groupExpanded ? " expanded" : ""}`} aria-hidden="true" />
                       </button>
-                      <div id={groupId} className="ribbon-actions" hidden={!groupExpanded}>{itemGroup.actions.map(renderAction)}</div>
+                      <div id={groupId} className={`ribbon-group-body${groupExpanded ? ' is-open' : ''}`} aria-hidden={!groupExpanded} {...(!groupExpanded ? { inert: '' } : {})}>
+                        <div className="ribbon-actions">{itemGroup.actions.map(renderAction)}</div>
+                      </div>
                     </section>;
                   })}
                 </div>
               </div>;
             })}
-          </nav>
-          {!filteredTabs.length && <p className="ribbon-search-empty" role="status">Không tìm thấy chức năng phù hợp.</p>}
+            {!filteredTabs.length && <p className="ribbon-search-empty" role="status">Không tìm thấy chức năng phù hợp.</p>}
+            {selectedTab === null && !searchTerm && <p className="ribbon-search-empty">Chọn nhóm chức năng ở thanh biểu tượng bên trái.</p>}
+            </div>
+          </div>
         </div>
         {logoutError && <div className="ribbon-logout-error" role="alert">{logoutError}</div>}
         <div className="ribbon-sidebar-footer" title={`Hồ sơ: ${session?.activeProfile?.name || roleNames[role] || role}`}>

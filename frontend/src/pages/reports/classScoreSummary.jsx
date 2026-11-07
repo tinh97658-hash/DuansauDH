@@ -151,7 +151,7 @@ export default function ClassScoreSummary() {
 
   return <FeatureLayout title="Tổng hợp điểm của lớp" group="BÁO CÁO">
     <section className="css-report" aria-label="Tổng hợp điểm của lớp" data-export-managed="true">
-      <Paper variant="outlined" className="css-filters">
+      <Paper variant="outlined" className="css-filters app-filter-toolbar">
         <FilterSelectField label="Năm vào trường" value={year} disabled={loadingOptions || exporting || !groups.length} onChange={event => changeScope(event.target.value, disciplineId, majorId)}>
           {!years.length && <MenuItem value="">Chọn năm</MenuItem>}
           {years.map(value => <MenuItem key={value} value={value}>{value || "Chưa có năm"}</MenuItem>)}

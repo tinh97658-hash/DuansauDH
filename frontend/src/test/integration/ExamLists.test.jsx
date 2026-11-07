@@ -29,7 +29,7 @@ const testTheme = createTheme({ components: { MuiButtonBase: { defaultProps: { d
 let testPermissions = [];
 let phaseFixture='components';
 const workflowFor=(phase='components')=>({mode:phase==='legacy'?'legacy_preserved':'new',eligibility:{status:phase==='components'?'draft':'approved',version:phase==='components'?0:2,snapshotId:phase==='components'?null:'snapshot',canReopen:phase==='waiting'},final:{status:phase==='components'||phase==='waiting'?'not_available':phase==='locked'?'approved':'draft',version:phase==='locked'?2:0},status:phase==='locked'?'approved':'draft',version:0});
-const render = (ui, url = "/") => renderUi(<MemoryRouter useTransitions={false} initialEntries={[url]}><AuthSessionContext.Provider value={{ access: { permissions: testPermissions } }}><ThemeProvider theme={testTheme}>{ui}</ThemeProvider></AuthSessionContext.Provider></MemoryRouter>);
+const render = (ui, url = "/", user) => renderUi(<MemoryRouter useTransitions={false} initialEntries={[url]}><AuthSessionContext.Provider value={{ user, access: { permissions: testPermissions } }}><ThemeProvider theme={testTheme}>{ui}</ThemeProvider></AuthSessionContext.Provider></MemoryRouter>);
 const reportExportName = () => screen.getByRole("button", { name: "Danh sách thi" }).getAttribute("aria-pressed") === "true" ? "Xuất lịch thi kết thúc học phần" : "Xuất phiếu theo dõi tình hình học tập — BM.02-QT.SDH.03";
 const savedRow = { participantId: "student:one", code: "HV001", fullName: "Nguyễn Văn An", dob: "1990-01-02", gender: "Nam", eligible: null, examExempt: false, testScore: null, assignmentScore: null, examScore: null, courseScore: null, grade4: null, letterGrade: "", attemptScores: [], result: "pending" };
 
@@ -1070,6 +1070,27 @@ it("exports the full offering signing sheet even when the gradebook search hides
     expect(doc.kind).toBe("subject-signing"); expect(doc.rows).toHaveLength(31); expect(doc.rows[30][1]).toBe("Học viên 31");
     expect(doc.rows[0].slice(2, 11)).toEqual(Array(9).fill(""));
     expect(axios.put).not.toHaveBeenCalled();
+  } finally { open.mockRestore(); }
+});
+
+it.each([
+  ['admin', { name: 'Nguyễn Văn Bình' }, 'Nguyễn Văn Bình'],
+  ['supervisor', { lastName: 'Trần Thị', firstName: 'Mai', name: 'Tên cũ' }, 'Trần Thị Mai'],
+])('prints the current %s account full name in the exam-list signature snapshot', async (role, user, name) => {
+  setup(role, [{ ...savedRow, testScore: 6, assignmentScore: 6 }], 'waiting');
+  const replace = vi.fn();
+  const open = vi.spyOn(window, 'open').mockReturnValue({ sessionStorage, location: { replace }, close: vi.fn() });
+  try {
+    render(<ExamLists />, '/', { ...user, role });
+    await screen.findByLabelText('Điểm kiểm tra HV001');
+    fireEvent.click(screen.getByRole('button', { name: 'Danh sách thi' }));
+    const menu = screen.getByRole('button', { name: reportExportName() });
+    await waitFor(() => expect(menu).toBeEnabled());
+    fireEvent.click(menu);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'PDF (.pdf)' }));
+    await waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+    const key = new URL(replace.mock.calls[0][0], 'http://localhost').searchParams.get('preview');
+    expect(JSON.parse(sessionStorage.getItem(`gradebook-preview:${key}`)).responsibleStaffName).toBe(name);
   } finally { open.mockRestore(); }
 });
 

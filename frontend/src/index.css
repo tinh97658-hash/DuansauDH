@@ -24,8 +24,8 @@
   --muted-surface: #F7F9FA;
   --border-color: #718292;
   --border-light: #B4C0CB;
-  --table-border-color: #687C8E;
-  --table-row-border-color: #718292;
+  --table-border-color: #000000;
+  --table-row-border-color: #000000;
   --table-header-bg: #DCE7F1;
   --table-radius: 0px;
   --table-hover-bg: #EAF2F8;
@@ -214,7 +214,7 @@ code, kbd, samp, pre {
 }
 
 #root .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
-  border-color: #9FB5C6 !important;
+  border-color: var(--table-border-color) !important;
 }
 
 #root .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
