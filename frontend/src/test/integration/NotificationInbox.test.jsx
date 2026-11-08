@@ -26,6 +26,11 @@ it('loads a real count and opening the bell never writes read state', async () =
   expect(axios.post).not.toHaveBeenCalled();
   expect(axios.get.mock.calls.every(([url]) => url.endsWith('/notifications'))).toBe(true);
 });
+it('shows a 9+ badge while preserving the actual unread count for accessibility', async () => {
+  axios.get.mockResolvedValue(response([item], 10));
+  render(tree());
+  expect(await screen.findByLabelText('10 thông báo chưa đọc')).toHaveTextContent('9+');
+});
 it('marks only the selected notification, then follows the freshly authorized target', async () => {
   axios.post.mockImplementation(async () => { axios.get.mockResolvedValue(response([{ ...item, readAt: '2026-11-06' }], 0)); return { data: { item } }; });
   render(tree()); await open(); fireEvent.click(await screen.findByRole('button', { name: /Có kết quả điểm chờ phê duyệt/ }));
@@ -122,5 +127,6 @@ it.each(['/masters/schedule', '/plan/admission-records', '/reports/lecturer-paym
 });
 it('accepts only recognized internal business targets', () => {
   expect(safeNotificationHref(item.href)).toBe(true);
+  expect(safeNotificationHref('/masters/study-leaves')).toBe(true);
   for (const href of ['https://example.com', '//example.com', 'javascript:alert(1)', '/system/roles']) expect(safeNotificationHref(href)).toBe(false);
 });

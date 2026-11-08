@@ -24,7 +24,7 @@ const fixture = (year = '2026') => ({ year, program: 'masters', permissions: { .
     items: [{ id: stage, title: `Lớp giai đoạn ${index + 1}`, detail: index === 1 ? 'Đã xếp lịch thi sắp tới' : 'Mốc thời gian đã ghi nhận',
       action: index === 3 ? 'Mở để gửi duyệt' : 'Mở bảng điểm', href: `/masters/exam-lists?year=${year}&offeringId=${stage}&groupId=g1` }] })) } },
   approvals: { status: 'ready', data: { resultApproval: metric([{ id: 'result', title: 'Lớp chờ khóa điểm', href: `/masters/exam-lists?year=${year}&offeringId=result&groupId=g1` }], { count: 28 }) } },
-  studyLeaveApproval: { status: 'ready', data: metric([{ id: 'leave', title: 'Học viên bảo lưu', href: '/masters/study-leaves/record1?tab=leave' }]) },
+  studyLeaveApproval: { status: 'ready', data: metric([{ id: 'leave', title: 'Học viên bảo lưu', href: '/masters/study-leaves' }]) },
   majorTransferApproval: { status: 'ready', data: metric([{ id: 'transfer', title: 'Học viên chuyển ngành', href: '/plan/admission-records/record2?tab=profile' }]) },
   learnersChart: { status: 'ready', data: { title: 'Tình trạng hồ sơ / học viên', kind: 'donut', unit: 'hồ sơ', values: [{ label: 'Đang học', count: 12 }, { label: 'Bảo lưu', count: 2 }] } },
   sessionsChart: { status: 'ready', data: { title: 'Buổi học trong tuần', kind: 'donut', unit: 'buổi', values: [{ label: 'Đã diễn ra', count: 3 }] } },
@@ -263,7 +263,7 @@ it('does not show an empty approval state when a permitted source failed to load
   expect(within(approvals()).getByRole('alert')).toHaveTextContent('Chưa tải được dữ liệu.');
   expect(within(approvals()).getByRole('button', { name: 'Thử lại' })).toBeInTheDocument();
 });
-it.each([['Bảo lưu', '/masters/study-leaves/record1?tab=leave'], ['Chuyển chuyên ngành', '/plan/admission-records/record2?tab=profile']])('opens the original %s record', async (label, href) => {
+it.each([['Bảo lưu', '/masters/study-leaves'], ['Chuyển chuyên ngành', '/plan/admission-records/record2?tab=profile']])('opens the %s destination', async (label, href) => {
   await open(); fireEvent.click(within(approvals()).getByRole('button', { name: new RegExp(label) }));
   fireEvent.click(within(approvals()).getByRole('link'));
   expect(screen.getByTestId('location')).toHaveTextContent(href);

@@ -284,23 +284,20 @@ describe("Ribbon read/navigation permission contracts", () => {
     } finally { window.matchMedia = previous; }
   });
 
-  it('omits notifications while retaining staff identity, profile switching and logout', () => {
+  it('shows notifications while retaining staff identity, profile switching and logout', () => {
     const value = { ...session(['scheduling.view']), user: { role: 'admin', name: 'Nguyễn Trang' },
       activeProfile: { id: 'p1', code: 'admin', name: 'Quản trị hệ thống' }, profiles: [{ id: 'p1' }, { id: 'p2' }], chooseProfile: vi.fn() };
     render(view(value, '/viewLogged'));
-    expect(screen.queryByRole('button', { name: 'Thông báo' })).not.toBeInTheDocument();
-    const identity = document.querySelector('.od-header-identity');
-    expect(identity).toHaveAttribute('aria-hidden', 'true');
-    expect(identity).toHaveStyle({ visibility: 'hidden' });
+    expect(screen.getByRole('button', { name: 'Thông báo' })).toBeInTheDocument();
+    expect(document.querySelector('.ribbon-header-account')).toHaveTextContent('Nguyễn Trang');
+    expect(document.querySelector('.ribbon-header-account')).toHaveTextContent('Quản trị hệ thống');
     const footer = within(document.querySelector('.ribbon-sidebar-footer'));
     expect(footer.getByText('Nguyễn Trang')).toBeVisible();
     expect(footer.getByText('Quản trị hệ thống')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Đổi phiên làm việc' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Đăng xuất' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Thu gọn menu tác vụ' }));
-    expect(document.querySelector('.od-header-identity')).toBe(identity);
-    expect(identity).toBeVisible();
-    expect(identity).toHaveAttribute('aria-hidden', 'false');
+    expect(screen.getByRole('button', { name: 'Thông báo' })).toBeVisible();
   });
   it("collapses subgroup labels independently and reveals matching actions during search", () => {
     render(view(session(["masters.view", "scheduling.view"]), "/masters/schedule"));

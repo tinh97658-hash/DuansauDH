@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Popover } from '@mui/material';
-import { BellIcon } from '@heroicons/react/24/outline';
+import { BellAlertIcon } from '@heroicons/react/24/outline';
 import { CalendarDaysIcon, ClipboardDocumentListIcon, UsersIcon } from '../../components/AppIcons';
 import { useConfirmGradeLeave, useDiscardUnsavedGrades } from '../../components/UnsavedChangesGuard';
 import { useNotificationInbox } from './useNotificationInbox';
 import './notifications.css';
 
-export const safeNotificationHref = href => typeof href === 'string' && /^\/(?:masters\/exam-lists\?|masters\/study-leaves\/[0-9a-f-]+\?|plan\/admission-records\/[0-9a-f-]+\?)/i.test(href);
+export const safeNotificationHref = href => typeof href === 'string' && (/^\/masters\/study-leaves$/i.test(href)
+  || /^\/(?:masters\/exam-lists\?|plan\/admission-records\/[0-9a-f-]+\?)/i.test(href));
 export default function NotificationBell() {
   const inbox = useNotificationInbox(), navigate = useNavigate(), confirmLeave = useConfirmGradeLeave();
   const discardUnsaved = useDiscardUnsavedGrades();
@@ -26,7 +27,7 @@ export default function NotificationBell() {
   return <>
     <button type="button" className="notification-bell" aria-label="Thông báo" aria-haspopup="dialog" aria-expanded={!!anchor}
       aria-controls={anchor ? 'notification-inbox' : undefined} onClick={open} title={count == null ? 'Thông báo' : `${count} thông báo chưa đọc`}>
-      <BellIcon aria-hidden="true" />{count > 0 && <span className="notification-badge" aria-label={`${count} thông báo chưa đọc`}>{count > 99 ? '99+' : count}</span>}
+      <BellAlertIcon aria-hidden="true" />{count > 0 && <span className="notification-badge" aria-label={`${count} thông báo chưa đọc`}>{count > 9 ? '9+' : count}</span>}
     </button>
     <Popover open={!!anchor} anchorEl={anchor} onClose={() => setAnchor(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       transformOrigin={{ vertical: 'top', horizontal: 'right' }} slotProps={{ paper: { className: 'notification-paper' } }}>

@@ -40,7 +40,7 @@ export class InboxAccessService {
         const rows = await this.db.query<any>('SELECT full_name, code FROM admission_records WHERE id=:id', { type: QueryTypes.SELECT, replacements: { id: event.entityId } });
         if (!rows[0]) return null;
         return { label: [rows[0].full_name, rows[0].code].filter(Boolean).join(' — '),
-          href: `${path}/${event.entityId}?tab=${transfer ? 'profile' : 'leave'}` };
+          href: transfer ? `${path}/${event.entityId}?tab=profile` : path };
       });
     });
   }

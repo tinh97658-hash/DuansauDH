@@ -197,7 +197,7 @@ function ApprovalPanel({ permissions, sources, retry }) {
       {sources[current.source]?.status === 'ready' ? <ApprovalList key={current.key} items={current.metric?.items} emptyRef={focusHeading} />
         : <SourceState source={sources[current.source]} onRetry={() => retry(current.source)} />}
     </div> : <>
-      <ul className={`od-approval-groups${allClear ? ' od-approval-clear' : ''}`} style={{ '--od-approval-group-count': groups.length }}>{groups.map(group => <li key={group.key} data-pending={sources[group.source]?.status === 'ready' && group.metric?.count > 0}>
+      <ul className={`od-approval-groups${allClear ? ' od-approval-clear' : ''}`}>{groups.map(group => <li key={group.key} data-pending={sources[group.source]?.status === 'ready' && group.metric?.count > 0}>
       <button type="button" onClick={() => setSelected(group.key)}><span className="od-approval-icon"><group.Icon aria-hidden="true" /></span><span>{group.title}</span>
         {sources[group.source]?.status === 'ready' && <strong>{group.metric?.count ?? 0}</strong>}<ArrowRightIcon aria-hidden="true" /></button>
       {sources[group.source]?.status !== 'ready' && <SourceState source={sources[group.source]} onRetry={() => retry(group.source)} />}
