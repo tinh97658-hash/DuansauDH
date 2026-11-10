@@ -178,10 +178,20 @@ export default function AdmissionScores() {
           <Typography fontWeight={700} mb={1}>Điểm ngưỡng từng ngành — {data.round.name}</Typography>
           <TableContainer sx={{ border: "1px solid #D7E4EE", borderRadius: "6px" }}><Table size="small"><TableHead><TableRow sx={{ bgcolor: "#EDF4FA", "& th": { fontWeight: 700, color: "#111" } }}><TableCell>Ngành</TableCell><TableCell>Chuyên ngành</TableCell><TableCell>Điểm ngưỡng (0–20)</TableCell></TableRow></TableHead><TableBody>
             {majors.map((major) => <TableRow key={major.id} hover sx={{ "&:hover": { bgcolor: "#F5FAFE!important" }, "& td": { borderColor: "#E2EBF2" } }}><TableCell>{major.discipline?.name || "—"}</TableCell><TableCell>{major.name}</TableCell><TableCell>
-              {admin ? <TextField size="small" type="number" value={thresholdDrafts[major.id] ?? data.round.majorThresholds?.find((entry) => entry.majorId === major.id)?.cutoff ?? ""}
-                disabled={saving || workflowBusy || loading} inputProps={{ min: 0, max: 20, step: 0.01, "aria-label": `Điểm ngưỡng ${major.name}` }}
+              {admin ? <TextField size="small" type="text" value={thresholdDrafts[major.id] ?? data.round.majorThresholds?.find((entry) => entry.majorId === major.id)?.cutoff ?? ""}
+                disabled={saving || workflowBusy || loading} inputProps={{ inputMode: "decimal", "aria-label": `Điểm ngưỡng ${major.name}` }}
                 sx={{ width: 90, "& .MuiOutlinedInput-root": { borderRadius: "4px" } }}
-                onChange={(event) => setThresholdDrafts((previous) => { const next = { ...previous }; if (event.target.value === String(data.round.majorThresholds?.find((entry) => entry.majorId === major.id)?.cutoff ?? "")) delete next[major.id]; else next[major.id] = event.target.value; return next; })} />
+                onChange={(event) => {
+                  const value = event.target.value.replace(/,/g, ".");
+                  // Validate the entire edit, including paste, before updating the field.
+                  if (value !== "" && (!/^\d+(?:\.\d*)?$/.test(value) || Number(value) > 20)) return;
+                  setThresholdDrafts((previous) => {
+                    const next = { ...previous };
+                    if (value === String(data.round.majorThresholds?.find((entry) => entry.majorId === major.id)?.cutoff ?? "")) delete next[major.id];
+                    else next[major.id] = value;
+                    return next;
+                  });
+                }} />
                 : data.round.majorThresholds?.find((entry) => entry.majorId === major.id)?.cutoff ?? "Chưa nhập"}
             </TableCell></TableRow>)}
           </TableBody></Table></TableContainer>

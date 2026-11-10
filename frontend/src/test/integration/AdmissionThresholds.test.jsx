@@ -1,4 +1,5 @@
 import React from "react";
+import userEvent from "@testing-library/user-event";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import axios from "axios";
@@ -24,6 +25,38 @@ function configure(rounds = [round]) {
 }
 const mount = (session = null) => render(<ThemeProvider theme={theme}><CssBaseline /><AuthSessionContext.Provider value={{ access: { permissions: ["admission.manage"] }, ...session }}><MemoryRouter useTransitions={false}><AdmissionScores /></MemoryRouter></AuthSessionContext.Provider></ThemeProvider>);
 beforeEach(() => { jest.clearAllMocks(); configure(); });
+it("rejects invalid threshold typing and paste immediately without changing saved thresholds", async () => {
+  mount(); await screen.findByText("HS001");
+  const input = screen.getByLabelText("Điểm ngưỡng Công nghệ thông tin");
+  for (const value of ["abc", "15abc", "1e1", "+15", "-1", "21", "20.01", "1.2.3", "NaN", "Infinity", " 15 "]) {
+    userEvent.clear(input);
+    userEvent.paste(input, value);
+    expect(input).toHaveValue("");
+  }
+  userEvent.type(input, "20");
+  userEvent.type(input, "1e+-abc");
+  expect(input).toHaveValue("20");
+  expect(axios.put).not.toHaveBeenCalled();
+});
+it("accepts threshold boundaries, decimal typing and comma paste, and saves numeric values", async () => {
+  axios.put.mockResolvedValue({ data: round });
+  mount(); await screen.findByText("HS001");
+  const input = screen.getByLabelText("Điểm ngưỡng Công nghệ thông tin");
+  for (const value of ["0", "20", "19.75"]) {
+    userEvent.clear(input);
+    userEvent.type(input, value);
+    expect(input).toHaveValue(value);
+  }
+  userEvent.clear(input);
+  userEvent.paste(input, "19,5");
+  expect(input).toHaveValue("19.5");
+  fireEvent.click(screen.getByRole("button", { name: "Lưu điểm ngưỡng các ngành" }));
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(
+    expect.stringContaining("/admission-rounds/round-1"),
+    expect.objectContaining({ majorThresholds: [{ majorId: "major-1", cutoff: 19.5 }, { majorId: "major-2", cutoff: 17 }] }),
+    { withCredentials: true },
+  ));
+});
 it("searches rounds without accents and combines the search with the year filter", async () => {
   const oldRound = { ...round, id: "round-old", name: "Đợt tuyển sinh mùa thu", academicYear: "2025" };
   const otherRound = { ...round, id: "round-other", name: "Đợt bổ sung", academicYear: "2026" };
@@ -75,7 +108,7 @@ it("keeps unsaved thresholds when cancelling a round change from the management 
     expect(confirm).toHaveBeenCalled();
     expect(axios.get.mock.calls.some(([url]) => url.endsWith("/round-other/ranking"))).toBe(false);
     fireEvent.click(within(dialog).getAllByRole("button", { name: "Đóng", exact: true }).at(-1));
-    expect(screen.getByLabelText("Điểm ngưỡng Công nghệ thông tin")).toHaveValue(14);
+    expect(screen.getByLabelText("Điểm ngưỡng Công nghệ thông tin")).toHaveValue("14");
   } finally { confirm.mockRestore(); }
 });
 it("paginates the round list and returns to matching results when searching", async () => {
@@ -174,8 +207,8 @@ it("loads rounds and ranking from a verified session without requesting auth aga
 it("một đợt hiển thị nhiều ngành và lọc theo đúng ngưỡng từng ngành", async () => {
   mount(); await screen.findByText("HS001");
   expect(screen.getByText("HS002")).toBeInTheDocument();
-  expect(screen.getByLabelText("Điểm ngưỡng Công nghệ thông tin")).toHaveValue(15);
-  expect(screen.getByLabelText("Điểm ngưỡng Quản trị kinh doanh")).toHaveValue(17);
+  expect(screen.getByLabelText("Điểm ngưỡng Công nghệ thông tin")).toHaveValue("15");
+  expect(screen.getByLabelText("Điểm ngưỡng Quản trị kinh doanh")).toHaveValue("17");
   expect(screen.queryByText(/chỉ tiêu/i)).not.toBeInTheDocument();
   fireEvent.mouseDown(screen.getByLabelText("Lọc hồ sơ"));
   fireEvent.click(await screen.findByRole("option", { name: "Đạt ngưỡng" }));
