@@ -32,3 +32,13 @@ it('keeps exam reads but denies exam writes for a readonly role',()=>{
   expect(result.current.can('exams.view')).toBe(true);
   expect(result.current.can('exams.write')).toBe(false);
 });
+it('keeps code preview and history reads for a readonly profile while denying issue',()=>{
+  const permissions=['learnercode.preview','learnercode.history.view','learnercode.issue','route.plan.learner-codes.view',
+    'route.plan.learner-codes.learnercode-preview','route.plan.learner-codes.learnercode-history-view','route.plan.learner-codes.learnercode-issue'];
+  const wrapper=({children})=><AuthSessionContext.Provider value={{currentPath:'/plan/learner-codes',access:{permissions,groupScope:{readOnly:true},
+    routeCatalog:[{path:'/plan/learner-codes',actions:['learnercode.preview','learnercode.history.view','learnercode.issue']}]}}}>{children}</AuthSessionContext.Provider>;
+  const {result}=renderHook(usePermissions,{wrapper});
+  expect(result.current.can('learnercode.preview')).toBe(true);
+  expect(result.current.can('learnercode.history.view')).toBe(true);
+  expect(result.current.can('learnercode.issue')).toBe(false);
+});

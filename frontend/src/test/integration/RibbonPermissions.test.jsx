@@ -9,6 +9,7 @@ const routesByPermission = {
   "account.view": ["/system/accounts"],
   "role.view": ["/system/roles"],
   "audit.view": ["/system/audit-logs"],
+  "learnercode.config.view": ["/system/learner-codes"],
   "catalog.view": ["ethnicities", "nationalities", "wards", "cities", "lecturers", "units", "rooms", "training-mode-groups", "training-modes", "disciplines", "majors", "training-years", "training-levels", "study-statuses", "bridge-knowledge"].map(s => "/system/" + s),
   "plan.view": ["/plan/training-plan", "/plan/annual-fees", "/masters/study-leaves"],
   "admission.view": ["/plan/admission-targets", "/plan/admission-records", "/masters/admission-scores", "/masters/admitted-records"],
@@ -381,8 +382,8 @@ describe("Ribbon read/navigation permission contracts", () => {
     expect(calendar).toHaveAttribute("aria-current", "page");
     expect(group.querySelectorAll(".ribbon-action")).toHaveLength(3);
   });
-  it("classifies all 66 actions against the independent contract", () => {
-    expect(items).toHaveLength(66);expect(expected.size).toBe(66);
+  it("classifies all 68 actions against the independent contract", () => {
+    expect(items).toHaveLength(67);expect(expected.size).toBe(67);
     for (const item of items) {
       expect(expected.has(item.route)).toBe(true);
       expect(item.permissions || []).toEqual(expected.get(item.route));

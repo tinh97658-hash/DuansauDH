@@ -12,11 +12,11 @@ export const usePermissions = () => {
   const can = useCallback(
     (permission) => {
       if (!access) return false;
-      if (access.groupScope?.readOnly && !permission.endsWith('.view') && !permission.startsWith('module.')) return false;
+      if (access.groupScope?.readOnly && !permission.endsWith('.view') && permission!=='learnercode.preview' && !permission.startsWith('module.')) return false;
       const route=permissionRoute(access.routeCatalog,session?.currentPath);
       if(route&&!permission.startsWith('route.')&&!permission.startsWith('module.')){
         if(!(access.permissions||[]).includes(routeViewCode(route.path)))return false;
-        if(!permission.endsWith('.view')&&(!route.actions.includes(permission)||!(access.permissions||[]).includes(routeActionCode(route.path,permission))))return false;
+        if((!permission.endsWith('.view')||permission==='learnercode.history.view')&&(!route.actions.includes(permission)||!(access.permissions||[]).includes(routeActionCode(route.path,permission))))return false;
       }
       return (access.permissions || []).includes(permission);
     },

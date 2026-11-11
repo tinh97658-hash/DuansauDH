@@ -254,9 +254,14 @@ describe("Approved major transfer and admission cycles", () => {
     expect(clone(s.entries[0])).toEqual(s.oldHistory);
   });
 
-  it("archives a pending A evaluation using its saved evidence rather than copying A's scores to B", async () => {
+  it("archives a pre-existing pending A evaluation using its saved evidence rather than copying A's scores to B", async () => {
     const s = await setup();
-    await s.admission.decide(s.record.id, { decision: "reopen", version: 2, note: "Đối soát A" }, s.actor);
+    // Legacy pending evaluations may already have class membership. Reopening an
+    // assigned learner is now blocked; retain coverage of archiving that old state.
+    s.oldEvaluation.decision = "pending";
+    s.oldEvaluation.version = 3;
+    s.record.status = "pending";
+    s.record.studyStatus = "Nộp hồ sơ đầu vào";
     await s.request(); await s.approve();
     expect(s.current()).toBeNull();
     expect(s.entries.at(-1)).toMatchObject({ action: "major_transfer", snapshot: { record: { majorId: "A" }, evaluation: { decision: "pending", inputs: { manualTotal: 16 } } } });

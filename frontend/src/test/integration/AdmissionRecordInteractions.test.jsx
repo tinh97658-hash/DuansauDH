@@ -64,8 +64,8 @@ it("filters learners by the assigned group and clears the group when changing ye
 it.each([
   ["Họ đệm", ""], ["Tên", "   "], ["Họ đệm", "Nguyễn123"],
   ["Tên", "An@"], ["Tên", "安"], ["Tên", "Аn"],
-  ["Số điện thoại", ""], ["Số điện thoại", "091234567"],
-  ["CCCD", ""], ["CCCD", "031090001234"],
+  ["Số điện thoại", "091234567"],
+  ["CCCD", "031090001234"],
 ])("blocks saving an invalid %s: %s even with an existing full name", async (label, value) => {
   mount("admitted-masters");
   fireEvent.click(await screen.findByRole("button", { name: "Sửa hồ sơ HV001" }));
@@ -184,8 +184,6 @@ it("creates a profile with the year selected in the filter", async () => {
   fireEvent.change(dialog.getByPlaceholderText("Nguyễn Văn"), { target: { value: "Trần Văn" } });
   fireEvent.change(dialog.getByPlaceholderText("An"), { target: { value: "Bình" } });
   const save = () => fireEvent.click(dialog.getByRole("button", { name: "Chấp nhận (Enter)" }));
-  save();
-  expect(axios.post).not.toHaveBeenCalled();
   fireEvent.change(dialog.getByRole("textbox", { name: "Số điện thoại" }), { target: { value: "091234567" } });
   fireEvent.change(dialog.getByRole("textbox", { name: "CCCD" }), { target: { value: "0310900012345" } });
   save();
@@ -199,6 +197,39 @@ it("creates a profile with the year selected in the filter", async () => {
   await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
     expect.stringContaining("/plan/admission-records"),
     expect.objectContaining({ academicYear: selectedYear, fullName: "Trần Văn Bình", profileCategory: "Dự thính" }),
+    { withCredentials: true },
+  ));
+});
+
+it('creates a profile without phone and identity card information', async () => {
+  axios.post.mockResolvedValue({ data: {} });
+  mount('applications');
+  await screen.findByRole('cell', { name: 'HV001' });
+  fireEvent.click(screen.getByRole('button', { name: 'Thêm hồ sơ mới' }));
+  const dialog = within(screen.getByRole('dialog'));
+  fireEvent.change(dialog.getByPlaceholderText('Nguyễn Văn'), { target: { value: 'Trần Văn' } });
+  fireEvent.change(dialog.getByPlaceholderText('An'), { target: { value: 'Bình' } });
+  expect(dialog.getByRole('textbox', { name: 'Số điện thoại' })).not.toBeRequired();
+  expect(dialog.getByRole('textbox', { name: 'CCCD' })).not.toBeRequired();
+  fireEvent.click(dialog.getByRole('button', { name: 'Chấp nhận (Enter)' }));
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
+    expect.stringContaining('/plan/admission-records'),
+    expect.objectContaining({ fullName: 'Trần Văn Bình', phone: '', idCard: '' }),
+    { withCredentials: true },
+  ));
+});
+
+it('allows clearing contact fields while editing a profile', async () => {
+  axios.put.mockResolvedValue({ data: {} });
+  mount('admitted-masters');
+  fireEvent.click(await screen.findByRole('button', { name: 'Sửa hồ sơ HV001' }));
+  const dialog = within(screen.getByRole('dialog'));
+  fireEvent.change(dialog.getByRole('textbox', { name: 'Số điện thoại' }), { target: { value: '' } });
+  fireEvent.change(dialog.getByRole('textbox', { name: 'CCCD' }), { target: { value: '' } });
+  fireEvent.click(dialog.getByRole('button', { name: 'Chấp nhận (Enter)' }));
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(
+    expect.stringContaining('/plan/admission-records/record-1'),
+    expect.objectContaining({ phone: '', idCard: '' }),
     { withCredentials: true },
   ));
 });

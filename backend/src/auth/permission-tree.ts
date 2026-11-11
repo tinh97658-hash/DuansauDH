@@ -1,5 +1,6 @@
-import { ROUTE_PERMISSION_ENTRIES,routeViewCode } from './route-permissions.js';
+import { ROUTE_PERMISSION_ENTRIES,routeViewCode,routeActionCode } from './route-permissions.js';
 export const permissionModules:Record<string,{id:string;name:string}>={
+  learnercode:{id:'learnercode',name:'Mã học viên'},
   account:{id:'administration',name:'Tài khoản & phân quyền'},role:{id:'administration',name:'Tài khoản & phân quyền'},audit:{id:'administration',name:'Tài khoản & phân quyền'},
   catalog:{id:'catalog',name:'Danh mục dùng chung'},plan:{id:'plan',name:'Kế hoạch & chương trình đào tạo'},admission:{id:'admission',name:'Tuyển sinh'},
   groups:{id:'groups',name:'Nhóm học viên'},masters:{id:'masters',name:'Đào tạo Thạc sĩ'},doctoral:{id:'doctoral',name:'Đào tạo Tiến sĩ'},
@@ -8,6 +9,10 @@ export const permissionModules:Record<string,{id:string;name:string}>={
   reports:{id:'reports',name:'Báo cáo & thống kê'},supervision:{id:'supervision',name:'Hướng dẫn & phản biện'},
 };
 export const permissionReadDependencies:Record<string,string[]>={
+  'learnercode.config.manage':['learnercode.config.view'], 'learnercode.counter.advance':['learnercode.config.view'],
+  'learnercode.preview':['admission.view'], 'learnercode.issue':['learnercode.preview','admission.view'],
+  'learnercode.reissue':['learnercode.preview','admission.view'], 'learnercode.type.assign':['admission.view','admission.manage'],
+  'learnercode.type.change':['admission.view'], 'learnercode.history.view':['admission.view'],
   'account.manage':['account.view'],'account.password.reset':['account.view'],'role.manage':['role.view'],
   'catalog.manage':['catalog.view'],'plan.manage':['plan.view'],'admission.manage':['admission.view'],
   'groups.assign':['masters.view'],'masters.manage':['masters.view'],'doctoral.manage':['doctoral.view'],
@@ -22,13 +27,15 @@ export function permissionTreeMeta(code:string){
   if(entry){
     const base=permissionModules[(entry.capability||entry.route.read[0]).split('.')[0]];
     return {moduleId:base.id,moduleName:base.name,kind:entry.capability?'write':'read',
-      requires:entry.capability?[routeViewCode(entry.route.path),entry.capability]:entry.route.read,
+      ...(['learnercode.preview','learnercode.history.view'].includes(entry.capability||'')?{readOnlyAction:true}:{}),
+      requires:entry.capability?[routeViewCode(entry.route.path),entry.capability,
+        ...(['learnercode.issue','learnercode.reissue'].includes(entry.capability)?[routeActionCode(entry.route.path,'learnercode.preview')]:[])]:entry.route.read,
       navigation:{section:entry.route.section,group:entry.route.group,path:entry.route.path,name:entry.route.name}};
   }
   const prefix=code.split('.')[0];
   if(prefix==='module')return {moduleId:code.slice(7),moduleName:'',kind:'module',requires:[]};
   const module=permissionModules[prefix]||{id:'other',name:'Quyền khác'};
-  return {moduleId:module.id,moduleName:module.name,kind:code.endsWith('.view')?'read':'write',requires:permissionReadDependencies[code]||[]};
+  return {moduleId:module.id,moduleName:module.name,kind:code.endsWith('.view')||code==='learnercode.preview'?'read':'write',requires:permissionReadDependencies[code]||[]};
 }
 export function effectiveProfilePermissions(permissions:Set<string>){
   let result=new Set(permissions),previous=-1;

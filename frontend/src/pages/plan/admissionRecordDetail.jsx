@@ -286,7 +286,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
   const [loading, setLoading] = useState(true);
   const profileRequest = useRef(0);
   const [saving, setSaving] = useState(false);
-  const { can } = usePermissions();
+  const { can, access } = usePermissions();
   const isAdmin = can("admission.manage");
   const canRequestTransfer = can("majortransfer.request");
   const canDecideTransfer = can("majortransfer.approve");
@@ -519,12 +519,12 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
       toast.error("Vui lòng nhập họ và tên học viên");
       return;
     }
-    if (!/^[0-9]{10}$/.test(formData.phone || "")) {
-      toast.error("Số điện thoại bắt buộc gồm đúng 10 chữ số");
+    if (formData.phone && !/^[0-9]{10}$/.test(formData.phone)) {
+      toast.error("Số điện thoại nếu nhập phải gồm đúng 10 chữ số");
       return;
     }
-    if (!/^[0-9]{13}$/.test(formData.idCard || "")) {
-      toast.error("CCCD bắt buộc gồm đúng 13 chữ số");
+    if (formData.idCard && !/^[0-9]{13}$/.test(formData.idCard)) {
+      toast.error("CCCD nếu nhập phải gồm đúng 13 chữ số");
       return;
     }
 
@@ -853,6 +853,10 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
       desc="Chỉnh sửa toàn bộ thông tin hồ sơ tuyển sinh trực tiếp trên một trang và xuất Excel."
       maxWidth={1260}
     >
+      {record&&can('admission.view')&&access?.permissions?.includes('route.plan.learner-codes.view')&&<Box sx={{mb:1}}>
+        <Button variant="outlined" onClick={()=>navigate(`/masters/admitted-records?tab=learner-codes&recordId=${record.id}`)}>Loại hồ sơ và mã học viên</Button>
+      </Box>}
+      {record?.intakeCode&&record.learnerCodeState==='official'&&<Typography variant="body2" sx={{mb:1}}>Mã tiếp nhận/SBD gốc: {record.intakeCode} · Mã học viên chính thức: {record.code}</Typography>}
 
       {/* ========================================================================= */}
       {/* 1. TOP HEADER TOOLBAR (SCREEN ONLY)                                       */}
@@ -1161,11 +1165,12 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                     size="small"
                     fullWidth
                     value={formData.code}
+                    disabled={record?.learnerCodeState==='official'}
                     onChange={(e) => setFormData((p) => ({ ...p, code: e.target.value }))}
                     sx={inputSx}
                     placeholder="HV26001"
                     inputProps={{ maxLength: 50 }}
-                    helperText="Mã học viên phải duy nhất trong toàn hệ thống, kể cả mã của hồ sơ cũ."
+                    helperText={record?.learnerCodeState==='official'?'Mã chính thức chỉ đổi tại chức năng Cấp mã học viên.':'Mã học viên phải duy nhất trong toàn hệ thống, kể cả mã của hồ sơ cũ.'}
                   />
                 </Box>
 
@@ -1202,7 +1207,6 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                     fullWidth
                     value={formData.idCard}
                     onChange={(e) => setFormData((p) => ({ ...p, idCard: e.target.value.replace(/[^0-9]/g, "").slice(0, 13) }))}
-                    required
                     inputProps={{ inputMode: "numeric", maxLength: 13, pattern: "[0-9]{13}", "aria-label": "CCCD" }}
                     error={Boolean(formData.idCard) && !/^[0-9]{13}$/.test(formData.idCard)}
                     sx={inputSx}
@@ -1229,7 +1233,6 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                     fullWidth
                     value={formData.phone}
                     onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value.replace(/[^0-9]/g, "").slice(0, 10) }))}
-                    required
                     inputProps={{ inputMode: "numeric", maxLength: 10, pattern: "[0-9]{10}", "aria-label": "Số điện thoại" }}
                     error={Boolean(formData.phone) && !/^[0-9]{10}$/.test(formData.phone)}
                     sx={inputSx}

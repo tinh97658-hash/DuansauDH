@@ -1,7 +1,7 @@
 import { Transform, Type } from "class-transformer";
 import { normalizeTrainingLevel, STUDY_STATUS_VALUES } from "../admission-values.js";
 import { SUBJECT_KNOWLEDGE_CODES } from '../subject-knowledge-groups.js';
-import { ArrayMaxSize, ArrayMinSize, ArrayNotEmpty, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, Min, ValidateIf, ValidateNested } from "class-validator";
+import { ArrayMaxSize, ArrayMinSize, ArrayNotEmpty, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, Min, ValidateNested } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim());
 const trimUpper = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim().toUpperCase());
@@ -153,10 +153,10 @@ export class CreateAdmissionRecordDto {
   @IsOptional() @IsString() firstName?: string;
   @IsString() @Transform(trim) fullName!: string;
   @IsOptional() @IsString() dob?: string;
-  @IsString() @Matches(/^[0-9]{13}$/, { message: "CCCD bắt buộc gồm đúng 13 chữ số" }) idCard!: string;
+  @IsOptional() @IsString() @Matches(/^(?:[0-9]{13})?$/, { message: "CCCD nếu nhập phải gồm đúng 13 chữ số" }) idCard?: string;
   @IsOptional() @IsString() gender?: string;
   @IsOptional() @IsString() email?: string;
-  @IsString() @Matches(/^[0-9]{10}$/, { message: "Số điện thoại bắt buộc gồm đúng 10 chữ số" }) phone!: string;
+  @IsOptional() @IsString() @Matches(/^(?:[0-9]{10})?$/, { message: "Số điện thoại nếu nhập phải gồm đúng 10 chữ số" }) phone?: string;
   @IsOptional() @IsString() pob?: string;
   @IsOptional() @IsString() receiptType?: string;
   @IsOptional() @IsString() profileCategory?: string;
@@ -206,12 +206,10 @@ export class UpdateAdmissionRecordDto {
   @IsOptional() @IsString() firstName?: string;
   @IsOptional() @IsString() @Transform(trim) fullName?: string;
   @IsOptional() @IsString() dob?: string;
-  @ValidateIf((_object, value) => value !== undefined)
-  @IsString() @Matches(/^[0-9]{13}$/, { message: "CCCD bắt buộc gồm đúng 13 chữ số" }) idCard?: string;
+  @IsOptional() @IsString() @Matches(/^(?:[0-9]{13})?$/, { message: "CCCD nếu nhập phải gồm đúng 13 chữ số" }) idCard?: string;
   @IsOptional() @IsString() gender?: string;
   @IsOptional() @IsString() email?: string;
-  @ValidateIf((_object, value) => value !== undefined)
-  @IsString() @Matches(/^[0-9]{10}$/, { message: "Số điện thoại bắt buộc gồm đúng 10 chữ số" }) phone?: string;
+  @IsOptional() @IsString() @Matches(/^(?:[0-9]{10})?$/, { message: "Số điện thoại nếu nhập phải gồm đúng 10 chữ số" }) phone?: string;
   @IsOptional() @IsString() pob?: string;
   @IsOptional() @IsString() receiptType?: string;
   @IsOptional() @IsString() profileCategory?: string;

@@ -8,6 +8,7 @@
  *   cho tới khi ma trận quyền được admin tùy chỉnh.
  */
 
+import { CODE_PERMISSIONS } from '../learner-codes/code-permissions.js';
 export interface PermissionDefinition {
   code: string;
   name: string;
@@ -102,6 +103,7 @@ export const PERMISSIONS: PermissionDefinition[] = [
   { code: "supervision.review", group: "Hướng dẫn & phản biện", name: "Duyệt hồ sơ được phân công", description: "Xem và xử lý hồ sơ được phân công hướng dẫn, phản biện. Quyền này khác với phụ trách nhóm và quản lý điểm thi." },
 ];
 
+PERMISSIONS.push(...CODE_PERMISSIONS);
 for(const entry of ROUTE_PERMISSION_ENTRIES){
   const capability=PERMISSIONS.find(permission=>permission.code===entry.capability);
   PERMISSIONS.push({code:entry.code,group:entry.route.section,

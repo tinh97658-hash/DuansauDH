@@ -89,10 +89,17 @@ export class DashboardService {
     const [majors, learners] = await Promise.all([majorsPromise, this.masters.listEligibleStudents(undefined, year)]);
     // Same major scope and eligible-student service as the assignment summary; tuition is irrelevant.
     const eligibleMajors = majors.filter((major) => major.disciplineId || major.discipline?.id);
+    const unassigned = new Map<string, Set<string>>();
+    for (const learner of learners) {
+      if (learner.assignedGroup) continue;
+      const ids = unassigned.get(learner.majorId) || new Set<string>();
+      ids.add(learner.id);
+      unassigned.set(learner.majorId, ids);
+    }
     const items = eligibleMajors.map((major) => ({
       id: major.id, title: major.name,
       detail: major.discipline?.name || "", unit: "HV",
-      count: new Set(learners.filter((learner) => learner.majorId === major.id && !learner.assignedGroup).map(learner => learner.id)).size,
+      count: unassigned.get(major.id)?.size || 0,
       href: href("/masters/assign-class-groups", { year, disciplineId: major.disciplineId || major.discipline.id, majorId: major.id }),
     })).filter((item) => item.count > 0).sort((a, b) => b.count - a.count || a.title.localeCompare(b.title, "vi"));
     return { count: items.reduce((sum, item) => sum + item.count, 0), itemCount: items.length,
@@ -148,6 +155,7 @@ export class DashboardService {
       COUNT(*)::int AS "scheduledCount" FROM course_exam_sessions
       WHERE course_offering_id IN (:ids) AND status='scheduled' GROUP BY course_offering_id`,
       { type: QueryTypes.SELECT, replacements: { ids: awaitingIds } }) : [];
+    const examsByOffering = new Map(examSessions.map(session => [session.offeringId, session]));
     for (const offering of offerings) {
       const state = tracking.get(offering.id);
       if (!state || state.legacy) continue;
@@ -158,7 +166,7 @@ export class DashboardService {
       else if (state.gradebookStage === 'result_ready') { index = 3; at = null; milestone = 'Đã đủ kết quả, có thể gửi duyệt'; }
       else continue;
       const group = scopeGroup(offering, year);
-      const exam = examSessions.find(session => session.offeringId === offering.id);
+      const exam = examsByOffering.get(offering.id);
       const upcoming = Number(exam?.upcomingCount) > 0;
       const eligibilityApproved = state.componentsApproved === true || state.eligibilityStatus === 'approved';
       const openExamSchedule = index === 1 && examsWrite && eligibilityApproved;
@@ -307,10 +315,10 @@ export class DashboardService {
     // Share only within this request, preserving each user's scope and fresh data on refresh.
     const offeringPromises = new Map<string, Promise<any[]>>();
     const offerings = (domain: 'schedule' | 'gradebook' = 'gradebook') => {
-      // Without a scope adapter (unit tests), sharing is safe. Real HTTP readers stay in their own domain.
-      const key = this.scope ? domain : 'shared';
+      // Each domain has different RLS and projection requirements; share only within a domain.
+      const key = domain;
       if (!offeringPromises.has(key)) offeringPromises.set(key, domainRead(domain, () =>
-        this.scheduling.listCourseOfferings({ program: "masters", academicYear: year })).then(rows =>
+        this.scheduling.listDashboardCourseOfferings(year, domain === 'schedule')).then(rows =>
           [...new Map(rows.map(row => { const value = plain(row); return [value.id, value] as const; })).values()]));
       return offeringPromises.get(key)!;
     };

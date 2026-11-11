@@ -9,6 +9,8 @@
 - [Quyền bảng điểm](gradebook-permissions.md)
 - [Thanh toán giảng viên](LECTURER-PAYMENTS.md)
 - [Chính sách học phí và ghi danh](TUITION-ENROLLMENT-POLICY.md)
+- [Kế hoạch cấu hình và cấp mã học viên](plans/KE-HOACH-CAU-HINH-MA-HOC-VIEN.md)
+- [Hướng dẫn cấu hình và cấp mã học viên](learner-code-management.md)
 
 Các hướng dẫn nghiệp vụ hiện hành nằm trực tiếp trong `docs/`.
 

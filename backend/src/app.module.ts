@@ -6,7 +6,6 @@ import { InjectConnection } from "@nestjs/sequelize";
 import connectSessionSequelize from "connect-session-sequelize";
 import cookieParser from "cookie-parser";
 import flash from "express-flash";
-import { rateLimit } from "express-rate-limit";
 import session from "express-session";
 import passport from "passport";
 import { Sequelize } from "sequelize-typescript";
@@ -28,6 +27,7 @@ import { SchedulingModule } from "./scheduling/scheduling.module.js";
 import { SystemModule } from "./system/system.module.js";
 import { DashboardModule } from "./dashboard/dashboard.module.js";
 import { InboxModule } from './notifications/inbox.module.js';
+import { LearnerCodeModule } from './learner-codes/code.module.js';
 
 @Module({
   imports: [
@@ -48,6 +48,7 @@ import { InboxModule } from './notifications/inbox.module.js';
     SchedulingModule,
     DashboardModule,
     InboxModule,
+    LearnerCodeModule,
   ],
 })
 export class AppModule implements NestModule {
@@ -75,25 +76,5 @@ export class AppModule implements NestModule {
     // Gắn ngữ cảnh người thực hiện cho nhật ký thay đổi dữ liệu (chạy sau passport.session).
     consumer.apply(WorkingProfileMiddleware,GroupScopeMiddleware, AuditContextMiddleware).forRoutes({ path: "*", method: RequestMethod.ALL });
 
-    consumer.apply(rateLimit({
-      windowMs: 15 * 60 * 1000,
-      limit: 1500,
-      standardHeaders: "draft-7",
-      legacyHeaders: false,
-    })).forRoutes({ path: "*", method: RequestMethod.ALL });
-
-    consumer.apply(rateLimit({
-      windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: "draft-7", legacyHeaders: false,
-    })).forRoutes({ path: "user/submit", method: RequestMethod.POST }, { path: "user/uploadpp", method: RequestMethod.PATCH });
-
-    consumer.apply(rateLimit({
-      windowMs: 15 * 60 * 1000,
-      limit: 100,
-      standardHeaders: "draft-7",
-      legacyHeaders: false,
-    })).forRoutes(
-      { path: "user/login", method: RequestMethod.POST },
-      { path: "user/forgotPassword", method: RequestMethod.POST },
-    );
   }
 }

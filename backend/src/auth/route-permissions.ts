@@ -1,6 +1,8 @@
 // Navigation catalog mirrors RibbonHeader and the registered application routes.
 export interface PermissionRoute {path:string;name:string;section:string;group:string;read:string[];actions:string[]}
 export const PERMISSION_ROUTES:PermissionRoute[] = [
+  {path:'/system/learner-codes',name:'Quy tắc mã học viên',section:'HỆ THỐNG',group:'CÀI ĐẶT HỆ THỐNG',read:['learnercode.config.view'],actions:['learnercode.config.manage','learnercode.counter.advance']},
+  {path:'/plan/learner-codes',name:'Cấp mã học viên',section:'ĐÀO TẠO THẠC SĨ',group:'THỦ TỤC ĐẦU VÀO',read:['admission.view'],actions:['learnercode.preview','learnercode.type.assign','learnercode.issue','learnercode.reissue','learnercode.type.change','learnercode.history.view']},
   {"path":"/system/accounts","name":"Tài khoản nhân sự","section":"HỆ THỐNG","group":"TÀI KHOẢN & PHÂN QUYỀN","read":["account.view"],"actions":["account.manage","account.password.reset","scheduling.assign"]},
   {"path":"/system/roles","name":"Vai trò & phân quyền","section":"HỆ THỐNG","group":"TÀI KHOẢN & PHÂN QUYỀN","read":["role.view"],"actions":["role.manage"]},
   {"path":"/system/audit-logs","name":"Nhật ký thao tác","section":"HỆ THỐNG","group":"TÀI KHOẢN & PHÂN QUYỀN","read":["audit.view"],"actions":[]},
@@ -15,7 +17,7 @@ export const PERMISSION_ROUTES:PermissionRoute[] = [
   {"path":"/system/training-modes","name":"Hình thức đào tạo","section":"HỆ THỐNG","group":"DANH MỤC ĐÀO TẠO","read":["catalog.view"],"actions":["catalog.manage"]},
   {"path":"/system/disciplines","name":"Ngành đào tạo","section":"HỆ THỐNG","group":"DANH MỤC ĐÀO TẠO","read":["catalog.view"],"actions":["catalog.manage"]},
   {"path":"/system/majors","name":"Chuyên ngành","section":"HỆ THỐNG","group":"DANH MỤC ĐÀO TẠO","read":["catalog.view"],"actions":["catalog.manage"]},
-  {"path":"/system/training-years","name":"Năm đào tạo","section":"HỆ THỐNG","group":"DANH MỤC ĐÀO TẠO","read":["catalog.view"],"actions":["catalog.manage"]},
+  {"path":"/system/training-years","name":"Năm và đợt tuyển sinh","section":"HỆ THỐNG","group":"DANH MỤC ĐÀO TẠO","read":["catalog.view"],"actions":["catalog.manage"]},
   {"path":"/system/training-levels","name":"Trình độ đào tạo","section":"HỆ THỐNG","group":"DANH MỤC ĐÀO TẠO","read":["catalog.view"],"actions":["catalog.manage"]},
   {"path":"/system/study-statuses","name":"Trạng thái học","section":"HỆ THỐNG","group":"DANH MỤC ĐÀO TẠO","read":["catalog.view"],"actions":["catalog.manage"]},
   {"path":"/system/bridge-knowledge","name":"Bổ sung kiến thức","section":"HỆ THỐNG","group":"DANH MỤC ĐÀO TẠO","read":["catalog.view"],"actions":["catalog.manage"]},

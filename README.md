@@ -10,7 +10,7 @@ Nội dung dài xuống dòng trong ô bảng; các vùng một dòng giữ gi�
 
 ## Quản lý năm đào tạo
 
-Vào **Hệ thống → Danh mục đào tạo → Năm đào tạo** để thêm/sửa năm và ngày bắt đầu, hoặc bật/tắt năm trong danh sách chọn. Combobox năm của hồ sơ tuyển sinh/học viên và chương trình đào tạo lấy dữ liệu từ danh mục này.
+Vào **Hệ thống → Danh mục đào tạo → Năm và đợt tuyển sinh**. Thẻ **Năm đào tạo** cho phép thêm/sửa năm và ngày bắt đầu, hoặc bật/tắt năm trong danh sách chọn. Combobox năm của hồ sơ tuyển sinh/học viên và chương trình đào tạo lấy dữ liệu từ danh mục này. Thẻ **Đợt xét tuyển** cho phép tìm, lọc theo năm, tạo/sửa đợt và mở bảng điểm của đợt đã chọn.
 
 Migration `098-training-years` tạo danh mục, giữ các năm đang có trong hồ sơ/lớp và khởi tạo ngày bắt đầu là **01/01** của từng năm. Cần chỉnh lại ngày bắt đầu theo thực tế. Khi cập nhật môi trường khác, chạy `npm run db:migrate` rồi khởi động lại backend.
 
@@ -20,6 +20,7 @@ Cấu trúc repository và quy trình production: xem [hướng dẫn triển kh
 Các tài liệu nghiệp vụ, kế hoạch và báo cáo được tổng hợp tại [docs/README.md](docs/README.md).
 
 Phân quyền theo hồ sơ làm việc, cây module và quyền xem/ghi: xem [hướng dẫn phân quyền](docs/working-profiles-permission-tree.md).
+Quy tắc, phân loại và cấp mã học viên: xem [hướng dẫn mã học viên](docs/learner-code-management.md).
 
 Dữ liệu demo nhập điểm, lịch sử giảng dạy và tạo lịch thi: xem [hướng dẫn demo thi](docs/exam-demo.md), chạy riêng bằng `npm --prefix backend run db:seed:exam-demo`.
 

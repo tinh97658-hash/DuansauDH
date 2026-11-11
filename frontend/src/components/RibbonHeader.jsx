@@ -36,6 +36,7 @@ export const ribbons = {
   system: [
     group("CÀI ĐẶT HỆ THỐNG", [
       action("Cài đặt giao diện", "/system/appearance", AdjustmentsHorizontalIcon, "var(--icon-primary)"),
+      action('Quy tắc mã học viên', '/system/learner-codes', ShieldCheckIcon, 'var(--icon-purple)', { permissions: ['learnercode.config.view'] }),
     ]),
     group("TÀI KHOẢN & PHÂN QUYỀN", [
       action("Tài khoản nhân sự", "/system/accounts", UsersIcon, "var(--icon-teal)", { permissions: ["account.view"] }),
@@ -62,7 +63,7 @@ export const ribbons = {
       action("Hình thức đào tạo", "/system/training-modes", ClipboardDocumentCheckIcon, "var(--icon-olive)", { permissions: ["catalog.view"] }),
       action("Ngành đào tạo", "/system/disciplines", BuildingLibraryIcon, "var(--icon-primary)", { permissions: ["catalog.view"] }),
       action("Chuyên ngành", "/system/majors", BookOpenIcon, "var(--icon-warning)", { permissions: ["catalog.view"] }),
-      action("Năm đào tạo", "/system/training-years", CalendarDaysIcon, "var(--icon-teal)", { permissions: ["catalog.view"] }),
+      action("Năm và đợt tuyển sinh", "/system/training-years", CalendarDaysIcon, "var(--icon-teal)", { permissions: ["catalog.view"] }),
       action("Trình độ đào tạo", "/system/training-levels", TrophyIcon, "var(--icon-purple)", { permissions: ["catalog.view"] }),
       action("Trạng thái học", "/system/study-statuses", CheckCircleIcon, "var(--icon-teal)", { permissions: ["catalog.view"] }),
       action("Bổ sung kiến thức", "/system/bridge-knowledge", ClipboardDocumentCheckIcon, "var(--icon-primary)", { permissions: ["catalog.view"] }),

@@ -144,5 +144,10 @@ schema còn tương thích, đặt lại `API_IMAGE`/`WEB_IMAGE` theo tag cũ r�
 `up -d --no-build --force-recreate --wait api web` với cùng file Compose/env. Nếu schema không
 tương thích, người vận hành cần restore DB/uploads cùng mốc rồi chạy image cũ.
 Không mặc định `migrate down` an toàn: một số migration không hỗ trợ đảo ngược.
+
+Bản cập nhật bảo mật/hiệu năng ngày 10/11/2026 cần migration
+`101-upload-storage-index` trước khi khởi động API mới. Không chạy song song hai
+phiên bản API ghi upload. API ghi yêu cầu `Origin` trùng `FRONTEND_URL`; có thêm
+timeout database cấu hình được. Xem [chi tiết triển khai và kiểm tra](reviews/SECURITY-PERFORMANCE-2026-11-10.md).
 Người vận hành chịu trách nhiệm kiểm thử restore và quyết định rollback thực tế.
 Khôi phục file cấu hình từ commit trước không tự hoàn nguyên schema/dữ liệu.

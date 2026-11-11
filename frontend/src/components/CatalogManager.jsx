@@ -12,6 +12,7 @@ import {
 import { PencilSquareIcon, PlusIcon, TrashIcon } from "./AppIcons";
 import { API_BASE_URL } from "../config/http";
 import FeatureLayout from "./FeatureLayout";
+import PageExportBoundary from "./PageExportBoundary";
 import AppDialog from "./AppDialog";
 import DateField from "./DateField";
 import ConfirmDialog from "./ConfirmDialog";
@@ -89,6 +90,7 @@ const AlphabeticalHeader = ({ children }) => (
 );
 
 const EMPTY_FIELDS = [];
+const EmbeddedCatalog = ({ children, title, exportConfig }) => <PageExportBoundary title={title} config={exportConfig}>{children}</PageExportBoundary>;
 
 const CatalogManager = ({
   title, group, desc, endpoint, itemName, nameLabel = "Tên", codeLabel = "Mã",
@@ -105,7 +107,9 @@ const CatalogManager = ({
   showStatusBadge = true,
   showStatus = true,
   addButtonLabel = null,
+  embedded = false,
 }) => {
+  const Layout = embedded ? EmbeddedCatalog : FeatureLayout;
   const apiBase = baseEndpoint || endpoint.split("?")[0];
   const [rows, setRows] = useState([]);
   const [options, setOptions] = useState([]);
@@ -393,7 +397,7 @@ const CatalogManager = ({
   };
 
   return (
-    <FeatureLayout title={title} group={group} desc={desc} exportConfig={{ disabled: loading || !!error,
+    <Layout title={title} group={group} desc={desc} exportConfig={{ disabled: loading || !!error,
       getReport: () => tableReport(title, columns, filtered, (row, column) => {
         if (column.key === "lastName") return getNameParts(row).familyAndMiddle;
         if (column.key === "firstName") return getNameParts(row).givenName;
@@ -642,7 +646,7 @@ const CatalogManager = ({
         content={`Bạn có chắc muốn xóa ${itemName} ${deleting?.name || ""}${showCode && deleting?.code ? ` (mã ${deleting?.code})` : ""} không?`}
       />
 
-  </FeatureLayout>
+  </Layout>
   );
 };
 

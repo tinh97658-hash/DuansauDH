@@ -29,7 +29,7 @@ function fixture() {
     { id: "outside-major", majorId: "other", assignedGroup: null },
   ]) };
   const scheduling = {
-    listCourseOfferings: jest.fn().mockResolvedValue([
+    listDashboardCourseOfferings: jest.fn().mockResolvedValue([
       offering("unscheduled", { totalCount: 0, heldCount: 0, pendingCount: 0 }),
       offering("pending", { totalCount: 3, heldCount: 1, pendingCount: 2 }),
       offering("completed", { totalCount: 4, heldCount: 4, pendingCount: 0 }, "completed"),
@@ -61,7 +61,7 @@ describe("operational dashboard permissions", () => {
       permissions.delete(missing);
       f.rbac.effectiveAccess.mockResolvedValue({ permissions, roleCodes: ['custom'] });
       expect((await f.service.operational(user('custom'), '2026', 'approvals')).sources).toEqual({});
-      expect(f.scheduling.listCourseOfferings).not.toHaveBeenCalled();
+      expect(f.scheduling.listDashboardCourseOfferings).not.toHaveBeenCalled();
       expect(f.gradebooks.tracking).not.toHaveBeenCalled();
     }
   });
@@ -88,7 +88,7 @@ describe("operational dashboard permissions", () => {
     const result = await f.service.operational(user("admin", true), "2026");
     expect(result.sources).toEqual({});
     expect(f.masters.listEligibleStudents).not.toHaveBeenCalled();
-    expect(f.scheduling.listCourseOfferings).not.toHaveBeenCalled();
+    expect(f.scheduling.listDashboardCourseOfferings).not.toHaveBeenCalled();
     expect(f.groups.findAll).not.toHaveBeenCalled();
     expect(f.system.listMajors).not.toHaveBeenCalled();
   });
@@ -121,7 +121,7 @@ describe("operational dashboard permissions", () => {
       expect(source).not.toHaveProperty('data');
     }
     expect(f.masters.listEligibleStudents).not.toHaveBeenCalled();
-    expect(f.scheduling.listCourseOfferings).not.toHaveBeenCalled();
+    expect(f.scheduling.listDashboardCourseOfferings).not.toHaveBeenCalled();
     expect(f.gradebooks.tracking).not.toHaveBeenCalled();
     expect(f.requests.query).not.toHaveBeenCalled();
     const retry = await f.service.operational(user(), '2025', 'grades', 'doctoral');
@@ -144,7 +144,7 @@ describe("operational dashboard aggregation", () => {
     f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(DEFAULT_ROLE_PERMISSIONS.admin), roleCodes: ['admin'],
       groupScope: { restrictView: true, restrictEdit: true, readOnly: false } } as any);
     const contexts: any[] = [];
-    f.scheduling.listCourseOfferings.mockImplementation(async () => { contexts.push({ ...scope.current() }); return []; });
+    f.scheduling.listDashboardCourseOfferings.mockImplementation(async () => { contexts.push({ ...scope.current() }); return []; });
     f.gradebooks.tracking.mockImplementation(async () => { contexts.push({ ...scope.current() }); return new Map(); });
     f.requests.query.mockImplementation(async () => { contexts.push({ ...scope.current() }); return []; });
     const service = new DashboardService(f.masters as any, f.scheduling as any, f.system as any, f.rbac as any, f.gradebooks as any, f.requests as any, scope);
@@ -161,7 +161,7 @@ describe("operational dashboard aggregation", () => {
     const f = fixture();
     const ids = ['components', 'exam', 'marks', 'ready', 'done'];
     const offerings = ids.map(id => offering(id, {}, 'completed'));
-    f.scheduling.listCourseOfferings.mockResolvedValue([...offerings, offerings[1]]);
+    f.scheduling.listDashboardCourseOfferings.mockResolvedValue([...offerings, offerings[1]]);
     f.gradebooks.tracking.mockResolvedValue(new Map(ids.map((id, index) => [id, {
       gradebookStage: ['components_missing', 'awaiting_exam', 'exam_missing', 'result_ready', 'completed'][index],
       completedTeachingAt: null, examCompletedAt: null, eligibilityStatus: 'approved',
@@ -178,7 +178,7 @@ describe("operational dashboard aggregation", () => {
   it('does not offer exam scheduling to a grade submitter without exams.write', async () => {
     const f = fixture();
     f.rbac.effectiveAccess.mockResolvedValue({ permissions: new Set(['gradebook.view', 'gradebook.submit', routeViewCode('/masters/exam-lists'), routeActionCode('/masters/exam-lists', 'gradebook.submit')]), roleCodes: ['entry'] });
-    f.scheduling.listCourseOfferings.mockResolvedValue([offering('exam', {}, 'completed')]);
+    f.scheduling.listDashboardCourseOfferings.mockResolvedValue([offering('exam', {}, 'completed')]);
     f.gradebooks.tracking.mockResolvedValue(new Map([['exam', { gradebookStage: 'awaiting_exam' }]]));
     const result = await f.service.operational(user(), '2026', 'grades');
     expect(result.permissions).toMatchObject({ grades: true, approvals: false, examsWrite: false });
@@ -225,33 +225,35 @@ describe("operational dashboard aggregation", () => {
   it('retains complete approval counts beyond any preview size', async () => {
     const f = fixture();
     const values = Array.from({ length: 31 }, (_, index) => offering(`o${index}`, {}, 'completed'));
-    f.scheduling.listCourseOfferings.mockResolvedValue(values);
+    f.scheduling.listDashboardCourseOfferings.mockResolvedValue(values);
     f.gradebooks.tracking.mockResolvedValue(new Map(values.map(value => [value.id, { resultStatus: 'submitted' }])));
     expect((await f.service.operational(user(), '2026', 'approvals')).sources.approvals.data.resultApproval)
       .toMatchObject({ count: 31, itemCount: 31, items: expect.any(Array) });
   });
-  it('loads course offerings once per dashboard request and refreshes them on the next request', async () => {
+  it('loads course offerings once per domain and refreshes them on the next request', async () => {
     const f = fixture();
     const first = await f.service.operational(user(), '2026');
     expect(first.sources.teaching.status).toBe('ready');
     expect(first.sources.grades.status).toBe('ready');
     expect(first.sources.approvals.status).toBe('ready');
-    expect(f.scheduling.listCourseOfferings).toHaveBeenCalledTimes(1);
+    expect(f.scheduling.listDashboardCourseOfferings).toHaveBeenCalledTimes(2);
+    expect(f.scheduling.listDashboardCourseOfferings).toHaveBeenCalledWith('2026', true);
+    expect(f.scheduling.listDashboardCourseOfferings).toHaveBeenCalledWith('2026', false);
     await f.service.operational(user(), '2025');
-    expect(f.scheduling.listCourseOfferings).toHaveBeenCalledTimes(2);
-    expect(f.scheduling.listCourseOfferings).toHaveBeenLastCalledWith({ program: 'masters', academicYear: '2025' });
+    expect(f.scheduling.listDashboardCourseOfferings).toHaveBeenCalledTimes(4);
+    expect(f.scheduling.listDashboardCourseOfferings).toHaveBeenLastCalledWith('2025', false);
   });
-  it('retries a failed shared offering load on the next request without failing unrelated queues', async () => {
+  it('isolates a failed schedule load from grade queues and retries on the next request', async () => {
     const f = fixture();
-    f.scheduling.listCourseOfferings.mockRejectedValueOnce(new Error('database unavailable'));
+    f.scheduling.listDashboardCourseOfferings.mockRejectedValueOnce(new Error('database unavailable'));
     const failed = await f.service.operational(user(), '2026');
     expect(failed.sources.teaching.status).toBe('error');
-    expect(failed.sources.grades.status).toBe('error');
-    expect(failed.sources.approvals.status).toBe('error');
+    expect(failed.sources.grades.status).toBe('ready');
+    expect(failed.sources.approvals.status).toBe('ready');
     expect(failed.sources.grouping.status).toBe('ready');
-    const retried = await f.service.operational(user(), '2026', 'approvals');
-    expect(retried.sources.approvals.status).toBe('ready');
-    expect(f.scheduling.listCourseOfferings).toHaveBeenCalledTimes(2);
+    const retried = await f.service.operational(user(), '2026', 'teaching');
+    expect(retried.sources.teaching.status).toBe('ready');
+    expect(f.scheduling.listDashboardCourseOfferings).toHaveBeenCalledTimes(3);
   });
 
   it('shows scoped pending learner requests and links to the decision screens', async () => {
@@ -300,7 +302,7 @@ describe("operational dashboard aggregation", () => {
   });
   it('shows requests to reopen eligibility only while there are no exams preventing reopening', async () => {
     const f = fixture();
-    f.scheduling.listCourseOfferings.mockResolvedValue(['requested','scheduled','locked'].map(id=>offering(id,{},'completed')));
+    f.scheduling.listDashboardCourseOfferings.mockResolvedValue(['requested','scheduled','locked'].map(id=>offering(id,{},'completed')));
     const base = {eligibilityStatus:'approved',resultStatus:'not_available',eligibilityCanReopen:true,eligibilityReopenRequest:{note:'Sửa điểm',at:'2026-10-29T01:00:00Z'}};
     f.gradebooks.tracking.mockResolvedValue(new Map([['requested',base],['scheduled',{...base,eligibilityCanReopen:false}],['locked',{...base,resultStatus:'approved'}]]));
     const result = await f.service.operational(user(), '2026', 'approvals');
@@ -309,7 +311,7 @@ describe("operational dashboard aggregation", () => {
   it('shows only submitted approvals and links each request to its scoped gradebook', async () => {
     const f = fixture();
     const ids = ['eligibility', 'final', 'draft', 'approved', 'legacy', 'cancelled'];
-    f.scheduling.listCourseOfferings.mockResolvedValue(ids.map(id => offering(id, {}, id === 'cancelled' ? 'cancelled' : 'completed')));
+    f.scheduling.listDashboardCourseOfferings.mockResolvedValue(ids.map(id => offering(id, {}, id === 'cancelled' ? 'cancelled' : 'completed')));
     f.gradebooks.tracking.mockResolvedValue(new Map([
       ['eligibility', { eligibilityStatus: 'submitted', resultStatus: 'not_available' }],
       ['final', { eligibilityStatus: 'approved', resultStatus: 'submitted' }],
@@ -348,7 +350,7 @@ describe("operational dashboard aggregation", () => {
     try {
       const f=fixture();
       const cases=['components','entered','submitted','exam','exam-grades','finished','legacy'];
-      f.scheduling.listCourseOfferings.mockResolvedValue(cases.map(id=>({...offering(id,{},'completed'),groupLinks:[{classGroup:{id:'g1',code:'QTKD 2026.1.1',academicYear:'2026',majorId:'m1'}}]})));
+      f.scheduling.listDashboardCourseOfferings.mockResolvedValue(cases.map(id=>({...offering(id,{},'completed'),groupLinks:[{classGroup:{id:'g1',code:'QTKD 2026.1.1',academicYear:'2026',majorId:'m1'}}]})));
       const base={componentsEntered:true,componentsApproved:false,examCompleted:false,examGradesComplete:false,candidateCount:2,completedTeachingAt:'2026-09-01T00:00:00Z',componentScoreApprovedAt:'2026-10-12T00:00:00Z',examCompletedAt:'2026-10-14T00:00:00Z'};
       f.gradebooks.tracking.mockResolvedValue(new Map([
         ['components',{...base,gradebookStage:'components_missing',componentsEntered:false,completedTeachingAt:'2026-10-09T00:00:00Z'}],['entered',base],['submitted',base],
@@ -380,12 +382,12 @@ describe("operational dashboard aggregation", () => {
     expect(result.sources.grouping).toMatchObject({ status: "ready", data: { count: 2, itemCount: 1, items: [
       { count: 2, href: "/masters/assign-class-groups?year=2026&disciplineId=d1&majorId=m1" },
     ] } });
-    expect(f.scheduling.listCourseOfferings).not.toHaveBeenCalled();
+    expect(f.scheduling.listDashboardCourseOfferings).not.toHaveBeenCalled();
   });
   it("counts only active offerings with no sessions; warnings reuse server pending confirmation summaries", async () => {
     const f = fixture();
     const result = await f.service.operational(user(), "2026", "teaching");
-    expect(f.scheduling.listCourseOfferings).toHaveBeenCalledWith({ program: "masters", academicYear: "2026" });
+    expect(f.scheduling.listDashboardCourseOfferings).toHaveBeenCalledWith('2026', true);
     expect(result.sources.teaching.data).toMatchObject({
       scheduling: { count: 1, href: "/masters/schedule?year=2026&queue=unscheduled" },
       progress: { count: 2, itemCount: 1, items: [{ id: "pending", count: 2, href: "/masters/schedule?year=2026&offeringId=pending&queue=pending-confirmation" }] },
@@ -394,7 +396,7 @@ describe("operational dashboard aggregation", () => {
   });
   it.each([[0, 0, 0], [7], [2, 3, 2]])("sums pending sessions while preserving class counts: %j", async (...counts) => {
     const f = fixture();
-    f.scheduling.listCourseOfferings.mockResolvedValue(counts.map((count, index) => offering(`p${index}`, { totalCount: count, pendingCount: count })));
+    f.scheduling.listDashboardCourseOfferings.mockResolvedValue(counts.map((count, index) => offering(`p${index}`, { totalCount: count, pendingCount: count })));
     const result = await f.service.operational(user(), "2026", "teaching");
     expect(result.sources.teaching.data.progress).toMatchObject({
       count: counts.reduce((sum, count) => sum + count, 0), itemCount: counts.filter(count => count > 0).length,
@@ -403,7 +405,7 @@ describe("operational dashboard aggregation", () => {
   });
   it("counts component-entry offerings rather than generic administrative-group grade progress", async () => {
     const f = fixture();
-    f.scheduling.listCourseOfferings.mockResolvedValue(['completed','second','third'].map(id=>offering(id,{},'completed')));
+    f.scheduling.listDashboardCourseOfferings.mockResolvedValue(['completed','second','third'].map(id=>offering(id,{},'completed')));
     f.gradebooks.tracking.mockResolvedValue(new Map(['completed','second','third'].map(id=>[id,{gradebookStage:'components_missing',componentsEntered:false,completedTeachingAt:'2026-10-20T00:00:00Z'}])));
     const result = await f.service.operational(user("examiner", false), "2026");
     expect(result.sources.grades).toMatchObject({ status: "ready", data: { count: 3, itemCount: 3 } });
@@ -427,7 +429,7 @@ describe("operational dashboard aggregation", () => {
   it("returns real healthy zeros for empty scoped data", async () => {
     const f = fixture();
     f.masters.listEligibleStudents.mockResolvedValue([]);
-    f.scheduling.listCourseOfferings.mockResolvedValue([]);
+    f.scheduling.listDashboardCourseOfferings.mockResolvedValue([]);
     f.groups.findAll.mockResolvedValue([]);
     const result = await f.service.operational(user(), "2025");
     expect(result.sources.grouping.data.count).toBe(0);

@@ -50,6 +50,23 @@ const buildService = () => {
 };
 
 describe('Scoped scheduling responses', () => {
+  it('loads dashboard summaries without loading participant rosters or individual teaching sessions', async () => {
+    const f = buildService();
+    const row: any = { id: 'offering', status: 'active', get: () => ({ id: 'offering', ...row.data }),
+      data: {}, setDataValue: (key: string, value: any) => { row.data[key] = value; } };
+    f.courseOfferings.findAll.mockResolvedValue([row]);
+    f.sequelize.query.mockResolvedValue([{ id: 'offering', totalCount: 3, heldCount: 1, pendingCount: 2 }]);
+    const result = await f.service.listDashboardCourseOfferings('2026', true);
+    expect(result[0].sessionSummary).toMatchObject({ totalCount: 3, heldCount: 1, pendingCount: 2 });
+    expect(f.classGroupMembers.findAll).not.toHaveBeenCalled();
+    expect(f.individualStudents.findAll).not.toHaveBeenCalled();
+    expect(f.teachingSessions.findAll).not.toHaveBeenCalled();
+    expect(f.sequelize.query).toHaveBeenCalledTimes(1);
+    f.sequelize.query.mockClear();
+    await f.service.listDashboardCourseOfferings('2026', false);
+    expect(f.courseOfferings.findAll).toHaveBeenLastCalledWith(expect.objectContaining({ where: { status: 'completed' } }));
+    expect(f.sequelize.query).not.toHaveBeenCalled();
+  });
   it('redacts cross-group JSON from shared offering and session responses', async () => {
     const { service, courseOfferings, teachingSessions } = buildService();
     const shared = {

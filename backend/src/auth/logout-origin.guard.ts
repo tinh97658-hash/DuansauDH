@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { trustedOrigin } from '../common/request-security.js';
 
 /** Login and logout mutate browser sessions: accept only the configured UI origin,
  * including its scheme and port. Never infer trust from Host/forwarded headers.
@@ -10,12 +11,7 @@ export class LogoutOriginGuard implements CanActivate {
 
   canActivate(context: ExecutionContext) {
     const origin = context.switchToHttp().getRequest().get("origin");
-    try {
-      const frontend = new URL(this.config.getOrThrow<string>("FRONTEND_URL"));
-      if (!["http:", "https:"].includes(frontend.protocol) || !origin || origin === "null") throw new Error();
-      const supplied = new URL(origin);
-      if (origin !== supplied.origin || supplied.origin !== frontend.origin) throw new Error();
-    } catch {
+    if (!trustedOrigin(origin, this.config.getOrThrow<string>('FRONTEND_URL'))) {
       throw new ForbiddenException("Nguồn yêu cầu không hợp lệ.");
     }
     return true;

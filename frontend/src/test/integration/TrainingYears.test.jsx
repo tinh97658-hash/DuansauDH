@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import axios from "axios";
+import { MemoryRouter } from 'react-router-dom';
 import { renderWithPermissions } from "../renderWithPermissions";
 import TrainingYears from "../../pages/system/trainingYears";
 import useTrainingYears from "../../hooks/useTrainingYears";
@@ -12,7 +13,7 @@ it("edits a year and saves its start date as an ISO date", async () => {
   const row = { id: "year-2026", name: "2026", startDate: "2026-01-01", active: true };
   axios.get.mockResolvedValue({ data: [row] });
   axios.put.mockResolvedValue({ data: { ...row, startDate: "2026-09-05" } });
-  renderWithPermissions(<TrainingYears />, ["catalog.manage"]);
+  renderWithPermissions(<MemoryRouter><TrainingYears /></MemoryRouter>, ["catalog.manage"]);
   fireEvent.doubleClick(await screen.findByText("2026"));
   fireEvent.change(screen.getByLabelText("Ngày bắt đầu"), { target: { value: "05/09/2026" } });
   fireEvent.click(screen.getByRole("button", { name: "Lưu" }));

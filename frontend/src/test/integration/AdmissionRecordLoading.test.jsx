@@ -91,6 +91,25 @@ it('shows the profile without fetching unopened learning tabs or rechecking the 
   expect(paths.some(url => url.includes('/auth/'))).toBe(false);
 });
 
+it('saves the detail form with blank contact fields', async () => {
+  const reads = axios.get.getMockImplementation();
+  axios.get.mockImplementation(url => url.endsWith('/admission-records/record')
+    ? Promise.resolve({ data: { ...record, phone: '0912345678', idCard: '0310900012345' } }) : reads(url));
+  axios.put.mockResolvedValue({ data: record });
+  mount();
+  await screen.findByDisplayValue('HV001');
+  expect(screen.getByRole('textbox', { name: 'Số điện thoại' })).not.toBeRequired();
+  expect(screen.getByRole('textbox', { name: 'CCCD' })).not.toBeRequired();
+  fireEvent.change(screen.getByRole('textbox', { name: 'Số điện thoại' }), { target: { value: '' } });
+  fireEvent.change(screen.getByRole('textbox', { name: 'CCCD' }), { target: { value: '' } });
+  fireEvent.click(screen.getAllByRole('button', { name: 'Lưu thay đổi (Ctrl+S)' })[0]);
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(
+    expect.stringContaining('/plan/admission-records/record'),
+    expect.objectContaining({ phone: '', idCard: '' }),
+    { withCredentials: true },
+  ));
+});
+
 it('loads learning on demand, shows progress during a slow request and keeps the profile available', async () => {
   let resolveStudied;
   const reads = axios.get.getMockImplementation();

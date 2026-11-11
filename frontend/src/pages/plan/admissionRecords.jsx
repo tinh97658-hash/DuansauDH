@@ -238,8 +238,8 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
   const [fieldTouched, setFieldTouched] = useState({});
   const lastNameError = nameInputError(formData.lastName, "Họ đệm");
   const firstNameError = nameInputError(formData.firstName, "Tên");
-  const phoneError = /^[0-9]{10}$/.test(formData.phone || "") ? "" : "Số điện thoại bắt buộc gồm đúng 10 chữ số";
-  const idCardError = /^[0-9]{13}$/.test(formData.idCard || "") ? "" : "CCCD bắt buộc gồm đúng 13 chữ số";
+  const phoneError = !formData.phone || /^[0-9]{10}$/.test(formData.phone) ? "" : "Số điện thoại nếu nhập phải gồm đúng 10 chữ số";
+  const idCardError = !formData.idCard || /^[0-9]{13}$/.test(formData.idCard) ? "" : "CCCD nếu nhập phải gồm đúng 13 chữ số";
   const [formDisciplineId, setFormDisciplineId] = useState("");
 
   const selectableMajors = useMemo(
@@ -432,7 +432,8 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
       nextForm.majorName = defaultMajor.name;
     }
     setFormDisciplineId(majorDisciplineId(defaultMajor));
-    nextForm.code = `HV${year.slice(-2)}${String(stats.total + 1).padStart(3, "0")}`;
+    // The server reserves receipt codes atomically; list totals are not a sequence.
+    nextForm.code = '';
     setFormData(nextForm);
     setIsFormOpen(true);
   };
@@ -447,6 +448,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
     setFormData({
       id: rec.id,
       code: rec.code || "",
+      learnerCodeState: rec.learnerCodeState,
       lastName: rec.lastName || "",
       firstName: rec.firstName || "",
       fullName: rec.fullName || "",
@@ -1062,12 +1064,13 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                   <TextField
                     size="small"
                     value={formData.code}
+                    disabled={formData.learnerCodeState==='official'}
                     onChange={(e) => setFormData((p) => ({ ...p, code: e.target.value.toUpperCase() }))}
                     fullWidth
                     sx={cellInputSx}
                     placeholder="VD: HV26001"
                     inputProps={{ maxLength: 50 }}
-                    helperText={!formData.id ? "Để trống để tự cấp mã mới. Mã đã dùng cho hồ sơ khác không được sử dụng lại." : "Mã học viên phải duy nhất trong toàn hệ thống."}
+                    helperText={formData.learnerCodeState==='official'?'Mã chính thức chỉ đổi tại chức năng Cấp mã học viên.':!formData.id?'Để trống để hệ thống cấp mã tiếp nhận. Mã học viên chính thức được cấp riêng sau xét tuyển.':'Mã phải duy nhất trong toàn hệ thống.'}
                   />
                 </Box>
 
@@ -1124,7 +1127,6 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                       size="small"
                       value={formData.idCard}
                       onChange={(e) => setFormData((p) => ({ ...p, idCard: e.target.value.replace(/[^0-9]/g, "").slice(0, 13) }))}
-                      required
                       inputProps={{ inputMode: "numeric", maxLength: 13, pattern: "[0-9]{13}", "aria-label": "CCCD" }}
                       onBlur={() => setFieldTouched((prev) => ({ ...prev, idCard: true }))}
                       error={Boolean(fieldTouched.idCard && idCardError)}
@@ -1154,7 +1156,6 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                     size="small"
                     value={formData.phone}
                     onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value.replace(/[^0-9]/g, "").slice(0, 10) }))}
-                    required
                     inputProps={{ inputMode: "numeric", maxLength: 10, pattern: "[0-9]{10}", "aria-label": "Số điện thoại" }}
                     onBlur={() => setFieldTouched((prev) => ({ ...prev, phone: true }))}
                     error={Boolean(fieldTouched.phone && phoneError)}

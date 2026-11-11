@@ -2,7 +2,7 @@ import { usePermissions } from "../../features/accounts/usePermissions";
 import GroupResponsibleStaff from "../../features/accounts/GroupResponsibleStaff";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
@@ -62,7 +62,8 @@ const TuitionStatus = ({ paid }) => (
 );
 
 const AssignClassGroups = () => {
-  const { can } = usePermissions();
+  const { can, access } = usePermissions();
+  const navigate=useNavigate();
   const canManageGroups = can("masters.manage");
   const [searchParams, setSearchParams] = useSearchParams();
   const [createScope, setCreateScope] = useState(null);
@@ -359,6 +360,7 @@ const AssignClassGroups = () => {
       desc="Phân bổ và sắp xếp học viên Thạc sĩ vào nhóm theo chuyên ngành."
       maxWidth={1880}
     >
+      {targetGroupId&&access?.permissions?.includes('route.plan.learner-codes.view')&&<Button sx={{mb:1}} variant="outlined" onClick={()=>navigate(`/masters/admitted-records?tab=learner-codes&classGroupId=${targetGroupId}`)}>Xem trước và cấp mã cho lớp này</Button>}
       {createScope && createScope.key === scopeKey && <ClassGroupCreateDialog
         majors={majors}
         initialValues={{ academicYear: createScope.year, majorId: createScope.majorId }}

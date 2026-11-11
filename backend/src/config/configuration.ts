@@ -26,6 +26,8 @@ export const environmentSchema = Joi.object({
   DB_POOL_MIN: Joi.number().integer().min(0).default(2),
   DB_POOL_IDLE_MS: Joi.number().integer().min(1000).default(10000),
   DB_POOL_ACQUIRE_MS: Joi.number().integer().min(1000).default(30000),
+  DB_LOCK_TIMEOUT_MS: Joi.number().integer().min(100).default(5000),
+  DB_STATEMENT_TIMEOUT_MS: Joi.number().integer().min(1000).default(30000),
   SESSION_SECRET: Joi.string().min(32).required(),
   SESSION_COOKIE_SECURE: Joi.boolean().truthy("true").falsy("false").optional(),
   FRONTEND_URL: Joi.string().uri({ scheme: ["http", "https"] }).required(),

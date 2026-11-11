@@ -173,10 +173,10 @@ export default function RoutePermissionTree({ permissions, checked, onChange, as
                 )}
               </Box>
             </Box>
-            <Box sx={cellActionSx}>
+            <Box sx={{...cellActionSx,gridColumn:permission.readOnlyAction?3:2,gridRow:1}}>
               <Typography variant="caption" sx={{ color: '#CBD5E1', fontSize: 13, userSelect: 'none' }}>—</Typography>
             </Box>
-            <Box sx={cellActionSx}>
+            <Box sx={{...cellActionSx,gridColumn:permission.readOnlyAction?2:3,gridRow:1}}>
               <Tooltip
                 title={
                   !enabled

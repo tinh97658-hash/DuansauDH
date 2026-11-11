@@ -7,6 +7,7 @@ import { AppModule } from '../../src/app.module.js';
 import { RbacService } from '../../src/auth/rbac.service.js';
 import { GroupScopeService } from '../../src/auth/group-scope.service.js';
 import { workingProfileStorage } from '../../src/auth/profile-context.js';
+import { SchedulingService } from '../../src/scheduling/scheduling.service.js';
 
 const describeDb = process.env.RUN_DASHBOARD_DB_TESTS === 'true' ? describe : describe.skip;
 describeDb('Dashboard V2 read models on disposable PostgreSQL', () => {
@@ -61,6 +62,15 @@ describeDb('Dashboard V2 read models on disposable PostgreSQL', () => {
     ]));
     expect(data.values.filter((value: any) => !['Đã diễn ra', 'Không diễn ra'].includes(value.label))
       .reduce((sum: number, value: any) => sum + value.count, 0)).toBe(2);
+  });
+  it('aggregates dashboard session summaries in SQL without loading individual sessions or counting cancelled sessions', async () => {
+    const offering: any = { id: id(10), get: () => ({ id: id(10), sessionSummary: offering.summary }) };
+    const reader = { courseOfferings: { findAll: async () => [offering] }, sequelize: db,
+      setSessionSummary: (row: any, summary: any) => { row.summary = summary; } };
+    const rows = await SchedulingService.prototype.listDashboardCourseOfferings.call(reader, '2026', true);
+    expect(rows[0].sessionSummary).toMatchObject({ totalCount: 4, heldCount: 1 });
+    expect(rows[0].sessionSummary.pendingCount).toBeGreaterThanOrEqual(0);
+    expect(rows[0].sessionSummary.pendingCount).toBeLessThanOrEqual(2);
   });
   it('counts a completed offering once and includes six months with explicit zero buckets', async () => {
     const data = await service.completionChart('2026');

@@ -2,60 +2,35 @@ import { usePermissions } from "../../features/accounts/usePermissions";
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { Alert, Box, Button, Chip, CircularProgress, FormControlLabel, MenuItem, Paper, Stack, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
-import { ArrowPathIcon, InformationCircleIcon, PencilSquareIcon, PlusIcon } from "../../components/AppIcons";
+import { ArrowPathIcon } from "../../components/AppIcons";
 import BulkAdmissionWorkflow from "../../features/admission/BulkAdmissionWorkflow";
-import AdmissionRoundManager from "../../features/admission/AdmissionRoundManager";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import FeatureLayout from "../../components/FeatureLayout";
 import InlineReportExport from "../../components/InlineReportExport";
 import FilterSearchField from "../../components/FilterSearchField";
 import FilterSelectField from "../../components/FilterSelectField";
-import AppDialog from "../../components/AppDialog";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { getMockConfirmResult } from "../../utils/confirmHelper";
 import { API_BASE_URL } from "../../config/http";
 import { normalizeMajorsResponse } from "../../utils/majors";
 
 const options = { withCredentials: true };
-const compactFieldLabelSx = {
-  display: "block",
-  mb: "5px",
-  color: "#435b72",
-  fontSize: "11px",
-  fontWeight: 700,
-  lineHeight: "15px",
-  textTransform: "uppercase",
-};
-const compactControlSx = {
-  "& .MuiOutlinedInput-root": {
-    height: 40,
-    borderRadius: "4px",
-    backgroundColor: "#fff",
-    color: "#1c2936",
-    fontSize: "13px",
-    fontWeight: 500,
-    "& fieldset": { borderColor: "#c5d1db" },
-    "&:hover fieldset": { borderColor: "#8fa6b9" },
-    "&.Mui-focused fieldset": { borderColor: "var(--primary, #0788B8)", borderWidth: "1.5px" },
-  },
-  "& .MuiOutlinedInput-input": {
-    height: "auto",
-    padding: "9px 12px",
-    lineHeight: "20px",
-  },
-};
 export default function AdmissionScores() {
   const { can } = usePermissions();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const requestedRoundId = params.get("roundId");
   const admin = can("admission.manage");
   const [scoresDirty, setScoresDirty] = useState(false), [workflowBusy, setWorkflowBusy] = useState(false);
   const [rounds, setRounds] = useState([]), [majors, setMajors] = useState([]);
   const [roundId, setRoundId] = useState("");
   const [data, setData] = useState(null), [loading, setLoading] = useState(true), [error, setError] = useState("");
-  const [saving, setSaving] = useState(false), [form, setForm] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState(""), [filter, setFilter] = useState("all"), [majorFilter, setMajorFilter] = useState("all");
   const [thresholdDrafts, setThresholdDrafts] = useState({});
   const [discardAction, setDiscardAction] = useState(null);
   const [showOldRecords, setShowOldRecords] = useState(false);
-  const [roundManagerOpen, setRoundManagerOpen] = useState(false), [roundsLoading, setRoundsLoading] = useState(false);
+  const [roundsLoading, setRoundsLoading] = useState(false);
   const thresholdsDirty = Object.keys(thresholdDrafts).length > 0;
   const loadRounds = useCallback(async () => {
     setRoundsLoading(true);
@@ -69,9 +44,9 @@ export default function AdmissionScores() {
     } finally { setRoundsLoading(false); }
   }, []);
   useEffect(() => {
-    loadRounds().then((rows) => { if (rows.length) setRoundId(rows[0].id); else setLoading(false); })
+    loadRounds().then((rows) => { if (rows.length) setRoundId(rows.some(row => row.id === requestedRoundId) ? requestedRoundId : rows[0].id); else setLoading(false); })
       .catch((err) => { setError(err.response?.data?.message || "Không tải được đợt xét tuyển."); setLoading(false); });
-  }, [loadRounds]);
+  }, [loadRounds, requestedRoundId]);
   const loadRanking = useCallback(async () => {
     if (!roundId) return;
     setLoading(true); setError("");
@@ -97,13 +72,8 @@ export default function AdmissionScores() {
     }
     setDiscardAction(() => action);
   };
-  const openForm = (round) => {
-    setError(""); setForm(round ? { id: round.id, name: round.name, academicYear: round.academicYear, majorThresholds: round.majorThresholds || [],
-      rules: round.rules, regulationNo: round.regulationNo || "", decisionNo: round.decisionNo || undefined, decisionDate: round.decisionDate || undefined }
-      : { name: "", academicYear: "2026", majorThresholds: [] });
-  };
   const selectRound = (id) => runWithDiscardCheck(() => {
-    setData(null); setThresholdDrafts({}); setMajorFilter("all"); setRoundId(id); setRoundManagerOpen(false);
+    setData(null); setThresholdDrafts({}); setMajorFilter("all"); setRoundId(id);
   });
   const refreshRounds = async () => {
     setError("");
@@ -113,16 +83,6 @@ export default function AdmissionScores() {
       if (updated.some(round => round.id === roundId)) await loadRanking();
       else { setData(null); setRoundId(updated[0]?.id || ""); setLoading(false); }
     } catch (err) { setError(err.response?.data?.message || "Không tải được đợt xét tuyển."); }
-  };
-  const saveRound = async () => {
-    setSaving(true); setError("");
-    try {
-      const { id, ...payload } = form;
-      const response = id ? await axios.put(`${API_BASE_URL}/plan/admission-rounds/${id}`, payload, options) : await axios.post(`${API_BASE_URL}/plan/admission-rounds`, payload, options);
-      await loadRounds(); setForm(null); setRoundManagerOpen(false); setThresholdDrafts({});
-      if (response.data.id === roundId) await loadRanking(); else { setData(null); setRoundId(response.data.id); }
-    } catch (err) { setError(err.response?.data?.message || "Không thể lưu đợt xét tuyển."); }
-    finally { setSaving(false); }
   };
   const saveMajorThresholds = async () => {
     setSaving(true); setError("");
@@ -161,18 +121,15 @@ export default function AdmissionScores() {
             <MenuItem value="">Chọn đợt xét tuyển</MenuItem>{rounds.map((round) => <MenuItem key={round.id} value={round.id}>{round.name} · {round.academicYear}</MenuItem>)}
           </FilterSelectField>
           <Stack direction="row" gap={1} flexWrap="wrap" sx={{ "& .MuiButton-root": { height: 38, whiteSpace: "nowrap", borderRadius: "4px" } }}>
-            <Button size="small" variant="outlined" disabled={workflowBusy || saving} onClick={() => setRoundManagerOpen(true)}>Quản lý đợt</Button>
+            <Button size="small" variant="outlined" disabled={workflowBusy || saving} onClick={() => runWithDiscardCheck(() => navigate("/system/training-years?tab=rounds"))}>Quản lý năm / đợt</Button>
             <Button size="small" variant="outlined" startIcon={<ArrowPathIcon />} onClick={() => runWithDiscardCheck(refreshRounds)} disabled={roundsLoading || loading || workflowBusy || saving}>Tải lại</Button>
-            {admin && <>
-              <Button size="small" variant="outlined" startIcon={<PencilSquareIcon />} disabled={!data || loading || workflowBusy || saving} onClick={() => runWithDiscardCheck(() => openForm(data.round))}>Sửa đợt</Button>
-              <Button size="small" variant="contained" startIcon={<PlusIcon />} disabled={workflowBusy || saving} onClick={() => runWithDiscardCheck(() => openForm(null))} sx={{ bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F" } }}>Tạo đợt xét tuyển</Button>
-            </>}
+
           </Stack>
           <InlineReportExport height={38} />
         </Stack>
       </Paper>
       {loading && <Box sx={{ textAlign: "center", p: 2 }}><CircularProgress size={28} /></Box>}
-      {!rounds.length && !loading && <Alert severity="info" sx={{ borderRadius: "4px" }}>Tạo đợt xét tuyển chung cho toàn viện, sau đó nhập điểm ngưỡng của từng ngành trong đợt.</Alert>}
+      {!rounds.length && !loading && <Alert severity="info" sx={{ borderRadius: "4px" }}>Tạo đợt tại Hệ thống → Năm và đợt tuyển sinh, sau đó chọn đợt để nhập điểm ngưỡng và xét tuyển.</Alert>}
       {data && <>
         <Paper variant="outlined" sx={{ p: 2, borderRadius: "6px", borderColor: "#D7E4EE" }}>
           <Typography fontWeight={700} mb={1}>Điểm ngưỡng từng ngành — {data.round.name}</Typography>
@@ -216,69 +173,6 @@ export default function AdmissionScores() {
                 "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: "#16803c", opacity: 0.5 } }} />} />} />
       </>}
     </Stack>
-    <AdmissionRoundManager open={roundManagerOpen && !form} onClose={() => setRoundManagerOpen(false)}
-      rounds={rounds} selectedRoundId={roundId} admin={admin} loading={roundsLoading || loading || saving || workflowBusy}
-      error={error} onRefresh={() => runWithDiscardCheck(refreshRounds)} onSelect={selectRound}
-      onEdit={round => runWithDiscardCheck(() => openForm(round))} onCreate={() => runWithDiscardCheck(() => openForm(null))} />
-    <AppDialog
-      open={Boolean(form)}
-      onClose={() => !saving && setForm(null)}
-      maxWidth="xs"
-      PaperProps={{ sx: { width: 480, maxWidth: "calc(100vw - 32px)" } }}
-      title={form?.id ? "SỬA ĐỢT XÉT TUYỂN TOÀN VIỆN" : "TẠO ĐỢT XÉT TUYỂN TOÀN VIỆN"}
-      confirmText={form?.id ? "Lưu thay đổi" : "Lưu đợt xét tuyển"}
-      cancelText="Hủy"
-      onConfirm={saveRound}
-      confirmDisabled={saving || !form?.name?.trim() || !form?.academicYear}
-      saving={saving}
-    >
-      {form && (
-        <Stack spacing={2} sx={{ pt: 0.5 }}>
-          {error && <Alert severity="error" sx={{ borderRadius: "4px" }}>{error}</Alert>}
-          <Box sx={{ p: 2, border: "1px solid #D6E0EA", borderRadius: "4px", bgcolor: "#F8FAFC" }}>
-            <Stack spacing={2}>
-              <Box>
-                <Typography component="label" htmlFor="round-name" sx={compactFieldLabelSx}>
-                  TÊN ĐỢT XÉT TUYỂN
-                </Typography>
-                <TextField
-                  id="round-name"
-                  size="small"
-                  fullWidth
-                  placeholder="Nhập tên đợt (VD: Đợt 1 / 2026)..."
-                  value={form.name}
-                  onChange={(event) => setForm({ ...form, name: event.target.value })}
-                  inputProps={{ "aria-label": "Tên đợt xét tuyển" }}
-                  sx={compactControlSx}
-                />
-              </Box>
-              <Box>
-                <Typography component="label" htmlFor="round-year" sx={compactFieldLabelSx}>
-                  NĂM TUYỂN SINH
-                </Typography>
-                <TextField
-                  id="round-year"
-                  size="small"
-                  fullWidth
-                  placeholder="VD: 2026"
-                  value={form.academicYear}
-                  onChange={(event) => setForm({ ...form, academicYear: event.target.value })}
-                  inputProps={{ "aria-label": "Năm tuyển sinh" }}
-                  sx={compactControlSx}
-                />
-              </Box>
-            </Stack>
-          </Box>
-          <Box sx={{ p: 1.25, bgcolor: "#EFF6FB", border: "1px solid #CDE0F0", borderRadius: "4px", display: "flex", gap: 1.25, alignItems: "flex-start" }}>
-            <InformationCircleIcon sx={{ fontSize: 18, color: "var(--icon-primary)", mt: "1px", flexShrink: 0 }} />
-            <Typography sx={{ fontSize: "12px", color: "#244360", lineHeight: "17px" }}>
-              Đợt áp dụng cho tất cả ngành thạc sĩ trong năm. Nhập điểm ngưỡng từng ngành ở bảng sau khi tạo đợt.
-            </Typography>
-          </Box>
-        </Stack>
-      )}
-    </AppDialog>
-
     <ConfirmDialog
       open={Boolean(discardAction)}
       onClose={() => setDiscardAction(null)}

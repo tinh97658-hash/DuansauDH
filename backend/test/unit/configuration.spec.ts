@@ -10,6 +10,13 @@ const config = {
 };
 
 describe("shared environment configuration", () => {
+  it('bounds database wait times and validates timeout configuration', () => {
+    const { value } = environmentSchema.validate(config);
+    expect(value.DB_LOCK_TIMEOUT_MS).toBe(5000);
+    expect(value.DB_STATEMENT_TIMEOUT_MS).toBe(30000);
+    expect(environmentSchema.validate({ ...config, DB_LOCK_TIMEOUT_MS: 0 }).error).toBeDefined();
+    expect(environmentSchema.validate({ ...config, DB_STATEMENT_TIMEOUT_MS: -1 }).error).toBeDefined();
+  });
   it("uses the repository env regardless of the working directory", () => {
     expect(environmentFiles).toEqual([join(__dirname, "../../../.env")]);
   });

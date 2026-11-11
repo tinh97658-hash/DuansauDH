@@ -9,11 +9,26 @@ describe("Upload storage quota and lifecycle", () => {
   const file = (name = "report.pdf", data = Buffer.from("%PDF-test")) => ({ originalname: name, buffer: data, size: data.length } as Express.Multer.File);
   const db: any = { query: jest.fn(), transaction: jest.fn(async work => work({})) };
   let storage: UploadStorageService;
+  let indexed: boolean;
+  let entries: Array<{ kind: string; filename: string; bytes: number }>;
   const submitted = () => join(folder, "public/submissions/submitted");
   beforeEach(async () => {
     folder = await mkdtemp(join(tmpdir(), "pgsms-security-upload-"));
     jest.spyOn(process, "cwd").mockReturnValue(folder);
     db.transaction.mockImplementation(async (work: any) => work({}));
+    indexed = false;
+    entries = [];
+    db.query.mockImplementation(async (sql: string, options: any = {}) => {
+      const values = options.replacements || {};
+      if (sql.startsWith('SELECT account_id')) return indexed ? [{ account_id: id }] : [];
+      if (sql.startsWith('INSERT INTO upload_storage_accounts')) indexed = true;
+      if (sql.includes('jsonb_to_recordset')) entries.push(...JSON.parse(values.files));
+      else if (sql.startsWith('INSERT INTO upload_storage_files')) entries.push({ kind: values.kind, filename: values.filename, bytes: values.bytes });
+      if (sql.startsWith('SELECT COALESCE(SUM')) return [{ bytes: String(entries.filter(entry =>
+        entry.kind !== values.kind || entry.filename !== values.oldFile).reduce((sum, entry) => sum + entry.bytes, 0)) }];
+      if (sql.startsWith('DELETE FROM upload_storage_files')) entries = entries.filter(entry => entry.kind !== values.kind || entry.filename !== values.filename);
+      return [];
+    });
     storage = new UploadStorageService(db);
   });
   afterEach(async () => {
@@ -55,5 +70,25 @@ describe("Upload storage quota and lifecycle", () => {
     const outside = join(folder, "keep.pdf"); await writeFile(outside, "keep");
     await storage.replace(id, "submission", file(), async () => ({ oldFile: "../../../keep.pdf", value: "ok" }));
     expect(await readFile(outside, "utf8")).toBe("keep");
+  });
+  it('indexes legacy files once and uses indexed sizes for subsequent quota checks', async () => {
+    await storage.replace(id, 'submission', file(), async () => ({ value: 'ok' }));
+    expect(indexed).toBe(true);
+    db.query.mockClear();
+    await storage.replace(id, 'submission', file(), async () => ({ value: 'ok' }));
+    expect(db.query.mock.calls.some(([sql]) => String(sql).startsWith('INSERT INTO upload_storage_accounts'))).toBe(false);
+    expect(db.query.mock.calls.some(([sql]) => String(sql).includes('jsonb_to_recordset'))).toBe(false);
+    expect(entries).toHaveLength(2);
+    expect(entries.reduce((sum, entry) => sum + entry.bytes, 0)).toBe(file().buffer.length * 2);
+  });
+  it('continues to account for an old file when filesystem cleanup fails', async () => {
+    await mkdir(submitted(), { recursive: true });
+    const old = `userDocs-${id}-legacy.pdf`;
+    await writeFile(join(submitted(), old), 'old');
+    jest.spyOn(jest.requireActual('node:fs/promises'), 'unlink').mockRejectedValue(Object.assign(new Error('busy'), { code: 'EBUSY' }));
+    await storage.replace(id, 'submission', file(), async () => ({ oldFile: old, value: 'ok' }));
+    expect(entries).toHaveLength(2);
+    expect(await readdir(submitted())).toHaveLength(2);
+    expect(entries.some(entry => entry.filename === old)).toBe(true);
   });
 });

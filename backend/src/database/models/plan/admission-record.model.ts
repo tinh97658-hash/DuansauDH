@@ -27,6 +27,9 @@ export class AdmissionRecord extends Model {
   // 1. THÔNG TIN CÁ NHÂN
   @Column({ type: DataType.STRING(50), allowNull: true })
   declare code: string | null; // Mã HV / Số báo danh
+  @Column(DataType.UUID) declare learnerCodeTypeId: string | null;
+  @Column(DataType.STRING) declare learnerCodeState: string;
+  @Column(DataType.STRING(50)) declare intakeCode: string | null;
 
   @Column({ type: DataType.STRING(100), allowNull: true })
   declare lastName: string | null; // Họ đệm

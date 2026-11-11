@@ -4,6 +4,7 @@ import { mkdir, open, readdir, stat, unlink } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Transaction } from "sequelize";
+import { QueryTypes } from 'sequelize';
 import { Sequelize } from "sequelize-typescript";
 
 export const UPLOAD_QUOTA_BYTES = 160 * 1024 * 1024;
@@ -51,24 +52,32 @@ export class UploadStorageService {
         await this.db.query("SELECT pg_advisory_xact_lock(hashtext(:account))", { replacements: { account: `uploads:${id}` }, transaction });
         const change = await persist(transaction, filename);
         oldFile = change.oldFile;
-        let used = 0;
-        for (const type of ["photo", "submission"] as const) {
-          await mkdir(directory(type), { recursive: true });
-          for (const name of await readdir(directory(type))) {
-            if (!name.startsWith(prefix(id, type)) || (type === kind && name === oldFile)) continue;
-            try { used += (await stat(resolve(directory(type), name))).size; }
-            catch (error: any) { if (error.code !== "ENOENT") throw error; }
-          }
-        }
+        await this.ensureIndex(id, transaction);
+        const usage = await this.db.query<{ bytes: string }>(`SELECT COALESCE(SUM(size_bytes),0)::text AS bytes
+          FROM upload_storage_files WHERE account_id=:id
+          AND NOT (kind=:kind AND filename=:oldFile)`, {
+          replacements: { id, kind, oldFile: oldFile || '' }, type: QueryTypes.SELECT, transaction,
+        });
+        const used = Number(usage[0].bytes);
         if (used + file.buffer.length > UPLOAD_QUOTA_BYTES) throw new PayloadTooLargeException("Tổng dung lượng tệp vượt hạn mức 160 MB.");
         const handle = await open(resolve(folder, filename), "wx", 0o600);
         written = true;
         try { await handle.writeFile(file.buffer); }
         finally { await handle.close(); }
+        await this.db.query(`INSERT INTO upload_storage_files(account_id,kind,filename,size_bytes)
+          VALUES(:id,:kind,:filename,:bytes)`, {
+          replacements: { id, kind, filename, bytes: file.buffer.length }, transaction,
+        });
         return change.value;
       });
       if (oldFile && basename(oldFile) === oldFile && oldFile.startsWith(prefix(id, kind))) {
-        await this.remove(resolve(folder, oldFile));
+        if (await this.remove(resolve(folder, oldFile))) {
+          // Failed cleanup stays indexed and counts toward the next quota check.
+          try {
+            await this.db.query('DELETE FROM upload_storage_files WHERE account_id=:id AND kind=:kind AND filename=:filename',
+              { replacements: { id, kind, filename: oldFile } });
+          } catch { this.logger.warn('Không thể cập nhật chỉ mục tệp đã dọn; cần đối soát dung lượng.'); }
+        }
       }
       return result;
     } catch (error) {
@@ -77,8 +86,33 @@ export class UploadStorageService {
     }
   }
 
+  private async ensureIndex(id: string, transaction: Transaction) {
+    const accounts = await this.db.query('SELECT account_id FROM upload_storage_accounts WHERE account_id=:id',
+      { replacements: { id }, type: QueryTypes.SELECT, transaction });
+    if (accounts.length) return;
+    const files: Array<{ kind: Kind; filename: string; bytes: number }> = [];
+    for (const kind of ['photo', 'submission'] as const) {
+      await mkdir(directory(kind), { recursive: true });
+      for (const filename of await readdir(directory(kind))) {
+        if (!filename.startsWith(prefix(id, kind))) continue;
+        try { files.push({ kind, filename, bytes: (await stat(resolve(directory(kind), filename))).size }); }
+        catch (error: any) { if (error.code !== 'ENOENT') throw error; }
+      }
+    }
+    await this.db.query('INSERT INTO upload_storage_accounts(account_id) VALUES(:id)',
+      { replacements: { id }, transaction });
+    if (files.length) await this.db.query(`INSERT INTO upload_storage_files(account_id,kind,filename,size_bytes)
+      SELECT CAST(:id AS uuid),kind,filename,bytes FROM jsonb_to_recordset(CAST(:files AS jsonb))
+      AS entry(kind text,filename text,bytes bigint)`,
+    { replacements: { id, files: JSON.stringify(files) }, transaction });
+  }
+
   private async remove(file: string) {
-    try { await unlink(file); }
-    catch (error: any) { if (error.code !== "ENOENT") this.logger.warn("Không thể dọn tệp upload; cần kiểm tra quyền ghi và dung lượng."); }
+    try { await unlink(file); return true; }
+    catch (error: any) {
+      if (error.code === 'ENOENT') return true;
+      this.logger.warn("Không thể dọn tệp upload; cần kiểm tra quyền ghi và dung lượng.");
+      return false;
+    }
   }
 }

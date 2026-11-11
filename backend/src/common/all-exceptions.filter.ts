@@ -6,6 +6,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
   catch(error: any, host: ArgumentsHost) {
     const response = host.switchToHttp().getResponse();
+    const databaseCode = error?.original?.code || error?.parent?.code;
+    if (['55P03', '57014'].includes(databaseCode)) {
+      response.setHeader('Retry-After', '2');
+      response.status(HttpStatus.SERVICE_UNAVAILABLE).json({
+        code: 'DATABASE_BUSY', message: 'Hệ thống đang bận. Vui lòng thử lại sau ít giây.',
+      });
+      return;
+    }
     const isUniqueConstraint = error?.name === "SequelizeUniqueConstraintError";
     const isForeignKeyConstraint = error?.name === "SequelizeForeignKeyConstraintError";
     const isValidationError = error?.name === "SequelizeValidationError";

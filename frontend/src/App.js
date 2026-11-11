@@ -38,6 +38,8 @@ const License = lazyPage(() => import("./pages/system/license"), ["/system/licen
 const ChangePassword = lazyPage(() => import("./pages/system/changePassword"), ["/system/change-password"]);
 const Accounts = lazyPage(() => import("./pages/system/accounts"), ["/system/accounts"]);
 const Roles = lazyPage(() => import("./pages/system/roles.jsx"), ["/system/roles"]);
+const LearnerCodeSettings = lazyPage(() => import('./features/learnerCodes/LearnerCodeSettings'), ['/system/learner-codes']);
+const LearnerCodeRedirect = lazyPage(() => import('./features/learnerCodes/LearnerCodeRedirect'), ['/plan/learner-codes']);
 const AuditLogs = lazyPage(() => import("./pages/system/auditLogs"), ["/system/audit-logs"]);
 const Ethnicities = lazyPage(() => import("./pages/system/ethnicities"), ["/system/ethnicities"]);
 const Nationalities = lazyPage(() => import("./pages/system/nationalities"), ["/system/nationalities"]);
@@ -140,6 +142,8 @@ const router = createBrowserRouter(createRoutesFromElements(
               <Route path="system/change-password" element={<ChangePassword />} />
               <Route path="system/accounts" element={<Accounts />} />
               <Route path="system/roles" element={<Roles />} />
+              <Route path="system/learner-codes" element={<LearnerCodeSettings />} />
+              <Route path="plan/learner-codes" element={<LearnerCodeRedirect />} />
               <Route path="system/audit-logs" element={<AuditLogs />} />
               <Route path="system/users" element={<Navigate to="/system/accounts" replace />} />
               <Route path="system/ethnicities" element={<Ethnicities />} />

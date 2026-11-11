@@ -186,19 +186,23 @@ export class ExamGradebookService {
       LEFT JOIN course_exam_eligibility_snapshots p ON p.id=w.eligibility_snapshot_id AND p.course_offering_id=o.id
       WHERE o.id IN (:ids) AND o.status='completed' AND s.program='masters'
     `, { type: QueryTypes.SELECT, replacements: { ids: completed.map(offering => offering.id) } });
-    const readiness = includeComponents ? await this.componentReadiness(completed.filter(offering => metadata.some(state =>
-      state.id === offering.id && state.mode !== 'legacy_preserved' && state.eligibility_status !== 'submitted'
-      && !(state.eligibility_status === 'approved' && Array.isArray(state.approvedRows)))))
+    const metadataById = new Map(metadata.map(state => [state.id, state]));
+    const readiness = includeComponents ? await this.componentReadiness(completed.filter(offering => {
+      const state = metadataById.get(offering.id);
+      return state && state.mode !== 'legacy_preserved' && state.eligibility_status !== 'submitted'
+        && !(state.eligibility_status === 'approved' && Array.isArray(state.approvedRows));
+    }))
       : new Map<string, { totalRows: number; unassessedRows: number }>();
     for (const state of metadata) {
       const approved = state.mode !== 'legacy_preserved' && state.eligibility_status === 'approved' && Array.isArray(state.approvedRows);
       const candidates = approved ? state.approvedRows.filter((row: any) => row.eligible === true && !row.examExempt) : [];
       const held = new Set(state.heldIds);
       const currentGrades=approved?resolveApprovedExamRows(state.approvedRows,state.books,state.heldIds,state):[];
-      const examCompleted = candidates.length > 0 && candidates.every((row: any) => held.has(row.participantId)&&currentGrades.find((r:any)=>r.participantId===row.participantId)?.examAttendanceStatus!=='absent_excused');
+      const gradesByParticipant = new Map(currentGrades.map((row: any) => [row.participantId, row]));
+      const examCompleted = candidates.length > 0 && candidates.every((row: any) => held.has(row.participantId)&&(gradesByParticipant.get(row.participantId) as any)?.examAttendanceStatus!=='absent_excused');
       const examGradesComplete = state.mode === 'legacy_preserved'
         ? legacyExamGradesComplete(state.legacyGradebookStatus, state.legacyGradebookSnapshot)
-        : approved && state.approvedRows.length > 0 && !unresolvedExamRows(resolveApprovedExamRows(state.approvedRows, state.books, state.heldIds, state)).length;
+        : approved && state.approvedRows.length > 0 && !unresolvedExamRows(currentGrades).length;
       let componentsEntered: boolean | null = approved || state.eligibility_status === 'submitted' ? true : null;
       if (includeComponents && !componentsEntered && state.mode !== 'legacy_preserved') {
         const book = readiness.get(state.id);

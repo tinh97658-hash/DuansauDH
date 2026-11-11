@@ -17,12 +17,13 @@ export class GroupScopeInterceptor implements NestInterceptor {
     if (access.groupScope?.restrictView && /\/accounts\/(audit-logs|change-logs)(\/|$)/.test(path)) {
       throw new ForbiddenException('Nhật ký toàn hệ thống không khả dụng khi vai trò bị giới hạn xem theo nhóm.');
     }
-    const dataRoute = /\/(groups|masters|doctoral|plan|scheduling|reports|data)(\/|$)/.test(path);
+    const dataRoute = /\/(groups|masters|doctoral|plan|scheduling|reports|data|learner-codes)(\/|$)/.test(path);
     const write = !['GET', 'HEAD', 'OPTIONS'].includes(request.method);
     // Only admissions endpoints receive the pre-class scope. Nested learner
     // operations (marks, leaves, recognitions, transfers) retain their own scope.
     const admissionRoute = /\/plan\/admission-rounds(?:\/[^/]+(?:\/(?:ranking|scores|preview|confirm))?)?$/.test(path)
-      || /\/plan\/admission-records(?:\/[^/]+(?:\/evaluation(?:\/decision)?)?)?$/.test(path);
+      || /\/plan\/admission-records(?:\/[^/]+(?:\/evaluation(?:\/decision)?)?)?$/.test(path)
+      || /^\/learner-codes\/(?:options|records\/[^/]+(?:\/type|\/history)?)$/.test(path);
     const admissionAction = admissionRoute && !['learners', 'study-management'].includes(request.query?.admissionStage)
       ? (write ? 'manage' as const : 'view' as const) : undefined;
     const schedulingView = !write && /\/scheduling\/(course-offerings|teaching-sessions|pending-teaching-sessions)(\/|$)/.test(path);

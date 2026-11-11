@@ -21,6 +21,12 @@ function setup() {
   return { service, record, records, rounds, majors, round, evaluation, evaluations, history, tx, decision, db };
 }
 describe("Duyệt hồ sơ đầu vào", () => {
+  it.each([{official:true,assigned:false},{official:false,assigned:true}])('chặn mở lại hồ sơ đã cấp mã hoặc phân lớp: %o',async({official,assigned})=>{
+    const f=setup();Object.assign(f.record,{status:'approved',studyStatus:'Đã trúng tuyển',learnerCodeState:official?'official':'provisional'});
+    f.evaluation.decision='admitted';f.db.query.mockResolvedValue([{assigned}]);
+    await expect(f.service.decide(f.record.id,{...f.decision,decision:'reopen'},{})).rejects.toThrow('đã phân lớp hoặc cấp mã');
+    expect(f.record.update).not.toHaveBeenCalled();expect(f.evaluation.update).not.toHaveBeenCalled();expect(f.history.create).not.toHaveBeenCalled();
+  });
   it.each(["Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học"])("không mở lại xét tuyển để bỏ qua trạng thái %s", async studyStatus => {
     const { service, record, evaluation, decision, history } = setup();
     record.studyStatus = studyStatus; evaluation.decision = "admitted";

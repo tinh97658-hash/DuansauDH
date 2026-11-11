@@ -106,6 +106,7 @@ export class AdmissionEvaluationService {
     return this.view(record, evaluation, round);
   }
   async ranking(roundId: string, transaction?: Transaction) {
+    if (transaction) await this.sequelize.query('SELECT pg_advisory_xact_lock(21026)', { transaction });
     const query = transaction ? { transaction, lock: transaction.LOCK.UPDATE } : {};
     const round = await this.rounds.findByPk(roundId, query);
     if (!round) throw new NotFoundException("Không tìm thấy đợt xét tuyển.");
@@ -181,6 +182,7 @@ export class AdmissionEvaluationService {
     const existing = await this.evaluations.findOne({ where: { admissionRecordId: id }, transaction: existingTransaction });
     if (!existing) throw new BadRequestException("Lưu dữ liệu xét tuyển trước khi duyệt.");
     const execute = async (transaction: Transaction) => {
+      await this.sequelize.query('SELECT pg_advisory_xact_lock(21026)', { transaction });
       const round = await this.rounds.findByPk(existing.roundId, { transaction, lock: transaction.LOCK.UPDATE });
       if (!round) throw new NotFoundException("Không tìm thấy đợt.");
       const record = await this.records.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
@@ -202,6 +204,15 @@ export class AdmissionEvaluationService {
         if (record.studyStatus === "Đang học") throw new ConflictException("Hồ sơ đã vào học, cần đối soát trước khi duyệt lại.");
       }
       if (dto.decision === "reopen" && record.studyStatus === "Đang học") throw new ConflictException("Hồ sơ đã vào học, cần xử lý nghiệp vụ học viên trước khi mở lại xét tuyển.");
+      if (dto.decision === 'reopen') {
+        const [links] = await this.sequelize.query<{ assigned: boolean }>(`SELECT EXISTS (
+          SELECT 1 FROM class_group_members WHERE admission_record_id=:id
+            OR (CAST(:student AS uuid) IS NOT NULL AND student_id=CAST(:student AS uuid))
+        ) AS assigned`, { replacements: { id: record.id, student: record.studentId || null }, type: QueryTypes.SELECT, transaction });
+        if (record.learnerCodeState === 'official' || links?.assigned) {
+          throw new ConflictException('Hồ sơ đã phân lớp hoặc cấp mã chính thức. Xử lý nghiệp vụ học viên/rút hồ sơ trước khi mở lại xét tuyển.');
+        }
+      }
       await evaluation.update({ decision: dto.decision === "reopen" ? "pending" : dto.decision, version: evaluation.version + 1 }, { transaction });
       await record.update({ status: dto.decision === "admitted" ? "approved" : dto.decision === "rejected" ? "rejected" : "pending",
         studyStatus: dto.decision === "admitted" ? (hasPaidAdmissionTuition(record) ? "Đang học" : "Đã trúng tuyển") : dto.decision === "rejected" ? "Không trúng tuyển" : "Nộp hồ sơ đầu vào" }, { transaction });

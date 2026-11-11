@@ -37,8 +37,8 @@ let created = false;
       INSERT INTO role_permissions(role_id,permission_id,created_at,updated_at)
         SELECT r.id,p.id,now(),now() FROM roles r CROSS JOIN permissions p WHERE r.code='admin' ON CONFLICT DO NOTHING;`);
     await migrator.up();
-    console.log('All migrations, including 098, passed on a fresh disposable database.');
-    const result = spawnSync(process.execPath, [require.resolve('jest/bin/jest'), '--config', 'test/jest.config.cjs', '--runInBand', 'test/integration/dashboard-v2-postgres.spec.ts'], {
+    console.log('All migrations passed on a fresh disposable database.');
+    const result = spawnSync(process.execPath, [require.resolve('jest/bin/jest'), '--config', 'test/jest.config.cjs', '--runInBand', 'test/integration/dashboard-v2-postgres.spec.ts', 'test/integration/upload-storage-postgres.spec.ts', 'test/integration/learner-code-management-postgres.spec.ts'], {
       cwd: root, stdio: 'inherit', env: { ...process.env, DATABASE_URL: uri.toString(), RUN_DASHBOARD_DB_TESTS: 'true', NODE_ENV: 'test' },
     });
     process.exitCode = result.status ?? 1;

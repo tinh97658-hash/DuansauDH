@@ -7,6 +7,8 @@ export function permissionRoutesForRequest(path:string,method:string){
   path=authorizationPath(path);
   method=method.toUpperCase();
   const paths=(...paths:string[])=>PERMISSION_ROUTES.filter(route=>paths.includes(route.path));
+  if(path.startsWith('/learner-codes/'))return /^\/learner-codes\/(config|types(?:\/|$)|rules(?:\/|$)|abbreviations(?:\/|$)|counters(?:\/|$))/.test(path)
+    ? paths('/system/learner-codes') : paths('/plan/learner-codes');
   if(path.startsWith('/scheduling/')){
     if(path.includes('class-curriculum-progress'))return paths('/masters/class-course-history','/masters/course-matrix');
     if(path.includes('teaching-sessions')||path.endsWith('/completion'))return paths('/masters/schedule','/masters/course-matrix');
@@ -48,7 +50,7 @@ export function routePermissionAllowed(permissions:Set<string>,path:string,metho
   // must never inherit a broad write grant from a different page.
   if(!routes.length)return ['GET','HEAD','OPTIONS'].includes(method.toUpperCase())
     || (authorizationPath(path)==='/accounts/me/password' && method.toUpperCase()==='PATCH');
-  const actions=capabilities.filter(code=>!code.endsWith('.view')&&!code.startsWith('module.'));
+  const actions=capabilities.filter(code=>(!code.endsWith('.view')||code==='learnercode.history.view')&&!code.startsWith('module.'));
   return routes.some(route=>permissions.has(routeViewCode(route.path))&&actions.every(action=>
     route.actions.includes(action)&&permissions.has(routeActionCode(route.path,action))));
 }

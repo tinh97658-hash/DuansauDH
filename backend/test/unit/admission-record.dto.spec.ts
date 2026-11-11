@@ -30,20 +30,23 @@ describe.each([CreateAdmissionRecordDto, UpdateAdmissionRecordDto])("%p contact 
 
   it.each([
     ["phone", "091234567"], ["phone", "09123456789"],
-    ["phone", "091234567a"], ["phone", ""], ["phone", null], ["phone", 9123456789],
+    ["phone", "091234567a"], ["phone", 9123456789],
     ["idCard", "031090001234"], ["idCard", "03109000123456"],
-    ["idCard", "031090001234a"], ["idCard", ""], ["idCard", null], ["idCard", 3109000123456],
+    ["idCard", "031090001234a"], ["idCard", 3109000123456],
   ])("rejects %s = %p", async (field, value) => {
     const errors = await validate(plainToInstance(Dto, { ...validRecord, [field]: value }));
     expect(errors.some((error) => error.property === field)).toBe(true);
   });
+  it.each([undefined, null, ""])("allows blank contact fields: %p", async (value) => {
+    expect(await validate(plainToInstance(Dto, { ...validRecord, phone: value, idCard: value }))).toHaveLength(0);
+  });
 });
 
-it("requires both contact fields when creating a record", async () => {
+it("allows creating a record without contact fields", async () => {
   const errors = await validate(plainToInstance(CreateAdmissionRecordDto, {
     fullName: validRecord.fullName, majorId: validRecord.majorId,
   }));
-  expect(errors.map((error) => error.property)).toEqual(expect.arrayContaining(["phone", "idCard"]));
+  expect(errors).toHaveLength(0);
 });
 
 it("allows updates that do not change contact fields", async () => {

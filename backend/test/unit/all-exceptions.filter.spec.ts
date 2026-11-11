@@ -3,6 +3,14 @@ import { jest } from "@jest/globals";
 import { AllExceptionsFilter } from "../../src/common/all-exceptions.filter.js";
 
 describe("AllExceptionsFilter conflict payload", () => {
+  it.each(['55P03', '57014'])('returns a retryable response for database timeout %s', code => {
+    const response = { setHeader: jest.fn(), status: jest.fn().mockReturnThis(), json: jest.fn() };
+    const host = { switchToHttp: () => ({ getResponse: () => response }) } as unknown as ArgumentsHost;
+    new AllExceptionsFilter().catch({ original: { code }, message: 'private SQL details' }, host);
+    expect(response.status).toHaveBeenCalledWith(503);
+    expect(response.setHeader).toHaveBeenCalledWith('Retry-After', '2');
+    expect(response.json).toHaveBeenCalledWith({ code: 'DATABASE_BUSY', message: expect.any(String) });
+  });
   it.each(['admission_records_code_reserved', 'admission_records_code_unique'])("explains a duplicate learner code: %s", constraint => {
     const status = jest.fn().mockReturnThis();
     const json = jest.fn();

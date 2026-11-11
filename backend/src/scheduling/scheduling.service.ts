@@ -1359,6 +1359,34 @@ export class SchedulingService {
     });
   }
 
+  /** Dashboard counters need neither rosters nor conflict/capability metadata.
+   * Keep this inside the caller's existing RLS read domain. */
+  async listDashboardCourseOfferings(academicYear: string, includeSessions: boolean) {
+    const offerings = await this.courseOfferings.findAll({
+      attributes: ['id', 'name', 'subjectId', 'status'],
+      ...(!includeSessions ? { where: { status: 'completed' } } : {}),
+      include: [
+        { model: Subject, as: 'subject', required: true, where: { program: 'masters' } },
+        { model: CourseOfferingClassGroup, as: 'groupLinks', attributes: ['classGroupId'], required: true,
+          include: [{ model: ClassGroup, as: 'classGroup', required: true,
+            attributes: ['id', 'code', 'majorId', 'academicYear'], where: { program: 'masters', academicYear } }] },
+      ],
+      order: [['id', 'ASC']],
+    });
+    if (includeSessions && offerings.length) {
+      const summaries = await this.sequelize.query<any>(`SELECT course_offering_id AS id,
+        COUNT(*)::int AS "totalCount", COUNT(*) FILTER (WHERE status='held')::int AS "heldCount",
+        COUNT(*) FILTER (WHERE status='planned' AND session_date+end_time < (now() AT TIME ZONE 'Asia/Ho_Chi_Minh'))::int AS "pendingCount"
+        FROM teaching_sessions WHERE course_offering_id IN (:ids) AND status IN ('planned','held','not_held')
+        GROUP BY course_offering_id`,
+      { replacements: { ids: offerings.map(row => row.id) }, type: QueryTypes.SELECT });
+      const byId = new Map(summaries.map(row => [row.id, row]));
+      for (const offering of offerings) this.setSessionSummary(offering,
+        byId.get(offering.id) || { totalCount: 0, heldCount: 0, pendingCount: 0 });
+    }
+    return offerings.map(offering => offering.get({ plain: true }));
+  }
+
   async listCourseOfferings(query: ListCourseOfferingsQueryDto) {
     const program = query.program || "masters";
     this.requireEnabledProgram(program);

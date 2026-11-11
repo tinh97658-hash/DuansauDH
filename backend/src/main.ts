@@ -7,6 +7,7 @@ import compression from "compression";
 import helmet from "helmet";
 import { AppModule } from "./app.module.js";
 import { AllExceptionsFilter } from "./common/all-exceptions.filter.js";
+import { requestSecurity } from './common/request-security.js';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -16,6 +17,7 @@ async function bootstrap() {
 
   if (trustProxy) express.set("trust proxy", trustProxy);
   express.disable("x-powered-by");
+  app.use(...requestSecurity(config.getOrThrow<string>('FRONTEND_URL')));
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   app.use(compression());
   app.enableCors({

@@ -7,10 +7,11 @@ import ListPagination from "../../components/ListPagination";
 import { formatDate } from "../../utils/dateFormat";
 
 const PAGE_SIZE = 10;
+const InlineManager = ({ children }) => <>{children}</>;
 const searchKey = value => String(value || "").toLocaleLowerCase("vi")
   .normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/đ/g, "d").trim();
 
-export default function AdmissionRoundManager({ open, onClose, rounds, selectedRoundId, admin,
+export default function AdmissionRoundManager({ open, onClose, rounds, selectedRoundId, admin, embedded = false,
   loading, error, onRefresh, onSelect, onEdit, onCreate }) {
   const [search, setSearch] = useState("");
   const [year, setYear] = useState("all");
@@ -23,7 +24,8 @@ export default function AdmissionRoundManager({ open, onClose, rounds, selectedR
   const currentPage = Math.min(page, Math.max(0, Math.ceil(filtered.length / PAGE_SIZE) - 1));
   const visible = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
-  return <AppDialog open={open} onClose={onClose} title="DANH SÁCH ĐỢT XÉT TUYỂN" maxWidth="lg" cancelText="Đóng">
+  const Layout = embedded ? InlineManager : AppDialog;
+  return <Layout open={open} onClose={onClose} title="DANH SÁCH ĐỢT XÉT TUYỂN" maxWidth="lg" cancelText="Đóng">
     <Stack spacing={2}>
       {error && <Alert severity="error">{error}</Alert>}
       <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="flex-end">
@@ -68,5 +70,5 @@ export default function AdmissionRoundManager({ open, onClose, rounds, selectedR
       <ListPagination count={filtered.length} page={currentPage} pageSize={PAGE_SIZE} onPageChange={setPage}
         disabled={loading} recordLabel="đợt xét tuyển" aria-label="Phân trang đợt xét tuyển" />
     </Stack>
-  </AppDialog>;
+  </Layout>;
 }
