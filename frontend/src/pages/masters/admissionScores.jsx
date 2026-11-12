@@ -2,7 +2,7 @@ import { usePermissions } from "../../features/accounts/usePermissions";
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { Alert, Box, Button, Chip, CircularProgress, FormControlLabel, MenuItem, Paper, Stack, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
-import { ArrowPathIcon, InformationCircleIcon, PencilSquareIcon, PlusIcon } from "../../components/AppIcons";
+import { InformationCircleIcon, PencilSquareIcon, PlusIcon } from "../../components/AppIcons";
 import BulkAdmissionWorkflow from "../../features/admission/BulkAdmissionWorkflow";
 import AdmissionRoundManager from "../../features/admission/AdmissionRoundManager";
 import FeatureLayout from "../../components/FeatureLayout";
@@ -162,7 +162,6 @@ export default function AdmissionScores() {
           </FilterSelectField>
           <Stack direction="row" gap={1} flexWrap="wrap" sx={{ "& .MuiButton-root": { height: 38, whiteSpace: "nowrap", borderRadius: "4px" } }}>
             <Button size="small" variant="outlined" disabled={workflowBusy || saving} onClick={() => setRoundManagerOpen(true)}>Quản lý đợt</Button>
-            <Button size="small" variant="outlined" startIcon={<ArrowPathIcon />} onClick={() => runWithDiscardCheck(refreshRounds)} disabled={roundsLoading || loading || workflowBusy || saving}>Tải lại</Button>
             {admin && <>
               <Button size="small" variant="outlined" startIcon={<PencilSquareIcon />} disabled={!data || loading || workflowBusy || saving} onClick={() => runWithDiscardCheck(() => openForm(data.round))}>Sửa đợt</Button>
               <Button size="small" variant="contained" startIcon={<PlusIcon />} disabled={workflowBusy || saving} onClick={() => runWithDiscardCheck(() => openForm(null))} sx={{ bgcolor: "#0788B8", "&:hover": { bgcolor: "#056A8F" } }}>Tạo đợt xét tuyển</Button>
@@ -233,8 +232,13 @@ export default function AdmissionScores() {
     <AppDialog
       open={Boolean(form)}
       onClose={() => !saving && setForm(null)}
-      maxWidth="xs"
-      PaperProps={{ sx: { width: 480, maxWidth: "calc(100vw - 32px)" } }}
+      maxWidth={false}
+      PaperProps={{ sx: {
+        width: { xs: "calc(100vw - 2 * var(--app-dialog-gap, 24px))", md: "64vw" },
+        maxWidth: "calc(100vw - 2 * var(--app-dialog-gap, 24px))",
+        height: "73dvh",
+        "--app-dialog-max-height": "73dvh",
+      } }}
       title={form?.id ? "SỬA ĐỢT XÉT TUYỂN TOÀN VIỆN" : "TẠO ĐỢT XÉT TUYỂN TOÀN VIỆN"}
       confirmText={form?.id ? "Lưu thay đổi" : "Lưu đợt xét tuyển"}
       cancelText="Hủy"

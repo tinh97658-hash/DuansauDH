@@ -7,6 +7,7 @@ import FeatureLayout from '../../components/FeatureLayout';
 import AppSelect from '../../components/AppSelect';
 import DateField from '../../components/DateField';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import ListPagination from '../../components/ListPagination';
 import { getBusinessTodayKey } from '../../utils/schedulingCalendar';
 import OfferingDetails from '../../features/scheduling/OfferingDetails';
 import { usePermissions } from '../../features/accounts/usePermissions';
@@ -16,6 +17,7 @@ import '../masters/classCourseHistory.css';
 import './lecturerPayments.css';
 
 const endpoint = `${API_BASE_URL}/reports/lecturer-payments`;
+const PAGE_SIZE = 15;
 const headers = ['STT', 'Giảng viên', 'Lớp học phần', 'Lớp tham gia', 'Số buổi', 'Ngày hoàn thành', 'Đã thanh toán', 'Ngày thanh toán', 'Ghi chú'];
 const dateLabel = value => value ? new Date(value).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '—';
 const failureMessage = error => error.response?.data?.message || 'Không thể xử lý dữ liệu thanh toán.';
@@ -62,6 +64,9 @@ export default function LecturerPayments() {
   const [filters, setFilters] = useState({ from: '', to: '', unitId: '', lecturerId: '', paymentStatus: 'all', search: '' });
   const [options, setOptions] = useState({ units: [], lecturers: [] });
   const [rows, setRows] = useState([]);
+  const [page, setPage] = useState(0);
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(rows.length / PAGE_SIZE) - 1));
+  const visibleRows = rows.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(new Set());
   const pendingRef = useRef(new Set());
@@ -79,6 +84,7 @@ export default function LecturerPayments() {
   const invalidDates = filters.from && filters.to && filters.from > filters.to;
   const change = (field, value) => {
     setError('');
+    setPage(0);
     setFilters(current => ({ ...current, [field]: value, ...(field === 'unitId' ? { lecturerId: '' } : {}) }));
   };
 
@@ -222,11 +228,13 @@ export default function LecturerPayments() {
       <div className="tp-table-wrap"><div className="tp-table-scroll"><table ref={tableRef} className="tp-table lp-table" aria-label="Báo cáo tài chính" aria-busy={loading}>
         <colgroup>{[4, 13, 20, 12, 5, 9, 7, 14, 16].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup>
         <thead><tr>{headers.map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
-        <tbody>{rows.map((row, index) => <PaymentRow key={rowKey(row)} row={row} index={index} draft={drafts[rowKey(row)]}
+        <tbody>{visibleRows.map((row, index) => <PaymentRow key={rowKey(row)} row={row} index={currentPage * PAGE_SIZE + index} draft={drafts[rowKey(row)]}
           disabled={loading || !canManage || !Object.hasOwn(row, 'paymentDate')} busy={pending.has(rowKey(row))}
           edit={edit} commitField={commitField} toggle={toggle} setOffering={setOffering} />)}
           {!rows.length && <tr><td colSpan={9}>{loading ? <CircularProgress size={24} aria-label="Đang tải" /> : 'Không có dữ liệu phù hợp.'}</td></tr>}
         </tbody></table></div></div>
+      <ListPagination count={rows.length} page={currentPage} pageSize={PAGE_SIZE} onPageChange={setPage}
+        disabled={loading} recordLabel="khoản thanh toán" aria-label="Phân trang thanh toán giảng viên" />
     </div>
     {offering && <OfferingDetails offering={offering} user={session?.user || {}} readOnly
       readBasePath="/reports/lecturer-payments/offerings" onClose={() => setOffering(null)} />}

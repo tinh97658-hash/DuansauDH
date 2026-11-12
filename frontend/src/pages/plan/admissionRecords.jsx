@@ -761,7 +761,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
             boxShadow: "0 5px 18px rgba(23, 62, 117, 0.06)",
           }}
         >
-          <ResizableTable key={mode} columns={columns} storageKey={`admission-records-columns:${mode}`} freezeThrough="firstName" aria-label={isStudyManagement ? "Hồ sơ bảo lưu" : isMastersList ? "Hồ sơ trúng tuyển" : "Hồ sơ tuyển sinh"}>
+          <ResizableTable key={mode} className={isStudyManagement ? undefined : "admission-records-table"} columns={columns} storageKey={`admission-records-columns:${mode}`} freezeThrough="firstName" aria-label={isStudyManagement ? "Hồ sơ bảo lưu" : isMastersList ? "Hồ sơ trúng tuyển" : "Hồ sơ tuyển sinh"}>
 
             <TableBody>
               {records.length === 0 ? (

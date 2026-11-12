@@ -286,13 +286,14 @@ it.each(['click','Enter',' '])('opens an entire overlap list row with %s',action
  const select=vi.fn(),item=session();renderWithPermissions(<MemoryRouter useTransitions={false}><ExamListTable sessions={[item]} onSelect={select}/></MemoryRouter>,[]);
  const row=screen.getAllByRole('row')[1];if(action==='click')fireEvent.click(row);else fireEvent.keyDown(row,{key:action});expect(select).toHaveBeenCalledOnce();expect(select).toHaveBeenCalledWith(item);
 });
-it('keeps long academic names out of queue identifiers, calendar cards and active bar, with details on hover',async()=>{
+it('keeps calendar cards compact without a hover preview and opens details on click',async()=>{
  const item={...offering,name:'QTKD 2026 — Quản trị nguồn nhân lực — Nhóm 11',subjectName:'Quản trị nguồn nhân lực',groups:[{...offering.groups[0],code:'QTKD 2026.1.11'}]};
  data.queue=[item];data.approvedOfferings=[item];data.sessions=[session({name:item.name,subjectName:item.subjectName,groups:item.groups,pendingConfirmation:true})];renderPage();
  const queue=await within(screen.getByRole('complementary',{name:'Chưa xếp lịch'})).findByRole('button',{name:/Nhóm 11/});expect(queue).toHaveTextContent('QTKD 2026.1.11');expect(queue.textContent).not.toContain('Nhóm 11');expect(queue).toHaveTextContent('Quản trị nguồn nhân lực');
  fireEvent.click(queue);const strip=document.querySelector('.sl-selected-strip');expect(strip).toHaveTextContent('ĐANG XẾP');expect(strip).toHaveTextContent('QTKD 2026.1.11');expect(strip).toHaveTextContent('2 th\u00ed sinh');expect(strip).not.toHaveTextContent(item.subjectName);
  const card=document.querySelector('.ep-event');expect(card).toHaveTextContent('QTKD 2026.1.11');expect(card).toHaveTextContent('301 · 2 TS');expect(card).toHaveTextContent('CHỜ XÁC NHẬN');expect(card.textContent).not.toContain(item.subjectName);expect(card.textContent).not.toContain('08:00');
- fireEvent.mouseOver(card);const tooltip=await screen.findByRole('tooltip');expect(tooltip).toHaveTextContent(item.subjectName);expect(tooltip).toHaveTextContent('19/10/2026 · 08:00–10:00');expect(tooltip).toHaveTextContent('Phòng 301 · 2 thí sinh');
+ fireEvent.mouseOver(card);expect(screen.queryByRole('tooltip')).toBeNull();expect(card).not.toHaveAttribute('aria-describedby');
+ fireEvent.click(card);expect(screen.getByRole('dialog',{name:'CHI TIẾT BUỔI THI'})).toHaveTextContent(item.subjectName);
 });
 it('uses the clicked afternoon without editable start/end times and permits an unassigned invigilator',async()=>{
  renderPage();fireEvent.click(await within(screen.getByRole('complementary',{name:'Chưa xếp lịch'})).findByRole('button',{name:/Lớp QT/}));fireEvent.click(screen.getByRole('button',{name:'Chọn 19/10/2026 Chiều'}));

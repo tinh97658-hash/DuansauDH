@@ -2,7 +2,7 @@ import { notify } from "../../utils/notify";
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { Alert, Box, Button, Chip, MenuItem, Paper, Stack, Tab, Tabs, TableBody, TableCell, TableContainer, TableRow, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, IconButton, MenuItem, Paper, Stack, Tab, Tabs, TableBody, TableCell, TableContainer, TableRow, Tooltip, Typography } from '@mui/material';
 import FeatureLayout from '../../components/FeatureLayout';
 import InlineReportExport from '../../components/InlineReportExport';
 import { useReportExport } from '../../components/ReportExportContext';
@@ -19,17 +19,17 @@ import StudyLeaveDecisionDialog from '../../features/learners/StudyLeaveDecision
 import StudyLeaveExtensionDialog from '../../features/learners/StudyLeaveExtensionDialog';
 import { usePermissions } from '../../features/accounts/usePermissions';
 import StudyManagementRecords from '../../features/learners/StudyManagementRecords';
-import { CalendarDaysIcon, ArrowRightIcon } from '../../components/AppIcons';
+import { CalendarDaysIcon, EyeIcon } from '../../components/AppIcons';
 import './studyLeaves.css';
 
 const COLUMNS = [
   { key: 'learner', label: 'Học viên', width: 190, minWidth: 180, stretch: false },
   { key: 'class', label: 'Lớp hành chính', width: 130, minWidth: 130, stretch: false },
   { key: 'dates', label: 'Thời gian bảo lưu', width: 190, minWidth: 190, stretch: false },
-  { key: 'status', label: 'Trạng thái', width: 170, minWidth: 170, align: 'center' },
-  { key: 'overdue', label: 'Quá hạn', width: 74, minWidth: 74, align: 'center', stretch: false },
-  { key: 'approval', label: 'Phê duyệt', width: 190, minWidth: 180, align: 'center' },
-  { key: 'actions', label: 'Thao tác', width: 250, minWidth: 240, align: 'center' },
+  { key: 'status', label: 'Trạng thái', width: 170, minWidth: 170, align: 'center', stretch: false },
+  { key: 'overdue', label: 'Quá hạn', width: 190, minWidth: 190, align: 'center' },
+  { key: 'approval', label: 'Phê duyệt', width: 190, minWidth: 190, align: 'center' },
+  { key: 'actions', label: 'Thao tác', width: 240, minWidth: 240, align: 'center', stretch: false },
 ];
 
 export default function StudyLeaves() {
@@ -116,7 +116,7 @@ function StudyLeaveList() {
     {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
     <Paper variant="outlined" sx={{ borderColor: '#D7E4EE', borderRadius: '6px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(23, 62, 117, 0.04)' }}>
       <TableContainer sx={{ overflow: 'auto' }}>
-      <ResizableTable columns={COLUMNS} storageKey="study-leaves-table-widths:compact-v2" aria-label="Danh sách bảo lưu" sx={{ '& td:first-of-type .MuiTypography-root': { whiteSpace: 'normal', overflowWrap: 'anywhere' } }}><TableBody>{result.rows.map(row => {
+      <ResizableTable className="study-leaves-table" columns={COLUMNS} storageKey="study-leaves-table-widths:compact-v2" aria-label="Danh sách bảo lưu" sx={{ '& td:first-of-type .MuiTypography-root': { whiteSpace: 'normal', overflowWrap: 'anywhere' } }}><TableBody>{result.rows.map(row => {
         const active = ['active', 'expiring', 'overdue'].includes(row.status);
         const pendingExtension = row.extensions?.some(item => item.status === 'pending');
         return <TableRow hover key={row.id}>
@@ -133,8 +133,21 @@ function StudyLeaveList() {
           <Button size="small" color="error" disabled={loading} onClick={() => setExtension({ leave: row, action: 'reject_extension' })}>Từ chối gia hạn</Button>
         </Stack> : '—'}</TableCell>
         <TableCell align="center"><div className="study-leave-row-actions">
-          <Link className="study-leave-action study-leave-action-primary" to={`/masters/study-leaves/${row.admissionRecordId}?tab=leave`} onPointerEnter={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)} onFocus={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)}>Mở hồ sơ<ArrowRightIcon aria-hidden="true" /></Link>
-          {active && !pendingExtension && can('studyleave.request') && <button type="button" className="study-leave-action study-leave-action-secondary" aria-label="Đề nghị gia hạn" title="Đề nghị gia hạn bảo lưu" disabled={loading} onClick={() => setExtension({ leave: row, action: 'request_extension' })}><CalendarDaysIcon aria-hidden="true" />Gia hạn</button>}
+          <Tooltip title="Mở hồ sơ" arrow>
+            <IconButton component={Link} aria-label="Mở hồ sơ" to={`/masters/study-leaves/${row.admissionRecordId}?tab=leave`}
+              onPointerEnter={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)} onFocus={() => preloadPage(`/masters/study-leaves/${row.admissionRecordId}`)}
+              sx={{ "--app-table-icon-size": "24px", "--app-table-action-size": "36px", color: '#075985', bgcolor: 'transparent', border: 0, boxShadow: 'none', '&:hover': { color: '#0c4a6e', bgcolor: 'transparent' } }}>
+              <EyeIcon sx={{ fontSize: 24 }} />
+            </IconButton>
+          </Tooltip>
+          {active && !pendingExtension && can('studyleave.request') && <Tooltip title="Đề nghị gia hạn bảo lưu" arrow>
+            <span style={{ display: 'inline-flex' }}>
+              <IconButton aria-label="Đề nghị gia hạn" disabled={loading} onClick={() => setExtension({ leave: row, action: 'request_extension' })}
+                sx={{ "--app-table-icon-size": "24px", "--app-table-action-size": "36px", color: '#075985', bgcolor: 'transparent', border: 0, boxShadow: 'none', '&:hover': { color: '#0c4a6e', bgcolor: 'transparent' } }}>
+                <CalendarDaysIcon sx={{ fontSize: 24 }} />
+              </IconButton>
+            </span>
+          </Tooltip>}
         </div></TableCell>
       </TableRow>})}{!result.rows.length && <TableRow><TableCell colSpan={7} align="center" sx={{ py: 5, color: 'text.secondary' }}>{loading ? 'Đang tải…' : 'Không có hồ sơ bảo lưu phù hợp.'}</TableCell></TableRow>}</TableBody></ResizableTable>
       </TableContainer>

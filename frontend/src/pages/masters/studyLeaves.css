@@ -8,3 +8,16 @@
 .study-leave-action:focus-visible{outline:2px solid #174a78;outline-offset:3px}
 .study-leave-action:disabled{opacity:.55;cursor:wait}
 @media (prefers-reduced-motion:reduce){.study-leave-row-actions .study-leave-action{transition:none}}
+@layer app-text-size {
+  @media screen {
+    :root body table.study-leaves-table > tbody > tr > td:nth-child(1) .MuiTypography-body2,
+    :root body table.study-leaves-table > tbody > tr > td:nth-child(2),
+    :root body table.study-leaves-table > tbody > tr > td:nth-child(3) {
+      font-size: calc(13.5px * var(--app-text-scale, 1)) !important;
+    }
+    :root body table.study-leaves-table > tbody > tr > td:nth-child(1) .MuiTypography-caption,
+    :root body table.study-leaves-table > tbody > tr > td:nth-child(4) :is(.MuiChip-root, .MuiChip-label) {
+      font-size: calc(12px * var(--app-text-scale, 1)) !important;
+    }
+  }
+}

@@ -9,6 +9,7 @@ import {
   ArrowLeftIcon as HeroArrowLeftIcon,
   ArrowPathIcon as HeroArrowPathIcon,
   ArrowRightIcon as HeroArrowRightIcon,
+  ArrowRightEndOnRectangleIcon as HeroArrowRightEndOnRectangleIcon,
   ArrowRightStartOnRectangleIcon as HeroArrowRightStartOnRectangleIcon,
   ArrowUpIcon as HeroArrowUpIcon,
   ArrowUpTrayIcon as HeroArrowUpTrayIcon,
@@ -105,6 +106,7 @@ export const ArrowDownTrayIcon = createAppIcon(HeroArrowDownTrayIcon, "ArrowDown
 export const ArrowLeftIcon = createAppIcon(HeroArrowLeftIcon, "ArrowLeftIcon");
 export const ArrowPathIcon = createAppIcon(HeroArrowPathIcon, "ArrowPathIcon");
 export const ArrowRightIcon = createAppIcon(HeroArrowRightIcon, "ArrowRightIcon");
+export const ArrowRightEndOnRectangleIcon = createAppIcon(HeroArrowRightEndOnRectangleIcon, "ArrowRightEndOnRectangleIcon");
 export const ArrowRightStartOnRectangleIcon = createAppIcon(HeroArrowRightStartOnRectangleIcon, "ArrowRightStartOnRectangleIcon");
 export const ArrowUpIcon = createAppIcon(HeroArrowUpIcon, "ArrowUpIcon");
 export const ArrowUpTrayIcon = createAppIcon(HeroArrowUpTrayIcon, "ArrowUpTrayIcon");

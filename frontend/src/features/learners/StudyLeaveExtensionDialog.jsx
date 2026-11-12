@@ -69,7 +69,13 @@ export default function StudyLeaveExtensionDialog({ leave, action, onClose, onCo
 
   return <AppDialog open title={titles[action]} onClose={onClose} onConfirm={submit}
     confirmText="Xác nhận" confirmColor={action === 'reject_extension' ? 'error' : 'primary'}
-    confirmDisabled={invalid} saving={busy}>
+    confirmDisabled={invalid} saving={busy} maxWidth={requesting ? false : 'sm'}
+    PaperProps={{ sx: requesting ? {
+      width: { xs: 'calc(100vw - 2 * var(--app-dialog-gap, 24px))', md: '46vw' },
+      maxWidth: 'calc(100vw - 2 * var(--app-dialog-gap, 24px))',
+      height: '86dvh',
+      '--app-dialog-max-height': '86dvh',
+    } : {} }}>
     <Stack spacing={2}>
       <Typography fontWeight={600}>{leave.fullName} · {leave.code}</Typography>
       {error && <Alert severity="error">{error}</Alert>}

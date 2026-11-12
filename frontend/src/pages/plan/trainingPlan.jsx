@@ -2046,7 +2046,7 @@ const TrainingPlan = () => {
                           <TableCell sx={{ width: 48, px: 0, textAlign: "center" }}>TC</TableCell>
                           <TableCell sx={{ width: 230, whiteSpace: "nowrap" }}>Nhóm kiến thức</TableCell>
                           <TableCell sx={{ width: 190, textAlign: "center" }}>Loại học phần</TableCell>
-                          {isAdmin && <TableCell sx={{ width: 45, textAlign: "center" }}>Xóa</TableCell>}
+                          {isAdmin && <TableCell sx={{ width: 68, px: 1, textAlign: "center" }}>Xóa</TableCell>}
                         </TableRow>
                       </TableHead>
 

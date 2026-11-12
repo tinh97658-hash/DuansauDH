@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import axios from 'axios';
 import LecturerPayments from '../../pages/reports/lecturerPayments';
 import { AuthSessionContext } from '../../context/AuthSession';
@@ -53,6 +53,23 @@ it('saves the exact pair, reloads persisted state, and can uncheck after remount
   expect(screen.getByRole('dialog', { name: 'Xác nhận bỏ thanh toán' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Bỏ thanh toán' }));
   await waitFor(() => expect(screen.getByRole('checkbox', { name: /^Đã thanh toán:/ })).not.toBeChecked());
+});
+
+it('paginates payment pairs in pages of 15 and resets when filters change', async () => {
+  const originalGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation(async (url, config) => url.endsWith('/options') ? originalGet(url, config)
+    : { data: { rows: Array.from({ length: 16 }, (_, index) => ({ ...row, courseOfferingId: `offering-${index}`, offeringName: `Payment class ${index + 1}`, paid: false })) } });
+  mount();
+  await screen.findByRole('button', { name: 'Payment class 1' });
+  expect(screen.getAllByRole('checkbox')).toHaveLength(15);
+  expect(screen.queryByRole('button', { name: 'Payment class 16' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }));
+  const last = screen.getByRole('button', { name: 'Payment class 16' });
+  expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+  expect(within(last.closest('tr')).getByRole('cell', { name: '16' })).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Tìm kiếm'), { target: { value: 'Payment' } });
+  await screen.findByRole('button', { name: 'Payment class 1' });
+  expect(screen.queryByRole('button', { name: 'Payment class 16' })).not.toBeInTheDocument();
 });
 
 it('passes completion dates, unit, lecturer, payment status and search together', async () => {

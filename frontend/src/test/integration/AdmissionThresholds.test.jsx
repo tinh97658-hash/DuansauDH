@@ -112,16 +112,20 @@ it("keeps unsaved thresholds when cancelling a round change from the management 
   } finally { confirm.mockRestore(); }
 });
 it("paginates the round list and returns to matching results when searching", async () => {
-  const manyRounds = Array.from({ length: 12 }, (_, index) => ({ ...round, id: `round-${index}`, name: `Đợt số ${index + 1}` }));
+  const manyRounds = Array.from({ length: 17 }, (_, index) => ({ ...round, id: `round-${index}`, name: `Đợt số ${index + 1}` }));
   configure(manyRounds); mount(); await screen.findByText("HS001");
   fireEvent.click(screen.getByRole("button", { name: "Quản lý đợt" }));
   const dialog = await screen.findByRole("dialog");
-  expect(within(dialog).queryByText("Đợt số 12")).not.toBeInTheDocument();
+  expect(within(dialog).getByText("Đợt số 15")).toBeInTheDocument();
+  expect(within(dialog).queryByText("Đợt số 16")).not.toBeInTheDocument();
+  expect(within(dialog).getByText("Hiển thị 1–15 trên 17 đợt xét tuyển")).toBeInTheDocument();
   fireEvent.click(within(dialog).getByRole("button", { name: "Trang sau" }));
-  expect(within(dialog).getByText("Đợt số 12")).toBeInTheDocument();
+  expect(within(dialog).getByText("Đợt số 16")).toBeInTheDocument();
+  expect(within(dialog).getByText("Đợt số 17")).toBeInTheDocument();
+  expect(within(dialog).getByText("Hiển thị 16–17 trên 17 đợt xét tuyển")).toBeInTheDocument();
   fireEvent.change(within(dialog).getByLabelText("Tìm đợt xét tuyển"), { target: { value: "Đợt số 1" } });
   expect(within(dialog).getByText("Đợt số 1")).toBeInTheDocument();
-  expect(within(dialog).getByText("Hiển thị 4 / 12 đợt xét tuyển")).toBeInTheDocument();
+  expect(within(dialog).getByText("Hiển thị 9 / 17 đợt xét tuyển")).toBeInTheDocument();
 });
 it("shows pending applications by default and includes old records only when requested", async () => {
   const originalGet = axios.get.getMockImplementation();
