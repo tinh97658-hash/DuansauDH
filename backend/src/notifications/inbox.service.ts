@@ -16,7 +16,9 @@ export class InboxService {
   private identity(user: unknown) {
     const context = workingProfileStorage.getStore();
     if (!(user instanceof Staff) || user.status !== 'active' || !context?.roleId || context.staffId !== user.id || context.selectionRequired) throw new ForbiddenException('Hồ sơ làm việc không hợp lệ.');
-    if (!inboxEnabled(this.config)) throw new ServiceUnavailableException('Thông báo chưa được kích hoạt trên môi trường này.');
+    if (!inboxEnabled(this.config)) throw new ServiceUnavailableException({
+      code: 'NOTIFICATION_V2_DISABLED', message: 'Thông báo chưa được kích hoạt trên môi trường này.',
+    });
     return { user, profile: context.roleId };
   }
   private async visible(user: Staff, profile: string) {

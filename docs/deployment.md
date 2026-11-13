@@ -16,13 +16,10 @@ backend/
 frontend/
   src/                  Features, components và test
   public/               Tài nguyên tĩnh, font và giấy phép cần phát hành
-docs/                   Tài liệu nghiệp vụ, hướng dẫn và báo cáo
-  plans/                Kế hoạch và phân tích nghiệp vụ
-  reviews/              Báo cáo kiểm tra, QA và tích hợp
+docs/                   Tài liệu nghiệp vụ và hướng dẫn vận hành
   archive/              Website tài liệu mẫu cũ, không tham gia build
 scripts/                Công cụ dùng ở gốc repository
-security-review/        Script/báo cáo; JSON và log sinh ra bị ignore
-SecuritySkills/         Submodule công cụ phát triển, không thuộc image ứng dụng
+security-review/        Script kiểm chứng; báo cáo, JSON và log chỉ lưu local
 compose.yaml            Database và pgAdmin development
 compose.prod.yaml       Database, API, web và công cụ migration production
 .env.example            Mẫu development
@@ -34,8 +31,8 @@ Giữ cấu trúc module hiện tại; không cần chuyển sang npm workspaces
 Commit các lockfile. Phát hành từ commit/tag đã kiểm tra hoặc image tương ứng;
 không sao chép cả workspace. Build, coverage và dependencies cũ không phải nguồn
 phát hành. Lưu backup ngoài checkout, có bản sao độc lập với máy chủ ứng dụng.
-Không xóa backup cũ khi chưa xác minh bản thay thế. Các báo cáo ở root đã được
-gom vào `docs/reviews/` và `docs/plans/`; xem [mục lục tài liệu](README.md).
+Không xóa backup cũ khi chưa xác minh bản thay thế. Các báo cáo kiểm tra và kế
+hoạch phát triển được giữ local; xem [mục lục hướng dẫn vận hành](README.md).
 
 ## Cấu hình và HTTPS
 

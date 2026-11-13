@@ -6,7 +6,6 @@ import { PermissionsGuard } from "../common/permissions.guard.js";
 import { SchedulingWriteGuard } from "../common/scheduling-write.guard.js";
 import { CourseOfferingWriteGuard } from "../common/course-offering-write.guard.js";
 import {
-  AssignSchedulingManagerDto,
   ClassCurriculumProgressQueryDto,
   ConfirmTeachingSessionDto,
   CompleteCourseOfferingDto,
@@ -186,9 +185,4 @@ export class SchedulingController {
     return this.scheduling.completeCourseOffering(id, user.id, dto);
   }
 
-  @Put("assignee")
-  @RequirePermissions("scheduling.assign")
-  assignSchedulingManager(@Body() dto: AssignSchedulingManagerDto) {
-    return this.scheduling.assignSchedulingManager(dto.staffId);
-  }
 }

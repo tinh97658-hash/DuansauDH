@@ -1,7 +1,7 @@
 // Navigation catalog mirrors RibbonHeader and the registered application routes.
 export interface PermissionRoute {path:string;name:string;section:string;group:string;read:string[];actions:string[]}
 export const PERMISSION_ROUTES:PermissionRoute[] = [
-  {"path":"/system/accounts","name":"Tài khoản nhân sự","section":"HỆ THỐNG","group":"TÀI KHOẢN & PHÂN QUYỀN","read":["account.view"],"actions":["account.manage","account.password.reset","scheduling.assign"]},
+  {"path":"/system/accounts","name":"Tài khoản nhân sự","section":"HỆ THỐNG","group":"TÀI KHOẢN & PHÂN QUYỀN","read":["account.view"],"actions":["account.manage","account.password.reset"]},
   {"path":"/system/roles","name":"Vai trò & phân quyền","section":"HỆ THỐNG","group":"TÀI KHOẢN & PHÂN QUYỀN","read":["role.view"],"actions":["role.manage"]},
   {"path":"/system/audit-logs","name":"Nhật ký thao tác","section":"HỆ THỐNG","group":"TÀI KHOẢN & PHÂN QUYỀN","read":["audit.view"],"actions":[]},
   {"path":"/system/ethnicities","name":"Dân tộc","section":"HỆ THỐNG","group":"DANH MỤC CHUNG","read":["catalog.view"],"actions":["catalog.manage"]},
@@ -30,7 +30,7 @@ export const PERMISSION_ROUTES:PermissionRoute[] = [
   {"path":"/masters/create-class-groups","name":"Tạo nhóm học viên","section":"ĐÀO TẠO THẠC SĨ","group":"THỦ TỤC ĐẦU VÀO","read":["masters.view"],"actions":["masters.manage","groups.assign","gradebook.policy"]},
   {"path":"/masters/assign-class-groups","name":"Phân nhóm học viên","section":"ĐÀO TẠO THẠC SĨ","group":"THỦ TỤC ĐẦU VÀO","read":["masters.view"],"actions":["masters.manage"]},
   {"path":"/masters/class-course-history","name":"Thống kê tiến độ","section":"ĐÀO TẠO THẠC SĨ","group":"THỦ TỤC ĐẦU VÀO","read":["plan.view","scheduling.view"],"actions":[]},
-  {"path":"/masters/course-offerings","name":"Tạo lớp học phần","section":"ĐÀO TẠO THẠC SĨ","group":"XẾP LỊCH HỌC","read":["scheduling.view"],"actions":["scheduling.organize","scheduling.assign"]},
+  {"path":"/masters/course-offerings","name":"Tạo lớp học phần","section":"ĐÀO TẠO THẠC SĨ","group":"XẾP LỊCH HỌC","read":["scheduling.view"],"actions":["scheduling.organize"]},
   {"path":"/masters/schedule","name":"Xếp lịch","section":"ĐÀO TẠO THẠC SĨ","group":"XẾP LỊCH HỌC","read":["scheduling.view"],"actions":["scheduling.write"]},
   {"path":"/masters/course-matrix","name":"Ma trận lớp học phần","section":"ĐÀO TẠO THẠC SĨ","group":"XẾP LỊCH HỌC","read":["scheduling.view"],"actions":["scheduling.write","scheduling.organize"]},
   {"path":"/masters/exam-lists","name":"Danh sách thi, điểm thi","section":"ĐÀO TẠO THẠC SĨ","group":"QUẢN LÝ ĐIỂM","read":["gradebook.view"],"actions":["gradebook.submit","gradebook.approve","gradebook.policy"]},

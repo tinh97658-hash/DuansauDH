@@ -5,7 +5,7 @@ import {
   IconButton, InputAdornment, MenuItem, Paper, Select, Stack, TableBody, TableCell, TableContainer,
   TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
-import { ArrowRightStartOnRectangleIcon, CalendarDateRangeIcon, DocumentDuplicateIcon, KeyIcon, LockClosedIcon, LockOpenIcon, PencilSquareIcon, PlusIcon } from "../../components/AppIcons";
+import { ArrowRightStartOnRectangleIcon, DocumentDuplicateIcon, KeyIcon, LockClosedIcon, LockOpenIcon, PencilSquareIcon, PlusIcon } from "../../components/AppIcons";
 import FeatureLayout from "../../components/FeatureLayout";
 import AppDialog from "../../components/AppDialog";
 import ConfirmDialog from "../../components/ConfirmDialog";
@@ -16,7 +16,7 @@ import ResizableTable from "../../components/ResizableTable";
 import { personNameParts } from "../../utils/personName";
 import { usePermissions } from "../../features/accounts/usePermissions";
 import {
-  assignScheduling, createAccount, listAccounts, resetAccountPassword,
+  createAccount, listAccounts, resetAccountPassword,
   revokeAccountSessions, updateAccount, updateAccountStatus,
 } from "../../features/accounts/api";
 import { listRoles } from "../../features/accounts/rolesApi";
@@ -38,7 +38,6 @@ const Accounts = () => {
   const { can } = usePermissions();
   const canManage = can("account.manage");
   const canReset = can("account.password.reset");
-  const canAssign = can("scheduling.assign");
 
   const [accounts, setAccounts] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -62,7 +61,6 @@ const Accounts = () => {
   const [resetForm, setResetForm] = useState({ auto: true, password: "" });
   const [resetError, setResetError] = useState("");
   const [revokeTarget, setRevokeTarget] = useState(null);
-  const [assignTarget, setAssignTarget] = useState(null);
   const [busy, setBusy] = useState(false);
   const [credentials, setCredentials] = useState(null);
 
@@ -97,7 +95,6 @@ const Accounts = () => {
 
   const currentPage = Math.min(page, Math.max(0, Math.ceil(filtered.length / pageSize) - 1));
   const visible = filtered.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
-  const scheduleHolder = accounts.find((account) => account.canManageScheduling);
 
   const openCreate = () => { setEditing(null); setForm(emptyForm()); setFormError(""); setEditorOpen(true); };
   const openEdit = (account) => {
@@ -169,7 +166,6 @@ const Accounts = () => {
       setBusy(false);
       setStatusTarget(null);
       setRevokeTarget(null);
-      setAssignTarget(null);
     }
   };
 
@@ -231,11 +227,6 @@ const Accounts = () => {
       </Paper>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {canAssign && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Người phụ trách tổ chức lớp và xếp lịch hiện tại: <strong>{scheduleHolder ? scheduleHolder.name : "chưa phân công"}</strong>. Phân công mới chuyển trách nhiệm từ người cũ. Quyền tạo lớp và sửa lịch được cấp riêng trong Vai trò & phân quyền.
-        </Alert>
-      )}
 
       <TableContainer component={Paper} variant="outlined">
         <ResizableTable columns={columns} storageKey="system-accounts-columns" aria-label="Tài khoản nhân sự">
@@ -272,7 +263,6 @@ const Accounts = () => {
                     : <Tooltip title="Mở khóa tài khoản"><IconButton size="small" color="success" aria-label={`Mở khóa ${account.email}`} onClick={() => setStatusTarget(account)} disabled={busy}><LockOpenIcon fontSize="small" /></IconButton></Tooltip>)}
                   {canReset && <Tooltip title="Đặt lại mật khẩu"><IconButton size="small" aria-label={`Đặt lại mật khẩu ${account.email}`} onClick={() => { setResetTarget(account); setResetForm({ auto: true, password: "" }); setResetError(""); }} disabled={busy}><KeyIcon fontSize="small" /></IconButton></Tooltip>}
                   {canManage && <Tooltip title="Buộc đăng xuất"><IconButton size="small" color="error" aria-label={`Buộc đăng xuất ${account.email}`} onClick={() => setRevokeTarget(account)} disabled={busy}><ArrowRightStartOnRectangleIcon fontSize="small" /></IconButton></Tooltip>}
-                  {canAssign && <Tooltip title={account.canManageScheduling ? "Đang phụ trách xếp lịch" : "Phân công phụ trách xếp lịch"}><span><IconButton size="small" color="info" aria-label={`Phân công xếp lịch ${account.email}`} onClick={() => setAssignTarget(account)} disabled={busy || account.canManageScheduling}><CalendarDateRangeIcon fontSize="small" /></IconButton></span></Tooltip>}
                 </TableCell>
               </TableRow>
             ))}
@@ -401,15 +391,6 @@ const Accounts = () => {
         content={`Buộc đăng xuất tất cả phiên đang hoạt động của ${revokeTarget?.email}?`}
       />
 
-      <ConfirmDialog
-        open={Boolean(assignTarget)}
-        onClose={() => setAssignTarget(null)}
-        onConfirm={() => run(() => assignScheduling(assignTarget.id), "Đã phân công phụ trách tổ chức lớp và xếp lịch.")}
-        title="PHÂN CÔNG PHỤ TRÁCH XẾP LỊCH"
-        confirmText="Xác nhận phân công"
-        loading={busy}
-        content={`Phân công ${assignTarget?.name || assignTarget?.email} phụ trách tổ chức lớp và xếp lịch?${scheduleHolder ? ` Trách nhiệm phụ trách của ${scheduleHolder.name} sẽ được chuyển sang tài khoản này; quyền theo vai trò không thay đổi.` : ""}`}
-      />
     </FeatureLayout>
   );
 };

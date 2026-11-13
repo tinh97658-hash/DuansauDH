@@ -4,13 +4,16 @@
 .operational-dashboard {
   --od-blue: #087c9c;
   --od-cyan: #10b5df;
-  --od-teal: #13866b;
+  --od-teal: #0d9488;
+  --od-info: #2563eb;
+  --od-warning: #d59b2a;
+  --od-critical: #dc6363;
   --od-text: #20262e;
   --od-muted: #626c78;
-  --od-border: #9aabba;
-  --od-divider: #bdcad5;
+  --od-border: #a8b8ca;
+  --od-divider: #cbd5e1;
   --od-surface: #fff;
-  --od-soft: #f8fafb;
+  --od-soft: #f5f8fc;
   --od-tint: #edf8fc;
   --od-shadow: 0 3px 8px #26354305, 0 12px 24px #26354303;
   container-type: inline-size; container-name: dashboard;
@@ -50,7 +53,7 @@
 .od-stat-body h2 { flex: 1; font-size: 13px; font-weight: 450; color: var(--od-muted)!important; margin: 0 0 6px; }
 .od-stat-value { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .od-stat-value>strong { color: #171e27; font-size: 29px; line-height: 1.15; letter-spacing: -.045em; font-weight: 650; font-variant-numeric: tabular-nums; }
-.od-stat-unit { display: block; color: var(--od-muted); font-size: 11px; margin-top: 3px; }
+.od-stat-unit { display: block; color: #000000; font-size: 13px; margin-top: 3px; }
 .od-stat-icon { display: grid; place-items: center; width: 30px; height: 30px; flex: none; background: #f4effc; color: #8655ba; }
 .od-stat-icon svg { width: 18px; height: 18px; }
 .od-stat[data-kind=scheduling] .od-stat-icon { background: #fff8e9; color: #a7780c; }
@@ -73,7 +76,7 @@
 .operational-dashboard .od-approvals>.od-panel-heading { padding-block: 11.5px; }
 .od-panel-title .od-panel-title-text { white-space: nowrap; }
 .od-panel-title .od-panel-title-icon {
-  position: absolute; inset-inline-start: 0; top: 50%; transform: translateY(calc(-50% + 2px));
+  position: absolute; inset-inline-start: 0; top: 50%; transform: translateY(-50%);
   display: grid; place-items: center; width: 38px; height: 38px;
 }
 .od-panel-title-icon svg { width: 22px; height: 22px; stroke-width: 1.8; }
@@ -103,7 +106,7 @@
 .od-chart-select .od-select { min-height: 36px; font-size: 11px; padding: 7px 28px 7px 10px; background-position: right 9px center; text-overflow: ellipsis; }
 .od-chart figure { display: flex; flex-direction: column; flex: none; margin: 0 18px 12px; padding: 0; }
 .od-chart figcaption { display: flex; align-items: baseline; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; color: #515b66; font-size: 12px; }
-.od-chart-unit { color: var(--od-muted); font-size: 10px; font-weight: 400; }
+.od-chart-unit { color: #000000; font-size: 13px; font-weight: 400; }
 .od-columns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); align-items: end; gap: 14px; min-height: 164px; margin: 14px 0 10px; padding: 20px 10px 0; border-bottom: 1px solid #e5ebef; background: repeating-linear-gradient(to top, transparent 0, transparent 47px, #edf1f4 48px, transparent 49px); }
 .od-month { display: grid; grid-template-rows: 112px 30px; align-items: end; min-width: 0; text-align: center; }
 .od-column-track { height: 112px; position: relative; display: flex; align-items: end; justify-content: center; }
@@ -112,7 +115,7 @@
 .od-month>span { display: flex; justify-content: center; align-items: center; min-height: 30px; font-size: 10px; white-space: nowrap; color: var(--od-muted); }
 .od-chart-body { display: flex; align-items: center; justify-content: center; gap: 24px; flex-wrap: wrap; min-height: 164px; margin: 14px 0 10px; padding: 4px 0; }
 .od-donut { display: grid; place-items: center; width: 132px; height: 132px; flex: none; }
-.od-donut>span { display: flex; align-items: center; justify-content: center; flex-direction: column; width: 104px; height: 104px; background: var(--od-surface); color: var(--od-muted); font-size: 11px; }
+.od-donut>span { display: flex; align-items: center; justify-content: center; flex-direction: column; width: 104px; height: 104px; background: var(--od-surface); color: #000000; font-size: 13px; }
 .od-donut strong { color: var(--od-text); font-size: 27px; font-weight: 650; line-height: 1.2; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
 .od-legend { list-style: none; margin: 0; padding: 0; flex: 1; max-width: 260px; min-width: 140px; font-size: 12px; }
 .od-legend li { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
@@ -196,8 +199,6 @@
 .od-select-popper .od-select-popup { border: 1px solid #9aabba; background: #fff; box-shadow: 0 8px 24px #2635431a; max-height: min(300px, calc(100dvh - 24px)); overflow: auto; color: #20262e; }
 .od-select-popper .MuiList-root { padding: 5px; }
 body .od-select-popper [role=option] { min-height: 40px; padding: 10px; font-size: 12px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere; color: #20262e; }
-body .od-select-popper [role=option][aria-selected=true] { color: #087c9c!important; background: #edf8fc!important; font-weight: 600; }
-body .od-select-popper [role=option]:is(:hover,:focus-visible,.Mui-focusVisible) { background: #f3f7fa!important; outline: 2px solid #087c9c; outline-offset: -2px; }
 /* Dashboard boxes follow the square-corner theme; chart circles retain their shape. */
 @layer app-square-corners {
   .operational-dashboard :is(.od-stat,.od-panel) { border-radius: 0!important; }
@@ -243,7 +244,7 @@ body .od-select-popper [role=option]:is(:hover,:focus-visible,.Mui-focusVisible)
   .od-stat-icon svg { width: 18px; height: 18px; }
   .od-stat-footer { padding: 8px 6px; }
   .od-stat-status { font-size: 10px; }
-  .od-stat-unit { font-size: 10px; }
+  .od-stat-unit { font-size: 13px; }
   .od-panel-heading { padding: 14px 14px 10px; gap: 10px; }
   .od-panel-heading h2 { font-size: 15px; }
   .od-panel-heading>span:not(.od-chart-heading-icon) { font-size: 10px; }
@@ -349,6 +350,81 @@ body .od-select-popper [role=option]:is(:hover,:focus-visible,.Mui-focusVisible)
 @media(max-width:600px){.od-header-identity{max-width:120px}.od-header-account{gap:8px}.ribbon-titlebar:has(.od-header-account){gap:10px;padding-right:12px}.ribbon-titlebar:has(.od-header-account) .ribbon-breadcrumb>span{flex-shrink:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 
 /* Preserve the current dashboard surface styling with the V2 layout. */
-.operational-dashboard { --od-shadow: 0 1px 3px rgba(15,23,42,.06), 0 4px 12px rgba(15,23,42,.04); }
+.operational-dashboard { --od-shadow: 0 1px 3px rgba(15,23,42,.04); }
 .operational-dashboard :is(.od-stat, .od-stat-body, .od-panel, .od-stat-icon) { border-radius: 8px !important; }
 .operational-dashboard :is(.od-select, .od-panel-title-icon) { border-radius: 6px !important; }
+
+/* Use black for all dashboard text, including status labels and counts. */
+#root .operational-dashboard :is(h1, h2, h3, h4, h5, h6, p, label, button, select, a, strong, small, figcaption, li),
+#root .operational-dashboard span:not(:has(svg)),
+.od-header-identity,
+.od-header-identity :is(strong, span) {
+  color: #000000 !important;
+}
+
+/* Work metrics are the primary focus; all treatments preserve existing geometry. */
+.operational-dashboard .od-stat { --od-card-accent: #2456c6; border-color: var(--od-border); background: #fff; box-shadow: inset 0 3px var(--od-card-accent); }
+.operational-dashboard .od-stat[data-kind=scheduling] { --od-card-accent: #c06424; }
+.operational-dashboard .od-stat[data-kind=progress] { --od-card-accent: #087d75; }
+.operational-dashboard .od-stat[data-kind=grades] { --od-card-accent: #a94655; }
+.operational-dashboard .od-stat-body { box-shadow: none; }
+.operational-dashboard .od-stat .od-stat-icon { color: var(--od-card-accent); background: transparent; }
+.operational-dashboard .od-stat .od-stat-footer { background: #fff; box-shadow: none; }
+.operational-dashboard .od-stat-footer>svg { color: var(--od-card-accent); }
+.operational-dashboard .od-stat-status>span { background: #b45309; }
+.operational-dashboard .od-stat-done>span { background: #0f766e; }
+.operational-dashboard .od-stat:has(a[href]:is(:hover,:focus-visible)) { border-color: var(--od-card-accent); }
+.operational-dashboard .od-stat-link[href]:hover .od-stat-footer { background: #fff; box-shadow: inset 0 -2px var(--od-card-accent); }
+.operational-dashboard .od-stat-link[href]:focus-visible { outline: 3px solid #0f172a; outline-offset: 3px; }
+
+/* The task panel is the primary operational area; chart remains neutral. */
+.operational-dashboard .od-work { border-color: var(--od-border); }
+.operational-dashboard .od-panel { background: #fff; box-shadow: none; }
+.operational-dashboard .od-work>.od-panel-heading { background: #fff; box-shadow: none; }
+.operational-dashboard .od-panel-title-icon--work { background: transparent; color: #2456c6; }
+.operational-dashboard .od-panel-title-icon--overview { background: transparent; color: #2456c6; }
+.operational-dashboard :is(.od-panel-title-icon,.od-stat-icon,.od-approval-icon,.od-chart-heading-icon) { background: transparent; border: 0; padding: 0; box-shadow: none; }
+.operational-dashboard .od-panel-title-icon--approval { background: transparent; color: #087d75; }
+.operational-dashboard .od-approval-icon { color: #2456c6; }
+.operational-dashboard .od-stat-icon svg { width: 22px; height: 22px; }
+.operational-dashboard .od-tabs { border-bottom-color: var(--od-divider); }
+.operational-dashboard .od-tabs button:focus-visible { outline: none; text-decoration: underline; text-underline-offset: 4px; }
+#root .operational-dashboard .od-tabs [aria-selected=true] { color: #111827 !important; background: #fff; border-bottom-color: #2456c6; }
+.operational-dashboard .od-tabs [aria-selected=false]:hover { background: #f1f5f9; }
+.operational-dashboard .od-task-row:has(.od-task-action[href]:hover) { background: #eff6ff; }
+#root .operational-dashboard :is(.od-task-action[href],.od-item-action[href]) { color: #075985 !important; background: #f0f7fc; border-color: #8199b1; }
+#root .operational-dashboard .od-item-action[href] span { color: #075985 !important; }
+.operational-dashboard :is(.od-task-action[href],.od-item-action[href]):hover { background: #dbeafe !important; border-color: #1d4ed8; }
+.operational-dashboard .od-task-row>.od-count { background: transparent; box-shadow: none; }
+
+/* Nonzero approval counts stand out without flooding the panel with red. */
+#root .operational-dashboard .od-approval-groups li[data-pending=true] strong { color: #b42318 !important; background: #fff1f0; box-shadow: none; }
+.operational-dashboard .od-approval-groups li:not([data-pending=true]) strong { background: #f1f5f9; }
+.operational-dashboard .od-approval-groups button>svg { color: #334155; }
+.operational-dashboard .od-approval-groups li>button:hover { background: #eff6ff; }
+.operational-dashboard .od-approval-groups li>button:hover>svg { color: #1d4ed8; }
+.operational-dashboard .od-approval-groups button:focus-visible { outline-offset: -2px; }
+.operational-dashboard .od-approval-pagination button:not(:disabled):hover { border-color: #1d4ed8; background: #dbeafe; }
+.operational-dashboard .od-select { border-color: var(--dropdown-border); background-color: #fff; box-shadow: none; }
+.operational-dashboard .od-select:hover { border-color: #9fb5c6; background-color: #fff; }
+.operational-dashboard .od-select:is(:focus-visible,[aria-expanded=true]) { border-color: var(--primary); outline: none; box-shadow: none; }
+.operational-dashboard :is(a,button,select,[tabindex]):focus-visible { outline-color: #1d4ed8; }
+/* DashboardSelect portals are isolated from all other application menus. */
+body .od-select-popper .od-select-popup { border-color: var(--dropdown-border); box-shadow: 0 4px 12px #26354314; }
+body .od-select-popper [role=option] { color: var(--text-primary); box-shadow: none; }
+body .od-select-popper [role=option]:is(:hover,:focus-visible,.Mui-focusVisible) { outline: none; }
+
+/* Slightly larger reading text; retain the KPI number scale and page layout. */
+.operational-dashboard .od-stat-body h2 { font-size: 14px; }
+.operational-dashboard .od-stat-status { font-size: 13px; }
+.operational-dashboard .od-panel-title { font-size: 17px; }
+.operational-dashboard .od-filters label { font-size: 13px; }
+.operational-dashboard .od-select { font-size: 14px; }
+.operational-dashboard .od-chart-select .od-select { font-size: 12px; }
+.operational-dashboard .od-tabs button { font-size: 13px; }
+.operational-dashboard .od-task-copy strong { font-size: 14px; font-weight: 400; }
+.operational-dashboard .od-task-row>.od-count { font-size: 13px; font-weight: 400; }
+.operational-dashboard .od-approval-groups li>button { font-size: 13px; }
+.operational-dashboard .od-chart figcaption,
+.operational-dashboard .od-legend { font-size: 13px; }
+#root .operational-dashboard .od-approval-groups strong { color: #111827 !important; }

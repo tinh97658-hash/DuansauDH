@@ -27,7 +27,8 @@ export function useNotificationInbox() {
     } catch (error) {
       if (controller.signal.aborted || request.current !== token || current.current !== identity) return;
       setState(previous => ({ ...previous, identity, status: 'error', unreadCount: null,
-        error: error.response?.status === 503 ? 'Thông báo chưa được kích hoạt trên môi trường này.' : 'Chưa tải được thông báo.' }));
+        error: error.response?.status === 503 && error.response?.data?.code === 'NOTIFICATION_V2_DISABLED'
+          ? 'Thông báo chưa được kích hoạt trên môi trường này.' : 'Chưa tải được thông báo.' }));
     }
   }, [identity, enabled, profile]);
 

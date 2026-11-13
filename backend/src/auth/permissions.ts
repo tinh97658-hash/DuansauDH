@@ -79,7 +79,6 @@ export const PERMISSIONS: PermissionDefinition[] = [
   { code: "scheduling.view", group: "Lớp học phần & xếp lịch", name: "Xem lớp học phần, lịch học", description: "Xem lớp học phần, danh sách học viên và lịch học toàn viện, không cần phân công nhóm." },
   { code: "scheduling.organize", group: "Lớp học phần & xếp lịch", name: "Tổ chức lớp học phần", description: "Tạo, quản lý và xóa lớp học phần theo điều kiện nghiệp vụ. Không cần được phân công quản lý lịch; quyền sửa lịch học được cấp riêng." },
   { code: "scheduling.write", group: "Lớp học phần & xếp lịch", name: "Xếp, sửa và xác nhận lịch học", description: "Xếp, sửa, xóa, xác nhận buổi học và hoàn thành giảng dạy toàn viện. Chỉ xem luôn chặn ghi. Không bao gồm xếp lịch thi, tổ chức lớp hoặc nhập, duyệt điểm." },
-  { code: "scheduling.assign", group: "Lớp học phần & xếp lịch", name: "Phân công người quản lý lịch đào tạo", description: "Chọn người đầu mối phụ trách lịch đào tạo; phân công mới chuyển trách nhiệm từ người cũ. Không tự cấp quyền tạo lớp hoặc sửa lịch; các quyền nghiệp vụ được chọn riêng." },
 
   // ===== Thi & điểm =====
   { code: "gradebook.view", group: "Thi & điểm", name: "Xem danh sách thi, bảng điểm", description: "Xem danh sách thi và bảng điểm; không tự cho phép nhập điểm hoặc duyệt điểm." },

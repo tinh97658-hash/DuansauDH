@@ -12,9 +12,6 @@
 
 Các hướng dẫn nghiệp vụ hiện hành nằm trực tiếp trong `docs/`.
 
-- `plans/`: kế hoạch, phân tích và câu hỏi nghiệp vụ; một số nội dung là lịch sử,
-  cần đọc ghi chú trạng thái trong từng tài liệu.
-- [reviews/](reviews/README.md): báo cáo kiểm tra, QA, hiệu năng và tích hợp.
 - `imports/`: dữ liệu danh mục phục vụ nhập liệu, cần review trước khi sử dụng.
 - [archive/](archive/README.md): tài liệu mẫu website cũ, giữ làm tham khảo.
 

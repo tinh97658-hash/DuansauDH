@@ -67,6 +67,15 @@ it('shows loading while a response is pending', async () => {
   axios.get.mockImplementation(() => new Promise(() => {}));
   render(tree()); await open(); expect(screen.getByRole('status')).toHaveTextContent('Đang tải thông báo');
 });
+it.each([
+  [{ code: 'NOTIFICATION_V2_DISABLED' }, 'Thông báo chưa được kích hoạt trên môi trường này.'],
+  [{ message: 'Upstream unavailable' }, 'Chưa tải được thông báo.'],
+])('distinguishes feature-disabled responses from unrelated HTTP 503 errors (%j)', async (data, message) => {
+  axios.get.mockRejectedValue({ response: { status: 503, data } });
+  render(tree()); await open();
+  await screen.findByText(message);
+  expect(screen.queryByText('Bạn chưa có thông báo.')).not.toBeInTheDocument();
+});
 it('does not navigate or hide an error when marking read fails', async () => {
   axios.post.mockRejectedValue(new Error('forbidden'));
   render(tree()); await open(); fireEvent.click(await screen.findByRole('button', { name: /Có kết quả điểm/ }));

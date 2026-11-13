@@ -11,7 +11,7 @@ export const permissionReadDependencies:Record<string,string[]>={
   'account.manage':['account.view'],'account.password.reset':['account.view'],'role.manage':['role.view'],
   'catalog.manage':['catalog.view'],'plan.manage':['plan.view'],'admission.manage':['admission.view'],
   'groups.assign':['masters.view'],'masters.manage':['masters.view'],'doctoral.manage':['doctoral.view'],
-  'scheduling.organize':['scheduling.view'],'scheduling.write':['scheduling.view'],'scheduling.assign':['scheduling.view'],
+  'scheduling.organize':['scheduling.view'],'scheduling.write':['scheduling.view'],
   'gradebook.submit':['gradebook.view'],'gradebook.approve':['gradebook.view'],'gradebook.policy':['masters.view'],
   'exams.write':['exams.view'],'studyleave.request':['plan.view'],'studyleave.approve':['plan.view'],
   'majortransfer.request':['admission.view'],'majortransfer.approve':['admission.view'],

@@ -2228,19 +2228,4 @@ export class SchedulingService {
     });
   }
 
-  async assignSchedulingManager(staffId: string) {
-    return this.sequelize.transaction(async (transaction) => {
-      const assignee = await this.staff.findByPk(staffId, { transaction, lock: transaction.LOCK.UPDATE });
-      if (!assignee) throw new NotFoundException("Không tìm thấy chuyên viên được phân công.");
-      await this.staff.update({ canManageScheduling: false }, { where: { canManageScheduling: true }, transaction });
-      await assignee.update({ canManageScheduling: true }, { transaction });
-      return {
-        id: assignee.id,
-        name: assignee.name,
-        email: assignee.email,
-        role: assignee.role,
-        canManageScheduling: true,
-      };
-    });
-  }
 }

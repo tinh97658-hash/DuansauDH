@@ -148,7 +148,7 @@ npm --prefix backend run db:migrate
 
 Khởi động lại backend/frontend sau migration. Migration 061 thêm lịch sử thành viên lớp, trạng thái duyệt điểm, nhật ký thay đổi và bản kết quả học tập đã chốt; đối soát trạng thái học theo phân lớp hiện tại. Điểm cũ giữ trạng thái nháp và phải được gửi/duyệt để tính vào hoàn thành học phần. Migration không hỗ trợ tự động xóa lịch sử bằng `down`; rollback dùng bản sao lưu đã kiểm chứng.
 
-Sau khi hoàn thành giảng dạy: lưu đủ điểm → gửi duyệt → admin duyệt và khóa. Admin muốn sửa phải mở lại với lý do. Bảng điểm cá nhân hiển thị điều kiện học phần còn thiếu và cho admin lưu bản kết quả khi đủ điều kiện; các bản cũ vẫn mở lại được sau điều chỉnh. Hoàn thành học phần được tách riêng với xét tốt nghiệp/GPA. Xem [kế hoạch và báo cáo vòng đời học viên](docs/reviews/BAO-CAO-LOGIC-VONG-DOI-HOC-VIEN.md).
+Sau khi hoàn thành giảng dạy: lưu đủ điểm → gửi duyệt → admin duyệt và khóa. Admin muốn sửa phải mở lại với lý do. Bảng điểm cá nhân hiển thị điều kiện học phần còn thiếu và cho admin lưu bản kết quả khi đủ điều kiện; các bản cũ vẫn mở lại được sau điều chỉnh. Hoàn thành học phần được tách riêng với xét tốt nghiệp/GPA.
 
 ### Quản lý tài khoản & phân quyền (migration 062)
 
@@ -188,7 +188,7 @@ khẩu (buộc đăng xuất và đổi mật khẩu lần kế tiếp); buộc 
 cách tăng `staff.session_version`. Giao diện nằm trong nhóm **Tài khoản & phân
 quyền** trên thanh điều hướng: `/system/accounts`, `/system/roles`,
 `/system/audit-logs` và `/system/change-password` (bắt buộc đổi mật khẩu khi còn
-mật khẩu khởi tạo). Xem [kế hoạch chi tiết](docs/plans/KE-HOACH-QUAN-LY-TAI-KHOAN-PHAN-QUYEN.md).
+mật khẩu khởi tạo).
 
 ### Nhật ký thay đổi dữ liệu (migration 063)
 
@@ -214,9 +214,9 @@ Docker Compose, backend, migration, seed và frontend đều đọc file này.
 Backend không còn tìm `config.env` hoặc `.env` riêng trong thư mục con.
 Môi trường mới chạy `Copy-Item .env.example .env`, rồi điền mật khẩu riêng và `SESSION_SECRET` trước khi khởi động. Không commit `.env`.
 
-Khi clone repository, dùng `git clone --recurse-submodules <repository-url>` để lấy cả SecuritySkills. Với bản clone đã có, chạy `git submodule update --init --recursive`.
+Clone repository bằng `git clone <repository-url>`. Ứng dụng không cần submodule.
 
-Git giữ mã nguồn, migration, test, lockfile, tài nguyên giao diện/font/giấy phép, cấu hình mẫu, báo cáo Markdown và script kiểm chứng. Log, build, coverage, backup, upload người dùng, snapshot trong `docs/data-changes` và JSON sinh ra trong `security-review` chỉ lưu local. Tạo lại các kết quả kiểm chứng khi cần; không dùng `.gitignore` để thay thế cơ chế backup riêng.
+Git giữ mã nguồn, migration, test, lockfile, tài nguyên giao diện/font/giấy phép, cấu hình mẫu, hướng dẫn vận hành và script kiểm chứng. Báo cáo nội bộ, log, build, coverage, backup, upload người dùng và snapshot sinh tự động chỉ lưu local. Tạo lại các kết quả kiểm chứng khi cần; không dùng `.gitignore` để thay thế cơ chế backup riêng.
 
 Các biến chính:
 
@@ -477,12 +477,11 @@ npm run db:migrate
 
 Dữ liệu PostgreSQL LOCAL không đi theo Git; mỗi môi trường có database riêng.
 
-Backend **đã có phân quyền scheduling** qua cờ `Staff.canManageScheduling` và
-`SchedulingWriteGuard`, kết hợp quyền RBAC `scheduling.write`. Giao diện
-**Tài khoản & phân quyền** (`/system/accounts`) cho phép admin/gười có quyền
-`scheduling.assign` gán người phụ trách scheduling. Admin có operation
-`PUT /scheduling/assignee`; body JSON chứa `staffId` của Staff thuộc chính database
-của môi trường triển khai. Không hard-code UUID/Staff ID từ database của máy khác.
+Backend **phân quyền scheduling** bằng RBAC: `scheduling.organize` cho phép tổ chức
+lớp học phần; `scheduling.write` cho phép xếp, sửa và xác nhận lịch học.
+`SchedulingWriteGuard` yêu cầu tài khoản `Staff` có quyền `scheduling.write` và
+chặn thao tác ghi khi hồ sơ làm việc ở chế độ chỉ xem. Chức năng chỉ định một người
+phụ trách xếp lịch đã được gỡ; phân công chuyên viên phụ trách nhóm vẫn được giữ.
 
 Unit/integration tests của feature được commit cùng source. PostgreSQL integration
 tests có tạo/xóa dữ liệu nên chỉ chạy sau khi cấu hình isolated test database,
@@ -605,7 +604,7 @@ Thực hiện theo [hướng dẫn triển khai và rollback](docs/deployment.md
 
 Nhân sự (`Staff`) là tác nhân; `admin` là vai trò mặc định và chỉ có những permission được gán trong `role_permissions`. Không còn `is_superadmin` hoặc nhánh bỏ qua kiểm tra quyền. Có thể chỉnh ma trận và tắt vai trò admin sau khi chuyển quyền quản trị sang nhân sự khác.
 
-Migration 064 chuyển đặc quyền cũ thành permission tường minh trước khi bỏ cột. Quyền hiệu lực là hợp quyền của các vai trò đang active. `scheduling.organize` cho phép tổ chức lớp học phần; chỉ định phụ trách xếp lịch vẫn được giữ theo nghiệp vụ.
+Migration 064 chuyển đặc quyền cũ thành permission tường minh trước khi bỏ cột. Quyền hiệu lực là hợp quyền của các vai trò đang active. `scheduling.organize` cho phép tổ chức lớp học phần; `scheduling.write` cho phép sửa lịch học. Chức năng chỉ định một người phụ trách xếp lịch đã được gỡ; phân công chuyên viên phụ trách nhóm vẫn được giữ.
 
 Hệ thống chặn thay đổi làm mất nhân sự active cuối cùng có đủ `account.view`, `account.manage`, `role.view`, `role.manage`, kể cả khi các quyền đến từ nhiều vai trò. Đổi vai trò nhân sự thu hồi phiên đăng nhập. Cache quyền trên instance khác có TTL tối đa 30 giây.
 

@@ -389,7 +389,7 @@ const RibbonHeader = () => {
             {currentTab ? <button type="button" className="ribbon-breadcrumb-trigger" data-dropdown-min-width="320"
               aria-haspopup="menu" aria-expanded={breadcrumbMenu?.level === "tab"}
               aria-controls={breadcrumbMenu?.level === "tab" ? "ribbon-breadcrumb-menu" : undefined}
-              onClick={event => openBreadcrumbMenu(event, "tab")}>{breadcrumbLabel(currentTab[1])}</button> : <span>{BRAND.institute}</span>}
+              onClick={event => openBreadcrumbMenu(event, "tab")}>{breadcrumbLabel(currentTab[1])}</button> : <span className="ribbon-breadcrumb-brand">{BRAND.institute}</span>}
             {currentGroup && <><ChevronRightIcon aria-hidden="true" /><button type="button" className="ribbon-breadcrumb-trigger" data-dropdown-min-width="320"
               aria-haspopup="menu" aria-expanded={breadcrumbMenu?.level === "group"}
               aria-controls={breadcrumbMenu?.level === "group" ? "ribbon-breadcrumb-menu" : undefined}
