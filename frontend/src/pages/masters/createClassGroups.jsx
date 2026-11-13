@@ -28,7 +28,7 @@ const CLASS_GROUP_COLUMNS = [
   { key: "code", label: "Mã nhóm", width: 150, minWidth: 100 },
   { key: "major", label: "Ngành học", width: 220, minWidth: 150 },
   { key: "curriculum", label: "Chương trình đào tạo", width: 260, minWidth: 180 },
-  { key: "responsibleStaff", label: "CV phụ trách", width: 220, minWidth: 180 },
+  { key: "responsibleStaffCompact", label: "CV phụ trách", width: 165, minWidth: 150, stretch: false },
   { key: "year", label: "Năm học", width: 100, minWidth: 80, align: "center" },
   { key: "students", label: "Sĩ số", width: 160, minWidth: 120 },
   { key: "status", label: "Trạng thái", width: 120, minWidth: 100, align: "center" },
@@ -222,7 +222,7 @@ const CreateClassGroups = () => {
       exportConfig={{ disabled: loading || !!error, getReport: () => tableReport("Danh sách nhóm học viên", CLASS_GROUP_COLUMNS, filtered, (row, column) => {
         if (column.key === "curriculum") return row.curriculum ? `${row.curriculum.code} — ${row.curriculum.name}` : "Chưa chọn";
         if (column.key === "major") return row.major?.name;
-        if (column.key === "responsibleStaff") return row.responsibleStaff?.name || "Chưa phân công";
+        if (column.key === "responsibleStaffCompact") return row.responsibleStaff?.name || "Chưa phân công";
         if (column.key === "year") return row.academicYear;
         if (column.key === "students") return `${row.memberCount || 0}/${row.maxStudents || 40}`;
         if (column.key === "status") return row.status === "open" ? "Đang mở" : "Đã đóng";

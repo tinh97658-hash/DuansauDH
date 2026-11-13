@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import axios from 'axios';
 import LecturerPayments from '../../pages/reports/lecturerPayments';
 import { AuthSessionContext } from '../../context/AuthSession';
@@ -53,6 +53,23 @@ it('saves the exact pair, reloads persisted state, and can uncheck after remount
   expect(screen.getByRole('dialog', { name: 'Xác nhận bỏ thanh toán' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Bỏ thanh toán' }));
   await waitFor(() => expect(screen.getByRole('checkbox', { name: /^Đã thanh toán:/ })).not.toBeChecked());
+});
+
+it('paginates payment pairs in pages of 15 and resets when filters change', async () => {
+  const originalGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation(async (url, config) => url.endsWith('/options') ? originalGet(url, config)
+    : { data: { rows: Array.from({ length: 16 }, (_, index) => ({ ...row, courseOfferingId: `offering-${index}`, offeringName: `Payment class ${index + 1}`, paid: false })) } });
+  mount();
+  await screen.findByRole('button', { name: 'Payment class 1' });
+  expect(screen.getAllByRole('checkbox')).toHaveLength(15);
+  expect(screen.queryByRole('button', { name: 'Payment class 16' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }));
+  const last = screen.getByRole('button', { name: 'Payment class 16' });
+  expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+  expect(within(last.closest('tr')).getByRole('cell', { name: '16' })).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Tìm kiếm'), { target: { value: 'Payment' } });
+  await screen.findByRole('button', { name: 'Payment class 1' });
+  expect(screen.queryByRole('button', { name: 'Payment class 16' })).not.toBeInTheDocument();
 });
 
 it('passes completion dates, unit, lecturer, payment status and search together', async () => {
@@ -227,7 +244,7 @@ it('defaults to all time and automatically shows an empty result for a catalog u
 });
 
 const browser = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(file => file && fs.existsSync(file));
-(browser ? it : it.skip)('keeps long names and 80 rows within stable columns on desktop and scrolls the complete table on small screens', async () => {
+(browser ? it : it.skip)('keeps long names and 80 paginated rows within stable columns on desktop and scrolls the complete table on small screens', async () => {
   const longClass = 'Lớp học phần nghiên cứu chuyên sâu '.repeat(16).trim();
   const longLecturer = 'Nguyễn Thị Tên Giảng Viên Rất Dài '.repeat(8).trim();
   const data = Array.from({ length: 80 }, (_, index) => ({ ...row, paid: false, courseOfferingId: `offering-${index}`,
@@ -235,6 +252,11 @@ const browser = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Applic
   axios.get.mockImplementation(async url => url.endsWith('/options') ? { data: { units: [], lecturers: [] } } : { data: { rows: data } });
   const view = mount();
   await screen.findByRole('button', { name: longClass });
+  expect(screen.getByText('Hiển thị 1–15 trên 80 khoản thanh toán')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Trang cuối' }));
+  expect(screen.getByRole('button', { name: 'Lớp CNTT 79' })).toBeInTheDocument();
+  expect(view.container.querySelector('.lp-table tbody').rows).toHaveLength(5);
+  fireEvent.click(screen.getByRole('button', { name: 'Trang đầu' }));
   expect(screen.getByRole('button', { name: longClass })).toHaveAttribute('title', longClass);
   screen.getByRole('button', { name: longClass }).focus();
   expect(screen.getByRole('button', { name: longClass })).toHaveFocus();
@@ -268,7 +290,7 @@ const browser = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Applic
       const dom = execFileSync(browser, ['--headless', '--disable-gpu', '--no-sandbox', '--disable-background-networking', `--window-size=${width},900`, '--dump-dom', `file:///${htmlPath.replaceAll('\\', '/')}`],
         { encoding: 'utf8', windowsHide: true, timeout: 30000, stdio: ['ignore', 'pipe', 'ignore'] });
       const checks = JSON.parse([...dom.matchAll(/<pre id="checks">(.*?)<\/pre>/gs)].at(-1)[1]);
-      expect(checks).toMatchObject({ rows: 80, namesFit: true, lastCheckboxVisible: true, tableLayout: 'fixed', aligns: ['center', 'left', 'left', 'left', 'center', 'center', 'center', 'center', 'left'] });
+      expect(checks, JSON.stringify({ viewportWidth: width, ...checks })).toMatchObject({ rows: 15, namesFit: true, lastCheckboxVisible: true, tableLayout: 'fixed', aligns: ['center', 'left', 'left', 'left', 'center', 'center', 'center', 'center', 'left'] });
       checks.widths.forEach((value, index) => expect(Math.abs(value - [4, 13, 20, 12, 5, 9, 7, 14, 16][index])).toBeLessThan(0.2));
       expect(checks.normal).toMatchObject({ color: checks.normal.cellColor, decoration: 'none', weight: '400' });
       expect(checks.maxRowHeight).toBeLessThanOrEqual(80);

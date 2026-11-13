@@ -54,6 +54,13 @@
 .ep-heading-actions h1{flex:none}
 .ep-heading-actions>.sl-btn{white-space:nowrap}
 .scheduling-v20.v20-dialog.ep-arrangement-dialog{width:min(1280px,94vw);max-width:calc(100vw - 24px)}
+.scheduling-v20.v20-dialog.ep-arrangement-dialog.ep-unified-dialog{
+  --app-dialog-max-height:84dvh;
+  width:90vw;
+  max-width:calc(100vw - 2 * var(--app-dialog-gap,24px));
+  height:84dvh;
+  max-height:84dvh;
+}
 .ep-session-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;color:#173e75}
 .ep-session-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin:0 0 12px;padding:14px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc}
 .ep-session-summary dt{color:#607486;font-size:12px;margin-bottom:5px}.ep-session-summary dd{margin:0;font-weight:600;overflow-wrap:anywhere}
@@ -63,8 +70,8 @@
 .ep-round-table .ep-session-detail-table{min-width:1120px;table-layout:auto;width:100%}
 .ep-session-detail-table th{white-space:nowrap!important;word-break:keep-all!important;overflow-wrap:normal!important;padding:9px 12px!important;font-size:12px!important;font-weight:700!important;background:#f1f5f9!important;color:#0f2b48!important;border-bottom:1px solid #cbd5e1}
 .ep-session-detail-table td{vertical-align:top;padding:8px 12px}
-.ep-session-round-column{width:64px;min-width:64px}.ep-session-time-column{width:120px;min-width:120px}.ep-session-classes-column{width:140px;min-width:140px}
-.ep-session-detail-table>:is(thead,tbody)>tr>:is(th,td):nth-child(3){width:140px;min-width:140px}
+.ep-session-round-column{width:64px;min-width:64px}.ep-session-time-column{width:120px;min-width:120px}.ep-session-classes-column{width:300px;min-width:300px}
+.ep-session-detail-table>:is(thead,tbody)>tr>:is(th,td):nth-child(3){width:calc(300px * var(--app-text-scale,1));min-width:calc(300px * var(--app-text-scale,1))}
 .ep-session-count-column{width:90px;min-width:90px}.ep-session-status-column{width:115px;min-width:115px}.ep-session-actions-column{width:280px;min-width:260px}
 body :is(#root,.MuiDialog-root,.scheduling-v20) table.ep-session-detail-table>:is(thead,tbody)>tr>:is(th,td):is(:nth-child(1),:nth-child(2),:nth-child(5),:nth-child(6)){white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important}
 body :is(#root,.MuiDialog-root,.scheduling-v20) table.ep-session-detail-table>:is(thead,tbody)>tr>:is(th,td):is(:nth-child(5),:nth-child(6)){padding-left:6px!important;padding-right:calc(4px + 2mm)!important;text-align:center}
@@ -153,10 +160,10 @@ body .app-popup .ep-arrangement-dialog .ep-resource-hint{margin:0;padding:10px 1
  @media screen{
   html[data-font-size]:not([data-font-size="100"]) .exam-planner .sl-schedule-head{display:grid!important;grid-template-columns:minmax(var(--sl-toolbar-side-width,max-content),1fr) max-content minmax(var(--sl-toolbar-side-width,max-content),1fr);gap:8px!important;flex-wrap:nowrap!important}
   html[data-font-size]:not([data-font-size="100"]) .exam-planner .sl-schedule-head .sl-actions{flex-wrap:nowrap!important}
-  .ep-round-table .ep-session-detail-table{table-layout:fixed!important;min-width:calc(1040px * var(--app-text-scale,1))!important}
+  .ep-round-table .ep-session-detail-table{table-layout:fixed!important;min-width:calc(1190px * var(--app-text-scale,1))!important}
   .ep-session-round-column{width:calc(50px * var(--app-text-scale,1))!important}
   .ep-session-time-column{width:calc(110px * var(--app-text-scale,1))!important}
-  .ep-session-classes-column{width:calc(150px * var(--app-text-scale,1))!important}
+  .ep-session-classes-column{width:calc(300px * var(--app-text-scale,1))!important}
   .ep-session-count-column{width:calc(80px * var(--app-text-scale,1))!important}
   .ep-session-status-column{width:calc(120px * var(--app-text-scale,1))!important}
   .ep-session-actions-column{width:calc(4 * var(--app-table-action-size,32px) + 40px)!important}
@@ -170,6 +177,7 @@ body .app-popup .ep-arrangement-dialog .ep-resource-hint{margin:0;padding:10px 1
 .ep-session-row-actions .ep-icon-action-warning{background:#fff8e9;border-color:#dfba80;color:#a65d13}
 .ep-session-row-actions .ep-icon-action-warning:hover:not(:disabled){background:#fff0cf;border-color:#a65d13}
 .ep-session-row-actions .ep-icon-action-danger{background:#fff4f4;border-color:#dfb1b4;color:#b52d2d}
+body .app-popup .ep-unified-dialog .ep-session-row-actions .ep-icon-action{border:0;box-shadow:none}
 .ep-makeup-badge{display:inline-block;width:max-content;max-width:100%;margin:.2em 0 .2em .5em;padding:.1em .45em;border:1px solid #c4b1e0;background:#f4effb;color:#674397;font-size:.85em;font-weight:600;line-height:1.5;white-space:nowrap;vertical-align:middle}
 .ep-queue-select>.ep-makeup-badge{grid-column:1/-1;margin-left:0}
 .ep-attendance-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid #c9d8e5}

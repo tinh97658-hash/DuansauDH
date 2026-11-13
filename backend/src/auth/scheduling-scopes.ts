@@ -1,7 +1,7 @@
 // Scope is automatic for each granted permission; this never grants another action.
 export const SCHEDULING_SCOPES = {
   'scheduling.view': ['institution'], 'scheduling.write': ['institution'],
-  'scheduling.organize': ['institution'], 'scheduling.assign': ['institution'],
+  'scheduling.organize': ['institution'],
 } as const;
 export const INSTITUTION_PERMISSIONS = new Set([
   ...Object.keys(SCHEDULING_SCOPES), 'gradebook.view', 'gradebook.submit',

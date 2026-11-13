@@ -1,6 +1,13 @@
 /* Admission-record table appearance for all screen tables, including dialogs.
    Print layouts keep their own sizing and page-break rules. */
 @media screen {
+  html:is(:not([data-font-size]), [data-font-size="100"]) body :is(#root, .MuiDialog-root) table.admission-records-table {
+    & > thead > tr > th { font-size: 13px !important; font-weight: 700 !important; }
+    & > tbody > tr > td,
+    & > tbody > tr > td .MuiTypography-body2 { font-size: 13.5px !important; }
+    & > tbody > tr > td :is(.MuiChip-root, .MuiChip-label, .MuiTypography-caption) { font-size: 11px !important; }
+  }
+
   body :is(
     .MuiTableContainer-root, .table-responsive, .ant-table-container,
     .sl-create-confirm-table-wrap, .sl-offering-sessions-wrap,

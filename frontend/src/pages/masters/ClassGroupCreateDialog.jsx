@@ -284,14 +284,16 @@ const ClassGroupCreateDialog = ({ majors, initialValues, initialDisciplineId = "
       <AppDialog
         open={dialogOpen}
         onClose={saving ? undefined : onClose}
-        maxWidth="md"
+        maxWidth={false}
         fullWidth
         saving={saving}
         title={editingId ? "CHỈNH SỬA NHÓM HỌC VIÊN" : lockedScope ? "Tạo nhóm học viên mới" : "THÊM NHÓM HỌC VIÊN MỚI"}
         PaperProps={{
           sx: {
-            width: 800,
-            maxWidth: "calc(100vw - 32px)",
+            width: { xs: "calc(100vw - 2 * var(--app-dialog-gap, 24px))", md: "63vw" },
+            maxWidth: "calc(100vw - 2 * var(--app-dialog-gap, 24px))",
+            height: "83dvh",
+            "--app-dialog-max-height": "83dvh",
           },
         }}
         actions={

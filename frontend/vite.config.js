@@ -7,7 +7,8 @@ export default defineConfig(({ mode }) => {
   const envDir = path.resolve(__dirname, "..");
   const env = loadEnv(mode, envDir, ["VITE_", "REACT_APP_", "WEB_"]);
   const port = parseInt(env.WEB_PORT || process.env.WEB_PORT || "3100", 10);
-  const apiUrl = env.REACT_APP_API_URL || process.env.REACT_APP_API_URL || "http://localhost:3001";
+  const apiUrl = env.REACT_APP_API_URL || process.env.REACT_APP_API_URL || "/api";
+  const apiProxyTarget = process.env.API_PROXY_TARGET || "http://127.0.0.1:3001";
 
   const vitestJestCompat = {
     name: "vitest-jest-compat",
@@ -83,6 +84,12 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      proxy: {
+        "/api": {
+          target: apiProxyTarget,
+          rewrite: requestPath => requestPath.replace(/^\/api(?=\/|$)/, ""),
+        },
+      },
       port,
       host: "0.0.0.0",
       strictPort: false,

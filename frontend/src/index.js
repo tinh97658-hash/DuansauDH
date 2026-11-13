@@ -9,6 +9,7 @@ import "./styles/appearance.css";
 import "./styles/adaptive-layout.css";
 import "./config/http";
 import App from "./App";
+import NativeTitleTooltip from "./components/NativeTitleTooltip";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App />);
+root.render(<><App /><NativeTitleTooltip /></>);

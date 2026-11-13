@@ -64,7 +64,13 @@ export default function StudyLeaveRequestDialog({ onClose, onCreated }) {
   };
 
   return <AppDialog open title="Tạo yêu cầu bảo lưu" onClose={onClose} onConfirm={submit}
-    confirmText="Xác nhận" confirmDisabled={invalid} saving={busy}>
+    confirmText="Xác nhận" confirmDisabled={invalid} saving={busy} maxWidth={false}
+    PaperProps={{ sx: {
+      width: { xs: 'calc(100vw - 2 * var(--app-dialog-gap, 24px))', md: '70vw' },
+      maxWidth: 'calc(100vw - 2 * var(--app-dialog-gap, 24px))',
+      height: '78dvh',
+      '--app-dialog-max-height': '78dvh',
+    } }}>
     <Stack spacing={2}>
       {error && <Alert severity="error">{error}</Alert>}
       <PopupFormField label="Mã học viên *" htmlFor="study-leave-learner-code">

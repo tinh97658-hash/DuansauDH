@@ -19,6 +19,16 @@ config.env.*
 *.p12
 *.pfx
 
+# Private key filenames; retain public keys and public CA certificates
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+*.private.pem
+*-private.pem
+*_private.pem
+*_key.pem
+
 # Tool caches and disposable test/browser output
 .cache/
 .vite/
@@ -50,6 +60,10 @@ Thumbs.db
 /.tmp/
 /.docker-recovery/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 *.dump
 *.dmp
 *.bak
@@ -70,6 +84,8 @@ Thumbs.db
 
 # Generated audit/test snapshots; keep Markdown reports and verification scripts
 /security-review/*.json
+# Local artifacts (all contents)
+/artifacts/
 
 # Local transcript implementation diary and retired comparison fonts
 /TRANSCRIPT-EXPORT-CONTINUOUS-IMPLEMENTATION.md
@@ -83,3 +99,24 @@ Thumbs.db
 /.rollback-verification/
 /.dashboard-verification/
 /.antigravity-qa/
+
+# Local-only review material and optional agent instructions (not application inputs)
+/Bao_cao_DuansauDH/
+/git-diff.txt
+/.gitmodules
+/SecuritySkills/
+/rules/
+/docs/reviews/
+/docs/plans/
+/docs/DASHBOARD_V2_LAYOUT_REVIEW.md
+/docs/DASHBOARD_V2_UI_REVIEW.md
+/docs/DASHBOARD_V2_VISUAL_REVIEW.md
+/docs/RELEASE-2026-10-08.md
+/docs/GIT_HYGIENE_AUDIT_2026-11-13.md
+/docs/NOTIFICATION_V2_AUDIT_2026-11-13.md
+/docs/SAFE_GIT_WORKFLOW_VT11.md
+/security-review/BAO-CAO-BAO-MAT-2026-10-27.md
+/security-review/KET-QUA-KHAC-PHUC.md
+/security-review/PHAN-QUYEN-2026-11-05.md
+/security-review/inventory.cjs
+/security-review/verify-findings.cjs

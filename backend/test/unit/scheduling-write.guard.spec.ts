@@ -1,18 +1,36 @@
 import { PERMISSIONS_KEY } from "../../src/common/permissions.decorator.js";
 import { ExecutionContext, ForbiddenException } from "@nestjs/common";
-import { GUARDS_METADATA } from "@nestjs/common/constants";
+import { GUARDS_METADATA, PATH_METADATA } from "@nestjs/common/constants";
 import { Staff } from "../../src/database/models/staff.model.js";
 import { SchedulingWriteGuard } from "../../src/common/scheduling-write.guard.js";
 import { CourseOfferingWriteGuard } from "../../src/common/course-offering-write.guard.js";
 import { PermissionsGuard } from "../../src/common/permissions.guard.js";
 import { RbacService } from "../../src/auth/rbac.service.js";
 import { SchedulingController } from "../../src/scheduling/scheduling.controller.js";
+import { PERMISSION_CODES } from "../../src/auth/permissions.js";
+import { PERMISSION_ROUTES } from "../../src/auth/route-permissions.js";
 
 const contextFor = (user: unknown) => ({
   switchToHttp: () => ({ getRequest: () => ({ user }) }),
 }) as unknown as ExecutionContext;
 
 describe("SchedulingWriteGuard", () => {
+  it("retires coordinator assignment while retaining timetable and account actions", () => {
+    expect(PERMISSION_CODES).not.toContain("scheduling.assign");
+    expect(PERMISSION_CODES).toEqual(expect.arrayContaining([
+      "scheduling.view", "scheduling.organize", "scheduling.write", "groups.assign",
+      "account.view", "account.manage", "account.password.reset", "exams.view", "exams.write",
+    ]));
+    const routes = new Map(PERMISSION_ROUTES.map(route => [route.path, route]));
+    expect(routes.get("/masters/course-offerings")?.actions).toEqual(["scheduling.organize"]);
+    expect(routes.get("/masters/schedule")?.actions).toEqual(["scheduling.write"]);
+    expect(routes.get("/system/accounts")?.actions).toEqual(["account.manage", "account.password.reset"]);
+    const prototype = SchedulingController.prototype;
+    const paths = Object.getOwnPropertyNames(prototype)
+      .filter(name => name !== "constructor")
+      .map(name => Reflect.getMetadata(PATH_METADATA, (prototype as any)[name]));
+    expect(paths).not.toContain("assignee");
+  });
   const rbac = { effectiveAccess: async (user: any) => ({ permissions: new Set<string>(user.permissions || []), groupScope: { readOnly: user.readOnly === true } }) } as unknown as RbacService;
   const guard = new SchedulingWriteGuard(rbac);
   const staffUser = (canManageScheduling: boolean) => Object.assign(

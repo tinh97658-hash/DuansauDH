@@ -86,7 +86,8 @@ it("liệt kê tài khoản nhân sự và mở các thao tác quản trị cho 
   expect(screen.getByRole("button", { name: "Khóa an@example.com" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Mở khóa binh@example.com" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Đặt lại mật khẩu an@example.com" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Phân công xếp lịch an@example.com" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^Phân công xếp lịch / })).not.toBeInTheDocument();
+  expect(screen.queryByText(/Người phụ trách tổ chức lớp và xếp lịch hiện tại/)).not.toBeInTheDocument();
 });
 
 it("ẩn toàn bộ điều khiển quản trị khi tài khoản chỉ có quyền xem", async () => {

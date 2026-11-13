@@ -1,0 +1,26 @@
+/* Shared palette for MUI tooltips and title hints, including dialog portals. */
+body .MuiTooltip-tooltip,
+body .app-title-tooltip {
+  background: #fff !important;
+  color: #172b3a !important;
+  border: 1px solid #767676 !important;
+  border-radius: 0 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .12) !important;
+  padding: 3px 7px;
+  font-family: var(--app-font-family);
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+body .MuiTooltip-arrow { color: #fff !important; }
+body .MuiTooltip-arrow::before { border: 1px solid #767676; }
+.app-title-tooltip {
+  position: fixed;
+  z-index: 20000;
+  max-width: min(360px, calc(100vw - 16px));
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+body:has(.document-export-options) .app-title-tooltip,
+body:has([aria-haspopup="menu"][aria-expanded="true"]) .app-title-tooltip { display: none; }
+@media print { .app-title-tooltip, .MuiTooltip-popper { display: none !important; } }

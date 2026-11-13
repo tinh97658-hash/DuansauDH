@@ -200,8 +200,8 @@
     html[data-font-size] {
       --app-control-height: calc(21.25px + 18.75px * var(--app-text-scale, 1));
       --app-control-icon-size: calc(18px * var(--app-text-scale, 1));
-      --app-table-action-size: calc(32px * var(--app-text-scale, 1));
-      --app-table-icon-size: calc(16px * var(--app-text-scale, 1));
+      --app-table-action-size: calc(36px * var(--app-text-scale, 1));
+      --app-table-icon-size: calc(24px * var(--app-text-scale, 1));
     }
 
     /* One geometry for single-line fields and actions, including lazy pages.
