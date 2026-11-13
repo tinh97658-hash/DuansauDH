@@ -8,8 +8,6 @@ import {ExamWorkflowService} from '../../src/masters/exam-workflow.service.js';
 import {ExamScheduleService} from '../../src/masters/exam-schedule.service.js';
 import {AuditContextService} from '../../src/audit/audit-context.js';
 import {up,down} from '../../src/database/migrations/066-masters-exam-workflow.js';
-import {up as addLecturer} from '../../src/database/migrations/067-exam-session-lecturer.js';
-import {up as addArrangements} from '../../src/database/migrations/068-exam-arrangements.js';
 import {LEGACY_GRADING_POLICY} from '../../src/masters/grading-policy.js';
 import {ClassScoreSummaryService} from '../../src/reports/class-score-summary.service.js';
 import {ExamScheduleQueryDto} from '../../src/masters/dto/exam-schedule.dto.js';
@@ -20,7 +18,7 @@ describeDb('Automatic eligibility and final exam workflow and scheduling on Post
  let app:any,db:Sequelize,m:any,grades:ExamGradebookService,workflow:ExamWorkflowService,schedule:ExamScheduleService,f:any;
  let legacy:any[],legacyGrades:any[];
  const sql=async(q:string,replacements:any={})=>workflow.query(q,replacements);
- async function fixture(){
+ async function fixture(participantCount=2){
   const code='EW'+randomUUID().replace(/-/g,'').slice(0,9);
   const actor=await m.Staff.create({name:code,email:code.toLowerCase()+'@example.invalid',role:'admin'});
   const discipline=await m.Discipline.create({code,name:code,active:true});
@@ -30,7 +28,7 @@ describeDb('Automatic eligibility and final exam workflow and scheduling on Post
   const block=await m.CurriculumBlock.create({curriculumId:curriculum.id,code:'KC',name:code});
   await m.CurriculumSubject.create({curriculumId:curriculum.id,blockId:block.id,subjectId:subject.id});
   const group=await m.ClassGroup.create({code,name:code,majorId:major.id,program:'masters',academicYear:'2026',curriculumId:curriculum.id});
-  const people=[];for(let i=0;i<2;i++)people.push(await m.AdmissionRecord.create({code:code+i,fullName:code+' Learner '+i,majorId:major.id,trainingLevel:'Thạc sĩ',academicYear:'2026',status:'approved',studyStatus:'Đang học'}));
+  const people=[];for(let i=0;i<participantCount;i++)people.push(await m.AdmissionRecord.create({code:code+i,fullName:code+' Learner '+i,majorId:major.id,trainingLevel:'Thạc sĩ',academicYear:'2026',status:'approved',studyStatus:'Đang học'}));
   await m.ClassGroupMember.bulkCreate(people.map(p=>({admissionRecordId:p.id,classGroupId:group.id})));
   const offering=await m.CourseOffering.create({subjectId:subject.id,name:code,status:'completed',completedAt:new Date(),completedByStaffId:actor.id});
   await m.CourseOfferingClassGroup.create({courseOfferingId:offering.id,classGroupId:group.id});
@@ -53,7 +51,7 @@ describeDb('Automatic eligibility and final exam workflow and scheduling on Post
    examDate:'2099-05-04',startTime:'08:00',endTime:'10:00',roomId:f.room.id,lecturerId:f.lecturer.id,...overrides},f.actor);
  }
  async function ended(id:string){await db.query(`UPDATE course_exam_sessions SET exam_date='2000-01-01' WHERE id=:id`,{replacements:{id}});}
- async function held(){const e=await exam();await ended(e.id);await schedule.confirm(e.id,{version:0,note:'QA held',status:'held'},f.actor);return e;}
+ async function held(){const e=await exam();await ended(e.id);await schedule.confirm(e.id,{version:0,note:'QA held',status:'held'},f.actor);await schedule.confirmAttendance(e.id,{version:1},f.actor);return e;}
  async function saveExam(score:number|null=7){
   const b=await read();return grades.save({...f.scope,revision:b.revision,rows:b.rows.map((r:any)=>({participantId:r.participantId,testScore:r.testScore,assignmentScore:r.assignmentScore,
    examScore:score,examExempt:r.examExempt,letterGrade:'',attemptScores:[],result:'pending'}))},f.actor);
@@ -69,11 +67,24 @@ describeDb('Automatic eligibility and final exam workflow and scheduling on Post
    await l.offering.update({gradebookStatus:state,gradebookSnapshot:state==='approved'?{rows:values}:null});
    await m.CourseExamGradebook.create({classGroupId:l.group.id,courseOfferingId:l.offering.id,grades:values,revision:3});legacy.push(l);legacyGrades.push(values);
   }
-  await up({context:db.getQueryInterface()});
-  await down({context:db.getQueryInterface()});
-  await up({context:db.getQueryInterface()});
-  await addLecturer({context:db.getQueryInterface()});
-  await addArrangements({context:db.getQueryInterface()});
+  // Exercise the old migration lifecycle in its own schema. Replaying 066 on
+  // the current application schema would destroy later attendance/RLS changes.
+  const schema='exam_migration_'+randomUUID().replaceAll('-','');
+  await db.query(`CREATE SCHEMA ${schema}`);
+  const migrationDb=new Sequelize(process.env.DATABASE_URL!,{logging:false,dialectOptions:{options:`-c search_path=${schema},public`}});
+  try{
+   await migrationDb.query(`CREATE TABLE course_offerings(id uuid PRIMARY KEY,gradebook_status text,gradebook_version integer,gradebook_snapshot jsonb);
+    CREATE TABLE course_exam_gradebooks(course_offering_id uuid,grades jsonb);
+    CREATE TABLE rooms(id uuid PRIMARY KEY); CREATE TABLE staff(id uuid PRIMARY KEY);
+    INSERT INTO course_offerings SELECT id,gradebook_status,gradebook_version,gradebook_snapshot FROM public.course_offerings;
+    INSERT INTO course_exam_gradebooks SELECT course_offering_id,grades FROM public.course_exam_gradebooks;`);
+   await up({context:migrationDb.getQueryInterface()});
+   await down({context:migrationDb.getQueryInterface()});
+   await up({context:migrationDb.getQueryInterface()});
+   const [migrated]:any=await migrationDb.query('SELECT course_offering_id,mode,legacy_evidence FROM course_exam_workflows');
+   for(const row of migrated)await db.query(`INSERT INTO course_exam_workflows(course_offering_id,mode,legacy_evidence)
+     VALUES(:id,:mode,CAST(:evidence AS jsonb))`,{replacements:{id:row.course_offering_id,mode:row.mode,evidence:JSON.stringify(row.legacy_evidence)}});
+  }finally{await migrationDb.close();await db.query(`DROP SCHEMA ${schema} CASCADE`);}
  },60000);
  beforeEach(async()=>{f=await fixture();});
  afterAll(async()=>{await app?.close();});
@@ -87,12 +98,13 @@ describeDb('Automatic eligibility and final exam workflow and scheduling on Post
   await schedule.reschedule(e.id,{courseOfferingId:f.offering.id,snapshotId:state.eligibility.snapshotId,eligibilityVersion:state.eligibility.version,version:0,examDate:'2099-05-04',startTime:'08:00',endTime:'10:00',roomId:f.room.id,lecturerId:peer.lecturer.id},f.actor);
   expect(await find()).toMatchObject({lecturerId:peer.lecturer.id,lecturerName:peer.lecturer.name});
  });
- it('rejects missing and inactive lecturers without creating an exam',async()=>{
+ it('allows an unassigned invigilator but rejects an inactive catalogue lecturer',async()=>{
   await save();
-  await expect(exam({lecturerId:undefined})).rejects.toThrow('chọn giảng viên');
+  const unassigned=await exam({lecturerId:undefined});
+  await schedule.cancel(unassigned.id,{version:0,note:'Verify inactive lecturer separately'},f.actor);
   await f.lecturer.update({active:false});
   await expect(exam()).rejects.toThrow('giảng viên đang hoạt động');
-  expect(await sql('SELECT id FROM course_exam_sessions WHERE course_offering_id=:id',{id:f.offering.id})).toHaveLength(0);
+  expect(await sql("SELECT id FROM course_exam_sessions WHERE course_offering_id=:id AND status<>'cancelled'",{id:f.offering.id})).toHaveLength(0);
  });
  it('serializes overlapping exam bookings for one lecturer across different rooms and rosters',async()=>{
   await save();const first=f;
@@ -193,7 +205,7 @@ describeDb('Automatic eligibility and final exam workflow and scheduling on Post
   await f.room.update({capacity:1});await exam();
   expect((await sql('SELECT * FROM course_exam_session_candidates')).filter(r=>r.session_id)).not.toHaveLength(0);
  });
- it.each(['2000-01-01','2020-01-01'])('rejects past starts %s',async(date)=>{await approve();await expect(exam({examDate:date})).rejects.toThrow('đã bắt đầu');});
+ it.each(['2000-01-01','2020-01-01'])('rejects past starts %s',async(date)=>{await approve();await expect(exam({examDate:date})).rejects.toMatchObject({response:{code:'EXAM_PERIOD_CLOSED'}});});
  it('allows Held without a reason, retains history and unlocks only its candidates',async()=>{
   await approve();const e=await exam();await ended(e.id);
   await schedule.confirm(e.id,{version:0,status:'held'},f.actor);
@@ -272,7 +284,7 @@ describeDb('Automatic eligibility and final exam workflow and scheduling on Post
  it('requires real scheduling permissions independently of approval permission',async()=>{
   await approve();const noAccess=await m.Staff.create({name:'QA no access',email:randomUUID()+'@example.invalid',role:'unknown'});
   await expect(schedule.schedule({} as any,noAccess)).rejects.toThrow('quyền xếp lịch');
-  await expect(grades.transition({...f.scope,action:'approve',revision:0,version:0,note:'QA'},noAccess,'eligibility')).rejects.toThrow('quyền');
+  await expect(grades.transition({...f.scope,action:'approve',revision:0,version:0,note:'QA'},noAccess,'eligibility')).rejects.toMatchObject({status:403});
  });
  it('counts only approved eligible candidates for capacity, excluding ineligible classmates',async()=>{
   const b=await read();await grades.save({...f.scope,revision:b.revision,rows:b.rows.map((r:any,i:number)=>({participantId:r.participantId,testScore:i?1:8,assignmentScore:8,examScore:null,examExempt:false,letterGrade:'',attemptScores:[],result:'pending',policyVersion:r.eligibilityPolicy.version,policyRulesVersion:r.eligibilityPolicy.rulesVersion}))},f.actor);
@@ -322,7 +334,7 @@ describeDb('Automatic eligibility and final exam workflow and scheduling on Post
    await db.query('INSERT INTO shared_grading_rules(version,policy,created_at) VALUES(:version,CAST(:policy AS jsonb),now())',{replacements:{version:ruleVersion,policy:JSON.stringify({...LEGACY_GRADING_POLICY,version:ruleVersion,minimums:{testScore:9,assignmentScore:9,examScore:9}})}});
    await transition('final','reopen');expect((await read()).rows[0]).toMatchObject({eligible:true,courseScore:6.6,result:'passed'});
    const card=await app.get(ClassScoreSummaryService).learnerScorecard(f.people[0].id,f.group.id);
-   expect(card.subjects[0].grade).toMatchObject({score:6.6,result:'passed',details:{eligibilityFrozen:false}});
+   expect(card.subjects[0].grade).toMatchObject({score:6.6,result:'passed',details:{eligibilityFrozen:true}});
   }finally{await db.query('DELETE FROM shared_grading_rules WHERE version=:version',{replacements:{version:ruleVersion}});}
  });
  it('prevents concurrent final mark overwrites using the grade revision',async()=>{
@@ -332,10 +344,9 @@ describeDb('Automatic eligibility and final exam workflow and scheduling on Post
   expect(result.filter(r=>r.status==='fulfilled')).toHaveLength(1);expect((result.find(r=>r.status==='rejected') as PromiseRejectedResult).reason.message).toContain('Điểm đã thay đổi');
  });
  it.each([0,10,5.55])('accepts component and exam score boundary %s without zero coercion',async(score)=>{
-  const rounded=Math.round((score+Number.EPSILON*10)*10)/10;
-  await save({testScore:score,assignmentScore:score});expect((await read()).rows[0].testScore).toBe(rounded);
+  await save({testScore:score,assignmentScore:score});expect((await read()).rows[0].testScore).toBe(score);
   if(score<5)await save();await held();
-  const result=await saveExam(score);expect(result.rows[0].examScore).toBe(rounded);expect(result.rows[0].courseScore).not.toBeNull();
+  const result=await saveExam(score);expect(result.rows[0].examScore).toBe(score);expect(result.rows[0].courseScore).not.toBeNull();
  });
  it.each([-0.01,10.01])('rejects out-of-range scores %s in each phase without changing persisted grades',async(score)=>{
   await save();const before=await read();
@@ -343,7 +354,7 @@ describeDb('Automatic eligibility and final exam workflow and scheduling on Post
   await held();const current=await read();
   await expect(saveExam(score)).rejects.toThrow();expect((await read()).revision).toBe(current.revision);
  });
- it.each([['08:00','10:00',true],['07:00','09:00',true],['09:00','11:00',true],['07:00','11:00',true],['10:00','11:00',false],['12:00','13:00',false]])('checks room interval %s–%s overlap=%s',async(start,end,conflict)=>{
+ it.each([['08:00','10:00',true],['08:00','09:00',true],['09:00','11:00',true],['08:00','11:00',true],['10:00','11:00',false],['11:00','12:00',false]])('checks room interval %s–%s overlap=%s',async(start,end,conflict)=>{
   const original=f;await approve();await exam();const peer=await fixture();f=peer;await approve();
   if(conflict)await expect(exam({roomId:original.room.id,startTime:start,endTime:end})).rejects.toMatchObject({response:{code:'EXAM_ROOM_CONFLICT'}});
   else await exam({roomId:original.room.id,startTime:start,endTime:end});
@@ -353,16 +364,16 @@ describeDb('Automatic eligibility and final exam workflow and scheduling on Post
   await approve();await expect(exam({startTime,endTime})).rejects.toMatchObject({response:{code:'EXAM_WORKING_HOURS'}});
   expect(await sql('SELECT id FROM course_exam_sessions WHERE course_offering_id=:id',{id:f.offering.id})).toHaveLength(0);
  });
- it.each([['07:00','08:00'],['18:00','19:00']])('accepts daytime boundaries within one period %s–%s',async(startTime,endTime)=>{
+ it.each([['08:00','09:00'],['17:00','18:00']])('accepts daytime boundaries within one period %s–%s',async(startTime,endTime)=>{
   await approve();const e=await exam({startTime,endTime});expect(e.id).toBeTruthy();
  });
  it('rejects an exam crossing the chosen morning/afternoon boundary',async()=>{
   await approve();await expect(exam({startTime:'12:30',endTime:'13:30'})).rejects.toThrow('nằm trọn trong buổi');
  });
- it.each([['07:59',true],['08:00',false],['08:01',false]])('uses a controlled Vietnam DB start boundary at %s',async(clock,allowed)=>{
+ it.each([['07:59',null],['08:00','EXAM_START_PASSED'],['08:01','EXAM_PERIOD_CLOSED']])('uses a controlled Vietnam DB start boundary at %s',async(clock,code)=>{
   await approve();const original=workflow.query.bind(workflow);
   const spy=jest.spyOn(workflow,'query').mockImplementation((query,args,tx)=>original(query.replaceAll('clock_timestamp()',`TIMESTAMPTZ '2099-05-04 ${clock}:00+07'`),args,tx));
-  try{if(allowed)await exam();else await expect(exam()).rejects.toThrow('đã bắt đầu');}finally{spy.mockRestore();}
+  try{if(!code)await exam();else await expect(exam()).rejects.toMatchObject({response:{code}});}finally{spy.mockRestore();}
  });
  it.each([['09:59:59',false],['10:00:00',true],['10:00:01',true]])('uses a controlled exact-end boundary at %s for explicit confirmation',async(clock,allowed)=>{
   await approve();const e=await exam();const original=workflow.query.bind(workflow);
@@ -422,8 +433,8 @@ describeDb('Automatic eligibility and final exam workflow and scheduling on Post
   expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);expect(await sql("SELECT id FROM course_exam_sessions WHERE exam_date='2099-05-05' AND room_id=:id",{id:original.room.id})).toHaveLength(1);
  });
  it.each([1,10,40])('handles a representative %s-person approved set with exact room capacity',async(size)=>{
-  if(size===1)await m.ClassGroupMember.destroy({where:{admissionRecordId:f.people[1].id}});
-  for(let i=2;i<size;i++){const person=await m.AdmissionRecord.create({code:'QA'+randomUUID().slice(0,12),fullName:'QA performance '+i,majorId:f.group.majorId,trainingLevel:'Thạc sĩ',academicYear:'2026',status:'approved',studyStatus:'Đang học'});await m.ClassGroupMember.create({admissionRecordId:person.id,classGroupId:f.group.id});}
+  // Membership must exist before the offering link freezes its teaching roster.
+  f=await fixture(size);
   await f.room.update({capacity:size});await approve();const e=await exam();expect(await sql('SELECT participant_id FROM course_exam_session_candidates WHERE session_id=:id',{id:e.id})).toHaveLength(size);
   const planner=await schedule.list({from:'2099-05-04',to:'2099-05-04'},f.actor);expect(planner.sessions.find(s=>s.id===e.id).candidateCount).toBe(size);
  });

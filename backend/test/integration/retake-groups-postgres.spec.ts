@@ -364,7 +364,9 @@ describeDb("Retake groups across scheduling and exam rosters", () => {
     const session=await examSchedule.schedule({courseOfferingId:source.id,snapshotId:state.eligibility.snapshotId,eligibilityVersion:state.eligibility.version,examDate:'2099-01-01',startTime:'08:00',endTime:'10:00',roomId:room.id,lecturerId:lecturer.id},staff);
     await db.query("UPDATE course_exam_sessions SET exam_date='2000-01-01' WHERE id=:id",{replacements:{id:session.id}});
     await examSchedule.confirm(session.id,{version:0,status:'held',note:'Held test exam'},staff);
-    const final=await exams.save({...scope,revision:eligible.revision,rows:eligible.rows.map((row:any)=>({...row,examScore:8}))},staff);
+    await examSchedule.confirmAttendance(session.id,{version:1},staff);
+    const current=await exams.get(scope);
+    const final=await exams.save({...scope,revision:current.revision,rows:current.rows.map((row:any)=>({...row,examScore:8}))},staff);
     const finalSubmitted=await exams.transition({...scope,action:'submit',note:'Final submission',revision:final.revision,version:0},staff,'final');
     return exams.transition({...scope,action:'approve',note:'Final approval',revision:finalSubmitted.revision,version:1},staff,'final');
   }

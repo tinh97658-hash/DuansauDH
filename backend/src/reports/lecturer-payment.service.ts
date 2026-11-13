@@ -7,6 +7,7 @@ import { Sequelize } from 'sequelize-typescript';
 import { LecturerPaymentQueryDto, UpdateLecturerPaymentDto } from './dto/lecturer-payment.dto.js';
 
 // Aggregate links separately so joining multiple groups never multiplies the session count.
+const OFFERING_NAME_SQL = "COALESCE(NULLIF(o.name,''),subject.name)";
 const PARTICIPATING_GROUPS_SQL = `SELECT COALESCE(jsonb_agg(jsonb_build_object(
   'id',g.id,'code',g.code,'name',g.name) ORDER BY COALESCE(NULLIF(g.code,''),g.name),g.id),'[]'::jsonb) AS groups,
   COALESCE(string_agg(COALESCE(g.code,'') || ' ' || COALESCE(g.name,''),' '),'') AS search
@@ -34,7 +35,7 @@ export class LecturerPaymentService {
     }
     const data = await this.db.query<any>(`WITH teaching AS (
       SELECT o.id AS "courseOfferingId", l.id AS "lecturerId", l.name AS "lecturerName",l.academic_rank AS "academicRank",l.academic_degree AS "academicDegree",
-        l.unit_id AS "unitId", COALESCE(NULLIF(o.name,''),subject.name) AS "offeringName",
+        l.unit_id AS "unitId", ${OFFERING_NAME_SQL} AS "offeringName",
         o.completed_at AS "completedAt", COUNT(s.id)::integer AS "sessionCount"
       ${PAYMENT_SESSIONS_SQL}
       GROUP BY o.id,l.id,subject.name
@@ -170,7 +171,7 @@ export class LecturerPaymentService {
         AND (:lecturerFilter IS NULL OR l.id=CAST(:lecturerFilter AS uuid))
         AND (:from IS NULL OR (o.completed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date>=CAST(:from AS date))
         AND (:to IS NULL OR (o.completed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date<=CAST(:to AS date))
-        AND (:search = '' OR POSITION(LOWER(:search) IN LOWER(l.name || ' ' || COALESCE(o.name,'') || ' ' ||
+        AND (:search = '' OR POSITION(LOWER(:search) IN LOWER(l.name || ' ' || ${OFFERING_NAME_SQL} || ' ' ||
           COALESCE((SELECT string_agg(COALESCE(g.code,'') || ' ' || COALESCE(g.name,''),' ')
             FROM course_offering_class_groups link JOIN class_groups g ON g.id=link.class_group_id WHERE link.course_offering_id=o.id),'')))>0)
         AND (:checkVersion = false OR

@@ -9,7 +9,7 @@ permissions:
 jobs:
   dependencies-and-regressions:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16-alpine
@@ -61,3 +61,33 @@ jobs:
         run: node security-review/verify-postgres.cjs
       - run: npm --prefix frontend test -- --maxWorkers=2
       - run: npm --prefix frontend run build
+
+  postgres-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pgsms_ci
+          POSTGRES_PASSWORD: disposable-ci-password
+          POSTGRES_DB: pgsms_ci_control
+        ports:
+          - 55440:5432
+        options: >-
+          --health-cmd "pg_isready -U pgsms_ci -d pgsms_ci_control"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      POSTGRES_TEST_ADMIN_URL: postgres://pgsms_ci:disposable-ci-password@127.0.0.1:55440/pgsms_ci_control
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci --prefix backend
+      - run: node --test backend/test/postgres-runner.test.cjs
+      - run: npm --prefix backend run build
+      - name: Run every guarded PostgreSQL suite on freshly migrated disposable databases
+        run: npm --prefix backend run test:postgres

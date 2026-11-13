@@ -20,6 +20,7 @@ import { resolveSavedExamGrade } from "../masters/exam-grade-calculation.js";
 import { matchesExamSubjectSql } from "../masters/exam-subject-scope.js";
 import { LEGACY_GRADING_POLICY } from "../masters/grading-policy.js";
 import { foreignLanguageExemptGrade, foreignLanguageSubjectSql } from "../masters/foreign-language-exemption.js";
+import { lockTrainingStructure } from "./training-structure-integrity.js";
 import {
   CreateLearningResultDto,
   DecideRecognitionDto,
@@ -101,19 +102,30 @@ export class SubjectRecognitionService {
     return this.studiedSubjectsInCurriculum(record, curriculum);
   }
 
-  private async currentLearningCurriculum(record: AdmissionRecord) {
+  private async currentLearningCurriculum(record: AdmissionRecord, transaction?: Transaction, requireUnambiguous = false, preferredId?: string) {
     const program = record.trainingLevel === "Tiến sĩ" ? "doctoral" : "masters";
     const memberships = await this.memberships.findAll({
       where: { [Op.or]: [{ admissionRecordId: record.id }, ...(record.studentId ? [{ studentId: record.studentId }] : [])] },
       include: [{ model: ClassGroup, as: "classGroup", required: true,
         where: { majorId: record.majorId, program, academicYear: record.academicYear || "" }, attributes: ["curriculumId"] }],
       order: [["enrolledAt", "DESC"], ["id", "ASC"]],
+      transaction,
     });
     const assignedId = memberships.find(row => row.classGroup?.curriculumId)?.classGroup.curriculumId;
-    if (assignedId) return this.curriculums.findByPk(assignedId);
+    if (assignedId) return this.curriculums.findByPk(assignedId, { transaction });
+    if (preferredId) return this.curriculums.findByPk(preferredId, { transaction });
+    if (requireUnambiguous) {
+      const candidates = await this.curriculums.findAll({
+        where: { majorId: record.majorId, program, applicableFromYear: record.academicYear || "" },
+        transaction,
+      });
+      if (candidates.length > 1) throw new ConflictException("Có nhiều CTĐT phù hợp. Hãy phân lớp và chọn CTĐT trước khi duyệt công nhận học phần.");
+      return candidates[0] || null;
+    }
     return this.curriculums.findOne({
       where: { majorId: record.majorId, program, applicableFromYear: record.academicYear || "" },
       order: [["createdAt", "DESC"]],
+      transaction,
     });
   }
 
@@ -555,6 +567,28 @@ export class SubjectRecognitionService {
         throw new ConflictException("Học phần tiền thạc sĩ phải có điểm từ 0 đến 10 trước khi công nhận.");
       }
       const targetSubjectId = dto.targetSubjectId || row.targetSubjectId;
+      if (dto.decision === "approved") {
+        await lockTrainingStructure(this.sequelize, transaction);
+        const record = await this.records.findByPk(row.admissionRecordId, { transaction, lock: transaction.LOCK.UPDATE });
+        if (!record) throw new NotFoundException("Không tìm thấy hồ sơ học viên.");
+        // The approved transfer explicitly selects the destination curriculum,
+        // including before the learner has been assigned to a new class.
+        const [transfer] = row.majorTransferId ? await this.sequelize.query<{ curriculumId: string }>(`
+          SELECT to_curriculum_id AS "curriculumId" FROM major_transfers
+          WHERE id=:id AND admission_record_id=:recordId AND to_major_id=:majorId AND status='approved'
+        `, { type: QueryTypes.SELECT, transaction,
+          replacements: { id: row.majorTransferId, recordId: record.id, majorId: record.majorId } }) : [];
+        const curriculum = await this.currentLearningCurriculum(record, transaction, true, transfer?.curriculumId);
+        const program = record.trainingLevel === "Tiến sĩ" ? "doctoral" : "masters";
+        if (!record.majorId || !curriculum || curriculum.majorId !== record.majorId
+          || curriculum.program !== program || curriculum.applicableFromYear !== (record.academicYear || "")) {
+          throw new ConflictException("Chưa xác định được CTĐT phù hợp với chuyên ngành, bậc và khóa hiện tại của học viên.");
+        }
+        const targets = await this.curriculumSubjects.findAll({
+          where: { curriculumId: curriculum.id, subjectId: targetSubjectId }, attributes: ["subjectId"], transaction,
+        });
+        if (!targets.length) throw new ConflictException("Học phần đích không thuộc CTĐT áp dụng cho học viên.");
+      }
       if (dto.targetSubjectId && dto.targetSubjectId !== row.targetSubjectId) {
         const duplicate = await this.recognitions.findOne({
           where: { admissionRecordId: row.admissionRecordId, targetSubjectId, id: { [Op.ne]: row.id } },

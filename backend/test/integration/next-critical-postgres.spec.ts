@@ -12,7 +12,10 @@ run("Independent subject constraints on disposable PostgreSQL", () => {
   const query = (sql: string, replacements: Record<string, unknown> = {}) => db.query(sql, { replacements, type: QueryTypes.SELECT });
   beforeAll(async () => {
     const url = process.env.TEST_DATABASE_URL;
-    if (!url || !/^postgres:\/\/[^/]+@127\.0\.0\.1:56487\/pgsms_ui_verification$/.test(url)) throw Error("Use the independently owned local test database only");
+    const target = url ? new URL(url) : null;
+    const legacy = target?.hostname === '127.0.0.1' && target.port === '56487' && target.pathname === '/pgsms_ui_verification';
+    const ci = target?.hostname === '127.0.0.1' && target.username === 'pgsms_ci' && /^\/pgsms_ci_test_\d+$/.test(target.pathname);
+    if (!target || target.protocol !== 'postgres:' || (!legacy && !ci)) throw Error("Use the independently owned local test database only");
     admin = new Sequelize(url, { logging: false }); await admin.query(`CREATE SCHEMA ${schema}`);
     db = new Sequelize(url, { logging: false, dialectOptions: { options: `-c search_path=${schema}` } });
   });

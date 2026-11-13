@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Controller, Get, NotImplementedException, Param, Post, UseGuards } from "@nestjs/common";
 import { CurrentUser } from "../common/auth-user.js";
 import { RequirePermissions } from "../common/permissions.decorator.js";
 import { PermissionsGuard } from "../common/permissions.guard.js";
@@ -25,5 +25,7 @@ export class DataController {
 
   @Post("submitreview")
   @RequirePermissions("supervision.review")
-  review(@Body() body: unknown) { return { status: "success", message: body }; }
+  review() {
+    throw new NotImplementedException("Chức năng lưu nhận xét chưa được triển khai. Nhận xét chưa được gửi hoặc lưu.");
+  }
 }

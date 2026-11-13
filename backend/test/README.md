@@ -6,6 +6,30 @@
 
 Tests must be deterministic and must not use production credentials or production data. Put reusable builders and fakes in `fixtures/` when the suite grows. Database integration tests should use a disposable PostgreSQL instance and clean their own records.
 
+## Complete PostgreSQL integration gate
+
+The `postgres-integration` CI job runs every integration suite guarded by a `RUN_*` flag,
+including notification, working profile/RLS, exam, payment, learner code and migration tests.
+Each suite gets a newly created, fully migrated database; an existing database is never reused
+or deleted. The runner fails if a selected suite reports zero passing tests or any skipped/todo tests.
+
+For local verification, provision an independent PostgreSQL 16 server on loopback port 55440
+with user `pgsms_ci`, database `pgsms_ci_control`, and a password used only for testing.
+Do not point the runner at the application server. It does not load `.env` to find its admin connection.
+
+```powershell
+$env:POSTGRES_TEST_ADMIN_URL = 'postgres://pgsms_ci:TEST_ONLY_PASSWORD@127.0.0.1:55440/pgsms_ci_control'
+npm run build
+npm run test:postgres
+# Optional: run only the named suite, with the same isolation and migration checks.
+npm run test:postgres -- lecturer-payment-batch-postgres.spec.ts
+```
+
+Notification tests additionally clone their own marked template for each case; this is why the
+complete gate uses port 55440. Database creation/removal is confined to the dedicated test server.
+The job creates a `notification_test` login on that test server for the notification fixture helper.
+Individual Jest JSON reports are kept in the OS temporary folder printed by the runner.
+
 Run from `backend/`:
 
 ```powershell

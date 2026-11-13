@@ -10,7 +10,7 @@ const buildService = () => {
   const recognitions = { findAll: jest.fn().mockResolvedValue([]), findOne: jest.fn(), findByPk: jest.fn(), create: jest.fn() };
   const bridgeSubjects = { findByPk: jest.fn() };
   const records = { findByPk: jest.fn() };
-  const curriculums = { findByPk: jest.fn(), findOne: jest.fn() };
+  const curriculums = { findByPk: jest.fn(), findOne: jest.fn(), findAll: jest.fn().mockResolvedValue([]) };
   const curriculumSubjects = { findAll: jest.fn().mockResolvedValue([]) };
   const subjects = { findByPk: jest.fn() };
   const offerings = { findAll: jest.fn().mockResolvedValue([]) };
@@ -39,6 +39,75 @@ const buildRecord = (overrides: Record<string, unknown> = {}) => ({
 });
 
 const buildCurriculum = () => ({ id: "curriculum-1", majorId: "major-1", program: "masters", applicableFromYear: "2026", totalCredits: 60 });
+
+describe("Recognition decision curriculum boundaries", () => {
+  const fixture = () => {
+    const mocks = buildService();
+    const update = jest.fn().mockResolvedValue(undefined);
+    const row = { id: "rec-1", status: "pending", admissionRecordId: "record-1", learningResultId: "lr-1",
+      targetSubjectId: "target-1", majorTransferId: null as string | null, update };
+    mocks.recognitions.findByPk.mockResolvedValue(row);
+    mocks.results.findByPk.mockResolvedValue({ id: "lr-1", sourceType: "external", status: "completed", result: "passed", score: 8 });
+    mocks.records.findByPk.mockResolvedValue(buildRecord());
+    mocks.curriculums.findAll.mockResolvedValue([buildCurriculum()]);
+    mocks.curriculumSubjects.findAll.mockResolvedValue([{ subjectId: "target-1" }]);
+    return { ...mocks, row, update };
+  };
+  it.each([undefined, "outside-target"])("rejects an out-of-curriculum target, including an unchanged stale proposal (%p)", async targetSubjectId => {
+    const f = fixture();
+    f.curriculumSubjects.findAll.mockResolvedValue([]);
+    await expect(f.service.decide("rec-1", { decision: "approved", targetSubjectId })).rejects.toThrow("không thuộc CTĐT");
+    expect(f.update).not.toHaveBeenCalled();
+  });
+  it("approves a valid replacement within the single applicable curriculum in the same transaction", async () => {
+    const f = fixture();
+    await f.service.decide("rec-1", { decision: "approved", targetSubjectId: "replacement" });
+    expect(f.curriculumSubjects.findAll).toHaveBeenCalledWith(expect.objectContaining({
+      where: { curriculumId: "curriculum-1", subjectId: "replacement" }, transaction,
+    }));
+    expect(f.records.findByPk).toHaveBeenCalledWith("record-1", { transaction, lock: "UPDATE" });
+    const statements = f.sequelize.query.mock.calls.map(([sql]) => sql);
+    expect(statements.indexOf('SELECT pg_advisory_xact_lock(21026)'))
+      .toBeLessThan(statements.indexOf('SELECT pg_advisory_xact_lock(714062)'));
+    expect(f.update).toHaveBeenCalledWith(expect.objectContaining({ status: "approved", targetSubjectId: "replacement" }), { transaction });
+  });
+  it("uses the curriculum assigned to the class rather than a newer curriculum", async () => {
+    const f = fixture();
+    f.memberships.findAll.mockResolvedValue([{ classGroup: { curriculumId: "assigned" } }]);
+    f.curriculums.findByPk.mockResolvedValue({ ...buildCurriculum(), id: "assigned" });
+    await f.service.decide("rec-1", { decision: "approved" });
+    expect(f.curriculumSubjects.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { curriculumId: "assigned", subjectId: "target-1" } }));
+    expect(f.curriculums.findAll).not.toHaveBeenCalled();
+  });
+  it.each([{ majorId: "other" }, { program: "doctoral" }, { applicableFromYear: "2025" }])("rejects a stale curriculum with mismatched metadata %p", async metadata => {
+    const f = fixture();
+    f.curriculums.findAll.mockResolvedValue([{ ...buildCurriculum(), ...metadata }]);
+    await expect(f.service.decide("rec-1", { decision: "approved" })).rejects.toThrow("Chưa xác định được CTĐT phù hợp");
+    expect(f.update).not.toHaveBeenCalled();
+  });
+  it("refuses to guess between multiple curricula for an unassigned learner", async () => {
+    const f = fixture();
+    f.curriculums.findAll.mockResolvedValue([buildCurriculum(), { ...buildCurriculum(), id: "another" }]);
+    await expect(f.service.decide("rec-1", { decision: "approved" })).rejects.toThrow("Có nhiều CTĐT");
+    expect(f.update).not.toHaveBeenCalled();
+  });
+  it("uses the approved transfer curriculum before a new class is assigned", async () => {
+    const f = fixture();
+    f.row.majorTransferId = "transfer";
+    f.sequelize.query.mockImplementation(async (sql: string) => sql.includes("FROM major_transfers")
+      ? [{ curriculumId: "transfer-curriculum" }] : []);
+    f.curriculums.findByPk.mockResolvedValue({ ...buildCurriculum(), id: "transfer-curriculum" });
+    await f.service.decide("rec-1", { decision: "approved" });
+    expect(f.curriculumSubjects.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { curriculumId: "transfer-curriculum", subjectId: "target-1" } }));
+  });
+  it("still permits rejecting an obsolete proposal without a current curriculum", async () => {
+    const f = fixture();
+    f.records.findByPk.mockResolvedValue(null);
+    await f.service.decide("rec-1", { decision: "rejected" });
+    expect(f.update).toHaveBeenCalledWith(expect.objectContaining({ status: "rejected" }), { transaction });
+    expect(f.records.findByPk).not.toHaveBeenCalled();
+  });
+});
 
 describe("Studied curriculum subjects", () => {
   it.each(["Thạc sĩ", "Tiến sĩ"])("counts passed, exempt and approved credits once for every %s record", async (trainingLevel) => {

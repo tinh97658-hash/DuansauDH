@@ -80,6 +80,16 @@ describeDb('Payment batch atomicity, conflicts and RLS on disposable PostgreSQL'
     expect((await service.list()).rows.find(row => row.lecturerId === id(3))!.paid).toBe(false);
   });
 
+  it.each([null, ''])('applies the preview when searching by subject for an offering named %p', async name => {
+    await db.query('UPDATE course_offerings SET name=:name WHERE id=:id', { replacements: { name, id: id(30) } });
+    const preview = await service.previewBatch({ unitId: id(20), search: 'Subject' }, true, actor, '2026-11-01');
+    expect(preview).toMatchObject({ count: 2, total: 2 });
+    expect((await service.applyBatch(preview.token, actor)).updated).toBe(2);
+    const rows = (await service.list()).rows;
+    expect(rows.filter(row => row.paid).map(row => row.lecturerId).sort()).toEqual([id(1), id(2)]);
+    expect(rows.find(row => row.lecturerId === id(3))!.paid).toBe(false);
+  });
+
   it('rejects stale state, including ABA changes, and leaves other targets unchanged', async () => {
     await save(false);
     const preview = await service.previewBatch({ unitId: id(20) }, true, actor, '2026-11-01');

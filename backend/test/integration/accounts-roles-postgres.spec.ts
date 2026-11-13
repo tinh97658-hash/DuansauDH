@@ -8,7 +8,8 @@ import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { AccountsService } from "../../src/accounts/accounts.service.js";
 import { AppModule } from "../../src/app.module.js";
-import { AdministrationSafetyService } from "../../src/auth/administration-safety.service.js";
+import { ADMINISTRATION_PERMISSIONS, AdministrationSafetyService } from "../../src/auth/administration-safety.service.js";
+import { permissionTreeMeta } from "../../src/auth/permission-tree.js";
 import { RbacService } from "../../src/auth/rbac.service.js";
 import { Staff } from "../../src/database/models/staff.model.js";
 import { StaffRole } from "../../src/database/models/staff-role.model.js";
@@ -67,10 +68,22 @@ describeDb("Staff account and role administration PostgreSQL integration", () =>
     }
   });
 
+  const withDependencies = async (permissionIds: string[]) => {
+    const permissions = await select("SELECT id,code FROM permissions");
+    const codes = new Set(permissions.filter(row => permissionIds.includes(row.id)).map(row => row.code as string));
+    for (const code of codes) {
+      if (code.startsWith('module.')) continue;
+      const meta = permissionTreeMeta(code);
+      codes.add(`module.${meta.moduleId}`);
+      meta.requires.forEach(required => codes.add(required));
+    }
+    return permissions.filter(row => codes.has(row.code)).map(row => row.id as string);
+  };
+
   const createCustomRole = async (suffix: string, permissionIds: string[] = []) => {
     const created = await roles.create(
       actor.id,
-      { code: `${prefix}-${suffix}`, name: `Vai trò ${suffix}`, permissionIds } as any,
+      { code: `${prefix}-${suffix}`, name: `Vai trò ${suffix}`, permissionIds: await withDependencies(permissionIds) } as any,
       context,
     );
     return created.data.id as string;
@@ -175,7 +188,7 @@ describeDb("Staff account and role administration PostgreSQL integration", () =>
     const roleId = await createCustomRole("lifecycle", [viewAccount.id]);
 
     const created = await roles.detail(roleId);
-    expect(created.permissions.map((permission: any) => permission.code)).toEqual([viewAccount.code]);
+    expect(created.permissions.map((permission: any) => permission.code).sort()).toEqual([viewAccount.code, 'module.administration'].sort());
 
     const member = await Staff.create({ name: `${prefix} Member`, email: `${prefix}.member@example.invalid`.toLowerCase(), role: "examiner" });
     await StaffRole.create({ staffId: member.id, roleId });
@@ -183,9 +196,9 @@ describeDb("Staff account and role administration PostgreSQL integration", () =>
     expect(access.permissions.has(viewAccount.code)).toBe(true);
     expect(access.roleCodes).toEqual([`${prefix}-lifecycle`]);
 
-    await roles.setPermissions(actor.id, roleId, { permissionIds: [viewRole.id] } as any, context);
+    await roles.setPermissions(actor.id, roleId, { permissionIds: await withDependencies([viewRole.id]) } as any, context);
     const updated = await roles.detail(roleId);
-    expect(updated.permissions.map((permission: any) => permission.code)).toEqual([viewRole.code]);
+    expect(updated.permissions.map((permission: any) => permission.code).sort()).toEqual([viewRole.code, 'module.administration'].sort());
     expect((await select("SELECT action FROM auth_audit_logs WHERE action = 'role.permissions.update'")).length).toBeGreaterThanOrEqual(1);
     if (triggerAudit) {
       const operations = await select("SELECT operation FROM db_change_logs WHERE table_name = 'role_permissions' ORDER BY id");
@@ -208,7 +221,7 @@ describeDb("Staff account and role administration PostgreSQL integration", () =>
     expect([...(await rbac.effectiveAccess(actor)).permissions]).toEqual([]);
   });
 
-  it("bảo vệ hợp quyền quản trị từ nhiều vai trò tùy chỉnh và bỏ qua vai trò bị tắt", async () => {
+  it("yêu cầu một hồ sơ đủ quyền quản trị, không gộp các hồ sơ riêng và bỏ qua hồ sơ bị tắt", async () => {
     // All changes in this spec, including existing staff status, are rolled back.
     await db.query("UPDATE staff SET status = 'disabled'");
     const perms = await select("SELECT id, code FROM permissions WHERE code IN ('account.view', 'account.manage', 'role.view', 'role.manage')");
@@ -218,9 +231,14 @@ describeDb("Staff account and role administration PostgreSQL integration", () =>
     await StaffRole.bulkCreate([{ staffId: member.id, roleId: accountRole }, { staffId: member.id, roleId: roleRole }]);
     const safety = app.get(AdministrationSafetyService);
     await safety.lock(tx);
-    await expect(safety.assertRetained(tx)).resolves.toBeUndefined();
+    await expect(safety.assertRetained(tx)).rejects.toThrow("Phải giữ ít nhất một nhân sự");
     rbac.invalidate();
-    expect((await rbac.effectiveAccess(member)).permissions.size).toBe(4);
+    expect((await rbac.effectiveAccess(member)).permissions.size).toBe(5); // Four capabilities plus their parent module.
+    const adminPermissions = await select('SELECT id FROM permissions WHERE code IN (:codes)', { codes: ADMINISTRATION_PERMISSIONS });
+    const fullRole = await createCustomRole('full-admin', adminPermissions.map(row => row.id));
+    await StaffRole.create({ staffId: member.id, roleId: fullRole });
+    await expect(safety.assertRetained(tx)).resolves.toBeUndefined();
+    await db.query("UPDATE roles SET active = false WHERE id = :id", { replacements: { id: fullRole } });
     await db.query("UPDATE roles SET active = false WHERE id = :id", { replacements: { id: roleRole } });
     rbac.invalidate();
     expect((await rbac.effectiveAccess(member)).permissions.has("role.manage")).toBe(false);

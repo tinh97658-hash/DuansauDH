@@ -48,7 +48,10 @@ describeDb("Audit actor propagation with real PostgreSQL, HTTP and connection po
     context = app.get(AuditContextService);
     beforeIdentity = await identitySnapshot();
     await select("INSERT INTO roles(id,code,name,active,is_system,created_at,updated_at) VALUES(:id,:code,:code,true,false,now(),now())", { id: ids.role, code: prefix.toLowerCase() });
-    await select("INSERT INTO role_permissions(role_id,permission_id,created_at,updated_at) SELECT :id,id,now(),now() FROM permissions WHERE code IN ('catalog.manage','account.manage','account.view','account.password.reset')", { id: ids.role });
+    await select(`INSERT INTO role_permissions(role_id,permission_id,created_at,updated_at)
+      SELECT :id,id,now(),now() FROM permissions WHERE code IN
+        ('module.catalog','module.administration','catalog.view','catalog.manage','account.manage','account.view','account.password.reset')
+        OR code LIKE 'route.system.ethnicities.%' OR code LIKE 'route.system.accounts.%'`, { id: ids.role });
     const hash = await bcrypt.hash(password, 4);
     for (const [index, id] of ids.staff.entries()) {
       await select("INSERT INTO staff(id,name,email,role,password,status,must_change_password,created_at,updated_at) VALUES(:id,:name,:email,:role,:hash,'active',false,now(),now())", { id, name: `${prefix} ${index}`, email: index === 0 ? emailA : index === 1 ? emailB : `${prefix}-target@example.invalid`.toLowerCase(), role: prefix.toLowerCase(), hash });

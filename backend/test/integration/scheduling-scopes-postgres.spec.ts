@@ -86,7 +86,15 @@ describeDb('Scheduling grants: PostgreSQL RLS and actual HTTP requests', () => {
     });
     tx = undefined;
   });
-  beforeEach(async () => { tx = await db.transaction(); actor = ids.staffA; app.get(RbacService).invalidate(); });
+  beforeEach(async () => {
+    // Route/module permissions are a prerequisite of the current working-profile
+    // model. Their capability dependencies still limit each fixture's access.
+    await db.query(`INSERT INTO role_permissions(role_id,permission_id,created_at,updated_at)
+      SELECT r.id,p.id,now(),now() FROM roles r CROSS JOIN permissions p
+      WHERE r.id IN (:roles) AND (p.code LIKE 'module.%' OR p.code LIKE 'route.%') ON CONFLICT DO NOTHING`,
+      { replacements: { roles: [ids.roleA, ids.roleB, ids.roleD] } });
+    tx = await db.transaction(); actor = ids.staffA; app.get(RbacService).invalidate();
+  });
   afterEach(async () => { if (tx && !(tx as any).finished) await tx.rollback(); tx = undefined; });
   afterAll(async () => {
     tx = undefined;
