@@ -100,3 +100,41 @@ it('validates mutually exclusive attendance, participant identity and version',a
  for(const change of [{status:['absent_excused','absent_unexcused']},{status:'absent'},{version:-1},{version:'4'},{participantId:'not-a-candidate'},{participantId:''}])
   expect((await validate(plainToInstance(ExamCandidateAttendanceDto,{...dto,...change}))).length).toBeGreaterThan(0);
 });
+
+it('only marks a scheduled exam held when attendance is confirmed',async()=>{
+ const f=fixture();f.session.status='scheduled';
+ const result=await f.service.confirmAttendance('session',{version:4},f.actor);
+ expect(result.status).toBe('held');
+ expect(f.query).toHaveBeenCalledWith(expect.stringContaining("SET status='held'"),expect.anything(),f.tx);
+ expect(f.workflow.event).toHaveBeenCalledWith('offering','exam.held',f.actor,expect.any(String),f.session,{status:'held'},f.tx);
+});
+it('rejects attendance confirmation before the exam ends',async()=>{
+ const f=fixture(),original=f.query.getMockImplementation()!;
+ f.query.mockImplementation(async sql=>sql.includes('clock_timestamp() ok')?[{ok:false}]:original(sql));
+ await expect(f.service.confirmAttendance('session',{version:4},f.actor)).rejects.toThrow(ConflictException);
+ expect(f.db.query).not.toHaveBeenCalled();
+});
+it('persists the first confirmation without marking the exam held',async()=>{
+ const f=fixture();f.session.status='scheduled';
+ const result=await f.service.confirm('session',{version:4,status:'held'},f.actor);
+ expect(result.status).toBe('scheduled');
+ expect(f.query).toHaveBeenCalledWith(expect.stringContaining('SET attendance_started_at=clock_timestamp()'),expect.anything(),f.tx);
+ expect(f.workflow.event).toHaveBeenCalledWith('offering','exam.attendance.start',f.actor,expect.any(String),f.session,expect.anything(),f.tx);
+});
+it('allows repeating the first confirmation after reopening before attendance is confirmed',async()=>{
+ const f=fixture();f.session.status='scheduled';(f.session as any).attendance_started_at=new Date();
+ const result=await f.service.confirm('session',{version:4,status:'held'},f.actor);
+ expect(result.status).toBe('scheduled');
+ expect(result.version).toBe(5);
+});
+it('allows choosing not held after an unfinished first confirmation',async()=>{
+ const f=fixture();f.session.status='scheduled';(f.session as any).attendance_started_at=new Date();
+ await expect(f.service.confirm('session',{version:4,status:'not_held',note:'Changed choice'},f.actor)).resolves.toEqual({id:'session',status:'not_held'});
+ expect(f.db.query).toHaveBeenCalledWith(expect.stringContaining('SET status= :status'),expect.objectContaining({replacements:expect.objectContaining({status:'not_held'})}));
+});
+it.each(['held','not_held'] as const)('rejects choosing %s after attendance has been confirmed',async status=>{
+ const f=fixture();f.session.status='scheduled';(f.session as any).attendance_confirmed_at=new Date();
+ await expect(f.service.confirm('session',{version:4,status,note:'Changed choice'},f.actor)).rejects.toThrow(ConflictException);
+ expect(f.db.query).not.toHaveBeenCalled();
+ expect(f.query.mock.calls.some(([sql])=>sql.startsWith('UPDATE'))).toBe(false);
+});

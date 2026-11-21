@@ -63,13 +63,14 @@ export class ExamScheduleService {
         JOIN course_exam_session_candidates c ON c.session_id=es.id AND c.participant_id=person->>'participantId'
         LEFT JOIN course_exam_candidate_attendance att ON att.session_id=c.session_id AND att.participant_id=c.participant_id) AS candidates,
       es.attendance_confirmed_at AS "attendanceConfirmedAt",
-      (es.status='held' AND es.attendance_confirmed_at IS NULL AND w.mode='new' AND w.result_status NOT IN ('submitted','approved')) AS "canConfirmAttendance",
+      es.attendance_started_at AS "attendanceStartedAt",
+      (es.status IN ('scheduled','held') AND (es.exam_date+es.end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp() AND es.attendance_confirmed_at IS NULL AND w.mode='new' AND w.result_status NOT IN ('submitted','approved')) AS "canConfirmAttendance",
       (es.status IN ('scheduled','held') AND es.attendance_confirmed_at IS NULL AND w.mode='new' AND w.result_status NOT IN ('submitted','approved')
         AND (es.exam_date+es.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp()) AS "canRecordAttendance",
       (es.status='scheduled' AND (es.exam_date+es.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'>clock_timestamp()) AS "canEdit",
-      (es.status='scheduled' AND (es.exam_date+es.end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp()) AS "pendingConfirmation"
+      (es.status='scheduled' AND es.attendance_confirmed_at IS NULL AND (es.exam_date+es.end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp()) AS "pendingConfirmation"
       FROM course_exam_sessions es JOIN course_exam_arrangements a ON a.id=es.arrangement_id LEFT JOIN course_exam_workflows w ON w.course_offering_id=es.course_offering_id JOIN course_offerings o ON o.id=es.course_offering_id JOIN subjects s ON s.id=o.subject_id JOIN rooms r ON r.id=es.room_id LEFT JOIN lecturers l ON l.id=es.lecturer_id LEFT JOIN lecturers l2 ON l2.id=es.second_lecturer_id JOIN course_exam_eligibility_snapshots p ON p.id=es.eligibility_snapshot_id
-      WHERE es.arrangement_id IN (SELECT x.arrangement_id FROM course_exam_sessions x WHERE x.exam_date BETWEEN :from::date AND :to::date OR (x.status='scheduled' AND (x.exam_date+x.end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp()))
+      WHERE es.arrangement_id IN (SELECT x.arrangement_id FROM course_exam_sessions x WHERE x.exam_date BETWEEN :from::date AND :to::date OR (x.status='scheduled' AND x.attendance_confirmed_at IS NULL AND (x.exam_date+x.end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp()))
       ORDER BY es.exam_date,es.start_time,es.id`,query);
     if(allowed!==null){
       const visible=allowed;
@@ -303,7 +304,27 @@ export class ExamScheduleService {
       return {id,participantId:dto.participantId,status:dto.status,version:updated.version,arrangementId:session.arrangement_id,arrangementVersion:arrangement.version};
     });
   }
-  async confirm(id:string,dto:ConfirmExamDto,actor:any){return this.finish(id,dto,actor,dto.status);}
+  async confirm(id:string,dto:ConfirmExamDto,actor:any){
+    if(dto.status!=='held')return this.finish(id,dto,actor,dto.status);
+    await this.authorize(actor);
+    return this.db.transaction(async tx=>{
+      const [ref]=await this.query('SELECT course_offering_id,arrangement_id FROM course_exam_sessions WHERE id= :id',{id},tx);
+      if(!ref)throw new NotFoundException('Không tìm thấy ca thi.');
+      if(this.access){const scope=await this.access.assertOffering(actor,ref.course_offering_id,tx);if(scope.readOnly)throw new ForbiddenException('Bạn chỉ có quyền xem.');}
+      const {state}=await this.workflow.lock(ref.course_offering_id,tx);
+      if(['submitted','approved'].includes(state.result_status))throw new ConflictException('Kết quả đã gửi duyệt hoặc đã khóa.');
+      await this.query('SELECT id FROM course_exam_arrangements WHERE id= :id FOR UPDATE',{id:ref.arrangement_id},tx);
+      const session=await this.session(id,tx);this.checkVersion(session,dto.version);
+      if(session.status!=='scheduled'||session.attendance_confirmed_at)throw new ConflictException('Ca thi đã được xác nhận và khóa.');
+      const [ended]=await this.query(`SELECT (exam_date+end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp() ok FROM course_exam_sessions WHERE id=:id`,{id},tx);
+      if(!ended?.ok)throw new ConflictException('Ca thi chưa kết thúc; chưa thể xác nhận.');
+      const [updated]=await this.query(`UPDATE course_exam_sessions SET attendance_started_at=clock_timestamp(),version=version+1,updated_by=:actor,updated_at=now()
+        WHERE id=:id RETURNING version,attendance_started_at AS "attendanceStartedAt"`,{id,actor:actor.id},tx);
+      const [arrangement]=await this.query('UPDATE course_exam_arrangements SET version=version+1 WHERE id=:id RETURNING version',{id:session.arrangement_id},tx);
+      await this.workflow.event(session.course_offering_id,'exam.attendance.start',actor,'Bắt đầu xác nhận danh sách dự thi',session,{sessionId:id,startedAt:updated.attendanceStartedAt},tx);
+      return {id,status:'scheduled',version:updated.version,attendanceStartedAt:updated.attendanceStartedAt,arrangementId:session.arrangement_id,arrangementVersion:arrangement.version};
+    });
+  }
   async confirmAttendance(id:string,dto:ConfirmExamAttendanceDto,actor:any){
     await this.authorize(actor);
     return this.db.transaction(async tx=>{
@@ -315,17 +336,21 @@ export class ExamScheduleService {
       await this.query('SELECT id FROM course_exam_arrangements WHERE id= :id FOR UPDATE',{id:ref.arrangement_id},tx);
       const session=await this.session(id,tx);this.checkVersion(session,dto.version);
       if(session.attendance_confirmed_at)throw new ConflictException('Trạng thái dự thi đã xác nhận và khóa.');
-      if(session.status!=='held')throw new ConflictException('Chỉ xác nhận trạng thái dự thi sau khi ca thi được xác nhận Đã diễn ra.');
-      const [updated]=await this.query(`UPDATE course_exam_sessions SET attendance_confirmed_at=clock_timestamp(),attendance_confirmed_by=:actor,
+      if(!['scheduled','held'].includes(session.status))throw new ConflictException('Ca thi đã hủy hoặc không diễn ra.');
+      const [ended]=await this.query(`SELECT (exam_date+end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp() ok FROM course_exam_sessions WHERE id=:id`,{id},tx);
+      if(!ended?.ok)throw new ConflictException('Ca thi chưa kết thúc; chưa thể xác nhận.');
+      const [updated]=await this.query(`UPDATE course_exam_sessions SET status='held',confirmed_by=COALESCE(confirmed_by,:actor::uuid),confirmed_at=COALESCE(confirmed_at,clock_timestamp()),attendance_confirmed_at=clock_timestamp(),attendance_confirmed_by=:actor,
         version=version+1,updated_by=:actor,updated_at=now() WHERE id=:id RETURNING version,attendance_confirmed_at AS "attendanceConfirmedAt"`,{id,actor:actor.id},tx);
       const [arrangement]=await this.query('UPDATE course_exam_arrangements SET version=version+1 WHERE id=:id RETURNING version',{id:session.arrangement_id},tx);
+      await this.db.query(`UPDATE course_exam_workflows SET result_status='draft',updated_at=now() WHERE course_offering_id=:offering AND result_status='not_available'`,{transaction:tx,replacements:{offering:session.course_offering_id}});
+      if(session.status==='scheduled')await this.workflow.event(session.course_offering_id,'exam.held',actor,'Xác nhận trạng thái dự thi',session,{status:'held'},tx);
       await this.workflow.event(session.course_offering_id,'exam.attendance.confirm',actor,'Xác nhận và khóa trạng thái dự thi',
         {sessionId:id},{sessionId:id,confirmedAt:updated.attendanceConfirmedAt},tx);
-      return {id,version:updated.version,attendanceConfirmedAt:updated.attendanceConfirmedAt,arrangementId:session.arrangement_id,arrangementVersion:arrangement.version};
+      return {id,status:'held',version:updated.version,attendanceConfirmedAt:updated.attendanceConfirmedAt,arrangementId:session.arrangement_id,arrangementVersion:arrangement.version};
     });
   }
   private async finish(id:string,dto:{version:number;note?:string},actor:any,status:'held'|'not_held'|'cancelled'){
-    await this.authorize(actor);if(status!=='held'&&!dto.note?.trim())throw new BadRequestException(status==='cancelled'?'Nhập lý do hủy lịch thi.':'Nhập lý do không diễn ra.');
+    await this.authorize(actor);if(status==='held')throw new ConflictException('Vui lòng xác nhận trạng thái dự thi để xác nhận đã diễn ra.');if(!dto.note?.trim())throw new BadRequestException(status==='cancelled'?'Nhập lý do hủy lịch thi.':'Nhập lý do không diễn ra.');
     const note=dto.note?.trim()||'';
     await this.db.transaction(async tx=>{
       // Offering first, matching all workflow/scheduling lock orders.
@@ -336,6 +361,7 @@ export class ExamScheduleService {
       await this.query('SELECT id FROM course_exam_arrangements WHERE id= :id FOR UPDATE',{id:ref.arrangement_id},tx);
       const s=await this.session(id,tx);this.checkVersion(s,dto.version);
       if(s.status!=='scheduled')throw new ConflictException('Ca thi đã được xử lý. Lịch sử được bảo toàn.');
+      if(s.attendance_confirmed_at)throw new ConflictException('Trạng thái dự thi đã xác nhận và khóa.');
       const candidates=(await this.query('SELECT participant_id FROM course_exam_session_candidates WHERE session_id= :id',{id},tx)).map(r=>r.participant_id);
       const aliases=await this.aliases(candidates,tx);
       await this.resources(['room:'+s.room_id,...(s.second_lecturer_id?['lecturer:'+s.second_lecturer_id]:[]),...(s.second_external_invigilator_key?['external-invigilator:'+s.second_external_invigilator_key]:[]),...(s.lecturer_id?['lecturer:'+s.lecturer_id]:[]),...(s.external_invigilator_key?['external-invigilator:'+s.external_invigilator_key]:[]),...aliases.map(p=>'candidate:'+p)],tx);
@@ -346,7 +372,6 @@ export class ExamScheduleService {
       }
       await this.db.query(`UPDATE course_exam_sessions SET status= :status,version=version+1,updated_by= :actor,updated_at=now(),note= :note,
         confirmed_by=CASE WHEN :status = 'cancelled' THEN NULL ELSE :actor::uuid END,confirmed_at=CASE WHEN :status = 'cancelled' THEN NULL ELSE clock_timestamp() END WHERE id= :id`,{transaction:tx,replacements:{id,status,actor:actor.id,note}});
-      if(status==='held')await this.db.query(`UPDATE course_exam_workflows SET result_status='draft',updated_at=now() WHERE course_offering_id= :offering AND result_status='not_available'`,{transaction:tx,replacements:{offering:s.course_offering_id}});
       await this.db.query('UPDATE course_exam_arrangements SET version=version+1 WHERE id= :id',{transaction:tx,replacements:{id:s.arrangement_id}});
       await this.workflow.event(s.course_offering_id,status==='cancelled'?'exam.cancel':`exam.${status}`,actor,note,s,{status},tx);
     });return {id,status};

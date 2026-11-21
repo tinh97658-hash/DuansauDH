@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 
 export type BulkOptions = {
   prefix: string; classes: number; students: number; subjects: number; weeks: number; start: string;
-  grantSchedulingTo?: string;
 };
 export type FixtureRow = Record<string, any>;
 export type FixtureBatch = { model: string; rows: FixtureRow[] };
@@ -13,7 +12,7 @@ export function parseBulkOptions(args: string[], now = new Date()) {
   for (let i = 0; i < args.length; i++) {
     const key = args[i];
     if (["--preview", "--rollback", "--help"].includes(key)) { flags.add(key); continue; }
-    if (!["--prefix", "--classes", "--students", "--subjects", "--weeks", "--start", "--grant-scheduling-to"].includes(key)
+    if (!["--prefix", "--classes", "--students", "--subjects", "--weeks", "--start"].includes(key)
       || !args[i + 1] || args[i + 1].startsWith("--")) throw new Error(`Invalid argument: ${key}`);
     values[key] = args[++i];
   }
@@ -34,10 +33,7 @@ export function parseBulkOptions(args: string[], now = new Date()) {
   const options: BulkOptions = {
     prefix, start, classes: count("--classes", 20, 1000), students: count("--students", 30, 200),
     subjects: count("--subjects", 4, 10), weeks: count("--weeks", 4, 52),
-    grantSchedulingTo: values["--grant-scheduling-to"]?.trim().toLowerCase() || undefined,
   };
-  if (options.grantSchedulingTo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(options.grantSchedulingTo))
-    throw new Error("--grant-scheduling-to must be a valid email address");
   if (options.classes * (2 * options.students + options.subjects * (3 + options.weeks)) > 500000)
     throw new Error("Batch is too large; reduce classes, students, subjects or weeks (maximum about 500,000 rows)");
   return { options, preview: flags.has("--preview"), rollback: flags.has("--rollback"), help: flags.has("--help") };

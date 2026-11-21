@@ -2,7 +2,7 @@ import {formatLecturerName} from '../../utils/lecturerName';
 import { CalendarDaysIcon, EyeIcon, XMarkIcon } from "../../components/AppIcons";
 import { notify } from "../../utils/notify";
 import { usePermissions } from "../accounts/usePermissions";
-import React, { useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import { api, groupsOf, message, Modal, Notice, offeringTitle, rows, subjectLabel, useLoad } from "./shared";
 import { vietnameseDate, vietnameseDayLabel, isSessionPast } from "../../utils/schedulingCalendar";
 import { personNameParts } from "../../utils/personName";
@@ -20,6 +20,7 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const sessionsWrapRef = useRef(null);
   const value = detail.data || offering;
   const canManage = !readOnly && can("scheduling.write") && (value.canWriteSchedule ?? value.scopeWritable) !== false;
   const canNotes = !readOnly && can("scheduling.organize") && (value.canOrganize ?? value.scopeWritable) !== false;
@@ -48,6 +49,25 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
     if (sessionFilter === "all") return true;
     return getSessionCategory(s) === sessionFilter;
   });
+
+  useLayoutEffect(() => {
+    const wrap = sessionsWrapRef.current;
+    if (!wrap || filteredSessions.length <= 10) return;
+    const table = wrap.querySelector('table');
+    const measure = () => {
+      const lastVisibleRow = table.tBodies[0]?.rows[9];
+      if (!lastVisibleRow || !table.offsetHeight) return;
+      const bounds = table.getBoundingClientRect();
+      const zoom = bounds.height / table.offsetHeight;
+      const height = (lastVisibleRow.getBoundingClientRect().bottom - bounds.top) / zoom;
+      wrap.style.setProperty('--sl-sessions-visible-height', `${Math.ceil(height) + 2}px`);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(table);
+    return () => observer.disconnect();
+  }, [filteredSessions, activeTab, sessions.loading]);
 
   const mutate = async (action, done) => {
     setSaving(true); setError("");
@@ -158,17 +178,17 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
           )}
         </div>
       ) : (
-        <div className="sl-offering-sessions-wrap">
+        <div ref={sessionsWrapRef} className={`sl-offering-sessions-wrap${filteredSessions.length > 10 ? ' sl-offering-sessions-scroll' : ''}`}>
           <table className="v20-table sl-sessions-table">
             <thead>
               <tr>
-                <th style={{ width: 44, textAlign: "center" }}>STT</th>
-                <th className="sl-session-centered" style={{ width: 145 }}>NGÀY HỌC</th>
-                <th className="sl-session-centered" style={{ width: 105 }}>CA HỌC</th>
-                <th className="sl-session-centered">PHÒNG HỌC</th>
+                <th style={{ width: '4%', textAlign: "center" }}>STT</th>
+                <th className="sl-session-centered" style={{ width: '13%' }}>NGÀY HỌC</th>
+                <th className="sl-session-centered" style={{ width: '9%' }}>CA HỌC</th>
+                <th className="sl-session-centered" style={{ width: '21%' }}>PHÒNG HỌC</th>
                 <th className="sl-session-centered">GIẢNG VIÊN</th>
-                <th style={{ width: 125, textAlign: "center" }}>TRẠNG THÁI</th>
-                {(onOpenSession || onSelect) && <th style={{ width: 112, textAlign: "center" }}>THAO TÁC</th>}
+                <th style={{ width: '15%', textAlign: "center" }}>TRẠNG THÁI</th>
+                {(onOpenSession || onSelect) && <th style={{ width: '8%', textAlign: "center" }}>THAO TÁC</th>}
               </tr>
             </thead>
             <tbody>
@@ -204,7 +224,7 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
                         fontWeight: 600,
                         color: badge.color,
                         background: badge.bg,
-                        whiteSpace: "nowrap",
+                        whiteSpace: "normal",
                       }}>
                         {badge.label}
                       </span>
@@ -214,20 +234,22 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
                         {onOpenSession ? (
                           <button
                             type="button"
-                            className="sl-session-details-button"
+                            className="sl-session-details-button app-icon-action"
+                            aria-label="Chi tiết"
+                            title="Chi tiết buổi học"
                             onClick={(e) => { e.stopPropagation(); onOpenSession(session); }}
                           >
                             <EyeIcon aria-hidden="true" />
-                            Chi tiết
                           </button>
                         ) : onSelect ? (
                           <button
                             type="button"
-                            className="sl-btn"
-                            style={{ padding: "2px 8px", fontSize: "12px", height: "auto", minHeight: "26px" }}
+                            className="sl-session-details-button app-icon-action"
+                            aria-label="Lịch tuần"
+                            title="Mở lịch tuần"
                             onClick={(e) => { e.stopPropagation(); onSelect(value); }}
                           >
-                            Lịch tuần
+                            <CalendarDaysIcon aria-hidden="true" />
                           </button>
                         ) : null}
                       </td>
@@ -304,7 +326,7 @@ export default function OfferingDetails({ offering, user, onClose, onSaved, onOp
       )}
       </section>}
     </div>
-    {completing && <Modal title="Hoàn thành giảng dạy" onClose={() => setCompleting(false)} busy={saving} actions={<><button className="sl-btn" disabled={saving} onClick={() => setCompleting(false)}>Không, giữ nguyên</button><button className="sl-btn sl-btn-primary" disabled={saving || unresolved.loading || !!unresolved.error} onClick={() => mutate(() => api.put(`/scheduling/course-offerings/${value.id}/completion`, {
+    {completing && <Modal className="sl-completion-dialog" title="Hoàn thành giảng dạy" onClose={() => setCompleting(false)} busy={saving} actions={<><button className="sl-btn" disabled={saving} onClick={() => setCompleting(false)}>Không, giữ nguyên</button><button className="sl-btn sl-btn-primary" disabled={saving || unresolved.loading || !!unresolved.error} onClick={() => mutate(() => api.put(`/scheduling/course-offerings/${value.id}/completion`, {
       cancelPlannedSessions: !!unresolved.data?.length,
       expectedPlannedSessionIds: (unresolved.data || []).map((session) => session.id),
     }), () => { setCompleting(false); detail.reload(); if (onSaved) onSaved(); })}>Xác nhận đóng lớp</button></>}>

@@ -45,7 +45,6 @@ const serializeAccount = (staff: Staff) => {
     mustChangePassword: value.mustChangePassword,
     lastLoginAt: value.lastLoginAt,
     passwordChangedAt: value.passwordChangedAt,
-    canManageScheduling: value.canManageScheduling,
     createdAt: value.createdAt,
     roles: (value.roles ?? []).map((role: any) => ({
       id: role.id,

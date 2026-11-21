@@ -39,6 +39,14 @@ it('admin can retain all sessions and offerings',async()=>{
   expect(result.queue).toHaveLength(2);expect(result.sessions).toHaveLength(2);
 });
 
+it('preserves historical held sessions without a new attendance timestamp instead of counting them as pending',async()=>{
+  const f=fixture();
+  await f.service.list({from:'2099-01-01',to:'2099-01-02'},f.actor);
+  const sql=f.workflow.query.mock.calls.find(([sql]:[string])=>sql.includes('AS "pendingConfirmation"'))[0];
+  expect(sql).toContain(`(es.status='scheduled' AND es.attendance_confirmed_at IS NULL AND (es.exam_date+es.end_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'<=clock_timestamp()) AS "pendingConfirmation"`);
+  expect(sql).toContain(`x.status='scheduled' AND x.attendance_confirmed_at IS NULL`);
+});
+
 it('checks ownership in the transaction before locking or changing an offering',async()=>{
   const f=fixture();f.access.assertOffering.mockRejectedValue(new ForbiddenException());
   await expect(f.service.saveArrangement(null,{lecturerId:'lecturer',groups:[{courseOfferingId:'hidden'}]} as any,f.actor)).rejects.toThrow(ForbiddenException);

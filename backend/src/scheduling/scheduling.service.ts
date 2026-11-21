@@ -70,7 +70,6 @@ export class SchedulingService {
     @InjectModel(ClassGroup) private readonly classGroups: typeof ClassGroup,
     @InjectModel(ClassGroupMember) private readonly classGroupMembers: typeof ClassGroupMember,
     @InjectModel(Major) private readonly majors: typeof Major,
-    @InjectModel(Staff) private readonly staff: typeof Staff,
     private readonly sequelize: Sequelize,
     @InjectModel(Room) private readonly rooms: typeof Room,
     @InjectModel(Lecturer) private readonly lecturers: typeof Lecturer,

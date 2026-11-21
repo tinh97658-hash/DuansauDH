@@ -37,8 +37,6 @@ export class Staff extends Model {
   @Column({ type: DataType.DATE, allowNull: true })
   declare passwordChangedAt: Date | null;
 
-  @Default(false) @Column({ type: DataType.BOOLEAN, allowNull: false }) declare canManageScheduling: boolean;
-
   @BelongsToMany(() => Role, { through: () => StaffRole, foreignKey: "staffId", otherKey: "roleId" })
   declare roles: Role[];
 

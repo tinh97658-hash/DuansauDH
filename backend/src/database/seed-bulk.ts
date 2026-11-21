@@ -4,7 +4,7 @@ import { buildBulkFixtures, parseBulkOptions } from "./bulk-fixtures.js";
 async function run() {
   const { options, preview, rollback, help } = parseBulkOptions(process.argv.slice(2));
   if (help) {
-    console.log("db:seed:bulk [--preview|--rollback] [--prefix BTTEST01] [--classes 20] [--students 30] [--subjects 4] [--weeks 4] [--start YYYY-MM-DD] [--grant-scheduling-to EMAIL]");
+    console.log("db:seed:bulk [--preview|--rollback] [--prefix BTTEST01] [--classes 20] [--students 30] [--subjects 4] [--weeks 4] [--start YYYY-MM-DD]");
     return;
   }
   const batches = buildBulkFixtures(options);
@@ -40,17 +40,6 @@ async function run() {
         }
         if (actual !== rows.length) throw new Error(`Count mismatch for ${model}: ${actual}/${rows.length}`);
         console.log(`[seed-bulk] Verified ${model}: ${actual}`);
-      }
-      if (options.grantSchedulingTo) {
-        const assignee = await sequelize.models.Staff.findOne({
-          where: { email: options.grantSchedulingTo }, transaction, lock: transaction.LOCK.UPDATE,
-        });
-        if (!assignee) throw new Error(`Staff account ${options.grantSchedulingTo} does not exist.`);
-        await sequelize.models.Staff.update({ canManageScheduling: false }, {
-          where: { canManageScheduling: true }, transaction,
-        });
-        await assignee.update({ canManageScheduling: true }, { transaction });
-        console.log(`[seed-bulk] Granted scheduling permission to ${options.grantSchedulingTo}.`);
       }
       if (rollback) {
         finalizing = true;

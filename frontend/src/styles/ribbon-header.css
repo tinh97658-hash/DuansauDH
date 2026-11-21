@@ -1,6 +1,7 @@
 /* Sidebar opens and collapses through explicit controls. */
 :root {
   --ribbon-rail-width: 64px;
+  --ribbon-footer-height: 63px;
   --ribbon-header-height: calc(64px * var(--app-text-scale, 1));
   --ribbon-expanded-width: min(clamp(320px, calc(300px * var(--app-text-scale, 1)), 460px), calc(100vw - 52px));
   --ribbon-menu-easing: cubic-bezier(.22, 1, .36, 1);
@@ -342,7 +343,7 @@ html[data-ribbon-sidebar] #root {
 .ribbon-search-empty,
 .ribbon-search input { color: #000000; }
 .ribbon-search input::placeholder { color: #000000; opacity: 1; }
-.ribbon-sidebar-footer { display: flex; align-items: center; gap: 10px; flex-shrink: 0; padding: 14px; border-top: 1px solid var(--border-light); background: var(--surface-bg, #fff); }
+.ribbon-sidebar-footer { display: flex; align-items: center; gap: 10px; flex-shrink: 0; min-height: var(--ribbon-footer-height); box-sizing: border-box; padding: 14px; border-top: 1px solid var(--border-light); background: var(--surface-bg, #fff); }
 .ribbon-sidebar-footer .ribbon-user-info { flex: 1; min-width: 0; gap: 4px; }
 .ribbon-sidebar-footer .ribbon-user-info[hidden], .ribbon-sidebar-footer .ribbon-user-avatar[hidden] { display: none; }
 .ribbon-sidebar-footer .ribbon-user-name { color: var(--text-primary); }
