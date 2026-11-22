@@ -15,7 +15,7 @@ export function scenarioRows(anchor = fixtureAnchor): SeedRow[] {
   const note = (text: string) => `${tag}: ${text}`;
   // Confirmation-state CHECK requires an actor FK. Use a separate TEST examiner,
   // without a password, instead of attributing synthetic confirmations to a real admin.
-  add("Staff", "actor", { name: note("Người xác nhận dữ liệu giả"), email: "seed-test-2026-actor@example.invalid", role: "examiner", password: null, canManageScheduling: false });
+  add("Staff", "actor", { name: note("Người xác nhận dữ liệu giả"), email: "seed-test-2026-actor@example.invalid", role: "examiner", password: null });
   function curriculum(key: string, majorId: string, year: string, definitions: SubjectDefinition[], group?: string) {
     add("Curriculum", `curriculum:${key}`, { code: `${tag}-${key}`, name: note(key.startsWith("ROBOT") ? `Phương án Robot ${group} - 60 TC` : "Tập con QTKD có căn cứ - 44 TC, chưa đủ CTĐT"),
       majorId, program: "masters", applicableFromYear: year, totalCredits: definitions.reduce((sum, def) => sum + def[2], 0), active: true, note: note("Phương án kiểm thử, không phải quyết định ban hành CTĐT") });

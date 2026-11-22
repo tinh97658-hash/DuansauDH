@@ -145,8 +145,13 @@
 .sl-create-confirm-table-wrap td{height:52px;padding:4px 12px;border-bottom:1px solid #d7e1e9;color:#172b3a;font-size:14px;font-weight:400}
 .sl-create-confirm-table-wrap th:first-child{width:52px}.sl-create-confirm-table-wrap th:nth-child(2){width:160px}.sl-create-confirm-table-wrap th:nth-child(4){width:38%}.sl-create-confirm-table-wrap td:first-child{color:#59708a}.sl-create-confirm-table-wrap td:nth-child(2){font-size:13.5px;font-weight:400}.sl-create-confirm-table-wrap td:nth-child(3){font-size:14px;font-weight:500}
 .sl-create-confirm-table-wrap input{width:100%;height:36px;padding:0 13px;border:1px solid #d7e1e9;border-radius:8px;background:#fff;color:#172b3a;font-size:13.5px;font-weight:400}.sl-create-confirm-table-wrap input::placeholder{color:#9aacbd}
-.sl-create-confirm-card>footer{display:flex;align-items:center;justify-content:flex-end;padding:0 24px;border-top:1px solid #d7e1e9;background:#fff}.sl-create-confirm-card>footer>div{display:flex;gap:14px}
-.sl-create-confirm-card>footer button{height:40px;padding:0 20px;border-radius:8px;font-size:13px}
+.sl-create-confirm-card>footer{display:flex;align-items:center;justify-content:flex-end;box-sizing:border-box;height:var(--ribbon-footer-height,63px);padding:0 24px;border-top:1px solid #d7e1e9;background:#fff}.sl-create-confirm-card>footer>div{display:flex;gap:14px}
+.sl-create-confirm-card > footer button {
+  height: 44px;
+  padding: 0 24px;
+  border-radius: 8px;
+  font-size: 13px;
+}
 
 .sl-create-success-page{display:grid;place-items:center;padding:24px}
 .sl-create-success-card{width:780px;min-height:0;padding:24px 40px;border:1px solid #bfcedb;border-radius:8px;background:#fff;text-align:center}
@@ -273,7 +278,7 @@
 .sl-schedule-view .sl-selected-clear{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;align-self:center;height:calc(1em + 3mm + 2px);min-height:0;padding:1.5mm;color:#36566d;font-size:11px;line-height:1;white-space:nowrap}
 @media(max-width:1100px){.sl-schedule-view .sl-selected-meta{display:none}}
 .sl-schedule-view .sl-calendar-wrap{background:#fff;overflow:auto}
-.sl-schedule-view .sl-calendar{width:100%;min-width:760px;grid-template-columns:max-content repeat(7,minmax(98px,1fr));grid-template-rows:calc(24px + 1.5mm) repeat(2,minmax(190px,1fr));border-color:#d7e1e9}
+.sl-schedule-view .sl-calendar{width:100%;min-width:760px;grid-template-columns:44px repeat(7,minmax(98px,1fr));grid-template-rows:30px repeat(2,minmax(190px,1fr));border-color:#d7e1e9}
 .sl-schedule-view .sl-corner,.sl-schedule-view .sl-day,.sl-schedule-view .sl-period{border-color:#d7e1e9;background:#f7f9fb}
 .sl-schedule-view .sl-corner{padding:2px 4px;font-size:10px;line-height:1.2;white-space:nowrap}
 .sl-schedule-view .sl-day{position:relative;display:grid;grid-template-columns:22px 8ch;justify-content:center;align-content:center;align-items:baseline;gap:4px;min-height:0;padding:2px 3px;border-top:0;border-left:0;font-size:11px;line-height:1.2;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer}
@@ -434,6 +439,7 @@
 .sl-session-editor-dialog .v20-dialog-foot .sl-btn{min-width:96px;height:36px;min-height:36px;border-radius:8px;font-size:12.5px}
 
 /* Course-offering and pending modal content. */
+.scheduling-v20.v20-dialog.sl-completion-dialog{width:680px;height:280px}
 .scheduling-v20.v20-dialog.v20-drawer{top:180px;bottom:auto;height:calc(100dvh - 190px);max-height:none;margin:0 16px 10px 0;border:1px solid #d7e1e9;box-shadow:none}
 .sl-offering-body{display:flex!important;flex-direction:column;padding:0!important;overflow:hidden!important}
 .sl-offering-hero{min-height:0;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:16px 20px 14px;border-bottom:1px solid #d9e4ec;background:#fff}
@@ -475,12 +481,15 @@
 .sl-offering-empty{padding:36px 20px;text-align:center;border:1.5px dashed #cbd5e1;border-radius:12px;background:#f8fafc;color:#475569;margin:12px 0}
 .sl-offering-empty p{margin:0;font-size:13.5px;font-weight:500;line-height:1.5;color:#475569}.sl-offering-empty p+button{margin-top:14px}
 .sl-offering-empty .sl-offering-empty-action{height:36px;min-height:36px;padding:0 16px;border-radius:8px;font-size:12.5px;font-weight:600;background:#0284c7;border:1px solid #0284c7;color:#fff;box-shadow:0 1px 3px rgba(2,132,199,.2)}
-.sl-offering-sessions-wrap{max-height:260px;overflow-y:auto;border:1px solid #d9e4ec;border-radius:8px;background:#fff}
+.sl-offering-sessions-wrap{overflow:visible;border:1px solid #d9e4ec;border-radius:8px;background:#fff}
+.sl-offering-sessions-scroll{max-height:var(--sl-sessions-visible-height,none);overflow-y:auto}
+.sl-sessions-table{table-layout:fixed;width:100%}
+.sl-sessions-table :is(th,td){overflow-wrap:anywhere;white-space:normal}
 .sl-sessions-table th{background:#f1f5f9;color:var(--text-secondary);font-size:12px;padding:8px 10px;font-weight:600}
 .sl-sessions-table td{padding:8px 10px;font-size:13px;border-bottom:1px solid #eef2f6;vertical-align:middle}
 .sl-sessions-table .sl-session-centered{text-align:center}
 .sl-sessions-table tr:hover td{background:#f8fafc}
-.sl-session-details-button{display:inline-flex;align-items:center;justify-content:center;gap:5px;height:30px;padding:0 10px;border:1px solid #d2e4f0;border-radius:7px;background:#edf5fc;color:#246b9b;font:inherit;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;transition:background .15s ease,border-color .15s ease}
+.sl-session-details-button{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border:1px solid #d2e4f0;border-radius:7px;background:#edf5fc;color:#246b9b;font:inherit;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;transition:background .15s ease,border-color .15s ease}
 .sl-session-details-button .MuiSvgIcon-root{width:16px;height:16px}
 .sl-session-details-button:hover{border-color:#9fc5df;background:#dcecf8;color:#155d8d}
 .sl-session-details-button:focus-visible{outline:2px solid #0b7f9c;outline-offset:2px}
@@ -489,9 +498,11 @@
 .sl-offering-groups>div{min-width:220px;max-width:320px;min-height:0;flex:1 1 240px;padding:10px 14px;border:1px solid #d9e4ec;border-radius:9px;background:#fff}
 .sl-offering-groups strong,.sl-offering-groups span{display:block}
 .sl-offering-groups strong{color:#123b63;font-size:16px;font-weight:600;line-height:1.35}.sl-offering-groups span{margin-top:4px;color:#5f748c;font-size:14px;line-height:1.35}
-.sl-offering-roster-wrap{max-height:270px;overflow:auto;border:1px solid #d5dfe6;border-radius:4px;background:#fff}
-.sl-offering-roster-table{width:100%;min-width:760px;table-layout:fixed}
-.sl-offering-roster-table .sl-roster-number{width:56px}
+.sl-offering-roster-wrap{position:relative;isolation:isolate;max-height:270px;overflow:auto;border:1px solid #d5dfe6;border-radius:4px;background:#fff}
+.sl-offering-roster-table{width:100%;min-width:760px;table-layout:fixed;border-collapse:separate;border-spacing:0}
+.sl-offering-roster-table thead{position:sticky;top:0;z-index:2;background:var(--table-header-bg,#eaf1f7)}
+.sl-offering-roster-table thead th{position:static;background:var(--table-header-bg,#eaf1f7)}
+.sl-offering-roster-table .sl-roster-number{width:calc(56px * var(--app-text-scale,1))}
 .sl-offering-roster-table .sl-roster-family{width:26%}
 .sl-offering-roster-table .sl-roster-given{width:16%}
 .sl-offering-roster-table .sl-roster-code{width:20%}
@@ -515,7 +526,7 @@
 .sl-pending-body{min-height:0;padding:12px 14px!important;overflow:auto!important;background:#f6f9fc}
 .scheduling-v20.v20-dialog.sl-pending-drawer{--app-dialog-max-height:760px}
 .scheduling-v20.v20-dialog.sl-pending-drawer:not(:has(.sl-pending-card)){width:600px}
-.scheduling-v20.v20-dialog:is(#schedule-pending-dialog,.sl-offering-drawer){
+.scheduling-v20.v20-dialog:is(#schedule-pending-dialog,#exam-pending-dialog,.sl-offering-drawer){
   --app-dialog-max-height:calc(100dvh - 2 * var(--app-dialog-gap,24px));
   width:calc(100vw - 2 * var(--app-dialog-gap,24px));
   max-width:calc(100vw - 2 * var(--app-dialog-gap,24px));
@@ -531,6 +542,23 @@
 .sl-pending-actions .sl-btn{width:auto;min-width:104px;height:35px;min-height:35px;padding:0 11px;border-radius:8px;font-size:12.5px}
 .sl-pending-actions .sl-btn:first-child{border-color:#dfb58b;background:#fff;color:#a65818}.sl-pending-actions .sl-btn:first-child:hover:not(:disabled){border-color:#cf955d;background:#fff8f1;color:#8f4610}
 .sl-pending-actions .sl-btn-primary{border-color:#2b8a5b;background:#2b8a5b;color:#fff}.sl-pending-actions .sl-btn-primary:hover:not(:disabled){border-color:#24764e;background:#24764e}
+
+/* This dialog uses explicit reading sizes above the shared popup/text-size rules. */
+@layer app-text-size {
+  @media screen {
+    :is(#schedule-pending-dialog,#exam-pending-dialog) .v20-dialog-head h2 {
+      font-size: 21px !important;
+      font-weight: 700;
+    }
+    :is(#schedule-pending-dialog,#exam-pending-dialog) .sl-pending-date strong,
+    :is(#schedule-pending-dialog,#exam-pending-dialog) .sl-pending-copy h3 { font-size: 15px !important; }
+    :is(#schedule-pending-dialog,#exam-pending-dialog) .sl-pending-date span { font-size: 13.5px !important; }
+    :is(#schedule-pending-dialog,#exam-pending-dialog) .sl-pending-copy span,
+    :is(#schedule-pending-dialog,#exam-pending-dialog) .sl-pending-side>small { font-size: 14px !important; }
+    :is(#schedule-pending-dialog,#exam-pending-dialog) .sl-pending-actions .sl-btn,
+    :is(#schedule-pending-dialog,#exam-pending-dialog) .v20-dialog-foot .sl-btn { font-size: 15px !important; }
+  }
+}
 
 @media(max-width:1199px){
   .scheduling-v20 .sl-workspace.sl-schedule-view{min-width:1100px!important;min-height:0;grid-template-columns:480px minmax(0,1fr)}

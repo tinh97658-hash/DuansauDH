@@ -12,7 +12,6 @@ export function permissionRoutesForRequest(path:string,method:string){
   if(path.startsWith('/scheduling/')){
     if(path.includes('class-curriculum-progress'))return paths('/masters/class-course-history','/masters/course-matrix');
     if(path.includes('teaching-sessions')||path.endsWith('/completion'))return paths('/masters/schedule','/masters/course-matrix');
-    if(path.endsWith('/assignee'))return paths('/masters/course-offerings','/system/accounts');
     return paths('/masters/course-offerings','/masters/schedule','/masters/course-matrix');
   }
   if(/^\/masters\/class-groups(?:\/|$)/.test(path)){

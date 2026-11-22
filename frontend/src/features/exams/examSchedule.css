@@ -185,3 +185,4 @@ body .app-popup .ep-unified-dialog .ep-session-row-actions .ep-icon-action{borde
 .ep-attendance-footer small{display:block;margin-top:4px;color:#607486}
 .ep-attendance-confirmed{display:inline-flex;align-items:center;gap:.45em;color:#137b3b;font-weight:600}
 .ep-attendance-footer :is(.sl-btn,.ep-attendance-confirmed)>svg{width:1.25em;height:1.25em;font-size:inherit;flex-shrink:0}
+#exam-pending-dialog .sl-pending-side>small{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}

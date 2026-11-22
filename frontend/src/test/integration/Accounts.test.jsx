@@ -29,7 +29,7 @@ const ACCOUNTS = [
   },
 ];
 
-const ALL_PERMISSIONS = ["account.view", "account.manage", "account.password.reset", "scheduling.assign"];
+const ALL_PERMISSIONS = ["account.view", "account.manage", "account.password.reset"];
 
 const mount = (permissions) => render(
   <ThemeProvider theme={theme}>

@@ -76,7 +76,9 @@ export default function ExamSchedule(){
    if(action==='save'){
     const offering=editor?.offering||offerings.find(o=>o.id===target?.courseOfferingId),payload={...form,courseOfferingId:offering.id,snapshotId:target?.snapshotId||offering.snapshotId,eligibilityVersion:offering.eligibilityVersion,...(target?{version:target.version}:{})};
     if(target)await axios.put(`${base}/${target.id}`,payload,options);else await axios.post(base,payload,options);
-   }else await axios.post(`${base}/${target.id}/${action==='cancel'?'cancel':'confirm'}`,{version:target.version,note,...(action==='cancel'?{}:{status:action})},options);
+   }else {const {data:updated}=await axios.post(`${base}/${target.id}/${action==='cancel'?'cancel':'confirm'}`,{version:target.version,note,...(action==='cancel'?{}:{status:action})},options);
+    if(action==='held')setData(current=>({...current,sessions:current.sessions.map(row=>({...row,...(row.arrangementId===updated.arrangementId?{arrangementVersion:updated.arrangementVersion}:{}),...(row.id===target.id?{version:updated.version,attendanceStartedAt:updated.attendanceStartedAt}: {})}))}));
+   }
    setEditor(null);
    if(action==='held'){setPendingOpen(false);setAggregate(null);setDetail({...target,attendanceSessionId:target.id});}
    else if(!keepDetail)setDetail(null);
@@ -107,13 +109,13 @@ export default function ExamSchedule(){
   finally{setSaving(false);}
  };
  const confirmAttendance=async session=>{
-  if(!canWrite||saving||loading||session.status!=='held'||!session.canConfirmAttendance)return false;
+  if(!canWrite||saving||loading||!session.canConfirmAttendance)return false;
   setSaving(true);setError('');
   try{
    const {data:updated}=await axios.post(`${API_BASE_URL}/masters/exam-sessions/${session.id}/attendance/confirm`,{version:session.version},{withCredentials:true});
    setData(current=>({...current,sessions:current.sessions.map(row=>({...row,
     ...(row.arrangementId===updated.arrangementId?{arrangementVersion:updated.arrangementVersion}:{}),
-    ...(row.id===session.id?{version:updated.version,attendanceConfirmedAt:updated.attendanceConfirmedAt,canRecordAttendance:false,canConfirmAttendance:false}:{})
+    ...(row.id===session.id?{version:updated.version,status:updated.status,pendingConfirmation:false,attendanceConfirmedAt:updated.attendanceConfirmedAt,canRecordAttendance:false,canConfirmAttendance:false}:{})
    }))}));
    setDetail(current=>current?.attendanceSessionId===session.id?{...current,attendanceSessionId:null}:current);
    setRevision(n=>n+1);notifyGradebookSaved();return true;

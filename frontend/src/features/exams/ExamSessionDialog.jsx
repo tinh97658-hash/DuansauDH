@@ -1,5 +1,5 @@
 import {examInvigilatorName} from './examInvigilators';
-import React,{useEffect,useState} from 'react';
+import React,{useEffect,useLayoutEffect,useState} from 'react';
 import {Link} from 'react-router-dom';
 import {UsersIcon,TableCellsIcon,CheckCircleIcon,XCircleIcon,TrashIcon} from '../../components/AppIcons';
 import {Modal} from '../scheduling/shared';
@@ -16,9 +16,12 @@ export default function ExamSessionDialog({members,queue,rooms,lecturers,units,c
  useEffect(()=>{
   if(!attendanceSessionId)return;
   setExpanded(ids=>ids.includes(attendanceSessionId)?ids:[...ids,attendanceSessionId]);
-  const timer=setTimeout(()=>document.getElementById(`exam-candidates-${attendanceSessionId}`)?.scrollIntoView?.({block:'nearest'}),0);
-  return()=>clearTimeout(timer);
  },[attendanceSessionId]);
+ const attendanceExpanded=expanded.includes(attendanceSessionId);
+ useLayoutEffect(()=>{
+  if(!attendanceSessionId||!attendanceExpanded)return;
+  document.getElementById(`exam-candidates-${attendanceSessionId}`)?.querySelector('.ep-attendance-footer')?.scrollIntoView?.({behavior:'instant',block:'end',inline:'nearest'});
+ },[attendanceSessionId,attendanceExpanded]);
  const sorted=[...members].sort((a,b)=>(a.roundNo||1)-(b.roundNo||1)||a.startTime.localeCompare(b.startTime)||(a.name||'').localeCompare(b.name||'','vi'));
  const active=sorted.filter(activeExamGroup),display=active.length?active:sorted,seed=display[0];
  if(!seed)return null;
@@ -75,11 +78,11 @@ export default function ExamSessionDialog({members,queue,rooms,lecturers,units,c
         <Link className="sl-btn app-icon-action ep-icon-action" title="Mở bảng điểm" aria-label="Mở bảng điểm" to={`/masters/exam-lists?offeringId=${g.courseOfferingId}&groupId=${g.classGroupId||g.groups?.[0]?.id||''}`}><TableCellsIcon/></Link>
         </div>
         {canWrite&&editable(g)&&<button className="sl-btn sl-btn-danger app-icon-action ep-icon-action ep-icon-action-danger" title="Hủy lịch thi" disabled={busy} aria-label={`Hủy lịch ${g.subjectName} · ${g.name}`} onClick={()=>rowAction('cancel',g)}><TrashIcon/></button>}
-        {canWrite&&g.pendingConfirmation&&<><button className="sl-btn app-icon-action ep-icon-action ep-icon-action-success" title="Xác nhận đã diễn ra" aria-label="Đã diễn ra" disabled={busy} onClick={()=>rowAction('held',g)}><CheckCircleIcon/></button><button className="sl-btn app-icon-action ep-icon-action ep-icon-action-warning" title="Xác nhận không diễn ra" aria-label="Không diễn ra" disabled={busy} onClick={()=>rowAction('not_held',g)}><XCircleIcon/></button></>}
+        {canWrite&&g.pendingConfirmation&&<><button className="sl-btn app-icon-action ep-icon-action ep-icon-action-success" title="Xác nhận đã diễn ra" aria-label="Đã diễn ra" disabled={busy||!!g.attendanceConfirmedAt} onClick={()=>rowAction('held',g)}><CheckCircleIcon/></button><button className="sl-btn app-icon-action ep-icon-action ep-icon-action-warning" title="Xác nhận không diễn ra" aria-label="Không diễn ra" disabled={busy||!!g.attendanceConfirmedAt} onClick={()=>rowAction('not_held',g)}><XCircleIcon/></button></>}
        </div></td>
       </tr>{open&&<tr><td colSpan={7} className="ep-session-candidate-cell"><section id={detailId} aria-label={`Thí sinh ${g.subjectName} · ${g.name}`}>
        <h3>Danh sách thí sinh · {g.subjectName} ({g.candidateCount})</h3>
-       <ExamCandidatesTable session={g} canWrite={canWrite} busy={busy} showAttendance={g.status==='held'} onAttendanceChange={onAttendanceChange} onAttendanceConfirm={confirmCandidates}/>
+       <ExamCandidatesTable session={g} canWrite={canWrite} busy={busy} showAttendance={g.status==='held'||g.canRecordAttendance||g.canConfirmAttendance} onAttendanceChange={onAttendanceChange} onAttendanceConfirm={confirmCandidates}/>
       </section></td></tr>}</React.Fragment>;
      })}</tbody>
     </table></div>

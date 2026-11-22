@@ -901,6 +901,31 @@ it("switches course-class tabs without refetching or losing a learner note", asy
   fireEvent.click(closeButton);
   expect(onClose).toHaveBeenCalledTimes(1);
 });
+it.each([4, 10, 11])("shows %i scheduled sessions with icon actions and only caps lists longer than ten", async count => {
+  const onOpenSession = vi.fn();
+  const scheduled = Array.from({ length: count }, (_, index) => ({
+    id: `session-${index}`, sessionDate: '2020-01-10', period: 'MORNING',
+    status: index === 0 ? 'not_held' : 'held', room: { code: 'P.301' },
+  }));
+  axios.get.mockImplementation(async url => ({ data:
+    url.endsWith('/teaching-sessions') ? scheduled :
+    url.endsWith('/roster') ? { participants: [] } :
+    url.endsWith('/course-offerings/offering') ? { ...offering, sessionSummary: { heldCount: count - 1 } } : [],
+  }));
+  render(<OfferingDetails offering={offering} onClose={vi.fn()} onOpenSession={onOpenSession} />);
+  const buttons = await screen.findAllByRole('button', { name: 'Chi tiết' });
+  expect(buttons).toHaveLength(count);
+  expect(buttons[0].textContent.trim()).toBe('');
+  expect(buttons[0].querySelector('svg')).not.toBeNull();
+  const wrap = screen.getByRole('table').parentElement;
+  expect(wrap.classList.contains('sl-offering-sessions-scroll')).toBe(count > 10);
+  fireEvent.click(buttons[0]);
+  expect(onOpenSession).toHaveBeenCalledTimes(1);
+  expect(onOpenSession).toHaveBeenCalledWith(scheduled[0]);
+  fireEvent.click(screen.getByRole('button', { name: `Đã diễn ra (${count - 1})` }));
+  expect(screen.getAllByRole('button', { name: 'Chi tiết' })).toHaveLength(count - 1);
+  expect(wrap).not.toHaveClass('sl-offering-sessions-scroll');
+});
 it("renders the list of scheduled sessions and filters them by status", async () => {
   const mockSessions = [
     {

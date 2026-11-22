@@ -392,7 +392,7 @@ const CreateClassGroups = () => {
                     </TableCell>
                     <TableCell align="center" onDoubleClick={(event) => event.stopPropagation()}>
                       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.25 }}>
-                        <Tooltip title="Phân học viên vào nhóm">
+                        <Tooltip title={<span style={{ color: "#000000" }}>Phân học viên vào nhóm</span>}>
                           <IconButton
                             size="small"
                             color="success"

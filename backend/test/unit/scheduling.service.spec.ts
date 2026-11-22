@@ -15,7 +15,6 @@ const buildService = () => {
   const classGroups = { findAll: jest.fn(), findByPk: jest.fn() };
   const classGroupMembers = { findAll: jest.fn().mockResolvedValue([]) };
   const majors = { findOne: jest.fn() };
-  const staff = { findByPk: jest.fn(), update: jest.fn() };
   const sequelize = { query: jest.fn().mockResolvedValue([]), transaction: jest.fn((callback: (tx: any) => Promise<unknown>) => callback(transaction)) };
   const rooms = { findAll: jest.fn() };
   const lecturers = { findAll: jest.fn() };
@@ -32,7 +31,6 @@ const buildService = () => {
     classGroups as never,
     classGroupMembers as never,
     majors as never,
-    staff as never,
     sequelize as never,
     rooms as never,
     lecturers as never,
@@ -44,7 +42,7 @@ const buildService = () => {
   );
   return {
     individualStudents, admissionRecords, subjectRecognitions, classScores, service, courseOfferings, offeringGroups, subjects,
-    packages: curriculumSubjects, classGroupElectives, classGroups, classGroupMembers, majors, staff,
+    packages: curriculumSubjects, classGroupElectives, classGroups, classGroupMembers, majors,
     sequelize, rooms, lecturers, teachingSessions,
   };
 };

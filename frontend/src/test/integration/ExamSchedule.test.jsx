@@ -36,7 +36,7 @@ it('closes the roster after attendance confirmation and keeps it locked when reo
  expect(within(dialog).queryByRole('button',{name:'Xác nhận trạng thái dự thi'})).not.toBeInTheDocument();
 });
 
-it('shows only the candidate roster before Held, without absence choices or attendance confirmation',async()=>{
+it('allows attendance before Held and waits for explicit confirmation',async()=>{
  data.sessions=[session({pendingConfirmation:true,canEdit:false,canRecordAttendance:true,canConfirmAttendance:true,
   candidates:[{participantId:'student:a',code:'HV001',fullName:'Nguyễn Văn An'}]})];
  renderPage();await waitFor(()=>expect(document.querySelector('.ep-event')).not.toBeNull());fireEvent.click(document.querySelector('.ep-event'));
@@ -44,8 +44,8 @@ it('shows only the candidate roster before Held, without absence choices or atte
  expect(within(dialog).queryByRole('table',{name:'Danh sách thí sinh Quản trị'})).not.toBeInTheDocument();
  fireEvent.click(within(dialog).getByRole('button',{name:/Danh sách thí sinh/}));
  expect(within(dialog).getByRole('table',{name:'Danh sách thí sinh Quản trị'})).toHaveTextContent('Nguyễn Văn An');
- expect(within(dialog).queryByRole('checkbox',{name:/Vắng (CP|KP)/})).not.toBeInTheDocument();
- expect(within(dialog).queryByRole('button',{name:'Xác nhận trạng thái dự thi'})).not.toBeInTheDocument();
+ expect(within(dialog).getAllByRole('checkbox',{name:/Vắng (CP|KP)/})).toHaveLength(2);
+ expect(within(dialog).getByRole('button',{name:'Xác nhận trạng thái dự thi'})).toBeEnabled();
  expect(axios.post).not.toHaveBeenCalled();expect(axios.put).not.toHaveBeenCalled();
 });
 
@@ -229,14 +229,35 @@ it('requires a cancellation reason inside the same detail dialog',async()=>{
  expect(screen.getAllByRole('dialog')).toHaveLength(1);const button=within(dialog).getByRole('button',{name:'Hủy lịch'});expect(button).toBeDisabled();
  fireEvent.change(within(dialog).getByLabelText('Lý do hủy'),{target:{value:'Đổi kế hoạch'}});fireEvent.click(button);await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/session/cancel'),{version:3,note:'Đổi kế hoạch'},{withCredentials:true}));
 });
-it('confirms Held directly without any reason field',async()=>{
- data.sessions=[session({pendingConfirmation:true,canEdit:false})];renderPage();fireEvent.click(await screen.findByRole('button',{name:'Chờ xác nhận (1)'}));const dialog=screen.getByRole('dialog');expect(within(dialog).queryByRole('textbox')).toBeNull();fireEvent.click(within(dialog).getByRole('button',{name:'Đã diễn ra'}));await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/session/confirm'),{version:3,note:'',status:'held'},{withCredentials:true}));
+it.each(['detail','pending'])('requires confirmation again from %s after leaving attendance unfinished',async entry=>{
+ axios.post.mockImplementation(async()=>{const attendanceStartedAt='2026-11-20T05:00:00Z';data.sessions=data.sessions.map(s=>({...s,attendanceStartedAt,version:4}));return {data:{id:'session',status:'scheduled',attendanceStartedAt,version:4}};});
+ data.sessions=[session({pendingConfirmation:true,canEdit:false})];renderPage();
+ fireEvent.click(await screen.findByRole('button',{name:/\(1\)/}));
+ fireEvent.click(within(screen.getByRole('dialog')).getAllByRole('button').find(b=>b.classList.contains('sl-btn-primary')));
+ await screen.findByRole('dialog',{name:/CHI TI/});
+ expect(axios.post).toHaveBeenCalledTimes(1);
+ expect(data.sessions[0].status).toBe('scheduled');
+ const dialog=screen.getByRole('dialog');
+ await waitFor(()=>expect(within(dialog).getByRole('button',{name:'Đã diễn ra'})).toBeEnabled());
+ fireEvent.click(within(dialog).getAllByRole('button',{name:'Đóng'})[0]);
+ await waitFor(()=>expect(document.querySelector('.ep-event')).not.toBeNull());
+ if(entry==='detail')fireEvent.click(document.querySelector('.ep-event'));
+ else fireEvent.click(screen.getByRole('button',{name:'Chờ xác nhận (1)'}));
+ const reopened=screen.getByRole('dialog');
+ expect(within(reopened).getByRole('button',{name:'Đã diễn ra'})).toBeEnabled();
+ expect(within(reopened).getByRole('button',{name:'Không diễn ra'})).toBeEnabled();
+ if(entry==='detail')expect(within(reopened).getByRole('button',{name:/Danh sách thí sinh/})).toHaveAttribute('aria-expanded','false');
+ expect(axios.post).toHaveBeenCalledTimes(1);
+ fireEvent.click(within(reopened).getByRole('button',{name:'Đã diễn ra'}));
+ await waitFor(()=>expect(axios.post).toHaveBeenCalledTimes(2));
+ expect(axios.post).toHaveBeenLastCalledWith(expect.stringContaining('/session/confirm'),{version:4,note:'',status:'held'},expect.any(Object));
+ await waitFor(()=>expect(within(screen.getByRole('dialog',{name:'CHI TIẾT BUỔI THI'})).getByRole('button',{name:/Danh sách thí sinh/})).toHaveAttribute('aria-expanded','true'));
 });
 it.each(['pending','detail'])('opens the candidate attendance list after Held from %s',async entry=>{
  const participantId='admission:11111111-1111-4111-8111-111111111111';
  data.sessions=[session({pendingConfirmation:true,canEdit:false,arrangementId:'arrangement',canRecordAttendance:true,
   candidates:[{participantId,code:'HV001',fullName:'Nguyễn Văn An'}]})];
- axios.post.mockImplementation(async()=>{data.sessions=data.sessions.map(s=>({...s,status:'held',pendingConfirmation:false,version:4}));return {data:{id:'session',status:'held'}};});
+ axios.post.mockImplementation(async()=>{data.sessions=data.sessions.map(s=>({...s,status:'scheduled',pendingConfirmation:true,attendanceStartedAt:'2026-11-20T05:00:00Z',version:4}));return {data:{id:'session',status:'scheduled',attendanceStartedAt:'2026-11-20T05:00:00Z',version:4}};});
  axios.put.mockImplementation(async(_url,payload)=>{data.sessions=data.sessions.map(s=>({...s,version:5,candidates:s.candidates.map(c=>({...c,attendanceStatus:payload.status}))}));return {data:{id:'session',participantId,status:payload.status,version:5,arrangementId:'arrangement',arrangementVersion:2}};});
  renderPage();
  if(entry==='pending')fireEvent.click(await screen.findByRole('button',{name:'Chờ xác nhận (1)'}));
@@ -250,13 +271,15 @@ it.each(['pending','detail'])('opens the candidate attendance list after Held fr
  fireEvent.click(cp);await waitFor(()=>expect(cp).toBeChecked());
  expect(axios.put).toHaveBeenCalledWith(expect.stringContaining('/session/attendance'),{version:4,participantId,status:'absent_excused'},expect.any(Object));
 });
-it('keeps the pending list open when Held fails instead of opening attendance',async()=>{
- data.sessions=[session({pendingConfirmation:true,canEdit:false})];axios.post.mockRejectedValue({response:{data:{message:'Ca thi đã thay đổi'}}});
- renderPage();fireEvent.click(await screen.findByRole('button',{name:'Chờ xác nhận (1)'}));
- fireEvent.click(screen.getByRole('button',{name:'Đã diễn ra'}));
+it('keeps an unconfirmed exam scheduled when attendance confirmation fails',async()=>{
+ data.sessions=[session({pendingConfirmation:true,canEdit:false,canRecordAttendance:true,canConfirmAttendance:true})];
+ axios.post.mockRejectedValue({response:{data:{message:'Conflict'}}});
+ renderPage();await waitFor(()=>expect(document.querySelector('.ep-event')).not.toBeNull());fireEvent.click(document.querySelector('.ep-event'));
+ const dialog=screen.getByRole('dialog');
+ fireEvent.click(within(dialog).getAllByRole('button').find(b=>b.getAttribute('aria-controls')?.startsWith('exam-candidates-')));
+ fireEvent.click(within(dialog).getAllByRole('button').find(b=>b.classList.contains('sl-btn-primary')));
  await waitFor(()=>expect(axios.post).toHaveBeenCalled());
- expect(screen.getByRole('dialog',{name:/CA THI CHỜ XÁC NHẬN/})).toBeInTheDocument();
- expect(screen.queryByRole('dialog',{name:'CHI TIẾT BUỔI THI'})).not.toBeInTheDocument();
+ expect(data.sessions[0].status).toBe('scheduled');
 });
 it.each([0,1,3])('uses the vt5 pending card layout with %i sessions',async(count)=>{
  data.sessions=Array.from({length:count},(_,i)=>session({id:'pending'+i,pendingConfirmation:true,canEdit:false,name:'Lớp học phần có tên dài '+i,subjectName:'Quản trị nguồn nhân lực và phát triển tổ chức'}));

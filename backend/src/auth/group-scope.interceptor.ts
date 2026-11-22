@@ -27,7 +27,7 @@ export class GroupScopeInterceptor implements NestInterceptor {
     const admissionAction = admissionRoute && !['learners', 'study-management'].includes(request.query?.admissionStage)
       ? (write ? 'manage' as const : 'view' as const) : undefined;
     const schedulingView = !write && /\/scheduling\/(course-offerings|teaching-sessions|pending-teaching-sessions)(\/|$)/.test(path);
-    const schedulingAction = /\/scheduling\//.test(path) && !/\/assignee$/.test(path)
+    const schedulingAction = /\/scheduling\//.test(path)
       ? (!write ? 'view' : /\/(teaching-sessions)(\/|$)|\/completion$/.test(path) ? 'write' : 'organize') : undefined;
     this.scope.configure(request.user.id, access, schedulingView, schedulingAction);
     const academicDomain = /\/masters\/exam-lists(\/|$)/.test(path) ? 'gradebook'
