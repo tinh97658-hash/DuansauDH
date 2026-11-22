@@ -9,7 +9,7 @@ import {activeExamGroup,examGroupsPeak} from './examArrangement';
 import ExamArrangementEditor from './ExamArrangementEditor';
 import ExamLearnerClasses from './ExamLearnerClasses';
 import ExamCandidatesTable from './ExamCandidatesTable';
-import {ExamEditor,ExamReasonDialog} from './ExamPlannerDialogs';
+import {ExamReasonDialog} from './ExamPlannerDialogs';
 
 export default function ExamSessionDialog({members,queue,rooms,lecturers,units,canWrite,saving,refreshing,error,attendanceSessionId,onClose,onClearError,onSaveArrangement,onSaveSession,onAction,onAttendanceChange,onAttendanceConfirm}){
  const [mode,setMode]=useState(null),[expanded,setExpanded]=useState(()=>attendanceSessionId?[attendanceSessionId]:[]);
@@ -41,10 +41,8 @@ export default function ExamSessionDialog({members,queue,rooms,lecturers,units,c
  const classes=new Set(active.flatMap(g=>(g.groups||[]).map(c=>c.id)));
  return <Modal wide className="ep-arrangement-dialog ep-unified-dialog" title="CHI TIẾT BUỔI THI" busy={saving} onClose={onClose}
   actions={!mode&&<button className="sl-btn" disabled={saving} onClick={onClose}>Đóng</button>}>
-  {mode?.action==='edit'?(arrangement?<ExamArrangementEditor embedded members={mode.members} queue={queue} rooms={rooms} lecturers={lecturers} units={units} canWrite={canWrite} saving={saving} error={error}
-    onClose={()=>changeMode(null)} onSave={(form,id,retry)=>saved(()=>onSaveArrangement(form,id,retry))}/>
-   :<ExamEditor embedded session={editSeed} offering={{...editSeed,id:editSeed.courseOfferingId}} rooms={rooms} lecturers={lecturers} units={units} canWrite={canWrite} saving={saving} error={error}
-    onClose={()=>changeMode(null)} onSave={(form,retry)=>saved(()=>onSaveSession(editSeed,form,retry))}/>)
+  {mode?.action==='edit'?<ExamArrangementEditor embedded allowAddGroups={arrangement} members={mode.members} queue={queue} rooms={rooms} lecturers={lecturers} units={units} canWrite={canWrite} saving={saving} error={error}
+    onClose={()=>changeMode(null)} onSave={(form,id,retry)=>saved(()=>arrangement?onSaveArrangement(form,id,retry):onSaveSession(editSeed,{...form,...form.groups[0],version:editSeed.version},retry))}/>
    :mode?<ExamReasonDialog embedded key={`${mode.action}:${mode.target.id}`} action={mode.action} session={mode.target} saving={saving} error={error}
      onClose={()=>changeMode(null)} onConfirm={note=>saved(()=>onAction(mode.action,mode.target,note))}/>
    :<>

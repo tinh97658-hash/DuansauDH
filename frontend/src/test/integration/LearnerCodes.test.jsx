@@ -85,3 +85,77 @@ it('refreshes both the row and cached unassigned application after saving its ty
   await waitFor(()=>expect(screen.getByRole('table')).toHaveTextContent('Tiền thạc sĩ'));
   expect(screen.getByRole('table')).not.toHaveTextContent('Bình thường');
 });
+
+it('renders learner code settings sections in tables and uses AppDialog without floating labels',async()=>{
+  axios.get.mockResolvedValue({data:{
+    types:[{id:'type',key:'pre_masters',name:'Tiền thạc sĩ',letter:'B',active:true,requires_admission:true,version:1}],
+    rules:[{id:'rule-1',name:'Chuẩn thạc sĩ',version:1,active:true,counter_scope:'class',start_number:1,parts:[{kind:'major'},{kind:'sequence',width:3}]}],
+    abbreviations:[{major_id:'m-1',abbreviation:'CN'}],
+    majors:[{id:'m-1',name:'Công nghệ thông tin'},{id:'m-2',name:'Kỹ thuật tàu thủy'}],
+    groups:[],
+  }});
+  axios.put.mockResolvedValue({data:{ok:true}});
+  render(view(LearnerCodeSettings));
+  const abbrTable=await screen.findByRole('table',{name:'Viết tắt chuyên ngành'});
+  expect(within(abbrTable).getByText('Công nghệ thông tin')).toBeInTheDocument();
+  expect(within(abbrTable).getByText('CN')).toBeInTheDocument();
+  expect(within(abbrTable).getByText('Chưa cấu hình')).toBeInTheDocument();
+  const ruleTable=screen.getByRole('table',{name:'Mẫu và phạm vi cấp mã'});
+  expect(within(ruleTable).getByText('Chuẩn thạc sĩ')).toBeInTheDocument();
+  const configButtons=within(abbrTable).getAllByRole('button',{name:'Cấu hình'});
+  fireEvent.click(configButtons[1]);
+  const dialog=await screen.findByRole('dialog');
+  expect(dialog.closest('.app-popup')).not.toBeNull();
+  expect(dialog.querySelector('.MuiInputLabel-root')).toBeNull();
+  fireEvent.change(within(dialog).getByLabelText('Viết tắt (2–12 chữ/số)'),{target:{value:'KTTT'}});
+  fireEvent.click(within(dialog).getByRole('button',{name:'Lưu'}));
+  await waitFor(()=>expect(axios.put).toHaveBeenCalledWith(expect.stringContaining('/abbreviations/m-2'),{abbreviation:'KTTT'}));
+});
+it('allows adding a custom profile category with optional special letter in LearnerCodeSettings',async()=>{
+  render(view(LearnerCodeSettings));
+  fireEvent.click(await screen.findByRole('button',{name:'Thêm loại'}));
+  const dialog=await screen.findByRole('dialog');
+  expect(within(dialog).queryByLabelText('Chữ cái của loại hồ sơ (A–Z)')).not.toBeInTheDocument();
+  fireEvent.change(within(dialog).getByLabelText('Tên loại hồ sơ'),{target:{value:'Chuyển tiếp'}});
+  fireEvent.click(within(dialog).getByRole('checkbox',{name:'Kích hoạt (cho phép cấp mã)'}));
+  fireEvent.click(within(dialog).getByRole('button',{name:'Lưu'}));
+  await waitFor(()=>expect(axios).toHaveBeenCalledWith(expect.objectContaining({
+    method:'post',
+    url:expect.stringContaining('/learner-codes/types'),
+    data:expect.objectContaining({name:'Chuyển tiếp',usesSpecialCode:false,letter:undefined,active:true}),
+  })));
+  fireEvent.click(await screen.findByRole('button',{name:'Thêm loại'}));
+  const specialDialog=await screen.findByRole('dialog');
+  fireEvent.change(within(specialDialog).getByLabelText('Tên loại hồ sơ'),{target:{value:'Thí sinh dự khuyết'}});
+  fireEvent.click(within(specialDialog).getByRole('checkbox',{name:'Cấp mã đặc biệt (gắn chữ cái phân biệt ở cuối mã)'}));
+  fireEvent.change(within(specialDialog).getByLabelText('Chữ cái của loại hồ sơ (A–Z)'),{target:{value:'K'}});
+  fireEvent.click(within(specialDialog).getByRole('checkbox',{name:'Kích hoạt (cho phép cấp mã)'}));
+  fireEvent.click(within(specialDialog).getByRole('button',{name:'Lưu'}));
+  await waitFor(()=>expect(axios).toHaveBeenCalledWith(expect.objectContaining({
+    method:'post',
+    url:expect.stringContaining('/learner-codes/types'),
+    data:expect.objectContaining({name:'Thí sinh dự khuyết',usesSpecialCode:true,letter:'K',active:true}),
+  })));
+});
+it('shows a single unified profile type column with letter/inactive hints and fallback original category only when needed',async()=>{
+  axios.get.mockImplementation(async url=>{
+    if(url.endsWith('/options'))return {data:{types:[],groups:[{id:group,code:'CN-2026',name:'Lớp 2',academic_year:'2026'}]}};
+    if(url.includes('/class/'))return {data:[
+      {id:'r1',code:'HV01',full_name:'Nguyễn An',profile_category:'Bình thường',type_name:'Bình thường',uses_special_code:false,letter:null,type_active:true,learner_code_state:'legacy'},
+      {id:'r2',code:'HV02',full_name:'Bùi Hương',profile_category:'Cựu SV Tiền thạc sỹ',type_name:'Cựu SV Tiền thạc sỹ',uses_special_code:true,letter:'B',type_active:true,learner_code_state:'legacy'},
+      {id:'r3',code:'HV03',full_name:'Lê Minh',profile_category:'Dự thính',type_name:'Dự thính',uses_special_code:false,letter:null,type_active:false,learner_code_state:'legacy'},
+      {id:'r4',code:'HV04',full_name:'Trần Cũ',profile_category:'Không rõ',type_name:null,learner_code_state:'legacy'},
+    ]};
+    return {data:[]};
+  });
+  render(view(LearnerCodeIssue));
+  const table=await screen.findByRole('table',{name:'Danh sách hồ sơ cấp mã'});
+  await within(table).findByText('Nguyễn An');
+  expect(within(table).queryByText('Phân loại hiện có')).not.toBeInTheDocument();
+  expect(within(table).queryByText('Loại hồ sơ để cấp mã')).not.toBeInTheDocument();
+  expect(within(table).getByRole('columnheader',{name:'Loại hồ sơ'})).toBeInTheDocument();
+  expect(within(table).getAllByText('Bình thường')).toHaveLength(1);
+  expect(within(table).getByText('B')).toBeInTheDocument();
+  expect(within(table).getByText('Chưa kích hoạt')).toBeInTheDocument();
+  expect(within(table).getByText('Phân loại gốc: Không rõ')).toBeInTheDocument();
+});

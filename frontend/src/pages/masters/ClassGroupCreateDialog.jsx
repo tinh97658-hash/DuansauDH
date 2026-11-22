@@ -1,5 +1,6 @@
 import { ResponsibleStaffSelect } from "../../features/accounts/GroupResponsibleStaff";
 import { usePermissions } from "../../features/accounts/usePermissions";
+import IntakeRoundSelect, { matchesIntakeRound } from "../../components/IntakeRoundSelect";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
@@ -208,6 +209,7 @@ const ClassGroupCreateDialog = ({ majors, initialValues, initialDisciplineId = "
     setForm((previous) => ({
       ...previous,
       academicYear,
+      intakeRound: "",
       curriculumId: "",
     }));
   };
@@ -489,7 +491,7 @@ const ClassGroupCreateDialog = ({ majors, initialValues, initialDisciplineId = "
                     </FormControl>
                   </CompactField>
 
-                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "minmax(0, .8fr) minmax(0, 1fr) minmax(0, .6fr) minmax(0, 1.6fr)" }, gap: 1.5, alignItems: "start" }}>
+                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "minmax(0, .75fr) minmax(0, .95fr) minmax(105px, .75fr) minmax(0, 1.55fr)" }, gap: 1.5, alignItems: "start" }}>
                     <CompactField label="SỐ NHÓM CẦN TẠO" htmlFor="create-group-count">
                       <TextField id="create-group-count" type="number" value={form.count} onChange={(e) => setForm((p) => ({ ...p, count: e.target.value }))} fullWidth size="small" inputProps={{ min: 1, max: 10, "aria-label": "Số nhóm cần tạo" }} sx={compactControlSx} />
                     </CompactField>
@@ -497,7 +499,7 @@ const ClassGroupCreateDialog = ({ majors, initialValues, initialDisciplineId = "
                       <TextField id="create-group-capacity" type="number" value={form.maxStudents} onChange={(e) => setForm((p) => ({ ...p, maxStudents: e.target.value }))} fullWidth size="small" inputProps={{ min: 1, max: 200, "aria-label": "Sĩ số tối đa / nhóm" }} sx={compactControlSx} />
                     </CompactField>
                     <CompactField label="ĐỢT" htmlFor="create-intake-round">
-                      <TextField id="create-intake-round" type="number" value={form.intakeRound} onChange={(e) => setForm((p) => ({ ...p, intakeRound: e.target.value }))} fullWidth size="small" inputProps={{ min: 1, max: 99, "aria-label": "Đợt" }} sx={compactControlSx} />
+                      <IntakeRoundSelect id="create-intake-round" variant="plain" year={form.academicYear} value={String(form.intakeRound || "")} onChange={value => setForm(previous => ({ ...previous, intakeRound: value }))} required label="Đợt" rows={dialogScopeGroups} sx={compactControlSx} />
                     </CompactField>
                     <CompactField label="QUY TẮC MÃ NHÓM" htmlFor="create-name-template" helper={nameTemplateError || "{n}: số nhóm nhỏ nhất chưa sử dụng trong đợt"} error={Boolean(nameTemplateError)}>
                       <TextField

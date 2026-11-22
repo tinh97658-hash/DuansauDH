@@ -96,16 +96,18 @@ export class MastersController {
     @Query("majorId") majorId?: string,
     @Query("academicYear") academicYear?: string,
     @Query("status") status?: string,
+    @Query("intakeRound") intakeRound?: string,
   ) {
-    return this.masters.listClassGroups(majorId, academicYear, status);
+    return this.masters.listClassGroups(majorId, academicYear, status, intakeRound);
   }
 
   @Get("class-groups/eligible-students")
   listEligibleStudents(
+    @Query("intakeRound") intakeRound?: string,
     @Query("majorId") majorId?: string,
     @Query("academicYear") academicYear?: string,
   ) {
-    return this.masters.listEligibleStudents(majorId, academicYear);
+    return this.masters.listEligibleStudents(majorId, academicYear, intakeRound);
   }
 
   @Get("class-groups/options")

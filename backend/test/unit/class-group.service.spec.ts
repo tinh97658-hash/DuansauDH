@@ -91,7 +91,7 @@ describe("ClassGroupService protects the academic scope", () => {
 
   it.each([
     { majorId: "m2" }, { academicYear: "2027" }, { curriculumId: "c2" },
-    { code: "CNTT 2027.1.1" },
+    { code: "CNTT 2027.1.1" }, { code: "CNTT 2026.2.1" },
   ])("blocks scope changes before writing a used class: %j", async patch => {
     const { service, group, curriculums, transaction } = build(true);
     await expect(service.update("g1", patch, transaction as never)).rejects.toMatchObject({ response: { code: "CLASS_SCOPE_IN_USE" } });
@@ -110,5 +110,28 @@ describe("ClassGroupService protects the academic scope", () => {
     const { service, group, transaction } = build(true);
     await service.update("g1", { majorId: "m1", academicYear: "2026", curriculumId: "c1", note: "Updated", maxStudents: 50 }, transaction as never);
     expect(group.update).toHaveBeenCalledWith(expect.objectContaining({ note: "Updated", maxStudents: 50 }), { transaction });
+  });
+
+  it("supports updating intakeRound on unused custom-code and standard-code groups and blocks used custom-code groups", async () => {
+    const unused = build(false);
+    unused.group.groupNumber = null as any;
+    unused.group.code = "LOP-CNTT-1";
+    unused.group.name = "LOP-CNTT-1";
+    (unused.group as any).intakeRound = 1;
+    await unused.service.update("g1", { intakeRound: 2 }, unused.transaction as never);
+    expect(unused.group.update).toHaveBeenCalledWith(expect.objectContaining({ intakeRound: 2 }), { transaction: unused.transaction });
+
+    const standard = build(false);
+    (standard.group as any).intakeRound = 1;
+    await standard.service.update("g1", { intakeRound: 2 }, standard.transaction as never);
+    expect(standard.group.update).toHaveBeenCalledWith(expect.objectContaining({ code: "CNTT 2026.2.1", intakeRound: 2 }), { transaction: standard.transaction });
+
+    await expect(standard.service.update("g1", { code: "CNTT 2026.1.1", intakeRound: 2 }, standard.transaction as never)).rejects.toThrow("Số đợt trong mã nhóm");
+
+    const usedCustom = build(true);
+    usedCustom.group.groupNumber = null as any;
+    usedCustom.group.code = "LOP-CNTT-1";
+    (usedCustom.group as any).intakeRound = 1;
+    await expect(usedCustom.service.update("g1", { intakeRound: 2 }, usedCustom.transaction as never)).rejects.toMatchObject({ response: { code: "CLASS_SCOPE_IN_USE" } });
   });
 });

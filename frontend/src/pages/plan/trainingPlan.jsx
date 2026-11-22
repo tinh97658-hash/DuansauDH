@@ -1214,7 +1214,7 @@ const TrainingPlan = () => {
             justifyContent="space-between"
             sx={{ mb: 1.5 }}
           >
-            <Stack className="app-filter-toolbar" direction="row" spacing={1} alignItems="flex-end" flexWrap="nowrap">
+            <Stack className="app-filter-toolbar" direction="row" gap={1} alignItems="flex-end">
               <FilterSearchField
                 placeholder="Tìm kiếm mã HP, tên học phần..."
                 value={subjectSearch}
@@ -1276,19 +1276,19 @@ const TrainingPlan = () => {
               overflow: "visible !important",
             }}
           >
-            <Table size="small" aria-label="Danh mục học phần" sx={{ minWidth: 1140, tableLayout: "fixed" }}>
+            <Table size="small" aria-label="Danh mục học phần" sx={{ minWidth: 960 }}>
               <TableHead>
                 <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", color: "#172B3A", fontWeight: 700, fontSize: 12, py: "8px", borderBottom: "2px solid #DFE4E8" } }}>
-                  <TableCell sx={{ width: 44, textAlign: "center" }}>STT</TableCell>
-                  <TableCell sx={{ width: 95 }}>Mã số</TableCell>
-                  <TableCell sx={{ width: 95 }}>Mã chữ</TableCell>
-                  <TableCell sx={{ width: "24%" }}>Tên môn học</TableCell>
-                  <TableCell sx={{ width: 88, textAlign: "center", px: 1, whiteSpace: "nowrap" }}>Số TC</TableCell>
-                  <TableCell sx={{ width: 270, textAlign: "center", whiteSpace: "nowrap" }}>Nhóm kiến thức</TableCell>
-                  <TableCell sx={{ width: 120, textAlign: "center" }}>Học chung</TableCell>
-                  <TableCell sx={{ width: 95, textAlign: "center" }}>Bài tập lớn</TableCell>
-                  <TableCell sx={{ width: 90, textAlign: "center" }}>Trạng thái</TableCell>
-                  {isAdmin && <TableCell sx={{ width: 110, textAlign: "center" }}>Thao tác</TableCell>}
+                  <TableCell sx={{ width: "3.5em", textAlign: "center" }}>STT</TableCell>
+                  <TableCell sx={{ width: "6em" }}>Mã số</TableCell>
+                  <TableCell sx={{ width: "6.5em" }}>Mã chữ</TableCell>
+                  <TableCell sx={{ minWidth: "13em" }}>Tên môn học</TableCell>
+                  <TableCell sx={{ width: "4.5em", textAlign: "center" }}>Số TC</TableCell>
+                  <TableCell sx={{ width: "14em", textAlign: "center" }}>Nhóm kiến thức</TableCell>
+                  <TableCell sx={{ width: "7.5em", textAlign: "center" }}>Học chung</TableCell>
+                  <TableCell sx={{ width: "6.5em", textAlign: "center" }}>Bài tập lớn</TableCell>
+                  <TableCell sx={{ width: "6em", textAlign: "center" }}>Trạng thái</TableCell>
+                  {isAdmin && <TableCell sx={{ width: "6.5em", textAlign: "center" }}>Thao tác</TableCell>}
                 </TableRow>
               </TableHead>
 
@@ -1458,7 +1458,8 @@ const TrainingPlan = () => {
                             sx={{
                               fontSize: 11,
                               fontWeight: 700,
-                              width: 250,
+                              width: "100%",
+                              minWidth: 180,
                               height: 28,
                               color: "#172B3A",
                               bgcolor: "transparent",
@@ -1679,27 +1680,32 @@ const TrainingPlan = () => {
 
       {!loading && majorId && tab === 1 && (
         /* TAB 2: CHƯƠNG TRÌNH ĐÀO TẠO THEO KHÓA */
-        <Stack
-          direction={{ xs: "column", lg: "row" }}
-          spacing={1.25}
-          alignItems="stretch"
-          sx={{ minHeight: { xs: "auto", lg: 360 } }}
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", lg: "minmax(340px, 34%) minmax(0, 1fr)" },
+            gap: 1.25,
+            alignItems: "stretch",
+            minHeight: { xs: "auto", lg: 360 },
+          }}
         >
           {/* LEFT PANE: CURRICULUMS LIST */}
-          <Box sx={{ width: { xs: "100%", lg: "32%" }, display: "flex" }}>
+          <Box sx={{ minWidth: 0, display: "flex" }}>
             <Paper
               variant="outlined"
               sx={{
                 p: 1.25,
                 width: "100%",
+                minWidth: 0,
+                display: "flex",
+                flexDirection: "column",
                 minHeight: { xs: 320, lg: 360 },
                 borderColor: "#D7E4EE",
-                borderRadius: "10px",
                 bgcolor: "#FFFFFF",
                 boxShadow: "none",
               }}
             >
-              <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+              <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center" justifyContent="space-between" sx={{ mb: 1, rowGap: 1 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#173E75", fontSize: 12 }}>
                   CTĐT theo từng khóa
                   <Typography component="span" variant="caption" sx={{ ml: 0.75, color: "#607486", fontWeight: 600 }}>
@@ -1715,11 +1721,10 @@ const TrainingPlan = () => {
                     onClick={handleOpenCreateCurriculum}
                     disabled={curriculumCodeLoading}
                     sx={{
-                      height: 28,
+                      minHeight: 28,
                       fontSize: 12,
                       fontWeight: 700,
                       textTransform: "none",
-                      borderRadius: "8px",
                       bgcolor: "#0788B8",
                       boxShadow: "none",
                       "&:hover": { bgcolor: "#06729b", boxShadow: "none" },
@@ -1730,21 +1735,20 @@ const TrainingPlan = () => {
                 )}
               </Stack>
 
-              <TableContainer sx={{ maxHeight: 480, overflowY: "auto", border: "1px solid #D7E4EE", borderRadius: "8px", boxShadow: "none !important" }}>
+              <TableContainer sx={{ maxHeight: 480, overflowY: "auto", border: "1px solid #D7E4EE", boxShadow: "none !important" }}>
                 <Table size="small" stickyHeader aria-label="Chương trình đào tạo">
                   <TableHead>
                     <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", fontWeight: 700, fontSize: 11, py: "6px" } }}>
                       <TableCell>Chương trình đào tạo</TableCell>
-                      <TableCell sx={{ width: 62, textAlign: "center" }}>Tín chỉ</TableCell>
-                      <TableCell sx={{ width: 110 }}>Lớp áp dụng</TableCell>
-                      {isAdmin && <TableCell sx={{ width: 45, textAlign: "center" }}>Xóa</TableCell>}
+                      <TableCell sx={{ width: "9.5em" }}>Lớp áp dụng</TableCell>
+                      {isAdmin && <TableCell sx={{ width: "3.5em", textAlign: "center" }}>Xóa</TableCell>}
                     </TableRow>
                   </TableHead>
 
                   <TableBody>
                     {curriculums.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={isAdmin ? 4 : 3} align="center" sx={{ py: 4, color: "#607486", fontSize: 12 }}>
+                        <TableCell colSpan={isAdmin ? 3 : 2} align="center" sx={{ py: 4, color: "#607486", fontSize: 12 }}>
                           Chưa có chương trình đào tạo nào cho chuyên ngành này. Bấm <strong>"+ Lập CTĐT mới"</strong> để tạo khung CTĐT cho từng khóa học.
                         </TableCell>
                       </TableRow>
@@ -1756,7 +1760,7 @@ const TrainingPlan = () => {
                           <React.Fragment key={group.year}>
                             <TableRow>
                               <TableCell
-                                colSpan={isAdmin ? 4 : 3}
+                                colSpan={isAdmin ? 3 : 2}
                                 sx={{
                                   bgcolor: "#E8F1F8",
                                   borderTop: "1px solid #C9DAE8",
@@ -1797,16 +1801,16 @@ const TrainingPlan = () => {
                                   }}
                                 >
                                   <TableCell>
-                                    <Typography variant="caption" sx={{ fontFamily: "inherit", fontWeight: 700, color: "#173E75", display: "block" }}>
-                                      {c.code}
-                                    </Typography>
+                                    <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ gap: 0.5 }}>
+                                      <Typography variant="caption" sx={{ fontFamily: "inherit", fontWeight: 700, color: "#173E75" }}>
+                                        {c.code}
+                                      </Typography>
+                                      <Typography component="span" variant="caption" sx={{ fontWeight: 700, color: "#137B3B" }}>
+                                        · {`${c.totalCredits || 0} TC`}
+                                      </Typography>
+                                    </Stack>
                                     <Typography variant="caption" sx={{ color: "#172B3A", display: "block", mt: 0.25, fontWeight: 500 }}>
                                       {c.name}
-                                    </Typography>
-                                  </TableCell>
-                                  <TableCell align="center">
-                                    <Typography variant="body2" sx={{ fontWeight: 700, color: "#137B3B", fontSize: 12 }}>
-                                      {`${c.totalCredits || 0} TC`}
                                     </Typography>
                                   </TableCell>
                                   <TableCell>
@@ -1816,14 +1820,15 @@ const TrainingPlan = () => {
                                           size="small"
                                           label={`${linkedClasses.length} lớp: ${classCodes}`}
                                           sx={{
-                                            height: 18,
-                                            maxWidth: 104,
-                                            fontSize: 10,
+                                            height: "auto",
+                                            minHeight: 22,
+                                            maxWidth: "100%",
+                                            fontSize: 10.5,
                                             fontWeight: 600,
                                             bgcolor: "#E6F4EA",
                                             color: "#137B3B",
                                             border: "1px solid #137B3B",
-                                            "& .MuiChip-label": { px: 0.75, overflow: "hidden", textOverflow: "ellipsis" },
+                                            "& .MuiChip-label": { px: 0.75, py: 0.25, whiteSpace: "normal" },
                                           }}
                                         />
                                       </Tooltip>
@@ -1831,7 +1836,7 @@ const TrainingPlan = () => {
                                       <Chip
                                         size="small"
                                         label="Chưa gán lớp"
-                                        sx={{ height: 18, fontSize: 10, fontWeight: 600, bgcolor: "#F1F5F9", color: "#8095A8" }}
+                                        sx={{ height: "auto", minHeight: 22, maxWidth: "100%", fontSize: 10.5, fontWeight: 600, bgcolor: "#F1F5F9", color: "#607486" }}
                                       />
                                     )}
                                   </TableCell>
@@ -1867,24 +1872,24 @@ const TrainingPlan = () => {
           </Box>
 
           {/* RIGHT PANE: CHƯƠNG TRÌNH ĐÀO TẠO CỦA KHÓA */}
-          <Box sx={{ width: { xs: "100%", lg: "68%" }, display: "flex" }}>
+          <Box sx={{ minWidth: 0, display: "flex" }}>
             <Paper
               variant="outlined"
               sx={{
                 p: 1.25,
                 width: "100%",
+                minWidth: 0,
                 minHeight: { xs: 360, lg: 360 },
                 display: "flex",
                 flexDirection: "column",
                 borderColor: "#D7E4EE",
-                borderRadius: "10px",
                 bgcolor: "#FFFFFF",
                 boxShadow: "none",
               }}
             >
               {!curriculumId || !curriculum ? (
                 <Box sx={{ py: 6, textAlign: "center" }}>
-                  <Alert severity="info" sx={{ borderRadius: "2px", mb: 2, maxWidth: 500, mx: "auto" }}>
+                  <Alert severity="info" sx={{ mb: 2, maxWidth: 500, mx: "auto" }}>
                     Vui lòng chọn một chương trình đào tạo ở bảng bên trái hoặc bấm nút <strong>"+ Lập CTĐT mới"</strong> để bắt đầu.
                   </Alert>
                   {isAdmin && curriculums.length === 0 && (
@@ -1895,12 +1900,11 @@ const TrainingPlan = () => {
                       onClick={handleOpenCreateCurriculum}
                       disabled={curriculumCodeLoading}
                       sx={{
-                        height: 32,
+                        minHeight: 32,
                         fontSize: 12,
                         fontWeight: 700,
                         bgcolor: "#0788B8",
                         textTransform: "none",
-                        borderRadius: "2px",
                       }}
                     >
                       Lập CTĐT đầu tiên cho ngành
@@ -1908,27 +1912,28 @@ const TrainingPlan = () => {
                   )}
                 </Box>
               ) : (
-                <Box sx={{ display: "flex", minHeight: 0, flex: 1, flexDirection: "column" }}>
+                <Box sx={{ display: "flex", minHeight: 0, minWidth: 0, flex: 1, flexDirection: "column" }}>
                   <Stack
                     direction={{ xs: "column", sm: "row" }}
                     spacing={1}
+                    flexWrap="wrap"
                     alignItems={{ xs: "flex-start", sm: "center" }}
                     justifyContent="space-between"
-                    sx={{ mb: 0.75 }}
+                    sx={{ mb: 0.75, rowGap: 1 }}
                   >
-                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ minWidth: 0, flex: "1 1 280px" }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#173E75", fontSize: 14 }}>
                         {curriculum.name}
                       </Typography>
                       <Chip
                         size="small"
                         label={curriculum.code}
-                        sx={{ height: 24, fontSize: 11, fontWeight: 700, bgcolor: "#E6F4EA", color: "#137B3B", border: "1px solid #137B3B" }}
+                        sx={{ minHeight: 24, fontSize: 11, fontWeight: 700, bgcolor: "#E6F4EA", color: "#137B3B", border: "1px solid #137B3B" }}
                       />
                       <Chip
                         size="small"
                         label={`Khóa ${curriculum.applicableFromYear || "—"}`}
-                        sx={{ height: 24, fontSize: 11, fontWeight: 700, bgcolor: "#E1F0F8", color: "#0788B8", border: "1px solid #0788B8" }}
+                        sx={{ minHeight: 24, fontSize: 11, fontWeight: 700, bgcolor: "#E1F0F8", color: "#0788B8", border: "1px solid #0788B8" }}
                       />
                       {matrixSaving && <CircularProgress size={14} sx={{ color: "#0788B8" }} />}
                       {(curriculum.classGroups || []).length > 0 && (
@@ -1946,8 +1951,9 @@ const TrainingPlan = () => {
                       <Stack
                         direction="row"
                         spacing={0.75}
+                        flexWrap="wrap"
                         alignItems="center"
-                        sx={{ width: 420, maxWidth: "100%", flexShrink: 0, transform: "translateY(-8px)" }}
+                        sx={{ maxWidth: "100%", rowGap: 0.75 }}
                       >
                         <Button
                           size="small"
@@ -1956,16 +1962,13 @@ const TrainingPlan = () => {
                           onClick={handleOpenAddSubjects}
                           disabled={matrixSaving || curriculumInUse}
                           sx={{
-                            height: 32,
-                            flex: 1,
-                            px: 1.25,
-                            fontSize: 11,
+                            minHeight: 32,
+                            px: 1.5,
+                            fontSize: 11.5,
                             fontWeight: 700,
                             textTransform: "none",
-                            borderRadius: "8px",
                             bgcolor: "#0788B8",
                             boxShadow: "none",
-                            whiteSpace: "nowrap",
                             "&:hover": { bgcolor: "#06729b", boxShadow: "none" },
                           }}
                         >
@@ -1979,7 +1982,7 @@ const TrainingPlan = () => {
                             startIcon={<TrashIcon />}
                             onClick={handleClearAllSubjectsFromCurriculum}
                             disabled={matrixSaving || curriculumInUse}
-                            sx={{ height: 32, flex: 1, px: 1.25, fontSize: 11, fontWeight: 700, textTransform: "none", borderRadius: "8px", whiteSpace: "nowrap" }}
+                            sx={{ minHeight: 32, px: 1.5, fontSize: 11.5, fontWeight: 700, textTransform: "none" }}
                           >
                             Làm sạch CTĐT
                           </Button>
@@ -1996,57 +1999,57 @@ const TrainingPlan = () => {
 
                   <Stack
                     direction={{ xs: "column", lg: "row" }}
-                    spacing={1}
+                    flexWrap="wrap"
                     alignItems={{ xs: "stretch", lg: "center" }}
                     justifyContent="space-between"
-                    sx={{ mb: 0.75 }}
+                    sx={{ mb: 0.75, gap: 1 }}
                   >
-                    <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ flexShrink: 0 }}>
+                    <Stack direction="row" flexWrap="wrap" sx={{ gap: 0.75, minWidth: 0 }}>
                       <Chip
                       size="small"
                       label={`Bắt buộc: ${requiredCredits} TC`}
-                      sx={{ height: 24, bgcolor: "#E6F4EA", color: "#137B3B", fontSize: 11, fontWeight: 700 }}
+                      sx={{ minHeight: 24, bgcolor: "#E6F4EA", color: "#137B3B", fontSize: 11, fontWeight: 700 }}
                       />
                       <Chip
                       size="small"
                       label={`Tự chọn: ${electiveCredits} TC`}
-                      sx={{ height: 24, bgcolor: "#FEF3E2", color: "#B86216", fontSize: 11, fontWeight: 700 }}
+                      sx={{ minHeight: 24, bgcolor: "#FEF3E2", color: "#B86216", fontSize: 11, fontWeight: 700 }}
                       />
                       <Chip
                       size="small"
                       label={`Tổng: ${requiredCredits + electiveCredits} TC`}
-                      sx={{ height: 24, bgcolor: "#EAF4FB", color: "#0788B8", fontSize: 11, fontWeight: 700 }}
+                      sx={{ minHeight: 24, bgcolor: "#EAF4FB", color: "#0788B8", fontSize: 11, fontWeight: 700 }}
                       />
                       <Chip
                       size="small"
                       label={`${curriculumSubjects.length} học phần`}
-                      sx={{ height: 24, bgcolor: "#F0F4F8", color: "#607486", fontSize: 11, fontWeight: 600 }}
+                      sx={{ minHeight: 24, bgcolor: "#F0F4F8", color: "#607486", fontSize: 11, fontWeight: 600 }}
                       />
                     </Stack>
 
-                    <Stack direction="row" alignItems="center" justifyContent="flex-end" sx={{ width: 420, maxWidth: "100%", minWidth: 0, flexShrink: 0 }}>
+                    <Stack direction="row" alignItems="center" justifyContent="flex-end" sx={{ flex: "1 1 260px", maxWidth: { xs: "100%", lg: 420 }, minWidth: 0, ml: "auto" }}>
                       <FilterSearchField
                         label=""
                         inputLabel="Tìm kiếm học phần trong chương trình đào tạo"
                         placeholder="Tìm kiếm theo Mã HP và Tên học phần...."
                         value={curriculumSubjectSearch}
                         onChange={(event) => setCurriculumSubjectSearch(event.target.value)}
-                        sx={{ width: "100%", "& .MuiOutlinedInput-root": { height: 32 } }}
+                        sx={{ width: "100%", "& .MuiOutlinedInput-root": { minHeight: 32 } }}
                       />
                     </Stack>
                   </Stack>
 
-                  <TableContainer sx={{ border: "1px solid #D7E4EE", borderRadius: "8px", boxShadow: "none !important" }}>
-                    <Table size="small" aria-label="Danh mục học phần" sx={{ minWidth: 900, tableLayout: "fixed" }}>
+                  <TableContainer sx={{ border: "1px solid #D7E4EE", boxShadow: "none !important" }}>
+                    <Table size="small" aria-label="Danh mục học phần" sx={{ minWidth: 720 }}>
                       <TableHead>
-                        <TableRow sx={{ height: 42, "& th": { bgcolor: "#F0F4F8", color: "#172B3A", fontWeight: 700, fontSize: 13, py: "8px" } }}>
-                          <TableCell sx={{ width: 36, textAlign: "center" }}>STT</TableCell>
-                          <TableCell sx={{ width: 80 }}>Mã HP</TableCell>
-                          <TableCell sx={{ width: "42%" }}>Tên học phần</TableCell>
-                          <TableCell sx={{ width: 48, px: 0, textAlign: "center" }}>TC</TableCell>
-                          <TableCell sx={{ width: 230, whiteSpace: "nowrap" }}>Nhóm kiến thức</TableCell>
-                          <TableCell sx={{ width: 190, textAlign: "center" }}>Loại học phần</TableCell>
-                          {isAdmin && <TableCell sx={{ width: 68, px: 1, textAlign: "center" }}>Xóa</TableCell>}
+                        <TableRow sx={{ "& th": { bgcolor: "#F0F4F8", color: "#172B3A", fontWeight: 700, fontSize: 13, py: "8px" } }}>
+                          <TableCell sx={{ width: "3.5em", textAlign: "center" }}>STT</TableCell>
+                          <TableCell sx={{ width: "6.5em" }}>Mã HP</TableCell>
+                          <TableCell sx={{ minWidth: "14em" }}>Tên học phần</TableCell>
+                          <TableCell sx={{ width: "3.5em", textAlign: "center" }}>TC</TableCell>
+                          <TableCell sx={{ minWidth: "12em" }}>Nhóm kiến thức</TableCell>
+                          <TableCell sx={{ minWidth: "11em", textAlign: "center" }}>Loại học phần</TableCell>
+                          {isAdmin && <TableCell sx={{ width: "4em", textAlign: "center" }}>Xóa</TableCell>}
                         </TableRow>
                       </TableHead>
 
@@ -2061,7 +2064,7 @@ const TrainingPlan = () => {
                           </TableRow>
                         ) : (
                           filteredCurriculumSubjects.map((entry, index) => (
-                            <TableRow key={entry.id} hover sx={{ height: 56, "& td": { py: "7px", fontSize: 13, verticalAlign: "middle" } }}>
+                            <TableRow key={entry.id} hover sx={{ "& td": { py: "7px", fontSize: 13, verticalAlign: "middle" } }}>
                               <TableCell align="center" sx={{ color: "#607486", fontSize: 12 }}>
                                 {index + 1}
                               </TableCell>
@@ -2116,7 +2119,7 @@ const TrainingPlan = () => {
               )}
             </Paper>
           </Box>
-        </Stack>
+        </Box>
       )}
 
 

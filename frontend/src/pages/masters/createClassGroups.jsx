@@ -1,4 +1,5 @@
 import GroupResponsibleStaff from "../../features/accounts/GroupResponsibleStaff";
+import IntakeRoundSelect, { matchesIntakeRound } from "../../components/IntakeRoundSelect";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -52,13 +53,14 @@ const CreateClassGroups = () => {
       && majorDisciplineId(major) === searchParams.get("disciplineId"));
 
   const [majorsLoading, setMajorsLoading] = useState(true);
+  const [intakeRound, setIntakeRound] = useState("");
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [selectedMajor, setSelectedMajor] = useState("ALL");
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("ALL");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  useEffect(() => { setPage(0); }, [selectedYear, selectedMajor, selectedDiscipline, selectedStatus, search]);
+  useEffect(() => { setPage(0); }, [selectedYear, intakeRound, selectedMajor, selectedDiscipline, selectedStatus, search]);
 
   // Data & loading
   const [groups, setGroups] = useState([]);
@@ -85,7 +87,9 @@ const CreateClassGroups = () => {
     setSelectedDiscipline(disciplineId);
     setSelectedMajor(majorId);
     setDialogDisciplineId(disciplineId);
-    setForm({ ...initialForm(year), majorId });
+    const round = searchParams.get("intakeRound");
+    setIntakeRound(/^[1-9]\d?$/.test(round || "") ? round : "");
+    setForm({ ...initialForm(year), majorId, intakeRound: /^[1-9]\d?$/.test(round || "") ? Number(round) : 1 });
     setDialogOpen(true);
   }, [quickCreateScope, searchParams]);
 
@@ -110,6 +114,7 @@ const CreateClassGroups = () => {
     try {
       const params = new URLSearchParams();
       if (selectedYear) params.append("academicYear", selectedYear);
+      if (intakeRound) params.append("intakeRound", intakeRound);
       if (selectedMajor !== "ALL") params.append("majorId", selectedMajor);
       if (selectedStatus !== "ALL") params.append("status", selectedStatus);
 
@@ -125,7 +130,7 @@ const CreateClassGroups = () => {
     } finally {
       if (requestVersion === groupRequestVersion.current) setLoading(false);
     }
-  }, [selectedYear, selectedMajor, selectedStatus]);
+  }, [selectedYear, intakeRound, selectedMajor, selectedStatus]);
 
   useEffect(() => {
     loadGroups();
@@ -158,6 +163,7 @@ const CreateClassGroups = () => {
     setEditingId(null);
     setForm({
       ...initialForm(selectedYear),
+      intakeRound: intakeRound && intakeRound !== "unassigned" ? Number(intakeRound) : 1,
       majorId,
     });
     setDialogOpen(true);
@@ -191,6 +197,8 @@ const CreateClassGroups = () => {
         disciplineId: searchParams.get("disciplineId"),
         majorId: searchParams.get("majorId"),
       });
+      const round = searchParams.get("intakeRound");
+      if (/^[1-9]\d?$/.test(round || "")) params.set("intakeRound", round);
       const created = createdGroups.find((group) => group.id && group.status === "open"
         && group.majorId === params.get("majorId")
         && String(group.academicYear) === params.get("year"));
@@ -247,22 +255,50 @@ const CreateClassGroups = () => {
           boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
         }}
       >
-        <Stack className="app-filter-toolbar" direction="row" flexWrap="nowrap" alignItems="flex-end" sx={{ gap: 1.5 }}>
-          <FilterSelectField label="Năm học" sx={{ flex: "1 1 190px", minWidth: 190 }}
+        <Stack className="app-filter-toolbar" direction="row" gap={1.25} alignItems="flex-end" justifyContent="space-between">
+          <FilterSearchField
+            placeholder="Tìm theo mã nhóm, ngành học..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            sx={{ flex: "1 1 320px", minWidth: "min(100%, 260px)", maxWidth: { lg: 560 } }}
+          />
+
+          <Stack direction="row" gap={1} alignItems="flex-end" sx={{ flexShrink: 0, ml: "auto" }}>
+            {isAdmin && (
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<PlusIcon />}
+                onClick={openAdd}
+                disabled={majorsLoading || loading}
+                sx={{ height: 38, px: 1.75, bgcolor: "#0788B8", fontSize: 12, borderRadius: "7px", boxShadow: "none", textTransform: "none", fontWeight: 700, whiteSpace: "nowrap", "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}
+              >
+                Thêm nhóm mới
+              </Button>
+            )}
+            <InlineReportExport height={38} />
+          </Stack>
+        </Stack>
+
+        <Box sx={{ borderBottom: "1px solid #E4EDF4", my: 1.25 }} />
+
+        <Stack className="app-filter-toolbar" direction="row" alignItems="flex-end" sx={{ gap: 1.25 }}>
+          <FilterSelectField label="Năm học" sx={{ flex: "0.6 1 100px", minWidth: 96 }}
               value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
+              onChange={(e) => { setSelectedYear(e.target.value); setIntakeRound(""); }}
             >
               {YEARS.map((y) => (
                 <MenuItem key={y} value={y}>{y}</MenuItem>
               ))}
           </FilterSelectField>
+          <IntakeRoundSelect year={selectedYear} value={intakeRound} onChange={setIntakeRound} rows={groups} sx={{ flex: "1 1 135px", minWidth: 128 }} />
 
-          <FilterSelectField label="Ngành" sx={{ flex: "1 1 210px", minWidth: 210 }} value={selectedDiscipline} onChange={(e) => { setSelectedDiscipline(e.target.value); setSelectedMajor("ALL"); }}>
+          <FilterSelectField label="Ngành" sx={{ flex: "1.2 1 175px", minWidth: 160 }} value={selectedDiscipline} onChange={(e) => { setSelectedDiscipline(e.target.value); setSelectedMajor("ALL"); }}>
               <MenuItem value="">Tất cả ngành</MenuItem>
               {disciplines.map((item) => <MenuItem key={item.id} value={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}
           </FilterSelectField>
 
-          <FilterSelectField label="Chuyên ngành" sx={{ flex: "1 1 210px", minWidth: 210 }}
+          <FilterSelectField label="Chuyên ngành" sx={{ flex: "1.5 1 210px", minWidth: 185 }}
               value={selectedMajor}
               onChange={(e) => setSelectedMajor(e.target.value)}
             >
@@ -272,7 +308,7 @@ const CreateClassGroups = () => {
               ))}
           </FilterSelectField>
 
-          <FilterSelectField label="Trạng thái" sx={{ flex: "1 1 190px", minWidth: 190 }}
+          <FilterSelectField label="Trạng thái" sx={{ flex: "1 1 140px", minWidth: 132 }}
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
             >
@@ -280,28 +316,6 @@ const CreateClassGroups = () => {
               <MenuItem value="open">Đang mở</MenuItem>
               <MenuItem value="closed">Đã đóng</MenuItem>
           </FilterSelectField>
-
-          <FilterSearchField
-            placeholder="Tìm theo mã nhóm, ngành học..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ flex: "2 1 280px", minWidth: 220 }}
-          />
-
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0, ml: "auto" }}>
-          {isAdmin && (
-            <Button
-              variant="contained"
-              startIcon={<PlusIcon />}
-              onClick={openAdd}
-              disabled={majorsLoading || loading}
-              sx={{ height: 40, px: 2, bgcolor: "#0788B8", borderRadius: "4px", boxShadow: "none", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}
-            >
-              Thêm nhóm mới
-            </Button>
-          )}
-          <InlineReportExport />
-          </Stack>
         </Stack>
       </Paper>
 
@@ -396,7 +410,7 @@ const CreateClassGroups = () => {
                           <IconButton
                             size="small"
                             color="success"
-                            onClick={() => navigate(`/masters/assign-class-groups?groupId=${row.id}&majorId=${row.majorId || ""}&year=${row.academicYear || ""}`)}
+                            onClick={() => navigate(`/masters/assign-class-groups?groupId=${row.id}&majorId=${row.majorId || ""}&year=${row.academicYear || ""}${row.intakeRound != null ? `&intakeRound=${row.intakeRound}` : ""}`)}
                           >
                             <UserGroupIcon fontSize="small" />
                           </IconButton>
@@ -445,14 +459,14 @@ const CreateClassGroups = () => {
         title="XÁC NHẬN XÓA"
         severity="error"
         confirmText={saving ? "Đang xóa..." : "Xóa"}
-        confirmDisabled={saving}
+        confirmDisabled={saving || (deletingGroup?.memberCount || 0) > 0}
       >
         <Typography sx={{ fontSize: "13.5px", color: "#1c2936" }}>
           Bạn có chắc muốn xóa nhóm <strong>{deletingGroup?.name}</strong> (Mã: <strong>{deletingGroup?.code}</strong>) không?
         </Typography>
         {deletingGroup?.memberCount > 0 && (
-          <Alert severity="warning" sx={{ mt: 1.5, borderRadius: "4px" }}>
-            Nhóm này đang có <strong>{deletingGroup?.memberCount}</strong> học viên. Các học viên sẽ được đưa về trạng thái chưa phân nhóm.
+          <Alert severity="error" sx={{ mt: 1.5, borderRadius: "4px" }}>
+            Nhóm này đang có <strong>{deletingGroup?.memberCount}</strong> học viên nên không thể xóa. Vui lòng bỏ học viên khỏi nhóm trước khi xóa.
           </Alert>
         )}
       </ConfirmDialog>

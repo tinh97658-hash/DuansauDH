@@ -2,11 +2,12 @@ import { useAuthSession } from "../../context/AuthSession";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress, Divider, FormControlLabel,
-  IconButton, InputAdornment, Paper, Stack, TextField, Tooltip, Typography,
+  IconButton, Paper, Stack, TextField, Tooltip, Typography,
 } from "@mui/material";
-import { DocumentCheckIcon, PencilSquareIcon, PlusIcon, TrashIcon, MagnifyingGlassIcon } from "../../components/AppIcons";
+import { DocumentCheckIcon, PencilSquareIcon, PlusIcon, TrashIcon } from "../../components/AppIcons";
 import FeatureLayout from "../../components/FeatureLayout";
 import AppDialog from "../../components/AppDialog";
+import FilterSearchField from "../../components/FilterSearchField";
 import PopupFormField from "../../components/PopupFormField";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { notify } from "../../utils/notify";
@@ -246,20 +247,13 @@ const Roles = () => {
   const renderPermissionEditor = () => (
     <Stack spacing={1.5}>
       <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between" sx={{ position: 'sticky', top: 0, zIndex: 2, bgcolor: '#fff', py: 1 }}>
-        <TextField
-          size="small"
+        <FilterSearchField
+          label=""
+          inputLabel="Tìm quyền"
           placeholder="Tìm quyền theo tên hoặc mã…"
-          inputProps={{ 'aria-label': 'Tìm quyền' }}
           value={search}
           onChange={event => setSearch(event.target.value)}
           sx={{ width: 'min(420px, 65%)' }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <MagnifyingGlassIcon fontSize="small" sx={{ color: '#8DA2B5' }} />
-              </InputAdornment>
-            ),
-          }}
         />
         {canManage && (
           <Button

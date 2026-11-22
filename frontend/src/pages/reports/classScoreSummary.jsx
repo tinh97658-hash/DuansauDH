@@ -1,3 +1,4 @@
+import IntakeRoundSelect, { matchesIntakeRound } from "../../components/IntakeRoundSelect";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { notify } from "../../utils/notify";
 import axios from "axios";
@@ -31,6 +32,7 @@ export default function ClassScoreSummary() {
   const catalogRevision = useSubjectCatalogRevision();
   const gradebookRevision = useGradebookRevision();
   const [groups, setGroups] = useState([]);
+  const [intakeRound, setIntakeRound] = useState("");
   const [year, setYear] = useState("");
   const [disciplineId, setDisciplineId] = useState("");
   const [majorId, setMajorId] = useState("");
@@ -104,7 +106,7 @@ export default function ClassScoreSummary() {
 
   const years = useMemo(() => [...new Set(groups.map(group => group.academicYear || ""))]
     .sort((a, b) => b.localeCompare(a, "vi", { numeric: true })), [groups]);
-  const yearGroups = useMemo(() => groups.filter(group => (group.academicYear || "") === year), [groups, year]);
+  const yearGroups = useMemo(() => groups.filter(group => (group.academicYear || "") === year && matchesIntakeRound(group, intakeRound)), [groups, year, intakeRound]);
   const yearMajors = useMemo(() => [...new Map(yearGroups.filter(group => group.major).map(group => [group.major.id, group.major])).values()]
     .sort((a, b) => a.name.localeCompare(b.name, "vi")), [yearGroups]);
   const disciplines = useMemo(() => disciplinesFromMajors(yearMajors), [yearMajors]);
@@ -118,13 +120,14 @@ export default function ClassScoreSummary() {
   const selectGroup = (group) => {
     setPage(1);
     setTranscriptOpen(false);
-    setYear(group?.academicYear || "");
+    if (group) setYear(group.academicYear || "");
     setDisciplineId(majorDisciplineId(group?.major));
     setMajorId(group?.majorId || group?.major?.id || "");
     setClassGroupId(group?.id || "");
   };
-  const changeScope = (nextYear, nextDisciplineId, nextMajorId) => {
-    const available = groups.filter(group => (group.academicYear || "") === nextYear);
+  const changeScope = (nextYear, nextDisciplineId, nextMajorId, round = nextYear === year ? intakeRound : "") => {
+    setIntakeRound(round);
+    const available = groups.filter(group => (group.academicYear || "") === nextYear && matchesIntakeRound(group, round));
     const discipline = available.some(group => majorDisciplineId(group.major) === nextDisciplineId) ? nextDisciplineId : "";
     const inDiscipline = available.filter(group => !discipline || majorDisciplineId(group.major) === discipline);
     const major = inDiscipline.some(group => (group.majorId || group.major?.id) === nextMajorId) ? nextMajorId : "";
@@ -151,29 +154,37 @@ export default function ClassScoreSummary() {
 
   return <FeatureLayout title="Tổng hợp điểm của lớp" group="BÁO CÁO">
     <section className="css-report" aria-label="Tổng hợp điểm của lớp" data-export-managed="true">
-      <Paper variant="outlined" className="css-filters app-filter-toolbar">
-        <FilterSelectField label="Năm vào trường" value={year} disabled={loadingOptions || exporting || !groups.length} onChange={event => changeScope(event.target.value, disciplineId, majorId)}>
-          {!years.length && <MenuItem value="">Chọn năm</MenuItem>}
-          {years.map(value => <MenuItem key={value} value={value}>{value || "Chưa có năm"}</MenuItem>)}
-        </FilterSelectField>
-        <FilterSelectField label="Ngành" value={disciplineId} disabled={loadingOptions || exporting || !disciplines.length} onChange={event => changeScope(year, event.target.value, majorId)}>
-          {!disciplines.length && <MenuItem value="">Chưa có ngành</MenuItem>}
-          {disciplines.map(discipline => <MenuItem key={discipline.id} value={discipline.id}>{discipline.name}</MenuItem>)}
-        </FilterSelectField>
-        <FilterSelectField label="Chuyên ngành" value={majorId} disabled={loadingOptions || exporting || !majors.length} onChange={event => changeScope(year, disciplineId, event.target.value)}>
-          {!majors.length && <MenuItem value="">Chưa có chuyên ngành</MenuItem>}
-          {majors.map(major => <MenuItem key={major.id} value={major.id}>{major.name}</MenuItem>)}
-        </FilterSelectField>
-        <FilterSelectField label="Chọn lớp" value={classGroupId} disabled={loadingOptions || exporting || !classes.length || (scoped&&classes.length===1)} onChange={event => selectGroup(groups.find(group => group.id === event.target.value))}>
-          {!classes.length && <MenuItem value="">Chọn lớp học viên</MenuItem>}
-          {classes.map(group => <MenuItem key={group.id} value={group.id}>{group.code || group.name}{group.major?.name ? ` — ${group.major.name}` : ""}</MenuItem>)}
-        </FilterSelectField>
-        <FilterSearchField placeholder="Tìm theo mã HV, họ tên..." value={search} disabled={loadingOptions || exporting} inputProps={{ maxLength: 200 }} onChange={event => { setSearch(event.target.value); setPage(1); }} />
-        <DocumentExportMenu className="css-export" formats={["excel", "word"]}
-          disabled={busy || exporting || !classGroupId || search.trim() !== debouncedSearch}
-          disabledFormats={subjects.length ? [] : ["excel"]}
-          excelLabel="Xuất bảng điểm cả lớp" wordLabel="Xuất bảng điểm cá nhân"
-          onExcel={exportDocument} onWord={() => setTranscriptOpen(true)} />
+      <Paper variant="outlined" className="css-filters">
+        <div className="app-filter-toolbar" style={{ justifyContent: "space-between" }}>
+          <FilterSearchField placeholder="Tìm theo mã HV, họ tên..." value={search} disabled={loadingOptions || exporting} inputProps={{ maxLength: 200 }} onChange={event => { setSearch(event.target.value); setPage(1); }} sx={{ flex: "1 1 320px", minWidth: "min(100%, 260px)", maxWidth: { lg: 560 } }} />
+          <div style={{ marginLeft: "auto", flexShrink: 0 }}>
+            <DocumentExportMenu className="css-export" formats={["excel", "word"]}
+              disabled={busy || exporting || !classGroupId || search.trim() !== debouncedSearch}
+              disabledFormats={subjects.length ? [] : ["excel"]}
+              excelLabel="Xuất bảng điểm cả lớp" wordLabel="Xuất bảng điểm cá nhân"
+              onExcel={exportDocument} onWord={() => setTranscriptOpen(true)} />
+          </div>
+        </div>
+        <div className="css-filters-divider" />
+        <div className="app-filter-toolbar css-filters-row">
+          <FilterSelectField label="Năm vào trường" value={year} disabled={loadingOptions || exporting || !groups.length} onChange={event => changeScope(event.target.value, disciplineId, majorId)} sx={{ flex: "0.65 1 115px", minWidth: 110 }}>
+            {!years.length && <MenuItem value="">Chọn năm</MenuItem>}
+            {years.map(value => <MenuItem key={value} value={value}>{value || "Chưa có năm"}</MenuItem>)}
+          </FilterSelectField>
+          <IntakeRoundSelect year={year} value={intakeRound} rows={groups} disabled={loadingOptions || exporting} onChange={value => changeScope(year, disciplineId, majorId, value)} sx={{ flex: "1 1 135px", minWidth: 128 }} />
+          <FilterSelectField label="Ngành" value={disciplineId} disabled={loadingOptions || exporting || !disciplines.length} onChange={event => changeScope(year, event.target.value, majorId)} sx={{ flex: "1.2 1 170px", minWidth: 155 }}>
+            {!disciplines.length && <MenuItem value="">Chưa có ngành</MenuItem>}
+            {disciplines.map(discipline => <MenuItem key={discipline.id} value={discipline.id}>{discipline.name}</MenuItem>)}
+          </FilterSelectField>
+          <FilterSelectField label="Chuyên ngành" value={majorId} disabled={loadingOptions || exporting || !majors.length} onChange={event => changeScope(year, disciplineId, event.target.value)} sx={{ flex: "1.4 1 195px", minWidth: 175 }}>
+            {!majors.length && <MenuItem value="">Chưa có chuyên ngành</MenuItem>}
+            {majors.map(major => <MenuItem key={major.id} value={major.id}>{major.name}</MenuItem>)}
+          </FilterSelectField>
+          <FilterSelectField label="Chọn lớp" value={classGroupId} disabled={loadingOptions || exporting || !classes.length || (scoped&&classes.length===1)} onChange={event => selectGroup(groups.find(group => group.id === event.target.value))} sx={{ flex: "1.4 1 200px", minWidth: 180 }}>
+            {!classes.length && <MenuItem value="">Chọn lớp học viên</MenuItem>}
+            {classes.map(group => <MenuItem key={group.id} value={group.id}>{group.code || group.name}{group.major?.name ? ` — ${group.major.name}` : ""}</MenuItem>)}
+          </FilterSelectField>
+        </div>
       </Paper>
       {(optionsError || error) && <Alert severity="error" action={<Button color="inherit" size="small" disabled={busy || exporting} onClick={() => optionsError ? setOptionsReload(value => value + 1) : setReload(value => value + 1)}>Thử lại</Button>}>{optionsError || error}</Alert>}
       <Paper variant="outlined" className="css-content">

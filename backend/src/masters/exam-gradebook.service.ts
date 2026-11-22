@@ -87,7 +87,7 @@ export class ExamGradebookService {
 
   async options() {
     const groups = await this.groups.findAll({
-      where: { program: "masters" }, attributes: ["id", "code", "name", "academicYear", "majorId"],
+      where: { program: "masters" }, attributes: ["id", "code", "name", "academicYear", "majorId", "intakeRound"],
       include: [{ model: Major, as: "major", attributes: ["id", "name"] }, examCurriculumInclude],
       order: [["academicYear", "DESC"], ["name", "ASC"]],
     });

@@ -120,7 +120,7 @@ const CatalogManager = ({
   const isAdmin = can("catalog.manage");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = useState(25);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(buildEmptyForm(parent, fields, sortable, activeField));
@@ -507,7 +507,10 @@ const CatalogManager = ({
           </TableBody>
         </ResizableTable>
       </TableContainer>
-      <ListPagination count={filtered.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} />
+      <ListPagination count={filtered.length} page={currentPage} pageSize={pageSize}
+        pageSizeOptions={[25, 50, 100]}
+        onPageChange={setPage}
+        onPageSizeChange={(nextSize) => { setPageSize(nextSize); setPage(0); }} />
 
       <AppDialog
         open={dialogOpen}

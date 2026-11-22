@@ -51,6 +51,7 @@ export default function AdmissionRoundManager({ open, onClose, rounds, selectedR
     </>}>
     <Stack spacing={2} sx={{ flex: 1, minWidth: 0, minHeight: 0, "& > :not(.admission-round-table-frame)": { flexShrink: 0 } }}>
       {error && <Alert severity="error">{error}</Alert>}
+      {rounds.some(round => round.intakeRound == null) && <Alert severity="warning">Có đợt cũ chưa xác định số đợt. Hãy sửa đợt để liên kết đúng với hồ sơ và mã lớp.</Alert>}
       <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="flex-end">
         <FilterSearchField label="Tìm đợt xét tuyển" placeholder="Nhập tên đợt hoặc năm…" value={search}
           onChange={event => { setSearch(event.target.value); setPage(0); }} sx={{ flex: "1 1 240px" }} />
@@ -76,7 +77,7 @@ export default function AdmissionRoundManager({ open, onClose, rounds, selectedR
                 <Typography variant="body2" fontWeight={600}>{round.name}</Typography>
                 {round.id === selectedRoundId && <Chip size="small" label="Đang chọn" color="primary" variant="outlined" />}
               </Stack></TableCell>
-              <TableCell>{round.academicYear}</TableCell>
+              <TableCell>{round.academicYear}{round.intakeRound != null && <Typography variant="caption" display="block">Đợt {round.intakeRound}</Typography>}</TableCell>
               <TableCell align="center">{(round.majorThresholds || []).filter(entry => entry.cutoff != null).length}</TableCell>
               <TableCell>{formatDate(round.createdAt)}</TableCell>
               <TableCell><Stack direction="row" gap={1}>

@@ -7,6 +7,7 @@ import { AcademicCapIcon, AdjustmentsHorizontalIcon, ArrowDownOnSquareIcon, Arro
 import { API_BASE_URL } from "../config/http";
 import { BRAND } from "../config/branding";
 import { useAuthSession } from "../context/AuthSession";
+import { FONT_SIZE_OPTIONS, useAppearanceSettings } from "../context/AppearanceSettings";
 import NotificationBell from '../features/notifications/NotificationBell';
 import { routeViewCode } from '../features/accounts/routePermissions';
 import { preloadPage } from "../utils/lazyPage";
@@ -165,6 +166,8 @@ const RibbonHeader = () => {
   });
   const [desktop, setDesktop] = useState(() => window.matchMedia?.('(min-width: 761px)').matches ?? true);
   const [breadcrumbMenu, setBreadcrumbMenu] = useState(null);
+  const [fontMenuAnchor, setFontMenuAnchor] = useState(null);
+  const appearance = useAppearanceSettings();
   const [searchQuery, setSearchQuery] = useState("");
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const menuToggleRef = useRef(null);
@@ -255,6 +258,7 @@ const RibbonHeader = () => {
     if (groupId) setCollapsedGroups(previous => previous[groupId] ? { ...previous, [groupId]: false } : previous);
     setSearchQuery("");
     setBreadcrumbMenu(null);
+    setFontMenuAnchor(null);
   }, [path, location.search]);
 
   useEffect(() => {
@@ -343,6 +347,9 @@ const RibbonHeader = () => {
   const currentTab = visibleTabs.find(([id]) => ribbons[id].some(section => section.actions.some(item => canSee(item) && isRibbonRouteActive(path, item.route))));
   const currentGroup = currentTab && ribbons[currentTab[0]].find(section => section.actions.some(item => canSee(item) && isRibbonRouteActive(path, item.route)));
   const currentAction = currentGroup?.actions.find(item => canSee(item) && isRibbonRouteActive(path, item.route));
+  const showGroupBreadcrumb = Boolean(
+    currentGroup && (!currentTab || breadcrumbLabel(currentGroup.label) !== breadcrumbLabel(currentTab[1])),
+  );
   const breadcrumbGroups = (!breadcrumbMenu ? [] : breadcrumbMenu.level === "group" ? [currentGroup] : currentTab ? ribbons[currentTab[0]] : [])
     .filter(Boolean).map(section => ({ ...section, actions: section.actions.filter(item => item.route && canSee(item)) }))
     .filter(section => section.actions.length);
@@ -391,7 +398,7 @@ const RibbonHeader = () => {
               aria-haspopup="menu" aria-expanded={breadcrumbMenu?.level === "tab"}
               aria-controls={breadcrumbMenu?.level === "tab" ? "ribbon-breadcrumb-menu" : undefined}
               onClick={event => openBreadcrumbMenu(event, "tab")}>{breadcrumbLabel(currentTab[1])}</button> : <span className="ribbon-breadcrumb-brand">{BRAND.institute}</span>}
-            {currentGroup && <><ChevronRightIcon aria-hidden="true" /><button type="button" className="ribbon-breadcrumb-trigger" data-dropdown-min-width="320"
+            {showGroupBreadcrumb && <><ChevronRightIcon aria-hidden="true" /><button type="button" className="ribbon-breadcrumb-trigger" data-dropdown-min-width="320"
               aria-haspopup="menu" aria-expanded={breadcrumbMenu?.level === "group"}
               aria-controls={breadcrumbMenu?.level === "group" ? "ribbon-breadcrumb-menu" : undefined}
               onClick={event => openBreadcrumbMenu(event, "group")}>{breadcrumbLabel(currentGroup.label)}</button></>}
@@ -401,6 +408,47 @@ const RibbonHeader = () => {
         <div className="ribbon-header-account">
           <div className="ribbon-header-identity"><strong>{userName}</strong><span>{session?.activeProfile?.name || roleNames[role] || role}</span></div>
           <div className="ribbon-user-avatar" title={userName}>{avatar}</div>
+          {appearance && (
+            <>
+              <button
+                type="button"
+                className="ribbon-font-trigger"
+                aria-label={`Cỡ chữ giao diện: ${appearance.fontSize}%`}
+                aria-haspopup="menu"
+                aria-expanded={Boolean(fontMenuAnchor)}
+                aria-controls={fontMenuAnchor ? "ribbon-font-menu" : undefined}
+                title="Đổi nhanh cỡ chữ hiển thị"
+                onClick={(event) => setFontMenuAnchor(event.currentTarget)}
+              >
+                <span aria-hidden="true">Aa</span>
+                <small>{appearance.fontSize}%</small>
+              </button>
+              <Menu
+                id="ribbon-font-menu"
+                anchorEl={fontMenuAnchor}
+                open={Boolean(fontMenuAnchor)}
+                onClose={() => setFontMenuAnchor(null)}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                transformOrigin={{ vertical: "top", horizontal: "right" }}
+                PaperProps={{ className: "ribbon-font-menu" }}
+                MenuListProps={{ "aria-label": "Cỡ chữ giao diện" }}
+              >
+                {FONT_SIZE_OPTIONS.map((option) => (
+                  <MenuItem
+                    key={option.value}
+                    selected={option.value === appearance.fontSize}
+                    aria-current={option.value === appearance.fontSize ? "true" : undefined}
+                    onClick={() => {
+                      appearance.setFontSize(option.value);
+                      setFontMenuAnchor(null);
+                    }}
+                  >
+                    <ListItemText primary={option.label} />
+                  </MenuItem>
+                ))}
+              </Menu>
+            </>
+          )}
           <NotificationBell />
         </div>
       </div>

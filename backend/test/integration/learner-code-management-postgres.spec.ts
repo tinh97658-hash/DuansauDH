@@ -151,13 +151,14 @@ describeDb('Configured learner codes on real PostgreSQL and active-profile RLS',
     const counters=await run('GET','/learner-codes/counters',()=>service.counters(actor));
     expect(counters.some(row=>row.type_name===type.name&&row.group_code===group.code&&Number(row.next_number)===3)).toBe(true);
   },30000);
-  it('classifies an unassigned special application without treating it as a regular official learner',async()=>{
+  it('classifies an unassigned special application automatically from its profile category without treating it as an official learner',async()=>{
     const row=await db.models.AdmissionRecord.create({fullName:'Vân',academicYear:'2026',majorId:major.id,
       trainingLevel:'Thạc sĩ',status:'pending',profileCategory:'Cựu SV Tiền thạc sỹ'});
-    expect(row.learnerCodeTypeId).toBeNull();
+    expect(row.learnerCodeTypeId).toBe(special.id);
     const options=await run('GET','/learner-codes/options',()=>service.options(actor,row.id));
     expect(options.defaultGroupId).toBeUndefined();expect(options.requestedRecord.id).toBe(row.id);
-    await run('PUT',`/learner-codes/records/${row.id}/type`,()=>service.setType(actor,row.id,{typeId:special.id,reason:'Phân loại trước phân lớp'}));
+    expect(options.requestedRecord.learner_code_type_id).toBe(special.id);
+    expect(options.requestedRecord.type_name).toBe(special.name);
     const [updated]=await read('SELECT code,learner_code_state,learner_code_type_id FROM admission_records WHERE id=:id',{id:row.id});
     expect(updated).toMatchObject({code:row.code,learner_code_state:'provisional',learner_code_type_id:special.id});
   });
@@ -240,11 +241,40 @@ describeDb('Configured learner codes on real PostgreSQL and active-profile RLS',
     await issue([row.id],p);
     expect((await read('SELECT learner_code_type_id,learner_code_state FROM admission_records WHERE id=:id',{id:row.id}))[0]).toEqual({learner_code_type_id:regular.id,learner_code_state:'official'});
   });
-  it.each(['Sinh viên','Cựu SV học trước','Cựu SV Tiền thạc sỹ','Dự thính','Không rõ'])('does not infer the ordinary code type for a special or unknown legacy category: %s',async(category)=>{
+  it.each(['Sinh viên','Dự thính','Không rõ'])('blocks preview for inactive or unknown legacy categories: %s',async(category)=>{
     const row=await legacyRecord(category);
-    expect(await run('GET',`/learner-codes/records/${row.id}`,()=>service.record(actor,row.id))).toMatchObject({learner_code_type_id:null,type_name:null});
+    const loaded=await run('GET',`/learner-codes/records/${row.id}`,()=>service.record(actor,row.id));
+    if(category==='Không rõ'){
+      expect(loaded).toMatchObject({learner_code_type_id:null,type_name:null});
+    }else{
+      expect(loaded.type_name).toBe(category);
+    }
     await expect(preview([row.id])).rejects.toThrow('chưa có loại hợp lệ');
   });
+  it('supports adding custom non-special and special profile categories synced dynamically to intake records',async()=>{
+    const typesBefore=await run('GET','/learner-codes/options',()=>service.options(actor));
+    expect(typesBefore.types.map((t:any)=>t.name).slice(0,5)).toEqual([
+      'Bình thường','Dự thính','Sinh viên','Cựu SV học trước','Cựu SV Tiền thạc sỹ',
+    ]);
+    const standardCustom=await config(()=>service.saveType(actor,null,{
+      name:'Chuyển tiếp',usesSpecialCode:false,active:true,requiresAdmission:true,
+    }));
+    expect(standardCustom).toMatchObject({name:'Chuyển tiếp',uses_special_code:false,letter:null,active:true});
+    const rowA=await add('Xuân');
+    const rowB=await db.models.AdmissionRecord.create({
+      fullName:'Yến',academicYear:'2026',majorId:major.id,trainingLevel:'Thạc sĩ',status:'approved',profileCategory:'Chuyển tiếp',
+    });
+    expect(rowB.learnerCodeTypeId).toBe(standardCustom.id);
+    await db.models.ClassGroupMember.create({classGroupId:group.id,admissionRecordId:rowB.id});
+    const issued=await issue([rowA.id,rowB.id]);
+    const codes=issued.result.rows.map((r:any)=>({fullName:r.fullName,typeName:r.typeName,code:r.code}));
+    expect(codes).toEqual([
+      {fullName:'Xuân',typeName:'Bình thường',code:expect.stringMatching(/^CN2612\d{3}$/)},
+      {fullName:'Yến',typeName:'Chuyển tiếp',code:expect.stringMatching(/^CN2612\d{3}$/)},
+    ]);
+    expect(Number(codes[1].code.slice(-3))).toBe(Number(codes[0].code.slice(-3))+1);
+    await expect(db.models.AdmissionRecord.update({profileCategory:'Bình thường'},{where:{id:rowB.id}})).rejects.toThrow();
+  },30000);
   it('keeps an explicitly assigned special type even if the historical category says ordinary',async()=>{
     const row=await legacyRecord('Bình thường');
     await run('PUT',`/learner-codes/records/${row.id}/type`,()=>service.setType(actor,row.id,{typeId:special.id,reason:'Xác minh loại riêng'}));

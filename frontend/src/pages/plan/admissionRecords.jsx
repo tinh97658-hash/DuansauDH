@@ -2,10 +2,11 @@ import { usePermissions } from "../../features/accounts/usePermissions";
 import DateField from "../../components/DateField";
 import useTrainingYears from "../../hooks/useTrainingYears";
 import { formatDate } from "../../utils/dateFormat";
+import IntakeRoundSelect, { matchesIntakeRound } from "../../components/IntakeRoundSelect";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
-import { PROFILE_CATEGORIES, profileCategoryLabel } from "../../features/admission/profileCategories";
+import { profileCategoryLabel, profileCategoryOptions } from "../../features/admission/profileCategories";
 import { RELIGIONS } from "../../features/admission/religions";
 import { STUDY_STATUS_OPTIONS, isStudyManagementStatus, studyManagementStatuses, studyManagementStatusLabel } from "../../features/admission/studyManagement";
 import { toast } from "react-toastify";
@@ -38,6 +39,7 @@ import {
 
 const currentYear = new Date().getFullYear();
 const PAGE_SIZE = 15;
+const PAGE_SIZE_OPTIONS = [15, 30, 50, 100];
 
 const TRAINING_LEVELS = [
   { value: "Thạc sĩ", label: "Thạc sĩ" },
@@ -146,6 +148,7 @@ const createEmptyForm = (defaultYear = String(currentYear)) => ({
   language: "Tiếng Việt",
   studyStatus: "Nộp hồ sơ đầu vào",
   academicYear: defaultYear,
+  intakeRound: "",
 
   nationality: "Việt Nam",
   ethnicity: "Kinh",
@@ -202,12 +205,14 @@ const EmbeddedList = ({ children, title, exportConfig }) => <PageExportBoundary 
 
 const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isStudyManagement = mode === "study-management";
   const isMastersList = mode === "admitted-masters" || isStudyManagement;
   const ListLayout = embedded ? EmbeddedList : FeatureLayout;
   const recordDetailBase = isStudyManagement ? "/masters/study-leaves" : isMastersList ? "/masters/admitted-records" : "/plan/admission-records";
   const recordDetailUrl = id => `${recordDetailBase}/${id}${isStudyManagement ? "?returnView=records" : ""}`;
   // Global Filter State
+  const [intakeRound, setIntakeRound] = useState("");
   const [year, setYear] = useState(isStudyManagement ? "" : String(currentYear));
   const years = useTrainingYears(year, setYear);
   const [levelFilter, setLevelFilter] = useState(isMastersList ? "Thạc sĩ" : "ALL");
@@ -218,11 +223,34 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [page, setPage] = useState(1);
+  const initialPage = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10) || 1);
+  const initialPageSize = PAGE_SIZE_OPTIONS.includes(Number(searchParams.get("pageSize"))) ? Number(searchParams.get("pageSize")) : PAGE_SIZE;
+  const [page, setPageState] = useState(initialPage);
+  const [pageSize, setPageSizeState] = useState(initialPageSize);
+  const syncPaginationParams = useCallback((nextPage, nextPageSize) => {
+    const next = new URLSearchParams(searchParams);
+    if (nextPage > 1) next.set("page", String(nextPage));
+    else next.delete("page");
+    if (nextPageSize !== PAGE_SIZE) next.set("pageSize", String(nextPageSize));
+    else next.delete("pageSize");
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+  const setPage = useCallback((nextPage) => {
+    const safePage = Math.max(1, Number(nextPage) || 1);
+    setPageState(safePage);
+    syncPaginationParams(safePage, pageSize);
+  }, [pageSize, syncPaginationParams]);
+  const handlePageSizeChange = useCallback((nextSize) => {
+    setPageSizeState(nextSize);
+    setPageState(1);
+    syncPaginationParams(1, nextSize);
+  }, [syncPaginationParams]);
 
   // Data State
   const [records, setRecords] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 1 });
+  const [pagination, setPagination] = useState({ page: initialPage, pageSize: initialPageSize, total: 0, totalPages: 1 });
   const [stats, setStats] = useState({ total: 0, mastersCount: 0, doctoralCount: 0, eligibleCount: 0 });
   const [majors, setMajors] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -270,7 +298,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
     && record.extraData?.tuitionPayment?.paid !== true && record.updatedAt);
   const selectedTuitionIds = new Set(selectedTuition.map((row) => row.admissionRecordId));
   const selectedOnPage = selectableTuitionRows.filter((row) => selectedTuitionIds.has(row.id)).length;
-  useEffect(() => { setSelectedTuition([]); }, [year, levelFilter, disciplineFilter, majorFilter, classGroupFilter, statusFilter, search, isMastersList]);
+  useEffect(() => { setSelectedTuition([]); }, [year, intakeRound, levelFilter, disciplineFilter, majorFilter, classGroupFilter, statusFilter, search, isMastersList]);
   const selectTuitionPage = (checked) => {
     const idsOnPage = new Set(selectableTuitionRows.map((row) => row.id));
     setSelectedTuition((previous) => [
@@ -313,6 +341,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
     { key: "gender", label: "Giới tính", width: 90, align: "center" },
     { key: "idCard", label: "Số CMND/CCCD", width: 150 },
     { key: "academicYear", label: "Năm nhập học", width: 120, align: "center" },
+    { key: "intakeRound", label: "Đợt", width: 110, align: "center" },
     { key: "trainingLevel", label: "Trình độ", width: 100, align: "center" },
     { key: "major", label: "Ngành", width: 210 },
     { key: "phone", label: "Điện thoại", width: 130 },
@@ -322,6 +351,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
   ];
 
   // Load Majors
+  const [profileTypeOptions, setProfileTypeOptions] = useState([]);
   useEffect(() => {
     axios.get(`${API_BASE_URL}/system/majors`, { withCredentials: true })
       .then(({ data }) => {
@@ -332,6 +362,19 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
         toast.error(error.response?.data?.message || "Không thể tải danh mục chuyên ngành");
       });
   }, []);
+
+  useEffect(() => {
+    axios.get(`${API_BASE_URL}/learner-codes/options`, { withCredentials: true })
+      .then(({ data }) => {
+        if (Array.isArray(data?.types) && data.types.length) setProfileTypeOptions(data.types);
+      })
+      .catch(() => {});
+  }, []);
+
+  const profileCategoryList = useMemo(
+    () => profileCategoryOptions(profileTypeOptions, formData.profileCategory),
+    [profileTypeOptions, formData.profileCategory],
+  );
 
   // Auth Check
 
@@ -349,16 +392,17 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
   }, [isMastersList]);
 
   const visibleClassGroups = useMemo(() => classGroups.filter((group) =>
-    (!year || String(group.academicYear) === year)
+    matchesIntakeRound(group, intakeRound) && (!year || String(group.academicYear) === year)
     && (majorFilter === "ALL" || group.majorId === majorFilter)
     && (!disciplineFilter || visibleFilterMajors.some((major) => major.id === group.majorId))),
-  [classGroups, year, majorFilter, disciplineFilter, visibleFilterMajors]);
+  [classGroups, year, intakeRound, majorFilter, disciplineFilter, visibleFilterMajors]);
 
   const loadRecords = useCallback(async (signal) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (year) params.append("academicYear", year);
+      if (intakeRound) params.append("intakeRound", intakeRound);
       if (levelFilter !== "ALL") params.append("trainingLevel", levelFilter);
       if (majorFilter !== "ALL") params.append("majorId", majorFilter);
       if (statusFilter !== "ALL") params.append("status", statusFilter);
@@ -368,24 +412,24 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
       if (disciplineFilter) params.append("disciplineId", disciplineFilter);
       if (debouncedSearch) params.append("search", debouncedSearch);
       params.append("page", String(page));
-      params.append("pageSize", String(PAGE_SIZE));
+      params.append("pageSize", String(pageSize));
 
       const { data } = await axios.get(`${API_BASE_URL}/plan/admission-records?${params.toString()}`, {
         withCredentials: true,
         signal,
       });
       setRecords(Array.isArray(data?.data) ? data.data : []);
-      setPagination(data?.pagination || { page, pageSize: PAGE_SIZE, total: 0, totalPages: 1 });
+      setPagination(data?.pagination || { page, pageSize, total: 0, totalPages: 1 });
       setStats(data?.stats || { total: 0, mastersCount: 0, doctoralCount: 0, eligibleCount: 0 });
     } catch (err) {
       if (axios.isCancel(err) || err.code === "ERR_CANCELED") return;
       setRecords([]);
-      setPagination({ page, pageSize: PAGE_SIZE, total: 0, totalPages: 1 });
+      setPagination({ page, pageSize, total: 0, totalPages: 1 });
       toast.error(err.response?.data?.message || "Không thể tải danh sách hồ sơ tuyển sinh");
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, [year, levelFilter, majorFilter, classGroupFilter, statusFilter, disciplineFilter, debouncedSearch, page, isMastersList, isStudyManagement]);
+  }, [year, intakeRound, levelFilter, majorFilter, classGroupFilter, statusFilter, disciplineFilter, debouncedSearch, page, pageSize, isMastersList, isStudyManagement]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -398,9 +442,14 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
     return () => window.clearTimeout(timer);
   }, [search]);
 
+  const filterKey = `${year}|${intakeRound}|${levelFilter}|${disciplineFilter}|${majorFilter}|${classGroupFilter}|${statusFilter}|${debouncedSearch}`;
+  const prevFilterKey = useRef(filterKey);
   useEffect(() => {
-    setPage(1);
-  }, [year, levelFilter, disciplineFilter, majorFilter, classGroupFilter, statusFilter, debouncedSearch]);
+    if (prevFilterKey.current !== filterKey) {
+      prevFilterKey.current = filterKey;
+      setPage(1);
+    }
+  }, [filterKey, setPage]);
 
   // Handle Photo Upload (Base64)
   const handlePhotoUpload = (e) => {
@@ -426,6 +475,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
   const handleOpenAdd = () => {
     setFieldTouched({});
     const nextForm = createEmptyForm(year);
+    nextForm.intakeRound = intakeRound === "unassigned" ? "" : intakeRound;
     const defaultMajor = selectMajorForLevel(majors, nextForm.trainingLevel);
     if (defaultMajor) {
       nextForm.majorId = defaultMajor.id;
@@ -459,7 +509,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
       email: rec.email || "",
       pob: rec.pob || "Hải Phòng",
       receiptType: rec.receiptType === "Trực tuyến" ? "Online" : rec.receiptType || "Trực tiếp",
-      profileCategory: profileCategoryLabel(rec.profileCategory),
+      profileCategory: profileCategoryLabel(rec.profileCategory, profileTypeOptions),
       admissionDate: rec.admissionDate || new Date().toISOString().split("T")[0],
       photo: rec.photo || "",
 
@@ -474,6 +524,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
       language: rec.language || "Tiếng Việt",
       studyStatus: rec.studyStatus || "Nộp hồ sơ đầu vào",
       academicYear: rec.academicYear || year,
+      intakeRound: rec.intakeRound == null ? "" : String(rec.intakeRound),
 
       nationality: rec.nationality || "Việt Nam",
       ethnicity: rec.ethnicity || "Kinh",
@@ -536,6 +587,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
       toast.error("Vui lòng chọn chuyên ngành phù hợp với trình độ đào tạo");
       return;
     }
+    if (!formData.id && !formData.intakeRound) { toast.error("Vui lòng chọn đợt nhập học"); return; }
     const majorName = selectedMajor?.name || formData.majorName || "";
 
     const payload = {
@@ -544,6 +596,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
       firstName,
       fullName: calculatedFullName,
       majorName,
+      intakeRound: formData.intakeRound ? Number(formData.intakeRound) : null,
       supplementSubjectsCount: Number(formData.supplementSubjectsCount || 0),
     };
 
@@ -571,6 +624,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
   const exportRecords = async () => {
     const params = new URLSearchParams({ admissionStage: isStudyManagement ? "study-management" : isMastersList ? "learners" : "applications", pageSize: String(PAGE_SIZE) });
     if (year) params.set("academicYear", year);
+    if (intakeRound) params.set("intakeRound", intakeRound);
     if (levelFilter !== "ALL") params.set("trainingLevel", levelFilter);
     if (majorFilter !== "ALL") params.set("majorId", majorFilter);
     if (statusFilter !== "ALL") params.set("status", statusFilter);
@@ -591,11 +645,12 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
       if (column.key === "dob") return formatDate(row.dob);
       if (column.key === "gender") return row.gender || "Nam";
       if (column.key === "trainingLevel") return row.trainingLevel || "Thạc sĩ";
+      if (column.key === "intakeRound") return row.intakeRound ? `Đợt ${row.intakeRound}` : "Chưa xác định đợt";
       if (column.key === "status") return (isStudyManagement ? studyManagementStatusLabel(row.studyStatus) : row.studyStatus) || "Nộp hồ sơ";
       if (column.key === "tuition") return row.extraData?.tuitionPayment?.paid ? "Đã nộp" : "Chưa nộp";
       if (["code", "email", "idCard", "academicYear", "phone"].includes(column.key)) return row[column.key] || "—";
       return row[column.key];
-    }, [["Năm", year || "Tất cả"], ["Tìm kiếm", debouncedSearch || "Tất cả"], ["Phạm vi", `${allRows.length} hồ sơ phù hợp bộ lọc`]]);
+    }, [["Năm", year || "Tất cả"], ["Đợt", intakeRound || "Tất cả"], ["Tìm kiếm", debouncedSearch || "Tất cả"], ["Phạm vi", `${allRows.length} hồ sơ phù hợp bộ lọc`]]);
     return { ...report, excelLayout: "single-table" };
   };
 
@@ -610,7 +665,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
       maxWidth={1880}
     >
 
-      {/* 1. TOP FILTER BAR */}
+      {/* 1. TOP FILTER & ACTION BAR */}
       <Paper
         variant="outlined"
         sx={{
@@ -620,98 +675,22 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
           borderColor: "#C6D5E1",
           borderRadius: "10px",
           boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
-          overflowX: "auto",
         }}
       >
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems="flex-end" justifyContent="space-between" sx={{ minWidth: { md: 1400 } }}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="flex-end" sx={{ width: { xs: "100%", md: "auto" }, minWidth: 0, flex: "1 1 0%", flexWrap: { xs: "wrap", md: "nowrap" } }}>
-            <FilterSelectField disabled={saving} label="Năm" value={year} onChange={(e) => { setYear(e.target.value); setClassGroupFilter(""); }} sx={{ flex: "1 1 108px", minWidth: 108 }}>
-                {isStudyManagement && <MenuItem value="">Tất cả năm</MenuItem>}
-                {years.map((y) => (
-                  <MenuItem key={y} value={y} sx={{ fontSize: 12 }}>
-                    {y}
-                  </MenuItem>
-                ))}
-            </FilterSelectField>
+        <Stack className="app-filter-toolbar" direction="row" gap={1.25} alignItems="flex-end" justifyContent="space-between">
+          <FilterSearchField
+            disabled={saving}
+            placeholder="Tìm theo họ tên, mã HV, CCCD, điện thoại, email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            sx={{
+              flex: "1 1 320px",
+              minWidth: "min(100%, 260px)",
+              maxWidth: { lg: 560 },
+            }}
+          />
 
-            {!isMastersList && <FilterSelectField disabled={saving} label="Trình độ" sx={{ flex: "1 1 150px", minWidth: 150 }}
-                value={levelFilter}
-                onChange={(e) => {
-                  setLevelFilter(e.target.value);
-                  setDisciplineFilter("");
-                  setMajorFilter("ALL");
-                }}
-              >
-                <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả trình độ</MenuItem>
-                {TRAINING_LEVELS.map((l) => (
-                  <MenuItem key={l.value} value={l.value} sx={{ fontSize: 12 }}>{l.label}</MenuItem>
-                ))}
-            </FilterSelectField>}
-
-            <FilterSelectField disabled={saving} label="Ngành" sx={{ flex: "1 1 190px", minWidth: 190 }}
-                value={disciplineFilter}
-                onChange={(e) => {
-                  setDisciplineFilter(e.target.value);
-                  setMajorFilter("ALL");
-                  setClassGroupFilter("");
-                }}
-              >
-                <MenuItem value="" sx={{ fontSize: 12 }}>Tất cả ngành</MenuItem>
-                {filterDisciplines.map((discipline) => (
-                  <MenuItem key={discipline.id} value={discipline.id} sx={{ fontSize: 12 }}>
-                    {disciplineOptionLabel(discipline)}
-                  </MenuItem>
-                ))}
-            </FilterSelectField>
-
-            <FilterSelectField disabled={saving} label="Chuyên ngành" value={majorFilter} onChange={(e) => { setMajorFilter(e.target.value); setClassGroupFilter(""); }} sx={{ flex: "1 1 220px", minWidth: 220 }}>
-                <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả chuyên ngành ({visibleFilterMajors.length})</MenuItem>
-                {visibleFilterMajors.map((m) => (
-                  <MenuItem key={m.id} value={m.id} sx={{ fontSize: 12 }}>{m.name}</MenuItem>
-                ))}
-            </FilterSelectField>
-
-            {isMastersList && <FilterSelectField disabled={saving} label="Mã nhóm" value={classGroupFilter}
-              onChange={(e) => setClassGroupFilter(e.target.value)} sx={{ flex: "1 1 180px", minWidth: 180 }}>
-              <MenuItem value="">Tất cả mã nhóm</MenuItem>
-              {visibleClassGroups.map((group) => <MenuItem key={group.id} value={group.id}>{group.code || group.name}</MenuItem>)}
-            </FilterSelectField>}
-
-            <FilterSelectField disabled={saving} label="Trạng thái" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} sx={{ flex: "1 1 150px", minWidth: 150 }}>
-                <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả trạng thái</MenuItem>
-                {(isStudyManagement ? studyManagementStatuses : STUDY_STATUSES.filter((s) => isMastersList ? ["Đã trúng tuyển", "Đang học"].includes(s) : !["Đã trúng tuyển", "Đang học"].includes(s) && (levelFilter === "Tiến sĩ" || !isStudyManagementStatus(s)))).map((s) => (
-                  <MenuItem key={s} value={s} sx={{ fontSize: 12 }}>{s}</MenuItem>
-                ))}
-            </FilterSelectField>
-
-            {!isMastersList && (
-              <FilterSearchField disabled={saving}
-                placeholder="Tìm theo họ tên, mã HV, CCCD, điện thoại, email..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                sx={{
-                  width: { xs: "100%", md: "auto" },
-                  minWidth: 220,
-                  flex: "2 1 220px",
-                }}
-              />
-            )}
-
-            {isMastersList && (
-              <FilterSearchField disabled={saving}
-                placeholder="Tìm theo họ tên, mã HV, CCCD, điện thoại, email..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                sx={{
-                  width: { xs: "100%", md: "auto" },
-                  minWidth: 220,
-                  flex: "2 1 220px",
-                }}
-              />
-            )}
-          </Stack>
-
-          <Stack direction="row" spacing={1} alignItems="flex-end" sx={{ flexShrink: 0, maxWidth: '100%' }}>
+          <Stack direction="row" gap={1} alignItems="flex-end" sx={{ flexShrink: 0, ml: "auto" }}>
             {isAdmin && !isMastersList && (
               <Button
                 variant="contained"
@@ -719,22 +698,127 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                 startIcon={<PlusIcon />}
                 onClick={handleOpenAdd}
                 sx={{
-                  height: 40,
+                  height: 38,
+                  px: 1.75,
                   bgcolor: "#0788B8",
                   fontSize: 12,
                   fontWeight: 700,
                   textTransform: "none",
                   whiteSpace: "nowrap",
-                  borderRadius: "8px",
+                  borderRadius: "7px",
                   boxShadow: "none",
-                  "&:hover": { bgcolor: "#056A8F" },
+                  "&:hover": { bgcolor: "#056A8F", boxShadow: "none" },
                 }}
               >
                 Thêm hồ sơ mới
               </Button>
             )}
-            <InlineReportExport />
+            <InlineReportExport height={38} />
           </Stack>
+        </Stack>
+
+        <Box sx={{ borderBottom: "1px solid #E4EDF4", my: 1.25 }} />
+
+        <Stack className="app-filter-toolbar" direction="row" gap={1.25} alignItems="flex-end">
+          <FilterSelectField
+            disabled={saving}
+            label="Năm"
+            value={year}
+            onChange={(e) => { setYear(e.target.value); setIntakeRound(""); setClassGroupFilter(""); }}
+            sx={{ flex: "0.6 1 96px", minWidth: 92 }}
+          >
+            {isStudyManagement && <MenuItem value="">Tất cả năm</MenuItem>}
+            {years.map((y) => (
+              <MenuItem key={y} value={y} sx={{ fontSize: 12 }}>
+                {y}
+              </MenuItem>
+            ))}
+          </FilterSelectField>
+
+          <IntakeRoundSelect
+            year={year}
+            value={intakeRound}
+            onChange={value => { setIntakeRound(value); setClassGroupFilter(""); }}
+            disabled={saving}
+            sx={{ flex: "1 1 135px", minWidth: 128 }}
+          />
+
+          {!isMastersList && (
+            <FilterSelectField
+              disabled={saving}
+              label="Trình độ"
+              sx={{ flex: "1 1 140px", minWidth: 132 }}
+              value={levelFilter}
+              onChange={(e) => {
+                setLevelFilter(e.target.value);
+                setDisciplineFilter("");
+                setMajorFilter("ALL");
+              }}
+            >
+              <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả trình độ</MenuItem>
+              {TRAINING_LEVELS.map((l) => (
+                <MenuItem key={l.value} value={l.value} sx={{ fontSize: 12 }}>{l.label}</MenuItem>
+              ))}
+            </FilterSelectField>
+          )}
+
+          <FilterSelectField
+            disabled={saving}
+            label="Ngành"
+            sx={{ flex: "1.2 1 170px", minWidth: 155 }}
+            value={disciplineFilter}
+            onChange={(e) => {
+              setDisciplineFilter(e.target.value);
+              setMajorFilter("ALL");
+              setClassGroupFilter("");
+            }}
+          >
+            <MenuItem value="" sx={{ fontSize: 12 }}>Tất cả ngành</MenuItem>
+            {filterDisciplines.map((discipline) => (
+              <MenuItem key={discipline.id} value={discipline.id} sx={{ fontSize: 12 }}>
+                {disciplineOptionLabel(discipline)}
+              </MenuItem>
+            ))}
+          </FilterSelectField>
+
+          <FilterSelectField
+            disabled={saving}
+            label="Chuyên ngành"
+            value={majorFilter}
+            onChange={(e) => { setMajorFilter(e.target.value); setClassGroupFilter(""); }}
+            sx={{ flex: "1.5 1 210px", minWidth: 185 }}
+          >
+            <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả chuyên ngành ({visibleFilterMajors.length})</MenuItem>
+            {visibleFilterMajors.map((m) => (
+              <MenuItem key={m.id} value={m.id} sx={{ fontSize: 12 }}>{m.name}</MenuItem>
+            ))}
+          </FilterSelectField>
+
+          {isMastersList && (
+            <FilterSelectField
+              disabled={saving}
+              label="Mã nhóm"
+              value={classGroupFilter}
+              onChange={(e) => setClassGroupFilter(e.target.value)}
+              sx={{ flex: "1 1 145px", minWidth: 138 }}
+            >
+              <MenuItem value="">Tất cả mã nhóm</MenuItem>
+              {visibleClassGroups.map((group) => <MenuItem key={group.id} value={group.id}>{group.code || group.name}</MenuItem>)}
+            </FilterSelectField>
+          )}
+
+          <FilterSelectField
+            disabled={saving}
+            label="Trạng thái"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            sx={{ flex: "1.15 1 160px", minWidth: 150 }}
+          >
+            <MenuItem value="ALL" sx={{ fontSize: 12 }}>Tất cả trạng thái</MenuItem>
+            {(isStudyManagement ? studyManagementStatuses : STUDY_STATUSES.filter((s) => isMastersList ? ["Đã trúng tuyển", "Đang học"].includes(s) : !["Đã trúng tuyển", "Đang học"].includes(s) && (levelFilter === "Tiến sĩ" || !isStudyManagementStatus(s)))).map((s) => (
+              <MenuItem key={s} value={s} sx={{ fontSize: 12 }}>{s}</MenuItem>
+            ))}
+          </FilterSelectField>
         </Stack>
       </Paper>
 
@@ -807,7 +891,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                           : previous.filter((row) => row.admissionRecordId !== r.id))} />
                     </TableCell>}
                     <TableCell align="center" sx={{ color: "#607486", fontSize: 11 }}>
-                      {(page - 1) * PAGE_SIZE + index + 1}
+                      {(page - 1) * pageSize + index + 1}
                     </TableCell>
 
                     <TableCell sx={{ fontFamily: "inherit", fontWeight: 700, color: "#173E75" }}>
@@ -876,6 +960,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                       {r.idCard || "—"}
                     </TableCell>
                     <TableCell align="center">{r.academicYear || "—"}</TableCell>
+                    <TableCell align="center">{r.intakeRound ? `Đợt ${r.intakeRound}` : "Chưa xác định đợt"}</TableCell>
 
                     <TableCell align="center">
                       <Chip
@@ -952,7 +1037,8 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
             </TableBody>
           </ResizableTable>
         </TableContainer>
-        <ListPagination count={pagination.total} page={page - 1} pageSize={PAGE_SIZE}
+        <ListPagination count={pagination.total} page={page - 1} pageSize={pageSize}
+          pageSizeOptions={PAGE_SIZE_OPTIONS} onPageSizeChange={handlePageSizeChange}
           onPageChange={next => setPage(next + 1)} disabled={saving} recordLabel="hồ sơ" />
         </Stack>
       )}
@@ -1070,7 +1156,7 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                     sx={cellInputSx}
                     placeholder="VD: HV26001"
                     inputProps={{ maxLength: 50 }}
-                    helperText={formData.learnerCodeState==='official'?'Mã chính thức chỉ đổi tại chức năng Cấp mã học viên.':!formData.id?'Để trống để hệ thống cấp mã tiếp nhận. Mã học viên chính thức được cấp riêng sau xét tuyển.':'Mã phải duy nhất trong toàn hệ thống.'}
+                    helperText={formData.learnerCodeState==='official'?'Mã chính thức chỉ đổi tại chức năng Cấp mã học viên.':!formData.id?'Để trống để hệ thống tự cấp mã hồ sơ (HS...). Mã học viên chính thức được cấp riêng sau xét tuyển.':'Mã phải duy nhất trong toàn hệ thống.'}
                   />
                 </Box>
 
@@ -1212,19 +1298,40 @@ const AdmissionRecords = ({ mode = "applications", embedded = false }) => {
                       labelId="admission-profile-category-label"
                       size="small"
                       data-dropdown-placement="bottom"
+                      disabled={Boolean(formData.id && formData.learnerCodeState === "official")}
                       value={formData.profileCategory}
                       onChange={(e) => setFormData((p) => ({ ...p, profileCategory: e.target.value }))}
                       fullWidth
                       sx={{ height: 32, fontSize: 12, bgcolor: "#fff" }}
                     >
-                      {PROFILE_CATEGORIES.map((c) => (
+                      {profileCategoryList.map((c) => (
                         <MenuItem key={c} value={c} sx={{ fontSize: 12 }}>{c}</MenuItem>
                       ))}
                     </Select>
+                    {formData.id && formData.learnerCodeState === "official" && (
+                      <Typography variant="caption" sx={{ display: "block", color: "#64748B", fontSize: 10, mt: 0.25 }}>
+                        Đã có mã chính thức; đổi loại tại mục Cấp mã học viên.
+                      </Typography>
+                    )}
                   </Box>
                 </Stack>
 
                 <Stack direction="row" spacing={1}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography component="label" id="admission-record-intake-round-label" variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Đợt nhập học</Typography>
+                    <IntakeRoundSelect
+                      variant="plain"
+                      id="admission-record-intake-round"
+                      labelId="admission-record-intake-round-label"
+                      year={formData.academicYear}
+                      value={formData.intakeRound}
+                      onChange={value => setFormData(previous => ({ ...previous, intakeRound: value }))}
+                      required
+                      configuredOnly
+                      label="Đợt nhập học"
+                      selectSx={{ height: 32, fontSize: 12, bgcolor: "#fff" }}
+                    />
+                  </Box>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography component="label" htmlFor="admission-record-year" variant="caption" sx={{ color: "#607486", fontSize: 11 }}>Năm nhập học</Typography>
                     <TextField

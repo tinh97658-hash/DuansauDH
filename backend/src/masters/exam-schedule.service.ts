@@ -29,7 +29,7 @@ export class ExamScheduleService {
       w.eligibility_version AS "eligibilityVersion",p.id AS "snapshotId",
       (SELECT jsonb_agg(r->>'participantId') FROM jsonb_array_elements(p.rows) r WHERE r->>'eligible'='true' AND r->>'examExempt' IS DISTINCT FROM 'true') AS "candidateIds",
       (SELECT jsonb_agg(jsonb_build_object('participantId',r->>'participantId','code',r->>'code','fullName',r->>'fullName')) FROM jsonb_array_elements(p.rows) r WHERE r->>'eligible'='true' AND r->>'examExempt' IS DISTINCT FROM 'true') AS candidates,
-      (SELECT jsonb_agg(jsonb_build_object('id',g.id,'name',g.name,'code',g.code,'academicYear',g.academic_year,'majorId',g.major_id,'majorName',m.name,'disciplineId',m.discipline_id,'disciplineName',d.name))
+      (SELECT jsonb_agg(jsonb_build_object('id',g.id,'name',g.name,'code',g.code,'academicYear',g.academic_year,'intakeRound',g.intake_round,'majorId',g.major_id,'majorName',m.name,'disciplineId',m.discipline_id,'disciplineName',d.name))
         FROM course_offering_class_groups l JOIN class_groups g ON g.id=l.class_group_id LEFT JOIN majors m ON m.id=g.major_id LEFT JOIN disciplines d ON d.id=m.discipline_id WHERE l.course_offering_id=o.id) AS groups,
       (SELECT count(*)::int FROM jsonb_array_elements(p.rows) r WHERE r->>'eligible'='true' AND r->>'examExempt' IS DISTINCT FROM 'true') AS "candidateCount",
       (SELECT count(*)::int FROM jsonb_array_elements(p.rows) r WHERE r->>'eligible'='true' AND r->>'examExempt' IS DISTINCT FROM 'true' AND NOT EXISTS(
@@ -51,7 +51,7 @@ export class ExamScheduleService {
       es.second_external_invigilator_name AS "secondExternalInvigilatorName",es.second_external_unit_name AS "secondExternalUnitName",
       es.arrangement_id AS "arrangementId",es.round_no AS "roundNo",a.version AS "arrangementVersion",a.note AS "arrangementNote",w.eligibility_version AS "eligibilityVersion",
       o.name,s.name AS "subjectName",s.id AS "subjectId",s.code AS "subjectCode",r.code AS "roomCode",r.name AS "roomName",
-      (SELECT jsonb_agg(jsonb_build_object('id',g.id,'name',g.name,'code',g.code,'academicYear',g.academic_year,'majorId',g.major_id,'majorName',m.name,'disciplineId',m.discipline_id,'disciplineName',d.name))
+      (SELECT jsonb_agg(jsonb_build_object('id',g.id,'name',g.name,'code',g.code,'academicYear',g.academic_year,'intakeRound',g.intake_round,'majorId',g.major_id,'majorName',m.name,'disciplineId',m.discipline_id,'disciplineName',d.name))
         FROM course_offering_class_groups l JOIN class_groups g ON g.id=l.class_group_id LEFT JOIN majors m ON m.id=g.major_id LEFT JOIN disciplines d ON d.id=m.discipline_id WHERE l.course_offering_id=o.id) AS groups,
       (SELECT count(*)::int FROM course_exam_session_candidates c WHERE c.session_id=es.id) AS "candidateCount",
       (SELECT count(*)::int FROM course_exam_session_candidates c WHERE c.session_id=es.id AND c.makeup_for_session_id IS NOT NULL) AS "makeupCount",

@@ -422,9 +422,11 @@ it("renders course matrix across cohorts, displays KPIs and switches between vie
   fireEvent.click(within(screen.getByRole("dialog")).getAllByRole("button", { name: "Đóng" })[0]);
 
   // Selecting one cohort lays its ordered offerings out in four columns.
-  fireEvent.change(screen.getByLabelText("Khóa / năm học"), { target: { value: "2026" } });
+  fireEvent.mouseDown(screen.getByLabelText("Khóa / năm học"));
+  fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: "Khóa 2026", exact: true }));
   expect(document.querySelector(".sl-matrix-col-cards")).toHaveClass("sl-matrix-col-cards-four");
-  fireEvent.change(screen.getByLabelText("Khóa / năm học"), { target: { value: "" } });
+  fireEvent.mouseDown(screen.getByLabelText("Khóa / năm học"));
+  fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: "Tất cả khóa", exact: true }));
 
   // Check pivot table view switch
   fireEvent.click(screen.getByRole("button", { name: /Bảng ma trận môn/ }));

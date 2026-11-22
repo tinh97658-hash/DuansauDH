@@ -13,6 +13,7 @@ import { TrainingYearDto, UpdateTrainingYearDto } from "./dto/training-year.dto.
 export class SystemController {
   constructor(private readonly system: SystemService, private readonly rbac: RbacService) {}
 
+  @Get("intake-rounds") intakeRounds() { return this.system.listIntakeRounds(); }
   @Get("training-years") trainingYears() { return this.system.listTrainingYears(); }
   @Post("training-years") @RequirePermissions("catalog.manage") createTrainingYear(@Body() dto: TrainingYearDto) { return this.system.saveTrainingYear(dto); }
   @Put("training-years/:id") @RequirePermissions("catalog.manage") updateTrainingYear(@Param("id") id: string, @Body() dto: UpdateTrainingYearDto) { return this.system.saveTrainingYear(dto, id); }

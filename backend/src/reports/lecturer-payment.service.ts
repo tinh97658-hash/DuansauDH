@@ -103,7 +103,11 @@ export class LecturerPaymentService {
   }
 
   private sign(payload: string) {
-    return createHmac('sha256', this.config?.get<string>('SESSION_SECRET') || this.fallbackSecret)
+    const secret = this.config?.get<string>('SESSION_SECRET');
+    if (!secret && process.env.NODE_ENV !== 'test') {
+      throw new Error('SESSION_SECRET is required to sign lecturer payment batches.');
+    }
+    return createHmac('sha256', secret || this.fallbackSecret)
       .update('lecturer-payment-batch:').update(payload).digest('base64url');
   }
 

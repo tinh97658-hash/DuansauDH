@@ -1,15 +1,46 @@
-/* Keep the catalog's original Toastify light surface, spacing, close and progress styling. */
+/* High-contrast Toastify styling while keeping light theme host semantics and close/progress controls. */
 .app-toast {
-  --toastify-color-success: var(--icon-success);
-  --toastify-color-error: var(--icon-danger);
-  --toastify-color-warning: var(--icon-warning);
-  --toastify-icon-color-success: var(--icon-success);
-  --toastify-icon-color-error: var(--icon-danger);
-  --toastify-icon-color-warning: var(--icon-warning);
-  --toastify-icon-color-info: var(--icon-primary);
+  --toastify-color-success: #137b3b;
+  --toastify-color-error: #c81e1e;
+  --toastify-color-warning: #d97706;
+  --toastify-color-info: #00658a;
+  --toastify-icon-color-success: #137b3b;
+  --toastify-icon-color-error: #c81e1e;
+  --toastify-icon-color-warning: #b45309;
+  --toastify-icon-color-info: #00658a;
+  border: 1px solid #cbd5e1;
+  border-left: 4px solid var(--toastify-color-info);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(16, 35, 51, 0.16);
+  font-weight: 500;
 }
-.app-toast.Toastify__toast--success { color: var(--toastify-color-success); }
-.app-toast.Toastify__toast--error { color: var(--toastify-color-error); }
-.app-toast.Toastify__toast--warning { color: var(--toastify-color-warning); }
-.app-toast.Toastify__toast--warning .Toastify__toast-body > div:last-child { color: var(--icon-warning); }
-.app-toast .Toastify__close-button { color: currentColor; }
+.app-toast.Toastify__toast--success {
+  background: #e6f6ec;
+  border-color: #7cd49e;
+  border-left-color: #137b3b;
+  color: #0b5128;
+  font-weight: 600;
+}
+.app-toast.Toastify__toast--error {
+  background: #fdecec;
+  border-color: #f5a3a3;
+  border-left-color: #c81e1e;
+  color: #7f1d1d;
+  font-weight: 600;
+}
+.app-toast.Toastify__toast--warning {
+  background: #fef3c7;
+  border-color: #f3b848;
+  border-left-color: #d97706;
+  color: #78350f;
+  font-weight: 600;
+}
+.app-toast.Toastify__toast--info {
+  background: #e6f3fa;
+  border-color: #7ec0df;
+  border-left-color: #00658a;
+  color: #0b3a53;
+}
+.app-toast.Toastify__toast--warning .Toastify__toast-body > div:last-child { color: #78350f; }
+.app-toast .Toastify__close-button { color: currentColor; opacity: 0.78; }
+.app-toast .Toastify__close-button:hover { opacity: 1; }

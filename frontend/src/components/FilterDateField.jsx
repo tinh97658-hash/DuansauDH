@@ -5,9 +5,9 @@ import DateField from "./DateField";
 /** Date control matching the labels and dimensions of other filter-bar fields. */
 export default function FilterDateField({ label, inputLabel = label, sx, inputProps, ...props }) {
   return <Box component="label" sx={{ display: "grid", gap: "6px", minWidth: 0, m: 0, ...sx }}>
-    <Box component="span" sx={{ color: "#526A82", fontSize: "10.5px", fontWeight: 700,
+    <Box component="span" className="app-filter-label" sx={{ color: "#526A82", fontSize: "10.5px", fontWeight: 700,
       letterSpacing: ".025em", lineHeight: 1.2, textTransform: "uppercase" }}>{label}</Box>
-    <DateField {...props} fullWidth size="small" inputProps={{ "aria-label": inputLabel, ...inputProps }}
+    <DateField {...props} fullWidth size="small" calendarLabel={inputLabel} inputProps={{ "aria-label": inputLabel, ...inputProps }}
       sx={{
         "& .MuiOutlinedInput-root": {
           height: 38, minHeight: 38, bgcolor: "#fff", borderRadius: "7px", color: "#12263F", fontSize: 12,

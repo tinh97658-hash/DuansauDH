@@ -1,3 +1,7 @@
+import React from "react";
+import { render, screen } from "@testing-library/react";
+import { Alert } from "@mui/material";
+import { ThemeProvider } from "@mui/material/styles";
 import {
   default as theme,
   CONTROL_BORDER_RADIUS,
@@ -32,5 +36,22 @@ describe("shared application typography", () => {
     expect(theme.components.MuiTableContainer.styleOverrides.root.border).toBe(`1px solid ${TABLE_BORDER_COLOR}`);
     expect(theme.components.MuiTableHead.styleOverrides.root.backgroundColor).toBe(TABLE_HEADER_BACKGROUND);
     expect(theme.components.MuiTableCell.styleOverrides.root.borderColor).toBe(TABLE_ROW_BORDER_COLOR);
+  });
+
+  it("renders high-contrast backgrounds and left accent borders on alerts", () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <Alert severity="error">Lỗi nghiêm trọng</Alert>
+        <Alert severity="warning">Cảnh báo quan trọng</Alert>
+        <Alert severity="info">Thông tin lưu ý</Alert>
+        <Alert severity="success">Thành công</Alert>
+      </ThemeProvider>,
+    );
+    const alerts = screen.getAllByRole("alert");
+    expect(alerts).toHaveLength(4);
+    expect(alerts[0]).toHaveStyle({ backgroundColor: "rgb(253, 236, 236)", color: "rgb(127, 29, 29)" });
+    expect(alerts[1]).toHaveStyle({ backgroundColor: "rgb(254, 243, 199)", color: "rgb(120, 53, 15)" });
+    expect(alerts[2]).toHaveStyle({ backgroundColor: "rgb(230, 243, 250)", color: "rgb(11, 58, 83)" });
+    expect(alerts[3]).toHaveStyle({ backgroundColor: "rgb(230, 246, 236)", color: "rgb(11, 81, 40)" });
   });
 });

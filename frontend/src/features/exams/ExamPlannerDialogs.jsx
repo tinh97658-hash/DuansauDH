@@ -1,20 +1,8 @@
-import SecondExamInvigilator from './SecondExamInvigilator';
-import {examInvigilators,examInvigilatorBusy,duplicateExamInvigilators,secondInvigilatorValid,secondInvigilatorPayload} from './examInvigilators';
 import { CheckIcon } from "../../components/AppIcons";
-import React,{useEffect,useState} from 'react';
-import axios from 'axios';
-import {Modal,SearchSelect,normalize} from '../scheduling/shared';
-import LecturerPicker from '../scheduling/LecturerPicker';
-import {API_BASE_URL} from '../../config/http';
-import {getBusinessTodayKey} from '../../utils/schedulingCalendar';
-import {formatExamDate,validExamHours} from './examCalendar';
-import {isExamPeriodClosed,useExamWallTime} from './examPeriodAvailability';
-import {examRoomReason,examStatus,overlappingExams,roomFloor} from './examPlanner';
+import React,{useState} from 'react';
+import {formatExamDate} from './examCalendar';
 import ExamDialogLayout from './ExamDialogLayout';
 
-const errorText=e=>{const text=e.response?.data?.message;return Array.isArray(text)?text.join(' '):text||'Không thể tải tình trạng phòng. Hãy thử lại.';};
-const examUnitNames=new Set(['vien dao tao sdh','vien dao tao sau dai hoc']);
-const isExamUnit=unit=>examUnitNames.has(normalize(String(unit.name||'').toLocaleLowerCase('vi')).trim().replace(/\s+/g,' '));
 const timeRange=s=>`${s.startTime.slice(0,5)}–${s.endTime.slice(0,5)}`;
 export function ExamPendingCards({sessions,onSelect,canWrite,saving,onHeld,onNotHeld}){
  return [...sessions].sort((a,b)=>`${a.examDate} ${a.startTime}`.localeCompare(`${b.examDate} ${b.startTime}`)).map(s=><article className="sl-pending-card" key={s.id}>
@@ -22,63 +10,6 @@ export function ExamPendingCards({sessions,onSelect,canWrite,saving,onHeld,onNot
   <div className="sl-pending-copy"><h3 title={s.name}><button className="ep-pending-title" onClick={()=>onSelect(s)}>{s.name}</button></h3><span title={s.subjectName}>{s.subjectName}</span></div>
   <div className="sl-pending-side"><small title={`Phòng ${s.roomCode} · ${s.candidateCount} thí sinh`}>Phòng {s.roomCode} · {s.candidateCount} TS</small><div className="sl-pending-actions"><button className="sl-btn" disabled={!canWrite||saving||!!s.attendanceConfirmedAt} onClick={()=>onNotHeld(s)}>Không diễn ra</button><button className="sl-btn sl-btn-primary" disabled={!canWrite||saving||!!s.attendanceConfirmedAt} onClick={()=>onHeld(s)}><CheckIcon fontSize="inherit" /> Đã diễn ra</button></div></div>
  </article>);
-}
-export function ExamEditor({session,offering,slot,rooms,lecturers=[],units=[],canWrite,saving,error,onClose,onSave,embedded=false}){
- const wallTime=useExamWallTime();
- const [form,setForm]=useState({examDate:session?.examDate||slot.date,startTime:session?.startTime.slice(0,5)||slot.start,endTime:session?.endTime.slice(0,5)||slot.end,roomId:session?.roomId||'',secondLecturerId:session?.secondLecturerId||'',secondExternalInvigilatorName:session?.secondExternalInvigilatorName||'',secondExternalUnitName:session?.secondExternalUnitName||'',lecturerId:session?.lecturerId||'',note:session?.note||''});
- const [unitId,setUnitId]=useState(()=>{const lecturer=lecturers.find(l=>l.id===session?.lecturerId);return lecturer&&units.some(unit=>unit.id===lecturer.unitId&&isExamUnit(unit))?lecturer.unitId:'';});
- const [availability,setAvailability]=useState({sessions:[],loading:true,error:''}),[retry,setRetry]=useState(0);
- useEffect(()=>{if(!form.examDate){setAvailability({sessions:[],loading:false,error:''});return;}let active=true;setAvailability({sessions:[],loading:true,error:''});
-  const timer=setTimeout(()=>axios.get(`${API_BASE_URL}/masters/exam-schedule`,{params:{from:form.examDate,to:form.examDate},withCredentials:true}).then(({data})=>{if(active)setAvailability({sessions:data.sessions,loading:false,error:''});}).catch(e=>{if(active)setAvailability({sessions:[],loading:false,error:errorText(e)});}),180);
-  return()=>{active=false;clearTimeout(timer);};
- },[form.examDate,retry]);
- const item=session||offering,count=item.candidateCount,conflicts=overlappingExams(availability.sessions,form,session?.id);
- const candidateIds=new Set(item.candidateKeys||item.candidateIds||[]),candidateConflicts=new Set(conflicts.flatMap(s=>(s.candidateKeys||s.candidateIds||[]).filter(id=>candidateIds.has(id))));
- const room=rooms.find(r=>r.id===form.roomId),reason=room?examRoomReason(room,count,conflicts):'';
- const validTime=validExamHours(form.startTime,form.endTime),pastDate=form.examDate&&form.examDate<getBusinessTodayKey(),periodClosed=isExamPeriodClosed(form.examDate,form.startTime<'13:00'?'MORNING':'AFTERNOON',wallTime);
- const lecturer=lecturers.find(l=>l.id===form.lecturerId),lecturerBusy=examInvigilators(form).some(p=>examInvigilatorBusy(p,conflicts));
- const visibleUnits=units.filter(unit=>isExamUnit(unit)&&(unit.active!==false||unit.id===unitId)).sort((a,b)=>a.name.localeCompare(b.name,'vi'));
- const filteredLecturers=lecturers.filter(l=>visibleUnits.some(unit=>unit.id===unitId)&&l.unitId===unitId&&(l.active||l.id===form.lecturerId))
-  .map(l=>({...l,unit:units.find(unit=>unit.id===l.unitId)||null}));
- const valid=canWrite&&form.examDate&&!pastDate&&!periodClosed&&validTime&&room&&!reason&&(!form.lecturerId||(lecturer?.active&&filteredLecturers.some(l=>l.id===form.lecturerId)))&&secondInvigilatorValid(form,lecturers)&&!duplicateExamInvigilators(form)&&!lecturerBusy&&!candidateConflicts.size&&!availability.loading&&!availability.error;
- const floors=[...new Set(rooms.map(roomFloor))].sort((a,b)=>(a??99)-(b??99));
- const change=(key,value)=>setForm(current=>({...current,[key]:value}));
- return <ExamDialogLayout embedded={embedded} wide className="sl-session-editor-dialog ep-editor" bodyClassName="sl-session-editor-body" title={session?'SỬA LỊCH THI':'XẾP LỊCH THI'} busy={saving} onClose={onClose} actions={<><button className="sl-btn" disabled={saving} onClick={onClose}>{embedded?'Hủy chỉnh sửa':'Hủy'}</button><button className="sl-btn sl-btn-primary" disabled={!valid||saving} onClick={()=>onSave({...form,lecturerId:form.lecturerId||undefined,...secondInvigilatorPayload(form)},()=>setRetry(n=>n+1))}>{embedded?'Lưu thay đổi':session?'Lưu lịch':'Xếp lịch'}</button></>}>
-  {error&&<div role="alert" className="v20-error">{error}</div>}
-  <div className="v20-composer">
-   <section className="sl-editor-info"><h4>THÔNG TIN CA THI</h4><strong>{item.name}</strong><p>{item.subjectName}</p>{item.makeupCount>0&&<p className="ep-makeup-badge">Thi bù · {item.makeupCount} học viên</p>}
-    <div className="ep-period-value">Buổi: <strong>{form.startTime<'13:00'?(form.endTime>'13:00'?'Sáng / Chiều':'Sáng'):'Chiều'}</strong></div>
-    <label className="v20-field sl-unit-field">Đơn vị
-     <SearchSelect label="Đơn vị" value={unitId} options={visibleUnits}
-      placeholder="Nhập để tìm đơn vị..." disabled={!canWrite||saving}
-      onChange={value=>{if(value!==unitId){setUnitId(value);change('lecturerId','');}}}/>
-    </label>
-    <label className="v20-field">Cán bộ coi thi 1
-     <LecturerPicker key={unitId} label="Cán bộ coi thi 1" placeholder="Chọn cán bộ coi thi 1" value={form.lecturerId} lecturers={filteredLecturers.map(l=>({...l,active:l.id===form.secondLecturerId?false:l.active}))} offering={offering||session}
-      conflicts={conflicts.flatMap(s=>[s,{...s,lecturerId:s.secondLecturerId}])} disabled={!unitId||!canWrite||saving||availability.loading||!!availability.error}
-      onChange={value=>change('lecturerId',value)}/>
-    </label>
-    {form.lecturerId&&<button className="sl-btn" disabled={saving} onClick={()=>change('lecturerId','')}>Bỏ chọn cán bộ coi thi 1</button>}
-    <SecondExamInvigilator form={form} onChange={values=>setForm(f=>({...f,...values}))} lecturers={lecturers} units={visibleUnits} busy={conflicts} disabled={!canWrite||saving||availability.loading||!!availability.error}/>
-    {duplicateExamInvigilators(form)&&<p role="alert">Hai cán bộ coi thi phải là hai người khác nhau.</p>}
-    {!lecturers.some(l=>l.active)&&<div className="v20-hint">Chưa có giảng viên đang hoạt động. Khai báo tại Hệ thống → Giảng viên.</div>}
-    {unitId&&lecturers.some(l=>l.active)&&!filteredLecturers.some(l=>l.active)&&<div className="v20-hint">Đơn vị này chưa có giảng viên đang hoạt động.</div>}
-    <label className="v20-field">Ghi chú<textarea aria-label="Ghi chú" value={form.note} maxLength={2000} disabled={saving} onChange={e=>change('note',e.target.value)}/></label>
-    <div className="ep-validation" aria-live="polite">{pastDate&&<span role="alert">Không thể xếp lịch thi vào ngày đã qua.</span>}{form.endTime<=form.startTime&&<span role="alert">Giờ kết thúc phải sau giờ bắt đầu.</span>}
-     {form.endTime>form.startTime&&!validTime&&<span role="alert">Giờ thi phải nằm trong khoảng 07:00–19:00.</span>}
-     {periodClosed&&!pastDate&&<span role="alert">Buổi thi đã khóa ghép theo giờ thực. Hãy chọn buổi hoặc ngày thi khác.</span>}
-     {reason&&room&&<span role="alert">{room.code}: {reason}</span>}
-     {lecturerBusy&&<span role="alert">Giảng viên đã có ca thi trùng giờ.</span>}
-     {candidateConflicts.size>0&&<span role="alert">{candidateConflicts.size} thí sinh đang có lịch thi khác trong khoảng {form.startTime}–{form.endTime}.</span>}
-     {availability.loading&&<span role="status">Đang kiểm tra phòng…</span>}
-     {availability.error&&<div role="alert">{availability.error} <button className="sl-btn" onClick={()=>setRetry(n=>n+1)}>Thử lại</button></div>}
-    </div>
-   </section>
-   <section className="sl-editor-rooms" aria-label="Phòng thi toàn viện"><h4>PHÒNG THI TOÀN VIỆN</h4>
-    {floors.map(floor=><div className="v20-room-floor" key={floor??'other'}><h4>{floor==null?'PHÒNG KHÁC':`TẦNG ${floor}`}</h4><div className="v20-room-grid">{rooms.filter(r=>roomFloor(r)===floor).map(r=>{const blocked=examRoomReason(r,count,conflicts),chosen=form.roomId===r.id;return <button key={r.id} aria-pressed={chosen} title={r.name} className={`v20-room ${chosen?'sl-on':''} ${blocked==='ĐÃ CÓ LỊCH'?'v20-busy':blocked?'v20-unavailable':''}`} disabled={!canWrite||saving||availability.loading||!!availability.error||!form.examDate||!!pastDate||!validTime||!!blocked} onClick={()=>change('roomId',r.id)}><strong>{r.code}</strong><span>{r.capacity==null?'Chưa có sức chứa':`${r.capacity} chỗ`}</span><small>{blocked|| (chosen?'ĐANG CHỌN':'TRỐNG')}</small></button>;})}</div></div>)}
-   </section>
-  </div>
- </ExamDialogLayout>;
 }
 export function ExamReasonDialog({action,session,saving,error,onClose,onConfirm,embedded=false}){
  const [note,setNote]=useState(''),cancel=action==='cancel';

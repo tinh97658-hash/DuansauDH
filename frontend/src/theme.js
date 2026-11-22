@@ -24,6 +24,41 @@ const iconForegrounds = {
   error: "var(--icon-danger, #8C2222)",
 };
 
+const alertTones = {
+  error: {
+    bg: "#FDECEC",
+    border: "#F5A3A3",
+    accent: "#C81E1E",
+    text: "#7F1D1D",
+    icon: "#C81E1E",
+    weight: 600,
+  },
+  warning: {
+    bg: "#FEF3C7",
+    border: "#F3B848",
+    accent: "#D97706",
+    text: "#78350F",
+    icon: "#B45309",
+    weight: 600,
+  },
+  info: {
+    bg: "#E6F3FA",
+    border: "#7EC0DF",
+    accent: "#00658A",
+    text: "#0B3A53",
+    icon: "#00658A",
+    weight: 500,
+  },
+  success: {
+    bg: "#E6F6EC",
+    border: "#7CD49E",
+    accent: "#137B3B",
+    text: "#0B5128",
+    icon: "#137B3B",
+    weight: 600,
+  },
+};
+
 /**
  * Institutional Theme for University Postgraduate Operations System
  * Strictly following .rulesforai and operational workspace reference design
@@ -254,26 +289,21 @@ export const theme = createTheme({
           fontSize: 13,
           color: "#102333",
           "& .MuiOutlinedInput-notchedOutline": {
-            borderColor: "#718292",
-            top: 0,
-          },
-          "& .MuiOutlinedInput-notchedOutline legend": {
-            display: "none",
+            borderColor: "#B9CBD8",
           },
           "&:hover .MuiOutlinedInput-notchedOutline": {
-            borderColor: "#A0AEC0",
+            borderColor: "#9FB5C6",
           },
           "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
             borderColor: "#00658A",
             borderWidth: 1.5,
           },
         },
-        notchedOutline: {
-          top: 0,
-          "& legend": {
-            display: "none",
-          },
-        },
+        notchedOutline: ({ ownerState }) => (
+          !(ownerState?.label != null && ownerState?.label !== "")
+            ? { top: 0, "& legend": { display: "none" } }
+            : {}
+        ),
         input: {
           padding: "7px 10px",
           height: "auto",
@@ -510,16 +540,42 @@ export const theme = createTheme({
         components: { CloseIcon: XMarkIcon },
       },
       styleOverrides: {
-        root: ({ ownerState, theme }) => ({
-          borderRadius: 0,
-          fontSize: "12.5px",
-          "& .MuiAlert-icon": {
-            color: ownerState.variant === "filled"
-              ? theme.palette[ownerState.color || ownerState.severity || "info"].contrastText
-              : iconForegrounds[ownerState.color || ownerState.severity || "info"],
-            opacity: 1,
-          },
-        }),
+        root: ({ ownerState, theme }) => {
+          const severity = ownerState.color || ownerState.severity || "info";
+          const tone = alertTones[severity] || alertTones.info;
+          const isFilled = ownerState.variant === "filled";
+          return {
+            borderRadius: "6px",
+            fontSize: "12.5px",
+            lineHeight: 1.5,
+            padding: "9px 14px",
+            alignItems: "flex-start",
+            ...(isFilled
+              ? { fontWeight: 600 }
+              : {
+                  backgroundColor: tone.bg,
+                  color: tone.text,
+                  fontWeight: tone.weight,
+                  border: `1px solid ${tone.border}`,
+                  borderLeft: `4px solid ${tone.accent}`,
+                }),
+            "& .MuiAlert-icon": {
+              color: isFilled ? theme.palette[severity].contrastText : tone.icon,
+              opacity: 1,
+              marginRight: "10px",
+              padding: "1px 0",
+              fontSize: "20px",
+            },
+            "& .MuiAlert-message": {
+              padding: "1px 0",
+              minWidth: 0,
+            },
+            "& .MuiAlert-action": {
+              paddingTop: 0,
+              color: "inherit",
+            },
+          };
+        },
       },
     },
   },

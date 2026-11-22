@@ -1,6 +1,16 @@
-/* Page-level controls keep one row; overflow belongs to the bar, not the page. */
+/* Page-level filter bars wrap cleanly into rows without horizontal scrollbars; action bars keep one row. */
 @media screen {
-    .app-filter-toolbar,
+    .app-filter-toolbar {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: wrap !important;
+      align-items: flex-end;
+      row-gap: 10px;
+      column-gap: 12px;
+      min-width: 0 !important;
+      max-width: 100%;
+      overflow-x: visible;
+    }
     .app-action-toolbar {
       display: flex !important;
       flex-direction: row !important;
@@ -11,11 +21,21 @@
       overscroll-behavior-x: contain;
       scrollbar-width: thin;
     }
-    .app-filter-toolbar { align-items: flex-end; padding-bottom: 4px; }
-    .app-filter-toolbar > * { flex-shrink: 1; }
-    .app-filter-toolbar > label > span { white-space: nowrap !important; }
-    .app-filter-toolbar > .MuiStack-root { flex-wrap: nowrap !important; flex-shrink: 0; }
-    :is(.tp-filters,.css-filters).app-filter-toolbar > :is(label,.tp-filter) { flex: 1 1 170px; min-width: 170px; }
+    .app-filter-toolbar > * { flex-shrink: 1; max-width: 100%; }
+    .app-filter-toolbar label > span { white-space: nowrap !important; }
+    .app-filter-toolbar > .MuiStack-root { flex-wrap: wrap; flex-shrink: 0; }
+    .app-filter-toolbar > .app-filter-search-group {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 10px 12px;
+      flex: 1 1 460px;
+      min-width: min(100%, 380px);
+      flex-shrink: 1;
+    }
+    .app-filter-toolbar > .app-filter-search-group > label { flex: 1 1 220px; min-width: 180px; }
+    :is(.tp-filters,.css-filters).app-filter-toolbar > :is(label,.tp-filter) { flex: 1 1 155px; min-width: 155px; }
     .app-filter-toolbar > .lp-date-filter { flex: none; }
     .app-filter-toolbar .MuiSelect-select { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis; }
     .app-action-toolbar { align-items: center; }
@@ -38,13 +58,14 @@
     ) {
       border-color: var(--table-border-color,#000) !important;
     }
-    #root :is(.app-filter-toolbar,.tp-filters,.css-filters) label > span:not(.MuiInputBase-root) {
+    #root :is(.app-filter-toolbar,.tp-filters,.css-filters) :is(label,.tp-year-filter) > span:not(.MuiInputBase-root) {
       color: var(--text-primary,#102333);
     }
 }
 @layer app-text-size {
   @media screen {
-    html[data-font-size] body [data-feature-main] :is(.app-filter-toolbar,.app-action-toolbar),
+    html[data-font-size] body [data-feature-main] .app-filter-toolbar { flex-wrap: wrap !important; }
+    html[data-font-size] body [data-feature-main] .app-action-toolbar,
     html[data-font-size] body [data-feature-main] .app-action-toolbar .exam-tool-actions { flex-wrap: nowrap !important; }
     html[data-font-size] body [data-feature-main] .app-action-toolbar :is(button,a,.MuiTypography-root) { white-space: nowrap !important; }
   }

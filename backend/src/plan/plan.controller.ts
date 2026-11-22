@@ -47,7 +47,7 @@ export class PlanController {
   @Delete("subjects/:id") @RequirePermissions("plan.manage") removeSubject(@Param("id") id: string) { return this.plan.removeSubject(id); }
 
   // ===== Lớp học =====
-  @Get("classes") classes(@Query("majorId") majorId?: string, @Query("program") program?: string, @Query("year") year?: string) { return this.plan.listClasses(majorId, program, year); }
+  @Get("classes") classes(@Query("majorId") majorId?: string, @Query("program") program?: string, @Query("year") year?: string, @Query("intakeRound") intakeRound?: string) { return this.plan.listClasses(majorId, program, year, intakeRound); }
   @Post("classes") @RequirePermissions("plan.manage") async createClass(@Body() dto: CreateClassDto, @CurrentUser() actor: any) { return this.plan.createClass({ ...dto, responsibleStaffId: await this.responsibility.forCreation(actor, dto.responsibleStaffId) }); }
   @Put("classes/:id") @RequirePermissions("plan.manage") updateClass(@Param("id") id: string, @Body() dto: UpdateClassDto) { return this.plan.updateClass(id, dto); }
   @Delete("classes/:id") @RequirePermissions("plan.manage") removeClass(@Param("id") id: string) { return this.plan.removeClass(id); }
@@ -80,10 +80,11 @@ export class PlanController {
     @Query("includeGroup") includeGroup?: string,
     @Query("admissionStage") admissionStage?: string,
     @Query("classGroupId") classGroupId?: string,
+    @Query("intakeRound") intakeRound?: string,
   ) {
     return this.plan.listAdmissionRecords(
       majorId, trainingLevel, academicYear, status, disciplineId, search, page, pageSize,
-      excludeStatus, includeGroup === "true", admissionStage, classGroupId,
+      excludeStatus, includeGroup === "true", admissionStage, classGroupId, intakeRound,
     );
   }
 

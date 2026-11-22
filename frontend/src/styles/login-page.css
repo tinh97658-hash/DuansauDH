@@ -37,11 +37,11 @@
 .vmu-login-submit-arrow svg { font-size: 28px; }
 .vmu-login-spinner { display: block; width: 20px; height: 20px; border: 2px solid #ffffff60; border-top-color: white; animation: vmu-spin .7s linear infinite; }
 @keyframes vmu-spin { to { transform: rotate(360deg); } }
-.vmu-login-status-box { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; margin: -8px 0 18px; border: 1px solid #c9def3; font-size: 14px; background: #eef6ff; color: #1264a9; }
+.vmu-login-status-box { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; margin: -8px 0 18px; border: 1px solid #7ec0df; border-left: 4px solid #00658a; border-radius: 6px; font-size: 14px; font-weight: 500; background: #e6f3fa; color: #0b3a53; }
 .vmu-login-status-text { min-width: 0; overflow-wrap: anywhere; }
 .vmu-login-status-code { flex-shrink: 0; padding: 4px 8px; border: 1px solid currentColor; font-family: monospace; font-size: 11px; font-weight: 700; }
-.vmu-login-status-box.status-error { color: #a92525; background: #fff0ef; border-color: #efc8c5; }
-.vmu-login-status-box.status-success { color: #197243; background: #ebf8f0; border-color: #b9ddc9; }
+.vmu-login-status-box.status-error { color: #7f1d1d; background: #fdecec; border-color: #f5a3a3; border-left-color: #c81e1e; font-weight: 600; }
+.vmu-login-status-box.status-success { color: #0b5128; background: #e6f6ec; border-color: #7cd49e; border-left-color: #137b3b; font-weight: 600; }
 .vmu-login-google { width: 100%; padding: 12px; margin-top: 14px; border: 1px solid #dce2eb; background: white; color: #183b65; cursor: pointer; }
 .vmu-login-google span { margin-right: 8px; font-weight: 700; }
 .vmu-login-art { position: absolute; inset: 0 0 0 auto; width: 60.5%; height: 100%; clip-path: inset(2px 0 0); z-index: 0; }

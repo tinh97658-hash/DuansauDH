@@ -86,7 +86,8 @@
       min-height: 0 !important;
       line-height: 1.4 !important;
       white-space: normal !important;
-      overflow-wrap: anywhere !important;
+      overflow-wrap: break-word !important;
+      word-break: normal !important;
       font-size: calc(12.5px * var(--app-text-scale)) !important;
     }
 
@@ -101,7 +102,10 @@
       .sl-create-confirm-badges, .sl-create-footer, .sl-create-actions,
       .sl-schedule-head, .sl-actions, .sl-selected-strip,
       .sl-offering-tabs, .sl-matrix-toolbar-head, .sl-matrix-toolbar-actions,
-      .exam-main-toolbar, .exam-tool-actions, .tp-filters, .css-filters
+      .sl-matrix-content-head, .exam-main-toolbar, .exam-tool-actions,
+      .ep-session-toolbar, .ep-round-heading, .ep-detail-actions,
+      .od-header, .od-panel-heading, .assignment-summary-heading, .assignment-selection-bar,
+      .MuiDialogActions-root > .MuiBox-root, .tp-filters, .css-filters
     ) {
       height: auto !important;
       min-width: 0 !important;
@@ -121,8 +125,16 @@
     html[data-font-size]:not([data-font-size="100"]) :is(
       .sl-section h2, .sl-create-subject-title > span, .sl-create-section-title b,
       .sl-create-confirm-badges span, .sl-create-student-list > div > span,
-      .sl-filter-chip, .sl-offering-tab, .transcript-format-option, .MuiTab-root, .MuiChip-root
-    ) {
+      .sl-filter-chip, .sl-offering-tab, .transcript-format-option, .MuiTab-root, .MuiChip-root,
+      .sl-day-focus-tabs button, .sl-day-focus-tabs b, .sl-status-lane > header b,
+      .sl-matrix-view-toggle button, .sl-matrix-cohort-tabs button,
+      .sl-matrix-cohort-tabs button > span, .sl-matrix-col-badge
+    ):not(:where(
+      .report-preview *, .transcript-print-document *, .report-print-sheet *,
+      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
+      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
+      [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
       box-sizing: border-box !important;
       height: auto !important;
       min-height: 1.6em !important;
@@ -131,14 +143,89 @@
       white-space: normal !important;
     }
 
+    html[data-font-size]:not([data-font-size="100"]) :is(
+      .sl-day-focus-tabs b, .sl-status-lane > header b,
+      .sl-matrix-cohort-tabs button > span, .sl-matrix-col-badge
+    ) {
+      min-width: 1.6em !important;
+      padding: 0.15em 0.45em !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .MuiChip-root:not(:where(
+      .report-preview *, .transcript-print-document *, .report-print-sheet *,
+      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
+      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
+      [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      max-width: 100% !important;
+    }
+
     html[data-font-size]:not([data-font-size="100"]) .MuiChip-label {
       white-space: normal !important;
-      overflow-wrap: anywhere !important;
-      padding-block: 3px !important;
+      overflow-wrap: break-word !important;
+      word-break: normal !important;
+      padding-block: 0.25em !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) [data-feature-main] .MuiTabs-scroller:not(.MuiTabs-scrollableX) {
+      overflow-x: auto !important;
+      scrollbar-width: thin;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) [data-feature-main] .MuiTab-root {
+      min-height: var(--app-control-height) !important;
+      padding: 0.45em 1em !important;
+      max-width: none !important;
     }
 
     html[data-font-size]:not([data-font-size="100"]) :is(.MuiGrid-item, .MuiStack-root, .MuiFormControl-root) { min-width: 0 !important; }
     html[data-font-size]:not([data-font-size="100"]) .MuiFormControlLabel-root { max-width: 100% !important; }
+
+    /* Prevent inner cards, split panels, search bars and chip strips from bursting past container bounds. */
+    html[data-font-size]:not([data-font-size="100"]) [data-feature-main] :is(
+      .MuiPaper-root, .MuiCard-root, .MuiTableContainer-root, .MuiTabs-root,
+      .MuiGrid-container, .MuiBox-root:has(> .MuiPaper-root),
+      .MuiInputBase-root, .MuiInputBase-input
+    ):not(:where(
+      .report-preview, .report-preview *, .transcript-print-document, .transcript-print-document *,
+      .report-print-sheet, .report-print-sheet *, .document-report-table, .document-report-table *,
+      [id="printable-a4-sheet"], [id="printable-a4-sheet"] *,
+      .a4-paper-sheet, .a4-paper-sheet *, .sl-print-sheet, .sl-print-sheet *,
+      .gradebook-document, .gradebook-document *, .subject-signing-sheet, .subject-signing-sheet *,
+      .progress-form-sheet, .progress-form-sheet *, .exam-print-sheet, .exam-print-sheet *,
+      [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      min-width: 0 !important;
+      max-width: 100% !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) [data-feature-main] .MuiPaper-root :is(div, section):not(table *):is(
+      :has(> .MuiChip-root),
+      :has(> label .MuiOutlinedInput-root),
+      :has(> .MuiButton-root)
+    ) {
+      min-width: 0 !important;
+      max-width: 100% !important;
+      flex-shrink: 1 !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .od-panel-title .od-panel-title-text {
+      white-space: normal !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) .od-sidebar {
+      grid-template-rows: minmax(var(--od-approval-height), auto) minmax(264px, 1fr) !important;
+    }
+
+    /* Non-colgroup MUI tables with narrow fixed pixel hints let columns expand around scaled text. */
+    html[data-font-size]:is([data-font-size="120"], [data-font-size="130"], [data-font-size="140"], [data-font-size="150"]) [data-feature-main] table.MuiTable-root:not(:has(> colgroup)):not(.assignment-table):not(:where(
+      .report-preview *, .transcript-print-document *, .report-print-sheet *,
+      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
+      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
+      [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      table-layout: auto !important;
+    }
 
     html[data-font-size] body .MuiInputBase-root:not(.MuiInputBase-multiline):is(.MuiAutocomplete-inputRoot, :has(.MuiSelect-multiple)) {
       height: auto !important;
@@ -203,11 +290,12 @@
       flex-shrink: 0 !important;
     }
 
-    html[data-font-size]:not([data-font-size="100"]) :is(.sl-card, .sl-matrix-card, .sl-pivot-mini-card, .sl-create-subject-list > button, .sl-create-group-list > button, .sl-create-student-list > div, .sl-session, .ep-event, .v20-room) :is(strong, span, small, em) {
+    html[data-font-size]:not([data-font-size="100"]) :is(.sl-card, .sl-matrix-card, .sl-pivot-mini-card, .sl-create-subject-list > button, .sl-create-group-list > button, .sl-create-student-list > div, .sl-session, .ep-event, .ep-queue-select, .v20-room) :is(strong, span, small, em) {
       font-size: inherit !important;
       line-height: 1.4 !important;
       white-space: normal !important;
-      overflow-wrap: anywhere !important;
+      overflow-wrap: break-word !important;
+      word-break: normal !important;
       overflow: visible !important;
       -webkit-line-clamp: unset !important;
     }
@@ -243,6 +331,22 @@
 }
 
 @layer app-text-size {
+  @media screen and (max-width: 1366px) {
+    html[data-font-size]:is([data-font-size="130"], [data-font-size="140"], [data-font-size="150"]) .sl-create-picker {
+      grid-template-columns: minmax(min(100%, 300px), 1.35fr) minmax(min(100%, 260px), 1fr) !important;
+    }
+  }
+  @media screen and (max-height: 760px) {
+    html[data-font-size]:is([data-font-size="130"], [data-font-size="140"], [data-font-size="150"]) :is(
+      [data-feature-workspace="true"],
+      [data-feature-workspace="true"] > [data-feature-main="true"],
+      .v20-workspace
+    ) {
+      height: auto !important;
+      min-height: 100dvh !important;
+      overflow: visible !important;
+    }
+  }
   @media screen and (max-width: 700px) {
     html[data-font-size]:not([data-font-size="100"]) .od-summary-row { grid-template-columns: minmax(0, 1fr) !important; }
   }

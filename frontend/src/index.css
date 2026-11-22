@@ -210,15 +210,15 @@ code, kbd, samp, pre {
 }
 
 #root .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline {
-  border-color: var(--table-border-color) !important;
+  border-color: var(--dropdown-border, #B9CBD8) !important;
 }
 
 #root .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
-  border-color: var(--table-border-color) !important;
+  border-color: #9FB5C6 !important;
 }
 
 #root .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
-  border-color: var(--primary) !important;
+  border-color: var(--primary, #0B7FA3) !important;
 }
 
 
@@ -250,12 +250,12 @@ a:hover {
   background: #9AA5B4;
 }
 
-/* Remove MUI OutlinedInput empty top notch/legend cutout */
-.MuiOutlinedInput-notchedOutline {
+/* Remove MUI OutlinedInput empty top notch/legend cutout only when there is no label */
+.MuiFormControl-root:not(:has(> .MuiInputLabel-root)) .MuiOutlinedInput-notchedOutline {
   top: 0 !important;
 }
 
-.MuiOutlinedInput-notchedOutline legend {
+.MuiFormControl-root:not(:has(> .MuiInputLabel-root)) .MuiOutlinedInput-notchedOutline legend {
   display: none !important;
 }
 

@@ -34,6 +34,7 @@ export interface UpdateClassGroupInput {
   majorId?: string | null;
   curriculumId?: string | null;
   academicYear?: string;
+  intakeRound?: number;
   maxStudents?: number;
   status?: string;
   note?: string | null;
@@ -150,16 +151,24 @@ export class ClassGroupService {
     // Lớp bắt buộc thuộc một chuyên ngành (để suy ra CTĐT), nên không cho xoá trắng.
     const majorId = input.majorId ? input.majorId : group.majorId;
     const major = await this.requireMajorForProgram(majorId, program, transaction);
+    let parsedCode = program === "masters" && group.groupNumber ? parseClassGroupCode(input.code || group.code) : null;
     if (program === "masters" && group.groupNumber) {
-      const parsed = parseClassGroupCode(input.code || group.code);
-      if (!parsed) throw new BadRequestException("Mã nhóm phải có dạng CNTT 2026.1.1.");
-      const academicYear = input.academicYear ?? parsed.academicYear;
-      const code = classGroupCode(major!.code, academicYear, parsed.intakeRound, parsed.groupNumber);
+      if (!parsedCode) throw new BadRequestException("Mã nhóm phải có dạng CNTT 2026.1.1.");
+      if (input.code !== undefined && input.intakeRound !== undefined && input.intakeRound !== parsedCode.intakeRound) {
+        throw new BadRequestException("Số đợt trong mã nhóm không khớp đợt đã chọn.");
+      }
+      const nextRound = input.code === undefined && input.intakeRound !== undefined ? input.intakeRound : parsedCode.intakeRound;
+      const academicYear = input.academicYear ?? parsedCode.academicYear;
+      const code = classGroupCode(major!.code, academicYear, nextRound, parsedCode.groupNumber);
       input = { ...input, code, name: code, academicYear };
+      parsedCode = parseClassGroupCode(code);
     }
     if (program === "masters" && input.code !== undefined) input = { ...input, name: input.code };
 
-    const scopeChanged = program !== group.program || majorId !== group.majorId
+    const nextRound = program === "masters" && group.groupNumber ? parsedCode?.intakeRound : input.intakeRound;
+    const roundChanged = program === "masters" && nextRound !== undefined
+      && nextRound !== (group.intakeRound ?? parseClassGroupCode(group.code)?.intakeRound);
+    const scopeChanged = !!roundChanged || program !== group.program || majorId !== group.majorId
       || (input.academicYear !== undefined && input.academicYear !== group.academicYear)
       || (input.curriculumId && input.curriculumId !== group.curriculumId);
     if (scopeChanged) await assertClassScopeEditable(this.sequelize, id, transaction);
@@ -175,10 +184,11 @@ export class ClassGroupService {
     }
 
     const payload: Record<string, unknown> = {};
-    if (program === "masters" && group.groupNumber) {
-      const parsed = parseClassGroupCode(input.code || group.code)!;
-      payload.intakeRound = parsed.intakeRound;
-      payload.groupNumber = parsed.groupNumber;
+    if (program === "masters" && group.groupNumber && parsedCode) {
+      payload.intakeRound = parsedCode.intakeRound;
+      payload.groupNumber = parsedCode.groupNumber;
+    } else if (input.intakeRound !== undefined) {
+      payload.intakeRound = input.intakeRound;
     }
     for (const key of ["responsibleStaffId", "code", "name", "program", "majorId", "academicYear", "maxStudents", "status", "note"] as const) {
       const value = input[key as keyof UpdateClassGroupInput];

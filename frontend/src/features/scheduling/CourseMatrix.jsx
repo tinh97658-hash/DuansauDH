@@ -1,8 +1,11 @@
-import { ArrowRightIcon, CalendarDaysIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, MagnifyingGlassIcon, Square3Stack3DIcon, Squares2X2Icon, TableCellsIcon, ViewColumnsIcon } from "../../components/AppIcons";
-import AppSelect from "../../components/AppSelect";
+import { ArrowRightIcon, CalendarDaysIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, Square3Stack3DIcon, Squares2X2Icon, TableCellsIcon, ViewColumnsIcon } from "../../components/AppIcons";
+import { MenuItem } from "@mui/material";
+import FilterSearchField from "../../components/FilterSearchField";
+import FilterSelectField from "../../components/FilterSelectField";
 import InlineReportExport from "../../components/InlineReportExport";
 import { useReportExport } from "../../components/ReportExportContext";
 import { usePermissions } from "../accounts/usePermissions";
+import IntakeRoundSelect, { matchesIntakeRound } from "../../components/IntakeRoundSelect";
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, groupsOf, labelOf, Notice, offeringTitle, rows, subjectLabel, unique, useLoad } from "./shared";
@@ -58,6 +61,7 @@ export default function CourseMatrix({ user }) {
   const [majorId, setMajor] = useState("");
   const [disciplineId, setDiscipline] = useState("");
   const [scheduleState, setScheduleState] = useState("all");
+  const [intakeRound, setIntakeRound] = useState("");
   const [year, setYear] = useState("");
   const [query, setQuery] = useState("");
   const [viewMode, setViewMode] = useState("board"); // "board" | "pivot"
@@ -77,21 +81,22 @@ export default function CourseMatrix({ user }) {
   );
 
   // Filter logic
-  const filtered = useLoadOfferings(all, disciplineId, visibleMajorIds, majorId, year, scheduleState, query);
+  const filtered = useLoadOfferings(all, disciplineId, visibleMajorIds, majorId, year, intakeRound, scheduleState, query);
   const offeringMajorIds = new Set(filtered.flatMap(groupsOf).map((group) => group.majorId || group.major?.id));
   const reportMajors = visibleMajors.filter((major) => majorId ? major.id === majorId : offeringMajorIds.has(major.id));
   const reportScope = reportMajors.map((major) => major.code ? `${major.name} (${major.code})` : major.name).join(", ");
-  useReportExport(() => ({ title: "Ma trận lớp học phần", metadata: [["Khóa", year || "Tất cả"], ["Tìm kiếm", query || "Tất cả"], ["Phạm vi", reportScope || "Không có chuyên ngành phù hợp"]],
+  useReportExport(() => ({ title: "Ma trận lớp học phần", metadata: [["Khóa", year || "Tất cả"], ["Đợt", intakeRound || "Tất cả"], ["Tìm kiếm", query || "Tất cả"], ["Phạm vi", reportScope || "Không có chuyên ngành phù hợp"]],
     sections: [{ title: "Danh sách lớp học phần", headers: ["STT", "Mã HP", "Học phần", "TC", "Lớp học phần", "Lớp/nhóm", "Khóa", "Số HV", "Tình trạng xếp lịch", "Số buổi đã học"],
       rows: sortCourseOfferings(filtered).map((offering, index) => [index + 1, offering.subject?.code, offering.subject?.name, offering.subject?.credits,
         offeringTitle(offering), labelOf(offering), unique(groupsOf(offering).map(group => group.academicYear)).join(", "), offering.participantCount || 0,
         scheduleCategory(offering) === "unscheduled" ? "Chưa xếp lịch" : "Đã xếp lịch", offering.sessionSummary?.heldCount || 0]) }] }), offerings.loading || !!offerings.error);
 
   // Cohorts calculation
+  const allGroups = useMemo(() => all.flatMap(groupsOf), [all]);
   const allCohorts = useMemo(() => {
-    return unique(all.flatMap(groupsOf).map((group) => group.academicYear).filter(Boolean))
+    return unique(allGroups.map((group) => group.academicYear).filter(Boolean))
       .sort((a, b) => b.localeCompare(a, "vi", { numeric: true }));
-  }, [all]);
+  }, [allGroups]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -133,116 +138,107 @@ export default function CourseMatrix({ user }) {
   return (
     <section className="sl-workspace sl-matrix-workspace" aria-label="Ma trận lớp học phần theo khóa">
       <div className="sl-matrix-toolbar">
-        <div className="sl-matrix-toolbar-head">
-          <div className="sl-matrix-kpi-bar" role="region" aria-label="Chỉ số tổng quan">
-            <div className="sl-matrix-kpi kpi-info">
-              <span className="sl-matrix-kpi-icon"><Square3Stack3DIcon aria-hidden="true" /></span>
-              <div><strong>{kpis.total}</strong><span>Tổng số lớp học phần</span></div>
-            </div>
-            <div className="sl-matrix-kpi kpi-warn">
-              <span className="sl-matrix-kpi-icon"><ClockIcon aria-hidden="true" /></span>
-              <div><strong>{kpis.unscheduled}</strong><span>Chưa xếp lịch</span></div>
-            </div>
-            <div className="sl-matrix-kpi kpi-progress">
-              <span className="sl-matrix-kpi-icon"><CalendarDaysIcon aria-hidden="true" /></span>
-              <div><strong>{kpis.scheduled}</strong><span>Đang học / Đã xếp lịch</span></div>
-            </div>
-            <div className="sl-matrix-kpi kpi-cross">
-              <span className="sl-matrix-kpi-icon"><Squares2X2Icon aria-hidden="true" /></span>
-              <div><strong>{kpis.crossCohort}</strong><span>Ghép liên khóa</span></div>
-            </div>
+        <div className="sl-matrix-kpi-bar" role="region" aria-label="Chỉ số tổng quan">
+          <div className="sl-matrix-kpi kpi-info">
+            <span className="sl-matrix-kpi-icon"><Square3Stack3DIcon aria-hidden="true" /></span>
+            <div><strong>{kpis.total}</strong><span>Tổng số lớp học phần</span></div>
           </div>
-          <div className="sl-matrix-view-toggle" aria-label="Kiểu hiển thị">
-            <button
-              type="button"
-              className={viewMode === "board" ? "active" : ""}
-              onClick={() => setViewMode("board")}
-              aria-pressed={viewMode === "board"}
-            >
-              <ViewColumnsIcon aria-hidden="true" /> Dạng cột theo khóa
-            </button>
-            <button
-              type="button"
-              className={viewMode === "pivot" ? "active" : ""}
-              onClick={() => setViewMode("pivot")}
-              aria-pressed={viewMode === "pivot"}
-            >
-              <TableCellsIcon aria-hidden="true" /> Bảng ma trận môn
-            </button>
+          <div className="sl-matrix-kpi kpi-warn">
+            <span className="sl-matrix-kpi-icon"><ClockIcon aria-hidden="true" /></span>
+            <div><strong>{kpis.unscheduled}</strong><span>Chưa xếp lịch</span></div>
+          </div>
+          <div className="sl-matrix-kpi kpi-progress">
+            <span className="sl-matrix-kpi-icon"><CalendarDaysIcon aria-hidden="true" /></span>
+            <div><strong>{kpis.scheduled}</strong><span>Đang học / Đã xếp lịch</span></div>
+          </div>
+          <div className="sl-matrix-kpi kpi-cross">
+            <span className="sl-matrix-kpi-icon"><Squares2X2Icon aria-hidden="true" /></span>
+            <div><strong>{kpis.crossCohort}</strong><span>Ghép liên khóa</span></div>
           </div>
         </div>
-        <div className="sl-matrix-filters">
-          <div className="sl-matrix-filter-item sl-matrix-search-item">
-            <label htmlFor="matrix-search-input">Tìm kiếm</label>
-            <div className="sl-matrix-search-wrap">
-              <MagnifyingGlassIcon aria-hidden="true" />
-              <input
-                id="matrix-search-input"
-                className="sl-search-input"
-                placeholder="Tên lớp, mã môn hoặc học phần..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
+
+        <div className="sl-matrix-toolbar-divider" />
+
+        <div className="sl-matrix-action-row app-filter-toolbar">
+          <FilterSearchField
+            id="matrix-search-input"
+            placeholder="Tên lớp, mã môn hoặc học phần..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            sx={{ flex: "1 1 280px", minWidth: "min(100%, 240px)", maxWidth: { lg: 480 } }}
+          />
+          <div className="sl-matrix-action-controls">
+            <div className="sl-matrix-view-toggle" aria-label="Kiểu hiển thị">
+              <button
+                type="button"
+                className={viewMode === "board" ? "active" : ""}
+                onClick={() => setViewMode("board")}
+                aria-pressed={viewMode === "board"}
+              >
+                <ViewColumnsIcon aria-hidden="true" /> Dạng cột theo khóa
+              </button>
+              <button
+                type="button"
+                className={viewMode === "pivot" ? "active" : ""}
+                onClick={() => setViewMode("pivot")}
+                aria-pressed={viewMode === "pivot"}
+              >
+                <TableCellsIcon aria-hidden="true" /> Bảng ma trận môn
+              </button>
             </div>
+            <InlineReportExport height={38} />
           </div>
+        </div>
 
-          <div className="sl-matrix-filter-item">
-            <label htmlFor="matrix-discipline-filter">Ngành</label>
-            <AppSelect
-              id="matrix-discipline-filter"
-              className="sl-select"
-              value={disciplineId}
-              onChange={(e) => { setDiscipline(e.target.value); setMajor(""); }}
-            >
-              <option value="">Tất cả ngành</option>
-              {disciplines.map((discipline) => <option key={discipline.id} value={discipline.id}>{disciplineOptionLabel(discipline)}</option>)}
-            </AppSelect>
-          </div>
+        <div className="sl-matrix-toolbar-divider" />
 
-          <div className="sl-matrix-filter-item">
-            <label htmlFor="matrix-major-filter">Chuyên ngành</label>
-            <AppSelect
-              id="matrix-major-filter"
-              className="sl-select"
-              value={majorId}
-              onChange={(e) => setMajor(e.target.value)}
-            >
-              <option value="">Tất cả chuyên ngành</option>
-              {visibleMajors.map((major) => (
-                <option key={major.id} value={major.id}>
-                  {major.name}
-                </option>
-              ))}
-            </AppSelect>
-          </div>
-
-          <div className="sl-matrix-filter-item">
-            <label htmlFor="matrix-year-filter">Khóa / năm học</label>
-            <AppSelect
-              id="matrix-year-filter"
-              className="sl-select"
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-            >
-              <option value="">Tất cả khóa</option>
-              {allCohorts.map((cohort) => <option key={cohort} value={cohort}>Khóa {cohort}</option>)}
-            </AppSelect>
-          </div>
-
-          <div className="sl-matrix-filter-item">
-            <label htmlFor="matrix-status-filter">Tình trạng lịch</label>
-            <AppSelect
-              id="matrix-status-filter"
-              className="sl-select"
-              value={scheduleState}
-              onChange={(e) => setScheduleState(e.target.value)}
-            >
-              <option value="all">Tất cả tình trạng</option>
-              <option value="scheduled">Đã xếp lịch</option>
-              <option value="unscheduled">Chưa xếp lịch</option>
-            </AppSelect>
-          </div>
-          <InlineReportExport height={42} />
+        <div className="sl-matrix-filters app-filter-toolbar">
+          <FilterSelectField
+            id="matrix-discipline-filter"
+            label="Ngành"
+            value={disciplineId}
+            onChange={(e) => { setDiscipline(e.target.value); setMajor(""); }}
+            sx={{ flex: "1.2 1 170px", minWidth: 155 }}
+          >
+            <MenuItem value="">Tất cả ngành</MenuItem>
+            {disciplines.map((discipline) => <MenuItem key={discipline.id} value={discipline.id}>{disciplineOptionLabel(discipline)}</MenuItem>)}
+          </FilterSelectField>
+          <FilterSelectField
+            id="matrix-major-filter"
+            label="Chuyên ngành"
+            value={majorId}
+            onChange={(e) => setMajor(e.target.value)}
+            sx={{ flex: "1.4 1 195px", minWidth: 175 }}
+          >
+            <MenuItem value="">Tất cả chuyên ngành</MenuItem>
+            {visibleMajors.map((major) => (
+              <MenuItem key={major.id} value={major.id}>
+                {major.name}
+              </MenuItem>
+            ))}
+          </FilterSelectField>
+          <FilterSelectField
+            id="matrix-year-filter"
+            label="Khóa / năm học"
+            value={year}
+            onChange={(e) => { setYear(e.target.value); setIntakeRound(""); }}
+            sx={{ flex: "0.9 1 140px", minWidth: 130 }}
+          >
+            <MenuItem value="">Tất cả khóa</MenuItem>
+            {allCohorts.map((cohort) => <MenuItem key={cohort} value={cohort}>Khóa {cohort}</MenuItem>)}
+          </FilterSelectField>
+          <IntakeRoundSelect year={year} value={intakeRound} rows={allGroups} onChange={setIntakeRound} sx={{ flex: "0.95 1 140px", minWidth: 130 }} />
+          <FilterSelectField
+            id="matrix-status-filter"
+            label="Tình trạng lịch"
+            value={scheduleState}
+            onChange={(e) => setScheduleState(e.target.value)}
+            sx={{ flex: "1 1 155px", minWidth: 145 }}
+          >
+            <MenuItem value="all">Tất cả tình trạng</MenuItem>
+            <MenuItem value="scheduled">Đã xếp lịch</MenuItem>
+            <MenuItem value="unscheduled">Chưa xếp lịch</MenuItem>
+          </FilterSelectField>
         </div>
       </div>
 
@@ -542,10 +538,10 @@ function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, canDelete,
                               .filter(Boolean)
                               .join(" · ");
                             return (
-                              <div
-                                key={offering.id}
-                                className="sl-pivot-mini-card"
-                              >
+                                <div
+                                  key={offering.id}
+                                  className={`sl-pivot-mini-card card-${scheduleCategory(offering)}`}
+                                >
                                 <button
                                   type="button"
                                   className="sl-pivot-card-detail-trigger"
@@ -598,18 +594,17 @@ function PivotMatrixView({ offerings, cohorts, selectedYear, canEdit, canDelete,
 }
 
 // Hook helper for filtering offerings
-function useLoadOfferings(all, disciplineId, visibleMajorIds, majorId, year, scheduleState, query) {
+function useLoadOfferings(all, disciplineId, visibleMajorIds, majorId, year, intakeRound, scheduleState, query) {
   return useMemo(() => {
     return all.filter((offering) => {
       const groups = groupsOf(offering);
-      const matchesDiscipline = !disciplineId || groups.some((g) => visibleMajorIds.has(g.majorId || g.major?.id));
-      const matchesMajor = !majorId || groups.some((g) => (g.majorId || g.major?.id) === majorId);
-      const matchesYear = !year || groups.some((g) => g.academicYear === year);
+      const matchesScope = !(disciplineId || majorId || year || intakeRound) || groups.some(g => (!disciplineId || visibleMajorIds.has(g.majorId || g.major?.id))
+        && (!majorId || (g.majorId || g.major?.id) === majorId) && (!year || g.academicYear === year) && matchesIntakeRound(g, intakeRound));
       const matchesScheduleState = scheduleState === "all" || scheduleCategory(offering) === scheduleState;
       const searchStr = `${offering.name || ""} ${offering.subject?.code || ""} ${offering.subject?.name || ""} ${labelOf(offering)}`.toLowerCase();
       const matchesQuery = !query.trim() || searchStr.includes(query.trim().toLowerCase());
-      return matchesDiscipline && matchesMajor && matchesYear && matchesScheduleState && matchesQuery;
+      return matchesScope && matchesScheduleState && matchesQuery;
     });
-  }, [all, disciplineId, visibleMajorIds, majorId, year, scheduleState, query]);
+  }, [all, disciplineId, visibleMajorIds, majorId, year, intakeRound, scheduleState, query]);
 }
 

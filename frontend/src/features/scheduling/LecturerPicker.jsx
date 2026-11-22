@@ -1,3 +1,4 @@
+import { MagnifyingGlassIcon } from "../../components/AppIcons";
 import {formatLecturerName} from '../../utils/lecturerName';
 import React, { useEffect, useRef, useState } from "react";
 import { normalize } from "./shared";
@@ -34,7 +35,10 @@ export default function LecturerPicker({ value, lecturers, offering, conflicts, 
       <span>{formatLecturerName(selected) || placeholder}</span><b aria-hidden="true">⌄</b>
     </button>
     {open && <div className="sl-lecturer-popover">
-      <input autoFocus aria-label="Tìm giảng viên" placeholder="Tìm giảng viên..." value={query} onChange={(event) => setQuery(event.target.value)} />
+      <div className="sl-lecturer-search-wrap">
+        <span aria-hidden="true"><MagnifyingGlassIcon fontSize="inherit" /></span>
+        <input autoFocus aria-label="Tìm giảng viên" placeholder="Tìm giảng viên..." value={query} onChange={(event) => setQuery(event.target.value)} />
+      </div>
       <div className="sl-lecturer-list" role="listbox" aria-label="Danh sách giảng viên">
         {groups.map((group) => <React.Fragment key={group.key}>
           <div className={`sl-lecturer-group ${group.recommended ? "sl-recommended" : ""}`}>

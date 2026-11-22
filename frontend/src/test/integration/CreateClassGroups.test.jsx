@@ -17,6 +17,7 @@ const major = { id: "major-1", code: "CNTT", name: "Công nghệ thông tin" };
 const curriculum = { id: "curriculum-1", code: `CT-CNTT-${year}`, name: "CTĐT CNTT", applicableFromYear: year, active: true };
 const mockRequests = () => {
   axios.get.mockImplementation(async (url) => {
+    if (url.includes("/system/intake-rounds")) return { data: [1, 2].map(intakeRound => ({ academicYear: year, intakeRound, configured: true })) };
     if (url.includes("/system/majors")) return { data: [major] };
     if (url.includes("/auth/isStaff")) return { data: { message: "admin" } };
     if (url.includes("/plan/curriculums")) return { data: [curriculum] };
@@ -196,7 +197,8 @@ test("changing intake round starts numbering within the selected round", async (
     return defaultGet(url);
   });
   await openCreateDialog();
-  fireEvent.change(screen.getByLabelText("Đợt"), { target: { value: "2" } });
+  fireEvent.mouseDown(screen.getByLabelText("Đợt"));
+  fireEvent.click(await screen.findByRole("option", { name: "Đợt 2", exact: true }));
   expect(await screen.findByText(`CNTT ${year}.2.1`)).toBeInTheDocument();
   const createButton = screen.getByRole("button", { name: "Tạo 1 nhóm" });
   await waitFor(() => expect(createButton).toBeEnabled());
@@ -214,7 +216,8 @@ test("allows overriding the generated template and submits the previewed codes",
   expect(templateInput).toHaveValue(`CNTT ${year}.1.{n}`);
   fireEvent.change(templateInput, { target: { value: "LOP-CNTT-{n}" } });
   fireEvent.change(screen.getByLabelText("Số nhóm cần tạo"), { target: { value: "2" } });
-  fireEvent.change(screen.getByLabelText("Đợt"), { target: { value: "2" } });
+  fireEvent.mouseDown(screen.getByLabelText("Đợt"));
+  fireEvent.click(await screen.findByRole("option", { name: "Đợt 2", exact: true }));
   expect(templateInput).toHaveValue("LOP-CNTT-{n}");
   expect(screen.getByText("LOP-CNTT-1")).toBeInTheDocument();
   expect(screen.getByText("LOP-CNTT-2")).toBeInTheDocument();
@@ -338,4 +341,28 @@ test("changes an assigned specialist only in the group editor and saves with the
   fireEvent.click(screen.getByRole("button", { name: "Lưu nhóm" }));
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(expect.stringContaining("/masters/class-groups/group-1"),
     expect.objectContaining({ responsibleStaffId: "staff-2" }), { withCredentials: true }));
+});
+
+test("disables delete confirmation and shows error when group already has members", async () => {
+  const defaultGet = axios.get.getMockImplementation();
+  const groups = [{
+    id: "group-with-members",
+    code: "NHOM-CO-HV",
+    name: "Nhóm có học viên",
+    major,
+    majorId: major.id,
+    academicYear: year,
+    status: "open",
+    memberCount: 2,
+    maxStudents: 20,
+  }];
+  axios.get.mockImplementation(async (url) => (url.includes("/masters/class-groups") ? { data: groups } : defaultGet(url)));
+  renderPage();
+  await screen.findByText("NHOM-CO-HV");
+  fireEvent.click(screen.getByRole("button", { name: "Xóa" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(within(dialog).getByText("XÁC NHẬN XÓA")).toBeVisible();
+  expect(within(dialog).getByRole("alert")).toHaveTextContent(/đang có 2 học viên nên không thể xóa/i);
+  expect(within(dialog).getByRole("button", { name: "Xóa" })).toBeDisabled();
+  expect(axios.delete).not.toHaveBeenCalled();
 });

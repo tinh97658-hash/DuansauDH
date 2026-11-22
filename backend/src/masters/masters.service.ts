@@ -1,3 +1,4 @@
+import { intakeRoundFilter } from "../plan/intake-round.js";
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import { literal, Op, UniqueConstraintError } from "sequelize";
@@ -60,6 +61,7 @@ export class MastersService {
     const where: Record<PropertyKey, unknown> = {
       trainingLevel: "Thạc sĩ",
       academicYear: group.academicYear,
+      intakeRound: group.intakeRound,
       ...admissionLearnerWhere(true),
     };
     if (group.majorId) where.majorId = group.majorId;
@@ -71,15 +73,16 @@ export class MastersService {
   async classGroupOptions(majorId?: string) {
     return this.classGroups.findAll({
       where: { program: "masters", ...(majorId ? { majorId } : {}) },
-      attributes: ["id", "code", "name", "majorId", "academicYear"],
+      attributes: ["id", "code", "name", "majorId", "academicYear", "intakeRound"],
       order: [["academicYear", "DESC"], ["code", "ASC"]],
     });
   }
 
-  async listClassGroups(majorId?: string, academicYear?: string, status?: string) {
+  async listClassGroups(majorId?: string, academicYear?: string, status?: string, intakeRound?: string) {
     const where: Record<string, unknown> = { program: "masters" };
     if (majorId) where.majorId = majorId;
     if (academicYear) where.academicYear = academicYear;
+    if (intakeRoundFilter(intakeRound) !== undefined) where.intakeRound = intakeRoundFilter(intakeRound);
     if (status && status !== "ALL") where.status = status;
 
     const groups = await this.classGroups.findAll({
@@ -239,13 +242,14 @@ export class MastersService {
     });
   }
 
-  async listEligibleStudents(majorId?: string, academicYear?: string) {
+  async listEligibleStudents(majorId?: string, academicYear?: string, intakeRound?: string) {
     const where: Record<PropertyKey, unknown> = {
       trainingLevel: "Thạc sĩ",
       ...admissionLearnerWhere(true),
     };
     if (majorId) where.majorId = majorId;
     if (academicYear) where.academicYear = academicYear;
+    if (intakeRoundFilter(intakeRound) !== undefined) where.intakeRound = intakeRoundFilter(intakeRound);
 
     const records = await this.admissionRecords.findAll({
       where,
@@ -295,6 +299,7 @@ export class MastersService {
         majorId: r.majorId,
         majorName: r.major?.name || r.majorName,
         academicYear: r.academicYear,
+        intakeRound: r.intakeRound,
         status: r.status,
         studyStatus: ["Đã trúng tuyển", "Đang học"].includes(r.studyStatus || "")
           ? (hasPaidAdmissionTuition(r) ? "Đang học" : "Đã trúng tuyển") : r.studyStatus,
@@ -324,7 +329,7 @@ export class MastersService {
         lock: transaction.LOCK.UPDATE,
       });
       if (records.length !== admissionRecordIds.length) {
-        throw new BadRequestException("Danh sách có học viên không đủ điều kiện, sai chuyên ngành hoặc sai khóa tuyển sinh.");
+        throw new BadRequestException("Danh sách có học viên không đủ điều kiện, sai chuyên ngành, khóa hoặc đợt tuyển sinh.");
       }
       const studentIds = records.map((record) => record.studentId).filter(Boolean) as string[];
       const existingMemberships = await this.classGroupMembers.findAll({
@@ -484,9 +489,10 @@ export class MastersService {
     const scope = groups[0];
     const sameScope = groups.every((group) => (
       group.academicYear === scope.academicYear
+      && group.intakeRound === scope.intakeRound
       && (group.majorId || null) === (scope.majorId || null)
     ));
-    if (!sameScope) throw new BadRequestException("Các nhóm phải cùng chuyên ngành và năm tuyển sinh.");
+    if (!sameScope) throw new BadRequestException("Các nhóm phải cùng chuyên ngành, năm và đợt tuyển sinh.");
     const records = await this.admissionRecords.findAll({
       where: this.eligibleAdmissionWhere(scope, dto.admissionRecordIds) as any,
       transaction,

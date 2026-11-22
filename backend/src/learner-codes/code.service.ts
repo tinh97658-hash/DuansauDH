@@ -14,11 +14,17 @@ import { isUUID } from 'class-validator';
 const fingerprint = (value: unknown) => createHash('sha256').update(JSON.stringify(value,(_key,item)=>
   item&&typeof item==='object'&&!Array.isArray(item)
     ?Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])):item)).digest('hex');
-// Match the ordinary-profile default used when accepting applications. Preserve
-// explicit code types and never infer a special type from a historical label.
-const recordTypeJoin = `LEFT JOIN learner_code_types t ON t.id=r.learner_code_type_id OR (
-  r.learner_code_type_id IS NULL AND r.learner_code_state<>'official'
-  AND COALESCE(NULLIF(btrim(r.profile_category),''),'Bình thường')='Bình thường' AND t.key='regular')`;
+// Match any configured type in learner_code_types (plus historical aliases) while
+// preserving explicit learner_code_type_id assignments and rejecting unknown labels.
+const typeOrderSql = `CASE key WHEN 'regular' THEN 1 WHEN 'auditing' THEN 2 WHEN 'student' THEN 3 WHEN 'early_study' THEN 4 WHEN 'pre_masters' THEN 5 ELSE 6 END, name`;
+const slugTypeKey = (name: string) => {
+  const base = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const candidate = (!base || !/^[a-z]/.test(base) ? `type_${base || 'custom'}` : base).slice(0, 34);
+  return candidate.length >= 2 ? candidate : `type_${candidate}`;
+};
+const recordTypeJoin = `LEFT JOIN learner_code_types t ON t.id=COALESCE(r.learner_code_type_id,
+  CASE WHEN r.learner_code_state<>'official' THEN app_resolve_learner_code_type(r.profile_category) ELSE NULL END)`;
 @Injectable()
 export class LearnerCodeService {
   constructor(@InjectConnection() private readonly db: Sequelize, private readonly rbac: RbacService, private readonly audit: AuditService) {}
@@ -60,7 +66,7 @@ export class LearnerCodeService {
   async config(actor: any) {
     await this.access(actor,'learnercode.config.view');
     const [types,rules,abbreviations,majors,groups] = await Promise.all([
-      this.q('SELECT * FROM learner_code_types ORDER BY key'),this.q('SELECT * FROM learner_code_rules ORDER BY name'),
+      this.q(`SELECT * FROM learner_code_types ORDER BY ${typeOrderSql}`),this.q('SELECT * FROM learner_code_rules ORDER BY name'),
       this.q('SELECT a.*,m.name FROM learner_code_abbreviations a JOIN majors m ON m.id=a.major_id ORDER BY m.name'),
       this.q('SELECT id,name,program FROM majors ORDER BY name'),
       this.q("SELECT id,code,name FROM class_groups WHERE group_type='ADMINISTRATIVE' ORDER BY code"),
@@ -69,7 +75,7 @@ export class LearnerCodeService {
   }
   async options(actor: any,recordId?:string) {
     await this.access(actor,'admission.view');
-    const [types,groups]=await Promise.all([this.q('SELECT id,key,name,active FROM learner_code_types ORDER BY key'),
+    const [types,groups]=await Promise.all([this.q(`SELECT id,key,name,active,uses_special_code,letter,requires_admission FROM learner_code_types ORDER BY ${typeOrderSql}`),
       this.q("SELECT id,code,name,academic_year FROM class_groups WHERE group_type='ADMINISTRATIVE' AND app_group_allowed(id,false) ORDER BY academic_year DESC,code")]);
     let defaultGroupId:string|undefined,requestedRecord:any;
     if(recordId){
@@ -82,21 +88,44 @@ export class LearnerCodeService {
   }
   async classRecords(actor:any,id:string) {
     await this.access(actor,'admission.view');
-    return this.q(`SELECT DISTINCT r.id,r.code,r.full_name,r.status,r.profile_category,r.intake_code,r.learner_code_state,COALESCE(r.learner_code_type_id,t.id) AS learner_code_type_id,t.name AS type_name
+    return this.q(`SELECT DISTINCT r.id,r.code,r.full_name,r.status,r.profile_category,r.intake_code,r.learner_code_state,COALESCE(r.learner_code_type_id,t.id) AS learner_code_type_id,t.name AS type_name,t.uses_special_code,t.letter,t.active AS type_active
       FROM admission_records r JOIN class_group_members m ON m.admission_record_id=r.id OR (r.student_id IS NOT NULL AND m.student_id=r.student_id)
       ${recordTypeJoin} WHERE m.class_group_id=:id AND app_record_allowed(r.id,false)
       ORDER BY r.full_name,r.id`,{id});
   }
   async saveType(actor: any, id: string|null, dto: CodeTypeDto) {
     return this.write(actor,'learnercode.config.manage',async tx=>{
+      const name=dto.name.trim();
       const old=id?(await this.q('SELECT * FROM learner_code_types WHERE id=:id',{id},tx))[0]:null;
       if(id&&(!old||old.version!==dto.version))throw new ConflictException('Loại hồ sơ đã thay đổi. Tải lại.');
-      if(old&&old.key!==dto.key)throw new BadRequestException('Không đổi khóa định danh loại hồ sơ đã tạo.');
-      if(dto.key==='regular'&&(dto.letter||!dto.requiresAdmission||!dto.active))throw new BadRequestException('Hồ sơ thường không có chữ cái và phải xét tuyển.');
-      if(dto.key!=='regular'&&dto.active&&!dto.letter)throw new BadRequestException('Nhập chữ cái trước khi kích hoạt loại đặc biệt.');
-      const values={id,name:dto.name.trim(),key:dto.key,letter:dto.letter||null,active:dto.active,requires:dto.requiresAdmission};
-      const [row]=await this.q(id?`UPDATE learner_code_types SET name=:name,letter=:letter,active=:active,requires_admission=:requires,version=version+1 WHERE id=:id RETURNING *`
-        :`INSERT INTO learner_code_types(name,key,letter,active,requires_admission) VALUES(:name,:key,:letter,:active,:requires) RETURNING *`,values,tx);
+      if(old&&dto.key&&old.key!==dto.key)throw new BadRequestException('Không đổi khóa định danh loại hồ sơ đã tạo.');
+      const existingTypes=await this.q('SELECT id,key,name,letter FROM learner_code_types',{},tx);
+      if(existingTypes.some(t=>t.id!==id&&t.name.trim().toLowerCase()===name.toLowerCase())) {
+        throw new ConflictException('Tên loại hồ sơ đã tồn tại.');
+      }
+      let key=old?.key||dto.key||'';
+      if(!old){
+        if(key){
+          if(existingTypes.some(t=>t.key===key))throw new ConflictException('Khóa định danh loại hồ sơ đã tồn tại.');
+        }else{
+          const base=slugTypeKey(name);
+          key=base;
+          let idx=2;
+          while(existingTypes.some(t=>t.key===key))key=`${base.slice(0,36)}_${idx++}`;
+        }
+      }
+      const usesSpecialCode=old
+        ?(dto.usesSpecialCode??(dto.letter?true:Boolean(old.uses_special_code)))
+        :(dto.usesSpecialCode??Boolean(dto.letter));
+      const letter=usesSpecialCode?(dto.letter||null):null;
+      if(key==='regular'&&(usesSpecialCode||letter||!dto.requiresAdmission||!dto.active)) {
+        throw new BadRequestException('Hồ sơ thường dùng mã chuẩn, không có chữ cái và phải xét tuyển.');
+      }
+      if(usesSpecialCode&&dto.active&&!letter)throw new BadRequestException('Nhập chữ cái trước khi kích hoạt loại cấp mã đặc biệt.');
+      if(letter&&existingTypes.some(t=>t.id!==id&&t.letter===letter))throw new ConflictException('Chữ cái này đã được dùng cho loại hồ sơ khác.');
+      const values={id,name,key,letter,usesSpecialCode,active:dto.active,requires:dto.requiresAdmission};
+      const [row]=await this.q(id?`UPDATE learner_code_types SET name=:name,letter=:letter,uses_special_code=:usesSpecialCode,active=:active,requires_admission=:requires,version=version+1 WHERE id=:id RETURNING *`
+        :`INSERT INTO learner_code_types(name,key,letter,uses_special_code,active,requires_admission) VALUES(:name,:key,:letter,:usesSpecialCode,:active,:requires) RETURNING *`,values,tx);
       await this.log(actor,'type.configure',old,row,tx);return row;
     },true);
   }
@@ -138,7 +167,8 @@ export class LearnerCodeService {
     const [group]=await this.q(`SELECT g.*,a.abbreviation FROM class_groups g LEFT JOIN learner_code_abbreviations a ON a.major_id=g.major_id
       WHERE g.id=:id AND g.group_type='ADMINISTRATIVE' AND app_group_allowed(g.id,:writing)`,{id:dto.classGroupId,writing},tx);
     if(!group)throw new ForbiddenException('Không có lớp hành chính trong phạm vi được phép.');
-    const records=await this.q(`SELECT r.*,COALESCE(r.learner_code_type_id,t.id) AS learner_code_type_id,t.key AS type_key,t.name AS type_name,t.letter,t.active AS type_active,t.version AS type_version,t.requires_admission,
+    const [regularType]=await this.q("SELECT id FROM learner_code_types WHERE key='regular'",{},tx);
+    const records=await this.q(`SELECT r.*,COALESCE(r.learner_code_type_id,t.id) AS learner_code_type_id,t.key AS type_key,t.name AS type_name,t.letter,t.uses_special_code,t.active AS type_active,t.version AS type_version,t.requires_admission,
       EXISTS (SELECT 1 FROM study_leaves pause WHERE pause.admission_record_id=r.id AND pause.status='approved'
         AND pause.start_date <= (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date) AS effective_study_leave
       FROM admission_records r ${recordTypeJoin}
@@ -153,7 +183,7 @@ export class LearnerCodeService {
     const counters=new Map<string,number>(),rows:any[]=[];
     for(const r of records){
       if(r.learner_code_state==='official')throw new ConflictException('Danh sách có hồ sơ đã được cấp mã. Dùng thao tác Đổi mã khi cần.');
-      if(!r.type_active||!r.learner_code_type_id||(r.type_key!=='regular'&&!r.letter))throw new BadRequestException('Hồ sơ chưa có loại hợp lệ hoặc loại chưa cấu hình chữ cái.');
+      if(!r.type_active||!r.learner_code_type_id||(r.uses_special_code&&!r.letter))throw new BadRequestException('Hồ sơ chưa có loại hợp lệ hoặc loại chưa cấu hình chữ cái.');
       if(r.requires_admission&&!['admitted','approved'].includes(r.status))throw new BadRequestException('Hồ sơ phải được xác nhận trúng tuyển trước khi cấp mã.');
       if(r.effective_study_leave || ['Bảo lưu','Đang bảo lưu','Bảo lưu quá hạn','Thôi học','Đã thôi học'].includes(r.study_status))throw new BadRequestException('Hồ sơ đang bảo lưu hoặc đã thôi học.');
       if(r.major_id!==group.major_id||r.academic_year!==group.academic_year||(r.training_level==='Tiến sĩ'?'doctoral':'masters')!==group.program) {
@@ -169,14 +199,17 @@ export class LearnerCodeService {
       const rank=codeRulePriority;
       matches.sort((a,b)=>rank(b)-rank(a));
       if(!matches.length||(matches[1]&&rank(matches[0])===rank(matches[1])))throw new ConflictException('Không tìm thấy một quy tắc cấp mã duy nhất.');
-      const rule=matches[0],key=codeCounterKey(rule.counter_scope,input);
+      const rule=matches[0];
+      const counterTypeId=(r.uses_special_code||rule.type_id)?r.learner_code_type_id:(regularType?.id||r.learner_code_type_id);
+      const key=codeCounterKey(rule.counter_scope,{...input,typeId:counterTypeId});
       if(!counters.has(key)){
         const [counter]=await this.q('SELECT next_number FROM learner_code_counters WHERE key=:key',{key},tx);
         counters.set(key,counter?Number(counter.next_number):Number(rule.start_number));
       }
       let n=counters.get(key)!,formatted:any;
+      const typeLetter=r.uses_special_code?r.letter:null;
       for(;;){
-        formatted=formatLearnerCode(rule.parts,input,n,r.letter,dto.manual||'');
+        formatted=formatLearnerCode(rule.parts,input,n,typeLetter,dto.manual||'');
         const reserved=await this.q('SELECT 1 FROM learner_code_reservations WHERE code_key=lower(:code)',{code:formatted.code},tx);
         if(!reserved.length&&!rows.some(row=>row.code===formatted.code))break;
         n++;
@@ -184,7 +217,7 @@ export class LearnerCodeService {
       counters.set(key,n+1);
       rows.push({id:r.id,fullName:r.full_name,oldCode:r.code,code:formatted.code,typeName:r.type_name,components:formatted.components,
         ruleId:rule.id,ruleVersion:rule.version,typeVersion:r.type_version,recordUpdatedAt:r.updated_at,
-        counterKey:key,sequence:n,input,ruleSnapshot:rule,typeLetter:r.letter});
+        counterKey:key,sequence:n,input,ruleSnapshot:rule,typeLetter});
     }
     const result={rows,counters:[...counters].map(([key,nextNumber])=>({key,nextNumber}))};
     return {...result,fingerprint:fingerprint(result)};
@@ -254,7 +287,7 @@ export class LearnerCodeService {
       const [type]=await this.q('SELECT * FROM learner_code_types WHERE id=:id AND active',{id:dto.typeId},tx);
       if(!type)throw new BadRequestException('Loại hồ sơ chưa kích hoạt.');
       await this.q("SELECT set_config('app.learner_code_write',:permission,true)",{permission:currentPermission},tx);
-      await this.q('UPDATE admission_records SET learner_code_type_id=:type,updated_at=now() WHERE id=:id RETURNING id',{id,type:dto.typeId},tx);
+      await this.q('UPDATE admission_records SET learner_code_type_id=:type,profile_category=:name,updated_at=now() WHERE id=:id RETURNING id',{id,type:dto.typeId,name:type.name},tx);
       await this.log(actor,'type.assign',row,{typeId:dto.typeId,name:type.name,code:row.code},tx,id,dto.reason);
       return {message:'Đã cập nhật loại hồ sơ; mã hiện tại được giữ nguyên.'};
     });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import axios from 'axios';
 import LecturerPayments from '../../pages/reports/lecturerPayments';
 import { AuthSessionContext } from '../../context/AuthSession';
@@ -21,16 +21,16 @@ beforeEach(() => {
 it('keeps every row mounted for slow saves at the start, middle and end and allows other rows to save', async () => {
   const resolve = new Map();
   axios.put.mockImplementation((url) => new Promise(done => resolve.set(url.split('/').at(-1), done)));
-  mount(); await screen.findByText('Teacher 79');
+  mount(); await screen.findByText('Teacher 14');
   const table = screen.getByRole('table'), before = [...table.tBodies[0].rows], requests = axios.get.mock.calls.length;
-  for (const i of [0, 39, 79]) {
+  for (const i of [0, 7, 14]) {
     fireEvent.click(box(i));
   }
   await waitFor(() => expect(axios.put).toHaveBeenCalledTimes(3));
-  expect(table.tBodies[0].rows).toHaveLength(80);
-  expect(box(1)).toBeEnabled(); expect(box(39)).toBeDisabled();
+  expect(table.tBodies[0].rows).toHaveLength(15);
+  expect(box(1)).toBeEnabled(); expect(box(7)).toBeDisabled();
   expect(screen.getByLabelText('Tìm kiếm')).toBeEnabled();
-  for (const i of [79, 0, 39]) {
+  for (const i of [14, 0, 7]) {
     await act(async () => resolve.get(`lecturer-${i}`)({ data: { paid: true } }));
     expect(box(i)).toBeChecked();
   }
@@ -130,12 +130,13 @@ it('keeps the latest note visible when queued edits return to an earlier value',
 it('removes only the saved row under the unpaid filter and retains the filter and other DOM rows', async () => {
   data = [row(0), row(1), row(2)]; axios.put.mockResolvedValue({ data: { paid: true } });
   mount(); await screen.findByText('Teacher 2');
-  fireEvent.change(screen.getByLabelText('Trạng thái thanh toán'), { target: { value: 'unpaid' } });
+  fireEvent.mouseDown(screen.getByLabelText('Trạng thái thanh toán'));
+  fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: 'Chưa thanh toán', exact: true }));
   await waitFor(() => expect(box(2)).toBeEnabled());
   const next = box(2).closest('tr'); fireEvent.click(box(1));
   await waitFor(() => expect(screen.queryByText('Teacher 1')).not.toBeInTheDocument());
   expect(box(2).closest('tr')).toBe(next);
-  expect(screen.getByLabelText('Trạng thái thanh toán')).toHaveValue('unpaid');
+  expect(screen.getByLabelText('Trạng thái thanh toán')).toHaveTextContent('Chưa thanh toán');
 });
 
 it('does not offer bulk writes to report viewers', async () => {
@@ -154,7 +155,8 @@ it('offers only per-row payment checkboxes without a select-all or bulk toolbar'
 it('anchors the adjacent visible row and keeps horizontal position when a saved row leaves the unpaid filter', async () => {
   data = [row(0), row(1), row(2)]; axios.put.mockResolvedValue({ data: { paid: true, paymentDate: '2026-11-04', note: '', paymentVersion: 'new' } });
   mount(); await screen.findByText('Teacher 2');
-  fireEvent.change(screen.getByLabelText('Trạng thái thanh toán'), { target: { value: 'unpaid' } });
+  fireEvent.mouseDown(screen.getByLabelText('Trạng thái thanh toán'));
+  fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: 'Chưa thanh toán', exact: true }));
   await waitFor(() => expect(box(2)).toBeEnabled());
   const anchor = box(2).closest('tr'), scroll = anchor.closest('.tp-table-scroll');
   scroll.scrollLeft = 123;

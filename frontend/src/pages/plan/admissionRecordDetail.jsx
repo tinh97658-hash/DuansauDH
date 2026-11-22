@@ -2,7 +2,7 @@ import { usePermissions } from "../../features/accounts/usePermissions";
 import { formatDateTime } from "../../utils/dateFormat";
 import DateField from "../../components/DateField";
 import AdmissionEvaluationPanel from "../../features/admission/AdmissionEvaluationPanel";
-import { PROFILE_CATEGORIES, profileCategoryLabel } from "../../features/admission/profileCategories";
+import { profileCategoryLabel, profileCategoryOptions } from "../../features/admission/profileCategories";
 import { RELIGIONS } from "../../features/admission/religions";
 import { STUDY_STATUS_OPTIONS } from "../../features/admission/studyManagement";
 import AdmissionTuitionCheckbox from "../../features/admission/AdmissionTuitionCheckbox";
@@ -10,6 +10,7 @@ import LearnerScorecard from "../../features/learners/LearnerScorecard";
 import LearningTables from "../../features/learners/LearningTables";
 import StudyLeavePanel from "../../features/learners/StudyLeavePanel";
 import { RESULT_LABELS } from "../../features/exams/gradebook";
+import IntakeRoundSelect, { matchesIntakeRound } from "../../components/IntakeRoundSelect";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import axios from "axios";
@@ -212,6 +213,7 @@ const mapRecordToFormState = (data, majorList = []) => {
   return {
     id: data.id,
     academicYear: data.academicYear || String(new Date().getFullYear()),
+    intakeRound: data.intakeRound == null ? "" : String(data.intakeRound),
     code: data.code || "",
     fullName: data.fullName || "",
     lastName: data.lastName || "",
@@ -451,6 +453,20 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
   }, [isDirty]);
 
   // Fetch record & majors list
+  const [profileTypeOptions, setProfileTypeOptions] = useState([]);
+  useEffect(() => {
+    axios.get(`${API_BASE_URL}/learner-codes/options`, { withCredentials: true })
+      .then(({ data }) => {
+        if (Array.isArray(data?.types) && data.types.length) setProfileTypeOptions(data.types);
+      })
+      .catch(() => {});
+  }, []);
+
+  const profileCategoryList = useMemo(
+    () => profileCategoryOptions(profileTypeOptions, formData?.profileCategory),
+    [profileTypeOptions, formData?.profileCategory],
+  );
+
   const fetchData = useCallback(async () => {
     const request = ++profileRequest.current;
     setLoading(true);
@@ -536,6 +552,7 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
 
     const payload = {
       ...mapRecordToFormState(formData, majors),
+      intakeRound: formData.intakeRound ? Number(formData.intakeRound) : null,
       majorId: selectedMajor.id,
       majorName: selectedMajor.name,
     };
@@ -1541,14 +1558,20 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                   size="small"
                   fullWidth
                   data-dropdown-placement="bottom"
+                  disabled={record?.learnerCodeState === "official"}
                   value={formData.profileCategory}
                   onChange={(e) => setFormData((p) => ({ ...p, profileCategory: e.target.value }))}
                   sx={selectSx}
                 >
-                  {PROFILE_CATEGORIES.map((p) => (
+                  {profileCategoryList.map((p) => (
                     <MenuItem key={p} value={p}>{p}</MenuItem>
                   ))}
                 </Select>
+                {record?.learnerCodeState === "official" && (
+                  <Typography variant="caption" sx={{ display: "block", color: "#64748B", fontSize: 11, mt: 0.5 }}>
+                    Hồ sơ đã có mã chính thức; đổi loại tại mục Cấp mã học viên.
+                  </Typography>
+                )}
               </Box>
 
               <Box>
@@ -1569,6 +1592,22 @@ const AdmissionRecordDetail = ({ returnPath: defaultReturnPath = "/plan/admissio
                   ))}
                 </Select>
                 {formData.trainingLevel === "Thạc sĩ" && <Typography variant="caption" color="text.secondary">Duyệt trúng tuyển tại mục Điểm xét tuyển. Xác nhận đã nộp học phí nhập học mới chuyển sang Đang học; chưa đóng tiền muốn nghỉ thì rút hồ sơ để trở về Nộp hồ sơ đầu vào.</Typography>}
+              </Box>
+
+              <Box>
+                <Typography component="label" id="admission-detail-intake-round-label" sx={fieldLabelSx}>Đợt nhập học</Typography>
+                <IntakeRoundSelect
+                  variant="plain"
+                  id="admission-detail-intake-round"
+                  labelId="admission-detail-intake-round-label"
+                  year={formData.academicYear}
+                  value={formData.intakeRound}
+                  onChange={value => setFormData(previous => ({ ...previous, intakeRound: value }))}
+                  required
+                  configuredOnly
+                  label="Đợt nhập học"
+                  selectSx={selectSx}
+                />
               </Box>
 
               <Box>

@@ -7,7 +7,7 @@ import { AuthSessionContext } from '../../context/AuthSession';
 
 vi.mock('axios', () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), defaults: {} } }));
 vi.mock('../../components/FeatureLayout', () => ({ default: ({ children }) => <main>{children}</main> }));
-const round = { id: 'round-1', name: 'Đợt mùa thu', academicYear: '2026', majorThresholds: [{ majorId: 'major-1', cutoff: 15 }],
+const round = { id: 'round-1', name: 'Đợt mùa thu', academicYear: '2026', intakeRound: 1, majorThresholds: [{ majorId: 'major-1', cutoff: 15 }],
   rules: { direct: 2 }, regulationNo: 'QC01', decisionNo: 'QD01', decisionDate: '2026-09-01' };
 const catalog = [
   { path: '/system/training-years', actions: ['catalog.manage'] },
@@ -51,10 +51,12 @@ it('creates a shared round using a configured year', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Tạo đợt mới' }));
   const dialog = within(screen.getByRole('dialog'));
   fireEvent.change(dialog.getByLabelText('Tên đợt xét tuyển'), { target: { value: 'Đợt bổ sung' } });
+  expect(dialog.getByRole('button', { name: 'Lưu đợt xét tuyển' })).toBeDisabled();
+  fireEvent.change(dialog.getByLabelText('Số đợt'), { target: { value: '2' } });
   expect(dialog.getByLabelText('Năm tuyển sinh')).toHaveTextContent('2026');
   fireEvent.click(dialog.getByRole('button', { name: 'Lưu đợt xét tuyển' }));
   await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/plan/admission-rounds'),
-    { name: 'Đợt bổ sung', academicYear: '2026', majorThresholds: [] }, { withCredentials: true }));
+    { name: 'Đợt bổ sung', academicYear: '2026', intakeRound: 2, majorThresholds: [] }, { withCredentials: true }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 });
 it('preserves thresholds, rules and decision information when renaming a round', async () => {
@@ -74,12 +76,12 @@ it('opens the selected round in admission scoring', async () => {
   expect(await screen.findByText('?roundId=round-1')).toBeInTheDocument();
 });
 it('refreshes and paginates the round list', async () => {
-  rounds = Array.from({ length: 12 }, (_, index) => ({ ...round, id: `round-${index}`, name: `Đợt số ${index + 1}` }));
+  rounds = Array.from({ length: 17 }, (_, index) => ({ ...round, intakeRound: index + 1, id: `round-${index}`, name: `Đợt số ${index + 1}` }));
   mount();
-  await screen.findByText('Hiển thị 12 / 12 đợt xét tuyển');
-  expect(screen.queryByText('Đợt số 12')).not.toBeInTheDocument();
+  await screen.findByText('Hiển thị 17 / 17 đợt xét tuyển');
+  expect(screen.queryByText('Đợt số 17')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }));
-  expect(screen.getByText('Đợt số 12')).toBeInTheDocument();
+  expect(screen.getByText('Đợt số 17')).toBeInTheDocument();
   rounds = [{ ...round, name: 'Đợt mới cập nhật' }];
   fireEvent.click(screen.getByRole('button', { name: 'Tải lại danh sách' }));
   expect(await screen.findByText('Đợt mới cập nhật')).toBeInTheDocument();
@@ -95,4 +97,15 @@ it('hides rounds without admission page access and makes no round request', asyn
   expect(screen.queryByRole('tab', { name: 'Đợt xét tuyển' })).not.toBeInTheDocument();
   await screen.findByText('2026');
   expect(axios.get.mock.calls.some(([url]) => url.endsWith('/admission-rounds'))).toBe(false);
+});
+it('allows creating a supplementary admission round sharing the same intakeRound number in a year', async () => {
+  mount();
+  await screen.findByText(round.name);
+  fireEvent.click(screen.getByRole('button', { name: 'Tạo đợt mới' }));
+  const dialog = within(screen.getByRole('dialog'));
+  fireEvent.change(dialog.getByLabelText('Số đợt'), { target: { value: '1' } });
+  fireEvent.change(dialog.getByLabelText('Tên đợt xét tuyển'), { target: { value: 'Đợt 1 - Bổ sung' } });
+  fireEvent.click(dialog.getByRole('button', { name: 'Lưu đợt xét tuyển' }));
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/plan/admission-rounds'),
+    { name: 'Đợt 1 - Bổ sung', academicYear: '2026', intakeRound: 1, majorThresholds: [] }, { withCredentials: true }));
 });

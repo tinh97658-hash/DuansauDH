@@ -15,6 +15,7 @@ const FilterSelectField = ({ label, inputLabel = label, children, sx, selectSx, 
   >
     <Box
       component="span"
+      className="app-filter-label"
       sx={{
         color: "#526A82",
         fontSize: "10.5px",

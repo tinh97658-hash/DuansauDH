@@ -85,15 +85,17 @@ function StudyLeaveList() {
   }, [status, debouncedSearch, page, revision]);
   return <>
     <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5, bgcolor: '#FFF', borderColor: '#C6D5E1', borderRadius: '10px', boxShadow: '0 2px 6px rgba(18, 59, 98, 0.07)' }}>
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'flex-end' }}>
-      <FilterSearchField label="Tìm kiếm" inputLabel="Tìm mã hoặc tên học viên" placeholder="Tìm mã hoặc tên học viên..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} sx={{ flex: '2 1 320px', minWidth: 0, width: '100%', '@media (max-width:599px)': { flex: 'none' } }} />
-      <FilterSelectField label="Trạng thái bảo lưu" value={status} onChange={e => { setStatus(e.target.value); setPage(0); }} sx={{ flex: '1 1 240px', minWidth: 0, width: '100%', '@media (max-width:599px)': { flex: 'none' } }}>
+      <Stack className="app-filter-toolbar" direction="row" gap={1.5} alignItems="flex-end">
+      <FilterSearchField label="Tìm kiếm" inputLabel="Tìm mã hoặc tên học viên" placeholder="Tìm mã hoặc tên học viên..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} sx={{ flex: '2 1 260px', minWidth: 200 }} />
+      <FilterSelectField label="Trạng thái bảo lưu" value={status} onChange={e => { setStatus(e.target.value); setPage(0); }} sx={{ flex: '1 1 200px', minWidth: 165 }}>
         <MenuItem value="">Tất cả</MenuItem>{Object.entries(leaveStatusLabels).map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
         <MenuItem value="extension_pending">Có gia hạn chờ duyệt</MenuItem>
       </FilterSelectField>
-      {can('studyleave.request') && <Button variant="contained" sx={{ flexShrink: 0, whiteSpace: 'nowrap', minHeight: 38 }}
-        onClick={() => {  setCreating(true); }}>Tạo yêu cầu bảo lưu</Button>}
-      <InlineReportExport height={38} />
+      <Stack direction="row" gap={1} alignItems="flex-end" sx={{ flexShrink: 0, ml: 'auto' }}>
+        {can('studyleave.request') && <Button variant="contained" sx={{ flexShrink: 0, whiteSpace: 'nowrap', minHeight: 38 }}
+          onClick={() => {  setCreating(true); }}>Tạo yêu cầu bảo lưu</Button>}
+        <InlineReportExport height={38} />
+      </Stack>
       </Stack>
     </Paper>
     {creating && <StudyLeaveRequestDialog onClose={() => setCreating(false)} onCreated={learner => {

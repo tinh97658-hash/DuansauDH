@@ -68,7 +68,8 @@ describe('Scoped scheduling responses', () => {
   it('redacts cross-group JSON from shared offering and session responses', async () => {
     const { service, courseOfferings, teachingSessions } = buildService();
     const shared = {
-      id: 'shared', subject: { program: 'masters' }, groupLinks: [{ classGroupId: 'owned', participantIds: ['admission:hidden'] }],
+      id: 'shared', subject: { program: 'masters' }, groupLinks: [{ classGroupId: 'owned', participantIds: ['admission:hidden'],
+        classGroup: { id: 'owned', code: 'CNTT 2026.2.1', name: 'CNTT 2026.2.1', academicYear: '2026', intakeRound: 2 } }],
       gradebookSnapshot: { learners: ['outside-group'] }, participantNotes: [{ participantId: 'outside', note: 'private' }],
     };
     courseOfferings.findAll.mockResolvedValue([shared]);
@@ -84,6 +85,7 @@ describe('Scoped scheduling responses', () => {
         expect(value).not.toHaveProperty('participantNotes');
         expect(value.groupLinks[0]).not.toHaveProperty('participantIds');
         expect(value.groupLinks[0].classGroupId).toBe('owned');
+        expect(value.groupLinks[0].classGroup.intakeRound).toBe(2);
       }
     });
     expect(shared.participantNotes).toHaveLength(1);

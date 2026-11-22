@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
-import { Op, QueryTypes, Transaction } from "sequelize";
+import { col, fn, Op, QueryTypes, Transaction, UniqueConstraintError, where } from "sequelize";
 import { hasPaidAdmissionTuition } from "./learner-study-status.js";
 import { returnUnpaidToApplication } from "./unpaid-enrollment.js";
 import { Sequelize } from "sequelize-typescript";
@@ -30,20 +30,84 @@ export class AdmissionEvaluationService {
   }
   async saveRound(id: string | undefined, dto: SaveAdmissionRoundDto) {
     return this.sequelize.transaction(async (transaction) => {
+      await this.sequelize.query('SELECT pg_advisory_xact_lock(21026)', { transaction });
+      await this.sequelize.query('SELECT pg_advisory_xact_lock(714062)', { transaction });
+      if (dto.intakeRound === null) throw new BadRequestException('Không thể xóa số đợt đã khai báo.');
+      const normalizedName = dto.name.trim();
+      if (!normalizedName) throw new BadRequestException("Tên đợt không được để trống.");
+      if (typeof this.rounds?.findOne === "function") {
+        const duplicateName = await this.rounds.findOne({
+          where: {
+            academicYear: dto.academicYear,
+            [Op.and]: [where(fn("lower", fn("btrim", col("name"))), normalizedName.toLowerCase())],
+            ...(id ? { id: { [Op.ne]: id } } : {}),
+          },
+          transaction,
+        });
+        if (duplicateName) throw new ConflictException("Tên đợt xét tuyển đã tồn tại trong năm này.");
+      }
       const majorIds = dto.majorThresholds.map((row) => row.majorId);
       if (new Set(majorIds).size !== majorIds.length) throw new BadRequestException("Không được nhập trùng ngành trong một đợt.");
       const majors = await this.majors.findAll({ where: { id: { [Op.in]: majorIds }, program: "masters", active: true }, transaction });
       if (majors.length !== majorIds.length) throw new BadRequestException("Chọn các chuyên ngành thạc sĩ đang hoạt động.");
-      if (!dto.name.trim()) throw new BadRequestException("Tên đợt không được để trống.");
-      const payload = { ...dto, majorThresholds: [...dto.majorThresholds].sort((a, b) => a.majorId.localeCompare(b.majorId)).map((row) => ({ majorId: row.majorId, cutoff: row.cutoff ?? null })), name: dto.name.trim(), regulationNo: dto.regulationNo?.trim() || "", decisionNo: dto.decisionNo?.trim() || null, decisionDate: dto.decisionDate || null, rules: { ...(dto.rules || DEFAULT_ADMISSION_RULES) } };
-      if (!id) return this.rounds.create(payload as any, { transaction });
-      const round = await this.rounds.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
-      if (!round) throw new NotFoundException("Không tìm thấy đợt xét tuyển.");
-      const decided = await this.evaluations.count({ where: { roundId: id, decision: { [Op.ne]: "pending" } }, transaction });
-      if (decided) throw new ConflictException("Đợt đã có hồ sơ được duyệt. Mở lại các kết quả trước khi sửa cấu hình.");
-      const assigned = await this.evaluations.count({ where: { roundId: id }, transaction });
-      if (assigned && (round.academicYear !== dto.academicYear || !isDeepStrictEqual(round.rules, payload.rules))) throw new ConflictException("Đợt đã có hồ sơ: không thể đổi năm hoặc bảng quy đổi.");
-      return round.update(payload as any, { transaction });
+      const payload = { ...dto, majorThresholds: [...dto.majorThresholds].sort((a, b) => a.majorId.localeCompare(b.majorId)).map((row) => ({ majorId: row.majorId, cutoff: row.cutoff ?? null })), name: normalizedName, regulationNo: dto.regulationNo?.trim() || "", decisionNo: dto.decisionNo?.trim() || null, decisionDate: dto.decisionDate || null, rules: { ...(dto.rules || DEFAULT_ADMISSION_RULES) } };
+      const persist = async () => {
+        if (!id) return this.rounds.create(payload as any, { transaction });
+        const round = await this.rounds.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+        if (!round) throw new NotFoundException("Không tìm thấy đợt xét tuyển.");
+        const normalizeThresholds = (rows: any[] = []) => [...rows]
+          .map((row: any) => ({ majorId: row.majorId, cutoff: row.cutoff ?? null }))
+          .sort((a, b) => String(a.majorId).localeCompare(String(b.majorId)));
+        const numberingLegacyRound = round.intakeRound == null && dto.intakeRound != null
+          && round.academicYear === payload.academicYear && round.name === payload.name
+          && (round.regulationNo || '') === payload.regulationNo
+          && (round.decisionNo || null) === payload.decisionNo && (round.decisionDate || null) === payload.decisionDate
+          && isDeepStrictEqual(round.rules || DEFAULT_ADMISSION_RULES, payload.rules)
+          && isDeepStrictEqual(normalizeThresholds(round.majorThresholds), payload.majorThresholds);
+        const decided = await this.evaluations.count({ where: { roundId: id, decision: { [Op.ne]: "pending" } }, transaction });
+        if (decided && !numberingLegacyRound) throw new ConflictException("Đợt đã có hồ sơ được duyệt. Mở lại các kết quả trước khi sửa cấu hình.");
+        const assigned = await this.evaluations.count({ where: { roundId: id }, transaction });
+        if (assigned && (round.academicYear !== dto.academicYear || !isDeepStrictEqual(round.rules || DEFAULT_ADMISSION_RULES, payload.rules))) throw new ConflictException("Đợt đã có hồ sơ: không thể đổi năm hoặc bảng quy đổi.");
+        if (round.intakeRound != null && (round.academicYear !== dto.academicYear || (dto.intakeRound != null && dto.intakeRound !== round.intakeRound))) {
+          const [used]: any = await this.sequelize.query(`
+            SELECT 1 FROM admission_evaluations WHERE round_id=:id
+            UNION ALL
+            SELECT 1 FROM (
+              SELECT 1 FROM admission_records WHERE academic_year=:year AND intake_round=:round
+              UNION ALL
+              SELECT 1 FROM class_groups WHERE academic_year=:year AND intake_round=:round
+            ) refs
+            WHERE NOT EXISTS (
+              SELECT 1 FROM admission_rounds other
+              WHERE other.id<>:id AND other.academic_year=:year AND other.intake_round=:round
+            )
+            LIMIT 1`,
+            { replacements: { id, year: round.academicYear, round: round.intakeRound }, transaction });
+          if (assigned || used.length) throw new ConflictException('Đợt đã có hồ sơ hoặc lớp; không thể đổi năm hoặc số đợt.');
+        }
+        if (assigned && round.intakeRound == null && dto.intakeRound != null) {
+          const [conflicts]: any = await this.sequelize.query(`SELECT 1 FROM admission_records r JOIN admission_evaluations e ON e.admission_record_id=r.id
+            WHERE e.round_id=:id AND (r.academic_year IS DISTINCT FROM :year OR (r.intake_round IS NOT NULL AND r.intake_round<>:n))
+            UNION ALL
+            SELECT 1 FROM admission_evaluations e JOIN admission_records r ON r.id=e.admission_record_id
+              JOIN class_group_members m ON m.admission_record_id=r.id OR m.student_id=r.student_id
+              JOIN class_groups g ON g.id=m.class_group_id AND g.program='masters'
+            WHERE e.round_id=:id AND (g.academic_year IS DISTINCT FROM :year OR g.intake_round IS DISTINCT FROM :n)
+            LIMIT 1`,
+            { replacements: { id, year: dto.academicYear, n: dto.intakeRound }, transaction });
+          if (conflicts.length) throw new ConflictException('Hồ sơ hoặc lớp đang khác năm hoặc đợt; cần đối soát trước khi đánh số đợt.');
+          await this.sequelize.query(`UPDATE admission_records r SET intake_round=:n FROM admission_evaluations e
+            WHERE e.admission_record_id=r.id AND e.round_id=:id AND r.academic_year=:year AND r.intake_round IS NULL`,
+            { replacements: { n: dto.intakeRound, id, year: dto.academicYear }, transaction });
+        }
+        return round.update(payload as any, { transaction });
+      };
+      try {
+        return await persist();
+      } catch (error) {
+        if (error instanceof UniqueConstraintError) throw new ConflictException("Tên đợt xét tuyển đã tồn tại trong năm này.");
+        throw error;
+      }
     });
   }
   private requireVersion(row: AdmissionEvaluation | null, version: number) {
@@ -93,6 +157,7 @@ export class AdmissionEvaluationService {
     const record = await this.records.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
     if (!record) throw new NotFoundException("Không tìm thấy hồ sơ.");
     if (record.trainingLevel !== "Thạc sĩ" || record.academicYear !== round.academicYear) throw new BadRequestException("Đợt xét tuyển phải cùng năm tuyển sinh với hồ sơ thạc sĩ.");
+    if (record.intakeRound != null && record.intakeRound !== round.intakeRound) throw new ConflictException('Hồ sơ thuộc đợt khác. Hãy kiểm tra lại đợt của hồ sơ.');
     let evaluation = await this.evaluations.findOne({ where: { admissionRecordId: id }, transaction, lock: transaction.LOCK.UPDATE });
     if (scoreOnly && evaluation && evaluation.roundId !== round.id) throw new ConflictException("Hồ sơ đã thuộc đợt khác. Tải lại bảng điểm.");
     this.requireVersion(evaluation, dto.version);
@@ -102,6 +167,7 @@ export class AdmissionEvaluationService {
     const payload = { roundId: round.id, inputs, recordSnapshot: admissionRecordSnapshot(record), version: dto.version + 1 };
     if (evaluation) await evaluation.update(payload as any, { transaction });
     else evaluation = await this.evaluations.create({ ...payload, admissionRecordId: id, decision: "pending" } as any, { transaction });
+    if (round.intakeRound != null && record.intakeRound == null) await record.update({ intakeRound: round.intakeRound }, { transaction });
     await this.appendHistory(record, evaluation, round, "saved", actor, {}, transaction);
     return this.view(record, evaluation, round);
   }
@@ -118,6 +184,7 @@ export class AdmissionEvaluationService {
     const rows = records.flatMap((record) => {
       const evaluation = evaluationMap.get(record.id);
       // Hồ sơ đã gán đợt khác hoặc trúng tuyển theo dữ liệu cũ cần xử lý ở luồng riêng.
+      if (record.intakeRound != null && record.intakeRound !== round.intakeRound) return [];
       if (evaluation && evaluation.roundId !== roundId) return [];
       if (!evaluation && (record.status === "admitted" || record.status === "approved" || ["Đã trúng tuyển", "Đang học"].includes(record.studyStatus || ""))) return [];
       const view = evaluation ? this.view(record, evaluation, round) : {
@@ -272,6 +339,26 @@ export class AdmissionEvaluationService {
   }
   async guardRecordUpdate(record: AdmissionRecord | null, dto: any, transaction?: Transaction) {
     if ((record?.trainingLevel || dto.trainingLevel || "Thạc sĩ") !== "Thạc sĩ") return;
+    const nextRound = dto.intakeRound !== undefined ? dto.intakeRound : record?.intakeRound;
+    const nextYear = dto.academicYear !== undefined ? dto.academicYear : (record ? record.academicYear : "2026");
+    const scopeChanged = !record || (dto.intakeRound !== undefined && dto.intakeRound !== record.intakeRound)
+      || (dto.academicYear !== undefined && dto.academicYear !== record.academicYear);
+    if (scopeChanged && nextRound != null && (!nextYear || !await this.rounds.findOne({ where: { academicYear: nextYear, intakeRound: nextRound }, transaction }))) {
+      throw new BadRequestException('Đợt chưa được khai báo trong năm nhập học đã chọn.');
+    }
+    if (record && scopeChanged) {
+      if (record.learnerCodeState === 'official') throw new ConflictException('Hồ sơ đã cấp mã học viên chính thức; không thể đổi năm hoặc đợt.');
+      const [members]: any = await this.sequelize.query(`SELECT 1 FROM class_group_members m JOIN class_groups g ON g.id=m.class_group_id
+        WHERE (m.admission_record_id=:id OR m.student_id=:studentId) AND g.program='masters'
+        AND (g.academic_year IS DISTINCT FROM :year OR g.intake_round IS DISTINCT FROM :round) LIMIT 1`,
+        { replacements: { id: record.id, studentId: record.studentId || null, year: nextYear || null, round: nextRound ?? null }, transaction });
+      if (members.length) throw new ConflictException('Hồ sơ đã được xếp lớp khác năm hoặc đợt. Cần xử lý xếp lớp trước.');
+      const existing = await this.evaluations.findOne({ where: { admissionRecordId: record.id }, transaction });
+      if (existing) {
+        const assignedRound = await this.rounds.findByPk(existing.roundId, { transaction });
+        if (assignedRound && (assignedRound.academicYear !== nextYear || assignedRound.intakeRound !== nextRound)) throw new ConflictException('Hồ sơ đã có kết quả xét tuyển ở đợt khác. Cần đối soát kết quả trước khi đổi đợt.');
+      }
+    }
     const startsAdmission = dto.status === "admitted"
       || (dto.status === "approved" && record?.status !== "approved")
       || (["Đã trúng tuyển", "Đang học"].includes(dto.studyStatus) && !["Đã trúng tuyển", "Đang học"].includes(record?.studyStatus || ""));

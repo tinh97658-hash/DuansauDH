@@ -19,11 +19,11 @@ const majors = [
   { id: "m2", name: "Khoa học dữ liệu", disciplineId: "d1", discipline: { id: "d1", name: "Công nghệ thông tin" } },
   { id: "m3", name: "Kế toán", disciplineId: "d2", discipline: { id: "d2", name: "Kinh tế" } },
 ];
-const candidate = (id, fullName, majorId = "m1") => ({ id, code: id, fullName, majorId, academicYear: year, studyStatus: "Đã trúng tuyển", tuitionPaid: false });
+const candidate = (id, fullName, majorId = "m1") => ({ id, code: id, fullName, majorId, academicYear: year, intakeRound: 1, studyStatus: "Đã trúng tuyển", tuitionPaid: false });
 const first = candidate("a", "Nguyễn Văn An");
 const second = candidate("b", "Trần Thị Bình");
 const member = { id: "member-x", admissionRecord: { id: "x", fullName: "Lê Văn X", code: "OLD", extraData: { tuitionPayment: { paid: true } } } };
-const baseGroup = { id: "g1", code: "HTTT.1", majorId: "m1", academicYear: year, program: "masters", status: "open", maxStudents: 4, memberCount: 1, members: [member] };
+const baseGroup = { id: "g1", code: "HTTT.1", majorId: "m1", academicYear: year, intakeRound: 1, program: "masters", status: "open", maxStudents: 4, memberCount: 1, members: [member] };
 const assignmentUrl = `/?year=${year}&disciplineId=d1&majorId=m1&groupId=g1`;
 let serverGroups;
 let serverStudents;
@@ -666,5 +666,18 @@ describe("AssignClassGroups summary and assignment", () => {
       fireEvent.keyDown(divider, { key: "ArrowRight" });
       expect(divider).toHaveAttribute("aria-valuenow", "32");
     } finally { window.PointerEvent = originalPointerEvent; }
+  });
+
+  it("auto-target prefers an open group with space matching an unassigned student's intake round", async () => {
+    serverGroups = [
+      { ...baseGroup, id: "g-r1", code: "CNTT 1", intakeRound: 1, members: [], memberCount: 0 },
+      { ...baseGroup, id: "g-r2", code: "CNTT 2", intakeRound: 2, members: [], memberCount: 0 },
+    ];
+    serverStudents = [{ ...candidate("s2", "Trần Đợt 2"), intakeRound: 2 }];
+    await openPage(`/?year=${year}&disciplineId=d1&majorId=m1`);
+    await waitFor(() => {
+      expect(new URLSearchParams(screen.getByTestId("url").textContent).get("groupId")).toBe("g-r2");
+    });
+    expect(await screen.findByText("Trần Đợt 2")).toBeInTheDocument();
   });
 });

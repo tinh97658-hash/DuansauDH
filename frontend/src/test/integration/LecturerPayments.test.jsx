@@ -17,6 +17,10 @@ let paid, paymentDate, note, paymentVersion;
 const row = { courseOfferingId: 'offering-1', lecturerId: 'lecturer-1', lecturerName: 'Nguyễn An', offeringName: 'Lớp CNTT', sessionCount: 3, completedAt: '2026-11-02T18:00:00Z', paymentDate: null, note: '', paymentVersion: null };
 const mount = (permissions = ['reports.view', 'reports.payments.manage', 'reports.export'], readOnly = false) => render(
   <AuthSessionContext.Provider value={{ user: {}, access: { permissions, groupScope: { readOnly } } }}><LecturerPayments /></AuthSessionContext.Provider>);
+const chooseFilter = (label, optionName) => {
+  fireEvent.mouseDown(screen.getByLabelText(label));
+  fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: optionName, exact: true }));
+};
 
 beforeEach(() => {
   vi.clearAllMocks(); paid = false; paymentDate = null; note = ''; paymentVersion = null;
@@ -76,9 +80,9 @@ it('passes completion dates, unit, lecturer, payment status and search together'
   mount(); await screen.findByRole('checkbox', { name: /^Đã thanh toán:/ });
   fireEvent.change(screen.getByLabelText('Từ ngày'), { target: { value: '2026-11-01' } });
   fireEvent.change(screen.getByLabelText('Đến ngày'), { target: { value: '2026-11-03' } });
-  fireEvent.change(screen.getByLabelText('Đơn vị'), { target: { value: 'unit-1' } });
-  fireEvent.change(screen.getByLabelText('Giảng viên'), { target: { value: 'lecturer-1' } });
-  fireEvent.change(screen.getByLabelText('Trạng thái thanh toán'), { target: { value: 'unpaid' } });
+  chooseFilter('Đơn vị', 'Khoa CNTT');
+  chooseFilter('Giảng viên', 'Nguyễn An');
+  chooseFilter('Trạng thái thanh toán', 'Chưa thanh toán');
   fireEvent.change(screen.getByLabelText('Tìm kiếm'), { target: { value: 'CNTT' } });
   await waitFor(() => expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/lecturer-payments$/), {
     params: { from: '2026-11-01', to: '2026-11-03', unitId: 'unit-1', lecturerId: 'lecturer-1', paymentStatus: 'unpaid', search: 'CNTT' }, withCredentials: true,
@@ -232,11 +236,13 @@ it('defaults to all time and automatically shows an empty result for a catalog u
   expect(screen.getByLabelText('Từ ngày')).not.toHaveAttribute('title');
   expect(screen.getByLabelText('Đến ngày')).not.toHaveAttribute('title');
   expect(screen.queryByRole('button', { name: 'Khoảng ngày hoàn thành' })).not.toBeInTheDocument();
-  expect(screen.getByRole('option', { name: 'Đơn vị chưa có giảng viên' })).toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText('Giảng viên'), { target: { value: 'lecturer-1' } });
-  fireEvent.change(screen.getByLabelText('Đơn vị'), { target: { value: 'unit-empty' } });
+  fireEvent.mouseDown(screen.getByLabelText('Đơn vị'));
+  expect(within(screen.getByRole('listbox')).getByRole('option', { name: 'Đơn vị chưa có giảng viên', exact: true })).toBeInTheDocument();
+  fireEvent.click(document.querySelector('.MuiBackdrop-root'));
+  chooseFilter('Giảng viên', 'Nguyễn An');
+  chooseFilter('Đơn vị', 'Đơn vị chưa có giảng viên');
   await screen.findByText('Không có dữ liệu phù hợp.');
-  expect(screen.getByLabelText('Giảng viên')).toHaveValue('');
+  expect(screen.getByLabelText('Giảng viên')).toHaveTextContent('Tất cả');
   expect(axios.get).toHaveBeenLastCalledWith(expect.stringMatching(/lecturer-payments$/), {
     params: { unitId: 'unit-empty', paymentStatus: 'all' }, withCredentials: true,
   });

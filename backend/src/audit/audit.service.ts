@@ -77,7 +77,7 @@ export class AuditService {
 
     const { rows, count } = await this.logs.findAndCountAll({
       where,
-      order: [["createdAt", "DESC"]],
+      order: [["createdAt", "DESC"], ["id", "DESC"]],
       limit: pageSize,
       offset: (page - 1) * pageSize,
       include: [

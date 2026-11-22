@@ -15,6 +15,7 @@ import { StudentsService } from "../students/students.service.js";
 import { AuthService } from "./auth.service.js";
 import { LocalAuthGuard } from "./auth.guards.js";
 import { LogoutOriginGuard } from "./logout-origin.guard.js";
+import { isSessionCookieSecure } from "./session-cookie.js";
 
 @Controller("user")
 export class UserController {
@@ -85,7 +86,7 @@ export class UserController {
     }
     response.clearCookie("pgsms.sid", {
       path: "/", httpOnly: true, sameSite: "lax",
-      secure: this.config.get<boolean>("SESSION_COOKIE_SECURE") ?? this.config.get("NODE_ENV") === "production",
+      secure: isSessionCookieSecure(this.config),
     });
     if (user instanceof Staff) await this.auth.recordLogout(user);
     return response.status(204).send();

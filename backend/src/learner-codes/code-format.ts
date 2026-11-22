@@ -63,7 +63,9 @@ export function codeCounterMaximum(key:string, types:any[], rules:any[]) {
   if(!Array.isArray(parts)||!Object.hasOwn(lengths,parts[0])||parts.length!==lengths[parts[0]])throw new BadRequestException('Khóa bộ đếm không hợp lệ.');
   const [scope,program,typeId]=parts;
   const type=types.find(row=>row.id===typeId&&row.active);
-  if(!type||(type.key!=='regular'&&!type.letter))throw new BadRequestException('Loại hồ sơ chưa có cấu hình cấp mã hợp lệ.');
+  const isSpecial=type?(type.uses_special_code??Boolean(type.letter)):false;
+  if(!type||(isSpecial&&!type.letter))throw new BadRequestException('Loại hồ sơ chưa có cấu hình cấp mã hợp lệ.');
+  const hasLetter=isSpecial?type.letter:null;
   const input:any={program,type_id:typeId};
   if(scope==='year')input.academic_year=parts[3];
   if(['major_year','major_round','class'].includes(scope)){input.major_id=parts[3];input.academic_year=parts[4];}
@@ -78,7 +80,7 @@ export function codeCounterMaximum(key:string, types:any[], rules:any[]) {
   if(!candidates.length)throw new BadRequestException('Bộ đếm không còn quy tắc đang áp dụng.');
   return Math.min(...candidates.map(rule=>{
     validateParts(rule.parts);
-    const width=(rule.parts.find((part:CodePart)=>part.kind==='sequence').width||3)-(type.letter?1:0);
+    const width=(rule.parts.find((part:CodePart)=>part.kind==='sequence').width||3)-(hasLetter?1:0);
     if(width<1)throw new BadRequestException('Đoạn số tự tăng không còn đủ độ dài.');
     return 10**width-1;
   }));

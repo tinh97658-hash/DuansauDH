@@ -57,6 +57,15 @@ export class SystemService {
   ) {}
 
   // ===== Các chức năng chưa triển khai =====
+  async listIntakeRounds() {
+    const [rows] = await this.sequelize.query(`SELECT academic_year AS "academicYear", intake_round AS "intakeRound",
+      max(name) FILTER (WHERE configured) AS name, bool_or(configured) AS configured FROM (
+        SELECT academic_year,intake_round,name,true AS configured FROM admission_rounds WHERE intake_round IS NOT NULL
+        UNION ALL SELECT academic_year,intake_round,NULL,false FROM class_groups
+        UNION ALL SELECT academic_year,intake_round,NULL,false FROM admission_records WHERE intake_round IS NOT NULL
+      ) rounds GROUP BY academic_year,intake_round ORDER BY academic_year DESC,intake_round ASC`);
+    return rows;
+  }
   async listTrainingYears() { return this.trainingYears.findAll({ order: [["name", "ASC"]] }); }
   async saveTrainingYear(dto: TrainingYearDto | UpdateTrainingYearDto, id?: string) {
     const row = id ? await this.trainingYears.findByPk(id) : null;

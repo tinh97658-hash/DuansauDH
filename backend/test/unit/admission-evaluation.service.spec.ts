@@ -21,6 +21,50 @@ function setup() {
   return { service, record, records, rounds, majors, round, evaluation, evaluations, history, tx, decision, db };
 }
 describe("Duyệt hồ sơ đầu vào", () => {
+  it('rejects evaluating a record in a different intake round', async () => {
+    const f = setup(); f.record.intakeRound = 2; f.round.intakeRound = 1;
+    await expect(f.service.save('record', { roundId: 'round', version: 1, inputs: {} }, {})).rejects.toThrow('đợt khác');
+    expect(f.evaluation.update).not.toHaveBeenCalled();
+  });
+  it('guards intakeRound lookup when academicYear is omitted or empty on record creation', async () => {
+    const f = setup();
+    (f.rounds as any).findOne = jest.fn().mockResolvedValue(f.round);
+    await expect(f.service.guardRecordUpdate(null, { intakeRound: 2 })).resolves.toBeUndefined();
+    expect((f.rounds as any).findOne).toHaveBeenCalledWith(expect.objectContaining({ where: { academicYear: '2026', intakeRound: 2 } }));
+    ((f.rounds as any).findOne as jest.Mock).mockClear();
+    await expect(f.service.guardRecordUpdate(null, { academicYear: '', intakeRound: 2 })).rejects.toThrow('Đợt chưa được khai báo');
+    expect((f.rounds as any).findOne).not.toHaveBeenCalled();
+  });
+  it('allows numbering a legacy round with unsorted thresholds and rejects conflicting class groups', async () => {
+    const f = setup();
+    const legacyRound: any = {
+      id: 'round-legacy', name: 'Đợt cũ', academicYear: '2026', intakeRound: null,
+      regulationNo: '', decisionNo: null, decisionDate: null, rules: null,
+      majorThresholds: [{ majorId: 'major-2', cutoff: 16 }, { majorId: 'major-1', cutoff: 15 }],
+      update: jest.fn(async (values) => Object.assign(legacyRound, values)),
+    };
+    f.rounds.findByPk.mockResolvedValue(legacyRound);
+    (f.rounds as any).findOne = jest.fn().mockResolvedValue(null);
+    f.majors.findAll.mockResolvedValue([{ id: 'major-1' }, { id: 'major-2' }]);
+    f.evaluations.count.mockResolvedValue(1);
+    f.db.query.mockResolvedValue([[]]);
+    await f.service.saveRound('round-legacy', {
+      name: 'Đợt cũ', academicYear: '2026', intakeRound: 2,
+      majorThresholds: [{ majorId: 'major-1', cutoff: 15 }, { majorId: 'major-2', cutoff: 16 }],
+    });
+    expect(legacyRound.update).toHaveBeenCalledWith(expect.objectContaining({ intakeRound: 2 }), { transaction: f.tx });
+    legacyRound.intakeRound = null;
+    f.db.query.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([[{ '?column?': 1 }]]);
+    await expect(f.service.saveRound('round-legacy', {
+      name: 'Đợt cũ', academicYear: '2026', intakeRound: 2,
+      majorThresholds: [{ majorId: 'major-1', cutoff: 15 }, { majorId: 'major-2', cutoff: 16 }],
+    })).rejects.toThrow('Hồ sơ hoặc lớp đang khác năm hoặc đợt');
+  });
+  it('excludes another intake round from ranking even before any evaluation is saved', async () => {
+    const f = setup(); f.record.intakeRound = 2; f.round.intakeRound = 1;
+    f.evaluations.findAll.mockResolvedValue([]);
+    expect((await f.service.ranking('round')).rows).toEqual([]);
+  });
   it.each([{official:true,assigned:false},{official:false,assigned:true}])('chặn mở lại hồ sơ đã cấp mã hoặc phân lớp: %o',async({official,assigned})=>{
     const f=setup();Object.assign(f.record,{status:'approved',studyStatus:'Đã trúng tuyển',learnerCodeState:official?'official':'provisional'});
     f.evaluation.decision='admitted';f.db.query.mockResolvedValue([{assigned}]);
@@ -295,5 +339,22 @@ describe("Nhập điểm và duyệt danh sách", () => {
     const preview = await service.preview("round");
     await service.confirmBatch("round", { previewToken: preview.previewToken, admissionRecordIds: preview.rows.map((row) => row.admissionRecordId) }, {});
     expect(record.studyStatus).toBe("Đã trúng tuyển"); expect(secondRecord.studyStatus).toBe("Đã trúng tuyển");
+  });
+  it("cho phép tạo đợt xét tuyển bổ sung dùng chung số đợt trong năm nhưng chặn trùng tên đợt", async () => {
+    const f = setup();
+    (f.rounds as any).findOne = jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "round-1", name: "Đợt 1 - Bổ sung" });
+    const created = await f.service.saveRound(undefined, {
+      name: "Đợt 1 - Bổ sung",
+      academicYear: "2026",
+      intakeRound: 1,
+      majorThresholds: [{ majorId: "major", cutoff: 15 }],
+    });
+    expect(created).toMatchObject({ name: "Đợt 1 - Bổ sung", academicYear: "2026", intakeRound: 1 });
+    await expect(f.service.saveRound(undefined, {
+      name: "Đợt 1 - Bổ sung",
+      academicYear: "2026",
+      intakeRound: 1,
+      majorThresholds: [{ majorId: "major", cutoff: 15 }],
+    })).rejects.toThrow("Tên đợt xét tuyển đã tồn tại trong năm này.");
   });
 });

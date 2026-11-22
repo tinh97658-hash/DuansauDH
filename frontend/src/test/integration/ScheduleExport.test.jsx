@@ -11,8 +11,12 @@ import SchedulePrintTemplate from "../../features/scheduling/SchedulePrintTempla
 import { buildExamScheduleDocument } from "../../features/exams/examScheduleExport";
 import { buildScheduleDocument, createScheduleExcel, createScheduleWord, exportSchedule, readSchedulePreview, readScheduleReturnView, scheduleDocumentColumns, scheduleDocumentMetadata, scheduleExportRows } from "../../features/scheduling/scheduleExport";
 
-jest.mock("axios");
-jest.mock("@mui/material", () => ({ Dialog: ({ children, open }) => open ? <div>{children}</div> : null, Tooltip: ({ children }) => children }));
+import { vi } from "vitest";
+vi.mock("axios");
+vi.mock("@mui/material", async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, Dialog: ({ children, open }) => open ? <div>{children}</div> : null, Tooltip: ({ children }) => children };
+});
 const snapshot = {
   week: "2026-10-05", end: "2026-10-11", discipline: "Công nghệ thông tin",
   major: "Khoa học máy tính", year: "2026",

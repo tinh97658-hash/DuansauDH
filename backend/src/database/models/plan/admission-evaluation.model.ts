@@ -6,6 +6,7 @@ export class AdmissionRound extends Model {
   @Default(DataType.UUIDV4) @Column({ type: DataType.UUID, primaryKey: true }) declare id: string;
   @Column({ type: DataType.STRING(200), allowNull: false }) declare name: string;
   @Column({ type: DataType.STRING(10), allowNull: false }) declare academicYear: string;
+  @Column(DataType.INTEGER) declare intakeRound: number | null;
   @Default([]) @Column({ type: DataType.JSONB, allowNull: false }) declare majorThresholds: { majorId: string; cutoff: number | null }[];
   @Column({ type: DataType.STRING(300), allowNull: false }) declare regulationNo: string;
   @Column(DataType.STRING(300)) declare decisionNo: string | null;

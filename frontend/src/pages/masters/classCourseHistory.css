@@ -16,9 +16,11 @@
 .tp-picker-grade-warning { display:inline-flex; align-items:center; gap:4px; color:#b27800; font-size:12px; }
 .tp-picker-grade-warning svg { width:17px; height:17px; }
 @media (max-width:600px) { .tp-offering-picker .tp-offering-option { align-items:flex-start; flex-direction:column; gap:10px; } .tp-offering-progress { justify-items:start; text-align:left; } }
-.tp-filters { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)) minmax(220px,1.35fr) auto; gap:16px; padding:11px 16px 13px; border:1px solid #c6d5e1; border-radius:10px; background:#fff; box-shadow:0 2px 6px rgba(18,59,98,.07); margin-bottom:12px; }
+.tp-filters { display:flex; flex-direction:column; padding:12px 16px; border:1px solid #c6d5e1; border-radius:10px; background:#fff; box-shadow:0 2px 6px rgba(18,59,98,.07); margin-bottom:12px; }
+.tp-filters-divider { border-bottom:1px solid #e4edf4; margin:10px 0; }
+.tp-filters-row > :is(label,.tp-filter) { flex:1 1 155px; min-width:140px; }
 .tp-filter { display:grid; gap:6px; min-width:0; margin:0; }
-.tp-filter > span { color:#526a82; font-size:10.5px; font-weight:700; letter-spacing:.025em; text-transform:uppercase; }
+.tp-filter > span { color:#526a82; font-size:10.5px; font-weight:700; letter-spacing:.025em; line-height:1.2; text-transform:uppercase; }
 .tp-filter select,.tp-search,.tp-year-trigger { width:100%; height:38px; border:1px solid #b9cbd8; border-radius:7px; background:#fff; transition:border-color .15s ease,box-shadow .15s ease; }
 .tp-filter select,.tp-search input { font:inherit; color:#12263f; text-align:left; }
 .tp-filter select { padding:0 34px 0 13px; min-width:0; appearance:none; -webkit-appearance:none; }
@@ -31,7 +33,7 @@
 .tp-filter select:focus-visible,.tp-search:focus-within,.tp-year-trigger:focus-visible { outline:0; border-color:#0b7fa3; box-shadow:0 0 0 3px rgba(11,127,163,.13); }
 .tp-year-filter { position:relative; }
 .tp-select-filter { position:relative; }
-.tp-year-trigger { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:0 34px 0 13px; color:#12263f; font:inherit; text-align:left; cursor:pointer; }
+.tp-year-trigger { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:0 34px 0 13px; color:#12263f; font-size:12px; font-family:inherit; text-align:left; cursor:pointer; }
 .tp-year-trigger > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .tp-year-trigger:disabled { cursor:default; }
 .tp-year-menu { position:absolute; z-index:20; top:calc(100% + 5px); right:0; left:0; overflow-x:hidden; overflow-y:auto; max-height:280px; padding:5px; border:1px solid #b9cbd8; border-radius:7px; background:#fff; box-shadow:0 8px 20px rgba(18,59,98,.16); }

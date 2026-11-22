@@ -88,7 +88,7 @@ export class SchedulingService {
   async classGroupOptions(majorId?: string) {
     const groups = await this.classGroups.findAll({
       where: { program: "masters", ...(majorId ? { majorId } : {}) },
-      attributes: ["id", "code", "name", "majorId", "academicYear"],
+      attributes: ["id", "code", "name", "majorId", "academicYear", "intakeRound"],
       order: [["academicYear", "DESC"], ["code", "ASC"]],
     });
     return this.attachGroupOrganizationCapabilities(groups);
@@ -118,6 +118,7 @@ export class SchedulingService {
       majorId: value.majorId,
       major: value.major || null,
       academicYear: value.academicYear,
+      intakeRound: value.intakeRound,
       status: value.status,
       memberCount,
       allowedWeekdays: value.allowedWeekdays || [1, 2, 3, 4, 5, 6, 0],
@@ -351,6 +352,7 @@ export class SchedulingService {
         memberCount: new Set(progressMembers.filter((member) => member.classGroupId === group.id).map((member) => this.memberIdentity(member))).size,
         major: group.major ? { name: group.major.name } : null,
         academicYear: group.academicYear,
+        intakeRound: group.intakeRound,
         curriculum: group.curriculum ? { code: group.curriculum.code } : null,
         summary: {
           totalSubjectCount: subjects.length,
@@ -2163,7 +2165,7 @@ export class SchedulingService {
         const group = visible.classGroup;
         visible.classGroup = Object.fromEntries([
           'id', 'program', 'code', 'name', 'majorId', 'major', 'academicYear',
-          'status', 'allowedWeekdays', 'groupType', 'memberCount', 'canOrganize',
+          'intakeRound', 'status', 'allowedWeekdays', 'groupType', 'memberCount', 'canOrganize',
         ].filter(key => group[key] !== undefined).map(key => [key, group[key]]));
       }
       return visible;

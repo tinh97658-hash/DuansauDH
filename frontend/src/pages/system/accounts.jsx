@@ -48,7 +48,7 @@ const Accounts = () => {
   const [statusFilter, setStatusFilter] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [page, setPage] = useState(0);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = useState(25);
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -269,7 +269,10 @@ const Accounts = () => {
           </TableBody>
         </ResizableTable>
       </TableContainer>
-      <ListPagination count={filtered.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} />
+      <ListPagination count={filtered.length} page={currentPage} pageSize={pageSize}
+        pageSizeOptions={[25, 50, 100]}
+        onPageChange={setPage}
+        onPageSizeChange={(nextSize) => { setPageSize(nextSize); setPage(0); }} />
 
       <AppDialog
         open={editorOpen}

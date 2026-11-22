@@ -1,10 +1,11 @@
 import {formatLecturerName} from '../../utils/lecturerName';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import axios from 'axios';
-import { Alert, CircularProgress } from '@mui/material';
-import { MagnifyingGlassIcon } from "../../components/AppIcons";
+import { Alert, CircularProgress, MenuItem } from '@mui/material';
 import FeatureLayout from '../../components/FeatureLayout';
-import AppSelect from '../../components/AppSelect';
+import FilterDateField from '../../components/FilterDateField';
+import FilterSearchField from '../../components/FilterSearchField';
+import FilterSelectField from '../../components/FilterSelectField';
 import DateField from '../../components/DateField';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import ListPagination from '../../components/ListPagination';
@@ -202,26 +203,48 @@ export default function LecturerPayments() {
     if (!paid && (savedRef.current.get(key) || row).paid) { setUnpay(row); return; }
     update(row, { paid, paymentDate: paid ? (draftsRef.current[key]?.paymentDate || savedRef.current.get(key)?.paymentDate || getBusinessTodayKey()) : null });
   }, [update]);
-  const select = (field, label, items) => <label className="tp-filter tp-select-filter"><span>{label}</span>
-    <AppSelect aria-label={label} value={filters[field]} onChange={event => change(field, event.target.value)}>
-      <option value="">Tất cả</option>{items.map(item => <option key={item.id} value={item.id}>{field==='lecturerId'?formatLecturerName(item):item.name}</option>)}
-    </AppSelect></label>;
+  const select = (field, label, items) => (
+    <FilterSelectField
+      label={label}
+      value={filters[field]}
+      onChange={event => change(field, event.target.value)}
+      sx={{ flex: '1 1 160px', minWidth: 150 }}
+    >
+      <MenuItem value="">Tất cả</MenuItem>
+      {items.map(item => <MenuItem key={item.id} value={item.id}>{field==='lecturerId'?formatLecturerName(item):item.name}</MenuItem>)}
+    </FilterSelectField>
+  );
 
   return <FeatureLayout title="Báo cáo tài chính" exportConfig={false}>
     <div className="tp-page lp-page">
-      <section className="tp-filters lp-filters app-filter-toolbar" aria-label="Bộ lọc thanh toán">
-        <div className="lp-date-filter" role="group" aria-label="Khoảng ngày hoàn thành">
-          <label className="tp-filter"><span>Từ ngày</span><input aria-label="Từ ngày" type="date" value={filters.from} onChange={event => change('from', event.target.value)} /></label>
-          <label className="tp-filter"><span>Đến ngày</span><input aria-label="Đến ngày" type="date" value={filters.to} onChange={event => change('to', event.target.value)} /></label>
+      <section className="tp-filters lp-filters" aria-label="Bộ lọc thanh toán">
+        <div className="app-filter-toolbar">
+          <FilterSearchField
+            placeholder="Giảng viên, lớp học phần, lớp tham gia…"
+            value={filters.search}
+            onChange={event => change('search', event.target.value)}
+            sx={{ flex: '1 1 320px', minWidth: 'min(100%, 260px)', maxWidth: { lg: 560 } }}
+          />
         </div>
-        {select('unitId', 'Đơn vị', options.units)}
-        {select('lecturerId', 'Giảng viên', options.lecturers.filter(item => !filters.unitId || item.unitId === filters.unitId))}
-        <label className="tp-filter tp-select-filter"><span>Trạng thái thanh toán</span>
-          <AppSelect aria-label="Trạng thái thanh toán" value={filters.paymentStatus} onChange={event => change('paymentStatus', event.target.value)}>
-            <option value="all">Tất cả</option><option value="paid">Đã thanh toán</option><option value="unpaid">Chưa thanh toán</option>
-          </AppSelect></label>
-        <label className="tp-filter"><span>Tìm kiếm</span><div className="tp-search"><MagnifyingGlassIcon />
-          <input aria-label="Tìm kiếm" placeholder="Giảng viên, lớp học phần, lớp tham gia…" value={filters.search} onChange={event => change('search', event.target.value)} /></div></label>
+        <div className="tp-filters-divider" />
+        <div className="app-filter-toolbar tp-filters-row">
+          <div className="lp-date-filter" role="group" aria-label="Khoảng ngày hoàn thành">
+            <FilterDateField label="Từ ngày" value={filters.from} onChange={event => change('from', event.target.value)} sx={{ width: 155 }} />
+            <FilterDateField label="Đến ngày" value={filters.to} onChange={event => change('to', event.target.value)} sx={{ width: 155 }} />
+          </div>
+          {select('unitId', 'Đơn vị', options.units)}
+          {select('lecturerId', 'Giảng viên', options.lecturers.filter(item => !filters.unitId || item.unitId === filters.unitId))}
+          <FilterSelectField
+            label="Trạng thái thanh toán"
+            value={filters.paymentStatus}
+            onChange={event => change('paymentStatus', event.target.value)}
+            sx={{ flex: '1 1 170px', minWidth: 165 }}
+          >
+            <MenuItem value="all">Tất cả</MenuItem>
+            <MenuItem value="paid">Đã thanh toán</MenuItem>
+            <MenuItem value="unpaid">Chưa thanh toán</MenuItem>
+          </FilterSelectField>
+        </div>
       </section>
       {invalidDates && <Alert severity="warning">Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.</Alert>}
       {error && <Alert severity="error">{error}</Alert>}

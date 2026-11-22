@@ -249,10 +249,10 @@ it.each(["applications", "admitted-masters"])("exports %s only as Excel with eve
     if (typeof values[0] === "number") exportedRows.push(values);
     expect(values.some(value => typeof value === "string" && /Phần \d+\//.test(value))).toBe(false);
   });
-  expect(header).toEqual(["STT", "Mã HV", ...(admitted ? ["Mã nhóm"] : []), "Họ đệm", "Tên", "Email", "Ngày sinh", "Giới tính", "Số CMND/CCCD", "Năm nhập học", "Trình độ", "Ngành", "Điện thoại", ...(admitted ? ["Học phí"] : []), "Trạng thái"]);
+  expect(header).toEqual(["STT", "Mã HV", ...(admitted ? ["Mã nhóm"] : []), "Họ đệm", "Tên", "Email", "Ngày sinh", "Giới tính", "Số CMND/CCCD", "Năm nhập học", "Đợt", "Trình độ", "Ngành", "Điện thoại", ...(admitted ? ["Học phí"] : []), "Trạng thái"]);
   expect(exportedRows).toEqual(exportedRecords.map((row, index) => [
     index + 1, row.code, ...(admitted ? [row.assignedGroup.code] : []), "Nguyễn Văn", "An", row.email, "03/02/1995", row.gender, row.idCard,
-    row.academicYear, row.trainingLevel, row.majorName, row.phone, ...(admitted ? [index === 0 ? "Đã nộp" : "Chưa nộp"] : []), row.studyStatus,
+    row.academicYear, row.intakeRound ? `Đợt ${row.intakeRound}` : "Chưa xác định đợt", row.trainingLevel, row.majorName, row.phone, ...(admitted ? [index === 0 ? "Đã nộp" : "Chưa nộp"] : []), row.studyStatus,
   ]));
   expect(axios.get.mock.calls.some(([url]) => url.includes("/admission-records?") && new URL(url, "http://localhost").searchParams.get("page") === "2")).toBe(true);
   expect(window.open).not.toHaveBeenCalled();

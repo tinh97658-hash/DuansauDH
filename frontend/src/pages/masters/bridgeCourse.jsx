@@ -18,6 +18,7 @@ import FilterSelectField from "../../components/FilterSelectField";
 import AppDialog from "../../components/AppDialog";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import ResizableTable from "../../components/ResizableTable";
+import ListPagination from "../../components/ListPagination";
 import { API_BASE_URL } from "../../config/http";
 import { disciplineOptionLabel, disciplinesFromMajors, majorsForDiscipline } from "../../utils/disciplineScope";
 import { personNameParts } from "../../utils/personName";
@@ -86,6 +87,8 @@ export default function BridgeCourse() {
   const [rows, setRows] = useState([]), [subjects, setSubjects] = useState([]), [majors, setMajors] = useState([]), [candidates, setCandidates] = useState([]);
   const [summary, setSummary] = useState({}), [year, setYear] = useState(String(now)), [status, setStatus] = useState("ALL"), [major, setMajor] = useState("ALL"), [search, setSearch] = useState("");
   const [disciplineId, setDisciplineId] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
   const [loading, setLoading] = useState(true), [error, setError] = useState("");
   const listRequestVersion = useRef(0);
   const [open, setOpen] = useState(false), [editing, setEditing] = useState(null), [form, setForm] = useState(blank(String(now))), [saving, setSaving] = useState(false), [deleting, setDeleting] = useState(null);
@@ -139,6 +142,12 @@ export default function BridgeCourse() {
         .some((v) => String(v || "").toLocaleLowerCase("vi").includes(key));
     });
   }, [disciplineId, rows, search, visibleMajors]);
+  useEffect(() => { setPage(0); }, [year, status, disciplineId, major, search]);
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(visible.length / pageSize) - 1));
+  const pagedVisible = useMemo(
+    () => visible.slice(currentPage * pageSize, (currentPage + 1) * pageSize),
+    [visible, currentPage, pageSize],
+  );
 
   const create = async () => {
     try {
@@ -185,17 +194,22 @@ export default function BridgeCourse() {
     <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mb: 1.25 }}>
       {[["Tổng đăng ký", summary.total, "#087da5"], ["Đã phân công", summary.assigned, "#667085"], ["Đang học", summary.studying, "#168bc2"], ["Đạt / miễn", summary.passed, "#168b63"], ["Không đạt", summary.failed, "#c0392b"]].map(([label, value, color]) => <Paper key={label} variant="outlined" sx={{ px: 1.5, py: .75, minHeight: 48, flex: 1, borderRadius: "6px" }}><Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: 11.5, lineHeight: 1.35 }}>{label}</Typography><Typography variant="h5" fontWeight={700} sx={{ color, fontSize: 18, lineHeight: 1.2 }}>{value || 0}</Typography></Paper>)}
     </Stack>
-    <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderColor: "#C6D5E1", borderRadius: "6px", boxShadow: "none" }}><Stack className="app-filter-toolbar" direction="row" spacing={1.5} useFlexGap flexWrap="nowrap" alignItems="flex-end">
-      <FilterSelectField label="Năm học" value={year} onChange={(e) => setYear(e.target.value)} sx={{ flex: "1 1 140px", minWidth: 140 }}>{YEARS.map((v) => <MenuItem key={v} value={v}>{v}</MenuItem>)}</FilterSelectField>
-      <FilterSelectField label="Ngành" value={disciplineId} onChange={(e) => { setDisciplineId(e.target.value); setMajor("ALL"); }} sx={{ flex: "1 1 210px", minWidth: 210 }}><MenuItem value="">Tất cả ngành</MenuItem>{disciplines.map((item) => <MenuItem key={item.id} value={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}</FilterSelectField>
-      <FilterSelectField label="Chuyên ngành" value={major} onChange={(e) => setMajor(e.target.value)} sx={{ flex: "1 1 210px", minWidth: 210 }}><MenuItem value="ALL">Tất cả chuyên ngành</MenuItem>{visibleMajors.map((m) => <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>)}</FilterSelectField>
-      <FilterSelectField label="Trạng thái" value={status} onChange={(e) => setStatus(e.target.value)} sx={{ flex: "1 1 155px", minWidth: 155 }}><MenuItem value="ALL">Tất cả</MenuItem>{Object.entries(STATES).map(([k, v]) => <MenuItem key={k} value={k}>{v[0]}</MenuItem>)}</FilterSelectField>
-      <FilterSearchField placeholder="Tìm học viên, học phần..." value={search} onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: 220, flex: 1 }} />
-      <Stack direction="row" spacing={1} useFlexGap alignItems="center" sx={{ flexShrink: 0, maxWidth: "100%", flexWrap: "wrap" }}>
-        {admin && <Button variant="contained" startIcon={<PlusIcon />} onClick={create} sx={{ height: 40, px: 2, bgcolor: "#0788B8", borderRadius: "4px", boxShadow: "none", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}>Đăng ký học phần</Button>}
-        <InlineReportExport />
+    <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderColor: "#C6D5E1", borderRadius: "10px", boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)" }}>
+      <Stack className="app-filter-toolbar" direction="row" gap={1.25} alignItems="flex-end" justifyContent="space-between">
+        <FilterSearchField placeholder="Tìm học viên, học phần..." value={search} onChange={(e) => setSearch(e.target.value)} sx={{ flex: "1 1 320px", minWidth: "min(100%, 260px)", maxWidth: { lg: 560 } }} />
+        <Stack direction="row" gap={1} alignItems="flex-end" sx={{ flexShrink: 0, ml: "auto" }}>
+          {admin && <Button variant="contained" size="small" startIcon={<PlusIcon />} onClick={create} sx={{ height: 38, px: 1.75, bgcolor: "#0788B8", fontSize: 12, borderRadius: "7px", boxShadow: "none", textTransform: "none", fontWeight: 700, whiteSpace: "nowrap", "&:hover": { bgcolor: "#056A8F", boxShadow: "none" } }}>Đăng ký học phần</Button>}
+          <InlineReportExport height={38} />
+        </Stack>
       </Stack>
-    </Stack></Paper>
+      <Box sx={{ borderBottom: "1px solid #E4EDF4", my: 1.25 }} />
+      <Stack className="app-filter-toolbar" direction="row" gap={1.25} alignItems="flex-end">
+        <FilterSelectField label="Năm học" value={year} onChange={(e) => setYear(e.target.value)} sx={{ flex: "0.6 1 105px", minWidth: 100 }}>{YEARS.map((v) => <MenuItem key={v} value={v}>{v}</MenuItem>)}</FilterSelectField>
+        <FilterSelectField label="Ngành" value={disciplineId} onChange={(e) => { setDisciplineId(e.target.value); setMajor("ALL"); }} sx={{ flex: "1.2 1 180px", minWidth: 165 }}><MenuItem value="">Tất cả ngành</MenuItem>{disciplines.map((item) => <MenuItem key={item.id} value={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}</FilterSelectField>
+        <FilterSelectField label="Chuyên ngành" value={major} onChange={(e) => setMajor(e.target.value)} sx={{ flex: "1.5 1 220px", minWidth: 185 }}><MenuItem value="ALL">Tất cả chuyên ngành</MenuItem>{visibleMajors.map((m) => <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>)}</FilterSelectField>
+        <FilterSelectField label="Trạng thái" value={status} onChange={(e) => setStatus(e.target.value)} sx={{ flex: "1 1 150px", minWidth: 140 }}><MenuItem value="ALL">Tất cả</MenuItem>{Object.entries(STATES).map(([k, v]) => <MenuItem key={k} value={k}>{v[0]}</MenuItem>)}</FilterSelectField>
+      </Stack>
+    </Paper>
     {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
     <TableContainer component={Paper} variant="outlined" sx={{ borderColor: "#D7E4EE", borderRadius: "6px", overflow: "auto", boxShadow: "0 2px 8px rgba(23, 62, 117, 0.04)" }}>
       <ResizableTable
@@ -209,7 +223,7 @@ export default function BridgeCourse() {
           ) : !visible.length ? (
             <TableRow><TableCell colSpan={columns.length} align="center" sx={{ py: 6 }}>Chưa có đăng ký phù hợp bộ lọc.</TableCell></TableRow>
           ) : (
-            visible.map((r) => (
+            pagedVisible.map((r) => (
               <TableRow key={r.id} hover sx={{ "&:hover": { bgcolor: "#F5FAFE!important" }, "& td": { borderColor: "#E2EBF2" } }}>
                 <TableCell>{r.admissionRecord?.code || "—"}</TableCell>
                 <TableCell><strong>{personNameParts(r.admissionRecord).familyAndMiddle}</strong></TableCell>
@@ -233,6 +247,16 @@ export default function BridgeCourse() {
         </TableBody>
       </ResizableTable>
     </TableContainer>
+    <ListPagination
+      count={visible.length}
+      page={currentPage}
+      pageSize={pageSize}
+      pageSizeOptions={[25, 50, 100]}
+      onPageChange={setPage}
+      onPageSizeChange={(nextSize) => { setPageSize(nextSize); setPage(0); }}
+      disabled={saving}
+      recordLabel="đăng ký"
+    />
     <AppDialog
       open={open}
       onClose={() => !saving && setOpen(false)}

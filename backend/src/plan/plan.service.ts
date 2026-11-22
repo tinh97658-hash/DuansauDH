@@ -1,3 +1,4 @@
+import { intakeRoundFilter } from "./intake-round.js";
 import { Optional } from "@nestjs/common";
 import { isDeepStrictEqual } from "node:util";
 import { assertSubjectStructureEditable, lockTrainingStructure } from "./training-structure-integrity.js";
@@ -553,11 +554,12 @@ export class PlanService {
   }
 
   // ===== Lớp học (ClassGroup) =====
-  async listClasses(majorId?: string, program?: string, academicYear?: string) {
+  async listClasses(majorId?: string, program?: string, academicYear?: string, intakeRound?: string) {
     const where: Record<string, unknown> = {};
     if (majorId) where.majorId = majorId;
     if (program) where.program = program;
     if (academicYear) where.academicYear = academicYear;
+    if (intakeRoundFilter(intakeRound) !== undefined) where.intakeRound = intakeRoundFilter(intakeRound);
     return this.classGroups.findAll({
       where,
       include: [
@@ -616,6 +618,7 @@ export class PlanService {
     includeGroup = false,
     admissionStage?: string,
     classGroupId?: string,
+    intakeRound?: string,
   ) {
     const page = Math.max(1, Number.parseInt(pageParam || "1", 10) || 1);
     const pageSize = Math.min(100, Math.max(1, Number.parseInt(pageSizeParam || "20", 10) || 20));
@@ -623,6 +626,7 @@ export class PlanService {
     if (majorId) where.majorId = majorId;
     if (trainingLevel) where.trainingLevel = trainingLevel;
     if (academicYear) where.academicYear = academicYear;
+    if (intakeRoundFilter(intakeRound) !== undefined) where.intakeRound = intakeRoundFilter(intakeRound);
     if (admissionStage === "learners") {
       where[Op.and] = [admissionLearnerWhere(), {
         [Op.or]: [{ studyStatus: { [Op.notIn]: STUDY_MANAGEMENT_STATUSES } }, { studyStatus: { [Op.is]: null } }],
@@ -691,7 +695,7 @@ export class PlanService {
           [literal(`COALESCE("AdmissionRecord"."last_name", "AdmissionRecord"."full_name", '') COLLATE "vi-x-icu"`), "ASC"],
           ["code", "ASC"],
           ["id", "ASC"],
-        ] : [["createdAt", "DESC"]],
+        ] : [["createdAt", "DESC"], ["id", "DESC"]],
         limit: pageSize,
         offset: (page - 1) * pageSize,
         distinct: true,
@@ -760,11 +764,26 @@ export class PlanService {
     return record;
   }
 
-  async createAdmissionRecord(dto: CreateAdmissionRecordDto) {
+  private async resolveProfileCategoryType(category: string | null | undefined, transaction?: Transaction): Promise<{ id: string; name: string } | null | undefined> {
+    if (typeof this.sequelize?.query !== "function") return undefined;
+    try {
+      const [matched] = await this.sequelize.query<{ id: string; name: string }>(
+        `SELECT t.id, t.name FROM learner_code_types t WHERE t.id = app_resolve_learner_code_type(:category)`,
+        { replacements: { category: category ?? "" }, type: QueryTypes.SELECT, transaction },
+      );
+      return matched || null;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async createAdmissionRecord(dto: CreateAdmissionRecordDto, transaction?: Transaction): Promise<any> {
+    if (dto.intakeRound != null && !transaction) return this.sequelize.transaction(tx => this.createAdmissionRecord(dto, tx));
+    if (transaction) await this.sequelize.query('SELECT pg_advisory_xact_lock(21026)', { transaction });
     if (["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Đã thôi học"].includes(dto.studyStatus || "")) {
       throw new BadRequestException("Tạo hồ sơ học viên trước, sau đó xử lý trong mục Bảo lưu.");
     }
-    await this.admissionEvaluation?.guardRecordUpdate(null, dto);
+    await this.admissionEvaluation?.guardRecordUpdate(null, dto, transaction);
     let fullName = dto.fullName?.trim();
     if (!fullName) {
       fullName = `${dto.lastName || ""} ${dto.firstName || ""}`.trim();
@@ -774,18 +793,21 @@ export class PlanService {
     }
 
     const trainingLevel = dto.trainingLevel || "Thạc sĩ";
-    const major = await this.requireAdmissionMajor(dto.majorId, trainingLevel);
-    const payload = {
+    const major = await this.requireAdmissionMajor(dto.majorId, trainingLevel, transaction);
+    const matchedType = dto.profileCategory !== undefined ? await this.resolveProfileCategoryType(dto.profileCategory, transaction) : null;
+    const payload: Record<string, unknown> = {
       ...dto,
       trainingLevel,
       fullName,
       email: dto.email || `candidate_${Date.now()}@vmu.edu.vn`,
       majorName: major.name,
+      ...(matchedType ? { profileCategory: matchedType.name, learnerCodeTypeId: matchedType.id } : {}),
     };
 
-    const created = await this.admissionRecordsModel.create(payload as any);
+    const created = transaction ? await this.admissionRecordsModel.create(payload as any, { transaction }) : await this.admissionRecordsModel.create(payload as any);
     return this.admissionRecordsModel.findByPk(created.id, {
       include: [{ model: Major, as: "major", attributes: ["id", "name"] }],
+      ...(transaction ? { transaction } : {}),
     });
   }
 
@@ -807,6 +829,22 @@ export class PlanService {
       await this.admissionEvaluation?.guardRecordUpdate(record, dto, transaction);
       const payload: Record<string, unknown> = { ...dto };
       delete payload.majorName;
+      if (dto.profileCategory !== undefined) {
+        const matchedType = await this.resolveProfileCategoryType(dto.profileCategory, transaction);
+        if (matchedType !== undefined) {
+          if (record.learnerCodeState === "official") {
+            if (dto.profileCategory !== record.profileCategory && matchedType?.id !== record.learnerCodeTypeId) {
+              throw new BadRequestException("Hồ sơ đã có mã học viên chính thức. Vui lòng dùng thao tác Gán/đổi loại hồ sơ ở mục Cấp mã học viên.");
+            }
+            if (matchedType) payload.profileCategory = matchedType.name;
+          } else if (matchedType) {
+            payload.profileCategory = matchedType.name;
+            payload.learnerCodeTypeId = matchedType.id;
+          } else {
+            payload.learnerCodeTypeId = null;
+          }
+        }
+      }
       if (dto.majorId !== undefined || dto.trainingLevel !== undefined) {
         const major = await this.requireAdmissionMajor(dto.majorId ?? record.majorId, dto.trainingLevel ?? record.trainingLevel, transaction);
         payload.majorId = major.id;

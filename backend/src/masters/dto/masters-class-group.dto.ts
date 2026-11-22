@@ -23,6 +23,7 @@ export class UpdateMastersClassGroupDto {
   @IsOptional() @IsUUID() majorId?: string;
   @IsOptional() @IsUUID() curriculumId?: string;
   @IsOptional() @IsString() @MaxLength(20) @Transform(trim) academicYear?: string;
+  @IsOptional() @IsInt() @Min(1) @Max(99) intakeRound?: number;
   @IsOptional() @IsInt() @Min(1) maxStudents?: number;
   @IsOptional() @IsEnum(["open", "closed"]) status?: "open" | "closed";
   @IsOptional() @IsString() @MaxLength(1000) @Transform(trim) note?: string;

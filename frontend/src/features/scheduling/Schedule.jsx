@@ -2,6 +2,7 @@ import {formatLecturerName} from '../../utils/lecturerName';
 import { ArrowDownIcon, ArrowLeftIcon, ArrowUpIcon, ArrowsUpDownIcon, CalendarDaysIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, MinusIcon, PlusIcon } from "../../components/AppIcons";
 import { notify } from "../../utils/notify";
 import { usePermissions } from "../accounts/usePermissions";
+import IntakeRoundSelect, { matchesIntakeRound } from "../../components/IntakeRoundSelect";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
@@ -168,6 +169,7 @@ export default function Schedule({ user }) {
   const appliedRequest = useRef(previewReturn ? requested : "");
   const [majorId, setMajor] = useState(previewReturn?.majorId || params.get("majorId") || "");
   const [disciplineId, setDiscipline] = useState(previewReturn?.disciplineId || params.get("disciplineId") || "");
+  const [intakeRound, setIntakeRound] = useState(previewReturn?.intakeRound || params.get("intakeRound") || "");
   const [year, setYear] = useState(previewReturn?.year || params.get("year") || "");
   const [status, setStatus] = useState(previewReturn?.status || "active");
   const [query, setQuery] = useState(previewReturn?.query || "");
@@ -209,7 +211,7 @@ export default function Schedule({ user }) {
     const groupMajorId = group.majorId || group.major?.id;
     return (!disciplineId || visibleMajorIds.has(groupMajorId))
       && (!majorId || groupMajorId === majorId)
-      && (!year || group.academicYear === year);
+      && (!year || group.academicYear === year) && matchesIntakeRound(group, intakeRound);
   });
   const scoped = all.filter(inScope);
   const listed = sortOfferingsByHeldSessions(scoped.filter((offering) => offering.status === status && matchesDashboardScheduleQueue(offering, dashboardQueue) && normalize(`${offering.subject?.code} ${offering.subject?.name} ${labelOf(offering)}`).includes(normalize(query))), sessionSort);
@@ -266,7 +268,7 @@ export default function Schedule({ user }) {
     const snapshot = printSchedule;
     downloadScheduleFile(await createScheduleExcel(snapshot), `lich-hoc-${snapshot.week}-${snapshot.end}.xlsx`);
   };
-  const openPdfPreview = () => exportSchedule(printSchedule, { week, disciplineId, majorId, year, status, query, selectedId, focusedDate, sidebarCollapsed });
+  const openPdfPreview = () => exportSchedule(printSchedule, { week, disciplineId, majorId, year, intakeRound, status, query, selectedId, focusedDate, sidebarCollapsed });
   const sessionsOn = (date, period) => visibleSessions.filter((session) => session.sessionDate === date && (!period || session.period === period));
   const slotState = (day, period) => {
     const date = formatDateKey(day);
@@ -311,9 +313,10 @@ export default function Schedule({ user }) {
     <button type="button" className="sl-sidebar-toggle" aria-label={sidebarCollapsed ? "Mở phạm vi làm việc" : "Thu gọn phạm vi làm việc"} aria-expanded={!sidebarCollapsed} onClick={() => setSidebarCollapsed((value) => !value)}>{sidebarCollapsed ? <ChevronRightIcon fontSize="inherit" /> : <ChevronLeftIcon fontSize="inherit" />}</button>
     <div className="sl-sidebar-content"><div className="sl-scope"><div className="sl-eyebrow">PHẠM VI LÀM VIỆC</div>
     <div className="sl-schedule-scope-fields">
-      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>1</b>NGÀNH</div><SearchSelect label="Ngành" value={disciplineId} placeholder="Tất cả ngành" options={[{ id: "", name: "Tất cả ngành" }, ...disciplines.map((item) => ({ ...item, name: item.name, code: "" }))]} onChange={(value) => changeScope(() => { setDiscipline(value); setMajor(""); setYear(""); })} /></div>
-      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>2</b>CHUYÊN NGÀNH</div><SearchSelect label="Chuyên ngành" value={majorId} placeholder="Tất cả chuyên ngành" options={[{ id: "", name: "Tất cả chuyên ngành" }, ...visibleMajors]} onChange={(value) => changeScope(() => { setMajor(value); setYear(""); })} /></div>
-      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>3</b>KHÓA / NĂM HỌC</div><YearSelect className={`sl-select sl-year-select${year ? "" : " sl-placeholder"}`} label="Khóa / Năm" value={year} onChange={value => changeScope(() => setYear(value))} years={unique(all.flatMap(groupsOf).filter((group) => (!disciplineId || visibleMajorIds.has(group.majorId || group.major?.id)) && (!majorId || (group.majorId || group.major?.id) === majorId)).map((group) => group.academicYear)).sort((a, b) => b.localeCompare(a, "vi", { numeric: true }))} /></div>
+      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>1</b>NGÀNH</div><SearchSelect label="Ngành" value={disciplineId} placeholder="Tất cả ngành" options={[{ id: "", name: "Tất cả ngành" }, ...disciplines.map((item) => ({ ...item, name: item.name, code: "" }))]} onChange={(value) => changeScope(() => { setDiscipline(value); setMajor(""); setYear(""); setIntakeRound(""); })} /></div>
+      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>2</b>CHUYÊN NGÀNH</div><SearchSelect label="Chuyên ngành" value={majorId} placeholder="Tất cả chuyên ngành" options={[{ id: "", name: "Tất cả chuyên ngành" }, ...visibleMajors]} onChange={(value) => changeScope(() => { setMajor(value); setYear(""); setIntakeRound(""); })} /></div>
+      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>3</b>KHÓA / NĂM HỌC</div><YearSelect className={`sl-select sl-year-select${year ? "" : " sl-placeholder"}`} label="Khóa / Năm" value={year} onChange={value => changeScope(() => { setYear(value); setIntakeRound(""); })} years={unique(all.flatMap(groupsOf).filter((group) => (!disciplineId || visibleMajorIds.has(group.majorId || group.major?.id)) && (!majorId || (group.majorId || group.major?.id) === majorId)).map((group) => group.academicYear)).sort((a, b) => b.localeCompare(a, "vi", { numeric: true }))} /></div>
+      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>4</b>ĐỢT</div><IntakeRoundSelect variant="scheduling" className="sl-select sl-year-select" year={year} value={intakeRound} rows={all.flatMap(groupsOf)} onChange={value => changeScope(() => setIntakeRound(value))} /></div>
     </div>
     {!canEdit && <div className="sl-attention">Chưa có quyền sửa lịch hoặc vai trò đang bị khóa chỉ xem. Quản trị viên cấu hình tại Vai trò & phân quyền.</div>}
     {dashboardQueue && <div className="sl-attention">{dashboardQueue === "unscheduled" ? "Đang xem lớp chưa có buổi học" : "Đang xem lớp có buổi chờ xác nhận"}<button type="button" className="sl-btn" onClick={() => { const next = new URLSearchParams(params); next.delete("queue"); setParams(next); }}>Bỏ lọc công việc</button></div>}

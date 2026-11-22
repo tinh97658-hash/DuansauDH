@@ -1,4 +1,5 @@
 import { ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassIcon, PlusIcon } from "../../components/AppIcons";
+import IntakeRoundSelect, { matchesIntakeRound } from "../../components/IntakeRoundSelect";
 import React,{useEffect,useRef,useState} from 'react';
 import {listenForBackgroundRefresh} from '../../utils/backgroundRefresh';
 import {useSearchParams} from 'react-router-dom';
@@ -18,7 +19,7 @@ import {addDays,formatDateKey,getBusinessTodayKey,mondayOf} from '../../utils/sc
 import {notifyGradebookSaved} from '../../utils/gradebookRevision';
 import {examPeriods,examSessionsForPeriod,formatExamDate} from '../../features/exams/examCalendar';
 import {examCardStatus,examOfferingLabel,examStatus,matchesExam,uniqueOptions} from '../../features/exams/examPlanner';
-import {ExamEditor,ExamListTable,ExamPendingCards,ExamReasonDialog} from '../../features/exams/ExamPlannerDialogs';
+import {ExamListTable,ExamPendingCards,ExamReasonDialog} from '../../features/exams/ExamPlannerDialogs';
 import ExamArrangementEditor from '../../features/exams/ExamArrangementEditor';
 import ExamSessionDialog from '../../features/exams/ExamSessionDialog';
 import {collectExamArrangements} from '../../features/exams/examArrangement';
@@ -35,10 +36,9 @@ export default function ExamSchedule(){
  const [data,setData]=useState({queue:[],approvedOfferings:[],sessions:[],rooms:[]}),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState('');
  const [loadError,setLoadError]=useState('');
  const [hasLoaded,setHasLoaded]=useState(false);
- const [filters,setFilters]=useState({discipline:'',major:'',year:'',search:''});
+ const [filters,setFilters]=useState({discipline:'',major:'',year:'',intakeRound:'',search:''});
  const [sidebarCollapsed,setSidebarCollapsed]=useState(false);
  const [selectedIds,setSelectedIds]=useState(()=>params.get('offeringId')?[params.get('offeringId')]:[]);
- const [mergeMode,setMergeMode]=useState(false);
  const [detail,setDetail]=useState(null),[editor,setEditor]=useState(null),[aggregate,setAggregate]=useState(null),[reason,setReason]=useState(null),[pendingOpen,setPendingOpen]=useState(false);
  const wallTime=useExamWallTime(),last=formatDateKey(addDays(week,6)),today=wallTime.slice(0,10);
  const requestState=useRef({inFlight:false,at:0});
@@ -67,9 +67,9 @@ export default function ExamSchedule(){
  const selectedCandidates=new Set(selectedOfferings.flatMap(o=>o.candidateKeys||o.candidateIds||o.candidates?.map(c=>c.participantId)||[]));
  const selectedCount=selectedCandidates.size||selectedOfferings.reduce((sum,o)=>sum+Number(o.candidateCount||0),0);
  useEffect(()=>{if(hasLoaded)setSelectedIds(ids=>ids.filter(id=>data.queue.some(o=>o.id===id)));},[data.queue,hasLoaded]);
- const clearSelection=()=>{setSelectedIds([]);setMergeMode(false);};
- const toggleOffering=(id,merge=false)=>{if(!canView||loading||saving)return;setSelectedIds(ids=>ids.includes(id)?ids.filter(value=>value!==id):[...ids,id]);if(merge)setMergeMode(true);setError('');};
- const changeFilter=(key,value)=>{setFilters(current=>({...current,[key]:value,...(key==='discipline'?{major:'',year:''}:key==='major'?{year:''}:{})}));};
+ const clearSelection=()=>setSelectedIds([]);
+ const toggleOffering=id=>{if(!canView||loading||saving)return;setSelectedIds(ids=>ids.includes(id)?ids.filter(value=>value!==id):[...ids,id]);setError('');};
+ const changeFilter=(key,value)=>{if(["discipline","major","year","intakeRound"].includes(key))clearSelection();setFilters(current=>({...current,[key]:value,...(key==='discipline'?{major:'',year:'',intakeRound:''}:key==='major'?{year:'',intakeRound:''}:key==='year'?{intakeRound:''}:{})}));};
  const openDetail=session=>{setAggregate(null);setPendingOpen(false);setDetail(session);setError('');};
  const mutate=async(action,target,note='',form,refreshAvailability,keepDetail=false)=>{if(!canWrite||saving)return false;setSaving(true);setError('');
   try{const base=`${API_BASE_URL}/masters/exam-sessions`,options={withCredentials:true};
@@ -87,7 +87,7 @@ export default function ExamSchedule(){
  };
  const close=setter=>()=>{if(!saving){setter(null);setError('');}};
  const compose=(session,initial={})=>{if(!canWrite||session?.canEdit===false)return;const members=session?data.sessions.filter(s=>(s.arrangementId||s.id)===(session.arrangementId||session.id)):[];setDetail(null);setError('');setEditor({mode:'arrangement',members,initial:{...(!session?nextExamSlot():{}),...initial}});};
- const openEditor=(session,slot)=>{if(session?.canEdit===false)return;if(!session&&slot&&isExamPeriodClosed(slot.date,slot.period))return;if(!session&&slot&&selected&&(mergeMode||selectedOfferings.length>1)){compose(null,{examDate:slot.date,startTime:slot.start,endTime:undefined,offerings:selectedOfferings});return;}if(session?.arrangementId&&(session.externalInvigilatorName||data.sessions.filter(s=>s.arrangementId===session.arrangementId).length>1)){compose(session);return;}const offering=offerings.find(o=>o.id===(session?.courseOfferingId||selected?.id));if(!offering||!canWrite||(session?.examDate||slot?.date)<getBusinessTodayKey())return;setDetail(null);setError('');setEditor({session,slot,offering});};
+ const openEditor=(session,slot)=>{if(session?.canEdit===false||!canWrite)return;if(session){compose(session);return;}if(!slot||!selectedOfferings.length||isExamPeriodClosed(slot.date,slot.period)||slot.date<getBusinessTodayKey())return;compose(null,{examDate:slot.date,startTime:slot.start,endTime:slot.end,offerings:selectedOfferings});};
  const saveArrangement=async(form,id,refresh,keepDetail=false)=>{if(!canWrite||saving)return false;setSaving(true);setError('');try{
   const url=`${API_BASE_URL}/masters/exam-arrangements`,options={withCredentials:true};
   if(id)await axios.put(`${url}/${id}`,form,options);else await axios.post(url,form,options);
@@ -130,13 +130,14 @@ export default function ExamSchedule(){
      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>1</b>NGÀNH</div><SearchSelect label="Ngành" value={filters.discipline} placeholder="Tất cả ngành" options={[{id:'',name:'Tất cả ngành'},...disciplines]} onChange={value=>changeFilter('discipline',value)}/></div>
      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>2</b>CHUYÊN NGÀNH</div><SearchSelect label="Chuyên ngành" value={filters.major} placeholder="Tất cả chuyên ngành" options={[{id:'',name:'Tất cả chuyên ngành'},...majors]} onChange={value=>changeFilter('major',value)}/></div>
      <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>3</b>KHÓA / NĂM HỌC</div><YearSelect className={`sl-select sl-year-select${filters.year?'':' sl-placeholder'}`} label="Khóa / năm học" value={filters.year} years={years} onChange={value=>changeFilter('year',value)}/></div>
+     <div className="sl-schedule-scope-field"><div className="v20-scope-step"><b>4</b>ĐỢT</div><IntakeRoundSelect variant="scheduling" className="sl-select sl-year-select" year={filters.year} value={filters.intakeRound} rows={groups} onChange={value=>changeFilter("intakeRound",value)} /></div>
     </div></div>
     <div className="sl-worklist"><div className="sl-search-wrap"><span aria-hidden="true"><MagnifyingGlassIcon fontSize="inherit" /></span><input className="sl-search" aria-label="Tìm kiếm" placeholder="Tìm lớp học phần..." value={filters.search} onChange={e=>changeFilter('search',e.target.value)}/></div>
      <div className="sl-card-scroll"><aside className="sl-section ep-queue" aria-label="Chưa xếp lịch"><h2><span>CHƯA XẾP LỊCH</span><b>{queue.length}</b></h2>
       {loading?<p role="status">Đang tải lịch thi…</p>:!queue.length&&<p>Không có danh sách cần xếp thi trong phạm vi này.</p>}
-      {canWrite&&<p className="ep-selection-help">{mergeMode?'Tích chọn các lớp cần ghép, rồi chọn ô Sáng / Chiều trên lịch.':'Tích chọn nhiều lớp để ghép thi, hoặc bấm tên lớp để xếp riêng.'}</p>}
+      {canWrite&&<p className="ep-selection-help">Chọn một hoặc nhiều lớp, rồi chọn ô Sáng / Chiều trên lịch để tạo buổi thi.</p>}
       {queue.map(o=><div key={o.id} className={`ep-queue-card${selectedIds.includes(o.id)?' ep-active':''}`}>
-       {canWrite&&<input type="checkbox" aria-label={`Chọn lớp ${o.name} · ${o.subjectName}`} checked={selectedIds.includes(o.id)} disabled={loading||saving} onChange={()=>toggleOffering(o.id,true)} />}
+       {canWrite&&<input type="checkbox" aria-label={`Chọn lớp ${o.name} · ${o.subjectName}`} checked={selectedIds.includes(o.id)} disabled={loading||saving} onChange={()=>toggleOffering(o.id)} />}
        <button type="button" className="ep-queue-select" disabled={loading||saving} aria-label={`${o.name} ${o.candidateCount} TS ${o.subjectName}${o.makeupCount?' · Thi bù':''}`} aria-pressed={selectedIds.includes(o.id)} onClick={()=>toggleOffering(o.id)}><strong title={o.name}>{examOfferingLabel(o)}</strong><b>{o.candidateCount} TS</b><span>{o.subjectName}</span>{o.makeupCount>0&&<small className="ep-makeup-badge">Thi bù · {o.makeupCount} học viên</small>}</button>
       </div>)}
      </aside></div>
@@ -146,7 +147,7 @@ export default function ExamSchedule(){
     <ScheduleHeader><div className="ep-heading-actions"><h1>XẾP LỊCH THI</h1><div className="sl-actions"><DocumentExportMenu className="sl-btn sl-export-trigger" disabled={loading||saving||!!error} onWord={()=>downloadExport('docx')} onExcel={()=>downloadExport('xlsx')} onPdf={()=>exportSchedule(printSchedule())} onError={e=>setError(e.message||'Không thể xuất lịch thi.')}/></div></div><nav className="sl-week ep-week-navigation" aria-label="Chuyển tuần lịch thi"><button aria-label="Tuần trước" onClick={()=>setWeek(formatDateKey(addDays(week,-7)))}><ChevronLeftIcon fontSize="inherit" /></button><strong>{formatExamDate(week)} – {formatExamDate(last)}</strong><button aria-label="Tuần sau" onClick={()=>setWeek(formatDateKey(addDays(week,7)))}><ChevronRightIcon fontSize="inherit" /></button></nav><div className="sl-actions"><button className="sl-btn sl-today" onClick={()=>setWeek(formatDateKey(mondayOf(getBusinessTodayKey())))}>Tuần này</button><PendingConfirmationButton showIcon={false} count={hasLoaded?pending.length:undefined} loading={loading} error={loadError} open={pendingOpen} controls="exam-pending-dialog" onClick={()=>setPendingOpen(true)} /></div></ScheduleHeader>
 
     {!!selectedOfferings.length&&<div className="sl-selected-strip ep-selection-strip" aria-label="Các lớp đang chọn">
-     <span className="sl-selected-tag">{mergeMode||selectedOfferings.length>1?'ĐANG GHÉP':'ĐANG XẾP'}</span>
+     <span className="sl-selected-tag">ĐANG XẾP</span>
      <div className="ep-selected-classes">{selectedOfferings.map(o=><span className="ep-selected-class" key={o.id}><span title={o.subjectName}>{examOfferingLabel(o)}</span><button type="button" aria-label={`Bỏ chọn lớp ${o.name} · ${o.subjectName}`} disabled={saving} onClick={()=>toggleOffering(o.id)}>Bỏ</button></span>)}</div>
      <span className="sl-selected-meta">{selectedOfferings.length} lớp · {selectedCount} thí sinh</span>
      <button className="sl-btn sl-selected-clear" disabled={saving} onClick={clearSelection}>Bỏ chọn tất cả</button>
@@ -169,7 +170,7 @@ export default function ExamSchedule(){
     </div>
    </section>
   </section>
-  {editor&&(editor.mode==='arrangement'?<ExamArrangementEditor initial={editor.initial} members={editor.members} queue={data.queue} rooms={data.rooms} lecturers={data.lecturers} units={data.units} canWrite={canWrite} saving={saving} error={error} onClose={close(setEditor)} onSave={saveArrangement}/>:<ExamEditor session={editor.session} offering={editor.offering} slot={editor.slot} rooms={data.rooms} lecturers={data.lecturers} units={data.units} canWrite={canWrite} saving={saving} error={error} onClose={close(setEditor)} onSave={(form,refresh)=>mutate('save',editor.session,'',form,refresh)}/>)}
+  {editor&&<ExamArrangementEditor initial={editor.initial} members={editor.members} queue={data.queue} rooms={data.rooms} lecturers={data.lecturers} units={data.units} canWrite={canWrite} saving={saving} error={error} onClose={close(setEditor)} onSave={saveArrangement}/>}
   {detail&&<ExamSessionDialog key={detail.arrangementId||detail.id} attendanceSessionId={detail.attendanceSessionId} members={detailMembers} queue={data.queue} rooms={data.rooms} lecturers={data.lecturers} units={data.units}
    canWrite={canWrite} saving={saving} refreshing={loading} error={error} onClose={close(setDetail)} onClearError={()=>setError('')} onAttendanceChange={saveAttendance} onAttendanceConfirm={confirmAttendance}
    onSaveArrangement={(form,id,retry)=>saveArrangement(form,id,retry,true)}

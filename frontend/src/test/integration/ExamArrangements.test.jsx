@@ -22,7 +22,7 @@ beforeEach(()=>{examClock.value='2026-10-19 07:00:00';vi.clearAllMocks();data={q
 const renderPage=()=>renderWithPermissions(<MemoryRouter useTransitions={false}><ExamSchedule/></MemoryRouter>,['exams.view','exams.write']);
 const choose=(label,name)=>{fireEvent.focus(screen.getByRole('combobox',{name:label}));fireEvent.click(screen.getByRole('option',{name}));};
 const add=(n,o)=>{fireEvent.focus(screen.getByRole('combobox',{name:`Thêm học phần đợt ${n}`}));fireEvent.click(screen.getByRole('option',{name:`${o.name} · ${o.candidateCount} TS`}));};
-async function open(){renderPage();const first=data.queue[0];const checkbox=await screen.findByRole('checkbox',{name:`Chọn lớp ${first.name} · ${first.subjectName}`});await waitFor(()=>expect(checkbox).toBeEnabled());fireEvent.click(checkbox);fireEvent.click(screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'}));fireEvent.click(screen.getByRole('button',{name:`Gỡ ${first.subjectName}`}));await waitFor(()=>expect(screen.getByRole('button',{name:'301 · 30 chỗ'})).toBeEnabled());choose('Đơn vị','Viện Đào tạo SĐH');choose('Cán bộ coi thi 1','Nguyễn An');fireEvent.click(screen.getByRole('button',{name:'301 · 30 chỗ'}));}
+async function open(){renderPage();const first=data.queue[0];const checkbox=await screen.findByRole('checkbox',{name:`Chọn lớp ${first.name} · ${first.subjectName}`});await waitFor(()=>expect(checkbox).toBeEnabled());fireEvent.click(checkbox);fireEvent.click(screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'}));fireEvent.click(screen.getByRole('button',{name:`Gỡ ${first.subjectName}`}));await waitFor(()=>expect(screen.getByRole('button',{name:/301 30 chỗ/})).toBeEnabled());choose('Đơn vị','Viện Đào tạo SĐH');choose('Cán bộ coi thi 1','Nguyễn An');fireEvent.click(screen.getByRole('button',{name:/301 30 chỗ/}));}
 it('creates a mixed parallel and sequential arrangement with immutable per-offering snapshots',async()=>{
  await open();add(1,a);add(1,b);fireEvent.click(screen.getByRole('button',{name:'Thêm đợt thi'}));add(2,c);add(2,d);
  expect(screen.getByText(/Thi đồng thời:/)).toHaveTextContent('30 thí sinh');
@@ -120,6 +120,28 @@ it('retains the composed form and server conflict details on a stale save',async
  expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/masters/exam-arrangements'),expect.objectContaining({groups:[expect.objectContaining({courseOfferingId:'a',snapshotId:'snapshot-a'})]}),{withCredentials:true});
 });
 const session=(o,id,extra={})=>({...o,id,courseOfferingId:o.id,arrangementId:'arrangement',arrangementVersion:0,roundNo:1,version:0,examDate:'2026-10-19',startTime:'08:00',endTime:'09:00',roomId:'room',roomCode:'301',lecturerId:'lecturer',lecturerName:'Nguyễn An',status:'scheduled',canEdit:true,...extra});
+it('opens one selected class in the shared form and adds another class without reopening',async()=>{
+ renderPage();
+ fireEvent.click(await within(screen.getByRole('complementary',{name:'Chưa xếp lịch'})).findByRole('button',{name:`${a.name} ${a.candidateCount} TS ${a.subjectName}`}));
+ fireEvent.click(screen.getByRole('button',{name:'Chọn 19/10/2026 Sáng'}));
+ const dialog=screen.getByRole('dialog',{name:'TẠO BUỔI THI'});
+ expect(within(dialog).queryByRole('combobox',{name:/Chuyển đợt/})).toBeNull();
+ await waitFor(()=>expect(screen.getByRole('button',{name:/301 30 chỗ/})).toBeEnabled());
+ add(1,b);expect(screen.getByRole('dialog')).toBe(dialog);
+ fireEvent.click(screen.getByRole('button',{name:/301 30 chỗ/}));
+ fireEvent.click(screen.getByRole('button',{name:'Lưu buổi thi'}));
+ await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/masters/exam-arrangements'),expect.objectContaining({groups:[expect.objectContaining({courseOfferingId:a.id,snapshotId:a.snapshotId}),expect.objectContaining({courseOfferingId:b.id,snapshotId:b.snapshotId})]}),expect.anything()));
+});
+it('edits a single-class arrangement with its original versions and note',async()=>{
+ data.sessions=[session(a,'session-a',{arrangementVersion:7,version:4,arrangementNote:'Giữ ghi chú'})];data.queue=[b];renderPage();
+ fireEvent.click(await screen.findByRole('button',{name:/19\/10\/2026 08:00 Đã xếp lịch/}));
+ fireEvent.click(screen.getByRole('button',{name:'Chỉnh sửa buổi thi'}));
+ expect(screen.getByLabelText('Ghi chú chung')).toHaveValue('Giữ ghi chú');
+ fireEvent.change(screen.getByLabelText(`Kết thúc ${a.name}`),{target:{value:'09:30'}});
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Lưu thay đổi'})).toBeEnabled());
+ fireEvent.click(screen.getByRole('button',{name:'Lưu thay đổi'}));
+ await waitFor(()=>expect(axios.put).toHaveBeenCalledWith(expect.stringContaining('/masters/exam-arrangements/arrangement'),expect.objectContaining({version:7,note:'Giữ ghi chú',groups:[expect.objectContaining({id:'session-a',version:4,endTime:'09:30'})]}),expect.anything()));
+});
 it('selects multiple classes in the queue and opens the selected period with their snapshots ready to save',async()=>{
  renderPage();
  const first=await screen.findByRole('checkbox',{name:`Chọn lớp ${a.name} · ${a.subjectName}`});
@@ -135,9 +157,9 @@ it('selects multiple classes in the queue and opens the selected period with the
  expect(within(dialog).getByLabelText('Bắt đầu đợt 1')).toHaveValue('14:00');
  expect(within(dialog).getByRole('table')).toHaveTextContent(a.subjectName);
  expect(within(dialog).getByRole('table')).toHaveTextContent(b.subjectName);
- await waitFor(()=>expect(within(dialog).getByRole('button',{name:'301 · 30 chỗ'})).toBeEnabled());
+ await waitFor(()=>expect(within(dialog).getByRole('button',{name:/301 30 chỗ/})).toBeEnabled());
  choose('Đơn vị','Viện Đào tạo SĐH');choose('Cán bộ coi thi 1','Nguyễn An');
- fireEvent.click(within(dialog).getByRole('button',{name:'301 · 30 chỗ'}));
+ fireEvent.click(within(dialog).getByRole('button',{name:/301 30 chỗ/}));
  fireEvent.click(within(dialog).getByRole('button',{name:'Lưu buổi thi'}));
  await waitFor(()=>expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/masters/exam-arrangements'),expect.objectContaining({examDate:'2026-10-20',period:'AFTERNOON',groups:[
   expect.objectContaining({courseOfferingId:a.id,snapshotId:a.snapshotId,startTime:'14:00',endTime:'15:00'}),

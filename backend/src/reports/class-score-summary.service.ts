@@ -5,7 +5,7 @@ import { academicProgress } from "./academic-progress.js";
 import { auditActor } from "../plan/membership-history.js";
 import { CurriculumBlock } from "../database/models/plan/curriculum-block.model.js";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
-import { QueryTypes } from "sequelize";
+import { QueryTypes, type Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { Major } from "../database/models/common/major.model.js";
 import { Discipline } from "../database/models/common/discipline.model.js";
@@ -72,7 +72,7 @@ export class ClassScoreSummaryService {
 
   async options() {
     return { groups: await this.groups.findAll({
-      attributes: ["id", "code", "name", "program", "academicYear", "curriculumId", "majorId"],
+      attributes: ["id", "code", "name", "program", "academicYear", "curriculumId", "majorId", "intakeRound"],
       include: [{ model: Major, attributes: ["id", "name", "disciplineId"],
         include: [{ model: Discipline, attributes: ["id", "code", "name"] }] }],
       order: [["academicYear", "DESC"], ["code", "ASC"]],
@@ -93,12 +93,13 @@ export class ClassScoreSummaryService {
     return { classGroup, students };
   }
 
-  async learnerScorecard(admissionRecordId: string, classGroupId?: string) {
+  async learnerScorecard(admissionRecordId: string, classGroupId?: string, transaction?: Transaction) {
     // Duration has several catalog sources without a precedence rule. The input
     // diploma number is an undergraduate degree, so neither is inferred here.
+    const txOption = transaction ? { transaction } : {};
     const [student] = await this.sequelize.query<any>(`
       ${TRANSCRIPT_PROFILE_SQL} WHERE ar.id = :admissionRecordId
-    `, { type: QueryTypes.SELECT, replacements: { admissionRecordId } });
+    `, { type: QueryTypes.SELECT, replacements: { admissionRecordId }, ...txOption });
     if (!student) throw new NotFoundException("Không tìm thấy học viên.");
     const groups = await this.sequelize.query<any>(`
       SELECT DISTINCT cg.id, cg.code, cg.name, cg.program, cg.academic_year AS "academicYear",
@@ -110,12 +111,14 @@ export class ClassScoreSummaryService {
       WHERE cm.admission_record_id = :admissionRecordId OR
         (:studentId IS NOT NULL AND (cm.student_id = :studentId OR member_record.student_id = :studentId))
       ORDER BY active DESC, "academicYear" DESC NULLS LAST, cg.code, cg.id
-    `, { type: QueryTypes.SELECT, replacements: { admissionRecordId, studentId: student.studentId } });
+    `, { type: QueryTypes.SELECT, replacements: { admissionRecordId, studentId: student.studentId }, ...txOption });
     const selected = classGroupId ? groups.find(group => group.id === classGroupId)
       : groups.find(group => group.active) || groups.find(group => group.academicYear === student.academicYear) || groups[0];
     if (classGroupId && !selected) throw new NotFoundException("Học viên không thuộc lớp được chọn.");
     if (!selected) return { student, groups, group: null, curriculum: null, subjects: [] };
-    const report = await this.get({ classGroupId: selected.id }, true, { participantId: student.participantId, includeDetails: true });
+    const report = transaction
+      ? await this.get({ classGroupId: selected.id }, true, { participantId: student.participantId, includeDetails: true }, transaction)
+      : await this.get({ classGroupId: selected.id }, true, { participantId: student.participantId, includeDetails: true });
     const person = report.rows.find(row => row.participantId === student.participantId);
     if (!person) throw new NotFoundException("Học viên không còn thuộc lớp được chọn.");
     const scorecard = { student, groups, group: report.group, curriculum: report.curriculum,
@@ -146,7 +149,8 @@ export class ClassScoreSummaryService {
     }) };
   }
 
-  async get(query: ClassScoreSummaryQueryDto, exportAll = false, scope: { participantId?: string; includeDetails?: boolean } = {}) {
+  async get(query: ClassScoreSummaryQueryDto, exportAll = false, scope: { participantId?: string; includeDetails?: boolean } = {}, transaction?: Transaction) {
+    const txOption = transaction ? { transaction } : {};
     const group = await this.groups.findByPk(query.classGroupId, {
       attributes: ["id", "code", "name", "program", "academicYear", "curriculumId"],
       include: [
@@ -155,6 +159,7 @@ export class ClassScoreSummaryService {
           { model: CurriculumBlock, as: "blocks" },
         ] },
       ],
+      ...txOption,
     });
     if (!group) throw new NotFoundException("Không tìm thấy lớp học viên.");
     const subjects = sortCurriculumSubjectsByVietnameseName(group.curriculumId ? await this.sequelize.query<any>(`
@@ -169,7 +174,7 @@ export class ClassScoreSummaryService {
       WHERE cs.curriculum_id = :curriculumId
       ORDER BY b.sort_order, cs.sort_order, s.sort_order, s.code, s.id
     `, { type: QueryTypes.SELECT, replacements: { curriculumId: group.curriculumId, classGroupId: group.id,
-    } }) : []);
+    }, ...txOption }) : []);
     const pageSize = Math.min(100, Math.max(1, query.pageSize || 50));
     const [roster] = await this.sequelize.query<any>(`
       ${CLASS_ROSTER_CTE}, filtered AS (
@@ -188,7 +193,7 @@ export class ClassScoreSummaryService {
     `, { type: QueryTypes.SELECT, replacements: {
       groupId: group.id, academicYear: group.academicYear || "", participantId: scope.participantId || "",
       page: exportAll ? 1 : Math.max(1, query.page || 1), pageSize, search: (query.search || "").trim(),
-    } });
+    }, ...txOption });
 
     const rows: any[] = roster.rows.map((row: any) => ({ ...row, scores: {} }));
     if (subjects.length && rows.length) {
@@ -234,7 +239,7 @@ export class ClassScoreSummaryService {
         SELECT "participantId", "subjectId", score, result, details FROM ranked WHERE rank = 1
       `, { type: QueryTypes.SELECT, replacements: {
         groupId: group.id, participantIds: rows.map(row => row.participantId), subjectIds: subjects.map(subject => subject.id), includeDetails: !!scope.includeDetails,
-      } });
+      }, ...txOption });
       const people = new Map(rows.map(row => [row.participantId, row]));
       for (const entry of scores) {
         if (entry.details?.source === "gradebook") {
@@ -290,7 +295,7 @@ export class ClassScoreSummaryService {
       // Serialize publication with grade, membership, policy and recognition
       // mutations before reading the scorecard used for the immutable snapshot.
       await this.sequelize.query("SELECT pg_advisory_xact_lock(21026)", { transaction });
-      const snapshot = await this.learnerScorecard(admissionRecordId, classGroupId);
+      const snapshot = await this.learnerScorecard(admissionRecordId, classGroupId, transaction);
       if (!(snapshot as any).progress?.completed) throw new ConflictException("Chưa hoàn thành các điều kiện học phần và chốt điểm của CTĐT.");
       (snapshot as any).issuedAt = new Date().toISOString();
       const id = randomUUID();

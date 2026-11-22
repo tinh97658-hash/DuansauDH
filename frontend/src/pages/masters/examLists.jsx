@@ -1,6 +1,7 @@
 import { notify } from "../../utils/notify";
 import { listenForBackgroundRefresh } from "../../utils/backgroundRefresh";
 import { usePermissions } from "../../features/accounts/usePermissions";
+import IntakeRoundSelect, { matchesIntakeRound } from "../../components/IntakeRoundSelect";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { Link, useSearchParams } from "react-router-dom";
@@ -107,6 +108,7 @@ export default function ExamLists() {
   const [groups, setGroups] = useState([]), [subjects, setSubjects] = useState([]);
   const [loadedOffering, setLoadedOffering] = useState(null);
   const [majorId, setMajorId] = useState("");
+  const [intakeRound, setIntakeRound] = useState("");
   const [yearFilter, setYearFilter] = useState("");
   const [groupId, setGroupId] = useState(""), [offeringId, setOfferingId] = useState("");
   const [rows, setRows] = useState([]), [revision, setRevision] = useState(0), [dirty, setDirty] = useState({});
@@ -236,7 +238,7 @@ export default function ExamLists() {
   const years = [...new Set(groups.filter(group => !majorId || group.majorId === majorId)
     .map(group => group.academicYear).filter(Boolean))].sort().reverse();
   const visibleClasses = classChoices.filter(({ group }) => (!majorId || group.majorId === majorId)
-    && (!yearFilter || group.academicYear === yearFilter));
+    && (!yearFilter || group.academicYear === yearFilter) && matchesIntakeRound(group, intakeRound));
   const offeringChoices = sortOfferingChoices([...new Map(visibleClasses.map(entry => [entry.offering.id, entry])).values()]);
   const selectedEntry = classChoices.find(entry => entry.key === `${groupId}:${offeringId}`);
   const year = selectedEntry?.group.academicYear || "";
@@ -455,31 +457,32 @@ export default function ExamLists() {
         newestOnTop limit={1} className="exam-warning-toast-container exam-no-print" toastClassName="app-toast exam-warning-toast"
          />
       <Paper variant="outlined" sx={{ ...panelSx, p: 1, mb: 1 }} className="exam-no-print">
-        <Stack className="app-filter-toolbar" role="group" aria-label="Bộ lọc bảng điểm" direction="row" gap={1.5} flexWrap="nowrap" alignItems="flex-end">
-          <FilterSelectField label="Chuyên ngành" value={majorId} disabled={optionsLoading || saving || exporting} sx={{ flex: "0 1 240px", minWidth: 180 }} onChange={(event) => {
+        <Stack className="app-filter-toolbar" role="group" aria-label="Bộ lọc bảng điểm" direction="row" gap={1.5} alignItems="flex-end">
+          <FilterSelectField label="Chuyên ngành" value={majorId} disabled={optionsLoading || saving || exporting} sx={{ flex: "1 1 180px", minWidth: 160 }} onChange={(event) => {
             const next = event.target.value;
             requestChange(() => {
               setMajorId(next);
               const nextYear = groups.some(group => (!next || group.majorId === next) && group.academicYear === yearFilter) ? yearFilter : "";
               setYearFilter(nextYear);
               const candidates = classChoices.filter(({ group }) => (!next || group.majorId === next)
-                && (!nextYear || group.academicYear === nextYear));
+                && (!nextYear || group.academicYear === nextYear) && matchesIntakeRound(group, intakeRound));
               selectClass(candidates.find(entry => entry.offering.id === offeringId)
                 || candidates.find(entry => subjectNameKey(entry.subject) === selectedName) || candidates[0]);
             });
           }}><MenuItem value="">Tất cả chuyên ngành</MenuItem>{majors.map((major) => <MenuItem key={major.id} value={major.id}>{major.name}</MenuItem>)}</FilterSelectField>
-          <FilterSelectField label="Năm" value={yearFilter} disabled={optionsLoading || saving || exporting} sx={{ flex: "0 0 110px", minWidth: 110 }} onChange={(event) => {
+          <FilterSelectField label="Năm" value={yearFilter} disabled={optionsLoading || saving || exporting} sx={{ flex: "0 1 105px", minWidth: 100 }} onChange={(event) => {
             const next = event.target.value;
             requestChange(() => {
-              setYearFilter(next);
+              setYearFilter(next); setIntakeRound("");
               const candidates = classChoices.filter(({ group }) => (!majorId || group.majorId === majorId)
                 && (!next || group.academicYear === next));
               selectClass(candidates.find(entry => entry.offering.id === offeringId)
                 || candidates.find(entry => subjectNameKey(entry.subject) === selectedName) || candidates[0]);
             });
           }}><MenuItem value="">Tất cả năm</MenuItem>{years.map(value => <MenuItem key={value} value={value}>{value}</MenuItem>)}</FilterSelectField>
+          <IntakeRoundSelect year={yearFilter} value={intakeRound} rows={groups} disabled={optionsLoading || saving || exporting} onChange={value => requestChange(() => { setIntakeRound(value); const candidates = classChoices.filter(({ group }) => (!majorId || group.majorId === majorId) && (!yearFilter || group.academicYear === yearFilter) && matchesIntakeRound(group, value)); selectClass(candidates.find(entry => entry.offering.id === offeringId) || candidates[0]); })} />
           <FilterSelectField label="Tên lớp học phần" value={offeringChoices.some(entry => entry.offering.id === offeringId) ? offeringId : ""}
-            disabled={optionsLoading || saving || exporting || !offeringChoices.length} sx={{ flex: "1 1 500px", minWidth: 260 }}
+            disabled={optionsLoading || saving || exporting || !offeringChoices.length} sx={{ flex: "2 1 260px", minWidth: 220 }}
             selectSx={{ height: 38, "& .MuiSelect-select": { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", py: 0, pr: "34px !important" } }}
             inputRef={offeringMenu.inputRef} MenuProps={offeringMenu.menuProps}
             renderValue={value => { const entry = offeringChoices.find(entry => entry.offering.id === value); return entry ? offeringLabel(entry) : 'Chưa có lớp học phần'; }}
@@ -489,10 +492,10 @@ export default function ExamLists() {
               if (entry.offering.id === offeringId && stageOf(entry.offering).group === 0) showCompletionWarning();
             })}
           </FilterSelectField>
-          <FilterSelectField label="Môn" value={subjectKey(selectedEntry?.subject)} disabled sx={{ flex: "0 1 220px", minWidth: 180 }}>
+          <FilterSelectField label="Môn" value={subjectKey(selectedEntry?.subject)} disabled sx={{ flex: "1 1 180px", minWidth: 155 }}>
             <MenuItem value={subjectKey(selectedEntry?.subject)}>{selectedEntry ? subjectLabel(selectedEntry.subject) : "Chưa có môn học"}</MenuItem>
           </FilterSelectField>
-          <FilterSearchField placeholder="Mã HV, họ tên..." value={search} disabled={saving || exporting} onChange={(event) => { setPage(1); setSearch(event.target.value); }} sx={{ flex: "0 0 200px", minWidth: 200 }} />
+          <FilterSearchField placeholder="Mã HV, họ tên..." value={search} disabled={saving || exporting} onChange={(event) => { setPage(1); setSearch(event.target.value); }} sx={{ flex: "1 1 190px", minWidth: 180 }} />
         </Stack>
       </Paper>
 

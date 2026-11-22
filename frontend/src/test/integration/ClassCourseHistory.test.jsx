@@ -54,9 +54,14 @@ function mount(query = "", session = null) {
   return render(<AuthSessionContext.Provider value={session}><MemoryRouter useTransitions={false} initialEntries={[`/masters/class-course-history${query}`]}><ClassCourseHistory /><CurrentLocation /></MemoryRouter></AuthSessionContext.Provider>);
 }
 
+function chooseFilter(label, optionName) {
+  fireEvent.mouseDown(screen.getByLabelText(label));
+  fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: optionName, exact: true }));
+}
+
 async function chooseScope({ expectTable = true } = {}) {
-  await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveValue(major.id));
-  expect(screen.getByLabelText("Ngành")).toHaveValue(discipline.id);
+  await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveTextContent(major.name));
+  expect(screen.getByLabelText("Ngành")).toHaveTextContent(discipline.name);
   expect(screen.getByLabelText("Khóa / năm học")).toHaveTextContent("2027");
   if (expectTable) return screen.findByRole("table", { name: "Ma trận tiến độ học phần theo lớp" });
   return null;
@@ -122,7 +127,7 @@ it.each([["word", "Word (.docx)"], ["excel", "Excel (.xlsx)"], ["pdf", "PDF (.pd
 
 it("prefills the class selected in the page filter and allows cancelling without exporting", async () => {
   mount(); await chooseScope();
-  fireEvent.change(screen.getByLabelText("Lớp học viên"), { target: { value: "group-2027-2" } });
+  chooseFilter("Lớp học viên", "CNT2027.02");
   fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Excel (.xlsx)" }));
   const dialog = screen.getByRole("dialog");
@@ -352,17 +357,19 @@ it("skips parents without usable classes and uses catalog parent order rather th
     { majorId: usable.id, academicYear: "2027" },
   ] });
   mount("?majorId=missing&year=1900");
-  await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveValue(usable.id));
-  expect(screen.getByLabelText("Ngành")).toHaveValue(first.disciplineId);
+  await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveTextContent(usable.name));
+  expect(screen.getByLabelText("Ngành")).toHaveTextContent(first.discipline.name);
   expect(screen.getByLabelText("Khóa / năm học")).toHaveTextContent("2027");
-  expect(screen.queryByRole("option", { name: "Tất cả ngành" })).not.toBeInTheDocument();
+  fireEvent.mouseDown(screen.getByLabelText("Ngành"));
+  expect(within(screen.getByRole("listbox")).queryByRole("option", { name: "Tất cả ngành" })).not.toBeInTheDocument();
+  fireEvent.click(document.querySelector(".MuiBackdrop-root"));
 });
 
 it("preserves a valid URL major and years and synchronizes its parent even when the URL parent differs", async () => {
   mockData({ catalog: [...makeClasses(), ...makeClasses("2028")] });
   mount(`?disciplineId=wrong-parent&majorId=${major.id}&year=2027,2028&context=keep`);
-  await waitFor(() => expect(screen.getByLabelText("Ngành")).toHaveValue(discipline.id));
-  await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveValue(major.id));
+  await waitFor(() => expect(screen.getByLabelText("Ngành")).toHaveTextContent(discipline.name));
+  await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveTextContent(major.name));
   expect(screen.getByLabelText("Khóa / năm học")).toHaveTextContent("2027, 2028");
   await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent(`disciplineId=${discipline.id}`));
   expect(screen.getByTestId("location")).toHaveTextContent("context=keep");
@@ -376,13 +383,17 @@ it("constrains majors when the parent changes and leaves a parent with no usable
   const empty = { ...major, id: "empty", disciplineId: "empty-parent", discipline: { id: "empty-parent", name: "Ngành trống" } };
   mockData({ majors: [major, other, empty], catalog: [...makeClasses(), { majorId: other.id, academicYear: "2029" }] });
   mount(); await chooseScope();
-  fireEvent.change(screen.getByLabelText("Ngành"), { target: { value: other.disciplineId } });
-  expect(screen.getByLabelText("Chuyên ngành")).toHaveValue(other.id);
-  expect(screen.getByLabelText("Chuyên ngành").querySelector(`option[value="${major.id}"]`)).not.toBeInTheDocument();
+  chooseFilter("Ngành", other.discipline.name);
+  expect(screen.getByLabelText("Chuyên ngành")).toHaveTextContent(other.name);
+  fireEvent.mouseDown(screen.getByLabelText("Chuyên ngành"));
+  const majorListbox = screen.getByRole("listbox");
+  expect(within(majorListbox).getAllByRole("option", { name: other.name })).toHaveLength(1);
+  expect(majorListbox.querySelector(`[data-value="${major.id}"]`)).toBeNull();
+  fireEvent.click(document.querySelector(".MuiBackdrop-root"));
   expect(screen.getByLabelText("Khóa / năm học")).toHaveTextContent("2029");
-  fireEvent.change(screen.getByLabelText("Ngành"), { target: { value: empty.disciplineId } });
-  await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveValue(""));
-  expect(screen.getByLabelText("Ngành")).toHaveValue(empty.disciplineId);
+  chooseFilter("Ngành", empty.discipline.name);
+  await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveTextContent("Chọn chuyên ngành"));
+  expect(screen.getByLabelText("Ngành")).toHaveTextContent(empty.discipline.name);
   expect(screen.getByText("Chưa có dữ liệu phù hợp để theo dõi tiến độ.")).toBeInTheDocument();
   expect(screen.queryByRole("table")).not.toBeInTheDocument();
 });
@@ -391,8 +402,8 @@ it("shows an empty state and makes no progress request when no parent-major pair
   mockData({ catalog: [] });
   mount("?majorId=missing&year=1900");
   expect(await screen.findByText("Chưa có dữ liệu phù hợp để theo dõi tiến độ.")).toBeInTheDocument();
-  expect(screen.getByLabelText("Ngành")).toHaveValue("");
-  expect(screen.getByLabelText("Chuyên ngành")).toHaveValue("");
+  expect(screen.getByLabelText("Ngành")).toHaveTextContent("Chọn ngành");
+  expect(screen.getByLabelText("Chuyên ngành")).toHaveTextContent("Chọn chuyên ngành");
   expect(axios.get.mock.calls.some(([url]) => url.includes("/class-curriculum-progress"))).toBe(false);
 });
 
@@ -441,13 +452,13 @@ it("shows every catalog subject but only shows progress in classes whose curricu
   fireEvent.click(screen.getByRole("button", { name: "Đóng" }));
   fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: "hoc phan moi" } });
   expect(within(table).getAllByRole("row")).toHaveLength(2);
-  fireEvent.change(screen.getByLabelText("Trạng thái"), { target: { value: "not_started" } });
+  chooseFilter("Trạng thái", "Chưa tổ chức");
   expect(screen.queryByText(added.name)).not.toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText("Trạng thái"), { target: { value: "completed" } });
+  chooseFilter("Trạng thái", "Hoàn thành");
   expect(screen.queryByText(added.name)).not.toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: "hoc phan khac" } });
   expect(screen.queryByText(another.name)).not.toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText("Trạng thái"), { target: { value: "all" } });
+  chooseFilter("Trạng thái", "Tất cả");
   expect(screen.getByText(another.name)).toBeInTheDocument();
 });
 
@@ -470,10 +481,10 @@ it("opens existing OfferingDetails from an organized status and leaves Chưa t�
 
 it("filters matrix rows by any class status and normalized subject search", async () => {
   mount(); await chooseScope();
-  fireEvent.change(screen.getByLabelText("Trạng thái"), { target: { value: "not_started" } });
+  chooseFilter("Trạng thái", "Chưa tổ chức");
   expect(screen.getByText("Hệ phân tán")).toBeInTheDocument();
   expect(screen.queryByText(baseSubjects[0].name)).not.toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText("Trạng thái"), { target: { value: "all" } });
+  chooseFilter("Trạng thái", "Tất cả");
   fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: "nghien cuu" } });
   expect(screen.getByText(baseSubjects[0].name)).toBeInTheDocument();
   expect(screen.queryByText("Hệ phân tán")).not.toBeInTheDocument();
@@ -521,9 +532,9 @@ it("prefers the current year and recomputes it when the major changes", async ()
   });
 
   mount();
-  await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveValue(major.id));
-  fireEvent.change(screen.getByLabelText("Chuyên ngành"), { target: { value: secondMajor.id } });
-  expect(screen.getByLabelText("Ngành")).toHaveValue(secondMajor.disciplineId);
+  await waitFor(() => expect(screen.getByLabelText("Chuyên ngành")).toHaveTextContent(major.name));
+  chooseFilter("Chuyên ngành", secondMajor.name);
+  expect(screen.getByLabelText("Ngành")).toHaveTextContent(discipline.name);
   expect(screen.getByLabelText("Khóa / năm học")).toHaveTextContent(currentYear);
   await waitFor(() => expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/class-curriculum-progress"), {
     params: { majorId: secondMajor.id, academicYear: currentYear }, withCredentials: true, signal: expect.any(AbortSignal),

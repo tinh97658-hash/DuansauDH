@@ -113,6 +113,42 @@ body .app-popup .ep-arrangement-dialog .ep-resource-input [role=option]{min-heig
 body .app-popup .ep-arrangement-dialog .ep-resource-input [role=option]:disabled{color:#8a98a3;cursor:default;background:#f5f7f9}
 body .app-popup .ep-arrangement-dialog .ep-resource-hint{margin:0;padding:10px 12px;font-weight:400;font-size:13px;color:var(--popup-muted)}
 .ep-arrangement-rooms{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.ep-composer-summary{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 20px;padding:12px 16px;margin-bottom:16px;border:1px solid #cbdbe8;border-radius:8px;background:#f1f6fa;color:#173e75}
+.ep-composer-summary>span{font-size:13px;color:#526a7e}
+.scheduling-v20.v20-dialog.ep-composer-dialog{width:min(1440px,96vw);max-width:calc(100vw - 40px);--app-dialog-max-height:92dvh;max-height:92dvh}
+.ep-composer-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px;align-items:start}
+.ep-composer-sidebar{min-width:0}
+.ep-composer-main{min-width:0}
+.ep-composer-section{min-width:0;margin-bottom:12px;padding:12px;border:1px solid #d7e1e9;border-radius:8px;background:#fff}
+.ep-composer-section>h3{margin:0 0 12px;font-size:15px;font-weight:700;color:#173e75}
+.ep-composer-section>h3 small{margin-left:8px;color:#607486;font-size:12px;font-weight:400}
+.ep-composer-dialog .ep-arrangement-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+.ep-composer-dialog .ep-arrangement-fields>.v20-field{margin-bottom:0}
+.ep-composer-hint{margin:0 0 12px;color:#607486;font-size:13px;line-height:1.5}
+.ep-composer-dialog .ep-round{margin:12px 0;padding:12px;background:#f8fafc}
+.ep-composer-dialog .ep-round-heading{justify-content:space-between;gap:10px}
+.ep-composer-dialog .ep-round-heading h4{margin:0;font-size:14px;color:#173e75}
+.ep-composer-dialog .ep-round-heading>label{display:flex;align-items:center;gap:8px;font-size:13px}
+.ep-composer-dialog .ep-round-table table{min-width:620px}
+body .app-popup .ep-composer-dialog .app-time-field{display:inline-flex;align-items:center;flex-wrap:nowrap;width:auto;height:40px;max-width:100%;border:1px solid #bfcedb;background:#fff}
+body .app-popup .ep-composer-dialog .app-time-field>input{display:block;flex:1 1 7ch;width:7ch;min-width:0;height:100%;margin:0;padding:0 8px;border:0;border-radius:0;font:inherit}
+body .app-popup .ep-composer-dialog .app-time-field>.app-time-trigger{display:grid;place-items:center;flex:0 0 32px;width:32px;min-width:32px;height:100%;margin:0;padding:0;border:0;border-left:1px solid #e1e8ee;background:transparent;color:#526a82}
+body .app-popup .ep-composer-dialog .app-time-field>.app-time-trigger svg{width:16px;height:16px}
+.ep-room-panel{background:#f8fafc}
+.ep-room-list{max-height:clamp(180px,32dvh,340px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:4px}
+.ep-room-selection{margin:0 0 16px;padding:10px 12px;border-radius:6px;background:#e8f0f8;color:#173e75;font-size:13px;font-weight:600}
+.ep-room-floor>h4{margin:12px 0 8px;font-size:13px;color:#526a7e}
+.ep-room-panel .ep-arrangement-rooms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0}
+body .app-popup .ep-room-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px 8px;text-align:left;min-width:0;min-height:64px;padding:8px 10px;border:1px solid #bfcedb;border-radius:6px;background:#fff;color:#173e75;font:inherit;cursor:pointer}
+body .app-popup .ep-room-card strong{font-size:15px;overflow-wrap:anywhere;line-height:1.35}
+body .app-popup .ep-room-card span{font-size:13px}
+body .app-popup .ep-room-card small{grid-column:1/-1;font-size:11px;font-weight:600;line-height:1.3}
+body .app-popup .ep-room-card:hover:not(:disabled){border-color:#2367a2;background:#edf5fc}
+body .app-popup .ep-room-card.ep-room-selected{border:2px solid #2367a2;background:#e6f1fb}
+body .app-popup .ep-room-card:disabled{background:#edf0f3;color:#778594;cursor:default}
+body .app-popup .ep-room-card:focus-visible{outline:3px solid #73b6ee;outline-offset:2px}
+@media(max-width:1050px){.ep-composer-grid{grid-template-columns:minmax(0,1fr)}.ep-room-panel{position:static}.ep-room-panel .ep-arrangement-rooms{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}}
+@media(max-width:600px){.ep-composer-dialog .ep-arrangement-fields{grid-template-columns:minmax(0,1fr)}.ep-composer-section{padding:12px}.ep-composer-summary{align-items:flex-start;flex-direction:column}}
 .ep-round{border:1px solid #d7e1e9;border-radius:6px;margin:16px 0;padding:12px}
 .ep-round-heading{display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin-bottom:10px}
 .ep-round-heading h3{font-size:15px;margin:0;color:#173e75}

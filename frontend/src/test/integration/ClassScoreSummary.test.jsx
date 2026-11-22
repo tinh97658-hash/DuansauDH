@@ -37,7 +37,7 @@ const reportFor = (id) => ({ group: groups.find(group => group.id === id), curri
 beforeEach(() => {
   jest.clearAllMocks();
   localStorage.clear();
-  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups } : reportFor(config.params.classGroupId) }));
+  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/system/intake-rounds") ? [] : url.endsWith("/options") ? { groups } : reportFor(config.params.classGroupId) }));
   createClassScoreWorkbook.mockResolvedValue(new Blob(["xlsx"]));
   generateTranscriptDocuments.mockResolvedValue([{ filename: "Bang-diem.docx", blob: new Blob(["word"]) }]);
   packTranscriptZip.mockResolvedValue(new Blob(["zip"], { type: "application/zip" }));
@@ -51,7 +51,7 @@ const chooseFilter = (label, text) => {
 
 it("refreshes the open class summary after exam grades are saved", async () => {
   let updated = false;
-  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups }
+  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/system/intake-rounds") ? [] : url.endsWith("/options") ? { groups }
     : { ...reportFor(config.params.classGroupId), rows: [{ ...student, scores: { hp1: { score: updated ? 8.5 : 0, result: updated ? "passed" : "failed" } } }] } }));
   mount();
   await screen.findByText("HV001");
@@ -62,7 +62,7 @@ it("refreshes the open class summary after exam grades are saved", async () => {
 
 it('shows a saved disqualification as Không đạt instead of a blank cell and refreshes when the latest result changes', async () => {
   let result = 'failed';
-  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith('/options') ? { groups }
+  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/system/intake-rounds") ? [] : url.endsWith('/options') ? { groups }
     : { ...reportFor(config.params.classGroupId), rows: [{ ...student, scores: { hp1: { score: null, result, eligibilityFrozen: true } } }] } }));
   mount();
   const failed = await screen.findByText('Không đạt');
@@ -74,7 +74,7 @@ it('shows a saved disqualification as Không đạt instead of a blank cell and 
 
 it("shows a profile language exemption as passed in the summary after the profile is saved", async () => {
   let exempt = false;
-  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups }
+  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/system/intake-rounds") ? [] : url.endsWith("/options") ? { groups }
     : { ...reportFor(config.params.classGroupId), rows: [{ ...student, scores: {
       hp2: exempt ? { score: null, result: "passed", profileForeignLanguageExempt: true } : null,
     } }] } }));
@@ -123,7 +123,7 @@ it.each(["Nguyễn", "Không khớp"])("exports the whole selected class indepen
   const matching = search === "Nguyễn" ? [student] : [];
   const cards = full.rows.map(row => ({ student: row, group: full.group, subjects: [] }));
   fetchClassTranscripts.mockResolvedValue({ classGroup: full.group, scorecards: cards });
-  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups }
+  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/system/intake-rounds") ? [] : url.endsWith("/options") ? { groups }
     : url.endsWith("/export") ? full : { ...full, rows: config.params.search ? matching : full.rows,
       total: config.params.search ? matching.length : full.total, page: config.params.page, pageSize: 15 } }));
   mount();
@@ -161,7 +161,7 @@ it("filters classes by intake year and loads the selected class", async () => {
 });
 
 it("loads only a page, requests the next page, and resets search to page one", async () => {
-  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups } : {
+  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/system/intake-rounds") ? [] : url.endsWith("/options") ? { groups } : {
     ...reportFor(config.params.classGroupId), total: config.params.search ? 1 : 40,
     page: config.params.page, pageSize: 15,
     rows: [{ ...student, code: config.params.search ? "HV040" : config.params.page === 2 ? "HV016" : "HV001" }],
@@ -184,7 +184,7 @@ it("exports all students using a separate full-class request", async () => {
   const full = { ...reportFor("g1"), rows: [student, { ...student, participantId: "student:two", code: "HV002" }], total: 2 };
   const cards = full.rows.map(row => ({ student: row, group: full.group, subjects: [] }));
   fetchClassTranscripts.mockResolvedValue({ classGroup: full.group, scorecards: cards });
-  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/options") ? { groups } : url.endsWith("/export") ? full : reportFor(config.params.classGroupId) }));
+  axios.get.mockImplementation(async (url, config) => ({ data: url.endsWith("/system/intake-rounds") ? [] : url.endsWith("/options") ? { groups } : url.endsWith("/export") ? full : reportFor(config.params.classGroupId) }));
   mount();
   await screen.findByText("HV001");
   fireEvent.click(screen.getByRole("button", { name: "Xuất báo cáo" }));
@@ -223,7 +223,7 @@ it("discards a late response from the previously selected class", async () => {
 });
 
 it("shows missing curriculum and empty class states with export disabled", async () => {
-  axios.get.mockImplementation(async url => ({ data: url.endsWith("/options") ? { groups } : { ...reportFor("g1"), curriculum: null, subjects: [], rows: [], total: 0 } }));
+  axios.get.mockImplementation(async url => ({ data: url.endsWith("/system/intake-rounds") ? [] : url.endsWith("/options") ? { groups } : { ...reportFor("g1"), curriculum: null, subjects: [], rows: [], total: 0 } }));
   mount();
   expect(await screen.findByText(/Lớp chưa được gán chương trình đào tạo/)).toBeInTheDocument();
   expect(screen.getByText("Lớp chưa có học viên.")).toBeInTheDocument();

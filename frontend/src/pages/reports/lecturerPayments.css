@@ -1,8 +1,5 @@
-.lp-page .lp-filters { grid-template-columns:minmax(300px,1.4fr) minmax(140px,1fr) minmax(150px,1fr) minmax(170px,1fr) minmax(210px,1.2fr); align-items:end; gap:12px; overflow-x:auto; }
-.lp-date-filter { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-.lp-date-filter input { width:100%; min-width:0; height:38px; border:1px solid #b9cbd8; border-radius:7px; background:#fff; padding:0 8px; color:#12263f; font:inherit; }
-.lp-date-filter input:disabled { background:#f8fafc; }
-.lp-date-filter input:focus { border-color:#0b7fa3; outline:none; box-shadow:none; }
+.lp-page .lp-filters { gap:0; }
+.lp-date-filter { display:flex; align-items:flex-end; gap:8px; flex:none; }
 .lp-link:focus-visible { outline:2px solid #0b7fa3; outline-offset:2px; }
 /* Filtered row removal is anchored explicitly; avoid a second native scroll adjustment. */
 .lp-page .lp-table { width:100%; min-width:1280px; table-layout:fixed; overflow-anchor:none; }

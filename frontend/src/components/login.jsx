@@ -259,7 +259,11 @@ const Login = () => {
       {/* CỘT PHẢI: BANNER HÌNH ẢNH THỰC TẾ TRƯỜNG & VIỆN */}
       <img
         className="vmu-login-art"
-        src="/images/vmu-login-banner-clean.png"
+        src="/images/vmu-login-banner-clean.webp"
+        width={1402}
+        height={1122}
+        fetchPriority="high"
+        decoding="async"
         alt=""
         aria-hidden="true"
       />

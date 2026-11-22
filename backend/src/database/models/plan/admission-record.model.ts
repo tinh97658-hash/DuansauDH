@@ -62,7 +62,7 @@ export class AdmissionRecord extends Model {
   @Column({ type: DataType.STRING(50), allowNull: true })
   declare receiptType: string | null; // Hình thức nhận hồ sơ (Trực tiếp, Bưu điện, Trực tuyến...)
 
-  @Column({ type: DataType.STRING(50), allowNull: true })
+  @Column({ type: DataType.STRING(120), allowNull: true })
   declare profileCategory: string | null; // Phân loại hồ sơ
 
   @Column({ type: DataType.STRING(30), allowNull: true })
@@ -113,7 +113,9 @@ export class AdmissionRecord extends Model {
 
   @Default("2026")
   @Column({ type: DataType.STRING(10), allowNull: true })
-  declare academicYear: string | null; // Năm tuyển sinh
+  declare academicYear: string | null;
+
+  @Column(DataType.INTEGER) declare intakeRound: number | null; // Năm tuyển sinh
 
   // 3. THÔNG TIN CHỖ Ở
   @Default("Việt Nam")

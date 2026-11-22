@@ -13,6 +13,7 @@ import { AccountsModule } from "./accounts/accounts.module.js";
 import { AuditContextMiddleware } from "./audit/audit-context.js";
 import { AuditModule } from "./audit/audit.module.js";
 import { AuthModule } from "./auth/auth.module.js";
+import { isSessionCookieSecure } from "./auth/session-cookie.js";
 import { RbacModule } from "./auth/rbac.module.js";
 import { environmentFiles, environmentSchema } from "./config/configuration.js";
 import { DatabaseModule } from "./database/database.module.js";
@@ -56,7 +57,7 @@ export class AppModule implements NestModule {
 
   configure(consumer: MiddlewareConsumer) {
     const SequelizeStore = connectSessionSequelize(session.Store);
-    const secure = this.config.get<boolean>("SESSION_COOKIE_SECURE") ?? this.config.get("NODE_ENV") === "production";
+    const secure = isSessionCookieSecure(this.config);
     consumer.apply(
       cookieParser(),
       flash(),

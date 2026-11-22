@@ -334,7 +334,7 @@ describe("Ribbon read/navigation permission contracts", () => {
     const group = screen.getByRole("button", { name: "HỆ THỐNG" });
     const breadcrumb = container.querySelector(".ribbon-breadcrumb");
     expect(breadcrumb).toHaveTextContent("Chuyên ngành");
-    expect(screen.getByRole("img", { name: /Biểu trưng/ })).toHaveAttribute("src", "https://sdh.vimaru.edu.vn/sites/sdh.vimaru.edu.vn/files/vmu-new-logo_0.png");
+    expect(screen.getByRole("img", { name: /Biểu trưng/ })).toHaveAttribute("src", "/vmu-logo.png");
     fireEvent.click(group);
     expect(group).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("button", { name: "Chuyên ngành" })).not.toBeInTheDocument();

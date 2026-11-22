@@ -1,5 +1,6 @@
 import { ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, CheckIcon, MagnifyingGlassIcon } from "../../components/AppIcons";
 import { usePermissions } from "../accounts/usePermissions";
+import IntakeRoundSelect, { matchesIntakeRound } from "../../components/IntakeRoundSelect";
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import YearSelect from "./YearSelect";
@@ -28,6 +29,7 @@ export default function CreateOffering({ user }) {
   const draftText = field => typeof initialDraft[field] === "string" ? initialDraft[field] : "";
   const [majorId, setMajor] = useState(() => draftText("majorId"));
   const [disciplineId, setDiscipline] = useState(() => draftText("disciplineId"));
+  const [intakeRound, setIntakeRound] = useState(() => draftText("intakeRound"));
   const [year, setYear] = useState(() => draftText("year"));
   const [subjectId, setSubject] = useState(() => draftText("subjectId"));
   const [offeringName, setOfferingName] = useState(() => draftText("offeringName"));
@@ -41,11 +43,11 @@ export default function CreateOffering({ user }) {
   const [created, setCreated] = useState(null);
   useEffect(() => {
     try {
-      sessionStorage.setItem(draftKey, JSON.stringify({ majorId, disciplineId, year, query, groupQuery,
+      sessionStorage.setItem(draftKey, JSON.stringify({ majorId, disciplineId, year, intakeRound, query, groupQuery,
         subjectId: created ? "" : subjectId, groupIds: created ? [] : groupIds,
         offeringName: created ? "" : offeringName, isCustomName: !created && isCustomName }));
     } catch { /* The form remains usable when storage is unavailable. */ }
-  }, [draftKey, majorId, disciplineId, year, subjectId, groupIds, offeringName, isCustomName, query, groupQuery, created]);
+  }, [draftKey, majorId, disciplineId, year, intakeRound, subjectId, groupIds, offeringName, isCustomName, query, groupQuery, created]);
   const confirmationPanelRef = useRef(null);
   const [confirmationScroll, setConfirmationScroll] = useState({ visible: false, offset: 0, height: 80 });
 
@@ -81,7 +83,10 @@ export default function CreateOffering({ user }) {
   const visibleMajors = majorsForDiscipline(majors.data || [], disciplineId);
   const groups = useLoad(async signal => majorId ? rows(await api.get(`/scheduling/class-groups/options?${new URLSearchParams({ majorId })}`, { signal })) : [], [majorId]);
   const candidates = useLoad(async signal => majorId && year ? (await api.get(`/scheduling/course-offering-candidates?${new URLSearchParams({ program: "masters", majorId, academicYear: year })}`, { signal })).subjects : [], [majorId, year, created?.id]);
-  const availableCandidates = (candidates.data || []).filter((item) => !isInternshipSubject(item.subject));
+  const availableCandidates = (candidates.data || []).map(item => ({ ...item,
+    eligibleClassGroups: (item.eligibleClassGroups || []).filter(group => matchesIntakeRound(group, intakeRound)),
+    retakeClassGroups: (item.retakeClassGroups || []).filter(group => matchesIntakeRound(group, intakeRound)),
+  })).filter(item => !isInternshipSubject(item.subject) && (!intakeRound || item.eligibleClassGroups.length || item.retakeClassGroups.length));
   const candidate = availableCandidates.find((item) => item.subject.id === subjectId);
   const subject = candidate?.subject;
   const eligible = [...(candidate?.eligibleClassGroups || []), ...(candidate?.retakeClassGroups || [])];
@@ -117,12 +122,14 @@ export default function CreateOffering({ user }) {
     setGroups((current) => current.includes(group.id) ? current.filter((id) => id !== group.id) : [...current, group.id]);
   };
   const openConfirmation = () => {
+    if (chosen.length !== groupIds.length) { setSaveError('Danh sách nhóm đã thay đổi theo năm hoặc đợt. Hãy chọn lại nhóm.'); return; }
     if (!preview.data?.participants) return;
     setSaveError("");
     setRoster(preview.data.participants.map((row) => ({ ...row, note: row.profileForeignLanguageExempt ? "Miễn thi" : "" })));
   };
   const create = async () => {
     if (saving || !roster || !canEdit) return;
+    if (chosen.length !== groupIds.length) { setSaveError('Danh sách nhóm đã thay đổi theo năm hoặc đợt. Hãy chọn lại nhóm.'); return; }
     setSaving(true);
     setSaveError("");
     try {
@@ -237,19 +244,23 @@ export default function CreateOffering({ user }) {
         <div className="sl-create-scope-fields">
           <div className="sl-create-scope-field sl-create-scope-discipline">
             <div className="v20-scope-step"><b>1</b>NGÀNH</div>
-            <SearchSelect label="Ngành" placeholder="Tất cả ngành" value={disciplineId} disabled={majors.loading} options={[{ id: "", name: "Tất cả ngành" }, ...disciplines.map((item) => ({ ...item, name: disciplineOptionLabel(item), code: "" }))]} onChange={(value) => changeScope(() => { setDiscipline(value); setMajor(""); setYear(""); })} />
+            <SearchSelect label="Ngành" placeholder="Tất cả ngành" value={disciplineId} disabled={majors.loading} options={[{ id: "", name: "Tất cả ngành" }, ...disciplines.map((item) => ({ ...item, name: disciplineOptionLabel(item), code: "" }))]} onChange={(value) => changeScope(() => { setDiscipline(value); setMajor(""); setYear(""); setIntakeRound(""); })} />
           </div>
           <div className="sl-create-scope-field sl-create-scope-major">
             <div className="v20-scope-step"><b>2</b>CHUYÊN NGÀNH</div>
-            <SearchSelect label="Chọn chuyên ngành" placeholder="Chọn chuyên ngành" value={majorId} disabled={majors.loading} options={visibleMajors} onChange={(value) => changeScope(() => { setMajor(value); setYear(""); })} />
+            <SearchSelect label="Chọn chuyên ngành" placeholder="Chọn chuyên ngành" value={majorId} disabled={majors.loading} options={visibleMajors} onChange={(value) => changeScope(() => { setMajor(value); setYear(""); setIntakeRound(""); })} />
             {majors.error && <Notice error={majors.error} />}
           </div>
           <div className="sl-create-scope-field sl-create-scope-year">
             <div className="v20-scope-step"><b>3</b>KHÓA / NĂM HỌC</div>
             <YearSelect className={`sl-create-year${year ? "" : " sl-placeholder"}`} menuClassName="sl-create-year-menu" label="Khóa / Năm học" role="button"
               value={year} years={years} placeholder="Chọn khóa / năm" disabled={!majorId || groups.loading}
-              onChange={value => changeScope(() => setYear(value))} />
+              onChange={value => changeScope(() => { setYear(value); setIntakeRound(""); })} />
             {groups.error && <Notice error={groups.error} />}
+          </div>
+          <div className="sl-create-scope-field sl-create-scope-round">
+            <div className="v20-scope-step"><b>4</b>ĐỢT</div>
+            <IntakeRoundSelect variant="scheduling" className="sl-create-year" menuClassName="sl-create-year-menu" year={year} value={intakeRound} rows={groups.data || []} onChange={value => changeScope(() => setIntakeRound(value))} />
           </div>
         </div>
         {majorId && !groups.loading && !groups.error && !years.length && <Notice>Chưa có nhóm cho chuyên ngành này. <Link to="/masters/create-class-groups">Tạo nhóm học viên</Link></Notice>}
@@ -324,7 +335,10 @@ export default function CreateOffering({ user }) {
               )}
             </div>
             <div className="sl-create-filter-area">
-              <input className="sl-create-filter" placeholder="Tìm mã lớp, tên lớp, chuyên ngành hoặc khóa..." aria-label="Tìm lớp / nhóm" value={groupQuery} onChange={(event) => setGroupQuery(event.target.value)} />
+              <div className="sl-create-filter-search">
+                <span aria-hidden="true"><MagnifyingGlassIcon fontSize="inherit" /></span>
+                <input className="sl-create-filter" placeholder="Tìm mã lớp, tên lớp, chuyên ngành hoặc khóa..." aria-label="Tìm lớp / nhóm" value={groupQuery} onChange={(event) => setGroupQuery(event.target.value)} />
+              </div>
             </div>
             <div className="sl-create-group-list">
               {visibleGroups.map((group) => {

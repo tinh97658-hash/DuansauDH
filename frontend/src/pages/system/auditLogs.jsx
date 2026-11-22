@@ -69,7 +69,7 @@ const ManagementLogs = () => {
   const [logs, setLogs] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = useState(25);
   const [action, setAction] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -128,7 +128,10 @@ const ManagementLogs = () => {
           </TableBody>
         </ResizableTable>
       </TableContainer>
-      <ListPagination count={total} page={page} pageSize={pageSize} onPageChange={setPage} />
+      <ListPagination count={total} page={page} pageSize={pageSize}
+        pageSizeOptions={[25, 50, 100]}
+        onPageChange={setPage}
+        onPageSizeChange={(nextSize) => { setPageSize(nextSize); setPage(0); }} />
       <Typography sx={{ fontSize: 12, color: "#607486", mt: 1 }}>Tổng {total} bản ghi.</Typography>
     </>
   );
@@ -138,7 +141,7 @@ const DataChangeLogs = () => {
   const [logs, setLogs] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = useState(25);
   const [table, setTable] = useState("");
   const [operation, setOperation] = useState("");
   const [from, setFrom] = useState("");
@@ -212,7 +215,10 @@ const DataChangeLogs = () => {
           </TableBody>
         </ResizableTable>
       </TableContainer>
-      <ListPagination count={total} page={page} pageSize={pageSize} onPageChange={setPage} />
+      <ListPagination count={total} page={page} pageSize={pageSize}
+        pageSizeOptions={[25, 50, 100]}
+        onPageChange={setPage}
+        onPageSizeChange={(nextSize) => { setPageSize(nextSize); setPage(0); }} />
       <Typography sx={{ fontSize: 12, color: "#607486", mt: 1 }}>Tổng {total} bản ghi.</Typography>
     </>
   );

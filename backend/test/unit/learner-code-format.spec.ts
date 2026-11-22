@@ -39,3 +39,14 @@ it('supports reordering, separators, four-digit years and zero-preserving manual
   expect(()=>validateParts([{kind:'literal',value:'evil()'}])).toThrow();
   expect(()=>validateParts([{kind:'sequence'},{kind:'sequence'}])).toThrow();
 });
+it('supports custom non-special types with standard numeric suffixes and rejects special types without a letter',()=>{
+  const types=[
+    {id:'regular',key:'regular',active:true,uses_special_code:false,letter:null},
+    {id:'transfer',key:'chuyen_tiep',active:true,uses_special_code:false,letter:null},
+    {id:'missing_letter',key:'special_missing',active:true,uses_special_code:true,letter:null},
+  ];
+  const generic={counter_scope:'class',parts:DEFAULT_CODE_PARTS};
+  expect(codeCounterMaximum(codeCounterKey('class',{...input,typeId:'transfer'}),types,[generic])).toBe(999);
+  expect(formatLearnerCode(DEFAULT_CODE_PARTS,{...input,typeId:'transfer'},12,null).code).toBe('CN2612012');
+  expect(()=>codeCounterMaximum(codeCounterKey('class',{...input,typeId:'missing_letter'}),types,[generic])).toThrow('cấu hình cấp mã hợp lệ');
+});

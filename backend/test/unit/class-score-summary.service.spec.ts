@@ -148,3 +148,22 @@ it("rejects invalid roster scope and missing classes before reading memberships"
   await expect(service.roster("missing")).rejects.toThrow("Không tìm thấy lớp học viên");
   expect(sequelize.query).not.toHaveBeenCalled();
 });
+
+it("reuses the locking transaction when building the scorecard inside issue()", async () => {
+  const { service, groups, sequelize } = build();
+  const tx = { LOCK: { UPDATE: "UPDATE" } };
+  (sequelize as any).transaction = jest.fn(async (work: any) => work(tx));
+  const scorecard = {
+    student: { admissionRecordId: "ar1", participantId: "student:one" },
+    groups: [{ id: "g1" }],
+    group: { id: "g1", code: "CNTT 2026.1.1" },
+    curriculum: { id: "c1", totalCredits: 3 },
+    subjects: [{ id: "hp1", isRequired: true, credits: 3, grade: { score: 8, result: "passed" } }],
+    progress: { completed: true },
+  };
+  const spy = jest.spyOn(service, "learnerScorecard").mockResolvedValue(scorecard as any);
+  sequelize.query.mockReset().mockResolvedValue([]);
+  await service.issue("ar1", "g1", { id: "staff-1" });
+  expect(spy).toHaveBeenCalledWith("ar1", "g1", tx);
+  expect(groups.findByPk).not.toHaveBeenCalled();
+});

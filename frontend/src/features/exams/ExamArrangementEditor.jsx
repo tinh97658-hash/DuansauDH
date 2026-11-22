@@ -11,7 +11,7 @@ import {SearchSelect,normalize} from '../scheduling/shared';
 import ExamDialogLayout from './ExamDialogLayout';
 import ExamLearnerClasses from './ExamLearnerClasses';
 import ExamResourceInput from './ExamResourceInput';
-import {examRoomReason} from './examPlanner';
+import {examRoomReason,roomFloor} from './examPlanner';
 import {isExamPeriodClosed,nextExamSlot,useExamWallTime} from './examPeriodAvailability';
 import {API_BASE_URL} from '../../config/http';
 import {getBusinessTodayKey} from '../../utils/schedulingCalendar';
@@ -21,12 +21,12 @@ const groupForm=g=>({...g,courseOfferingId:g.courseOfferingId||g.id,sessionId:g.
 const nextHour=t=>{const m=Number(t.slice(0,2))*60+Number(t.slice(3,5))+60;return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;};
 const movedEnd=(g,start)=>{const minutes=t=>Number(t.slice(0,2))*60+Number(t.slice(3,5));const end=minutes(start)+minutes(g.endTime)-minutes(g.startTime);return `${String(Math.floor(end/60)).padStart(2,'0')}:${String(end%60).padStart(2,'0')}`;};
 const suggestedUnitNames=new Set(['vien dao tao sdh','vien dao tao sau dai hoc']);
-export default function ExamArrangementEditor({initial={},members=[],queue=[],rooms=[],lecturers=[],units=[],canWrite,saving,error,onClose,onSave,embedded=false}){
+export default function ExamArrangementEditor({initial={},members=[],queue=[],rooms=[],lecturers=[],units=[],canWrite,saving,error,onClose,onSave,embedded=false,allowAddGroups=true}){
  const wallTime=useExamWallTime(),defaultSlot=nextExamSlot(wallTime);
  const initialStart=initial.startTime==='13:00'?'14:00':initial.startTime||defaultSlot.startTime;
  const initialEnd=initial.startTime==='13:00'?nextHour(initialStart):initial.endTime;
- const seed=members.find(activeExamGroup)||members[0],arrangementId=seed?.arrangementId;
- const [form,setForm]=useState(()=>({examDate:seed?.examDate||initial.examDate||defaultSlot.examDate,period:(seed?.startTime||initialStart)<'13:00'?'MORNING':'AFTERNOON',roomId:seed?.roomId||initial.roomId||'',secondLecturerId:(seed||initial)?.secondLecturerId||'',secondExternalInvigilatorName:(seed||initial)?.secondExternalInvigilatorName||'',secondExternalUnitName:(seed||initial)?.secondExternalUnitName||'',lecturerId:seed?.lecturerId||initial.lecturerId||'',note:seed?.arrangementNote||initial.note||''}));
+ const seed=members.find(activeExamGroup)||members[0],arrangementId=seed?.arrangementId,editing=members.length>0;
+ const [form,setForm]=useState(()=>({examDate:seed?.examDate||initial.examDate||defaultSlot.examDate,period:(seed?.startTime||initialStart)<'13:00'?'MORNING':'AFTERNOON',roomId:seed?.roomId||initial.roomId||'',secondLecturerId:(seed||initial)?.secondLecturerId||'',secondExternalInvigilatorName:(seed||initial)?.secondExternalInvigilatorName||'',secondExternalUnitName:(seed||initial)?.secondExternalUnitName||'',lecturerId:seed?.lecturerId||initial.lecturerId||'',note:seed?.arrangementNote??seed?.note??initial.note??''}));
  const [groups,setGroups]=useState(()=>members.length?members.filter(activeExamGroup).map(groupForm)
   :(initial.offerings||(initial.offering?[initial.offering]:[])).map(offering=>groupForm({...offering,startTime:initialStart,endTime:initialEnd||nextHour(initialStart)})));
  const [unitId,setUnitId]=useState(()=>lecturers.find(l=>l.id===(seed?.lecturerId||initial.lecturerId))?.unitId||'');
@@ -44,8 +44,9 @@ export default function ExamArrangementEditor({initial={},members=[],queue=[],ro
  const locked=groups.some(g=>g.sessionId&&(g.canEdit===false||g.status!=='scheduled'));
  const isLocked=g=>g.sessionId&&(g.canEdit===false||g.status!=='scheduled');
  const periodClosed=isExamPeriodClosed(form.examDate,form.period,wallTime);
- const problems=arrangementProblems(form,groups,availability.sessions,arrangementId);
- const candidateConflicts=groups.flatMap((g,i)=>examCandidateConflictDetails(g,[...groups.slice(i+1),...otherExamSessions(form,availability.sessions,arrangementId)]));
+ const excludedId=arrangementId||seed?.id;
+ const problems=arrangementProblems(form,groups,availability.sessions,excludedId);
+ const candidateConflicts=groups.flatMap((g,i)=>examCandidateConflictDetails(g,[...groups.slice(i+1),...otherExamSessions(form,availability.sessions,excludedId)]));
  const conflictCount=examConflictCandidateCount([...blockedConflicts,...candidateConflicts]);
  const warningText=conflictCount?`Không thể ghép các môn này cùng đợt thi vì có ${conflictCount} thí sinh trùng lịch.`:'';
  useEffect(()=>{if(warningText)warningRef.current?.scrollIntoView?.({block:'nearest',behavior:'smooth'});},[warningText]);
@@ -53,7 +54,7 @@ export default function ExamArrangementEditor({initial={},members=[],queue=[],ro
  if(form.examDate<getBusinessTodayKey())problems.push('Không thể xếp lịch vào ngày đã qua.');
  if(periodClosed)problems.push(`Buổi ${form.period==='MORNING'?'sáng':'chiều'} đã khóa ghép thi từ ${form.period==='MORNING'?'08:01':'14:01'}. Hãy chọn buổi hoặc ngày thi khác.`);
  const activeGroups=groups.filter(activeExamGroup),peak=examGroupsPeak(activeGroups),start=groups.map(g=>g.startTime).sort()[0]||'',end=groups.map(g=>g.endTime).sort().at(-1)||'';
- const busy=collectExamArrangements(availability.sessions.filter(s=>activeExamGroup(s)&&s.examDate===form.examDate)).filter(s=>(s.arrangementId||s.id)!==arrangementId&&s.startTime.slice(0,5)<end&&s.endTime.slice(0,5)>start);
+ const busy=collectExamArrangements(availability.sessions.filter(s=>activeExamGroup(s)&&s.examDate===form.examDate)).filter(s=>(s.arrangementId||s.id)!==excludedId&&s.startTime.slice(0,5)<end&&s.endTime.slice(0,5)>start);
  const roomReason=r=>examRoomReason(r,peak,busy);
  const selectedRoom=rooms.find(r=>r.id===form.roomId),lecturer=lecturers.find(l=>l.id===form.lecturerId),lecturerBusy=examInvigilators({...form,externalInvigilatorName:invigilatorText,externalUnitName:unitText}).some(p=>examInvigilatorBusy(p,busy));
  const visibleUnits=units.filter(u=>suggestedUnitNames.has(normalize(u.name||'').trim().replace(/\s+/g,' '))&&(u.active!==false||u.id===unitId));
@@ -70,37 +71,51 @@ export default function ExamArrangementEditor({initial={},members=[],queue=[],ro
   setGroups(gs=>gs.map(g=>({...g,startTime:shift(g.startTime),endTime:shift(g.endTime)})));
  };
  const changeStart=(n,value)=>{setRoundStarts(s=>({...s,[n]:value}));setGroups(gs=>gs.map(g=>g.roundNo===n?{...g,startTime:value,endTime:movedEnd(g,value)}:g));};
- const tryGroup=(candidate,others)=>{if(isExamPeriodClosed(form.examDate,form.period))return false;const conflicts=examCandidateConflictDetails(candidate,[...others,...otherExamSessions(form,availability.sessions,arrangementId)]);setBlockedConflicts(conflicts);return !conflicts.length;};
+ const tryGroup=(candidate,others)=>{if(isExamPeriodClosed(form.examDate,form.period))return false;const conflicts=examCandidateConflictDetails(candidate,[...others,...otherExamSessions(form,availability.sessions,excludedId)]);setBlockedConflicts(conflicts);return !conflicts.length;};
  const add=(offeringId,n)=>{const o=queue.find(q=>q.id===offeringId);if(!o)return;const candidate=groupForm({...o,startTime:roundStarts[n],endTime:nextHour(roundStarts[n]),roundNo:n});if(tryGroup(candidate,groups))setGroups(gs=>[...gs,candidate]);};
  const moveGroup=(g,target)=>{const candidate={...g,roundNo:target,startTime:roundStarts[target],endTime:movedEnd(g,roundStarts[target])};if(tryGroup(candidate,groups.filter(x=>x!==g)))setGroups(gs=>gs.map(x=>x===g?candidate:x));};
  const submit=()=>{if(isExamPeriodClosed(form.examDate,form.period))return;onSave({...form,...secondInvigilatorPayload(form),lecturerId:form.lecturerId||undefined,externalUnitName:!form.lecturerId&&invigilatorText.trim()?unitText.trim():undefined,externalInvigilatorName:!form.lecturerId?invigilatorText.trim()||undefined:undefined,...(arrangementId?{version:seed.arrangementVersion}:{}),groups:groups.map(g=>({...(g.sessionId?{id:g.sessionId,version:g.version}:{}),courseOfferingId:g.courseOfferingId,snapshotId:g.snapshotId,eligibilityVersion:g.eligibilityVersion,roundNo:g.roundNo,startTime:g.startTime,endTime:g.endTime}))},arrangementId,()=>setRetry(n=>n+1));};
- return <ExamDialogLayout embedded={embedded} wide className="ep-arrangement-dialog" title={arrangementId?'SỬA BUỔI THI':'TẠO BUỔI THI'} busy={saving} onClose={onClose} actions={<>
+ const floors=[...new Set(rooms.map(roomFloor))].sort((a,b)=>(a??Infinity)-(b??Infinity));
+ return <ExamDialogLayout embedded={embedded} wide className="ep-arrangement-dialog ep-composer-dialog" title={editing?'SỬA BUỔI THI':'TẠO BUỔI THI'} busy={saving} onClose={onClose} actions={<>
   {error&&<div role="alert" className={`ep-save-error ${/thí sinh.*trùng|trùng.*thí sinh/i.test(error)?'ep-candidate-warning':'v20-error'}`}>{error}</div>}
-  <button className="sl-btn" disabled={saving} onClick={onClose}>{embedded?'Hủy chỉnh sửa':'Đóng'}</button><button className="sl-btn sl-btn-primary" disabled={!valid||saving} onClick={submit}>{saving?'Đang lưu…':embedded?'Lưu thay đổi':'Lưu buổi thi'}</button></>}>
-  <div className="ep-arrangement-fields">
+  <button className="sl-btn" disabled={saving} onClick={onClose}>{embedded?'Hủy chỉnh sửa':'Hủy'}</button><button className="sl-btn sl-btn-primary" disabled={!valid||saving} onClick={submit}>{saving?'Đang lưu…':embedded?'Lưu thay đổi':'Lưu buổi thi'}</button></>}>
+  <div className="ep-composer-summary"><strong>{groups.length} lớp học phần · {rounds.length} đợt thi</strong><span>Thi đồng thời: <strong>{peak} thí sinh</strong> · {groups.reduce((n,g)=>n+Number(g.candidateCount||0),0)} lượt dự thi</span></div>
+  <div className="ep-composer-grid"><div className="ep-composer-main">
+  <section className="ep-composer-section" aria-label="Thời gian thi"><h3>Thời gian thi</h3><div className="ep-arrangement-fields">
    <label className="v20-field">Ngày thi<DateField fullWidth size="small" inputProps={{'aria-label':'Ngày thi'}} value={form.examDate} disabled={locked||saving} onChange={e=>change('examDate',e.target.value)}/></label>
    <label className="v20-field">Buổi<AppSelect aria-label="Buổi thi" value={form.period} disabled={locked||saving} onChange={e=>changePeriod(e.target.value)}><option value="MORNING" disabled={isExamPeriodClosed(form.examDate,'MORNING',wallTime)}>Sáng · 08:00–12:00</option><option value="AFTERNOON" disabled={isExamPeriodClosed(form.examDate,'AFTERNOON',wallTime)}>Chiều · 14:00–18:00</option></AppSelect></label>
-   <label className="v20-field">Đơn vị<ExamResourceInput label="Đơn vị" value={unitText} options={visibleUnits} placeholder="Chọn hoặc nhập đơn vị" disabled={locked||saving} onChange={value=>{setUnitText(value);setUnitId(visibleUnits.find(u=>normalize(u.name).trim()===normalize(value).trim())?.id||'');setInvigilatorText('');change('lecturerId','');}} onSelect={u=>{setUnitText(u.name);setUnitId(u.id);setInvigilatorText('');change('lecturerId','');}}/></label>
-   <label className="v20-field">Cán bộ coi thi 1<ExamResourceInput label="Cán bộ coi thi 1" value={form.lecturerId?formatLecturerName(lecturer):invigilatorText} getOptionLabel={formatLecturerName} placeholder="Chọn hoặc nhập tên cán bộ coi thi" options={filteredLecturers.map(l=>({...l,disabled:l.id===form.secondLecturerId||examInvigilatorBusy({id:l.id},busy)}))} disabled={!unitText.trim()||locked||saving||availability.loading||!!availability.error} onChange={value=>{setInvigilatorText(value);change('lecturerId',filteredLecturers.find(l=>(normalize(l.name).trim()===normalize(value).trim()||normalize(formatLecturerName(l)).trim()===normalize(value).trim()))?.id||'');}} onSelect={l=>{setInvigilatorText(l.name);change('lecturerId',l.id);}}/></label>
-   <SecondExamInvigilator form={form} onChange={values=>setForm(f=>({...f,...values}))} lecturers={lecturers} units={visibleUnits} busy={busy} disabled={locked||saving||availability.loading||!!availability.error}/>
-  </div>
+  </div></section>
   {duplicateExamInvigilators({...form,externalInvigilatorName:invigilatorText,externalUnitName:unitText})&&<p role="alert">Hai cán bộ coi thi phải là hai người khác nhau.</p>}
   {locked&&<p className="v20-hint">Buổi có nhóm đã bắt đầu hoặc đã xác nhận: giữ nguyên ngày, phòng và giám thị. Chỉ sửa các nhóm chưa bắt đầu.</p>}
-  <p>Thi đồng thời: <strong>{peak} thí sinh</strong> · {groups.reduce((n,g)=>n+Number(g.candidateCount||0),0)} lượt dự thi · Giữ phòng và giám thị {start||'…'}–{end||'…'}, gồm khoảng nghỉ.</p>
-  <div className="ep-arrangement-rooms" aria-label="Phòng thi">{rooms.map(r=><button key={r.id} className={`sl-btn ${r.id===form.roomId?'sl-btn-primary':''}`} disabled={locked||saving||availability.loading||!!availability.error||!!roomReason(r)} aria-pressed={r.id===form.roomId} onClick={()=>change('roomId',r.id)}>{r.code} · {r.capacity??'?'} chỗ {roomReason(r)}</button>)}</div>
+  <section className="ep-composer-section" aria-label="Lớp và đợt thi"><h3>Lớp dự thi</h3><p className="ep-composer-hint">Các lớp trong cùng đợt bắt đầu cùng giờ. Thêm đợt khi cần thi nối tiếp.</p>
   {rounds.map(n=>{const items=groups.filter(g=>g.roundNo===n),roundLocked=items.some(isLocked);return <section className="ep-round" key={n} aria-label={`Đợt ${n}`}>
-   <div className="ep-round-heading"><h3>Đợt {n} · {items.reduce((sum,g)=>sum+Number(g.candidateCount||0),0)} thí sinh</h3><label>Bắt đầu <TimeField aria-label={`Bắt đầu đợt ${n}`} value={roundStarts[n]} disabled={roundLocked||saving} onChange={e=>changeStart(n,e.target.value)}/></label>{!items.length&&<button className="sl-btn" onClick={()=>setRounds(rs=>rs.filter(r=>r!==n))}>Bỏ đợt {n}</button>}</div>
+   <div className="ep-round-heading"><h4>{rounds.length>1?`Đợt ${n}`:'Danh sách lớp'} · {items.reduce((sum,g)=>sum+Number(g.candidateCount||0),0)} thí sinh</h4><label>Giờ bắt đầu <TimeField aria-label={`Bắt đầu đợt ${n}`} value={roundStarts[n]} disabled={roundLocked||saving} onChange={e=>changeStart(n,e.target.value)}/></label>{!items.length&&rounds.length>1&&<button className="sl-btn" onClick={()=>setRounds(rs=>rs.filter(r=>r!==n))}>Bỏ đợt {n}</button>}</div>
    <div className="ep-round-table"><table className="v20-table"><thead><tr><th>Lớp học viên</th><th>Học phần</th><th>Thí sinh</th><th>Kết thúc</th><th>Thao tác</th></tr></thead><tbody>{items.map(g=><tr key={g.courseOfferingId}>
     <td><ExamLearnerClasses groups={g.groups}/></td><td>{g.subjectName||'—'}</td>
-    <td>{g.candidateCount} người{g.makeupCount>0&&<span className="ep-makeup-badge">{g.makeupCount} thi bù</span>}</td>
+    <td>{g.candidateCount} người{g.makeupCount>0&&<span className="ep-makeup-badge">Thi bù · {g.makeupCount} học viên</span>}</td>
     <td><TimeField aria-label={`Kết thúc ${g.name}`} value={g.endTime} disabled={isLocked(g)||saving} onChange={e=>setGroups(gs=>gs.map(x=>x===g?{...x,endTime:e.target.value}:x))}/></td>
-    <td>{!isLocked(g)&&<AppSelect aria-label={`Chuyển đợt ${g.name}`} value={g.roundNo} disabled={saving||periodClosed} onChange={e=>{moveGroup(g,Number(e.target.value));}}>{rounds.filter(r=>r===g.roundNo||!groups.some(x=>x.roundNo===r&&isLocked(x))).map(r=><option key={r} value={r}>Đợt {r}</option>)}</AppSelect>}{g.sessionId?<small>{isLocked(g)?'Giữ lịch sử':'Hủy riêng tại chi tiết nhóm thi'}</small>:<button className="sl-btn" aria-label={`Gỡ ${g.subjectName}`} disabled={saving} onClick={()=>setGroups(gs=>gs.filter(x=>x!==g))}>Gỡ</button>}</td>
+    <td>{rounds.length>1&&!isLocked(g)&&<AppSelect aria-label={`Chuyển đợt ${g.name}`} value={g.roundNo} disabled={saving||periodClosed} onChange={e=>{moveGroup(g,Number(e.target.value));}}>{rounds.filter(r=>r===g.roundNo||!groups.some(x=>x.roundNo===r&&isLocked(x))).map(r=><option key={r} value={r}>Đợt {r}</option>)}</AppSelect>}{g.sessionId?<small>{isLocked(g)?'Giữ lịch sử':'Hủy riêng tại chi tiết nhóm thi'}</small>:<button className="sl-btn" aria-label={`Gỡ ${g.subjectName}`} disabled={saving} onClick={()=>setGroups(gs=>gs.filter(x=>x!==g))}>Gỡ</button>}</td>
    </tr>)}</tbody></table></div>
-   <SearchSelect label={`Thêm học phần đợt ${n}`} value="" placeholder="Thêm lớp học phần đã duyệt..." disabled={periodClosed||roundLocked||saving||availability.loading||!!availability.error} options={queue.filter(o=>!groups.some(g=>g.courseOfferingId===o.id)).map(o=>({id:o.id,name:`${o.name} · ${o.candidateCount} TS${o.makeupCount?` · ${o.makeupCount} thi bù`:''}`}))} onChange={value=>add(value,n)}/>
+   {!items.length&&<p className="ep-composer-hint">Chưa có lớp dự thi. Chọn lớp học phần đã duyệt bên dưới.</p>}
+   {allowAddGroups&&<SearchSelect label={`Thêm học phần đợt ${n}`} value="" placeholder="Thêm lớp học phần đã duyệt..." disabled={periodClosed||roundLocked||saving||availability.loading||!!availability.error} options={queue.filter(o=>!groups.some(g=>g.courseOfferingId===o.id)).map(o=>({id:o.id,name:`${o.name} · ${o.candidateCount} TS${o.makeupCount?` · ${o.makeupCount} thi bù`:''}`}))} onChange={value=>add(value,n)}/>}
   </section>;})}
   {conflictCount>0&&<div ref={warningRef} role="alert" className="ep-candidate-warning"><div>{warningText}</div><div>Hãy chọn đợt hoặc giờ thi khác không trùng lịch.</div></div>}
-  <button className="sl-btn" disabled={saving||periodClosed} onClick={()=>{const n=Math.max(0,...rounds)+1;setRounds(rs=>[...rs,n]);setRoundStarts(s=>({...s,[n]:end|| (form.period==='MORNING'?'08:00':'14:00')}));}}><PlusIcon fontSize="inherit" /> Thêm đợt thi</button>
+  {allowAddGroups&&<button className="sl-btn" disabled={saving||periodClosed} onClick={()=>{const n=Math.max(0,...rounds)+1;setRounds(rs=>[...rs,n]);setRoundStarts(s=>({...s,[n]:end|| (form.period==='MORNING'?'08:00':'14:00')}));}}><PlusIcon fontSize="inherit" /> Thêm đợt thi</button>}
+  </section>
   <label className="v20-field">Ghi chú chung<textarea aria-label="Ghi chú chung" maxLength={2000} value={form.note} disabled={saving} onChange={e=>change('note',e.target.value)}/></label>
+  </div><aside className="ep-composer-sidebar">
+  <section className="ep-composer-section" aria-label="Cán bộ coi thi"><h3>Cán bộ coi thi <small>Có thể phân công sau</small></h3><div className="ep-arrangement-fields">
+   <label className="v20-field">Đơn vị cán bộ 1<ExamResourceInput label="Đơn vị" value={unitText} options={visibleUnits} placeholder="Chọn hoặc nhập đơn vị" disabled={locked||saving} onChange={value=>{setUnitText(value);setUnitId(visibleUnits.find(u=>normalize(u.name).trim()===normalize(value).trim())?.id||'');setInvigilatorText('');change('lecturerId','');}} onSelect={u=>{setUnitText(u.name);setUnitId(u.id);setInvigilatorText('');change('lecturerId','');}}/></label>
+   <label className="v20-field">Cán bộ coi thi 1<ExamResourceInput label="Cán bộ coi thi 1" value={form.lecturerId?formatLecturerName(lecturer):invigilatorText} getOptionLabel={formatLecturerName} placeholder="Chọn hoặc nhập tên cán bộ coi thi" options={filteredLecturers.map(l=>({...l,disabled:l.id===form.secondLecturerId||examInvigilatorBusy({id:l.id},busy)}))} disabled={!unitText.trim()||locked||saving||availability.loading||!!availability.error} onChange={value=>{setInvigilatorText(value);change('lecturerId',filteredLecturers.find(l=>(normalize(l.name).trim()===normalize(value).trim()||normalize(formatLecturerName(l)).trim()===normalize(value).trim()))?.id||'');}} onSelect={l=>{setInvigilatorText(l.name);change('lecturerId',l.id);}}/></label>
+   <SecondExamInvigilator form={form} onChange={values=>setForm(f=>({...f,...values}))} lecturers={lecturers} units={visibleUnits} busy={busy} disabled={locked||saving||availability.loading||!!availability.error}/>
+  </div></section>
+  <section className="ep-composer-section ep-room-panel" aria-label="Chọn phòng thi"><h3>Phòng thi</h3>
+   <p className="ep-composer-hint">Tối đa <strong>{peak} thí sinh</strong> đồng thời. Giữ phòng và cán bộ {start||'…'}–{end||'…'}, gồm khoảng nghỉ.</p>
+   <p className="ep-room-selection" role="status">{selectedRoom?`Đang chọn phòng ${selectedRoom.code}`:'Chưa chọn phòng thi'}</p>
+   {!rooms.length&&<p className="ep-composer-hint">Chưa có phòng thi. Khai báo phòng trước khi xếp lịch.</p>}
+   <div className="ep-room-list">{floors.map(floor=><section key={floor??'other'} className="ep-room-floor"><h4>{floor==null?'Phòng khác':`Tầng ${floor}`}</h4><div className="ep-arrangement-rooms" aria-label={floor==null?'Phòng khác':`Phòng tầng ${floor}`}>{rooms.filter(r=>roomFloor(r)===floor).map(r=>{const blocked=roomReason(r),chosen=r.id===form.roomId;return <button key={r.id} className={`ep-room-card${chosen?' ep-room-selected':''}`} disabled={locked||saving||availability.loading||!!availability.error||!!blocked} aria-pressed={chosen} title={r.name||r.code} onClick={()=>change('roomId',r.id)}><strong>{r.code}</strong><span>{r.capacity??'?'} chỗ</span><small>{availability.loading?'Đang kiểm tra':availability.error?'Chưa xác minh':blocked|| (chosen?'ĐANG CHỌN':'TRỐNG')}</small></button>;})}</div></section>)}
+   </div></section>
+  </aside></div>
   <div className="ep-validation" aria-live="polite">{problems.filter(p=>!p.startsWith('Tr\u00f9ng gi\u1edd th\u00ed sinh')).map(p=><span role="alert" key={p}>{p}</span>)}{selectedRoom&&roomReason(selectedRoom)&&<span role="alert">Phòng {selectedRoom.code}: {roomReason(selectedRoom)}</span>}{lecturerBusy&&<span role="alert">Giám thị đã có buổi thi trùng giờ.</span>}{availability.loading&&<span role="status">Đang kiểm tra lịch…</span>}{availability.error&&<span role="alert">{availability.error} <button className="sl-btn" onClick={()=>setRetry(n=>n+1)}>Thử lại</button></span>}</div>
  </ExamDialogLayout>;
 }

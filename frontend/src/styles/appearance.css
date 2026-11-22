@@ -21,19 +21,95 @@
       [data-preserve-font-size], [data-preserve-font-size] *, .sl-combo > button, svg, svg *
     )) {
       font-size: calc(var(--app-reading-base, 12.5px) * var(--app-text-scale)) !important;
-      overflow-wrap: anywhere;
+      overflow-wrap: break-word;
+      word-break: normal;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) body th:not(:where(
+      .report-preview, .report-preview *, .transcript-print-document, .transcript-print-document *,
+      .report-print-sheet, .report-print-sheet *, .document-report-table, .document-report-table *,
+      [id="printable-a4-sheet"], [id="printable-a4-sheet"] *,
+      .a4-paper-sheet, .a4-paper-sheet *, .sl-print-sheet, .sl-print-sheet *,
+      .gradebook-document, .gradebook-document *, .subject-signing-sheet, .subject-signing-sheet *,
+      .progress-form-sheet, .progress-form-sheet *, .exam-print-sheet, .exam-print-sheet *,
+      [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      font-size: calc(12px * var(--app-text-scale)) !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) body :is(
+      .MuiChip-root, .MuiChip-label, .MuiTypography-caption, .MuiFormHelperText-root
+    ):not(:where(
+      .report-preview, .report-preview *, .transcript-print-document, .transcript-print-document *,
+      .report-print-sheet, .report-print-sheet *, .document-report-table, .document-report-table *,
+      [id="printable-a4-sheet"], [id="printable-a4-sheet"] *,
+      .a4-paper-sheet, .a4-paper-sheet *, .sl-print-sheet, .sl-print-sheet *,
+      .gradebook-document, .gradebook-document *, .subject-signing-sheet, .subject-signing-sheet *,
+      .progress-form-sheet, .progress-form-sheet *, .exam-print-sheet, .exam-print-sheet *,
+      [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      font-size: max(10px, calc(11px * var(--app-text-scale))) !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) body :is(
+      .app-filter-label, .tp-filter > span, .app-footer a, .app-footer p
+    ) {
+      font-size: max(10px, calc(10.5px * var(--app-text-scale))) !important;
     }
 
     html[data-font-size]:not([data-font-size="100"]) .app-popup { --app-reading-base: 15px; }
 
-    /* Headings keep a separate size from body text. */
-    html[data-font-size]:not([data-font-size="100"]) :is(h1, h2, h3, h4, h5, h6, .MuiDialogTitle-root):not(:where(
+    /* Headings keep a clear hierarchy without inflating compact panel titles at large scales. */
+    html[data-font-size="90"] :where(h1, h2, h3, h4, h5, h6, .MuiDialogTitle-root, .MuiDialogTitle-root > span):not(:where(
+      .report-preview *, .transcript-print-document *, .report-print-sheet *, [id="printable-a4-sheet"] *,
+      .a4-paper-sheet *, .sl-print-sheet *, .gradebook-document *, .subject-signing-sheet *,
+      .progress-form-sheet *, .exam-print-sheet *, [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      font-size: calc(15px * var(--app-text-scale)) !important;
+      overflow-wrap: break-word;
+      word-break: normal;
+      line-height: 1.35;
+    }
+
+    html[data-font-size="90"] :where(h1, h2, .MuiDialogTitle-root, .MuiDialogTitle-root > span):not(:where(
       .report-preview *, .transcript-print-document *, .report-print-sheet *, [id="printable-a4-sheet"] *,
       .a4-paper-sheet *, .sl-print-sheet *, .gradebook-document *, .subject-signing-sheet *,
       .progress-form-sheet *, .exam-print-sheet *, [data-preserve-font-size], [data-preserve-font-size] *
     )) {
       font-size: calc(18px * var(--app-text-scale)) !important;
-      overflow-wrap: anywhere;
+    }
+
+    html[data-font-size]:is([data-font-size="110"], [data-font-size="120"], [data-font-size="130"], [data-font-size="140"], [data-font-size="150"]) :where(
+      h1, h2, h3, h4, h5, h6, .MuiDialogTitle-root, .MuiDialogTitle-root > span
+    ):not(:where(
+      .report-preview *, .transcript-print-document *, .report-print-sheet *, [id="printable-a4-sheet"] *,
+      .a4-paper-sheet *, .sl-print-sheet *, .gradebook-document *, .subject-signing-sheet *,
+      .progress-form-sheet *, .exam-print-sheet *, [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      font-size: calc(14px + 10px * (var(--app-text-scale) - 1)) !important;
+      overflow-wrap: break-word;
+      word-break: normal;
+      line-height: 1.35;
+    }
+
+    html[data-font-size]:is([data-font-size="110"], [data-font-size="120"], [data-font-size="130"], [data-font-size="140"], [data-font-size="150"]) :where(
+      h2, h3
+    ):not(:where(
+      .report-preview *, .transcript-print-document *, .report-print-sheet *, [id="printable-a4-sheet"] *,
+      .a4-paper-sheet *, .sl-print-sheet *, .gradebook-document *, .subject-signing-sheet *,
+      .progress-form-sheet *, .exam-print-sheet *, [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      font-size: calc(16px + 9px * (var(--app-text-scale) - 1)) !important;
+    }
+
+    html[data-font-size]:is([data-font-size="110"], [data-font-size="120"], [data-font-size="130"], [data-font-size="140"], [data-font-size="150"]) :where(
+      h1, .MuiDialogTitle-root, .MuiDialogTitle-root > span
+    ):not(:where(
+      .report-preview *, .transcript-print-document *, .report-print-sheet *, [id="printable-a4-sheet"] *,
+      .a4-paper-sheet *, .sl-print-sheet *, .gradebook-document *, .subject-signing-sheet *,
+      .progress-form-sheet *, .exam-print-sheet *, [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      font-size: calc(18px + 10px * (var(--app-text-scale) - 1)) !important;
     }
 
     /* Proportional heading and badge overrides for compact dashboard and widget elements */
@@ -64,16 +140,51 @@
       font-size: calc(11px * var(--app-text-scale)) !important;
     }
 
-    /* Table headers keep their titles intact on one line, never breaking letter-by-letter */
+    /* Multi-word table headers may wrap between words instead of inflating table width.
+       Single-line metadata and resizable headers stay intact. */
     html[data-font-size]:not([data-font-size="100"]) th:not(:where(
+      .report-preview *, .transcript-print-document *, .report-print-sheet *,
+      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
+      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
+      [data-preserve-font-size], [data-preserve-font-size] *,
+      .nowrap, .assignment-nowrap, .report-short-cell, .report-serial-cell,
+      [class*="nowrap"], [class*="action"], [class*="status"], [class*="count"],
+      [class*="round"], [class*="badge"], [class*="date"], [class*="time"], [class*="code"],
+      [class*="metric"], [class*="state"], .ep-session-round-column, .ep-session-time-column,
+      .ep-session-count-column, .ep-session-status-column, .ep-session-detail-table th,
+      .tp-table th, :has([role="slider"])
+    )) {
+      white-space: normal !important;
+      overflow-wrap: normal !important;
+      word-break: normal !important;
+      line-height: 1.35 !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) body :is(#root, .MuiDialog-root, .scheduling-v20) table:not(.document-report-table) > thead > tr > th:not(:where(
       .report-preview *, .transcript-print-document *, .report-print-sheet *,
       .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
       .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
       [data-preserve-font-size], [data-preserve-font-size] *
     )) {
-      white-space: nowrap !important;
-      overflow-wrap: normal !important;
-      word-break: normal !important;
+      padding: 0.5em 0.55em !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) body :is(#root, .MuiDialog-root, .scheduling-v20) table:not(.document-report-table) > thead > tr > th:has([role="slider"]):not(:where(
+      .report-preview *, .transcript-print-document *, .report-print-sheet *,
+      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
+      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
+      [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      padding-right: 12px !important;
+    }
+
+    html[data-font-size]:not([data-font-size="100"]) body :is(#root, .MuiDialog-root, .scheduling-v20) table:not(.document-report-table) > tbody > tr:not(:only-child) > :is(td, th):not([colspan]):not(:where(
+      .report-preview *, .transcript-print-document *, .report-print-sheet *,
+      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
+      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
+      [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      padding: 0.45em 0.5em !important;
     }
 
     /* Long text in ordinary data cells may wrap cleanly at word boundaries.
@@ -93,14 +204,15 @@
       word-break: normal !important;
     }
 
-    /* Keep short metadata cells and explicit nowrap cells on a single line */
+    /* Keep short metadata cells, resizable headers, and explicit nowrap cells on a single line */
     html[data-font-size]:not([data-font-size="100"]) :is(td, th):is(
       .nowrap, .assignment-nowrap, .report-short-cell, .report-serial-cell,
       [class*="nowrap"], [class*="action"], [class*="status"], [class*="count"],
       [class*="round"], [class*="badge"], [class*="date"], [class*="time"], [class*="code"],
       [class*="metric"], [class*="state"], .ep-session-round-column, .ep-session-time-column,
       .ep-session-count-column, .ep-session-status-column
-    ) {
+    ),
+    html[data-font-size]:not([data-font-size="100"]) th:has([role="slider"]) {
       white-space: nowrap !important;
       overflow-wrap: normal !important;
       word-break: normal !important;
@@ -137,56 +249,6 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-    }
-
-    html[data-font-size]:not([data-font-size="100"]) :is(.MuiButton-root, .sl-btn, .btn, .document-export-trigger):not(:where(
-      .MuiIconButton-root, .sl-drawer-close,
-      .report-preview *, .transcript-print-document *, .report-print-sheet *,
-      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
-      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
-      [data-preserve-font-size], [data-preserve-font-size] *,
-      td .sl-btn, td .btn, td .MuiButton-root, .ep-session-row-actions .sl-btn
-    )) {
-      /* A fixed height clips wrapped labels when the font grows. A minimum
-         preserves a usable target while allowing every line to fit. */
-      height: auto !important;
-      min-height: calc(1.5em + 12px) !important;
-      max-height: none !important;
-      line-height: 1.5 !important;
-      white-space: normal !important;
-      overflow-wrap: anywhere !important;
-      max-width: 100% !important;
-    }
-
-    /* Inline actions share the same height as text grows. */
-    html[data-font-size]:not([data-font-size="100"]) :is(.MuiButton-root, .page-export-inline .document-export-trigger):not(:where(
-      .report-preview *, .transcript-print-document *, .report-print-sheet *,
-      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
-      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
-      [data-preserve-font-size], [data-preserve-font-size] *
-    )) {
-      box-sizing: border-box;
-      min-height: calc(1.5em + 14px) !important;
-      padding: 6px 14px !important;
-    }
-
-    html[data-font-size]:not([data-font-size="100"]) .MuiButton-root:not(:where(
-      .report-preview *, .transcript-print-document *, .report-print-sheet *,
-      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
-      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
-      [data-preserve-font-size], [data-preserve-font-size] *
-    )) :is(.MuiButton-startIcon, .MuiButton-endIcon) > svg {
-      font-size: 1.6em !important;
-      width: 1em !important;
-      height: 1em !important;
-      flex-shrink: 0;
-    }
-
-    /* Mode labels grow horizontally with the selected text size. */
-    html[data-font-size]:not([data-font-size="100"]) .exam-mode-switch .MuiButton-root {
-      white-space: nowrap !important;
-      overflow-wrap: normal !important;
-      max-width: none !important;
     }
 
     /* Scheduling cards have bounded areas; scroll their content rather than
@@ -243,6 +305,42 @@
       overflow-wrap: normal !important;
       flex-shrink: 0;
       min-width: max-content;
+    }
+
+    /* Buttons inside cards, panels and dialogs keep the shared minimum control height
+       while wrapping cleanly between words instead of overflowing narrow containers. */
+    html[data-font-size]:not([data-font-size="100"]) body :is(
+      .MuiButton-root, .sl-btn, .btn, .document-export-trigger
+    ):not(:where(
+      .MuiIconButton-root, .app-icon-action, .sl-drawer-close, .ribbon-header *, .ribbon-sidebar *,
+      .app-action-toolbar *, .app-filter-toolbar *, .page-export-inline *,
+      .exam-mode-switch *, .exam-tool-actions *, .sl-actions *,
+      .sl-create-actions *, .sl-create-confirm-card footer *,
+      td .sl-btn, td .btn, td .MuiButton-root, .ep-session-row-actions *,
+      .report-preview *, .transcript-print-document *, .report-print-sheet *,
+      .document-report-table *, [id="printable-a4-sheet"] *, .a4-paper-sheet *, .sl-print-sheet *,
+      .gradebook-document *, .subject-signing-sheet *, .progress-form-sheet *, .exam-print-sheet *,
+      [data-preserve-font-size], [data-preserve-font-size] *
+    )) {
+      height: auto !important;
+      min-height: var(--app-control-height) !important;
+      max-height: none !important;
+      padding: 0.4em 1em !important;
+      line-height: 1.4 !important;
+      white-space: normal !important;
+      overflow-wrap: break-word !important;
+      word-break: normal !important;
+      min-width: 0;
+      max-width: 100% !important;
+      flex-shrink: 1;
+      text-align: center;
+    }
+
+    /* Mode labels grow horizontally with the selected text size. */
+    html[data-font-size]:not([data-font-size="100"]) .exam-mode-switch .MuiButton-root {
+      white-space: nowrap !important;
+      overflow-wrap: normal !important;
+      max-width: none !important;
     }
 
     /* Keep the inline deselect action compact as the surrounding text scales. */

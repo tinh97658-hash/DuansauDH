@@ -12,9 +12,9 @@ export function examOfferingLabel(offering){
 export const examCardStatus=session=>session.pendingConfirmation?'CHỜ XÁC NHẬN':({scheduled:'ĐÃ XẾP',held:'ĐÃ DIỄN RA',not_held:'KHÔNG DIỄN RA',cancelled:'ĐÃ HỦY'}[session.status]||'');
 export const roomFloor=room=>getRoomFloor(room.code)??(Number(String(room.code||'').match(/^[^0-9]*([0-9])/)?.[1])||null);
 export const uniqueOptions=(items,id,name)=>[...new Map(items.filter(i=>i[id]).map(i=>[i[id],{id:i[id],name:i[name]||i[id]}])).values()].sort((a,b)=>a.name.localeCompare(b.name,'vi'));
-export function matchesExam(offering,{discipline='',major='',year='',subject='',search=''}={}){
+export function matchesExam(offering,{discipline='',major='',year='',intakeRound='',subject='',search=''}={}){
  return (!subject||offering.subjectId===subject)&&normalize(`${offering.name||''} ${offering.code||''} ${offering.subjectName||''} ${offering.subjectCode||''}`).includes(normalize(search))&&
-  (!(discipline||major||year)||(offering.groups||[]).some(g=>(!discipline||g.disciplineId===discipline)&&(!major||g.majorId===major)&&(!year||g.academicYear===year)));
+  (!(discipline||major||year||intakeRound)||(offering.groups||[]).some(g=>(!discipline||g.disciplineId===discipline)&&(!major||g.majorId===major)&&(!year||g.academicYear===year)&&(!intakeRound||(intakeRound==='unassigned'?g.intakeRound==null:Number(g.intakeRound)===Number(intakeRound)))));
 }
 export function overlappingExams(sessions,form,exclude){
  const available=sessions.filter(s=>s.id!==exclude&&['scheduled','held'].includes(s.status)&&s.examDate===form.examDate);

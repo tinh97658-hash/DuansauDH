@@ -82,6 +82,12 @@ async function openMatrix() {
   return screen.findByRole("table", { name: "Ma trận học phần theo khóa" });
 }
 
+function chooseFilter(label, optionName) {
+  fireEvent.mouseDown(screen.getByLabelText(label));
+  const listbox = document.body.querySelector('.MuiPopover-root:not([aria-hidden="true"]) [role="listbox"]');
+  fireEvent.click(within(listbox).getByText(optionName, { selector: '[role="option"]' }));
+}
+
 beforeEach(() => jest.clearAllMocks());
 afterEach(cleanup);
 
@@ -102,7 +108,7 @@ it("exports the major scope from the filters while preserving shared offerings",
   const getReport = () => reportProvider.current.getReport();
   expect(getReport().metadata).toContainEqual(["Phạm vi", "Khai thác hàng hải (KTHH), Quản trị kinh doanh (QTKD)"]);
 
-  fireEvent.change(screen.getByLabelText("Chuyên ngành"), { target: { value: major.id } });
+  chooseFilter("Chuyên ngành", major.name);
   expect(getReport().metadata).toContainEqual(["Phạm vi", "Khai thác hàng hải (KTHH)"]);
   expect(getReport().sections[0].rows).toHaveLength(1);
 
@@ -160,24 +166,25 @@ it("moves an eleven-year history by one year without refetching and keeps the wi
   fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: "không có kết quả" } });
   expect(cohortHeaders()).toEqual(["KHÓA 2025", "KHÓA 2024", "KHÓA 2023", "KHÓA 2022"]);
   expect(screen.getByText(/Không tìm thấy lớp học phần/)).toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText("Tình trạng lịch"), { target: { value: "scheduled" } });
-  fireEvent.change(screen.getByLabelText("Chuyên ngành"), { target: { value: "major-2" } });
+  chooseFilter("Tình trạng lịch", "Đã xếp lịch");
+  chooseFilter("Chuyên ngành", "Quản trị kinh doanh");
   expect(cohortHeaders()).toEqual(["KHÓA 2025", "KHÓA 2024", "KHÓA 2023", "KHÓA 2022"]);
   expect(screen.getByRole("button", { name: "Xem khóa mới hơn" })).toBeInTheDocument();
 
-  fireEvent.change(screen.getByLabelText("Khóa / năm học"), { target: { value: "2025" } });
+  chooseFilter("Khóa / năm học", "Khóa 2025");
   expect(cohortHeaders()).toEqual(["KHÓA 2025"]);
   expect(screen.queryByRole("button", { name: "Xem khóa mới hơn" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Xem khóa cũ hơn" })).not.toBeInTheDocument();
 
-  fireEvent.change(screen.getByLabelText("Khóa / năm học"), { target: { value: "" } });
+  chooseFilter("Khóa / năm học", "Tất cả khóa");
   expect(cohortHeaders()).toEqual(["KHÓA 2026", "KHÓA 2025", "KHÓA 2024", "KHÓA 2023"]);
   fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: "" } });
-  fireEvent.change(screen.getByLabelText("Tình trạng lịch"), { target: { value: "all" } });
-  fireEvent.change(screen.getByLabelText("Chuyên ngành"), { target: { value: "" } });
+  chooseFilter("Tình trạng lịch", "Tất cả tình trạng");
+  chooseFilter("Chuyên ngành", "Tất cả chuyên ngành");
 
+  const shiftOlder = screen.getByRole("button", { name: "Xem khóa cũ hơn" });
   for (let index = 0; index < 7; index += 1) {
-    fireEvent.click(screen.getByRole("button", { name: "Xem khóa cũ hơn" }));
+    fireEvent.click(shiftOlder);
   }
   expect(cohortHeaders()).toEqual(["KHÓA 2019", "KHÓA 2018", "KHÓA 2017", "KHÓA 2016"]);
   expect(screen.queryByRole("button", { name: "Xem khóa cũ hơn" })).not.toBeInTheDocument();
@@ -219,7 +226,7 @@ it("keeps a selected year as a real filter and presents its offerings in the sin
   await openMatrix();
   expect(cohortHeaders()).toEqual(["KHÓA 2026", "KHÓA 2025"]);
 
-  fireEvent.change(screen.getByLabelText("Khóa / năm học"), { target: { value: "2026" } });
+  chooseFilter("Khóa / năm học", "Khóa 2026");
   const selectedYearMatrix = screen.getByRole("table", { name: "Ma trận học phần theo khóa" });
   expect(cohortHeaders()).toEqual(["KHÓA 2026"]);
   expect(selectedYearMatrix).toHaveClass("sl-matrix-pivot-table-selected-year");
@@ -275,8 +282,10 @@ it("excludes completed offerings from the active board, matrix, KPIs, filters, a
   expect(within(kpis).getByText("1", { selector: "strong" })).toBeInTheDocument();
   expect(within(kpis).queryByText("ĐÃ HOÀN THÀNH")).not.toBeInTheDocument();
   const scheduleFilter = screen.getByLabelText("Tình trạng lịch");
-  expect(scheduleFilter).not.toHaveDisplayValue("Đã hoàn thành");
-  expect(screen.queryByRole("option", { name: "Đã hoàn thành" })).not.toBeInTheDocument();
+  expect(scheduleFilter).not.toHaveTextContent("Đã hoàn thành");
+  fireEvent.mouseDown(scheduleFilter);
+  expect(within(document.body.querySelector('.MuiPopover-root:not([aria-hidden="true"]) [role="listbox"]')).queryByRole("option", { name: "Đã hoàn thành" })).not.toBeInTheDocument();
+  fireEvent.click(document.querySelector('.MuiPopover-root:not([aria-hidden="true"]) .MuiBackdrop-root'));
 
   const matrix = await openMatrix();
   expect(cohortHeaders()).toEqual(["KHÓA 2028"]);
@@ -289,10 +298,10 @@ it("excludes completed offerings from the active board, matrix, KPIs, filters, a
   expect(within(matrix).queryByText(completedSameCell.name)).not.toBeInTheDocument();
   expect(within(matrix).getAllByRole("button", { name: `Xem chi tiết ${activeScheduled.name}` })).toHaveLength(1);
 
-  fireEvent.change(screen.getByLabelText("Tình trạng lịch"), { target: { value: "scheduled" } });
+  chooseFilter("Tình trạng lịch", "Đã xếp lịch");
   expect(within(matrix).queryByText("Chưa xếp lịch")).not.toBeInTheDocument();
   expect(within(matrix).getByText("3 buổi")).toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText("Tình trạng lịch"), { target: { value: "all" } });
+  chooseFilter("Tình trạng lịch", "Tất cả tình trạng");
 
   const unscheduledRow = within(matrix).getByRole("row", { name: /SUBJECT-UNSCHEDULED.*Học phần unscheduled/ });
   const schedule = within(unscheduledRow).getByRole("button", { name: "Xếp lịch" });
@@ -346,32 +355,39 @@ it("combines all filters and preserves discipline dependency and the selected vi
   const { container } = render(<MemoryRouter useTransitions={false}><CourseMatrixPage /></MemoryRouter>);
   await screen.findByRole("region", { name: "Khóa 2026" });
   const expectKpis = (values) => expect(Array.from(container.querySelectorAll(".sl-matrix-kpi strong"), e => Number(e.textContent))).toEqual(values);
-  const change = (label, value) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
   expectKpis([3, 2, 1, 1]);
-  change("Tình trạng lịch", "scheduled");
+  chooseFilter("Tình trạng lịch", "Đã xếp lịch");
   expectKpis([1, 0, 1, 1]);
-  change("Tình trạng lịch", "unscheduled");
+  chooseFilter("Tình trạng lịch", "Chưa xếp lịch");
   expectKpis([2, 2, 0, 0]);
-  change("Tình trạng lịch", "all");
-  change("Chuyên ngành", "m2");
+  chooseFilter("Tình trạng lịch", "Tất cả tình trạng");
+  chooseFilter("Chuyên ngành", "QTKD");
   expectKpis([1, 1, 0, 0]);
-  change("Ngành", "d1");
-  expect(screen.getByLabelText("Chuyên ngành")).toHaveValue("");
-  expect(within(screen.getByLabelText("Chuyên ngành")).queryByRole("option", { name: "QTKD" })).not.toBeInTheDocument();
+  chooseFilter("Ngành", "Công nghệ");
+  expect(screen.getByLabelText("Chuyên ngành")).toHaveTextContent("Tất cả chuyên ngành");
+  fireEvent.mouseDown(screen.getByLabelText("Chuyên ngành"));
+  expect(within(document.body.querySelector('.MuiPopover-root:not([aria-hidden="true"]) [role="listbox"]')).queryByRole("option", { name: "QTKD" })).not.toBeInTheDocument();
+  fireEvent.click(document.querySelector('.MuiPopover-root:not([aria-hidden="true"]) .MuiBackdrop-root'));
   expectKpis([2, 1, 1, 1]);
-  change("Chuyên ngành", "m1");
-  change("Khóa / năm học", "2026");
-  change("Tìm kiếm", "SUBJECT-A");
-  change("Tình trạng lịch", "scheduled");
+  chooseFilter("Chuyên ngành", "CNTT");
+  chooseFilter("Khóa / năm học", "Khóa 2026");
+  fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: "SUBJECT-A" } });
+  chooseFilter("Tình trạng lịch", "Đã xếp lịch");
   expectKpis([1, 0, 1, 1]);
   expect(screen.getByText("Đang hiển thị 1 / 3 lớp học phần")).toBeInTheDocument();
   await openMatrix();
   expect(screen.queryByRole("button", { name: "Xóa lọc" })).not.toBeInTheDocument();
-  ["Tìm kiếm", "Ngành", "Chuyên ngành", "Khóa / năm học"].forEach(label => change(label, ""));
-  change("Tình trạng lịch", "all");
+  fireEvent.change(screen.getByLabelText("Tìm kiếm"), { target: { value: "" } });
+  chooseFilter("Ngành", "Tất cả ngành");
+  chooseFilter("Chuyên ngành", "Tất cả chuyên ngành");
+  chooseFilter("Khóa / năm học", "Tất cả khóa");
+  chooseFilter("Tình trạng lịch", "Tất cả tình trạng");
   expectKpis([3, 2, 1, 1]);
-  ["Tìm kiếm", "Ngành", "Chuyên ngành", "Khóa / năm học"].forEach(label => expect(screen.getByLabelText(label)).toHaveValue(""));
-  expect(screen.getByLabelText("Tình trạng lịch")).toHaveValue("all");
+  expect(screen.getByLabelText("Tìm kiếm")).toHaveValue("");
+  expect(screen.getByLabelText("Ngành")).toHaveTextContent("Tất cả ngành");
+  expect(screen.getByLabelText("Chuyên ngành")).toHaveTextContent("Tất cả chuyên ngành");
+  expect(screen.getByLabelText("Khóa / năm học")).toHaveTextContent("Tất cả khóa");
+  expect(screen.getByLabelText("Tình trạng lịch")).toHaveTextContent("Tất cả tình trạng");
   expect(screen.getByRole("button", { name: "Bảng ma trận môn" })).toHaveAttribute("aria-pressed", "true");
   const cards = container.querySelectorAll(".sl-matrix-kpi");
   for (const card of cards) {

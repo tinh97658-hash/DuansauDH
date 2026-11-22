@@ -1,5 +1,6 @@
 import { usePermissions } from "../../features/accounts/usePermissions";
 import GroupResponsibleStaff from "../../features/accounts/GroupResponsibleStaff";
+import IntakeRoundSelect, { matchesIntakeRound } from "../../components/IntakeRoundSelect";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -22,6 +23,7 @@ import ConfirmDialog from "../../components/ConfirmDialog";
 import ClassGroupCreateDialog from "./ClassGroupCreateDialog";
 import ResizableSplit from "../../components/ResizableSplit";
 import ResizableTable from "../../components/ResizableTable";
+import ListPagination from "../../components/ListPagination";
 import { disciplineOptionLabel, disciplinesFromMajors, majorDisciplineId, majorsForDiscipline } from "../../utils/disciplineScope";
 import { personNameParts } from "../../utils/personName";
 import "./assignClassGroups.css";
@@ -79,6 +81,8 @@ const AssignClassGroups = () => {
   const disciplines = useMemo(() => disciplinesFromMajors(majors), [majors]);
   const rawYear = searchParams.get("year");
   const selectedYear = /^\d{4}$/.test(rawYear || "") ? rawYear : String(currentYear);
+  const rawRound = searchParams.get("intakeRound") || "";
+  const intakeRound = /^(?:[1-9]\d{0,1}|unassigned)$/.test(rawRound) ? rawRound : "";
   const requestedMajor = majors.find((m) => m.id === searchParams.get("majorId"));
   // Existing links from the class list provide majorId + groupId, without disciplineId.
   const rawDiscipline = searchParams.get("disciplineId")
@@ -89,7 +93,7 @@ const AssignClassGroups = () => {
   const selectedMajor = selectedDiscipline && majorDisciplineId(requestedMajor) === selectedDiscipline
     ? requestedMajor.id : "ALL";
   const assignmentMode = !!selectedDiscipline && selectedMajor !== "ALL";
-  const scopeKey = `${selectedYear}:${selectedDiscipline}:${selectedMajor}`;
+  const scopeKey = `${selectedYear}:${intakeRound}:${selectedDiscipline}:${selectedMajor}`;
   const scopeRef = useRef(scopeKey);
   scopeRef.current = scopeKey;
   const [dataScope, setDataScope] = useState("");
@@ -97,6 +101,8 @@ const AssignClassGroups = () => {
   const [students, setStudents] = useState([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [studentSearch, setStudentSearch] = useState("");
+  const [candidatePage, setCandidatePage] = useState(0);
+  const [candidatePageSize, setCandidatePageSize] = useState(25);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
@@ -125,9 +131,10 @@ const AssignClassGroups = () => {
     if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
   }, [searchParams, selectedYear, selectedDiscipline, selectedMajor, majorsLoading, majorsError, setSearchParams]);
 
-  const navigateScope = (year, discipline, major = "ALL") => {
+  const navigateScope = (year, discipline, major = "ALL", round = year === selectedYear ? intakeRound : "") => {
     const next = new URLSearchParams(searchParams);
     next.set("year", year);
+    if (round) next.set("intakeRound", round); else next.delete("intakeRound");
     if (discipline) next.set("disciplineId", discipline); else next.delete("disciplineId");
     if (major !== "ALL") next.set("majorId", major); else next.delete("majorId");
     next.delete("groupId");
@@ -135,13 +142,13 @@ const AssignClassGroups = () => {
   };
 
   const unassignedInScope = useCallback((rows) => rows.filter((student) =>
-    (!student.academicYear || String(student.academicYear) === selectedYear)
+    matchesIntakeRound(student, intakeRound) && (!student.academicYear || String(student.academicYear) === selectedYear)
     && visibleMajors.some((major) => major.id === student.majorId)
     && (selectedMajor === "ALL" || student.majorId === selectedMajor)
     && !student.assignedGroup
     && !["Bảo lưu", "Đang bảo lưu", "Bảo lưu quá hạn", "Thôi học", "Đã thôi học"].includes(student.studyStatus)
     && (student.status === "approved" || ["Đã trúng tuyển", "Đang học"].includes(student.studyStatus))
-  ), [selectedYear, selectedMajor, visibleMajors]);
+  ), [selectedYear, intakeRound, selectedMajor, visibleMajors]);
 
   // Reload and reconcile independently from explicit selection clearing.
   const reloadData = useCallback(async () => {
@@ -151,6 +158,7 @@ const AssignClassGroups = () => {
     setLoading(true);
     setError("");
     const params = new URLSearchParams({ academicYear: selectedYear });
+    if (intakeRound) params.set("intakeRound", intakeRound);
     if (selectedMajor !== "ALL") params.set("majorId", selectedMajor);
     try {
       const [groupResponse, studentResponse] = await Promise.all([
@@ -160,7 +168,7 @@ const AssignClassGroups = () => {
       ]);
       if (request !== requestId.current || scope !== scopeRef.current) return;
       const rows = (data) => Array.isArray(data) ? data : data.data || [];
-      setGroups(rows(groupResponse.data).filter((g) => String(g.academicYear) === selectedYear
+      setGroups(rows(groupResponse.data).filter((g) => matchesIntakeRound(g, intakeRound) && String(g.academicYear) === selectedYear
         && (!g.program || g.program === "masters")
         && visibleMajors.some((m) => m.id === (g.majorId || g.major?.id))
         && (selectedMajor === "ALL" || (g.majorId || g.major?.id) === selectedMajor)));
@@ -200,6 +208,9 @@ const AssignClassGroups = () => {
   [assignmentMode, dataReady, groups, selectedMajor]);
   const targetGroupId = targetGroups.some((g) => g.id === searchParams.get("groupId")) ? searchParams.get("groupId") : "";
   const setTargetGroupId = (id) => {
+    const nextGroup = targetGroups.find(group => group.id === id);
+    if (nextGroup) setSelectedStudentIds(previous => previous.filter(id => students.some(student =>
+      student.id === id && matchesIntakeRound(student, String(nextGroup.intakeRound)))));
     const next = new URLSearchParams(searchParams);
     if (id) next.set("groupId", id); else next.delete("groupId");
     setSearchParams(next);
@@ -207,7 +218,8 @@ const AssignClassGroups = () => {
   useEffect(() => {
     if (assignmentMode && dataReady && !loading && !error && !targetGroupId && !postCreateLoading && !suppressAutoTarget) {
       const next = new URLSearchParams(searchParams);
-      const available = targetGroups.find(groupHasSpace);
+      const available = targetGroups.find((group) => groupHasSpace(group) && students.some((student) => matchesIntakeRound(student, String(group.intakeRound))))
+        || targetGroups.find(groupHasSpace);
       if (available) next.set("groupId", available.id);
       else next.delete("groupId");
       if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
@@ -221,16 +233,19 @@ const AssignClassGroups = () => {
   const currentMemberCount = Math.max(groupMembers.length, Number(currentTargetGroup?.memberCount || 0));
   const remainingCapacity = currentTargetGroup ? Math.max(0, maximumStudents - currentMemberCount) : 0;
   const overCapacity = !!currentTargetGroup && selectedStudentIds.length > remainingCapacity;
-  const unassignedStudents = dataReady ? students : [];
+  const unassignedStudents = dataReady ? students.filter(student => !currentTargetGroup || matchesIntakeRound(student, String(currentTargetGroup.intakeRound))) : [];
   const filteredStudents = unassignedStudents.filter((s) => {
     const kw = studentSearch.trim().toLowerCase();
     return !kw || [s.fullName, s.code, s.phone, s.majorName].some((value) => (value || "").toLowerCase().includes(kw));
   });
+  useEffect(() => { setCandidatePage(0); }, [scopeKey, studentSearch, targetGroupId]);
+  const safeCandidatePage = Math.min(candidatePage, Math.max(0, Math.ceil(filteredStudents.length / candidatePageSize) - 1));
+  const pagedStudents = filteredStudents.slice(safeCandidatePage * candidatePageSize, (safeCandidatePage + 1) * candidatePageSize);
   const majorById = useMemo(() => new Map(majors.map((m) => [m.id, m])), [majors]);
-  const visibleSelectedCount = filteredStudents.filter((s) => selectedStudentIds.includes(s.id)).length;
+  const visibleSelectedCount = pagedStudents.filter((s) => selectedStudentIds.includes(s.id)).length;
   const handleToggleSelectAll = (e) => {
     if (loading || groupsLoading || actionInFlight.current) return;
-    const visibleIds = new Set(filteredStudents.map((s) => s.id));
+    const visibleIds = new Set(pagedStudents.map((s) => s.id));
     setSelectedStudentIds((previous) => e.target.checked
       ? [...new Set([...previous, ...visibleIds])]
       : previous.filter((id) => !visibleIds.has(id)));
@@ -246,8 +261,11 @@ const AssignClassGroups = () => {
     actionInFlight.current = true;
     setActionLoading(true);
     try {
+      const visibleIds = new Set(unassignedStudents.map(student => student.id));
+      const selectedIds = selectedStudentIds.filter(id => visibleIds.has(id));
+      if (selectedIds.length !== selectedStudentIds.length) { setSelectedStudentIds(selectedIds); return; }
       const { data } = await axios.post(`${API_BASE_URL}/masters/class-groups/${targetGroupId}/members`,
-        { admissionRecordIds: selectedStudentIds }, { withCredentials: true });
+        { admissionRecordIds: selectedIds }, { withCredentials: true });
       toast.success(data.message || "Đã phân học viên vào nhóm.");
       if (scope === scopeRef.current) { setSelectedStudentIds([]); await reloadData(); }
     } catch (err) {
@@ -291,7 +309,7 @@ const AssignClassGroups = () => {
   const quickCreate = () => {
     if (!canManageGroups) return;
     setCreateFeedback("");
-    const scope = { key: scopeKey, year: selectedYear, disciplineId: selectedDiscipline, majorId: selectedMajor };
+    const scope = { key: scopeKey, year: selectedYear, intakeRound, disciplineId: selectedDiscipline, majorId: selectedMajor };
     createSession.current = scope;
     setCreateScope(scope);
   };
@@ -301,10 +319,11 @@ const AssignClassGroups = () => {
     try {
       // Refresh only targets: candidates, hidden selection, search and pane scroll stay mounted.
       const params = new URLSearchParams({ academicYear: scope.year, majorId: scope.majorId });
+      if (scope.intakeRound) params.set("intakeRound", scope.intakeRound);
       const { data } = await axios.get(`${API_BASE_URL}/masters/class-groups?${params}`, { withCredentials: true });
       if (scope !== createSession.current || scope.key !== scopeRef.current) return;
       const rows = (Array.isArray(data) ? data : data.data || []).filter((group) =>
-        String(group.academicYear) === scope.year
+        matchesIntakeRound(group, scope.intakeRound) && String(group.academicYear) === scope.year
         && (!group.program || group.program === "masters")
         && (group.majorId || group.major?.id) === scope.majorId);
       // Server creation order is primary; never infer new IDs from list position/name.
@@ -339,10 +358,10 @@ const AssignClassGroups = () => {
   const candidateColumns = [
     { key: "select", label: "Chọn học viên", width: 44, minWidth: 44, padding: "checkbox", header: <Checkbox
       size="small"
-      indeterminate={visibleSelectedCount > 0 && visibleSelectedCount < filteredStudents.length}
-      checked={filteredStudents.length > 0 && visibleSelectedCount === filteredStudents.length}
+      indeterminate={visibleSelectedCount > 0 && visibleSelectedCount < pagedStudents.length}
+      checked={pagedStudents.length > 0 && visibleSelectedCount === pagedStudents.length}
       onChange={handleToggleSelectAll}
-      disabled={filteredStudents.length === 0 || loading || groupsLoading || actionLoading}
+      disabled={pagedStudents.length === 0 || loading || groupsLoading || actionLoading}
       inputProps={{ "aria-label": "Chọn tất cả học viên" }}
     /> },
     { key: "code", label: "Mã học viên", width: 115, minWidth: 110 },
@@ -363,7 +382,7 @@ const AssignClassGroups = () => {
       {targetGroupId&&access?.permissions?.includes('route.plan.learner-codes.view')&&<Button sx={{mb:1}} variant="outlined" onClick={()=>navigate(`/masters/admitted-records?tab=learner-codes&classGroupId=${targetGroupId}`)}>Xem trước và cấp mã cho lớp này</Button>}
       {createScope && createScope.key === scopeKey && <ClassGroupCreateDialog
         majors={majors}
-        initialValues={{ academicYear: createScope.year, majorId: createScope.majorId }}
+        initialValues={{ academicYear: createScope.year, majorId: createScope.majorId, intakeRound: createScope.intakeRound && createScope.intakeRound !== "unassigned" ? Number(createScope.intakeRound) : 1 }}
         initialDisciplineId={createScope.disciplineId}
         lockedScope
         isScopeCurrent={() => createScope === createSession.current && createScope.key === scopeRef.current}
@@ -381,8 +400,8 @@ const AssignClassGroups = () => {
         borderRadius: 0,
         boxShadow: "0 2px 6px rgba(18, 59, 98, 0.07)",
       }}>
-        <Stack className="app-filter-toolbar" direction="row" spacing={1.5} flexWrap="nowrap" alignItems="flex-end">
-          <FilterSelectField label="Năm tuyển sinh" sx={{ flex: "1 1 150px", minWidth: 150 }}
+        <Stack className="app-filter-toolbar" direction="row" gap={1.5} alignItems="flex-end">
+          <FilterSelectField label="Năm tuyển sinh" sx={{ flex: "0 1 125px", minWidth: 115 }}
               value={selectedYear}
               disabled={actionLoading}
               onChange={(e) => navigateScope(e.target.value, selectedDiscipline, selectedMajor)}
@@ -391,13 +410,14 @@ const AssignClassGroups = () => {
                 <MenuItem key={y} value={y}>{y}</MenuItem>
               ))}
           </FilterSelectField>
+          <IntakeRoundSelect year={selectedYear} value={intakeRound} rows={groups} disabled={actionLoading} onChange={value => navigateScope(selectedYear, selectedDiscipline, selectedMajor, value)} />
 
-          <FilterSelectField label="Ngành" sx={{ flex: "1 1 260px", minWidth: 260 }} value={selectedDiscipline} disabled={majorsLoading || actionLoading} onChange={(e) => navigateScope(selectedYear, e.target.value)}>
+          <FilterSelectField label="Ngành" sx={{ flex: "1 1 200px", minWidth: 170 }} value={selectedDiscipline} disabled={majorsLoading || actionLoading} onChange={(e) => navigateScope(selectedYear, e.target.value)}>
               <MenuItem value="">Tất cả ngành</MenuItem>
               {disciplines.map((item) => <MenuItem key={item.id} value={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}
           </FilterSelectField>
 
-          <FilterSelectField label="Chuyên ngành" sx={{ flex: "1 1 280px", minWidth: 280 }}
+          <FilterSelectField label="Chuyên ngành" sx={{ flex: "1 1 220px", minWidth: 180 }}
               value={selectedMajor}
               disabled={majorsLoading || actionLoading}
               onChange={(e) => { const major = majorById.get(e.target.value); navigateScope(selectedYear, major ? majorDisciplineId(major) : selectedDiscipline, e.target.value); }}
@@ -530,7 +550,7 @@ const AssignClassGroups = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredStudents.map((s) => {
+                    pagedStudents.map((s) => {
                       const isSelected = selectedStudentIds.includes(s.id);
                       const selectionLimitReached = loading || groupsLoading || actionLoading;
                       const name = personNameParts(s);
@@ -572,6 +592,16 @@ const AssignClassGroups = () => {
                 </TableBody>
               </ResizableTable>
             </TableContainer>
+            <ListPagination
+              count={filteredStudents.length}
+              page={safeCandidatePage}
+              pageSize={candidatePageSize}
+              pageSizeOptions={[25, 50, 100]}
+              onPageChange={setCandidatePage}
+              onPageSizeChange={(nextSize) => { setCandidatePageSize(nextSize); setCandidatePage(0); }}
+              disabled={loading || actionLoading}
+              recordLabel="học viên"
+            />
           </Paper>
         </>} right={<>
 

@@ -1,11 +1,14 @@
 import { Type, Transform } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 const upper = ({ value }: any) => typeof value === 'string' ? value.trim().toUpperCase() : value;
+const optionalUpper = ({ value }: any) => typeof value === 'string' ? (value.trim().toUpperCase() || undefined) : (value ?? undefined);
 const trim = ({ value }: any) => typeof value === 'string' ? value.trim() : value;
+const optionalTrim = ({ value }: any) => typeof value === 'string' ? (value.trim() || undefined) : (value ?? undefined);
 export class CodeTypeDto {
   @Transform(trim) @IsString() @Length(1,100) name!: string;
-  @IsString() @Matches(/^[a-z][a-z0-9_]{1,39}$/) key!: string;
-  @IsOptional() @Transform(upper) @Matches(/^[A-Z]$/) letter?: string;
+  @IsOptional() @Transform(optionalTrim) @IsString() @Matches(/^[a-z][a-z0-9_]{1,39}$/) key?: string;
+  @IsOptional() @Transform(optionalUpper) @Matches(/^[A-Z]$/) letter?: string;
+  @IsOptional() @IsBoolean() usesSpecialCode?: boolean;
   @IsBoolean() active!: boolean;
   @IsBoolean() requiresAdmission!: boolean;
   @IsOptional() @IsInt() @Min(1) version?: number;

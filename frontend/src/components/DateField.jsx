@@ -7,7 +7,7 @@ import { DATE_PLACEHOLDER, formatDate, parseDisplayDate } from "../utils/dateFor
 
 /** Fixed day/month/year display, with ISO values for existing form handlers. */
 export default function DateField({ value = "", onChange, inputProps = {}, InputProps = {},
-  disabled, error, helperText, onBlur, onAccept, min: minimum, max: maximum, readOnly: isReadOnly, ...props }) {
+  disabled, error, helperText, onBlur, onAccept, min: minimum, max: maximum, readOnly: isReadOnly, calendarLabel, ...props }) {
   const [draft, setDraft] = useState(() => formatDate(value, ""));
   const [calendarAnchor, setCalendarAnchor] = useState(null);
   const lastEmitted = useRef(value);
@@ -44,7 +44,7 @@ export default function DateField({ value = "", onChange, inputProps = {}, Input
     InputProps={{ ...InputProps, readOnly: InputProps.readOnly || readOnly,
       endAdornment: <InputAdornment position="end">{InputProps.endAdornment}
           <IconButton size="small" type="button" disabled={disabled || readOnly || InputProps.readOnly}
-            aria-label={`Chọn ngày${props.label ? `: ${props.label}` : ""}`} aria-haspopup="dialog" aria-expanded={!!calendarAnchor}
+            aria-label={`Chọn ngày${(calendarLabel ?? props.label) ? `: ${calendarLabel ?? props.label}` : ""}`} aria-haspopup="dialog" aria-expanded={!!calendarAnchor}
             onClick={event => setCalendarAnchor(event.currentTarget)}><CalendarDaysIcon fontSize="small" /></IconButton>
       </InputAdornment> }} />
     {calendarAnchor && !disabled && !readOnly && !InputProps.readOnly && <DateCalendar anchorEl={calendarAnchor}

@@ -27,6 +27,7 @@ beforeEach(() => {
   axios.get.mockImplementation(async url => {
     if (url.includes("/auth/isStaff")) return { data: { message: "admin" } };
     if (url.includes("/system/training-years")) return { data: [0, 1].map(offset => ({ name: String(new Date().getFullYear() - offset), active: true, startDate: "2000-01-01" })) };
+    if (url.includes("/system/intake-rounds")) return { data: [0, 1].flatMap(offset => [1, 2].map(intakeRound => ({ academicYear: String(new Date().getFullYear() - offset), intakeRound, configured: true }))) };
     if (url.includes("/system/majors")) return { data: [{ id: "m1", name: "Công nghệ thông tin", program: "masters" }] };
     if (url.includes("/admission-records?")) return { data: { data: [record], pagination: { total: 1, totalPages: 1 }, stats: { total: 1 } } };
     return { data: [] };
@@ -41,6 +42,21 @@ const mount = mode => render(<ThemeProvider theme={theme}><CssBaseline /><Memory
     <Route path="/masters/study-leaves/:id" element={<p>Trang chi tiết học viên</p>} />
   </Routes>
 </MemoryRouter></ThemeProvider>);
+
+it('filters records on the server by round and resets the round when changing year', async () => {
+  mount('admitted-masters');
+  await screen.findByText('Nguyễn Văn');
+  fireEvent.mouseDown(screen.getByLabelText('Đợt tuyển sinh'));
+  fireEvent.click(await screen.findByRole('option', { name: 'Đợt 2', exact: true }));
+  await waitFor(() => expect(axios.get.mock.calls.some(([url]) => url.includes('/admission-records?') && url.includes('intakeRound=2'))).toBe(true));
+  fireEvent.mouseDown(screen.getByLabelText('Năm'));
+  fireEvent.click(await screen.findByRole('option', { name: String(new Date().getFullYear() - 1), exact: true }));
+  await waitFor(() => {
+    const requests = axios.get.mock.calls.filter(([url]) => url.includes('/admission-records?'));
+    expect(requests.at(-1)[0]).not.toContain('intakeRound=');
+  });
+  expect(screen.getByRole('button', { name: /Đợt tuyển sinh/ })).toHaveTextContent('Tất cả đợt');
+});
 
 it("filters learners by the assigned group and clears the group when changing year", async () => {
   const reads = axios.get.getMockImplementation();
@@ -150,6 +166,8 @@ it("keeps manual profile creation open and shows the duplicate learner code erro
   mount('applications');
   await screen.findByRole('cell', { name: 'HV001' });
   fireEvent.click(screen.getByRole('button', { name: 'Thêm hồ sơ mới' }));
+  fireEvent.mouseDown(within(screen.getByRole('dialog')).getByLabelText('Đợt nhập học'));
+  fireEvent.click(await screen.findByRole('option', { name: 'Đợt 2', exact: true }));
   const dialog = within(screen.getByRole('dialog'));
   fireEvent.change(dialog.getByPlaceholderText('VD: HV26001'), { target: { value: 'HV001' } });
   fireEvent.change(dialog.getByPlaceholderText('Nguyễn Văn'), { target: { value: 'Trần Văn' } });
@@ -170,6 +188,8 @@ it("creates a profile with the year selected in the filter", async () => {
   fireEvent.mouseDown(screen.getByLabelText("Năm"));
   fireEvent.click(await screen.findByRole("option", { name: selectedYear }));
   fireEvent.click(screen.getByRole("button", { name: "Thêm hồ sơ mới" }));
+  fireEvent.mouseDown(within(screen.getByRole("dialog")).getByLabelText("Đợt nhập học"));
+  fireEvent.click(await screen.findByRole("option", { name: "Đợt 2", exact: true }));
   const dialog = within(screen.getByRole("dialog"));
   const yearField = dialog.getByRole("textbox", { name: "Năm nhập học" });
   expect(yearField).toHaveValue(selectedYear);
@@ -196,7 +216,7 @@ it("creates a profile with the year selected in the filter", async () => {
   fireEvent.click(dialog.getByRole("button", { name: "Chấp nhận (Enter)" }));
   await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
     expect.stringContaining("/plan/admission-records"),
-    expect.objectContaining({ academicYear: selectedYear, fullName: "Trần Văn Bình", profileCategory: "Dự thính" }),
+    expect.objectContaining({ academicYear: selectedYear, intakeRound: 2, fullName: "Trần Văn Bình", profileCategory: "Dự thính" }),
     { withCredentials: true },
   ));
 });
@@ -206,6 +226,8 @@ it('creates a profile without phone and identity card information', async () => 
   mount('applications');
   await screen.findByRole('cell', { name: 'HV001' });
   fireEvent.click(screen.getByRole('button', { name: 'Thêm hồ sơ mới' }));
+  fireEvent.mouseDown(within(screen.getByRole('dialog')).getByLabelText('Đợt nhập học'));
+  fireEvent.click(await screen.findByRole('option', { name: 'Đợt 2', exact: true }));
   const dialog = within(screen.getByRole('dialog'));
   fireEvent.change(dialog.getByPlaceholderText('Nguyễn Văn'), { target: { value: 'Trần Văn' } });
   fireEvent.change(dialog.getByPlaceholderText('An'), { target: { value: 'Bình' } });
@@ -268,4 +290,31 @@ it("does not open the profile when double clicking the tuition checkbox", async 
   mount("admitted-masters");
   fireEvent.doubleClick(await screen.findByLabelText("Chọn xác nhận học phí HV001"));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+it("loads dynamically configured profile categories from learner code options", async () => {
+  const reads = axios.get.getMockImplementation();
+  axios.get.mockImplementation(url => url.includes("/learner-codes/options")
+    ? Promise.resolve({
+      data: {
+        types: [
+          { id: "t1", key: "regular", name: "Bình thường", active: true },
+          { id: "t2", key: "auditing", name: "Dự thính", active: false },
+          { id: "t3", key: "student", name: "Sinh viên", active: false },
+          { id: "t4", key: "early_study", name: "Cựu SV học trước", active: true },
+          { id: "t5", key: "pre_masters", name: "Cựu SV Tiền thạc sỹ", active: true },
+          { id: "t6", key: "chuyen_tiep", name: "Chuyển tiếp", active: true },
+        ],
+      },
+    })
+    : reads(url));
+  mount("applications");
+  await screen.findByRole("cell", { name: "HV001" });
+  fireEvent.click(screen.getByRole("button", { name: "Thêm hồ sơ mới" }));
+  const dialog = within(screen.getByRole("dialog"));
+  fireEvent.mouseDown(dialog.getByLabelText("Phân loại hồ sơ"));
+  const categories = screen.getByRole("listbox");
+  expect(within(categories).getAllByRole("option").map(option => option.textContent)).toEqual([
+    "Bình thường", "Dự thính", "Sinh viên", "Cựu SV học trước", "Cựu SV Tiền thạc sỹ", "Chuyển tiếp",
+  ]);
 });

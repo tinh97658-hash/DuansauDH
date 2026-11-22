@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Checkbox, Divider, ListItemText, ListSubheader, MenuItem, Select, TextField, Typography } from "@mui/material";
+import { Checkbox, Divider, InputAdornment, ListItemText, ListSubheader, MenuItem, Select, TextField, Typography } from "@mui/material";
 import { toast } from "react-toastify";
+import { MagnifyingGlassIcon } from "./AppIcons";
 import { isCommonMajor } from "../utils/majorScope";
 import { matchingSharingMajorIds } from "../utils/subjectSharing";
 
@@ -109,7 +110,14 @@ export default function SubjectSharingCheckbox({ subject, majors = [], subjects 
             Chỉ chọn ngành có học phần đang hoạt động, cùng tên, số tín chỉ và bậc đào tạo.
           </Typography>
           <TextField autoFocus fullWidth size="small" placeholder="Tìm chuyên ngành…" value={search}
-            inputProps={{ "aria-label": "Tìm chuyên ngành học chung" }} onChange={event => setSearch(event.target.value)} />
+            inputProps={{ "aria-label": "Tìm chuyên ngành học chung" }} onChange={event => setSearch(event.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <MagnifyingGlassIcon sx={{ width: 16, height: 16, color: "var(--icon-muted)" }} />
+                </InputAdornment>
+              ),
+            }} />
           <Typography fontSize={12} color="text.secondary" sx={{ mt: 1 }}>Đã chọn {validSelected.length} / {eligible.length} ngành đủ điều kiện</Typography>
           {invalidSelected.length > 0 && <Typography fontSize={12} color="warning.main">Có {invalidSelected.length} ngành đã chọn trước đây không còn phù hợp.</Typography>}
         </SharingMenuHeader>

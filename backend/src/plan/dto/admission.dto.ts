@@ -43,6 +43,7 @@ export class MajorAdmissionThresholdDto {
   @IsOptional() @IsNumber() @Min(0) @Max(20) cutoff?: number | null;
 }
 export class SaveAdmissionRoundDto {
+  @IsOptional() @IsInt() @Min(1) @Max(99) intakeRound?: number;
   @IsString() @IsNotEmpty() @MaxLength(200) name!: string;
   @IsString() @IsNotEmpty() @MaxLength(10) academicYear!: string;
   @IsArray() @ArrayMaxSize(2000) @ArrayUnique((row: MajorAdmissionThresholdDto) => row.majorId)

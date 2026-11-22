@@ -1,12 +1,14 @@
 import {formatLecturerName} from '../../utils/lecturerName';
-import AppSelect from "../../components/AppSelect";
+import IntakeRoundSelect, { matchesIntakeRound } from "../../components/IntakeRoundSelect";
+import FilterSearchField from "../../components/FilterSearchField";
+import FilterSelectField from "../../components/FilterSelectField";
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { dropdownMenuGeometry } from "../../utils/dropdownGeometry";
 import axios from "axios";
 import { useSearchParams } from "react-router-dom";
-import { Alert, Box, CircularProgress, Tooltip } from "@mui/material";
-import { ExclamationTriangleIcon, MagnifyingGlassIcon } from "../../components/AppIcons";
+import { Alert, Box, CircularProgress, MenuItem, Tooltip } from "@mui/material";
+import { ExclamationTriangleIcon } from "../../components/AppIcons";
 import FeatureLayout from "../../components/FeatureLayout";
 import DocumentExportMenu from "../../components/DocumentExportMenu";
 import ClassProgressExportDialog from "../../features/scheduling/ClassProgressExportDialog";
@@ -38,7 +40,7 @@ const statusInfo = {
 };
 
 function SelectFilter({ label, value, onChange, children, disabled }) {
-  return <label className="tp-filter tp-select-filter"><span>{label}</span><AppSelect value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>{children}</AppSelect></label>;
+  return <FilterSelectField label={label} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>{children}</FilterSelectField>;
 }
 
 function YearMultiSelect({ years, value, onChange, disabled }) {
@@ -143,6 +145,7 @@ export default function ClassCourseHistory() {
   const [majorId, setMajorId] = useState(searchParams.get("majorId") || "");
   const [disciplineId, setDisciplineId] = useState(searchParams.get("disciplineId") || "");
   const scopeInitialized = useRef(false);
+  const [intakeRound, setIntakeRound] = useState(searchParams.get("intakeRound") || "");
   const [academicYears, setAcademicYears] = useState((searchParams.get("year") || "").split(",").filter(Boolean));
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
@@ -246,12 +249,13 @@ export default function ClassCourseHistory() {
     const next = new URLSearchParams(searchParams);
     if (disciplineId) next.set("disciplineId", disciplineId); else next.delete("disciplineId");
     if (majorId) next.set("majorId", majorId); else next.delete("majorId");
+    if (intakeRound) next.set("intakeRound", intakeRound); else next.delete("intakeRound");
     if (academicYears.length) next.set("year", academicYears.join(",")); else next.delete("year");
     if (classGroupId) next.set("groupId", classGroupId); else next.delete("groupId");
     if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
-  }, [academicYears, classGroupId, disciplineId, loadingCatalog, majorId, searchParams, setSearchParams, visibleMajors]);
+  }, [academicYears, intakeRound, classGroupId, disciplineId, loadingCatalog, majorId, searchParams, setSearchParams, visibleMajors]);
 
-  const availableClasses = useMemo(() => report?.classes || [], [report]);
+  const availableClasses = useMemo(() => (report?.classes || []).filter(group => matchesIntakeRound(groups.find(item => item.id === group.id) || group, intakeRound)), [report, groups, intakeRound]);
   const classes = useMemo(() => classGroupId ? availableClasses.filter(group => group.id === classGroupId) : availableClasses, [availableClasses, classGroupId]);
   useEffect(() => {
     if (report && !loadingReport && classGroupId && !availableClasses.some(group => group.id === classGroupId)) setClassGroupId("");
@@ -320,34 +324,40 @@ export default function ClassCourseHistory() {
 
   return <FeatureLayout title="Theo dõi tiến độ" exportConfig={false}>
     <div className="tp-page">
-      <section className="tp-filters app-filter-toolbar" aria-label="Bộ lọc tiến độ">
-        <SelectFilter label="Ngành" value={disciplineId} onChange={(value) => {
-          const candidates = majorsForDiscipline(eligibleMajors, value);
-          const nextMajorId = candidates.find((item) => item.id === majorId)?.id || candidates[0]?.id || "";
-          const preferred = preferredYearForMajor(groups, nextMajorId);
-          setDisciplineId(value); setMajorId(nextMajorId);
-          if (nextMajorId !== majorId) setAcademicYears(preferred ? [preferred] : []);
-          setSelectedOffering(null); setError("");
-        }} disabled={loadingCatalog}>
-          <option value="" disabled>Chọn ngành</option>
-          {disciplines.map((item) => <option value={item.id} key={item.id}>{disciplineOptionLabel(item)}</option>)}
-        </SelectFilter>
-        <SelectFilter label="Chuyên ngành" value={majorId} onChange={(value) => { const preferred = preferredYearForMajor(groups, value); setDisciplineId(majorDisciplineId(eligibleMajors.find((item) => item.id === value))); setMajorId(value); setAcademicYears(preferred ? [preferred] : []); setSelectedOffering(null); setError(""); }} disabled={loadingCatalog || !visibleMajors.length}>
-          <option value="" disabled>Chọn chuyên ngành</option>
-          {visibleMajors.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
-        </SelectFilter>
-        <YearMultiSelect years={years} value={academicYears} onChange={(value) => { setAcademicYears(value); setSelectedOffering(null); setError(""); }} disabled={!majorId || !years.length} />
-        <SelectFilter label="Lớp học viên" value={classGroupId} onChange={setClassGroupId} disabled={loadingReport || !availableClasses.length}>
-          <option value="">Tất cả lớp</option>
-          {availableClasses.map(group => <option value={group.id} key={group.id}>{group.code || group.name}</option>)}
-        </SelectFilter>
-        <SelectFilter label="Trạng thái" value={status} onChange={setStatus} disabled={!report}>
-          <option value="all">Tất cả</option>
-          {Object.entries(statusInfo).map(([value, info]) => <option value={value} key={value}>{info.label}</option>)}
-        </SelectFilter>
-        <label className="tp-filter"><span>Tìm kiếm</span><div className="tp-search"><MagnifyingGlassIcon /><input aria-label="Tìm kiếm" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm mã, học phần, giảng viên..." disabled={!report} /></div></label>
-        <div className="page-export-inline" data-export-exclude="true" style={{ "--export-control-height": "38px" }}>
-          <DocumentExportMenu disabled={exportDisabled} onWord={() => beginExport("word")} onExcel={() => beginExport("excel")} onPdf={() => beginExport("pdf")} />
+      <section className="tp-filters" aria-label="Bộ lọc tiến độ">
+        <div className="app-filter-toolbar" style={{ justifyContent: "space-between" }}>
+          <FilterSearchField value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm mã, học phần, giảng viên..." disabled={!report} sx={{ flex: "1 1 320px", minWidth: "min(100%, 260px)", maxWidth: { lg: 560 } }} />
+          <div className="page-export-inline" data-export-exclude="true" style={{ "--export-control-height": "38px", marginLeft: "auto" }}>
+            <DocumentExportMenu disabled={exportDisabled} onWord={() => beginExport("word")} onExcel={() => beginExport("excel")} onPdf={() => beginExport("pdf")} />
+          </div>
+        </div>
+        <div className="tp-filters-divider" />
+        <div className="app-filter-toolbar tp-filters-row">
+          <SelectFilter label="Ngành" value={disciplineId} onChange={(value) => {
+            const candidates = majorsForDiscipline(eligibleMajors, value);
+            const nextMajorId = candidates.find((item) => item.id === majorId)?.id || candidates[0]?.id || "";
+            const preferred = preferredYearForMajor(groups, nextMajorId);
+            setDisciplineId(value); setMajorId(nextMajorId);
+            if (nextMajorId !== majorId) setAcademicYears(preferred ? [preferred] : []);
+            setSelectedOffering(null); setError("");
+          }} disabled={loadingCatalog}>
+            <MenuItem value="" disabled>Chọn ngành</MenuItem>
+            {disciplines.map((item) => <MenuItem value={item.id} key={item.id}>{disciplineOptionLabel(item)}</MenuItem>)}
+          </SelectFilter>
+          <SelectFilter label="Chuyên ngành" value={majorId} onChange={(value) => { const preferred = preferredYearForMajor(groups, value); setDisciplineId(majorDisciplineId(eligibleMajors.find((item) => item.id === value))); setMajorId(value); setAcademicYears(preferred ? [preferred] : []); setSelectedOffering(null); setError(""); }} disabled={loadingCatalog || !visibleMajors.length}>
+            <MenuItem value="" disabled>Chọn chuyên ngành</MenuItem>
+            {visibleMajors.map((item) => <MenuItem value={item.id} key={item.id}>{item.name}</MenuItem>)}
+          </SelectFilter>
+          <YearMultiSelect years={years} value={academicYears} onChange={(value) => { setAcademicYears(value); setIntakeRound(""); setSelectedOffering(null); setError(""); }} disabled={!majorId || !years.length} />
+          <IntakeRoundSelect year={academicYears.length === 1 ? academicYears[0] : ""} value={intakeRound} rows={groups} onChange={value => { setIntakeRound(value); setClassGroupId(""); setSelectedOffering(null); }} />
+          <SelectFilter label="Lớp học viên" value={classGroupId} onChange={setClassGroupId} disabled={loadingReport || !availableClasses.length}>
+            <MenuItem value="">Tất cả lớp</MenuItem>
+            {availableClasses.map(group => <MenuItem value={group.id} key={group.id}>{group.code || group.name}</MenuItem>)}
+          </SelectFilter>
+          <SelectFilter label="Trạng thái" value={status} onChange={setStatus} disabled={!report}>
+            <MenuItem value="all">Tất cả</MenuItem>
+            {Object.entries(statusInfo).map(([value, info]) => <MenuItem value={value} key={value}>{info.label}</MenuItem>)}
+          </SelectFilter>
         </div>
       </section>
 

@@ -1,7 +1,7 @@
 import { Transform, Type } from "class-transformer";
 import { normalizeTrainingLevel, STUDY_STATUS_VALUES } from "../admission-values.js";
 import { SUBJECT_KNOWLEDGE_CODES } from '../subject-knowledge-groups.js';
-import { ArrayMaxSize, ArrayMinSize, ArrayNotEmpty, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, Min, ValidateNested } from "class-validator";
+import { ArrayMaxSize, ArrayMinSize, ArrayNotEmpty, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim());
 const trimUpper = ({ value }: { value: unknown }) => (value === undefined || value === null ? value : String(value).trim().toUpperCase());
@@ -173,6 +173,7 @@ export class CreateAdmissionRecordDto {
   @IsOptional() @IsString() language?: string;
   @IsOptional() @Transform(trim) @IsIn(STUDY_STATUS_VALUES) studyStatus?: string;
   @IsOptional() @IsString() academicYear?: string;
+  @IsOptional() @IsInt() @Min(1) @Max(99) intakeRound?: number | null;
 
   @IsOptional() @IsString() nationality?: string;
   @IsOptional() @IsString() ethnicity?: string;
@@ -226,6 +227,7 @@ export class UpdateAdmissionRecordDto {
   @IsOptional() @IsString() language?: string;
   @IsOptional() @Transform(trim) @IsIn(STUDY_STATUS_VALUES) studyStatus?: string;
   @IsOptional() @IsString() academicYear?: string;
+  @IsOptional() @IsInt() @Min(1) @Max(99) intakeRound?: number | null;
 
   @IsOptional() @IsString() nationality?: string;
   @IsOptional() @IsString() ethnicity?: string;
