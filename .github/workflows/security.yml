@@ -35,6 +35,8 @@ jobs:
       API_PUBLIC_URL: http://localhost:3001
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
@@ -43,6 +45,15 @@ jobs:
             package-lock.json
             backend/package-lock.json
             frontend/package-lock.json
+      - name: Scan commits for secrets and disallowed artifacts
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            node scripts/git-safety.cjs --range "${{ github.event.pull_request.base.sha }}..${{ github.sha }}"
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            node scripts/git-safety.cjs --range "${{ github.event.before }}..${{ github.sha }}"
+          else
+            node scripts/git-safety.cjs --range "HEAD~1..HEAD"
+          fi
       - run: npm ci --ignore-scripts
       - run: npm ci --prefix backend
       - run: npm ci --prefix frontend --ignore-scripts
@@ -78,7 +89,8 @@ jobs:
           --health-cmd "pg_isready -U pgsms_ci -d pgsms_ci_control"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      POSTGRES_TEST_ADMIN_URL: postgres://pgsms_ci:disposable-ci-password@127.0.0.1:55440/pgsms_ci_control
+      POSTGRES_CI_PASSWORD: disposable-ci-password
+      POSTGRES_TEST_ADMIN_URL: postgres://pgsms_ci:${{ env.POSTGRES_CI_PASSWORD }}@127.0.0.1:55440/pgsms_ci_control
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0

@@ -72,7 +72,7 @@ export class ReportsController {
   classScoreSummaryOptions() { return this.scoreSummary.options(); }
   @Get("class-score-summary/roster")
   classScoreRoster(@Query() query: ClassScoreRosterQueryDto) { return this.scoreSummary.roster(query.classGroupId); }
-  @Get("class-score-summary/transcripts")
+  @Get("class-score-summary/transcripts") @RequirePermissions("reports.view", "reports.export")
   classTranscripts(@Query() query: ClassScoreRosterQueryDto) { return this.scoreSummary.transcripts(query.classGroupId); }
   @Get("class-score-summary/export") @RequirePermissions("reports.export")
   exportClassScoreSummary(@Query() query: ClassScoreSummaryQueryDto) { return this.scoreSummary.get(query, true); }

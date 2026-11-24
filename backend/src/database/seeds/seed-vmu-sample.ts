@@ -14,6 +14,9 @@ import { COMMON_DISCIPLINE_CODE } from "../../common/major-scope.js";
  * Tính chất: IDEMPOTENT (Chạy lại an toàn mà không phá vỡ quan hệ khoá ngoại hay trùng lặp).
  */
 async function run() {
+  if (process.env.NODE_ENV !== "development") {
+    throw new Error("Refusing to run demo seed outside NODE_ENV=development.");
+  }
   console.log("=========================================================================");
   console.log("   KHỞI TẠO DỮ LIỆU MẪU VIỆN ĐÀO TẠO SAU ĐẠI HỌC - ĐH HÀNG HẢI VIỆT NAM  ");
   console.log("=========================================================================");

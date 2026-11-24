@@ -113,12 +113,15 @@ export class AuditContextMiddleware implements NestMiddleware {
     const user: any = (request as any).user;
     const isStaff = user instanceof Staff;
     const headerRequestId = request.get("x-request-id");
+    const safeRequestId = headerRequestId && /^[a-zA-Z0-9._-]{1,64}$/.test(headerRequestId)
+      ? headerRequestId
+      : randomUUID();
     this.context.run(
       {
         actorStaffId: isStaff ? user.id : null,
         actorProfileId:isStaff?workingProfileStorage.getStore()?.roleId||null:null,
         actorEmail: isStaff ? user.email : null,
-        requestId: headerRequestId ? String(headerRequestId) : randomUUID(),
+        requestId: safeRequestId,
         ip: request.ip ?? null,
         userAgent: request.get("user-agent") ?? null,
       },

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Put, Req, UseGuards } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentUser } from "../common/auth-user.js";
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
@@ -37,25 +37,25 @@ export class RolesController {
 
   @Get(":id")
   @RequirePermissions("role.view")
-  detail(@Param("id") id: string) {
+  detail(@Param("id", ParseUUIDPipe) id: string) {
     return this.roles.detail(id);
   }
 
   @Put(":id")
   @RequirePermissions("role.manage")
-  update(@CurrentUser() user: any, @Param("id") id: string, @Body() dto: UpdateRoleDto, @Req() request: Request) {
+  update(@CurrentUser() user: any, @Param("id", ParseUUIDPipe) id: string, @Body() dto: UpdateRoleDto, @Req() request: Request) {
     return this.roles.update(user.id, id, dto, contextFrom(request));
   }
 
   @Put(":id/permissions")
   @RequirePermissions("role.manage")
-  setPermissions(@CurrentUser() user: any, @Param("id") id: string, @Body() dto: SetRolePermissionsDto, @Req() request: Request) {
+  setPermissions(@CurrentUser() user: any, @Param("id", ParseUUIDPipe) id: string, @Body() dto: SetRolePermissionsDto, @Req() request: Request) {
     return this.roles.setPermissions(user.id, id, dto, contextFrom(request));
   }
 
   @Delete(":id")
   @RequirePermissions("role.manage")
-  remove(@CurrentUser() user: any, @Param("id") id: string, @Req() request: Request) {
+  remove(@CurrentUser() user: any, @Param("id", ParseUUIDPipe) id: string, @Req() request: Request) {
     return this.roles.remove(user.id, id, contextFrom(request));
   }
 }

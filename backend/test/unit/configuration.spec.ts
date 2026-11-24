@@ -35,4 +35,11 @@ describe("shared environment configuration", () => {
   it("rejects a missing database password instead of using a fallback", () => {
     expect(environmentSchema.validate({ ...config, POSTGRES_PASSWORD: undefined }).error).toBeDefined();
   });
+
+  it("requires a valid 32-byte DATA_ENCRYPTION_KEY in production and validates format in all modes", () => {
+    expect(environmentSchema.validate({ ...config, NODE_ENV: "production" }).error).toBeDefined();
+    expect(environmentSchema.validate({ ...config, DATA_ENCRYPTION_KEY: "invalid-key" }).error).toBeDefined();
+    const validKey = "a".repeat(64);
+    expect(environmentSchema.validate({ ...config, NODE_ENV: "production", DATA_ENCRYPTION_KEY: validKey }).error).toBeUndefined();
+  });
 });

@@ -42,4 +42,11 @@ export class Staff extends Model {
 
   @BelongsToMany(() => Student, () => StaffStudent)
   declare students: Student[];
+
+  override toJSON() {
+    const values: any = { ...this.get() };
+    delete values.password;
+    delete values.sessionVersion;
+    return values;
+  }
 }

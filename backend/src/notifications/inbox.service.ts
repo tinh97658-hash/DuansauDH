@@ -21,16 +21,18 @@ export class InboxService {
     });
     return { user, profile: context.roleId };
   }
-  private async visible(user: Staff, profile: string) {
+  private async visible(user: Staff, profile: string, options?: { unreadOnly?: boolean; deliveryId?: string }) {
     const result: any[] = [], targets = new Map<string, any>();
+    const MAX_SCAN = 2000;
     let offset = 0;
+    const extraWhere = `${options?.unreadOnly ? ' AND d.read_at IS NULL' : ''}${options?.deliveryId ? ' AND d.id=:deliveryId' : ''}`;
     // Filter under current business RLS before pagination/count; never count hidden rows.
-    for (;;) {
+    for (; offset < MAX_SCAN;) {
       const rows = await this.db.query<Delivery>(`SELECT d.id,d.read_at,d.audience,e.kind,e.entity_id,e.occurred_at
         FROM notification_deliveries d JOIN notification_events e ON e.id=d.event_id
-        WHERE d.staff_id=:staff AND d.profile_id=:profile AND e.actor_staff_id IS DISTINCT FROM d.staff_id
+        WHERE d.staff_id=:staff AND d.profile_id=:profile AND e.actor_staff_id IS DISTINCT FROM d.staff_id${extraWhere}
         ORDER BY e.occurred_at DESC,d.id DESC LIMIT 500 OFFSET :offset`,
-      { type: QueryTypes.SELECT, replacements: { staff: user.id, profile, offset } });
+      { type: QueryTypes.SELECT, replacements: { staff: user.id, profile, offset, ...(options?.deliveryId ? { deliveryId: options.deliveryId } : {}) } });
       for (const row of rows) {
         if (!Object.hasOwn(eventTitles, row.kind)) continue;
         const key = `${row.kind}:${row.entity_id}:${row.audience}`;
@@ -39,7 +41,7 @@ export class InboxService {
         if (target) result.push({ id: row.id, type: row.kind, title: eventTitles[row.kind],
           body: target.label, href: target.href, occurredAt: row.occurred_at, readAt: row.read_at });
       }
-      if (rows.length < 500) break;
+      if (rows.length < 500 || options?.deliveryId) break;
       offset += rows.length;
     }
     return result;
@@ -49,10 +51,10 @@ export class InboxService {
     return { items: visible.slice((page - 1) * pageSize, page * pageSize), total: visible.length,
       unreadCount: visible.filter(item => !item.readAt).length, page, pageSize };
   }
-  async unread(actor: unknown) { const { user, profile } = this.identity(actor); return { unreadCount: (await this.visible(user, profile)).filter(item => !item.readAt).length }; }
+  async unread(actor: unknown) { const { user, profile } = this.identity(actor); return { unreadCount: (await this.visible(user, profile, { unreadOnly: true })).length }; }
   async read(actor: unknown, id: string) {
     const { user, profile } = this.identity(actor);
-    const item = (await this.visible(user, profile)).find(value => value.id === id);
+    const [item] = await this.visible(user, profile, { deliveryId: id });
     if (!item) throw new NotFoundException('Không tìm thấy thông báo trong phạm vi hiện tại.');
     const [updated] = await this.db.query<{ read_at: Date }>(`UPDATE notification_deliveries SET read_at=COALESCE(read_at,clock_timestamp())
       WHERE id=:id AND staff_id=:staff AND profile_id=:profile RETURNING read_at`, { type: QueryTypes.SELECT, replacements: { id, staff: user.id, profile } });
@@ -60,8 +62,8 @@ export class InboxService {
     return { item: { ...item, readAt: updated.read_at } };
   }
   async readAll(actor: unknown) {
-    const { user, profile } = this.identity(actor), items = await this.visible(user, profile);
-    const ids = items.filter(item => !item.readAt).map(item => item.id);
+    const { user, profile } = this.identity(actor), items = await this.visible(user, profile, { unreadOnly: true });
+    const ids = items.map(item => item.id);
     const updated = ids.length ? await this.db.query<{ id: string }>(`UPDATE notification_deliveries SET read_at=clock_timestamp()
       WHERE id IN (:ids) AND staff_id=:staff AND profile_id=:profile AND read_at IS NULL RETURNING id`,
     { type: QueryTypes.SELECT, replacements: { ids, staff: user.id, profile } }) : [];

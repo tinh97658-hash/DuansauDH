@@ -380,6 +380,7 @@ const RibbonHeader = () => {
     setLogoutError("");
     try {
       await axios.post(`${API_BASE_URL}/user/logout`, {}, { withCredentials: true });
+      try { window.sessionStorage.clear(); } catch {}
       discardUnsaved();
       navigate("/login", { replace: true });
     } catch {

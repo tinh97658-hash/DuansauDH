@@ -266,7 +266,7 @@ export class AccountsService {
       password: hashed,
       mustChangePassword: true,
       passwordChangedAt: new Date(),
-      sessionVersion: staff.sessionVersion + 1,
+      sessionVersion: literal('"session_version" + 1'),
     });
 
     await this.audit.record({
@@ -316,7 +316,7 @@ export class AccountsService {
     const staff = await this.staff.findByPk(id);
     if (!staff) throw new NotFoundException("Không tìm thấy tài khoản.");
 
-    await staff.update({ sessionVersion: staff.sessionVersion + 1 });
+    await staff.update({ sessionVersion: literal('"session_version" + 1') });
     await this.audit.record({
       actorStaffId: actorId,
       targetStaffId: id,

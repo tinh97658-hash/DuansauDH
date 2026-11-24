@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy } from "passport-google-oauth2";
@@ -17,7 +17,11 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
   }
 
   validate(_accessToken: string, _refreshToken: string, profile: any) {
-    const email = profile.email || profile.emails?.[0]?.value;
+    const email = profile?.email || profile?.emails?.[0]?.value;
+    const verified = profile?.email_verified === true || profile?.verified === true;
+    if (typeof email !== "string" || !email.trim() || !verified) {
+      throw new UnauthorizedException("Email Google chưa được xác minh.");
+    }
     return this.auth.validateGoogle(email);
   }
 }

@@ -1,5 +1,6 @@
 import Joi from "joi";
 import { join } from "node:path";
+import { isValidEncryptionKey } from "../common/pii-encryption.js";
 
 export const environmentFiles = [join(__dirname, "../../../.env")];
 
@@ -20,7 +21,7 @@ export const environmentSchema = Joi.object({
     url.pathname = `/${encodeURIComponent(config.POSTGRES_DB)}`;
     return url.toString();
   }),
-  DATABASE_SSL: Joi.boolean().truthy("true").falsy("false").default(false),
+  DATABASE_SSL: Joi.boolean().truthy("true").falsy("false").default((config) => config.NODE_ENV === "production"),
   DATABASE_SSL_CA: Joi.string().allow("").optional(),
   DB_POOL_MAX: Joi.number().integer().min(1).default(25),
   DB_POOL_MIN: Joi.number().integer().min(0).default(2),
@@ -29,6 +30,16 @@ export const environmentSchema = Joi.object({
   DB_LOCK_TIMEOUT_MS: Joi.number().integer().min(100).default(5000),
   DB_STATEMENT_TIMEOUT_MS: Joi.number().integer().min(1000).default(30000),
   SESSION_SECRET: Joi.string().min(32).required(),
+  DATA_ENCRYPTION_KEY: Joi.string()
+    .custom((value, helpers) => {
+      if (!isValidEncryptionKey(value)) return helpers.error("any.invalid");
+      return value;
+    })
+    .when("NODE_ENV", {
+      is: "production",
+      then: Joi.required(),
+      otherwise: Joi.optional().allow(""),
+    }),
   SESSION_COOKIE_SECURE: Joi.boolean().truthy("true").falsy("false").optional(),
   FRONTEND_URL: Joi.string().uri({ scheme: ["http", "https"] }).required(),
   API_PUBLIC_URL: Joi.string().uri({ scheme: ["http", "https"] }).required(),

@@ -42,8 +42,10 @@ describe('Request protection before database work', () => {
   });
   it('keeps the recovery limiter effective for mixed-case routes and trailing slashes', async () => {
     const { app, databaseWork } = fixture();
-    for (let i = 0; i < 100; i++) await request(app).post('/USER/forgotPassword/').set('Origin', origin).expect(200);
+    for (let i = 0; i < 20; i++) await request(app).post('/USER/forgotPassword/').set('Origin', origin).expect(200);
     await request(app).post('/user/forgotPassword').set('Origin', origin).expect(429);
-    expect(databaseWork).toHaveBeenCalledTimes(100);
+    await request(app).patch('/accounts/me/password').set('Origin', origin).expect(429);
+    await request(app).patch('/user/resetPassword/sampletoken').set('Origin', origin).expect(429);
+    expect(databaseWork).toHaveBeenCalledTimes(20);
   });
 });

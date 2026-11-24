@@ -22,6 +22,7 @@ const ChangePassword = () => {
     setLoggingOut(true);
     try {
       await axios.post(`${API_BASE_URL}/user/logout`, {}, { withCredentials: true });
+      try { window.sessionStorage.clear(); } catch {}
       navigate("/login", { replace: true });
     } catch {
       notify.error("Không thể đăng xuất. Vui lòng thử lại.");

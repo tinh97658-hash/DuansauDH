@@ -91,7 +91,7 @@ export default defineConfig(({ mode }) => {
         },
       },
       port,
-      host: "0.0.0.0",
+      host: env.VITE_DEV_HOST || "127.0.0.1",
       strictPort: false,
       watch: {
         ignored: ["**/build/**", "**/node_modules-before-*/**"],
@@ -99,7 +99,7 @@ export default defineConfig(({ mode }) => {
     },
     preview: {
       port,
-      host: "0.0.0.0",
+      host: env.VITE_DEV_HOST || "127.0.0.1",
     },
     build: {
       rollupOptions: {

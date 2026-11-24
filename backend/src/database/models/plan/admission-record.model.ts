@@ -1,9 +1,11 @@
-import { BelongsTo, Column, DataType, Default, ForeignKey, Model, Table } from "sequelize-typescript";
+import { BelongsTo, Column, DataType, Default, DefaultScope, ForeignKey, Model, Table } from "sequelize-typescript";
+import { decryptPii, encryptPii, hashIdCard, hashPhone } from "../../../common/pii-encryption.js";
 import { TrainingPlan } from "./training-plan.model.js";
 import { Major } from "../common/major.model.js";
 import { TrainingMode } from "../common/training-mode.model.js";
 import { Student } from "../student.model.js";
 
+@DefaultScope(() => ({ attributes: { exclude: ["idCardHash", "phoneHash"] } }))
 @Table({ tableName: "admission_records", underscored: true, timestamps: true })
 export class AdmissionRecord extends Model {
   @Default(DataType.UUIDV4)
@@ -43,8 +45,21 @@ export class AdmissionRecord extends Model {
   @Column({ type: DataType.STRING(30), allowNull: true })
   declare dob: string | null; // Ngày sinh
 
-  @Column({ type: DataType.STRING(30), allowNull: true })
+  @Column({
+    type: DataType.TEXT,
+    allowNull: true,
+    get(this: AdmissionRecord) {
+      return decryptPii(this.getDataValue("idCard"), "admission_records:id_card");
+    },
+    set(this: AdmissionRecord, value: string | null) {
+      this.setDataValue("idCard", encryptPii(value, "admission_records:id_card"));
+      this.setDataValue("idCardHash", hashIdCard(value));
+    },
+  })
   declare idCard: string | null; // Số CMND / CCCD
+
+  @Column({ type: DataType.STRING(64), allowNull: true, field: "id_card_hash" })
+  declare idCardHash: string | null;
 
   @Default("Nam")
   @Column({ type: DataType.STRING(10), allowNull: true })
@@ -53,8 +68,21 @@ export class AdmissionRecord extends Model {
   @Column({ type: DataType.STRING(150), allowNull: true })
   declare email: string;
 
-  @Column({ type: DataType.STRING(30), allowNull: true })
+  @Column({
+    type: DataType.TEXT,
+    allowNull: true,
+    get(this: AdmissionRecord) {
+      return decryptPii(this.getDataValue("phone"), "admission_records:phone");
+    },
+    set(this: AdmissionRecord, value: string | null) {
+      this.setDataValue("phone", encryptPii(value, "admission_records:phone"));
+      this.setDataValue("phoneHash", hashPhone(value));
+    },
+  })
   declare phone: string | null;
+
+  @Column({ type: DataType.STRING(64), allowNull: true, field: "phone_hash" })
+  declare phoneHash: string | null;
 
   @Column({ type: DataType.STRING(150), allowNull: true })
   declare pob: string | null; // Nơi sinh
@@ -133,7 +161,16 @@ export class AdmissionRecord extends Model {
   @Column({ type: DataType.STRING(100), allowNull: true })
   declare city: string | null; // Thành phố
 
-  @Column({ type: DataType.STRING(150), allowNull: true })
+  @Column({
+    type: DataType.TEXT,
+    allowNull: true,
+    get(this: AdmissionRecord) {
+      return decryptPii(this.getDataValue("ward"), "admission_records:ward");
+    },
+    set(this: AdmissionRecord, value: string | null) {
+      this.setDataValue("ward", encryptPii(value, "admission_records:ward"));
+    },
+  })
   declare ward: string | null; // Phường xã / Địa chỉ
 
   // 4. GIẤY TỜ BỔ SUNG
@@ -172,10 +209,28 @@ export class AdmissionRecord extends Model {
   @Column({ type: DataType.STRING(50), allowNull: true })
   declare gradClassification: string | null; // Loại TN
 
-  @Column({ type: DataType.STRING(50), allowNull: true })
+  @Column({
+    type: DataType.TEXT,
+    allowNull: true,
+    get(this: AdmissionRecord) {
+      return decryptPii(this.getDataValue("diplomaNumber"), "admission_records:diploma_number");
+    },
+    set(this: AdmissionRecord, value: string | null) {
+      this.setDataValue("diplomaNumber", encryptPii(value, "admission_records:diploma_number"));
+    },
+  })
   declare diplomaNumber: string | null; // Số Văn bằng
 
-  @Column({ type: DataType.STRING(50), allowNull: true })
+  @Column({
+    type: DataType.TEXT,
+    allowNull: true,
+    get(this: AdmissionRecord) {
+      return decryptPii(this.getDataValue("registryBookNumber"), "admission_records:registry_book_number");
+    },
+    set(this: AdmissionRecord, value: string | null) {
+      this.setDataValue("registryBookNumber", encryptPii(value, "admission_records:registry_book_number"));
+    },
+  })
   declare registryBookNumber: string | null; // Số vào sổ gốc
 
   @Default("pending")
@@ -192,4 +247,11 @@ export class AdmissionRecord extends Model {
   @Default({})
   @Column({ type: DataType.JSON, allowNull: true })
   declare extraData: Record<string, any> | null;
+
+  override toJSON() {
+    const values: any = { ...this.get() };
+    delete values.idCardHash;
+    delete values.phoneHash;
+    return values;
+  }
 }

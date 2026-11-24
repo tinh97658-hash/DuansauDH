@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Param, Post, Put, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, ForbiddenException, Get, Param, ParseUUIDPipe, Post, Put, Query, UseGuards } from "@nestjs/common";
 import { RbacService } from "../auth/rbac.service.js";
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
 import { CurrentUser } from "../common/auth-user.js";
@@ -58,10 +58,13 @@ export class SystemController {
   @Put("units/:id") @RequirePermissions("catalog.manage") updateUnit(@Param("id") id: string, @Body() dto: UpdateCatalogDto) { return this.system.updateUnit(id, dto); }
   @Delete("units/:id") @RequirePermissions("catalog.manage") removeUnit(@Param("id") id: string) { return this.system.removeUnit(id); }
 
-  @Get("lecturers") lecturers() { return this.system.listLecturers(); }
+  @Get("lecturers") async lecturers(@CurrentUser() user: any) {
+    const access = await this.rbac.effectiveAccess(user);
+    return this.system.listLecturers(access.permissions.has("catalog.manage"));
+  }
   @Post("lecturers") @RequirePermissions("catalog.manage") createLecturer(@Body() dto: CreateCatalogDto) { return this.system.createLecturer(dto); }
-  @Put("lecturers/:id") @RequirePermissions("catalog.manage") updateLecturer(@Param("id") id: string, @Body() dto: UpdateCatalogDto) { return this.system.updateLecturer(id, dto); }
-  @Delete("lecturers/:id") @RequirePermissions("catalog.manage") removeLecturer(@Param("id") id: string) { return this.system.removeLecturer(id); }
+  @Put("lecturers/:id") @RequirePermissions("catalog.manage") updateLecturer(@Param("id", ParseUUIDPipe) id: string, @Body() dto: UpdateCatalogDto) { return this.system.updateLecturer(id, dto); }
+  @Delete("lecturers/:id") @RequirePermissions("catalog.manage") removeLecturer(@Param("id", ParseUUIDPipe) id: string) { return this.system.removeLecturer(id); }
 
   // ===== Phòng học dùng chung =====
   @Get("rooms") async rooms(

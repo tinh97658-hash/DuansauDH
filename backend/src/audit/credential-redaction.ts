@@ -5,13 +5,17 @@
 export const CREDENTIAL_KEYS = [
   "password", "passwordhash", "passwordresettoken", "resettoken",
   "refreshtoken", "accesstoken", "apikey", "secret", "clientsecret",
-  "sessionsecret", "privatekey", "totpsecret", "mfasecret",
-  "recoverycodes", "backupcodes",
+  "sessionsecret", "sessionversion", "privatekey", "totpsecret", "mfasecret",
+  "recoverycodes", "backupcodes", "dataencryptionkey",
+  "idcardhash", "phonehash", "telnohash",
 ] as const;
 
 const sensitive = new Set<string>(CREDENTIAL_KEYS);
 export function redactCredentials(value: unknown): any {
   if (Array.isArray(value)) return value.map(redactCredentials);
+  if (typeof value === "string" && (value.startsWith("enc:v1:") || value.startsWith("enc:v2:"))) {
+    return "[ENCRYPTED]";
+  }
   if (value === null || typeof value !== "object") return value;
   return Object.fromEntries(Object.entries(value).map(([key, entry]) => [
     key,

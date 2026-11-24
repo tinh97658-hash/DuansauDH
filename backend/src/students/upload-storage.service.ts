@@ -22,7 +22,7 @@ export function validateUpload(file: Express.Multer.File, kind: Kind) {
   const png = starts("89504e470d0a1a0a");
   const webp = data.toString("ascii", 0, 4) === "RIFF" && data.toString("ascii", 8, 12) === "WEBP";
   const zip = starts("504b0304") || starts("504b0506");
-  const ole = starts("d0cf11e0a1b11e1");
+  const ole = starts("d0cf11e0a1b11ae1");
   const valid = [".jpg", ".jpeg"].includes(ext) ? jpeg : ext === ".png" ? png : ext === ".webp" ? webp
     : kind === "photo" ? false : ext === ".pdf" ? data.toString("ascii", 0, 5) === "%PDF-"
     : [".docx", ".xlsx", ".pptx", ".zip"].includes(ext) ? zip

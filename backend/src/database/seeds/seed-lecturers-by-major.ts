@@ -34,6 +34,9 @@ const extraName = (index: number) => {
 };
 
 async function run() {
+  if (process.env.NODE_ENV !== "development") {
+    throw new Error("Refusing to run demo seed outside NODE_ENV=development.");
+  }
   const app = await NestFactory.createApplicationContext(AppModule, { logger: false });
   try {
     const sequelize = app.get<Sequelize>(getConnectionToken());

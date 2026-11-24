@@ -11,6 +11,9 @@ async function run() {
   console.log("[seed-bulk]", options);
   console.table(batches.map(({ model, rows }) => ({ model, count: rows.length })));
   if (preview) { console.log("Preview only: no database connection or writes."); return; }
+  if (process.env.NODE_ENV !== "development") {
+    throw new Error("Refusing to run bulk seed outside NODE_ENV=development.");
+  }
 
   const [{ NestFactory }, { getConnectionToken }, { AppModule }] = await Promise.all([
     import("@nestjs/core"), import("@nestjs/sequelize"), import("../app.module.js"),

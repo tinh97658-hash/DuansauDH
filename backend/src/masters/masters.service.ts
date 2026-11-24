@@ -98,12 +98,12 @@ export class MastersService {
             {
               model: AdmissionRecord,
               as: "admissionRecord",
-              attributes: ["id", "code", "fullName", "dob", "gender", "email", "phone", "extraData", "note"],
+              attributes: ["id", "code", "fullName", "gender", "note"],
             },
             {
               model: Student,
               as: "student",
-              attributes: ["id", "regNo", "fullName", "email", "telNo"],
+              attributes: ["id", "regNo", "fullName"],
             },
           ],
         },

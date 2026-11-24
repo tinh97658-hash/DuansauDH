@@ -20,14 +20,14 @@ export class PermissionsGuard implements CanActivate {
     const actions = this.reflector.getAllAndOverride<Record<string, string>>(ACTION_PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
     const actionPermission = actions && Object.hasOwn(actions, request.body?.action) ? actions[request.body.action] : undefined;
     if (actions && !actionPermission) throw new ForbiddenException("Thao tác không được phép.");
+    const user = request.user;
+    if (!(user instanceof Staff)) throw new ForbiddenException("Bạn không có quyền thực hiện thao tác này");
+
     const profile=workingProfileStorage.getStore();
     // This self-service endpoint must remain available to read-only profiles.
     if (!required.length && !any.length && !actions && request.method==='PATCH'
       && authorizationPath(request.originalUrl||request.url||'')==='/accounts/me/password') return true;
     if (!required.length && !any.length && !actions && (!profile||(['GET','HEAD','OPTIONS'].includes(request.method)&&!permissionRoutesForRequest(request.originalUrl||request.url||'',request.method).length))) return true;
-
-    const user = request.user;
-    if (!(user instanceof Staff)) throw new ForbiddenException("Bạn không có quyền thực hiện thao tác này");
 
     const access = await this.rbac.effectiveAccess(user, !['GET', 'HEAD', 'OPTIONS'].includes(request.method));
     if(!['GET','HEAD','OPTIONS'].includes(request.method)&&access.groupScope?.readOnly)throw new ForbiddenException('Hồ sơ đang ở chế độ Chỉ xem, không được thay đổi dữ liệu.');

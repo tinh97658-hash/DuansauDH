@@ -459,10 +459,13 @@ export class SystemService {
   }
 
   // ===== Giảng viên =====
-  async listLecturers() {
+  async listLecturers(includeContact = false) {
     return this.lecturers.findAll({
+      attributes: includeContact
+        ? { exclude: ["phoneHash"] }
+        : { exclude: ["phone", "phoneHash", "email"] },
       include: [
-        { model: Staff, as: "staff", attributes: ["id", "name", "email"] },
+        { model: Staff, as: "staff", attributes: includeContact ? ["id", "name", "email"] : ["id", "name"] },
         { model: Unit, as: "unit", attributes: ["id", "code", "name", "active"] },
         { model: Discipline, as: "discipline", attributes: ["id", "code", "name"] },
         { model: Major, as: "major", attributes: ["id", "name", "disciplineId", "program"] },

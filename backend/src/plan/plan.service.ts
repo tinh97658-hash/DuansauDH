@@ -11,6 +11,7 @@ import { col, fn, Op, literal, QueryTypes, UniqueConstraintError, where as sqlWh
 import { learnerStudyStatusSql } from "./learner-study-status.js";
 import type { Transaction } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
+import { hashIdCard, hashPhone, isPiiEncryptionEnabled } from "../common/pii-encryption.js";
 import { Major } from "../database/models/common/major.model.js";
 import { Discipline } from "../database/models/common/discipline.model.js";
 import { Staff } from "../database/models/staff.model.js";
@@ -666,9 +667,18 @@ export class PlanService {
     const keyword = search?.trim().slice(0, 100);
     if (keyword) {
       const pattern = `%${keyword}%`;
-      where[Op.or] = ["fullName", "code", "idCard", "phone", "email", "majorName"].map((field) => ({
+      const orClauses: Record<string, any>[] = ["fullName", "code", "email", "majorName"].map((field) => ({
         [field]: { [Op.iLike]: pattern },
       }));
+      if (isPiiEncryptionEnabled()) {
+        const idHash = hashIdCard(keyword);
+        const phoneHashValue = hashPhone(keyword);
+        if (idHash) orClauses.push({ idCardHash: idHash });
+        if (phoneHashValue) orClauses.push({ phoneHash: phoneHashValue });
+      } else {
+        orClauses.push({ idCard: { [Op.iLike]: pattern } }, { phone: { [Op.iLike]: pattern } });
+      }
+      where[Op.or] = orClauses;
     }
 
     const includeMajor = {
@@ -687,7 +697,7 @@ export class PlanService {
     const [result, mastersCount, doctoralCount, eligibleCount] = await Promise.all([
       this.admissionRecordsModel.findAndCountAll({
         where,
-        attributes: { exclude: ["studyStatus", "photo"], include: [[effectiveStatus, "studyStatus"]] },
+        attributes: { exclude: ["studyStatus", "photo", "idCardHash", "phoneHash"], include: [[effectiveStatus, "studyStatus"]] },
         include: [includeMajor],
         order: admissionStage === "learners" ? [
           [literal(`COALESCE(NULLIF(BTRIM("AdmissionRecord"."major_name"), ''), "major"."name", '') COLLATE "vi-x-icu"`), "ASC"],
@@ -757,7 +767,7 @@ export class PlanService {
 
   async getAdmissionRecord(id: string) {
     const record = await this.admissionRecordsModel.findByPk(id, {
-      attributes: { exclude: ["studyStatus"], include: [[literal(learnerStudyStatusSql('"AdmissionRecord"')), "studyStatus"]] },
+      attributes: { exclude: ["studyStatus", "idCardHash", "phoneHash"], include: [[literal(learnerStudyStatusSql('"AdmissionRecord"')), "studyStatus"]] },
       include: [{ model: Major, as: "major", attributes: ["id", "name"] }],
     });
     if (!record) throw new NotFoundException("Không tìm thấy hồ sơ tuyển sinh");
@@ -862,7 +872,7 @@ export class PlanService {
         }
       }
       return this.admissionRecordsModel.findByPk(id, {
-        attributes: { exclude: ["studyStatus"], include: [[literal(learnerStudyStatusSql('"AdmissionRecord"')), "studyStatus"]] },
+        attributes: { exclude: ["studyStatus", "idCardHash", "phoneHash"], include: [[literal(learnerStudyStatusSql('"AdmissionRecord"')), "studyStatus"]] },
         include: [{ model: Major, as: "major", attributes: ["id", "name"] }], transaction,
       });
     });

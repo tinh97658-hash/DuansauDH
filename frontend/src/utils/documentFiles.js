@@ -1,10 +1,16 @@
+export function clearSensitiveSessionStorage() {
+  try {
+    window.sessionStorage.clear();
+  } catch {
+    // Ignore storage access errors in restricted browser modes.
+  }
+}
+
 // Transfer a frozen document to its own tab; session storage also supports reload.
 export function openDocumentPreview({ prefix, path, snapshot, fallbackToCurrentTab = true, reservedTab }) {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const key = `${prefix}${id}`;
   const value = JSON.stringify({ ...snapshot, version: 1 });
-  try { window.sessionStorage.setItem(key, value); }
-  catch { throw new Error("Không thể lưu bản xem trước. Vui lòng cho phép trình duyệt lưu dữ liệu phiên và thử lại."); }
   const url = `${path}?${new URLSearchParams({ preview: id })}`;
   const tab = reservedTab || window.open("about:blank", "_blank");
   if (tab) {
@@ -17,6 +23,8 @@ export function openDocumentPreview({ prefix, path, snapshot, fallbackToCurrentT
       throw new Error("Không thể mở bản xem trước. Vui lòng thử lại.");
     }
   } else if (fallbackToCurrentTab) {
+    try { window.sessionStorage.setItem(key, value); }
+    catch { throw new Error("Không thể lưu bản xem trước. Vui lòng cho phép trình duyệt lưu dữ liệu phiên và thử lại."); }
     window.location.assign(url);
   } else {
     throw new Error("Trình duyệt đã chặn tab xem trước. Vui lòng cho phép mở tab mới và chọn Xuất PDF (.pdf) lại.");

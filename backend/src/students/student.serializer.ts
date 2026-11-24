@@ -10,7 +10,7 @@ const submissionFields = (submissions: any[] = []) => Object.fromEntries(
 
 export const serializeStudent = (model: Student) => {
   const value: any = model.get({ plain: true });
-  const { id, password, passwordResetToken, passwordResetExpires, submissions, approvalState, accountType, dateOfRegistration, dateOfLastSubmission, websiteUrl, ...safe } = value;
+  const { id, password, passwordResetToken, passwordResetExpires, sessionVersion, telNoHash, submissions, approvalState, accountType, dateOfRegistration, dateOfLastSubmission, websiteUrl, ...safe } = value;
   return {
     _id: id,
     ...safe,

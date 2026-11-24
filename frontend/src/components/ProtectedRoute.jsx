@@ -51,7 +51,7 @@ const ProtectedRoute = () => {
   };
   const logoutProfile=async()=>{
     if(profileBusy)return;setProfileBusy(true);setProfileError('');
-    try{await axios.post('/user/logout',{}, {withCredentials:true});setStatus('anonymous');}
+    try{await axios.post('/user/logout',{}, {withCredentials:true});try{window.sessionStorage.clear();}catch{}setStatus('anonymous');}
     catch{setProfileError('Không thể đăng xuất. Vui lòng thử lại.');setProfileBusy(false);}
   };
 

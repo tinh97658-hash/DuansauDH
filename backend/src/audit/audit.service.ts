@@ -3,6 +3,7 @@ import { InjectModel } from "@nestjs/sequelize";
 import { Op, type Transaction } from "sequelize";
 import { AuthAuditLog } from "../database/models/auth-audit-log.model.js";
 import { Staff } from "../database/models/staff.model.js";
+import { redactCredentials } from "./credential-redaction.js";
 
 export interface AuditEntry {
   actorStaffId?: string | null;
@@ -36,7 +37,7 @@ const serialize = (log: AuthAuditLog) => {
     action: value.action,
     actorProfileId:value.actorProfileId,
     actorProfile:value.actorProfile,
-    metadata: value.metadata,
+    metadata: redactCredentials(value.metadata),
     ip: value.ip,
     userAgent: value.userAgent,
     createdAt: value.createdAt,
@@ -54,7 +55,7 @@ export class AuditService {
       actorStaffId: entry.actorStaffId ?? null,
       targetStaffId: entry.targetStaffId ?? null,
       action: entry.action,
-      metadata: entry.metadata ?? null,
+      metadata: entry.metadata ? redactCredentials(entry.metadata) : null,
       ip: entry.ip ?? null,
       userAgent: entry.userAgent ?? null,
     } as any, ...(transaction ? [{ transaction }] : []));

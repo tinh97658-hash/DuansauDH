@@ -11,6 +11,32 @@ import { IsUUID } from 'class-validator';
 import { LogoutOriginGuard } from './logout-origin.guard.js';
 class SelectWorkingProfileDto {@IsUUID() profileId!:string;}
 
+function serializeSessionUser(user: any) {
+  if (!user) return null;
+  if (user instanceof Staff) {
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      mustChangePassword: Boolean(user.mustChangePassword),
+      lastLoginAt: user.lastLoginAt ?? null,
+    };
+  }
+  return {
+    id: user.id,
+    nameWithInitials: user.nameWithInitials,
+    fullName: user.fullName,
+    email: user.email,
+    role: user.role,
+    accountType: user.accountType,
+    approvalState: user.approvalState,
+    regNo: user.regNo,
+    photo: user.photo ?? null,
+  };
+}
+
 @Controller("auth")
 export class AuthController {
   constructor(private readonly config: ConfigService,private readonly rbac:RbacService,private readonly audit:AuditService) {}
@@ -38,7 +64,7 @@ export class AuthController {
   @Get("session")
   session(@Req() request: any) {
     const authenticated = Boolean(request.isAuthenticated?.() && request.user);
-    return { authenticated, user: authenticated ? request.user : null,
+    return { authenticated, user: authenticated ? serializeSessionUser(request.user) : null,
       profiles:authenticated?request.workingProfiles||[]:[],activeProfile:authenticated?request.activeProfile||null:null,
       profileSelectionRequired:authenticated&&request.user instanceof Staff?request.profileSelectionRequired===true:false };
   }

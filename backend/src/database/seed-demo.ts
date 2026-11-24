@@ -19,6 +19,9 @@ import { AppModule } from "../app.module.js";
  *    học viên vào 2 lớp.
  */
 async function run() {
+  if (process.env.NODE_ENV !== "development") {
+    throw new Error("Refusing to run demo seed outside NODE_ENV=development.");
+  }
   const app = await NestFactory.createApplicationContext(AppModule, { logger: false });
   const sequelize = app.get<Sequelize>(getConnectionToken());
   const M = sequelize.models as any;

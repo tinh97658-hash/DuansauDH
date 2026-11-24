@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy } from "passport-local";
 import { AuthService } from "./auth.service.js";
@@ -9,7 +9,10 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     super({ usernameField: "email", passwordField: "password" });
   }
 
-  validate(email: string, password: string) {
+  validate(email: unknown, password: unknown) {
+    if (typeof email !== "string" || typeof password !== "string" || !email.trim() || !password || password.length > 72) {
+      throw new UnauthorizedException("Email hoặc mật khẩu không chính xác");
+    }
     return this.auth.validateLocal(email, password);
   }
 }

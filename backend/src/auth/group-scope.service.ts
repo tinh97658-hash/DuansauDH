@@ -61,7 +61,7 @@ export class GroupScopeService implements OnModuleInit {
       'study-leaves': 'study_leaves', 'learning-results': 'learner_subject_results',
       'subject-recognitions': 'subject_recognitions', 'major-transfers': 'major_transfers',
     };
-    segments.forEach((segment, index) => { if (resourceKinds[segment]) add(resourceKinds[segment], segments[index + 1]); });
+    segments.forEach((segment, index) => { if (Object.hasOwn(resourceKinds, segment)) add(resourceKinds[segment], segments[index + 1]); });
     for (const { kind, id } of checks) {
       const predicate = organizing && ['group', 'record', 'offering'].includes(kind)
         ? kind === 'group' ? 'app_schedule_group_allowed(:id,true)'

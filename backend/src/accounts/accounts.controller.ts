@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentUser } from "../common/auth-user.js";
 import { AuthenticatedGuard } from "../common/authenticated.guard.js";
@@ -73,31 +73,31 @@ export class AccountsController {
 
   @Get(":id")
   @RequirePermissions("account.view")
-  detail(@Param("id") id: string) {
+  detail(@Param("id", ParseUUIDPipe) id: string) {
     return this.accounts.detail(id);
   }
 
   @Put(":id")
   @RequirePermissions("account.manage")
-  update(@CurrentUser() user: any, @Param("id") id: string, @Body() dto: UpdateAccountDto, @Req() request: Request) {
+  update(@CurrentUser() user: any, @Param("id", ParseUUIDPipe) id: string, @Body() dto: UpdateAccountDto, @Req() request: Request) {
     return this.accounts.update(user.id, id, dto, contextFrom(request));
   }
 
   @Patch(":id/status")
   @RequirePermissions("account.manage")
-  updateStatus(@CurrentUser() user: any, @Param("id") id: string, @Body() dto: UpdateAccountStatusDto, @Req() request: Request) {
+  updateStatus(@CurrentUser() user: any, @Param("id", ParseUUIDPipe) id: string, @Body() dto: UpdateAccountStatusDto, @Req() request: Request) {
     return this.accounts.updateStatus(user.id, id, dto, contextFrom(request));
   }
 
   @Post(":id/reset-password")
   @RequirePermissions("account.password.reset")
-  resetPassword(@CurrentUser() user: any, @Param("id") id: string, @Body() dto: ResetAccountPasswordDto, @Req() request: Request) {
+  resetPassword(@CurrentUser() user: any, @Param("id", ParseUUIDPipe) id: string, @Body() dto: ResetAccountPasswordDto, @Req() request: Request) {
     return this.accounts.resetPassword(user.id, id, dto, contextFrom(request));
   }
 
   @Post(":id/revoke-sessions")
   @RequirePermissions("account.manage")
-  revokeSessions(@CurrentUser() user: any, @Param("id") id: string, @Req() request: Request) {
+  revokeSessions(@CurrentUser() user: any, @Param("id", ParseUUIDPipe) id: string, @Req() request: Request) {
     return this.accounts.revokeSessions(user.id, id, contextFrom(request));
   }
 }

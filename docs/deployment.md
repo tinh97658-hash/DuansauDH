@@ -63,6 +63,8 @@ Ví dụ location trong virtual host HTTPS Nginx trên host (domain/chứng ch�
 người vận hành cấu hình):
 
 ```nginx
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
 location / {
     client_max_body_size 25m;
     proxy_pass http://127.0.0.1:8080;

@@ -3,14 +3,17 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   HasMany,
   Model,
   Table,
 } from "sequelize-typescript";
+import { decryptPii, encryptPii, hashPhone } from "../../common/pii-encryption.js";
 import { StaffStudent } from "./staff-student.model.js";
 import { Staff } from "./staff.model.js";
 import { Submission } from "./submission.model.js";
 
+@DefaultScope(() => ({ attributes: { exclude: ["telNoHash"] } }))
 @Table({ tableName: "students", underscored: true, timestamps: true })
 export class Student extends Model {
   @Default(DataType.UUIDV4)
@@ -19,9 +22,31 @@ export class Student extends Model {
 
   @Column({ type: DataType.STRING, allowNull: false, field: "name_with_initials" }) declare nameWithInitials: string;
   @Column({ type: DataType.STRING, allowNull: false, field: "full_name" }) declare fullName: string;
-  @Column({ type: DataType.TEXT, allowNull: false, field: "postal_address" }) declare postalAddress: string;
+  @Column({
+    type: DataType.TEXT,
+    allowNull: false,
+    field: "postal_address",
+    get(this: Student) {
+      return decryptPii(this.getDataValue("postalAddress"), "students:postal_address") ?? "";
+    },
+    set(this: Student, value: string) {
+      this.setDataValue("postalAddress", encryptPii(value, "students:postal_address") ?? "");
+    },
+  }) declare postalAddress: string;
   @Column({ type: DataType.STRING, allowNull: false }) declare email: string;
-  @Column({ type: DataType.STRING, allowNull: false, field: "tel_no" }) declare telNo: string;
+  @Column({
+    type: DataType.TEXT,
+    allowNull: false,
+    field: "tel_no",
+    get(this: Student) {
+      return decryptPii(this.getDataValue("telNo"), "students:tel_no") ?? "";
+    },
+    set(this: Student, value: string) {
+      this.setDataValue("telNo", encryptPii(value, "students:tel_no") ?? "");
+      this.setDataValue("telNoHash", hashPhone(value));
+    },
+  }) declare telNo: string;
+  @Column({ type: DataType.STRING(64), allowNull: true, field: "tel_no_hash" }) declare telNoHash: string | null;
   @Column({ type: DataType.STRING, allowNull: false }) declare password: string;
   @Default(0)
   @Column({ type: DataType.INTEGER, allowNull: false, field: "session_version" }) declare sessionVersion: number;
@@ -53,4 +78,14 @@ export class Student extends Model {
 
   @HasMany(() => Submission)
   declare submissions: Submission[];
+
+  override toJSON() {
+    const values: any = { ...this.get() };
+    delete values.password;
+    delete values.passwordResetToken;
+    delete values.passwordResetExpires;
+    delete values.sessionVersion;
+    delete values.telNoHash;
+    return values;
+  }
 }

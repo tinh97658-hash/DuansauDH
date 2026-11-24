@@ -174,6 +174,9 @@ function generateStudentList(): Record<string, StudentSeedData[]> {
 }
 
 async function run() {
+  if (process.env.NODE_ENV !== "development") {
+    throw new Error("Refusing to run demo seed outside NODE_ENV=development.");
+  }
   console.log("=== BẮT ĐẦU SEED DỮ LIỆU THẠC SĨ CNTT & QTKD (VMU) ===");
   const app = await NestFactory.createApplicationContext(AppModule, { logger: false });
   const sequelize = app.get<Sequelize>(getConnectionToken());
